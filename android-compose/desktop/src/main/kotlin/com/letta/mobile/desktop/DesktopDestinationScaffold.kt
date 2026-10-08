@@ -31,11 +31,17 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
-import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.ui.shell.pages.home.HomePage
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
-import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
+import com.letta.mobile.data.channel.ChannelsPageActions
+import com.letta.mobile.data.channel.ChannelsPageState
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
+import com.letta.mobile.ui.shell.pages.channels.ChannelsRefreshActionSlot
+import com.letta.mobile.ui.shell.pages.channels.ChannelsSearchFieldSlot
+import androidx.compose.material.icons.outlined.Refresh
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.ui.memory.MemoryPage
@@ -109,7 +115,7 @@ internal data class DestinationContentInputs(
     val chat: DesktopChatSurfaceState,
     val memoryState: MemoryPageState,
     val schedule: DestinationScheduleInputs,
-    val channelLibraryState: DesktopChannelLibraryState,
+    val channels: ChannelsPageState,
     val toolLibraryState: DesktopToolLibraryState,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
@@ -132,7 +138,7 @@ internal data class DestinationContentActions(
     val onRetryConnection: () -> Unit,
     val memory: MemoryPageActions,
     val schedules: DestinationScheduleActions,
-    val onChannelsRefresh: () -> Unit,
+    val channels: ChannelsPageActions,
     val tools: DestinationToolsActions,
     val skills: DestinationSkillsActions,
     val onConfigSaved: (LettaConfig) -> Unit,
@@ -204,8 +210,8 @@ internal fun DestinationContent(
             ProvidersDestinationContent(session = session, modifier = modifier)
         }
         DesktopDestination.Channels -> ChannelsDestinationContent(
-            channelLibraryState = inputs.channelLibraryState,
-            onChannelsRefresh = actions.onChannelsRefresh,
+            state = inputs.channels,
+            actions = actions.channels,
             modifier = modifier,
         )
         DesktopDestination.Agents -> AgentsDestinationContent(
@@ -299,16 +305,27 @@ private fun SchedulesDestinationContent(
 
 @Composable
 private fun ChannelsDestinationContent(
-    channelLibraryState: DesktopChannelLibraryState,
-    onChannelsRefresh: () -> Unit,
+    state: ChannelsPageState,
+    actions: ChannelsPageActions,
     modifier: Modifier = Modifier,
 ) {
-    DesktopChannelLibrarySurface(
-        state = channelLibraryState,
-        onRefresh = onChannelsRefresh,
+    ChannelsPage(
+        state = state,
+        actions = actions,
         modifier = modifier,
+        options = ChannelsPageOptions(slots = DesktopChannelsPageSlots),
     )
 }
+
+/** The desktop's compact Jewel search field and icon-only refresh in the shared Channels header. */
+private val DesktopChannelsPageSlots = ChannelsPageSlots(
+    searchField = ChannelsSearchFieldSlot { query, onQueryChange, placeholder, modifier ->
+        DesktopTextField(value = query, onValueChange = onQueryChange, placeholder = placeholder, modifier = modifier)
+    },
+    refreshAction = ChannelsRefreshActionSlot { onRefresh, modifier ->
+        DesktopIconButton(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh", onClick = onRefresh, modifier = modifier)
+    },
+)
 
 @Composable
 private fun AgentsDestinationContent(

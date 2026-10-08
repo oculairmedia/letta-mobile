@@ -200,7 +200,7 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
             focusedAgentId = focus.selectedAgentId,
             canCreateCron = canCreateCron(context, libraries.schedules, focus),
         ),
-        channelLibraryState = libraries.channels,
+        channels = libraries.channels,
         toolLibraryState = libraries.tools,
         skills = DestinationSkillsInputs(
             skills = skillsPanel.all,
@@ -298,7 +298,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
                 selectedAgentId = selectedAgentId,
             ),
         ),
-        onChannelsRefresh = controllers.channels::refresh,
+        channels = controllers.channels,
         tools = DestinationToolsActions(
             onRefresh = controllers.tools::reload,
             onSearchQueryChanged = controllers.tools::updateSearchQuery,

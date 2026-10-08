@@ -109,14 +109,16 @@ private fun DesktopShellNavigationPanes(context: DesktopShellContext, frame: Des
 private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopShellFrame) {
     val navigator = context.navigator
     val focus = frame.focus
+    val recents = rememberRecentRailAgents(
+        frame.chatState.conversations,
+        focus.railAgents,
+        context.core.railPrefs,
+        focus.selectedAgentId,
+    )
     DesktopAgentRail(
         state = DesktopAgentRailState(
-            agents = rememberRecentRailAgents(
-                frame.chatState.conversations,
-                focus.railAgents,
-                context.core.railPrefs,
-                focus.selectedAgentId,
-            ),
+            agents = recents.agents,
+            hiddenAgentCount = recents.hiddenCount,
             focus = DesktopAgentRailFocus(
                 selectedAgentId = focus.selectedAgentId,
                 activityByAgentId = focus.railActivityByAgentId,
@@ -138,7 +140,10 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
             // Contacts-style picker over the persistent-agent
             // roster; agent creation lives inside it.
             onNewSession = { context.overlays.newConversation = true },
+            // The same roster picker lists every agent the recents cut left off the rail.
+            onShowAllAgents = { context.overlays.newConversation = true },
             onToggleExpanded = { navigator.railExpanded = !navigator.railExpanded },
+            onAgentSettings = { navigator.editAgentId = it },
         ),
     )
 }

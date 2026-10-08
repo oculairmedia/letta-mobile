@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.backendIdentity
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -398,6 +399,16 @@ open class CachedSettingsRepository(
     override suspend fun setOpenChatsOnCanvas(enabled: Boolean) {
         preferencesStore.edit { prefs ->
             prefs.putBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS, enabled)
+        }
+    }
+
+    override fun getFeatureFlag(flag: FeatureFlag): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
+        prefs.getBoolean(flag.preferenceKey) ?: flag.defaultEnabled
+    }
+
+    override suspend fun setFeatureFlag(flag: FeatureFlag, enabled: Boolean) {
+        preferencesStore.edit { prefs ->
+            prefs.putBoolean(flag.preferenceKey, enabled)
         }
     }
 

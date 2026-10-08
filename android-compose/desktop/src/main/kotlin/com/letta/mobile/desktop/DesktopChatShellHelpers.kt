@@ -8,7 +8,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.letta.mobile.data.agents.RecentAgents
+import com.letta.mobile.data.agents.RecentAgentsCut
+import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
@@ -93,48 +97,34 @@ internal fun buildRailAgents(
     )
 }
 
-/** Agents used inside this window stay on the rail; older ones live only in the picker. */
-internal val RAIL_RECENCY_WINDOW: java.time.Duration = java.time.Duration.ofDays(RAIL_RECENCY_DAYS_DEFAULT.toLong())
-internal const val RAIL_MAX_AGENTS = 8
+/**
+ * Each agent's activity for the rail's recents cut: its newest conversation. Queued work sorts
+ * newest and an unparseable label oldest, as everywhere on the rail.
+ */
+internal fun railAgentActivity(conversations: List<DesktopConversationSummary>): Map<String, kotlin.time.Instant> =
+    RecentAgents.latestByAgent(
+        conversations.mapNotNull { conversation ->
+            conversation.agentId?.let { it to ShellRailMapping.recency(conversation.updatedAtLabel) }
+        },
+    )
 
 /**
- * The rail is a recents strip, not the whole roster (Grok Bot's layout): agents with a
- * conversation updated inside [RailRecencyPolicy.window], newest first, capped at
- * [RailRecencyPolicy.maxAgents]. The selected agent is always kept so a pick from the
- * directory shows up. With nothing recent (a fresh install), the head of [directory] fills
- * the rail so it is never empty.
+ * The rail is a recents strip, not the whole roster (Grok Bot's layout): the shared
+ * [RecentAgents.cut] over [railAgentActivity] — the same rule the phone's drawer applies
+ * (letta-mobile-c3np7.5.8). The desktop keeps no agent pins. Recomputed only when its inputs change.
  */
-internal fun recentRailAgents(
-    conversations: List<DesktopConversationSummary>,
-    directory: List<Pair<String, String>>,
-    policy: RailRecencyPolicy = RailRecencyPolicy(),
-    selectedAgentId: String? = null,
-): List<Pair<String, String>> {
-    val nameById = directory.toMap()
-    val cutoff = policy.now.minus(policy.window)
-    val recentIds = conversations
-        .filter { !it.agentId.isNullOrBlank() && it.agentId in nameById }
-        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
-        .filter { conversationRecency(it.updatedAtLabel) >= cutoff }
-        .map { it.agentId!! }
-        .distinct()
-    val ids = if (recentIds.isEmpty()) directory.map { it.first } else recentIds
-    val kept = ids.take(policy.maxAgents).toMutableList()
-    if (shouldPinSelectedAgent(selectedAgentId, nameById, kept)) {
-        kept += selectedAgentId!!
-    }
-    return kept.map { it to nameById.getValue(it) }
-}
-
-/** The rail's recents cut, recomputed only when its inputs change. */
 @Composable
 internal fun rememberRecentRailAgents(
     conversations: List<DesktopConversationSummary>,
     directory: List<Pair<String, String>>,
     prefs: DesktopRailPrefs,
     selectedAgentId: String?,
-): List<Pair<String, String>> = remember(conversations, directory, selectedAgentId, prefs.recencyDays) {
-    recentRailAgents(conversations, directory, RailRecencyPolicy(window = prefs.recencyWindow), selectedAgentId)
+): RecentAgentsCut = remember(conversations, directory, selectedAgentId, prefs.recencyDays) {
+    RecentAgents.cut(
+        RecentAgentsInput(directory = directory, lastActiveAt = railAgentActivity(conversations), selectedAgentId = selectedAgentId),
+        kotlin.time.Clock.System.now(),
+        prefs.recencyPolicy,
+    )
 }
 
 /** Each agent's newest conversation, for the rail's hover card. */
@@ -150,20 +140,6 @@ internal fun rememberRailActivityByAgentId(
             RailAgentActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
         }
 }
-
-/** How far back, and how many agents, the recents rail reaches. */
-internal data class RailRecencyPolicy(
-    val now: java.time.Instant = java.time.Instant.now(),
-    val window: java.time.Duration = RAIL_RECENCY_WINDOW,
-    val maxAgents: Int = RAIL_MAX_AGENTS,
-)
-
-/** A selected agent that exists but fell off the recents cut is appended so the pick shows. */
-private fun shouldPinSelectedAgent(
-    selectedAgentId: String?,
-    nameById: Map<String, String>,
-    kept: List<String>,
-): Boolean = selectedAgentId != null && selectedAgentId in nameById && selectedAgentId !in kept
 
 /**
  * The selected stack's conversations under the archive filter, newest first.

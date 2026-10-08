@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.letta.mobile.data.channel.ChannelsPageController
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.commands.SlashCommandsApi
 import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
@@ -19,7 +20,6 @@ import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillsApi
-import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.data.home.HomePageController
@@ -120,7 +120,7 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
 internal class DesktopLibraryControllers(
     val memory: MemoryPageController,
     val schedules: DesktopScheduleLibraryController,
-    val channels: DesktopChannelLibraryController,
+    val channels: ChannelsPageController,
     val tools: DesktopToolLibraryController,
     val home: HomePageController,
 )
@@ -143,7 +143,7 @@ internal fun rememberDesktopLibraryControllers(
         DesktopScheduleLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
     val channels = remember(sessionGraphId, chatScope) {
-        DesktopChannelLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
+        ChannelsPageController.forSession(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
     val tools = remember(sessionGraphId, chatScope) {
         DesktopToolLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)

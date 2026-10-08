@@ -124,7 +124,17 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
             )
         },
+        onNavigateToAppSettings = { navController.navigate(ConfigRoute()) },
+        onOpenCanvas = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
+        onNavigateToChannels = { navController.navigate(ChannelsRoute) },
     )
+}
+
+/** letta-mobile-c3np7.5.7: the shared Channels page, reached from the shared drawer's Channels row. */
+private fun androidx.navigation.NavGraphBuilder.appChannelsGraph(navController: NavHostController) {
+    composable<ChannelsRoute> {
+        com.letta.mobile.ui.screens.channels.ChannelsScreen(onNavigateBack = { navController.popBackStack() })
+    }
 }
 
 private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: NavHostController) {
@@ -297,6 +307,8 @@ fun AppNavGraph(
         appChatGraph(navController)
 
         appCanvasGraph(navController)
+
+        appChannelsGraph(navController)
     }
     }
 

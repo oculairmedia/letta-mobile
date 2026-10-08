@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Surface of [com.letta.mobile.data.repository.SettingsRepository] used by
@@ -99,6 +100,13 @@ interface ISettingsRepository {
      */
     fun getOpenChatsOnCanvas(): Flow<Boolean>
     suspend fun setOpenChatsOnCanvas(enabled: Boolean)
+
+    /**
+     * A Settings preview switch ([FeatureFlag]). Hosts without preference storage report each
+     * flag's default and ignore writes.
+     */
+    fun getFeatureFlag(flag: FeatureFlag): Flow<Boolean> = flowOf(flag.defaultEnabled)
+    suspend fun setFeatureFlag(flag: FeatureFlag, enabled: Boolean) = Unit
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemePreset(themePreset: ThemePreset)
     suspend fun setDynamicColor(enabled: Boolean)

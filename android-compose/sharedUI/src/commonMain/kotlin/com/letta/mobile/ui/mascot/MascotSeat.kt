@@ -93,6 +93,12 @@ fun MascotSeat(
     onDrag: ((dxDp: Float, dyDp: Float) -> Unit)? = null,
     /** Whether a drag starting now goes to [onDrag]; one it turns down is left to what is under it. */
     dragEnabled: () -> Boolean = { true },
+    /**
+     * Without a transport layer, whether the seat draws the live scene or the agent's still
+     * ([MascotInPlace]); a seat that pictures an agent at rest, as the agent panel's hero does,
+     * passes [mascotAtWork] so it shows what every avatar of the agent shows. A layer draws live.
+     */
+    live: Boolean = true,
     empty: @Composable (MascotSeatVacancy) -> Unit,
 ) {
     val transport = LocalMascotTransport.current
@@ -124,7 +130,7 @@ fun MascotSeat(
     ) {
         when {
             !occupancy.available -> empty(MascotSeatVacancy.NO_MASCOT)
-            !transport.layerMounted -> MascotLive(agentId!!, occupancy.shown!!, size = size * overscale, onClick = onClick)
+            !transport.layerMounted -> MascotInPlace(agentId!!, occupancy.shown!!, size = size * overscale, live = live, onClick = onClick)
             !occupancy.standsHere -> empty(MascotSeatVacancy.SEATED_ELSEWHERE)
         }
     }

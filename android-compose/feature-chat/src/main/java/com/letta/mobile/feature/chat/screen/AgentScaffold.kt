@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,27 +57,37 @@ fun AgentScaffold(
     onNavigateToProjects: (() -> Unit)? = null,
     onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -> Unit)? = null,
     viewModelKey: String? = null,
+    onNavigateToAppSettings: (() -> Unit)? = null,
+    onOpenCanvas: ((canvasId: String) -> Unit)? = null,
+    onNavigateToChannels: (() -> Unit)? = null,
 ) {
-    AgentScaffoldContent(
-        initialProjectStartAction = initialProjectStartAction,
-        navigation = AgentScaffoldNavigationCallbacks(
-            onNavigateBack = onNavigateBack,
-            onNavigateToSettings = onNavigateToSettings,
-            onNavigateToArchival = onNavigateToArchival,
-            onNavigateToTools = onNavigateToTools,
-            onNavigateToMemory = onNavigateToMemory,
-            onSwitchConversation = onSwitchConversation,
-            onViewSubagentConversation = onViewSubagentConversation,
-            onNavigateToAdmin = onNavigateToAdmin,
-            onNavigateToProviders = onNavigateToProviders,
-            onNavigateToConversationList = onNavigateToConversationList,
-            onNavigateToSchedules = onNavigateToSchedules,
-            onNavigateToProjects = onNavigateToProjects,
-            onNavigateToCanvas = onNavigateToCanvas,
-        ),
-        conversationRepository = null,
-        viewModel = hiltViewModel(key = viewModelKey),
+    val navigation = AgentScaffoldNavigationCallbacks(
+        onNavigateBack = onNavigateBack,
+        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToArchival = onNavigateToArchival,
+        onNavigateToTools = onNavigateToTools,
+        onNavigateToMemory = onNavigateToMemory,
+        onSwitchConversation = onSwitchConversation,
+        onViewSubagentConversation = onViewSubagentConversation,
+        onNavigateToAdmin = onNavigateToAdmin,
+        onNavigateToProviders = onNavigateToProviders,
+        onNavigateToConversationList = onNavigateToConversationList,
+        onNavigateToSchedules = onNavigateToSchedules,
+        onNavigateToProjects = onNavigateToProjects,
+        onNavigateToCanvas = onNavigateToCanvas,
+        onNavigateToAppSettings = onNavigateToAppSettings,
+        onOpenCanvas = onOpenCanvas,
+        onNavigateToChannels = onNavigateToChannels,
     )
+    // letta-mobile-c3np7.5.5: the shared navigation drawer's binding, for the drawer to pick up.
+    CompositionLocalProvider(LocalSharedNavDrawer provides hiltViewModel<SharedNavDrawerViewModel>()) {
+        AgentScaffoldContent(
+            initialProjectStartAction = initialProjectStartAction,
+            navigation = navigation,
+            conversationRepository = null,
+            viewModel = hiltViewModel(key = viewModelKey),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)

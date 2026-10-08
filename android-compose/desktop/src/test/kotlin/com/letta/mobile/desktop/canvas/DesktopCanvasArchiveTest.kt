@@ -1,8 +1,7 @@
-@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+﻿@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
 package com.letta.mobile.desktop.canvas
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -10,10 +9,10 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.desktop.DesktopAgentSidebar
 import com.letta.mobile.desktop.DesktopAgentSidebarActions
 import com.letta.mobile.desktop.DesktopAgentSidebarState
 import com.letta.mobile.desktop.DesktopDestination
-import com.letta.mobile.desktop.SidebarConversationList
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
@@ -45,12 +44,10 @@ class DesktopCanvasArchiveTest {
         val toggled = mutableListOf<Pair<CanvasId, Boolean>>()
         val canvases = listOf(CanvasDocument(id = CanvasId("a"), title = "Roadmap"), CanvasDocument(id = CanvasId("b"), title = "Old board"))
         setContent {
-            Column {
-                SidebarConversationList(
-                    state = sidebarState(canvases, archived = setOf(CanvasId("b"))),
-                    actions = sidebarActions { id, archived -> toggled += id to archived },
-                )
-            }
+            DesktopAgentSidebar(
+                state = sidebarState(canvases, archived = setOf(CanvasId("b"))),
+                actions = sidebarActions { id, archived -> toggled += id to archived },
+            )
         }
 
         onNodeWithText("Roadmap").performMouseInput { moveTo(center) }

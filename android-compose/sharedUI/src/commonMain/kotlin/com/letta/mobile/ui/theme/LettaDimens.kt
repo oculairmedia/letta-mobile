@@ -109,6 +109,9 @@ object LettaDimens {
         val lg: Dp = 40.dp
         val railSlotWidth: Dp = 48.dp
         val railSlotHeight: Dp = 44.dp
+
+        /** The agent panel's hero seat; the mascot draws across ~60 % of it (~75 dp of character). */
+        val hero: Dp = 124.dp
     }
 
     /**
@@ -162,6 +165,10 @@ object LettaDimens {
 
         /** A settings page's left navigation column on wide windows. */
         val navWidth: Dp = 220.dp
+
+        /** The agent rail: orbs only, and expanded to names (the library). */
+        val railWidth: Dp = 56.dp
+        val railExpandedWidth: Dp = 248.dp
 
         /** Readable width of a settings page's content column. */
         val contentMaxWidth: Dp = 760.dp

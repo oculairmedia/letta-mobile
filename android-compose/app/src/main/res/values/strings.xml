@@ -343,6 +343,8 @@
     <string name="screen_config_haptics_description">Vibrate as the agent streams replies and runs tools. Turn off to silence streaming and tool-call buzzes.</string>
     <string name="screen_config_shared_chat_page">Shared chat page (preview)</string>
     <string name="screen_config_shared_chat_page_description">Use the new chat page shared with desktop. Turn off to return to the current chat screen.</string>
+    <string name="screen_config_shared_nav_drawer">Shared navigation drawer (preview)</string>
+    <string name="screen_config_shared_nav_drawer_description">The chat menu opens the desktop\'s agent rail and agent panel. Turn off to return to the current menu.</string>
     <string name="screen_config_open_chats_on_canvas">Open conversations on the canvas</string>
     <string name="screen_config_open_chats_on_canvas_description">Start each conversation on the canvas with the chat docked below. Turn off to open the traditional full-screen chat instead.</string>
     <string name="screen_config_background_delivery_section">Background delivery</string>
@@ -712,6 +714,7 @@
     <string name="screen_models_search_hint">Search models…</string>
     <string name="screen_models_filter_all">All</string>
     <string name="screen_memory_title">Memory</string>
+    <string name="screen_channels_title">Channels</string>
     <string name="screen_archival_title">Archival Memory</string>
     <string name="screen_archival_search_hint">Search archival memory…</string>
     <string name="screen_archival_add_title">Add Passage</string>

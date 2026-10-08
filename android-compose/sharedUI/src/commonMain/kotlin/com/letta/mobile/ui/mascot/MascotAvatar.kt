@@ -182,7 +182,7 @@ fun MascotLive(
     // requiredSize: an overscaled mascot must exceed its tile so the tile's clip crops it;
     // plain size() is coerced down to the parent's constraints and never overscales.
     Box(
-        modifier = modifier.requiredSize(size).onGloballyPositioned {
+        modifier = modifier.mascotSemantics(identity, live = true).requiredSize(size).onGloballyPositioned {
             val r = it.boundsInWindow()
             bounds = r
             val slot = MascotSlot(agentId, GazeRect(r.left, r.top, r.right, r.bottom))
@@ -202,7 +202,7 @@ fun MascotLive(
  * affordance.
  */
 @Composable
-private fun MascotHitArea(size: Dp, onClick: () -> Unit) {
+internal fun MascotHitArea(size: Dp, onClick: () -> Unit) {
     Box(
         Modifier
             .offset(y = size * BODY_DROP_FRACTION)
@@ -251,7 +251,7 @@ internal fun candidateSceneKey(identity: MascotIdentity): String = "mascot-candi
  * still drive the entry; a list of stills must not register one frame callback per row.
  */
 @Composable
-private fun MascotStill(
+internal fun MascotStill(
     agentId: String,
     identity: MascotIdentity,
     size: Dp,
@@ -259,15 +259,16 @@ private fun MascotStill(
 ) {
     val host = LocalMascotHost.current
     val stills = host.stills
+    val drawn = modifier.mascotSemantics(identity, live = false)
     if (stills != null) {
         // The identity's captured still: an image, no scene. Empty for the moment the one capture
         // of a new identity takes; after that, and on every later launch, it is simply there.
         val image = stills.get(identity)
         LaunchedEffect(stills, identity) { stills.ensure(identity) }
         if (image != null) {
-            Image(image, contentDescription = null, modifier = modifier.requiredSize(size), contentScale = ContentScale.Fit)
+            Image(image, contentDescription = null, modifier = drawn.requiredSize(size), contentScale = ContentScale.Fit)
         } else {
-            Box(modifier.requiredSize(size))
+            Box(drawn.requiredSize(size))
         }
         return
     }
@@ -275,7 +276,7 @@ private fun MascotStill(
     val entry = remember(host, agentId, identity) { host.entry(agentId, identity) } ?: return
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
-    host.Surface(entry, modifier.requiredSize(size), playing = false)
+    host.Surface(entry, drawn.requiredSize(size), playing = false)
 }
 
 /**
@@ -340,11 +341,6 @@ fun MascotAvatar(
         modifier = modifier.size(size).clip(RoundedCornerShape(cornerRadius)).clickableIfSet(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (live) {
-            MascotLive(agentId, identity, size = size * overscale)
-        } else {
-            MascotStill(agentId, identity, size = size * overscale)
-        }
+        MascotInPlace(agentId, identity, size = size * overscale, live = live)
     }
 }
-
