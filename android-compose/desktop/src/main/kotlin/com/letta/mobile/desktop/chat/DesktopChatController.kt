@@ -492,6 +492,15 @@ class DesktopChatController(
         start()
     }
 
+    /**
+     * The machine woke from sleep (letta-mobile-bzvro.4, F04): a connection that is down now is
+     * retried at once rather than after the sustained-outage window.
+     */
+    fun onSystemResumed() {
+        if (closed) return
+        connectionWatcher.onSystemResumed()
+    }
+
     fun close() {
         if (closed) return
         closed = true

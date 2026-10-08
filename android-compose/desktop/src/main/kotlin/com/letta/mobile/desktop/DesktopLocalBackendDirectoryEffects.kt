@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.runtime.LocalBackendDirectoryValidation
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -112,6 +113,8 @@ internal data class DesktopLocalConfigState(
     val providerActions: DesktopLocalRuntimeProviderActions,
     val directoryState: DesktopLocalBackendDirectoryState,
     val directoryActions: DesktopLocalBackendDirectoryActions,
+    /** Health, Force restart and launch settings of the bundled runtime (F03, F05). */
+    val runtime: DesktopLocalRuntimeController,
 )
 
 @Composable
@@ -134,10 +137,19 @@ internal fun rememberDesktopLocalConfigState(
             if (isLocalMode) onRestartRequested()
         },
     )
+    val restartIfLocal by rememberUpdatedState { if (isLocalMode) onRestartRequested() }
+    val runtime = remember(scope, secureSettingsStore) {
+        DesktopLocalRuntimeController(
+            store = secureSettingsStore,
+            scope = scope,
+            onRestartRequested = { restartIfLocal() },
+        )
+    }
     return DesktopLocalConfigState(
         providerState = providerState,
         providerActions = providerActions,
         directoryState = directoryState,
         directoryActions = directoryActions,
+        runtime = runtime,
     )
 }

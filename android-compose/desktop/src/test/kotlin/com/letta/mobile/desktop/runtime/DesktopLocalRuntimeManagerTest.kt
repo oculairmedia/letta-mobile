@@ -108,9 +108,9 @@ class DesktopLocalRuntimeManagerTest {
         val manager = DesktopLocalRuntimeManager(
             installationProvider = { installation },
             backendDirectory = { backend },
-            processLauncher = DesktopRuntimeProcessLauncher { command, environment ->
-                commands += command
-                environments += environment
+            processLauncher = DesktopRuntimeProcessLauncher { spec ->
+                commands += spec.command
+                environments += spec.environment
                 processes.removeFirst()
             },
             logLine = {},
@@ -135,6 +135,7 @@ class DesktopLocalRuntimeManagerTest {
         override fun destroy() { destroyCount += 1; alive = false }
         override fun destroyForcibly() { forceCount += 1; alive = false }
         override fun waitFor(timeoutMs: Long): Boolean = !alive
+        override fun onExit(callback: (exitCode: Int?) -> Unit) = Unit
     }
 
     private class FakeHandle : DesktopRuntimeProcessHandle {

@@ -137,6 +137,40 @@ class DesktopChatControllerConnectionLossTest {
         controller.close()
     }
 
+    @Test
+    fun wakeFromSleepRetriesADroppedConnectionAtOnce() = runTest {
+        // letta-mobile-bzvro.4 (F04): no waiting out the sustained-outage window after a sleep.
+        val gateway = ConnectionAwareFakeGateway()
+        var gatewayBuilds = 0
+        val controller = testController { gatewayBuilds += 1; gateway }
+        controller.start()
+        runCurrent()
+        gateway.states.value = degraded()
+        runCurrent()
+
+        controller.onSystemResumed()
+        runCurrent()
+
+        assertEquals(2, gatewayBuilds, "the dropped connection is rebuilt immediately on wake")
+        assertEquals(0L, testScheduler.currentTime)
+        controller.close()
+    }
+
+    @Test
+    fun wakeWithAHealthyConnectionLeavesItAlone() = runTest {
+        val gateway = ConnectionAwareFakeGateway()
+        var gatewayBuilds = 0
+        val controller = testController { gatewayBuilds += 1; gateway }
+        controller.start()
+        runCurrent()
+
+        controller.onSystemResumed()
+        runCurrent()
+
+        assertEquals(1, gatewayBuilds)
+        controller.close()
+    }
+
     private fun TestScope.testController(
         gatewayFactory: suspend () -> DesktopChatGateway,
     ): DesktopChatController = DesktopChatController(

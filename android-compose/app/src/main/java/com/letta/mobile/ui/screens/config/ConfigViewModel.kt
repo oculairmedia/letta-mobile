@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.letta.mobile.data.api.AppServerConnectionTester
 import com.letta.mobile.data.api.CloudConnectionValidationResult
 import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
@@ -12,6 +13,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
@@ -76,7 +78,21 @@ data class ConfigUiState(
     val refreshError: String? = null,
     val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
+    val connectionTest: ConnectionTestUiState = ConnectionTestUiState.Idle,
 )
+
+/** The server card's "Test connection" result (letta-mobile-bzvro.1, F01). */
+@androidx.compose.runtime.Immutable
+sealed interface ConnectionTestUiState {
+    data object Idle : ConnectionTestUiState
+
+    data object Running : ConnectionTestUiState
+
+    data class Finished(val result: AppServerProbeResult) : ConnectionTestUiState
+
+    /** The URL is an Iroh ticket or not a ws/wss/http/https URL; it is checked when connecting. */
+    data object NotSupported : ConnectionTestUiState
+}
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
@@ -87,6 +103,7 @@ class ConfigViewModel @Inject constructor(
     private val onDeviceModelImporter: OnDeviceModelImporter,
     private val embeddedModelRepository: EmbeddedModelRepository,
     private val endpointOpenAiModelCatalog: EndpointOpenAiModelCatalog,
+    private val appServerConnectionTester: AppServerConnectionTester,
 ) : ViewModel() {
 
     companion object {
@@ -268,22 +285,55 @@ class ConfigViewModel @Inject constructor(
                 }
         }
         _uiState.value = UiState.Success(
-            currentState.copy(hasUnsavedChanges = true, mode = mode, serverUrl = updatedUrl)
+            currentState.copy(
+                hasUnsavedChanges = true,
+                mode = mode,
+                serverUrl = updatedUrl,
+                connectionTest = ConnectionTestUiState.Idle,
+            )
         )
     }
 
     fun updateServerUrl(url: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, serverUrl = url))
+            _uiState.value = UiState.Success(
+                currentState.copy(hasUnsavedChanges = true, serverUrl = url, connectionTest = ConnectionTestUiState.Idle)
+            )
         }
     }
 
     fun updateApiToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, apiToken = token))
+            _uiState.value = UiState.Success(
+                currentState.copy(hasUnsavedChanges = true, apiToken = token, connectionTest = ConnectionTestUiState.Idle)
+            )
         }
+    }
+
+    /**
+     * Probes the self-hosted URL and token in the form, before they are saved (F01). HTTP only:
+     * it never opens a WebSocket, so the live session is not disturbed.
+     */
+    fun testConnection() {
+        val state = (_uiState.value as? UiState.Success)?.data ?: return
+        if (state.mode != ServerMode.SELF_HOSTED || state.connectionTest == ConnectionTestUiState.Running) return
+        val request = ++latestConnectionTest
+        _uiState.value = UiState.Success(state.copy(connectionTest = ConnectionTestUiState.Running))
+        viewModelScope.launch {
+            val result = appServerConnectionTester.test(state.serverUrl.trim(), state.apiToken.trim().ifBlank { null })
+            finishConnectionTest(request, result?.let { ConnectionTestUiState.Finished(it) } ?: ConnectionTestUiState.NotSupported)
+        }
+    }
+
+    private var latestConnectionTest = 0L
+
+    /** Applies [next] only to the latest test, and only if no edit reset it meanwhile (the result would be stale). */
+    private fun finishConnectionTest(request: Long, next: ConnectionTestUiState) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        if (request != latestConnectionTest || current.connectionTest != ConnectionTestUiState.Running) return
+        _uiState.value = UiState.Success(current.copy(connectionTest = next))
     }
 
     fun updateTheme(theme: AppTheme) {

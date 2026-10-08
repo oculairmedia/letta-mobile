@@ -15,6 +15,7 @@ internal class ServerSettingsCallbacks(
     val onModeChange: (ServerMode) -> Unit,
     val onServerUrlChange: (String) -> Unit,
     val onApiTokenChange: (String) -> Unit,
+    val onTestConnection: () -> Unit = {},
 )
 
 /** The on-device model and local provider field edits, shown while the mode is [ServerMode.LOCAL]. */

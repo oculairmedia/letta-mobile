@@ -1,11 +1,15 @@
 package com.letta.mobile.ui.screens.config
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -19,16 +23,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import ca.oculair.meridian.R
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaDimens
 
 // The settings screen's server card: connection mode, server URL and API token.
 
@@ -81,8 +88,73 @@ internal fun ServerSection(
                 },
             )
         }
+        if (state.mode == ServerMode.SELF_HOSTED) {
+            item(
+                headlineContent = {
+                    ConnectionTestRow(
+                        state = state.connectionTest,
+                        enabled = state.serverUrl.isNotBlank(),
+                        onTestConnection = server.onTestConnection,
+                    )
+                },
+            )
+        }
     }
 }
+
+/** "Test connection" for a self-hosted App Server, with the classified result (F01). */
+@Composable
+internal fun ConnectionTestRow(
+    state: ConnectionTestUiState,
+    enabled: Boolean,
+    onTestConnection: () -> Unit,
+) {
+    val running = state == ConnectionTestUiState.Running
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        OutlinedButton(
+            onClick = onTestConnection,
+            enabled = enabled && !running,
+            modifier = Modifier.testTag(CONNECTION_TEST_BUTTON_TAG),
+        ) {
+            Text(
+                stringResource(
+                    if (running) R.string.screen_config_test_connection_running else R.string.screen_config_test_connection,
+                ),
+            )
+        }
+        connectionTestMessage(state)?.let { (message, isError) ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag(CONNECTION_TEST_RESULT_TAG),
+            )
+        }
+    }
+}
+
+@Composable
+private fun connectionTestMessage(state: ConnectionTestUiState): Pair<String, Boolean>? = when (state) {
+    ConnectionTestUiState.Idle, ConnectionTestUiState.Running -> null
+    ConnectionTestUiState.NotSupported -> stringResource(R.string.screen_config_test_connection_not_supported) to false
+    is ConnectionTestUiState.Finished -> when (val result = state.result) {
+        is AppServerProbeResult.Ok -> stringResource(
+            R.string.screen_config_test_connection_ok,
+            result.identity.lettaCodeVersion,
+            result.identity.backend,
+            result.identity.protocolVersion,
+        ) to false
+        is AppServerProbeResult.Authentication ->
+            stringResource(R.string.screen_config_test_connection_authentication, result.detail) to true
+        is AppServerProbeResult.Incompatible ->
+            stringResource(R.string.screen_config_test_connection_incompatible, result.reason) to true
+        is AppServerProbeResult.Unavailable ->
+            stringResource(R.string.screen_config_test_connection_unavailable, result.detail) to true
+    }
+}
+
+internal const val CONNECTION_TEST_BUTTON_TAG = "config_test_connection"
+internal const val CONNECTION_TEST_RESULT_TAG = "config_test_connection_result"
 
 @Composable
 private fun ConnectionModeSelector(

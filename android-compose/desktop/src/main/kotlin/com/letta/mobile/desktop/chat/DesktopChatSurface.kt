@@ -205,6 +205,8 @@ private fun ChatDetailBody(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
+        // F03: says when the bundled runtime crashed, and offers Restart once auto-restart gave up.
+        com.letta.mobile.desktop.DesktopLocalRuntimeBanner()
         if (state.workingDirectorySupported && surface.selectedConversation != null) {
             DesktopWorkingDirectoryRow(
                 path = state.workingDirectory,
@@ -692,11 +694,18 @@ internal fun ChatStatePanel(
  * reads as ordinary, so it counts as a failure regardless of [status].
  */
 internal fun failureHeadline(status: ChatScreenStatus, errorMessage: String?): String? = when {
+    // F02: the connect preflight classified the server; these do not fix themselves by waiting.
+    errorMessage?.startsWith(AUTHENTICATION_FAILED_PREFIX) == true -> "The server rejected the access token"
+    errorMessage?.startsWith(INCOMPATIBLE_SERVER_PREFIX) == true -> "This server is not a compatible App Server"
     status is ChatScreenStatus.BackendOffline -> "Can't reach the backend"
     status is ChatScreenStatus.SendFailed -> "Message wasn't sent"
     errorMessage != null -> "Something went wrong"
     else -> null
 }
+
+// Prefixes of AppServerProbeResult.summary() for the terminal kinds.
+private const val AUTHENTICATION_FAILED_PREFIX = "Authentication failed:"
+private const val INCOMPATIBLE_SERVER_PREFIX = "Incompatible server:"
 
 private fun ChatScreenStatus.heroBody(): String = when (this) {
     is ChatScreenStatus.ConfigNeeded -> "Configure a backend, then ask questions, inspect tools, and continue work across sessions."
