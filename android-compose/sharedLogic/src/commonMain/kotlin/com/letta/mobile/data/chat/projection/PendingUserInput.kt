@@ -23,5 +23,12 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
     return request.takeUnless { answered }
 }
 
-private fun UiApprovalRequest.requiresUserInput(): Boolean =
+/**
+ * letta-mobile-bglj6.1.25: whether this request waits on the person: it carries a runtime
+ * user-input tool (AskUserQuestion). Every other request (a Bash call under approve-all, say) is
+ * resolved by the runtime, even while the projection still holds it as undecided because its tool
+ * has not returned yet, so it must render as its plain tool row, never as an approval card. The
+ * legacy Android chat applied the same gate (ChatApprovals.requiresUserInput).
+ */
+fun UiApprovalRequest.requiresUserInput(): Boolean =
     toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }

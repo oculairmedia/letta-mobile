@@ -124,7 +124,7 @@ internal fun ToolRunGroup(
             )
         }
         if (inline) ToolRunInlineCards(visible = detailsOpen, toolCalls, callbacks)
-        approvals.filter { it.requiresUserInput() }.forEach { ApprovalRequestCard(it, context, callbacks) }
+        approvals.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
         ToolRunDetailsSheet(toolCalls, ToolRunLine(summary, startedAtEpochMs), callbacks) { detailsOpen = false }

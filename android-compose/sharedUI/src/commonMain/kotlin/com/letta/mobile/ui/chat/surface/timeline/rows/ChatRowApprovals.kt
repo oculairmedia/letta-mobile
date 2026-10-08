@@ -37,12 +37,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Terminal
+import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
-import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_approval_body
 import com.letta.mobile.sharedui.resources.rows_approval_requested
@@ -120,12 +120,19 @@ internal fun rememberApprovalDecider(
     }
 }
 
+/**
+ * A timeline row's approval card, drawn only while the request waits on the person
+ * ([requiresUserInput]). letta-mobile-bglj6.1.25: a request the runtime resolves (Bash under
+ * approve-all) stays on its message until the tool returns; it draws nothing here, so the row
+ * reads as its plain tool line, as the legacy Android ApprovalRequestCard did.
+ */
 @Composable
 internal fun ApprovalRequestCard(
     approval: UiApprovalRequest,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
 ) {
+    if (!approval.requiresUserInput()) return
     val decider = rememberApprovalDecider(
         approval = approval,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
@@ -135,19 +142,21 @@ internal fun ApprovalRequestCard(
     // The moment a decision lands on the person: one attention cue per request.
     val haptics = LocalHaptics.current
     LaunchedEffect(approval.requestId) {
-        if (decider.submit != null && approval.requiresUserInput()) haptics.play(LettaHapticCue.ApprovalNeeded)
+        if (decider.submit != null) haptics.play(LettaHapticCue.ApprovalNeeded)
     }
     ApprovalRequestCard(approval, decider)
 }
 
-/** The approval (or its structured AskUserQuestion) with its controls, deciding through [decider]. */
+/**
+ * The approval (or its structured AskUserQuestion) with its controls, deciding through [decider].
+ * Callers pass only a request that waits on the person ([requiresUserInput]); the controls stay
+ * disabled while the owner cannot take approvals.
+ */
 @Composable
 internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalDecider) {
     // A structured AskUserQuestion takes precedence over the generic disclosure.
     if (AskUserQuestionCard(approval, decider)) return
-    // Only runtime user-input tools wait on the user (Android's requiresUserInput); every
-    // other approval is resolved by the runtime, so its card stays read-only, as on desktop.
-    val actionable = decider.submit != null && approval.requiresUserInput()
+    val actionable = decider.submit != null
     ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
         ApprovalCardContent(approval, decider, actionable)
     }
@@ -164,9 +173,6 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
         ApprovalActionRow(approval, decider)
     }
 }
-
-internal fun UiApprovalRequest.requiresUserInput(): Boolean =
-    toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
 
 /**
  * The approval's container: desktop's [ArtifactCard]; on Touch Android's chrome, the title in the

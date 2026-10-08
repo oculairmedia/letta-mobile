@@ -9,6 +9,8 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
@@ -45,6 +47,18 @@ class TouchRowPolishTest {
         val toolLine = message("a-3", "assistant", "").copy(toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = null, toolCallId = "c")))
         assertFalse(showsSpeakerHeader(toolLine, GroupPosition.None))
         assertFalse(showsSpeakerHeader(withImages.copy(isError = true), GroupPosition.None))
+    }
+
+    /** letta-mobile-bglj6.1.25: only an approval that waits on the person makes the row a card. */
+    @Test
+    fun onlyAnApprovalWaitingOnThePersonEarnsASpeakerHeader() {
+        val call = UiToolCall(name = "Bash", arguments = "{}", result = null, toolCallId = "c")
+        fun requesting(tool: String) = message("a-4", "assistant", "").copy(
+            toolCalls = listOf(call),
+            approvalRequest = UiApprovalRequest("req-1", listOf(UiApprovalToolCall("c", tool, "{}"))),
+        )
+        assertFalse(showsSpeakerHeader(requesting("Bash"), GroupPosition.None))
+        assertTrue(showsSpeakerHeader(requesting("AskUserQuestion"), GroupPosition.None))
     }
 
     @Test

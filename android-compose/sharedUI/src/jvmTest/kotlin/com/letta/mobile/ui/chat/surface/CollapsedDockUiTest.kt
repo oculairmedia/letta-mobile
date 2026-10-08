@@ -223,12 +223,24 @@ class CollapsedDockUiTest {
     fun anApprovalShowsANeedsInputChipThatOpensThePanel() = runComposeUiTest {
         val ask = reply.copy(
             content = "",
-            approvalRequest = UiApprovalRequest("req-1", listOf(UiApprovalToolCall("t1", "delete_board", "{}"))),
+            approvalRequest = UiApprovalRequest("req-1", listOf(UiApprovalToolCall("t1", "AskUserQuestion", "{}"))),
         )
         val harness = show(Port(listOf(prompt, ask)))
         onNodeWithTag(DOCK_COLLAPSED_NEEDS_INPUT_TAG).performClick()
         settle()
         assertFalse(harness.geometry.collapsed)
+    }
+
+    /** letta-mobile-bglj6.1.25: a request the runtime resolves (Bash under approve-all) needs nothing from the person. */
+    @Test
+    fun aRuntimeResolvedApprovalShowsNoNeedsInputChip() = runComposeUiTest {
+        val bash = reply.copy(
+            content = "",
+            approvalRequest = UiApprovalRequest("req-1", listOf(UiApprovalToolCall("t1", "Bash", "{}"))),
+        )
+        show(Port(listOf(prompt, bash)))
+        settle()
+        onNodeWithTag(DOCK_COLLAPSED_NEEDS_INPUT_TAG).assertDoesNotExist()
     }
 
     @Test
