@@ -93,12 +93,12 @@ class AppServerMemfsSourceTest {
             }
         }
 
-        assertEquals("---\ndescription: x\n---\nhi", source.read("a", "system/persona.md"))
-        val commit = source.history("a", "system/persona.md").single()
+        assertEquals("---\ndescription: x\n---\nhi", source.read(MemfsFileRef("a", "system/persona.md")))
+        val commit = source.history(MemfsHistoryScope("a", "system/persona.md")).single()
         assertEquals("abcdef1", commit.shortSha)
         assertEquals("Letta", commit.author)
-        assertEquals("diff --git a/x b/x", source.commitDiff("a", "abcdef123"))
-        assertEquals("old", source.fileAtRef("a", "x", "abc"))
+        assertEquals("diff --git a/x b/x", source.commitDiff(MemfsCommitRef("a", "abcdef123")))
+        assertEquals("old", source.fileAtRef(MemfsFileRef("a", "x"), "abc"))
         assertEquals(
             listOf("read_memory_file", "memory_history", "memory_commit_diff", "memory_file_at_ref"),
             transport.sent.map { it.type() },
@@ -111,7 +111,7 @@ class AppServerMemfsSourceTest {
         val (source, _) = source { command ->
             listOf("""{"type":"read_memory_file_response","request_id":"${command.requestId}","content":null,"success":false,"error":"memfs is not enabled for this agent"}""")
         }
-        val error = assertFailsWith<MemfsException> { source.read("a", "system/x.md") }
+        val error = assertFailsWith<MemfsException> { source.read(MemfsFileRef("a", "system/x.md")) }
         assertEquals("memfs is not enabled for this agent", error.message)
     }
 
@@ -120,7 +120,7 @@ class AppServerMemfsSourceTest {
         val (source, transport) = source { command ->
             listOf("""{"type":"write_memory_file_response","request_id":"${command.requestId}","agent_id":"a","path":"p","success":true,"committed":true,"commit_sha":"c0ffee"}""")
         }
-        assertEquals("c0ffee", source.write("a", "system/persona.md", "new"))
+        assertEquals("c0ffee", source.write(MemfsFileRef("a", "system/persona.md"), "new"))
         val sent = transport.sent.single()
         assertEquals("write_memory_file", sent.type())
         assertEquals("new", (sent["content"] as JsonPrimitive).content)

@@ -33,30 +33,30 @@ class AppServerMemfsSource(
         return MemfsListing(enabled = enabled, files = pages.flatMap { page -> page.entries.map(MemoryEntry::toFile) })
     }
 
-    override suspend fun read(agentId: String, path: String): String =
-        single(AppServerMemfsCommand.ReadMemoryFile(requestId("read-memory-file"), agentId, path), ContentResponse.serializer())
+    override suspend fun read(file: MemfsFileRef): String =
+        single(AppServerMemfsCommand.ReadMemoryFile(requestId("read-memory-file"), file.agentId, file.path), ContentResponse.serializer())
             .content.orEmpty()
 
-    override suspend fun write(agentId: String, path: String, content: String): String? {
+    override suspend fun write(file: MemfsFileRef, content: String): String? {
         val response = guarded {
             client().writeMemoryFile(
-                AppServerCommand.WriteMemoryFile(requestId = requestId("write-memory-file"), agentId = agentId, path = path, content = content),
+                AppServerCommand.WriteMemoryFile(requestId = requestId("write-memory-file"), agentId = file.agentId, path = file.path, content = content),
             )
         }
         if (!response.success) throw MemfsException(response.error ?: "The memory file could not be saved.")
         return response.commitSha
     }
 
-    override suspend fun history(agentId: String, path: String?): List<MemfsCommit> =
-        single(AppServerMemfsCommand.MemoryHistory(requestId("memory-history"), agentId, filePath = path), HistoryResponse.serializer())
+    override suspend fun history(scope: MemfsHistoryScope): List<MemfsCommit> =
+        single(AppServerMemfsCommand.MemoryHistory(requestId("memory-history"), scope.agentId, filePath = scope.path), HistoryResponse.serializer())
             .commits.map { MemfsCommit(sha = it.sha, message = it.message, timestamp = it.timestamp, author = it.authorName) }
 
-    override suspend fun commitDiff(agentId: String, sha: String): String =
-        single(AppServerMemfsCommand.MemoryCommitDiff(requestId("memory-commit-diff"), agentId, sha), DiffResponse.serializer())
+    override suspend fun commitDiff(commit: MemfsCommitRef): String =
+        single(AppServerMemfsCommand.MemoryCommitDiff(requestId("memory-commit-diff"), commit.agentId, commit.sha), DiffResponse.serializer())
             .diff.orEmpty()
 
-    override suspend fun fileAtRef(agentId: String, path: String, ref: String): String =
-        single(AppServerMemfsCommand.MemoryFileAtRef(requestId("memory-file-at-ref"), agentId, path, ref), ContentResponse.serializer())
+    override suspend fun fileAtRef(file: MemfsFileRef, ref: String): String =
+        single(AppServerMemfsCommand.MemoryFileAtRef(requestId("memory-file-at-ref"), file.agentId, file.path, ref), ContentResponse.serializer())
             .content.orEmpty()
 
     override suspend fun enable(agentId: String) {

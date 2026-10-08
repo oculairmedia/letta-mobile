@@ -1,9 +1,18 @@
 package com.letta.mobile.data.memory.memfs
 
+/** One agent's memory file: what an editor result is for. */
+data class MemfsFileRef(val agentId: String, val path: String)
+
+/** One agent's history view: a file's commits, or the whole repository's when [path] is null. */
+data class MemfsHistoryScope(val agentId: String, val path: String?)
+
+/** One agent's commit: what a diff result is for. */
+data class MemfsCommitRef(val agentId: String, val sha: String)
+
 /**
  * Pure transitions of [MemfsPageState] (letta-mobile-bzvro.24). The controller performs the I/O
- * and feeds results back through these; every result names the agent and path it was for, and a
- * result for anything no longer on screen leaves the state untouched.
+ * and feeds results back through these; every result names the agent and file, scope or commit it
+ * was for, and a result for anything no longer on screen leaves the state untouched.
  */
 object MemfsPageReducer {
     /** A new agent: everything from the previous one is dropped. */
@@ -13,15 +22,15 @@ object MemfsPageReducer {
     fun listingStarted(state: MemfsPageState): MemfsPageState =
         state.copy(load = if (state.files.isEmpty()) MemfsLoad.Loading else MemfsLoad.Refreshing)
 
-    fun listingLoaded(state: MemfsPageState, agentId: String, listing: MemfsListing): MemfsPageState =
-        if (state.agentId != agentId) {
+    fun listingLoaded(state: MemfsPageState, listing: MemfsAgentListing): MemfsPageState =
+        if (state.agentId != listing.agentId) {
             state
         } else {
-            state.copy(load = MemfsLoad.Loaded, memfsEnabled = listing.enabled, files = listing.files, enabling = false)
+            state.copy(load = MemfsLoad.Loaded, memfsEnabled = listing.listing.enabled, files = listing.listing.files, enabling = false)
         }
 
-    fun listingFailed(state: MemfsPageState, agentId: String, message: String): MemfsPageState =
-        if (state.agentId != agentId) state else state.copy(load = MemfsLoad.Failed(message))
+    fun listingFailed(state: MemfsPageState, failure: MemfsAgentFailure): MemfsPageState =
+        if (state.agentId != failure.agentId) state else state.copy(load = MemfsLoad.Failed(failure.message))
 
     fun withQuery(state: MemfsPageState, query: String): MemfsPageState = state.copy(query = query)
 
@@ -52,16 +61,15 @@ object MemfsPageReducer {
     fun closed(state: MemfsPageState): MemfsPageState = state.copy(editor = null, pendingNavigation = null)
 
     /** The server's content for the open file: replaces both sides, clearing any conflict. */
-    fun fileRead(state: MemfsPageState, agentId: String, path: String, content: String): MemfsPageState =
-        state.updateEditor(agentId, path) { it.copy(original = content, draft = content, loading = false, error = null, conflict = false) }
+    fun fileRead(state: MemfsPageState, file: MemfsFileRef, content: String): MemfsPageState =
+        state.updateEditor(file) { it.copy(original = content, draft = content, loading = false, error = null, conflict = false) }
 
-    fun fileFailed(state: MemfsPageState, agentId: String, path: String, message: String): MemfsPageState =
-        state.updateEditor(agentId, path) { it.copy(loading = false, saving = false, error = message) }
+    fun fileFailed(state: MemfsPageState, file: MemfsFileRef, message: String): MemfsPageState =
+        state.updateEditor(file) { it.copy(loading = false, saving = false, error = message) }
 
     /** The user's edit; ignored while the file is still loading, and for images. */
     fun edited(state: MemfsPageState, text: String): MemfsPageState {
-        val editor = state.editor ?: return state
-        if (editor.loading || editor.isImage) return state
+        val editor = state.editor?.takeIf { it.editable } ?: return state
         return state.copy(editor = editor.copy(draft = text, error = null))
     }
 
@@ -72,8 +80,8 @@ object MemfsPageReducer {
         state.copy(editor = state.editor?.copy(saving = true, error = null))
 
     /** A save succeeded: what was written is now the server's content. */
-    fun saved(state: MemfsPageState, agentId: String, path: String, written: String): MemfsPageState =
-        state.updateEditor(agentId, path) { it.copy(original = written, saving = false, conflict = false) }
+    fun saved(state: MemfsPageState, file: MemfsFileRef, written: String): MemfsPageState =
+        state.updateEditor(file) { it.copy(original = written, saving = false, conflict = false) }
 
     /**
      * The server says [update] changed files. Returns the new state and whether the open file
@@ -81,8 +89,7 @@ object MemfsPageReducer {
      * A push that lands while our own save is in flight is that save's echo, not a conflict.
      */
     fun afterUpdate(state: MemfsPageState, update: MemfsUpdate): Pair<MemfsPageState, Boolean> {
-        val editor = state.editor
-        if (editor == null || editor.isImage || editor.saving || !update.touches(editor.path)) return state to false
+        val editor = state.editor?.takeIf { it.followsServer && update.touches(it.path) } ?: return state to false
         if (editor.dirty) return state.copy(editor = editor.copy(conflict = true)) to false
         return state to true
     }
@@ -98,8 +105,8 @@ object MemfsPageReducer {
         )
     }
 
-    fun historyLoaded(state: MemfsPageState, agentId: String, path: String?, commits: List<MemfsCommit>): MemfsPageState =
-        state.updateHistory(agentId, path) { history ->
+    fun historyLoaded(state: MemfsPageState, scope: MemfsHistoryScope, commits: List<MemfsCommit>): MemfsPageState =
+        state.updateHistory(scope) { history ->
             val keepSelection = history.selectedSha?.takeIf { sha -> commits.any { it.sha == sha } }
             history.copy(
                 commits = commits,
@@ -110,8 +117,8 @@ object MemfsPageReducer {
             )
         }
 
-    fun historyFailed(state: MemfsPageState, agentId: String, path: String?, message: String): MemfsPageState =
-        state.updateHistory(agentId, path) { it.copy(loading = false, error = message) }
+    fun historyFailed(state: MemfsPageState, scope: MemfsHistoryScope, message: String): MemfsPageState =
+        state.updateHistory(scope) { it.copy(loading = false, error = message) }
 
     fun commitSelected(state: MemfsPageState, sha: String): MemfsPageState =
         state.copy(history = state.history.copy(selectedSha = sha, diff = emptyList(), diffLoading = true, diffError = null))
@@ -119,35 +126,31 @@ object MemfsPageReducer {
     fun commitCleared(state: MemfsPageState): MemfsPageState =
         state.copy(history = state.history.copy(selectedSha = null, diff = emptyList(), diffLoading = false, diffError = null))
 
-    fun diffLoaded(state: MemfsPageState, agentId: String, sha: String, diff: List<MemfsFileDiff>): MemfsPageState =
-        state.updateCommit(agentId, sha) { it.copy(diff = diff, diffLoading = false) }
+    fun diffLoaded(state: MemfsPageState, commit: MemfsCommitRef, diff: List<MemfsFileDiff>): MemfsPageState =
+        state.updateCommit(commit) { it.copy(diff = diff, diffLoading = false) }
 
-    fun diffFailed(state: MemfsPageState, agentId: String, sha: String, message: String): MemfsPageState =
-        state.updateCommit(agentId, sha) { it.copy(diffLoading = false, diffError = message) }
+    fun diffFailed(state: MemfsPageState, commit: MemfsCommitRef, message: String): MemfsPageState =
+        state.updateCommit(commit) { it.copy(diffLoading = false, diffError = message) }
 
     fun enabling(state: MemfsPageState): MemfsPageState = state.copy(enabling = true, enableError = null)
 
-    fun enableFailed(state: MemfsPageState, agentId: String, message: String): MemfsPageState =
-        if (state.agentId != agentId) state else state.copy(enabling = false, enableError = message)
+    fun enableFailed(state: MemfsPageState, failure: MemfsAgentFailure): MemfsPageState =
+        if (state.agentId != failure.agentId) state else state.copy(enabling = false, enableError = failure.message)
 
-    private fun MemfsPageState.updateEditor(
-        agentId: String,
-        path: String,
-        change: (MemfsEditor) -> MemfsEditor,
-    ): MemfsPageState {
+    private fun MemfsPageState.updateEditor(file: MemfsFileRef, change: (MemfsEditor) -> MemfsEditor): MemfsPageState {
         val editor = editor
-        return if (this.agentId != agentId || editor?.path != path) this else copy(editor = change(editor))
+        return if (agentId != file.agentId || editor?.path != file.path) this else copy(editor = change(editor))
     }
 
-    private fun MemfsPageState.updateHistory(
-        agentId: String,
-        path: String?,
-        change: (MemfsHistory) -> MemfsHistory,
-    ): MemfsPageState = if (this.agentId != agentId || history.path != path) this else copy(history = change(history))
+    private fun MemfsPageState.updateHistory(scope: MemfsHistoryScope, change: (MemfsHistory) -> MemfsHistory): MemfsPageState =
+        if (agentId != scope.agentId || history.path != scope.path) this else copy(history = change(history))
 
-    private fun MemfsPageState.updateCommit(
-        agentId: String,
-        sha: String,
-        change: (MemfsHistory) -> MemfsHistory,
-    ): MemfsPageState = if (this.agentId != agentId || history.selectedSha != sha) this else copy(history = change(history))
+    private fun MemfsPageState.updateCommit(commit: MemfsCommitRef, change: (MemfsHistory) -> MemfsHistory): MemfsPageState =
+        if (agentId != commit.agentId || history.selectedSha != commit.sha) this else copy(history = change(history))
 }
+
+/** A listing, with the agent it was read for. */
+data class MemfsAgentListing(val agentId: String, val listing: MemfsListing)
+
+/** A failed request, with the agent it was for and why. */
+data class MemfsAgentFailure(val agentId: String, val message: String)

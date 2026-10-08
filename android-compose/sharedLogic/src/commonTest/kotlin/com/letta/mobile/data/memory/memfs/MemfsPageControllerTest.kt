@@ -36,25 +36,25 @@ class MemfsPageControllerTest {
             )
         }
 
-        override suspend fun read(agentId: String, path: String): String {
-            reads += path
-            return contents.getValue(path)
+        override suspend fun read(file: MemfsFileRef): String {
+            reads += file.path
+            return contents.getValue(file.path)
         }
 
-        override suspend fun write(agentId: String, path: String, content: String): String? {
+        override suspend fun write(file: MemfsFileRef, content: String): String? {
             writeGate?.await()
-            writes += path to content
-            contents[path] = content
+            writes += file.path to content
+            contents[file.path] = content
             return "sha"
         }
 
-        override suspend fun history(agentId: String, path: String?): List<MemfsCommit> =
-            listOf(MemfsCommit("aaaaaaa1", "Update ${path ?: "all"}", "2026-10-01T00:00:00Z", "Letta"))
+        override suspend fun history(scope: MemfsHistoryScope): List<MemfsCommit> =
+            listOf(MemfsCommit("aaaaaaa1", "Update ${scope.path ?: "all"}", "2026-10-01T00:00:00Z", "Letta"))
 
-        override suspend fun commitDiff(agentId: String, sha: String): String =
+        override suspend fun commitDiff(commit: MemfsCommitRef): String =
             "diff --git a/system/persona.md b/system/persona.md\n--- a/system/persona.md\n+++ b/system/persona.md\n@@ -1 +1 @@\n-old\n+new"
 
-        override suspend fun fileAtRef(agentId: String, path: String, ref: String): String = "old"
+        override suspend fun fileAtRef(file: MemfsFileRef, ref: String): String = "old"
 
         override suspend fun enable(agentId: String) {
             enabled = true
@@ -279,8 +279,8 @@ class MemfsPageControllerTest {
     fun aResultForAPreviousAgentIsDropped() {
         val state = MemfsPageState(agentId = "agent-2")
         val listing = MemfsListing(enabled = true, files = listOf(MemfsFile("x.md", false, null, 1, MemfsFileKind.Markdown)))
-        assertEquals(state, MemfsPageReducer.listingLoaded(state, "agent-1", listing))
-        assertIs<MemfsPageState>(MemfsPageReducer.fileRead(state, "agent-1", "x.md", "y"))
-        assertNull(MemfsPageReducer.fileRead(state, "agent-1", "x.md", "y").editor)
+        assertEquals(state, MemfsPageReducer.listingLoaded(state, MemfsAgentListing("agent-1", listing)))
+        assertIs<MemfsPageState>(MemfsPageReducer.fileRead(state, MemfsFileRef("agent-1", "x.md"), "y"))
+        assertNull(MemfsPageReducer.fileRead(state, MemfsFileRef("agent-1", "x.md"), "y").editor)
     }
 }

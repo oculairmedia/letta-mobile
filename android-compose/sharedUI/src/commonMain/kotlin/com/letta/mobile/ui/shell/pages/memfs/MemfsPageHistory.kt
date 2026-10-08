@@ -66,7 +66,7 @@ internal fun MemfsCommitList(page: MemfsPageScope) {
             }
         }
         history.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(LettaDimens.Space.lg)) }
-        if (!history.loading && history.error == null && history.commits.isEmpty()) {
+        if (history.hasNoCommits) {
             MemfsDetailHint(NO_COMMITS)
         }
         LazyColumn(contentPadding = HistoryPadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
@@ -121,7 +121,7 @@ internal fun MemfsDiffPane(page: MemfsPageScope) {
         }
         if (history.diffLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
         history.diffError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(LettaDimens.Space.lg)) }
-        if (!history.diffLoading && history.diffError == null && history.diff.isEmpty()) MemfsDetailHint(EMPTY_COMMIT)
+        if (history.hasEmptyDiff) MemfsDetailHint(EMPTY_COMMIT)
         LazyColumn(contentPadding = HistoryPadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
             items(history.diff, key = { it.path }) { file -> FileDiff(file) }
         }

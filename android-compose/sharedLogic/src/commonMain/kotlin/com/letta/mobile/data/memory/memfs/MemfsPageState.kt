@@ -36,9 +36,15 @@ data class MemfsEditor(
     val conflict: Boolean = false,
     val isImage: Boolean = false,
 ) {
-    val dirty: Boolean get() = !loading && !isImage && draft != original
+    /** Text that has finished loading; images and files still loading take no edits. */
+    val editable: Boolean get() = !loading && !isImage
+
+    val dirty: Boolean get() = editable && draft != original
 
     val canSave: Boolean get() = dirty && !saving
+
+    /** Whether a server push may touch this editor: not an image, and not mid-save (its echo). */
+    val followsServer: Boolean get() = !isImage && !saving
 }
 
 /** The commit list, for one file ([path]) or the whole repository (null), and one commit's diff. */
@@ -55,6 +61,17 @@ data class MemfsHistory(
 ) {
     val selectedCommit: MemfsCommit?
         get() = selectedSha?.let { sha -> commits.firstOrNull { it.sha == sha } }
+
+    /** The history loaded fine and is empty. */
+    val hasNoCommits: Boolean get() = settled(loading, error) && commits.isEmpty()
+
+    /** The selected commit's diff loaded fine and touched no files. */
+    val hasEmptyDiff: Boolean get() = settled(diffLoading, diffError) && diff.isEmpty()
+
+    /** Whether the History view still needs its first load. */
+    val needsFirstLoad: Boolean get() = commits.isEmpty() && !loading
+
+    private fun settled(loading: Boolean, error: String?): Boolean = !loading && error == null
 }
 
 /** A step the unsaved-changes guard is holding until the user discards or keeps their draft. */
@@ -64,7 +81,8 @@ sealed interface MemfsNavigation {
 
     data object Close : MemfsNavigation
 
-    data class SwitchAgent(val agentId: String) : MemfsNavigation
+    /** [agentId] null shows no agent. */
+    data class SwitchAgent(val agentId: String?) : MemfsNavigation
 }
 
 /** Everything the shared MemFS page draws (letta-mobile-bzvro.24). */

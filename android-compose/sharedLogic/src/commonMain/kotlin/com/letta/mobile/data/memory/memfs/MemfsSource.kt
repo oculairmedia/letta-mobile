@@ -14,19 +14,19 @@ interface MemfsSource {
     suspend fun list(agentId: String): MemfsListing
 
     /** The file exactly as stored, frontmatter included: what an editor must round-trip. */
-    suspend fun read(agentId: String, path: String): String
+    suspend fun read(file: MemfsFileRef): String
 
-    /** Writes and commits [content] at [path]; returns the commit sha when one was made. */
-    suspend fun write(agentId: String, path: String, content: String): String?
+    /** Writes and commits [content] to [file]; returns the commit sha when one was made. */
+    suspend fun write(file: MemfsFileRef, content: String): String?
 
-    /** Commits touching [path] (every commit when null), newest first. */
-    suspend fun history(agentId: String, path: String?): List<MemfsCommit>
+    /** Commits touching the scope's file (every commit when it names none), newest first. */
+    suspend fun history(scope: MemfsHistoryScope): List<MemfsCommit>
 
-    /** The patch of commit [sha]. */
-    suspend fun commitDiff(agentId: String, sha: String): String
+    /** The patch of [commit]. */
+    suspend fun commitDiff(commit: MemfsCommitRef): String
 
-    /** [path] as it was at [ref]. */
-    suspend fun fileAtRef(agentId: String, path: String, ref: String): String
+    /** [file] as it was at [ref]. */
+    suspend fun fileAtRef(file: MemfsFileRef, ref: String): String
 
     suspend fun enable(agentId: String)
 
