@@ -170,9 +170,12 @@ class SharedNavDrawerBindingTest {
     fun openingTheDrawerRefreshesTheFleetConversationsAndSurvivesFailure() = runTest(mainDispatcherRule.dispatcher) {
         coEvery { allConversations.refreshIfStale(any()) } throws IllegalStateException("offline")
         val vm = viewModel()
+        backgroundScope.launch { vm.agentActivity.collect {} }
         vm.refreshAgentActivity()
         advanceUntilIdle()
         coVerify { allConversations.refreshIfStale(any()) }
+        // The failed refresh leaves the rail's activity as it was.
+        assertEquals(emptyMap<String, Instant>(), vm.agentActivity.value)
     }
 
     private fun conversation(id: String, agentId: String, lastMessageAt: String) =
