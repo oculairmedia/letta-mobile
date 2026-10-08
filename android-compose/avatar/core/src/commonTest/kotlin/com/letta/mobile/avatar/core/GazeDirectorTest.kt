@@ -1,6 +1,7 @@
 package com.letta.mobile.avatar.core
 
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -226,7 +227,9 @@ class GazeDirectorTest {
         val ticks = 3750 // 60 s at 16 ms
         repeat(ticks) {
             val pose = g.tick(0.016f, AvatarState.IDLE, GazeWorld())
-            if (abs(pose.lookX) > 0.2f) offAxis++
+            // Off-axis is where the face points (eyes riding the head), any direction; asides are
+            // biased right / up now (ContentGaze.aside), so a pure |x| count would miss the rises.
+            if (hypot(pose.lookX + pose.headX, pose.lookY + pose.headY) > 0.2f) offAxis++
         }
         assertTrue(offAxis > ticks / 2, "straight ahead should be the exception: $offAxis / $ticks off-axis")
     }

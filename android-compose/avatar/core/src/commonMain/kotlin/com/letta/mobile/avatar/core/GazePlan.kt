@@ -27,8 +27,9 @@ data class GazeLook(
 )
 
 /**
- * Per-state justified attention. Numbers are the bench's `GAZE_PLAN` (ms)
- * converted to seconds — do not retune here without retuning the spike.
+ * Per-state justified attention. Numbers began as the bench's `GAZE_PLAN` (ms) converted to
+ * seconds; the at-work rows (THINKING / WORKING / SPEAKING) are product-tuned to follow the content
+ * (letta-mobile-bglj6.1) and no longer match the spike.
  */
 object GazePlan {
     val byState: Map<AvatarState, List<GazeLook>> = mapOf(
@@ -49,25 +50,30 @@ object GazePlan {
             GazeLook(GazeTarget.CURSOR, 10, 1f..2f),
             GazeLook(GazeTarget.PEER, 5, 1f..2.5f),
         ),
+        // At work (thinking, running tools, streaming) the eyes belong on the content being written:
+        // the timeline's live edge, up and to the right of the companion (letta-mobile-bglj6.1 device
+        // feedback - the old plan spent 65 % of thinking parked aside, half of it to the left). The
+        // asides that remain go right and up (ContentGaze.aside). Short gaps keep the look on the work.
         AvatarState.THINKING to listOf(
-            GazeLook(GazeTarget.AWAY, 40, 3f..8f),
-            GazeLook(GazeTarget.OWN, 25, 3f..8f),
-            GazeLook(GazeTarget.TIMELINE, 25, 2f..5f),
-            GazeLook(GazeTarget.PEER, 10, 1.5f..3f),
+            GazeLook(GazeTarget.TIMELINE, 60, 3f..7f, 0.3f..1.2f),
+            GazeLook(GazeTarget.AWAY, 20, 2f..5f),
+            GazeLook(GazeTarget.OWN, 15, 2f..5f),
+            GazeLook(GazeTarget.PEER, 5, 1.5f..3f),
         ),
         // WORKING looks at its work: the timeline where the tool output is landing.
         AvatarState.WORKING to listOf(
-            GazeLook(GazeTarget.TIMELINE, 45, 2f..5f),
-            GazeLook(GazeTarget.AWAY, 25, 2f..6f),
-            GazeLook(GazeTarget.OWN, 20, 2f..5f),
-            GazeLook(GazeTarget.PEER, 10, 1.5f..3f),
+            GazeLook(GazeTarget.TIMELINE, 65, 3f..7f, 0.3f..1.2f),
+            GazeLook(GazeTarget.AWAY, 15, 2f..5f),
+            GazeLook(GazeTarget.OWN, 15, 2f..5f),
+            GazeLook(GazeTarget.PEER, 5, 1.5f..3f),
         ),
+        // SPEAKING streams the reply: it reads what it writes, glancing at you now and then.
         AvatarState.SPEAKING to listOf(
-            GazeLook(GazeTarget.USER, 45, 2.5f..6f, 0.3f..1.5f),
-            GazeLook(GazeTarget.TIMELINE, 25, 1.5f..4f),
-            GazeLook(GazeTarget.AWAY, 15, 1.5f..3.5f),
-            GazeLook(GazeTarget.CURSOR, 10, 1f..2f),
-            GazeLook(GazeTarget.PEER, 5, 1f..2.5f),
+            GazeLook(GazeTarget.TIMELINE, 60, 3f..7f, 0.3f..1.2f),
+            GazeLook(GazeTarget.USER, 20, 1.5f..3.5f, 0.3f..1.5f),
+            GazeLook(GazeTarget.AWAY, 10, 1.5f..3.5f),
+            GazeLook(GazeTarget.CURSOR, 7, 1f..2f),
+            GazeLook(GazeTarget.PEER, 3, 1f..2.5f),
         ),
         AvatarState.WAITING_INPUT to listOf(
             GazeLook(GazeTarget.USER, 70, 4f..9f, 0.3f..1f),
