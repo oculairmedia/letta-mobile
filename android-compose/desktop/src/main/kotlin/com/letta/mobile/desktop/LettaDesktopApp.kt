@@ -2,6 +2,7 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,6 +12,7 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.workspace.DesktopWorkspaceFileViewerHost
 import dev.nucleusframework.application.NucleusApplicationScope
 import java.awt.Window
 import kotlinx.coroutines.flow.StateFlow
@@ -46,8 +48,11 @@ internal fun LettaDesktopApp(
     val frame = rememberDesktopShellFrame(context, chatState)
     DesktopShellEffects(context, frame, conversationTabs)
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
+    val workingDirectory by context.core.chatController.selectedConversationWorkingDirectory.collectAsState()
     DesktopMaterialTheme {
-        DesktopShellWindowContent(context, frame)
+        DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
+            DesktopShellWindowContent(context, frame)
+        }
         DesktopShellHeaderChrome(context, frame, conversationTabs, onHeaderChromeChange)
     }
 }
