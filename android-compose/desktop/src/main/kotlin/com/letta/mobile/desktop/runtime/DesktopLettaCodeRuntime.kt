@@ -93,6 +93,7 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     )
 
     // Concurrent so the supervisor can read it from process threads without this object's monitor.
+    @Suppress("NoProcessGlobalMutableState") // This object is the one per-process runtime host; the set is its own state.
     private val owners: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     @Suppress("NoDetachedCoroutineLifecycle") // Lives as long as the desktop process, like this object.

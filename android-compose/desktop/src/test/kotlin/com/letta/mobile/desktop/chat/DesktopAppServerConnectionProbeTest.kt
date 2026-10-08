@@ -31,15 +31,17 @@ class DesktopAppServerConnectionProbeTest {
 
     @Test
     fun preflightLetsTransientFailuresAndUnprobeableUrlsDial() = runTest {
-        preflightDesktopAppServer("ws://h:1", null, DesktopAppServerProbe { _, _ -> AppServerProbeResult.Unavailable("refused") })
-        preflightDesktopAppServer("iroh://ticket", null, DesktopAppServerProbe { _, _ -> null })
-        preflightDesktopAppServer("ws://h:1", null, DesktopAppServerProbe { _, _ -> ok })
+        var probed = 0
+        fun probe(result: AppServerProbeResult?) = DesktopAppServerProbe { _, _ ->
+            probed++
+            result
+        }
+        preflightDesktopAppServer("ws://h:1", null, probe(AppServerProbeResult.Unavailable("refused")))
+        preflightDesktopAppServer("iroh://ticket", null, probe(null))
+        preflightDesktopAppServer("ws://h:1", null, probe(ok))
         // An App Server older than the HTTP discovery route: the socket handshake decides.
-        preflightDesktopAppServer(
-            "ws://h:1",
-            null,
-            DesktopAppServerProbe { _, _ -> AppServerProbeResult.Incompatible("HTTP 404", endpointMissing = true) },
-        )
+        preflightDesktopAppServer("ws://h:1", null, probe(AppServerProbeResult.Incompatible("HTTP 404", endpointMissing = true)))
+        assertEquals(4, probed, "every URL was probed and none of the outcomes stopped the dial")
     }
 
     @Test
