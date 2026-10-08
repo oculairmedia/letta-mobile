@@ -43,7 +43,7 @@ class WorkspaceFilesControllersTest {
     @Test
     fun anAtMentionSearchesTheWorkingDirectoryAfterTheDebounce() = runTest {
         val (controller, source) = mentions()
-        controller.onDraftChanged("look at @ma", cwd = "/work/repo")
+        controller.onDraftChanged(MentionDraft("look at @ma", "/work/repo"))
         assertTrue(controller.state.value.loading)
         advanceTimeBy(FileMentionController.DEFAULT_DEBOUNCE.inWholeMilliseconds - 1)
         runCurrent()
@@ -63,9 +63,9 @@ class WorkspaceFilesControllersTest {
     @Test
     fun typingFastSendsOnlyTheLastQuery() = runTest {
         val (controller, source) = mentions()
-        controller.onDraftChanged("@s", "/work/repo")
-        controller.onDraftChanged("@sr", "/work/repo")
-        controller.onDraftChanged("@src/u", "/work/repo")
+        controller.onDraftChanged(MentionDraft("@s", "/work/repo"))
+        controller.onDraftChanged(MentionDraft("@sr", "/work/repo"))
+        controller.onDraftChanged(MentionDraft("@src/u", "/work/repo"))
         advanceTimeBy(500)
         runCurrent()
         assertEquals(listOf<Pair<String, String?>>("src/u" to "/work/repo"), source.searches)
@@ -76,10 +76,10 @@ class WorkspaceFilesControllersTest {
     fun aSlowSearchForAnOldQueryIsDropped() = runTest {
         val source = FakeWorkspace().apply { gate = CompletableDeferred() }
         val (controller, _) = mentions(source)
-        controller.onDraftChanged("@READ", "/work/repo")
+        controller.onDraftChanged(MentionDraft("@READ", "/work/repo"))
         advanceTimeBy(300)
         runCurrent()
-        controller.onDraftChanged("@READ", "/work/other")
+        controller.onDraftChanged(MentionDraft("@READ", "/work/other"))
         source.gate!!.complete(Unit)
         advanceTimeBy(300)
         runCurrent()
@@ -90,10 +90,10 @@ class WorkspaceFilesControllersTest {
     @Test
     fun leavingTheMentionClearsTheSuggestions() = runTest {
         val (controller, _) = mentions()
-        controller.onDraftChanged("@ma", "/work/repo")
+        controller.onDraftChanged(MentionDraft("@ma", "/work/repo"))
         advanceTimeBy(300)
         runCurrent()
-        controller.onDraftChanged("@main.kt and more", "/work/repo")
+        controller.onDraftChanged(MentionDraft("@main.kt and more", "/work/repo"))
         assertNull(controller.state.value.query)
         assertTrue(controller.state.value.results.isEmpty())
     }
@@ -101,7 +101,7 @@ class WorkspaceFilesControllersTest {
     @Test
     fun aFailedSearchSaysWhy() = runTest {
         val (controller, _) = mentions(FakeWorkspace().apply { failSearch = "The App Server did not answer in time." })
-        controller.onDraftChanged("@x", "/work/repo")
+        controller.onDraftChanged(MentionDraft("@x", "/work/repo"))
         advanceTimeBy(300)
         runCurrent()
         assertEquals("The App Server did not answer in time.", controller.state.value.error)

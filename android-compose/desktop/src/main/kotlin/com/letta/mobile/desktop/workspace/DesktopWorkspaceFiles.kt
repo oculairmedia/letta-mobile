@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.workspace.AppServerWorkspaceFileSource
 import com.letta.mobile.data.workspace.FileMentionController
+import com.letta.mobile.data.workspace.MentionDraft
 import com.letta.mobile.data.workspace.WorkspaceFileOpener
 import com.letta.mobile.data.workspace.WorkspaceFileSource
 import com.letta.mobile.data.workspace.WorkspaceFileViewerController
@@ -47,7 +48,7 @@ internal fun DesktopWorkspaceFileViewerHost(
 internal fun rememberDesktopFileMentions(scope: CoroutineScope, draft: String, workingDirectory: String?): List<Mentionable> {
     val mentions = remember(scope) { FileMentionController(DesktopWorkspaceSources().files(), scope) }
     DisposableEffect(mentions) { onDispose { mentions.close() } }
-    LaunchedEffect(mentions, draft, workingDirectory) { mentions.onDraftChanged(draft, workingDirectory) }
+    LaunchedEffect(mentions, draft, workingDirectory) { mentions.onDraftChanged(MentionDraft(draft, workingDirectory)) }
     val state by mentions.state.collectAsState()
     return state.results
 }

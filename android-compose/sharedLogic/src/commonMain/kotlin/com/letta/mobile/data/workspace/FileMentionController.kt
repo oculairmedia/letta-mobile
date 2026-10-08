@@ -31,21 +31,31 @@ data class FileMentionState(
     val error: String? = null,
 )
 
+/** The composer's draft and the directory its `@` mentions search. */
+@Immutable
+data class MentionDraft(val text: String, val cwd: String?)
+
+/** One workspace search: what was typed after `@`, and where. */
+@Immutable
+data class MentionSearch(val query: String, val cwd: String?)
+
 /** Pure transitions of [FileMentionState]; a result for a query no longer typed is dropped. */
 object FileMentionReducer {
-    /** The query of the draft's active `@` mention, or null. */
-    fun mentionQuery(draft: String): String? =
-        ComposerAutocomplete.activeToken(draft)?.takeIf { it.trigger == AutocompleteTrigger.Mention }?.query
+    /** The search for the draft's active `@` mention, or null when the cursor is not in one. */
+    fun searchFor(draft: MentionDraft): MentionSearch? =
+        ComposerAutocomplete.activeToken(draft.text)
+            ?.takeIf { it.trigger == AutocompleteTrigger.Mention }
+            ?.let { MentionSearch(it.query, draft.cwd) }
 
     /** A new query: the previous results stay up until the new ones land, so the list does not blink. */
-    fun queried(state: FileMentionState, query: String?, cwd: String?): FileMentionState =
-        if (query == null) FileMentionState() else state.copy(query = query, cwd = cwd, loading = true, error = null)
+    fun queried(state: FileMentionState, search: MentionSearch?): FileMentionState =
+        if (search == null) FileMentionState() else state.copy(query = search.query, cwd = search.cwd, loading = true, error = null)
 
-    fun found(state: FileMentionState, query: String, cwd: String?, paths: List<String>): FileMentionState =
-        if (!state.isFor(query, cwd)) state else state.copy(results = paths.map(::mentionable), loading = false)
+    fun found(state: FileMentionState, search: MentionSearch, paths: List<String>): FileMentionState =
+        if (!state.isFor(search)) state else state.copy(results = paths.map(::mentionable), loading = false)
 
-    fun failed(state: FileMentionState, query: String, cwd: String?, message: String): FileMentionState =
-        if (!state.isFor(query, cwd)) state else state.copy(results = emptyList(), loading = false, error = message)
+    fun failed(state: FileMentionState, search: MentionSearch, message: String): FileMentionState =
+        if (!state.isFor(search)) state else state.copy(results = emptyList(), loading = false, error = message)
 
     /** A workspace file as a mention: named by its file name, inserted as its path. */
     fun mentionable(path: String): Mentionable = Mentionable(
@@ -56,7 +66,7 @@ object FileMentionReducer {
         insertText = path,
     )
 
-    private fun FileMentionState.isFor(query: String, cwd: String?): Boolean = this.query == query && this.cwd == cwd
+    private fun FileMentionState.isFor(search: MentionSearch): Boolean = query == search.query && cwd == search.cwd
 }
 
 /**
@@ -76,23 +86,23 @@ class FileMentionController(
 
     private var searchJob: Job? = null
 
-    fun onDraftChanged(draft: String, cwd: String?) {
-        val query = FileMentionReducer.mentionQuery(draft)
+    fun onDraftChanged(draft: MentionDraft) {
+        val search = FileMentionReducer.searchFor(draft)
         val current = stateFlow.value
-        if (query == current.query && cwd == current.cwd) return
+        if (search?.query == current.query && draft.cwd == current.cwd) return
         searchJob?.cancel()
-        stateFlow.update { FileMentionReducer.queried(it, query, cwd) }
-        if (query == null) return
+        stateFlow.update { FileMentionReducer.queried(it, search) }
+        if (search == null) return
         searchJob = scope.launch {
             delay(debounce)
             try {
-                val paths = source.search(query, cwd, limit)
-                stateFlow.update { FileMentionReducer.found(it, query, cwd, paths) }
+                val paths = source.search(search.query, search.cwd, limit)
+                stateFlow.update { FileMentionReducer.found(it, search, paths) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 val message = (error as? WorkspaceFileException)?.message ?: "File search failed."
-                stateFlow.update { FileMentionReducer.failed(it, query, cwd, message) }
+                stateFlow.update { FileMentionReducer.failed(it, search, message) }
             }
         }
     }
