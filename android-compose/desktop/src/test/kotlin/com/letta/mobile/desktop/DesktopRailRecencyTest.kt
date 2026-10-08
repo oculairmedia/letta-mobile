@@ -97,6 +97,14 @@ class DesktopRailRecencyTest {
     }
 
     @Test
+    fun `only the selected agent being recent still fills the rail from the directory`() {
+        val conversations = listOf(conversation("1", "c", daysAgo = 0))
+        val rail = recentRailAgents(conversations, directory, RecentAgentsPolicy(maxAgents = 2), selectedAgentId = "c")
+        assertEquals(listOf("a", "b", "c"), rail.agents.map { it.first })
+        assertEquals(1, rail.hiddenCount)
+    }
+
+    @Test
     fun `the every-agent preference widens the window but keeps the cap`() {
         val conversations = listOf(conversation("1", "d", daysAgo = 400), conversation("2", "b", daysAgo = 200))
         val rail = recentRailAgents(conversations, directory, RecentAgentsPolicy.forDays(0))

@@ -33,7 +33,8 @@ data class ShellNavDrawerInput(
     val agents: List<Pair<String, String>> = emptyList(),
     /** Each agent's latest activity, for the recents cut. */
     val agentLastActiveAt: Map<String, Instant> = emptyMap(),
-    val recentAgentsPolicy: RecentAgentsPolicy = RecentAgentsPolicy(),
+    /** Full by default: the phone's activity signal is thin, so the strip tops up to the cap. */
+    val recentAgentsPolicy: RecentAgentsPolicy = RecentAgentsPolicy(fillToCap = true),
     /** The favourite agent stays on the rail like a pinned one. */
     val favoriteAgentId: String? = null,
     /** Mascot identities by agent id (the rail's orbs and the panel's hero). */
@@ -79,13 +80,15 @@ object ShellNavDrawerMapping {
         return ShellNavDrawerState(rail = rail, panel = panel)
     }
 
-    /** The rail's agents: the shared recents cut, keeping pins, the favourite and the focused agent. */
+    /**
+     * The rail's agents: the shared recents cut, keeping pins and the favourite. The focused agent
+     * heads the panel instead, so it neither takes a rail slot nor counts as hidden.
+     */
     fun recentAgents(input: ShellNavDrawerInput, now: Instant): RecentAgentsCut =
         RecentAgents.cut(
             RecentAgentsInput(
-                directory = input.agents,
+                directory = input.agents.filter { (id, _) -> id != input.agent.agentId },
                 lastActiveAt = input.agentLastActiveAt,
-                selectedAgentId = input.agent.agentId,
                 pinnedAgentIds = input.pinnedAgentIds + listOfNotNull(input.favoriteAgentId),
             ),
             now,

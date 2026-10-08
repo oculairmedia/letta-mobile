@@ -6,7 +6,10 @@ import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.FeatureFlag
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.MainDispatcherRule
@@ -16,9 +19,11 @@ import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -41,8 +46,14 @@ class SharedNavDrawerBindingTest {
     private val settings = FakeSettingsRepository()
     private val canvasStore: CanvasDocumentStore = mockk(relaxed = true)
     private val conversations: IConversationRepository = mockk(relaxed = true)
+    private val fleetConversations = MutableStateFlow<List<Conversation>>(emptyList())
+    private val allConversations: IAllConversationsRepository = mockk(relaxed = true) {
+        every { this@mockk.conversations } returns fleetConversations
+    }
 
-    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, conversations)
+    private val now = Instant.parse("2026-10-17T12:00:00Z")
+
+    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, conversations, allConversations)
 
     @Test
     fun followsTheSettingsFlag() = runTest(mainDispatcherRule.dispatcher) {
@@ -109,16 +120,63 @@ class SharedNavDrawerBindingTest {
         }
         val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
             .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a12", pinnedAgentIds = setOf("a11")))
-        val state = ShellNavDrawerMapping.state(input, Instant.parse("2026-10-17T12:00:00Z"))
+        val state = ShellNavDrawerMapping.state(input, now)
         // Pins and the favourite first, then the eight newest; the focused agent heads the panel, not the rail.
         assertEquals(
-            listOf("Agent 11", "Agent 12", "Agent 2", "Agent 3", "Agent 4", "Agent 5", "Agent 6", "Agent 7", "Agent 8"),
+            listOf("Agent 11", "Agent 12") + (2..9).map { "Agent $it" },
             state.rail.entries.map { it.name },
         )
-        // a9 and a10 fell off the strip; the rail's "+N" reaches them through the agent switcher.
-        assertEquals(2, state.rail.hiddenAgentCount)
+        // Only a10 fell off the strip; the rail's "All agents" reaches it through the agent switcher.
+        assertEquals(1, state.rail.hiddenAgentCount)
     }
 
+    @Test
+    fun aRosterWithNoTimestampsStillFillsTheRail() {
+        // The device report: 139 agents and no activity on their records gave the rail one orb and "99+".
+        val agents = (1..139).map { Agent(id = AgentId("a$it"), name = "Agent $it") }
+        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
+            .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a50"))
+        val rail = ShellNavDrawerMapping.state(input, now).rail
+        assertEquals(listOf("Agent 50") + (2..9).map { "Agent $it" }, rail.entries.map { it.name })
+        assertEquals(138 - 9, rail.hiddenAgentCount)
+    }
+
+    @Test
+    fun conversationActivityOrdersTheRailAheadOfTheAgentRecords() = runTest(mainDispatcherRule.dispatcher) {
+        val vm = viewModel()
+        backgroundScope.launch { vm.agentActivity.collect {} }
+        fleetConversations.value = listOf(
+            conversation("c1", "a7", lastMessageAt = "2026-10-17T11:00:00Z"),
+            conversation("c2", "a5", lastMessageAt = "2026-10-17T10:00:00Z"),
+            conversation("c3", "a7", lastMessageAt = "2026-10-10T10:00:00Z"),
+        )
+        advanceUntilIdle()
+        assertEquals(
+            mapOf("a7" to Instant.parse("2026-10-17T11:00:00Z"), "a5" to Instant.parse("2026-10-17T10:00:00Z")),
+            vm.agentActivity.value,
+        )
+        // a3's record is newer than a5's conversation but older than a7's.
+        val agents = (1..10).map { n ->
+            Agent(id = AgentId("a$n"), name = "Agent $n", updatedAt = "2026-10-17T10:30:00Z".takeIf { n == 3 })
+        }
+        val input = ShellNavDrawerInput(agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"))
+            .withRoster(SharedDrawerRoster(agents = agents, conversationActivity = vm.agentActivity.value))
+        val rail = ShellNavDrawerMapping.state(input, now).rail
+        assertEquals(listOf("Agent 7", "Agent 3", "Agent 5", "Agent 2", "Agent 4", "Agent 6", "Agent 8", "Agent 9"), rail.entries.map { it.name })
+        assertEquals(1, rail.hiddenAgentCount)
+    }
+
+    @Test
+    fun openingTheDrawerRefreshesTheFleetConversationsAndSurvivesFailure() = runTest(mainDispatcherRule.dispatcher) {
+        coEvery { allConversations.refreshIfStale(any()) } throws IllegalStateException("offline")
+        val vm = viewModel()
+        vm.refreshAgentActivity()
+        advanceUntilIdle()
+        coVerify { allConversations.refreshIfStale(any()) }
+    }
+
+    private fun conversation(id: String, agentId: String, lastMessageAt: String) =
+        Conversation(id = ConversationId(id), agentId = AgentId(agentId), lastMessageAt = lastMessageAt)
     @Test
     fun sectionsNavigateToTheAndroidPages() {
         val calls = mutableListOf<String>()

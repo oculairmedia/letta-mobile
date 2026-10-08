@@ -74,8 +74,9 @@ class ShellAgentRailTest {
                 )
             }
         }
-        onNodeWithText("+5").assertExists()
-        onNodeWithContentDescription("All agents").performClick()
+        // An "All agents" button, not a count bubble: the count is only in its description.
+        onNodeWithContentDescription("All agents (5 more)").performClick()
+        onNodeWithText("+5").assertDoesNotExist()
         assertEquals(1, opened)
     }
 
@@ -94,7 +95,9 @@ class ShellAgentRailTest {
         onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()
         hidden = 120
         waitForIdle()
-        onNodeWithText("99+").assertExists()
+        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertExists()
+        onNodeWithContentDescription("All agents", substring = true).assertExists()
+        onNodeWithText("99+").assertDoesNotExist()
         action = null
         waitForIdle()
         onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()

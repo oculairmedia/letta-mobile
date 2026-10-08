@@ -76,6 +76,21 @@ class ShellNavDrawerTest {
     }
 
     @Test
+    fun aLargeRosterWithOnlyTheFocusedAgentActiveStillFillsTheRail() {
+        // The device report: ~139 agents, activity only on the focused one, gave one orb and "99+".
+        val roster = (1..138).map { "a$it" to "Agent $it" }
+        val bigInput = input.copy(
+            agents = listOf("meridian" to "Meridian") + roster,
+            agentLastActiveAt = mapOf("meridian" to now - 1.hours, "a40" to now - 20.days),
+            pinnedAgentIds = setOf("meridian"),
+        )
+        val rail = ShellNavDrawerMapping.state(bigInput, now).rail
+        // Eight orbs, newest activity first then roster order; the focused agent is neither an orb nor hidden.
+        assertEquals(listOf("Agent 40") + (1..7).map { "Agent $it" }, rail.entries.map { it.name })
+        assertEquals(138 - 8, rail.hiddenAgentCount)
+    }
+
+    @Test
     fun theArchiveFilterAppliesToConversations() {
         val active = ShellNavDrawerMapping.state(input, now).panel.conversations
         val archived = ShellNavDrawerMapping.state(input.copy(archiveFilter = ShellArchiveFilter.Archived), now).panel.conversations

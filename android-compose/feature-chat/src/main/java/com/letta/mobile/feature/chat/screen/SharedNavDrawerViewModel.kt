@@ -3,9 +3,11 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.repository.api.FeatureFlag
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
@@ -15,9 +17,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Instant
 
 /**
  * The shared navigation drawer's binding for the chat scaffold; null (tests, hosts without Hilt)
@@ -35,6 +39,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
     private val conversationRepository: IConversationRepository,
+    private val allConversations: IAllConversationsRepository,
 ) : ViewModel() {
 
     val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
@@ -43,6 +48,14 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     /** Agents pinned to Home; the rail orbs' menu pins and unpins them. */
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
+
+    /**
+     * Each agent's newest conversation activity across the fleet, for the rail's recents cut. An
+     * agent's own record rarely carries a last run, so this is the rail's main recency signal.
+     */
+    val agentActivity: StateFlow<Map<String, Instant>> = allConversations.conversations
+        .map { RecentAgents.lastActiveAtFromConversations(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     private val _canvases = MutableStateFlow<List<CanvasDocument>>(emptyList())
     val canvases: StateFlow<List<CanvasDocument>> = _canvases.asStateFlow()
@@ -54,6 +67,13 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     fun refreshCanvases() {
         viewModelScope.launch {
             _canvases.value = runCatchingNonCancel { canvasStore.listAll() } ?: _canvases.value
+        }
+    }
+
+    /** Brings the fleet's conversation list up to date (a cached list stays); the drawer calls it each time it opens. */
+    fun refreshAgentActivity() {
+        viewModelScope.launch {
+            runCatchingNonCancel { allConversations.refreshIfStale(ACTIVITY_MAX_AGE_MS) }
         }
     }
 
@@ -93,5 +113,6 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private companion object {
         const val TAG = "SharedNavDrawer"
         const val STOP_TIMEOUT_MS = 5_000L
+        const val ACTIVITY_MAX_AGE_MS = 60_000L
     }
 }

@@ -110,7 +110,7 @@ internal data class DesktopAgentRailState(
     val expanded: Boolean = false,
     /** The fleet Home page is showing; its rail icon draws selected. */
     val homeSelected: Boolean = false,
-    /** Agents the shared recents cut left off the rail (the "+N" control). */
+    /** Agents the shared recents cut left off the rail (behind the "All agents" button). */
     val hiddenAgentCount: Int = 0,
 )
 
@@ -123,7 +123,7 @@ internal data class DesktopAgentRailActions(
     val onHome: () -> Unit = {},
     /** An orb's right-click "Agent settings": edits that agent. */
     val onAgentSettings: ((String) -> Unit)? = null,
-    /** The rail's "+N": the full agent directory. */
+    /** The rail's "All agents" button: the full agent directory. */
     val onShowAllAgents: (() -> Unit)? = null,
 )
 

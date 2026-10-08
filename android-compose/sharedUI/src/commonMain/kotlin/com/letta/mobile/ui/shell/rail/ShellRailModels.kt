@@ -66,7 +66,7 @@ data class ShellAgentRailState(
 /**
  * What the rail asks its host to do. The orb menu (desktop: right-click, touch: long-press) always
  * offers Open; Pin / Unpin and Agent settings show when the host supplies them (null: it cannot).
- * [onShowAllAgents] opens the host's full agent list, reached from the rail's "+N" control.
+ * [onShowAllAgents] opens the host's full agent list, reached from the rail's "All agents" button.
  */
 data class ShellAgentRailActions(
     val onAgentSelected: (String) -> Unit = {},

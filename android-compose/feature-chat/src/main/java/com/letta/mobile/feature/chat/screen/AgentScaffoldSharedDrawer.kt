@@ -24,6 +24,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * Sections Android has no page for yet: their rows stay out of the drawer until it does.
@@ -41,11 +42,22 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val canvases by drawer.canvases.collectAsStateWithLifecycle()
     val archiveFilter by drawer.archiveFilter.collectAsStateWithLifecycle()
     val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
+    val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
     val open = state.drawerState.isOpen
-    LaunchedEffect(open) { if (open) drawer.refreshCanvases() }
-    val roster = remember(state.switchableAgents, state.favoriteAgentId, pinnedAgentIds) {
-        SharedDrawerRoster(agents = state.switchableAgents, favoriteAgentId = state.favoriteAgentId, pinnedAgentIds = pinnedAgentIds)
+    LaunchedEffect(open) {
+        if (open) {
+            drawer.refreshCanvases()
+            drawer.refreshAgentActivity()
+        }
+    }
+    val roster = remember(state.switchableAgents, state.favoriteAgentId, pinnedAgentIds, agentActivity) {
+        SharedDrawerRoster(
+            agents = state.switchableAgents,
+            favoriteAgentId = state.favoriteAgentId,
+            pinnedAgentIds = pinnedAgentIds,
+            conversationActivity = agentActivity,
+        )
     }
     val input = ShellNavDrawerInput(
         agent = ShellPanelAgent(name = state.agentName.ifBlank { "Agent" }, agentId = state.agentIdValue),
@@ -68,20 +80,23 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     }
 }
 
-/** Android's agents as the drawer's rail sees them: the roster, its pins and its favourite. */
+/** Android's agents as the drawer's rail sees them: the roster, its pins, its favourite and their activity. */
 internal data class SharedDrawerRoster(
     val agents: List<Agent>,
     val favoriteAgentId: String? = null,
     val pinnedAgentIds: Set<String> = emptySet(),
+    /** Each agent's newest conversation across the fleet ([SharedNavDrawerViewModel.agentActivity]). */
+    val conversationActivity: Map<String, Instant> = emptyMap(),
 )
 
 /**
  * The whole roster goes in; [ShellNavDrawerMapping] cuts it to the desktop rail's recents strip
- * ([RecentAgents.cut]) using each agent's own last run / update as its activity.
+ * ([RecentAgents.cut]). An agent's activity is the newest of its conversations and its own record's
+ * last run / update; agents with none still fill the strip to its cap, in roster order.
  */
 internal fun ShellNavDrawerInput.withRoster(roster: SharedDrawerRoster): ShellNavDrawerInput = copy(
     agents = roster.agents.map { it.id.value to it.name },
-    agentLastActiveAt = RecentAgents.lastActiveAt(roster.agents),
+    agentLastActiveAt = RecentAgents.merge(roster.conversationActivity, RecentAgents.lastActiveAt(roster.agents)),
     favoriteAgentId = roster.favoriteAgentId,
     pinnedAgentIds = roster.pinnedAgentIds,
 )
@@ -108,7 +123,7 @@ internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: S
         },
         onHome = { closeDrawerAndRun(state) { navigation.onNavigateToAdmin?.invoke() } },
         onNewSession = openAgentSwitcher,
-        // The rail is a recents strip; "+N" opens the agent switcher, which lists every agent.
+        // The rail is a recents strip; "All agents" opens the agent switcher, which lists every agent.
         onShowAllAgents = openAgentSwitcher,
         // The orb's long-press menu: pin to Home, and that agent's settings.
         onAgentPinnedChange = drawer::setAgentPinned,

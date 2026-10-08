@@ -45,13 +45,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.lettaFadingEdges
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellHoverCard
 import com.letta.mobile.ui.shell.ShellRowMenus
@@ -135,7 +134,7 @@ private fun RailHeaderRow(onClick: () -> Unit, label: String?, icon: @Composable
 
 /**
  * The orbs, lazy and scrolling so a long roster never pushes New off-screen; the edges fade while it
- * scrolls. When the recents cut left agents out, a "+N" control after the orbs opens the full list.
+ * scrolls. When the recents cut left agents out, an "All agents" button after the orbs opens the full list.
  */
 @Composable
 private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, hiddenAgentCount: Int, actions: ShellAgentRailActions) {
@@ -161,36 +160,33 @@ private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, hiddenAg
     }
 }
 
-/** The rail's way to every agent the recents cut left out: "+N", opening the host's full agent list. */
+/**
+ * The rail's way to every agent the recents cut left out: an "All agents" grid button, opening the
+ * host's full agent list. How many are left out is in its description and tooltip, not on its face.
+ */
 @Composable
 private fun AllAgentsButton(hiddenAgentCount: Int, onClick: () -> Unit) {
-    LocalShellChromeDecorations.current.tooltip(ALL_AGENTS) {
-        Box(
-            modifier = Modifier
-                .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
-                .testTag(ShellAgentRailTags.ALL_AGENTS),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(LettaDimens.Control.iconButton)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable(onClickLabel = ALL_AGENTS, onClick = onClick)
-                    .semantics { contentDescription = ALL_AGENTS },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = if (hiddenAgentCount > MAX_COUNT_SHOWN) "$MAX_COUNT_SHOWN+" else "+$hiddenAgentCount",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-        }
+    Box(
+        modifier = Modifier
+            .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
+            .testTag(ShellAgentRailTags.ALL_AGENTS),
+        contentAlignment = Alignment.Center,
+    ) {
+        RailCircleButton(
+            RailCircleButtonStyle(
+                icon = LettaIcons.Apps,
+                description = allAgentsDescription(hiddenAgentCount),
+                diameter = LettaDimens.Control.iconButton,
+                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            onClick = onClick,
+        )
     }
 }
+
+/** "All agents (N more)": the control's description and tooltip. */
+internal fun allAgentsDescription(hiddenAgentCount: Int): String = "$ALL_AGENTS ($hiddenAgentCount more)"
 
 /** Fades whichever edge of the rail list has more to scroll to (about one orb's worth). */
 @Composable
@@ -335,7 +331,6 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
 }
 
 private const val ALL_AGENTS = "All agents"
-private const val MAX_COUNT_SHOWN = 99
 private const val FADE_MS = 250
 private const val ORBIT_MS = 1200
 private const val FULL_TURN = 360f
