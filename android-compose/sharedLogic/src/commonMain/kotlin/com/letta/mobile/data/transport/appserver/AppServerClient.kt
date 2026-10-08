@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Typed client for one Letta Code App Server process.
@@ -187,6 +188,14 @@ interface AppServerClient {
     /** Reads the runtime's full per-conversation working-directory map (`get_cwd_map`). */
     suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
         throw UnsupportedOperationException("GetCwdMap is not supported by this client")
+
+    /**
+     * letta-mobile-bzvro.24–.26: sends an agent-workspace command (MemFS, secrets, device files)
+     * and returns the raw envelopes of the frames that answer it: one frame, or every page up to
+     * `done: true` for an [AppServerWorkspaceCommand.isStreamed] command.
+     */
+    suspend fun workspaceRequest(command: AppServerWorkspaceCommand): List<JsonObject> =
+        throw UnsupportedOperationException("${command.responseType} is not supported by this client")
 
     // Channels host ownership (lgns8.23). CONTROLLER-INTERNAL: only
     // ChannelRestoreCoordinator calls these; the responses carry cleartext
@@ -450,6 +459,19 @@ class DefaultAppServerClient(
 
     override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.GetCwdMapResponse }) { transport.sendControl(command) }
+
+    override suspend fun workspaceRequest(command: AppServerWorkspaceCommand): List<JsonObject> {
+        val match: (AppServerInboundFrame) -> AppServerInboundFrame.Unknown? = { frame ->
+            (frame as? AppServerInboundFrame.Unknown)?.takeIf { it.type == command.responseType }
+        }
+        val send: suspend () -> Unit = { transport.sendControl(command) }
+        val frames = if (command.isStreamed) {
+            registry.requestStream(command.requestId, match, { isFinalWorkspaceFrame(it.raw) }, send)
+        } else {
+            listOf(registry.request(command.requestId, match, send))
+        }
+        return frames.map { it.raw }
+    }
 
     override suspend fun channelsList(command: AppServerCommand.ChannelsList): AppServerInboundFrame.ChannelsListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelsListResponse }) { transport.sendControl(command) }

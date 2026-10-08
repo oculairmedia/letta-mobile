@@ -7,6 +7,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +32,7 @@ internal class AppServerRequestRegistry(
     private val timeoutMs: Long = DEFAULT_REQUEST_TIMEOUT_MS,
 ) {
     private val lock = SynchronizedObject()
-    private val pending = LinkedHashMap<String, PendingRequest<*>>()
+    private val pending = LinkedHashMap<String, Pending>()
     private var collectorJob: Job? = null
     private var failed = false
 
@@ -53,7 +54,7 @@ internal class AppServerRequestRegistry(
             val frame = received.frame
             val requestId = frame.requestId ?: return@collect
             val entry = synchronized(lock) { pending[requestId] }
-            if (entry != null && entry.complete(frame)) {
+            if (entry != null && entry.offer(frame)) {
                 synchronized(lock) { pending.remove(requestId) }
             }
         }
@@ -71,9 +72,44 @@ internal class AppServerRequestRegistry(
         requestId: String,
         response: (AppServerInboundFrame) -> T?,
         send: suspend () -> Unit,
-    ): T = coroutineScope {
+    ): T {
         val deferred = CompletableDeferred<T>()
-        val entry = PendingRequest(deferred, response)
+        return awaitRegistered(requestId, PendingRequest(deferred, response), send) {
+            withTimeout(timeoutMs.milliseconds) { deferred.await() }
+        }
+    }
+
+    /**
+     * A request the server answers with several frames sharing one request_id, the last of
+     * which [isFinal] recognises (letta-mobile-bzvro.24: `list_memory` pages carry `done`).
+     * Returns every matched frame in arrival order. [timeoutMs] bounds the wait for EACH frame,
+     * so a long listing that keeps producing pages is never cut off, while a stalled one
+     * surfaces [AppServerRequestTimeoutException] instead of a partial result.
+     */
+    suspend fun <T : AppServerInboundFrame> requestStream(
+        requestId: String,
+        response: (AppServerInboundFrame) -> T?,
+        isFinal: (T) -> Boolean,
+        send: suspend () -> Unit,
+    ): List<T> {
+        val entry = PendingStream(response, isFinal)
+        return awaitRegistered(requestId, entry, send) {
+            buildList {
+                while (true) {
+                    val next = withTimeout(timeoutMs.milliseconds) { entry.frames.receiveCatching() }
+                    next.exceptionOrNull()?.let { throw it }
+                    add(next.getOrNull() ?: break)
+                }
+            }
+        }
+    }
+
+    private suspend fun <R> awaitRegistered(
+        requestId: String,
+        entry: Pending,
+        send: suspend () -> Unit,
+        await: suspend () -> R,
+    ): R = coroutineScope {
         synchronized(lock) {
             check(!failed) { "generation already failed" }
             check(requestId !in pending) {
@@ -88,9 +124,7 @@ internal class AppServerRequestRegistry(
 
         try {
             send()
-            withTimeout(timeoutMs.milliseconds) {
-                deferred.await()
-            }
+            await()
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             // Must precede the CancellationException clause below:
             // TimeoutCancellationException IS a CancellationException, and
@@ -138,11 +172,19 @@ internal class AppServerRequestRegistry(
         failAll(CancellationException("registry cancelled"))
     }
 
+    /** One registered request_id awaiting its response frame(s). */
+    private interface Pending {
+        /** Offers a frame carrying this request_id; true once the request has its last frame. */
+        fun offer(frame: AppServerInboundFrame): Boolean
+
+        fun fail(cause: Throwable)
+    }
+
     private class PendingRequest<T : AppServerInboundFrame>(
         private val deferred: CompletableDeferred<T>,
         private val response: (AppServerInboundFrame) -> T?,
-    ) {
-        fun complete(frame: AppServerInboundFrame): Boolean {
+    ) : Pending {
+        override fun offer(frame: AppServerInboundFrame): Boolean {
             val typed = response(frame)
             return if (typed != null) {
                 deferred.complete(typed)
@@ -152,10 +194,29 @@ internal class AppServerRequestRegistry(
             }
         }
 
-        fun fail(cause: Throwable) {
+        override fun fail(cause: Throwable) {
             if (deferred.isActive) {
                 deferred.completeExceptionally(cause)
             }
+        }
+    }
+
+    private class PendingStream<T : AppServerInboundFrame>(
+        private val response: (AppServerInboundFrame) -> T?,
+        private val isFinal: (T) -> Boolean,
+    ) : Pending {
+        val frames = Channel<T>(Channel.UNLIMITED)
+
+        override fun offer(frame: AppServerInboundFrame): Boolean {
+            val typed = response(frame) ?: return false
+            frames.trySend(typed)
+            val last = isFinal(typed)
+            if (last) frames.close()
+            return last
+        }
+
+        override fun fail(cause: Throwable) {
+            frames.close(cause)
         }
     }
 
