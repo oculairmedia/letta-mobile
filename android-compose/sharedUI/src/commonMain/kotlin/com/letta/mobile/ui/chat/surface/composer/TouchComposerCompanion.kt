@@ -93,8 +93,9 @@ internal fun TouchCompanionSlot(model: ComposerModel) {
  */
 @Composable
 internal fun companionIndicatorShowing(uiState: ChatUiState): Boolean {
-    val agentId = uiState.agentId
-    if (!LocalComposerCompanion.current || agentId == null || !mascotAvailable(agentId)) return false
+    if (!LocalComposerCompanion.current) return false
+    val agentId = uiState.agentId ?: return false
+    if (!mascotAvailable(agentId)) return false
     return companionWorking(uiState, LocalMascotRegistry.current.presence[agentId])
 }
 
