@@ -38,13 +38,7 @@ class AppServerDiscovery(private val http: HttpClient) {
                 error = "app-server-info HTTP ${response.status.value}",
             )
         }
-        val raw = AppServerProtocol.json.parseToJsonElement(body) as? JsonObject
-            ?: return AppServerInboundFrame.AppServerInfoResponse(HTTP_REQUEST_ID, success = false, error = "app-server-info body is not an object")
-        // The body has the frame's shape but no request_id of ours; give it one so it decodes.
-        val framed = JsonObject(raw + mapOf("request_id" to kotlinx.serialization.json.JsonPrimitive(HTTP_REQUEST_ID)))
-        return AppServerProtocol.json.decodeFromJsonElement(AppServerInboundFrame.serializer(), framed)
-            as? AppServerInboundFrame.AppServerInfoResponse
-            ?: AppServerInboundFrame.AppServerInfoResponse(HTTP_REQUEST_ID, success = false, error = "app-server-info body is not an info response")
+        return decodeAppServerInfoBody(body)
     }
 
     private suspend fun probe(baseUrl: String, path: String): Boolean =
@@ -58,6 +52,20 @@ class AppServerDiscovery(private val http: HttpClient) {
 
     companion object {
         private const val HTTP_REQUEST_ID = "http-app-server-info"
+
+        /**
+         * Decodes a `/app-server-info` body. A body that is not a JSON object or not an info
+         * response reads as an unsuccessful response; malformed JSON throws.
+         */
+        internal fun decodeAppServerInfoBody(body: String): AppServerInboundFrame.AppServerInfoResponse {
+            val raw = AppServerProtocol.json.parseToJsonElement(body) as? JsonObject
+                ?: return AppServerInboundFrame.AppServerInfoResponse(HTTP_REQUEST_ID, success = false, error = "app-server-info body is not an object")
+            // The body has the frame's shape but no request_id of ours; give it one so it decodes.
+            val framed = JsonObject(raw + mapOf("request_id" to kotlinx.serialization.json.JsonPrimitive(HTTP_REQUEST_ID)))
+            return AppServerProtocol.json.decodeFromJsonElement(AppServerInboundFrame.serializer(), framed)
+                as? AppServerInboundFrame.AppServerInfoResponse
+                ?: AppServerInboundFrame.AppServerInfoResponse(HTTP_REQUEST_ID, success = false, error = "app-server-info body is not an info response")
+        }
 
         /** `ws://host:4500/ws?x` → `http://host:4500`; `https://host` stays as it is. */
         fun httpOrigin(baseUrl: String): String {
