@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_copy_response
@@ -138,10 +139,14 @@ internal fun showsSpeakerHeader(message: UiMessage, position: GroupPosition): Bo
     }
 }
 
-/** What turns an assistant message into a bubbled card in the legacy timeline (not shouldRenderBubbleLess). */
+/**
+ * What turns an assistant message into a bubbled card in the legacy timeline (not
+ * shouldRenderBubbleLess). An approval counts only while it waits on the person: a runtime-resolved
+ * one draws no card (letta-mobile-bglj6.1.25), so it must not label the row either.
+ */
 private fun UiMessage.hasStructuredContent(): Boolean {
-    val cards = listOf(generatedUi, approvalRequest, approvalResponse, subagentNotification)
-    return cards.any { it != null } || attachments.isNotEmpty()
+    val cards = listOf(generatedUi, approvalResponse, subagentNotification)
+    return cards.any { it != null } || approvalRequest?.requiresUserInput() == true || attachments.isNotEmpty()
 }
 
 /** "Agent" (or "Agent · Live"), "Inter-agent", the single tool's name, or "Tool output". */

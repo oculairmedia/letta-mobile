@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import kotlinx.datetime.LocalDate
@@ -88,9 +89,13 @@ private fun UiMessage.isBareToolCallMessage(): Boolean {
     return content.isBlank() && !toolCalls.isNullOrEmpty()
 }
 
-/** Generated UI, an approval either way, or media: conversation that keeps its own row. */
+/**
+ * Generated UI, an approval waiting on the person or answered, or media: conversation that keeps
+ * its own row. A runtime-resolved request (Bash under approve-all) draws no card, so it folds with
+ * its run like any tool call (letta-mobile-bglj6.1.25).
+ */
 private fun UiMessage.carriesConversation(): Boolean {
-    if (generatedUi != null || approvalRequest != null) return true
+    if (generatedUi != null || approvalRequest?.requiresUserInput() == true) return true
     return approvalResponse != null || carriesMedia()
 }
 

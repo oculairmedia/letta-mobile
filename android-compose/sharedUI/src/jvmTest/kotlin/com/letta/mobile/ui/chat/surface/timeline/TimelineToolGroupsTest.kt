@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
@@ -72,6 +74,28 @@ class TimelineToolGroupsTest {
     fun messageWithProseAndToolCallsIsNotFoldable() {
         val withProse = toolMessage("1").let { it.copy(message = it.message.copy(content = "Running the check now.")) }
         assertTrue(groupToolCallRows(listOf(withProse, toolMessage("2"))).all { it is TimelineRow.Item })
+    }
+
+    private fun withApproval(single: ChatRenderItem.Single, tool: String) = single.copy(
+        message = single.message.copy(
+            approvalRequest = UiApprovalRequest(
+                requestId = "req-${single.message.id}",
+                toolCalls = listOf(UiApprovalToolCall("tc-${single.message.id}", tool, "{}")),
+            ),
+        ),
+    )
+
+    /** letta-mobile-bglj6.1.25: a runtime-resolved approval (Bash under approve-all) is not conversation. */
+    @Test
+    fun aRuntimeResolvedApprovalStillFoldsIntoTheGroup() {
+        val rows = groupToolCallRows(listOf(toolMessage("1"), withApproval(toolMessage("2"), "Bash")))
+        assertEquals(listOf("1", "2"), (rows.single() as TimelineRow.ToolGroup).singles.map { it.message.id })
+    }
+
+    @Test
+    fun anApprovalWaitingOnThePersonKeepsItsOwnRow() {
+        val rows = groupToolCallRows(listOf(toolMessage("1"), withApproval(toolMessage("2"), "AskUserQuestion")))
+        assertTrue(rows.all { it is TimelineRow.Item })
     }
 
     @Test

@@ -321,6 +321,30 @@ class ChatRowInteractionUiTest {
         onNodeWithText("requesting input", useUnmergedTree = true).assertDoesNotExist()
     }
 
+    /**
+     * letta-mobile-bglj6.1.25: a Bash call under approve-all keeps its (runtime-resolved) request
+     * on the message until the tool returns. It is not waiting on the person, so it reads as the
+     * plain tool line in every idiom: no "Approval requested", no "requesting input" chip.
+     */
+    @Test
+    fun aRuntimeResolvedApprovalRendersAsItsToolLineOnly() = runComposeUiTest {
+        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        setContent {
+            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+                MaterialTheme { RenderRow(single(runtimeResolvedBashMessage())) }
+            }
+        }
+
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        onNodeWithText("Approval requested").assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_TOOL_CALL).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_REQUESTING_INPUT, useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.SPEAKER_HEADER).assertDoesNotExist()
+        runOnIdle { style = ChatPlatformStyle.Pointer }
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        onNodeWithText("Approval requested").assertDoesNotExist()
+    }
+
     @Test
     fun subagentDispatchOpensTheSubagentThroughTheHost() = runComposeUiTest {
         var opened: ChatSubagentTarget? = null
@@ -473,6 +497,17 @@ class ChatRowInteractionUiTest {
             toolCalls = listOf(UiApprovalToolCall(toolCallId = "ask-2", name = "AskUserQuestion", arguments = "rm -rf build")),
         ),
     )
+
+    private fun runtimeResolvedBashMessage(): UiMessage {
+        val command = """{"command":"curl -s https://example.test/_matrix/client/versions"}"""
+        return message("b-1", "assistant", "").copy(
+            toolCalls = listOf(UiToolCall(name = "Bash", arguments = command, result = null, status = "running", toolCallId = "bash-1")),
+            approvalRequest = UiApprovalRequest(
+                requestId = "req-bash-1",
+                toolCalls = listOf(UiApprovalToolCall(toolCallId = "bash-1", name = "Bash", arguments = command)),
+            ),
+        )
+    }
 
     private fun questionMessage() = message("q-1", "assistant", "").copy(
         approvalRequest = UiApprovalRequest(
