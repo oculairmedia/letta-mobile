@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.screens.dashboard
 
+import com.letta.mobile.data.home.HomeAgentRef
+import com.letta.mobile.data.home.HomePageState
+import com.letta.mobile.data.home.HomeShortcut
+import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
+
 internal data class HomeNavigationCallbacks(
     val onNavigateToAgents: () -> Unit,
     val onNavigateToConversations: () -> Unit,
@@ -26,7 +31,7 @@ internal data class HomeNavigationCallbacks(
     val onNavigateToProjects: () -> Unit = {},
     val onNavigateToModels: () -> Unit = {},
 ) {
-    fun shortcutNavigator(shortcut: DashboardShortcut, state: DashboardUiState): () -> Unit = when (shortcut) {
+    fun shortcutNavigator(shortcut: DashboardShortcut, favorite: HomeAgentRef?): () -> Unit = when (shortcut) {
         DashboardShortcut.CONVERSATIONS -> onNavigateToConversations
         DashboardShortcut.AGENTS -> onNavigateToAgents
         DashboardShortcut.TOOLS -> onNavigateToTools
@@ -46,14 +51,7 @@ internal data class HomeNavigationCallbacks(
         DashboardShortcut.PROJECTS -> onNavigateToProjects
         DashboardShortcut.MODELS -> onNavigateToModels
         DashboardShortcut.USAGE -> onNavigateToUsage
-        DashboardShortcut.FAVORITE_AGENT -> {
-            val agentId = state.favoriteAgentId
-            if (agentId != null) {
-                { onNavigateToChat(agentId, state.favoriteAgentName, null) }
-            } else {
-                onNavigateToAgents
-            }
-        }
+        DashboardShortcut.FAVORITE_AGENT -> favorite?.let { { onNavigateToChat(it.id, it.name, null) } } ?: onNavigateToAgents
         DashboardShortcut.SETTINGS -> onNavigateToSettings
         DashboardShortcut.TELEMETRY -> onNavigateToTelemetry
         DashboardShortcut.SYSTEM_ACCESS -> onNavigateToSystemAccess
@@ -61,14 +59,50 @@ internal data class HomeNavigationCallbacks(
     }
 }
 
-internal data class HomeContentCallbacks(
-    val onNavigateToTools: () -> Unit,
-    val onNavigateToBlocks: () -> Unit,
-    val onNavigateToChat: (String, String?, String?) -> Unit,
-    val onNavigateToChatMessage: (String, String, String) -> Unit,
-    val onNavigateToEditAgent: (String) -> Unit,
-    val onUnpinAgent: (String) -> Unit,
-    val onShortcutClick: (DashboardShortcut) -> Unit,
-    val onUnpinShortcut: (DashboardShortcut) -> Unit,
-    val onReorderPinnedItems: (List<String>) -> Unit,
+/** The drawer's shortcut and the shared page's shortcut share their persistence name. */
+internal fun DashboardShortcut.toHomeShortcut(): HomeShortcut = HomeShortcut.valueOf(name)
+
+internal fun HomeShortcut.toDashboardShortcut(): DashboardShortcut = DashboardShortcut.valueOf(name)
+
+/** Opens a conversation (or, without one, a chat) with the agent at [agentId]. */
+internal data class HomeChatRoutes(
+    val onNavigateToChatMessage: (agentId: String, conversationId: String, messageId: String) -> Unit,
+    val onNavigateToConversation: (agentId: String, conversationId: String) -> Unit,
+    val onNavigateToEditAgent: (agentId: String) -> Unit,
 )
+
+/**
+ * Android's navigation for the shared Home page. The composer talks to the favorite agent (the
+ * dashboard's quick chat), else to the agent of the newest conversation, else opens the agent list.
+ */
+internal fun HomeNavigationCallbacks.homePageNavigation(state: HomePageState, routes: HomeChatRoutes): HomePageNavigation =
+    HomePageNavigation(
+        onSubmitPrompt = { text ->
+            val target = state.favorite ?: state.fleet.recent.firstNotNullOfOrNull { recent ->
+                recent.agentId?.let { HomeAgentRef(it, recent.agentName) }
+            }
+            if (target != null) onNavigateToChat(target.id, target.name, text) else onNavigateToAgents()
+        },
+        onOpenConversation = { recent ->
+            val agentId = recent.agentId
+            if (agentId != null) routes.onNavigateToConversation(agentId, recent.conversationId) else onNavigateToConversations()
+        },
+        onOpenAgent = { agentId ->
+            val name = state.fleet.agents.firstOrNull { it.agentId == agentId }?.name
+            onNavigateToChat(agentId, name, null)
+        },
+        onOpenShortcut = { shortcut -> shortcutNavigator(shortcut.toDashboardShortcut(), state.favorite)() },
+        onConfigureAgent = routes.onNavigateToEditAgent,
+        onOpenMessage = { message ->
+            val agentId = message.agentId
+            val conversationId = message.conversationId
+            val messageId = message.messageId
+            when {
+                agentId == null -> Unit
+                conversationId != null && messageId != null -> routes.onNavigateToChatMessage(agentId, conversationId, messageId)
+                else -> onNavigateToChat(agentId, null, null)
+            }
+        },
+        onOpenTool = { onNavigateToTools() },
+        onOpenBlock = { onNavigateToBlocks() },
+    )

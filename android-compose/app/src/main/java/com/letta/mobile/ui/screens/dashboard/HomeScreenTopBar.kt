@@ -31,7 +31,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class HomeScreenTopBarParams(
     val title: String,
-    val state: DashboardUiState,
+    val searchQuery: String,
+    val isConnected: Boolean,
     val isSearchExpanded: Boolean,
     val onSearchExpandedChange: (Boolean) -> Unit,
     val onSearchQueryChange: (String) -> Unit,
@@ -75,7 +76,7 @@ private fun HomeScreenTopBarAppBar(params: HomeScreenTopBarParams) {
 @Composable
 private fun HomeScreenTopBarTitle(params: HomeScreenTopBarParams) {
     ExpandableTitleSearch(
-        query = params.state.searchQuery,
+        query = params.searchQuery,
         onQueryChange = params.onSearchQueryChange,
         onClear = params.onSearchClear,
         expanded = params.isSearchExpanded,
@@ -94,7 +95,7 @@ private fun HomeScreenTopBarTitleRow(params: HomeScreenTopBarParams) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(params.title)
-        if (params.state.isConnected) {
+        if (params.isConnected) {
             Icon(
                 LettaIcons.Circle,
                 contentDescription = "Connected",
@@ -125,7 +126,7 @@ private fun HomeScreenTopBarBackendChip(params: HomeScreenTopBarParams) {
 @Composable
 private fun HomeScreenTopBarSearchField(params: HomeScreenTopBarParams) {
     ExpandableSearchField(
-        query = params.state.searchQuery,
+        query = params.searchQuery,
         onQueryChange = params.onSearchQueryChange,
         onClear = params.onSearchClear,
         expanded = params.isSearchExpanded,
@@ -142,10 +143,8 @@ private fun previewTopBarParams(
     activeBackendLabel: String? = "Local",
 ) = HomeScreenTopBarParams(
     title = "Letta",
-    state = DashboardUiState(
-        isConnected = true,
-        searchQuery = if (isSearchExpanded) "plan" else "",
-    ),
+    searchQuery = if (isSearchExpanded) "plan" else "",
+    isConnected = true,
     isSearchExpanded = isSearchExpanded,
     onSearchExpandedChange = {},
     onSearchQueryChange = {},

@@ -18,6 +18,7 @@ object HomePageTags {
     const val EDIT_PINS = "home_edit_pins"
     const val ADD_PIN = "home_add_pin"
     const val STATS = "home_stats"
+    const val ERROR = "home_error"
 
     fun pin(item: HomePinnedItem): String = "home_pin_${item.key}"
 

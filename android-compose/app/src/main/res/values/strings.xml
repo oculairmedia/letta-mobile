@@ -9,18 +9,8 @@
     <string name="common_none">None</string>
 
     <string name="screen_home_search_placeholder">Search</string>
-    <string name="screen_home_chat_placeholder">Ask something\u2026</string>
-    <string name="screen_home_search_agents_section">Agents</string>
     <string name="screen_home_search_messages_section">Messages</string>
     <string name="screen_home_search_no_results">No results found</string>
-    <string name="screen_home_search_tools_section">Tools</string>
-    <string name="screen_home_search_blocks_section">Blocks</string>
-    <string name="screen_home_search_unnamed_block">Unnamed</string>
-    <string name="screen_home_search_message_role_fallback">Message</string>
-    <string name="screen_home_pinned_subtitle">Pinned agent</string>
-    <string name="action_configure_agent">Configure</string>
-    <string name="action_unpin_agent">Unpin from Homepage</string>
-    <string name="action_unpin_shortcut">Unpin from Homepage</string>
     <string name="screen_nav_bot_settings">Bot Settings</string>
     <string name="widget_desc_templates">Browse starter agents</string>
     <string name="widget_desc_archives">View archived data</string>
@@ -68,10 +58,6 @@
     <string name="screen_system_access_saf_folder_granted">Folder access saved.</string>
     <string name="screen_system_access_saf_grant_failed">Android storage access could not be saved.</string>
     <string name="screen_system_access_action_future">This setup action will be wired by the capability implementation.</string>
-    <plurals name="widget_tile_count_format">
-        <item quantity="one">%d item</item>
-        <item quantity="other">%d items</item>
-    </plurals>
     <string name="screen_usage_empty_runs">No recent runs recorded for the selected time range.</string>
 
     <string name="screen_projects_title">Projects</string>

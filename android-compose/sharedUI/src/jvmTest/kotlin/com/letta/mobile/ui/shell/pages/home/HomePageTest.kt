@@ -167,6 +167,25 @@ class HomePageTest {
     }
 
     @Test
+    fun aBackendErrorShowsABannerEvenWithoutAHeader() = runComposeUiTest {
+        val failing = HomePageReducer.withStats(baseState(), HomeStats(loading = false, error = "Backend unreachable"))
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(COMPACT).height(PAGE_HEIGHT)) {
+                    HomePage(
+                        state = failing,
+                        callbacks = HomePageCallbacks(actions, navigation.navigation),
+                        options = HomePageOptions(showTitle = false, showSearch = false, touch = true),
+                    )
+                }
+            }
+        }
+        onNodeWithTag(HomePageTags.ERROR).assertExists()
+        onNodeWithText("Backend unreachable").assertExists()
+        onNodeWithTag(HomePageTags.SEARCH).assertDoesNotExist()
+    }
+
+    @Test
     fun aSearchWithNothingFoundSaysSo() = runComposeUiTest {
         show(HomePageReducer.withQuery(baseState(), "zzz", awaitMessages = false))
         onNodeWithTag(HomePageTags.SEARCH_EMPTY).assertExists()

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.home
 
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IRunRepository
@@ -27,6 +28,15 @@ import kotlin.time.Duration.Companion.hours
 /** Searches the backend's messages for Home; hosts without a message repository pass none. */
 fun interface HomeMessageSearch {
     suspend fun search(query: String): List<ParsedSearchMessage>
+
+    companion object {
+        /** Messages Home asks for per query. */
+        const val RESULT_LIMIT = 20
+
+        /** Home's message search: full-text, over what the user and the agents said. */
+        fun request(query: String): MessageSearchRequest =
+            MessageSearchRequest(query = query, searchMode = "fts", roles = listOf("user", "assistant"), limit = RESULT_LIMIT)
+    }
 }
 
 /**

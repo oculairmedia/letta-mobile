@@ -131,6 +131,13 @@ internal class HomePageScope(
     val navigation: HomePageNavigation = callbacks.navigation
     val horizontalPadding = if (wide) LettaDimens.Space.xxl else LettaDimens.Space.lg
 
+    /** A phone host that titles and searches in its own app bar still shows the error banner here. */
+    val hasCompactHeader: Boolean
+        get() = drawsHeaderControls || state.stats.error != null
+
+    private val drawsHeaderControls: Boolean
+        get() = options.showTitle || options.showSearch
+
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0
 }
 
@@ -159,7 +166,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
         ) {
-            if (page.options.showTitle || page.options.showSearch) item { HomeHeader(page) }
+            if (page.hasCompactHeader) item { HomeHeader(page) }
             if (page.state.search.isActive) homeSearchResults(page) else homeDashboard(page)
         }
         if (!page.state.search.isActive) {

@@ -209,6 +209,19 @@ class HomePageControllerTest {
     }
 
     @Test
+    fun persistedNamesKeepPinnedAgentsVisibleUntilAgentsSettle() = runTest {
+        val source = FakeSource()
+        val pins = FakePins(listOf("agent:a-7"))
+        pins.names.value = mapOf("a-7" to "Old friend")
+        val home = controller(source, pins)
+        assertEquals(listOf(HomePinnedItem.Agent(HomeAgentRef("a-7", "Old friend"))), home.state.value.pinnedItems)
+
+        source.catalogFlow.value = HomeSearchCatalog(agents = listOf(scout), agentsSettled = true)
+        runCurrent()
+        assertTrue(home.state.value.pinnedItems.isEmpty(), "an orphan from another backend hides once agents settle")
+    }
+
+    @Test
     fun refreshAsksTheSource() = runTest {
         val source = FakeSource()
         controller(source).refresh()
@@ -256,7 +269,9 @@ class HomePageControllerTest {
 
     private class FakePins(initial: List<String> = emptyList()) : HomePinStore {
         private val keys = MutableStateFlow(initial)
+        val names = MutableStateFlow(emptyMap<String, String>())
         override val pinnedKeys: StateFlow<List<String>> = keys
+        override val persistedAgentNames: StateFlow<Map<String, String>> = names
 
         override fun setOrder(keys: List<String>) {
             this.keys.value = keys

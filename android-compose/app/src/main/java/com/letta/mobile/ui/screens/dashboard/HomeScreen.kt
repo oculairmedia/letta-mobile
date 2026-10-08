@@ -21,8 +21,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
+import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import kotlinx.coroutines.launch
 
+/** The phone presentation of the shared Home page: the app bar and drawer carry title and search. */
+private val AndroidHomeOptions = HomePageOptions(showTitle = false, showSearch = false, touch = true)
+
+/**
+ * The Admin tab's home: Android's app bar (search, backend chip, settings) and admin drawer around
+ * the shared Home page (letta-mobile-c3np7.3.11.1).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -35,6 +45,9 @@ fun HomeScreen(
     onNavigateToChatMessage: (agentId: String, conversationId: String, messageId: String) -> Unit,
     onNavigateToEditAgent: (agentId: String) -> Unit,
     onNavigateToUsage: () -> Unit,
+    onNavigateToConversation: (agentId: String, conversationId: String) -> Unit = { agentId, _ ->
+        onNavigateToChat(agentId, null, null)
+    },
     onNavigateToTemplates: () -> Unit = {},
     onNavigateToArchives: () -> Unit = {},
     onNavigateToFolders: () -> Unit = {},
@@ -57,37 +70,19 @@ fun HomeScreen(
     title: String = "Letta",
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val navigation = remember(
-        onNavigateToAgents,
-        onNavigateToConversations,
-        onNavigateToTools,
-        onNavigateToBlocks,
-        onNavigateToSettings,
-        onNavigateToChat,
-        onNavigateToUsage,
-        onNavigateToTemplates,
-        onNavigateToArchives,
-        onNavigateToFolders,
-        onNavigateToGroups,
-        onNavigateToProviders,
-        onNavigateToIdentities,
-        onNavigateToSchedules,
-        onNavigateToRuns,
-        onNavigateToJobs,
-        onNavigateToMessageBatches,
-        onNavigateToMcp,
-        onNavigateToAbout,
-        onNavigateToTelemetry,
-        onNavigateToSystemAccess,
-        onNavigateToBotSettings,
-        onNavigateToProjects,
-        onNavigateToModels,
+        onNavigateToAgents, onNavigateToConversations, onNavigateToTools, onNavigateToBlocks,
+        onNavigateToSettings, onNavigateToChat, onNavigateToUsage, onNavigateToTemplates,
+        onNavigateToArchives, onNavigateToFolders, onNavigateToGroups, onNavigateToProviders,
+        onNavigateToIdentities, onNavigateToSchedules, onNavigateToRuns, onNavigateToJobs,
+        onNavigateToMessageBatches, onNavigateToMcp, onNavigateToAbout, onNavigateToTelemetry,
+        onNavigateToSystemAccess, onNavigateToBotSettings, onNavigateToProjects, onNavigateToModels,
     ) {
         HomeNavigationCallbacks(
             onNavigateToAgents = onNavigateToAgents,
@@ -116,18 +111,7 @@ fun HomeScreen(
             onNavigateToModels = onNavigateToModels,
         )
     }
-
-    val contentCallbacks = HomeContentCallbacks(
-        onNavigateToTools = navigation.onNavigateToTools,
-        onNavigateToBlocks = navigation.onNavigateToBlocks,
-        onNavigateToChat = navigation.onNavigateToChat,
-        onNavigateToChatMessage = onNavigateToChatMessage,
-        onNavigateToEditAgent = onNavigateToEditAgent,
-        onUnpinAgent = viewModel::unpinAgent,
-        onShortcutClick = { shortcut -> navigation.shortcutNavigator(shortcut, uiState)() },
-        onUnpinShortcut = viewModel::unpinShortcut,
-        onReorderPinnedItems = viewModel::reorderPinnedItems,
-    )
+    val routes = HomeChatRoutes(onNavigateToChatMessage, onNavigateToConversation, onNavigateToEditAgent)
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -135,9 +119,9 @@ fun HomeScreen(
             ModalDrawerSheet {
                 HomeScreenDrawerContent(
                     params = HomeScreenDrawerParams(
-                        state = uiState,
+                        state = state,
                         navigation = navigation,
-                        viewModel = viewModel,
+                        actions = viewModel.actions,
                         drawerState = drawerState,
                         scope = scope,
                     ),
@@ -155,11 +139,12 @@ fun HomeScreen(
                 HomeScreenTopBar(
                     params = HomeScreenTopBarParams(
                         title = title,
-                        state = uiState,
+                        searchQuery = state.search.query,
+                        isConnected = !state.stats.loading && state.stats.error == null,
                         isSearchExpanded = isSearchExpanded,
                         onSearchExpandedChange = { isSearchExpanded = it },
-                        onSearchQueryChange = viewModel::updateSearchQuery,
-                        onSearchClear = viewModel::clearSearch,
+                        onSearchQueryChange = viewModel.actions::updateSearchQuery,
+                        onSearchClear = viewModel.actions::clearSearch,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onNavigateToSettings = onNavigateToSettings,
                         activeBackendLabel = activeBackendLabel,
@@ -169,10 +154,11 @@ fun HomeScreen(
                 )
             },
         ) { paddingValues ->
-            HomeContent(
-                state = uiState,
-                callbacks = contentCallbacks,
+            HomePage(
+                state = state,
+                callbacks = HomePageCallbacks(viewModel.actions, navigation.homePageNavigation(state, routes)),
                 modifier = Modifier.padding(paddingValues),
+                options = AndroidHomeOptions,
             )
         }
     }

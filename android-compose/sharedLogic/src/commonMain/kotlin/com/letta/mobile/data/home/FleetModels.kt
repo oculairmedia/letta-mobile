@@ -2,6 +2,7 @@ package com.letta.mobile.data.home
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.Conversation
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.datetime.LocalDate
@@ -324,6 +325,25 @@ fun preferredComposerConversationId(conversations: List<FleetConversation>, pref
     val focused = preferredAgentId?.let { id -> newest(conversations.filter { it.agentId == id }) }
     return focused ?: newest(conversations)
 }
+
+/**
+ * The fleet model's view of a backend [Conversation] (hosts that list conversations straight from
+ * the backend, like Android). Hidden (subagent / background) conversations map to null.
+ */
+fun Conversation.toFleetConversation(): FleetConversation? = if (hidden == true) {
+    null
+} else {
+    FleetConversation(
+        id = id.value,
+        agentId = agentId.value,
+        agentName = agentName.orEmpty(),
+        title = summary?.takeIf { it.isNotBlank() } ?: UNTITLED_CONVERSATION,
+        preview = "",
+        updatedAtLabel = lastMessageAt ?: updatedAt ?: createdAt.orEmpty(),
+    )
+}
+
+private const val UNTITLED_CONVERSATION = "Untitled conversation"
 
 /** ISO-8601 conversation timestamps parse; sentinel labels ("Queued") carry no date and give null. */
 fun parseConversationInstant(label: String): Instant? = runCatching { Instant.parse(label) }.getOrNull()

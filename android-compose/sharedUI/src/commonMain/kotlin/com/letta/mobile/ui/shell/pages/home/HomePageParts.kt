@@ -80,6 +80,24 @@ internal fun HomeHeader(page: HomePageScope) {
             page.options.headerActions?.invoke(this)
         }
         if (!page.wide && page.options.showSearch) HomeSearchField(page, Modifier.fillMaxWidth())
+        page.state.stats.error?.let { HomeErrorBanner(it) }
+    }
+}
+
+/** A backend figure failed to load; the rest of the page still works, so this is a note, not a wall. */
+@Composable
+private fun HomeErrorBanner(message: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(LettaDimens.Radius.sm),
+        modifier = Modifier.fillMaxWidth().testTag(HomePageTags.ERROR),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
+        )
     }
 }
 
