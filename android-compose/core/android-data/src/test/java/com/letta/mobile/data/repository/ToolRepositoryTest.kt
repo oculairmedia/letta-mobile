@@ -118,6 +118,31 @@ class ToolRepositoryTest {
         assertEquals("/v1/agents/agent-1/tools/detach/tool-1", transport.adminRpcCalls[1].path)
     }
 
+    @Test
+    fun `countTools in iroh mode counts the admin rpc catalog instead of calling HTTP`() = runTest {
+        val tools = listOf(TestData.tool(id = "t1"), TestData.tool(id = "t2"))
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                assertEquals("tool.list", method)
+                AppServerInboundFrame.AdminRpcResponse(
+                    "req",
+                    true,
+                    Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), tools),
+                )
+            }
+        }
+        val irohRepository = ToolRepository(
+            toolApi = fakeApi,
+            irohToolSource = IrohAdminRpcToolSource(transport, irohSettings()),
+        )
+
+        assertEquals(2, irohRepository.countTools())
+        assertEquals(2, irohRepository.countTools())
+
+        assertTrue("no HTTP count under iroh://", fakeApi.calls.none { it == "countTools" })
+        assertEquals("a fresh catalog is reused", 1, transport.adminRpcCalls.size)
+    }
+
     private fun irohSettings() = FakeSettingsRepository(
         initialActiveConfig = LettaConfig(
             id = "iroh",
