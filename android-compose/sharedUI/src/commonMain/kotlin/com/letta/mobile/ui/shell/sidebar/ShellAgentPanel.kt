@@ -60,6 +60,7 @@ import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
+import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -67,6 +68,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 object ShellAgentPanelTags {
     const val PANEL = "shell-agent-panel"
     const val AGENT_MENU = "shell-agent-panel-agent-menu"
+    /** The focused agent's mascot (or its orb) at the head of the panel. */
+    const val HERO = "shell-agent-panel-hero"
 }
 
 /**
@@ -194,11 +197,15 @@ private fun ShellAgentIdentity(agent: ShellPanelAgent, onEditAgent: () -> Unit) 
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         // The seat is empty while the character stands elsewhere; an agent with no mascot keeps its orb.
+        // Drawn in place (a phone has no transport layer) it follows the avatar's live-or-still rule,
+        // so the hero is the same picture of the agent as its rail orb, chip and list row.
         MascotSeat(
             agentId = agent.agentId,
             stage = MascotStage.AGENT_PANE_HERO,
             size = if (agent.identity != null) LettaDimens.Orb.hero else LettaDimens.Space.xxl,
+            modifier = Modifier.testTag(ShellAgentPanelTags.HERO),
             onEdit = onEditAgent,
+            live = mascotAtWork(agent.agentId),
         ) { vacancy ->
             if (vacancy == MascotSeatVacancy.NO_MASCOT) {
                 AgentOrb(index = agent.orbIndex, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)

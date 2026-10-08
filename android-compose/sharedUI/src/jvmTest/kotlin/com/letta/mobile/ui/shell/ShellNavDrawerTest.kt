@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.avatar.core.MascotShape
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasId
@@ -88,6 +90,23 @@ class ShellNavDrawerTest {
         // Eight orbs, newest activity first then roster order; the focused agent is neither an orb nor hidden.
         assertEquals(listOf("Agent 40") + (1..7).map { "Agent $it" }, rail.entries.map { it.name })
         assertEquals(138 - 8, rail.hiddenAgentCount)
+    }
+
+    @Test
+    fun theHeroAndTheOrbsTakeEachAgentsIdentityFromTheOneMap() {
+        val pm = MascotIdentity(MascotShape.TRIANGLE, argb = 0xFFF08A3C.toInt(), rotationDegrees = 135)
+        val lester = MascotIdentity(MascotShape.HEXAGON, argb = 0xFF3FA0F0.toInt(), rotationDegrees = 45)
+        val identities = mapOf("pm" to pm, "lester" to lester)
+        val focusedPm = ShellNavDrawerMapping.state(
+            input.copy(agent = ShellPanelAgent(name = "PM - letta-mobile", agentId = "pm"), identities = identities),
+            now,
+        )
+        assertEquals(pm, focusedPm.panel.agent.identity)
+        assertEquals(lester, focusedPm.rail.entries.single { it.agentId == "lester" }.identity)
+        // Focus another agent and PM's orb carries the very identity its hero did.
+        val focusedMeridian = ShellNavDrawerMapping.state(input.copy(identities = identities), now)
+        assertEquals(pm, focusedMeridian.rail.entries.single { it.agentId == "pm" }.identity)
+        assertEquals(null, focusedMeridian.panel.agent.identity)
     }
 
     @Test
