@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.data.composer.ComposerEffort
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_effort_default
@@ -76,8 +77,9 @@ internal fun ComposerModelControls(
     }
 }
 
+/** The current model's efforts, None … Max (letta-mobile-bzvro.18: the full upstream set, in order). */
 private fun currentModelEfforts(model: ChatModelUiState): List<String> =
-    model.options.firstOrNull { it.handle == model.currentHandle }?.reasoningEfforts.orEmpty()
+    ComposerEffort.sorted(model.options.firstOrNull { it.handle == model.currentHandle }?.reasoningEfforts.orEmpty())
 
 /**
  * The reasoning-effort chip and popover, lifted from desktop's ComposerEffortChip. Unlike the
@@ -94,7 +96,7 @@ private fun ComposerEffortChip(
     val defaultLabel = stringResource(Res.string.composer_effort_default)
     Box {
         ComposerActionChip(
-            label = ComposerChipLabel(current ?: defaultLabel, Lucide.Gauge),
+            label = ComposerChipLabel(current?.let { ComposerEffort.labelOf(it) } ?: defaultLabel, Lucide.Gauge),
             onClick = { open = !open },
             modifier = Modifier.testTag(ComposerTestTags.EFFORT_CHIP),
         )
@@ -110,7 +112,7 @@ private fun ComposerEffortChip(
                     onSelect(ReasoningEffortChoice.ProviderDefault)
                 }
                 efforts.forEach { effort ->
-                    EffortRow(label = effort, selected = effort == current) {
+                    EffortRow(label = ComposerEffort.labelOf(effort), selected = effort == current) {
                         open = false
                         onSelect(ReasoningEffortChoice.Named(effort))
                     }

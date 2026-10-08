@@ -42,13 +42,41 @@ class MessageActionPolicyTest {
         assertFalse(availability(message(role = "tool")).hasActions)
     }
 
+    @Test
+    fun `fork and edit follow the owners support and only stored messages qualify`() {
+        val both = BranchActionSupport(fork = true, edit = true)
+        val prompt = availability(message(role = "user"), branching = both)
+        assertTrue(prompt.canFork)
+        assertTrue(prompt.canEdit)
+
+        val reply = availability(message(role = "assistant"), branching = both)
+        assertTrue(reply.canFork)
+        assertFalse(reply.canEdit, "only the user's own prompt is edited")
+
+        assertFalse(availability(message(role = "user")).canFork, "an owner without forks hides the action")
+        assertFalse(availability(message(role = "user").copy(isPending = true), branching = both).canFork)
+        assertFalse(availability(message(role = "user").copy(isSendFailed = true), branching = both).canEdit)
+    }
+
+    @Test
+    fun `a prompt with images is not edited because the composer would drop them`() {
+        val message = message(role = "user").copy(
+            attachments = listOf(UiImageAttachment(base64 = "image", mediaType = "image/png")),
+        )
+        val actions = availability(message, branching = BranchActionSupport(fork = true, edit = true))
+        assertFalse(actions.canEdit)
+        assertTrue(actions.canFork)
+    }
+
     private fun availability(
         message: UiMessage,
         sendAgainAvailable: Boolean = true,
+        branching: BranchActionSupport = BranchActionSupport.None,
     ) = messageActionAvailability(
         message = message,
         copyText = "Structured message text",
         sendAgainAvailable = sendAgainAvailable,
+        branching = branching,
     )
 
     private fun message(role: String) = UiMessage(

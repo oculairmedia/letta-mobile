@@ -11,8 +11,6 @@ import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.ConversationSummary
-import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
-import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.Agent
@@ -87,6 +85,8 @@ class DesktopChatController(
      * (HTTP / demo backends) keeps the list to startup, reconnect and this window's own writes.
      */
     private val conversationChanges: IChannelTransport? = null,
+    /** letta-mobile-bzvro.17 / .18: pinned conversations and recently used models. */
+    private val conversationPrefs: DesktopConversationPrefs = DesktopConversationPrefs(),
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
     private val _state = MutableStateFlow(initialState)
@@ -443,8 +443,6 @@ class DesktopChatController(
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
-    private val conversationSummaryGateway: ConversationSummaryGateway?
-        get() = gateway as? ConversationSummaryGateway
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -722,6 +720,7 @@ class DesktopChatController(
             val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
             val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
             extras.setConversationModel(conversationId, transportModel)
+            conversationManagement.recordModel(model)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -760,6 +759,44 @@ class DesktopChatController(
         }
         scope.launch {
             runCatching { gatewayExtras?.setConversationArchived(conversationId, archived) }
+        }
+    }
+
+    /** letta-mobile-bzvro.15-.18: titles, pins, recent models, fork and edit-and-resend. */
+    internal val conversationManagement = DesktopConversationManagement(scope, ListHost(), conversationPrefs)
+
+    private inner class ListHost : DesktopConversationListHost {
+        override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
+        override val pins = conversationPrefs.pins
+        override val isClosed: Boolean get() = closed
+
+        override fun origin(): DesktopBranchOrigin? = _state.value.selectedConversation?.let {
+            DesktopBranchOrigin(it.id, it.agentId?.takeIf(String::isNotBlank))
+        }
+
+        override suspend fun openBranch(branch: DesktopOpenedBranch) {
+            if (closed) return
+            reloadConversationsAndSelect(preferConversationId = branch.conversation.id.value)
+            branch.draft?.let(::updateComposerText)
+        }
+
+        override fun showError(message: String) {
+            if (!closed) _state.update { it.copy(errorMessage = message) }
+        }
+
+        override fun listedTitle(conversationId: ConversationId): String? =
+            _state.value.conversations.firstOrNull { it.id == conversationId.value }?.title
+
+        override fun showTitle(
+            conversationId: ConversationId,
+            title: ConversationSummary,
+            onlyIf: ConversationSummary?,
+        ) = _state.update { current ->
+            val conversations = current.conversations.map { item ->
+                val replace = item.id == conversationId.value && (onlyIf == null || item.title == onlyIf.value)
+                if (replace) item.copy(title = title.value) else item
+            }
+            current.withRuntimeState(current.runtimeState.copy(conversations = conversations))
         }
     }
 
@@ -1077,41 +1114,8 @@ class DesktopChatController(
         }
     }
 
-    private fun persistConversationTitle(conversationId: String, candidate: String) {
-        val summaryGateway = conversationSummaryGateway ?: return
-        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
-        val originalTitle = conversation.title
-        _state.update { current ->
-            current.withRuntimeState(
-                current.runtimeState.copy(
-                    conversations = current.conversations.map { item ->
-                        if (item.id == conversationId) item.copy(title = candidate) else item
-                    },
-                ),
-            )
-        }
-        scope.launch {
-            val update = ConversationSummaryUpdate(ConversationId(conversationId), ConversationSummary(candidate))
-            runCatching { summaryGateway.setConversationSummary(update) }
-                .onFailure {
-                    if (closed) return@onFailure
-                    _state.update { current ->
-                        current.withRuntimeState(
-                            current.runtimeState.copy(
-                                conversations = current.conversations.map { item ->
-                                    if (item.id == conversationId && item.title == candidate) {
-                                        item.copy(title = originalTitle)
-                                    } else {
-                                        item
-                                    }
-                                },
-                            ),
-                        )
-                    }
-                }
-        }
-    }
-
+    private fun persistConversationTitle(conversationId: String, candidate: String) =
+        conversationManagement.persistTitle(ConversationId(conversationId), candidate)
     private fun beginThinking(conversationId: String?) {
         if (conversationId == null) return
         val generation = ++thinkingGeneration

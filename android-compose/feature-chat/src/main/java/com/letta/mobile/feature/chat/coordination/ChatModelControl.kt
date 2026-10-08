@@ -27,7 +27,8 @@ class ChatModelControl @Inject constructor(
     }
 
     /** letta-mobile-w4q4p.6.1: the shared picker's view of the host catalog (the Hilt singletons, so edits show at once). */
-    fun pickerSource(): ModelPickerSource = ModelPickerSource.catalog(providers, catalog)
+    fun pickerSource(): ModelPickerSource =
+        ModelPickerSource.catalog(providers, catalog).withRecents(conversationModels.recentModels)
 
     /** The Models sheet's presenter over the same repositories. */
     fun managementController(scope: CoroutineScope): ProviderManagementController =

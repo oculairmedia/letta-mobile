@@ -1,5 +1,6 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
@@ -96,10 +97,10 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         return conversations.find { it.id == conversationId } ?: throw ApiException(404, "Not found")
     }
 
-    override suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId?): Conversation {
-        calls.add("forkConversation:$conversationId")
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation {
+        calls.add("forkConversation:${request.conversationId}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val forked = TestData.conversation(id = "fork-${conversations.size}", agentId = agentId?.value ?: "")
+        val forked = TestData.conversation(id = "fork-${conversations.size}", agentId = request.agentId.orEmpty())
         conversations.add(forked)
         return forked
     }

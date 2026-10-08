@@ -34,6 +34,8 @@ internal fun ChatScreen(
     onOpenAgentPane: (() -> Unit)? = null,
     onOpenCanvas: (() -> Unit)? = null,
     onOpenAgentSwitcher: (() -> Unit)? = null,
+    /** letta-mobile-bzvro.15/.16: opens a conversation (agent id, conversation id); a fork opens here. */
+    onOpenConversation: ((String, String) -> Unit)? = null,
     /** The shared page's canvas mode wants the board's top clear: true while the host's header should hide. */
     onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
@@ -57,13 +59,16 @@ internal fun ChatScreen(
         is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
     }
 
-    val navigation = remember(onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher) {
+    val navigation = remember(
+        onBugCommand, onViewSubagentConversation, onOpenAgentPane, onOpenCanvas, onOpenAgentSwitcher, onOpenConversation,
+    ) {
         ChatScreenNavigationCallbacks(
             onBugCommand = onBugCommand,
             onViewSubagentConversation = onViewSubagentConversation,
             onOpenAgentPane = onOpenAgentPane,
             onOpenCanvas = onOpenCanvas,
             onOpenAgentSwitcher = onOpenAgentSwitcher,
+            onOpenConversation = onOpenConversation,
         )
     }
 

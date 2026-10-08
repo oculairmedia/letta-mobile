@@ -34,6 +34,7 @@ enum class NativeAdminOp(
     ConversationUpdate("conversation.update", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationArchive("conversation.archive", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationRestore("conversation.restore", NativeAdminOperationPolicy.MutationAmbiguous),
+    ConversationFork("conversation.fork", NativeAdminOperationPolicy.MutationAmbiguous),
 
     MessageList("message.list", NativeAdminOperationPolicy.ReadScan),
     MessageGet("message.get", NativeAdminOperationPolicy.Read),

@@ -43,6 +43,8 @@ data class ShellConversationRowModel(
     val thinking: Boolean = false,
     val deleting: Boolean = false,
     val archived: Boolean = false,
+    /** letta-mobile-bzvro.17: pinned rows lead the list and show a pin. */
+    val pinned: Boolean = false,
 )
 
 /** One canvas row in the panel's library. */
@@ -90,6 +92,10 @@ data class ShellAgentPanelActions(
     val onConversationSelected: (String) -> Unit = {},
     val onArchiveConversation: (id: String, archived: Boolean) -> Unit = { _, _ -> },
     val onDeleteConversation: (String) -> Unit = {},
+    /** letta-mobile-bzvro.17: rename a conversation; null means the host cannot, so rows offer no rename. */
+    val onRenameConversation: ((id: String, title: String) -> Unit)? = null,
+    /** letta-mobile-bzvro.17: pin or unpin a conversation; null means the host keeps no pins. */
+    val onPinConversation: ((id: String, pinned: Boolean) -> Unit)? = null,
     val onOpenCanvas: (CanvasId) -> Unit = {},
     val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
 )

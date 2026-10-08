@@ -428,6 +428,9 @@ class ReconnectingAppServerClient(
     override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
         ready().conversationUpdate(command)
 
+    override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
+        ready().conversationFork(command)
+
     override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
         ready().conversationMessagesList(command)
 

@@ -1,5 +1,8 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.chat.branch.ConversationForkGateway
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -71,7 +74,12 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway, ConnectionStatusGateway {
+) : ChatGateway,
+    ChatGatewayExtras,
+    ConversationSummaryGateway,
+    ConversationForkGateway,
+    ApprovalSubmittingGateway,
+    ConnectionStatusGateway {
 
     private val deviceLabel: IrohDeviceLabel = IrohDeviceLabel(deviceLabel)
 
@@ -340,6 +348,19 @@ class IrohAdminRpcChatGateway(
             ),
         ) ?: throw TimelineTransportHttpException(502, "conversation.update returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
+    }
+
+    /** letta-mobile-bzvro.15: the host's `conversation.fork` (App Server `conversation_fork`). */
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation {
+        val result = rpc(
+            AdminRpcCall.of(
+                method = AdminRpcMethod(IrohConversationForkRpc.METHOD),
+                path = AdminRpcPath(IrohConversationForkRpc.path(request.conversationId)),
+                body = AdminRpcBody(IrohConversationForkRpc.params(request).toString()),
+            ),
+        ) ?: throw TimelineTransportHttpException(502, "conversation.fork returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
+            .also { agentIdByConversation[it.id] = it.agentId }
     }
 
     /** letta-mobile-w4q4p: the wrapper's `model.update` (App Server `update_model`) for this conversation. */

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -83,43 +85,31 @@ class IrohAdminRpcConversationListSource(
     // letta-mobile-qfa81 (P4 rows 3-6): conversation reads/writes whose
     // server handlers already exist (ConversationAdminHandlers).
 
-    suspend fun getConversation(id: ConversationId): Conversation {
-        val response = channelTransport.adminRpc(
-            method = "conversation.get",
-            path = "/v1/conversations/${id.value}",
-            body = null,
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.get failed")
-        val result = response.result ?: error("Iroh admin_rpc conversation.get returned no result")
-        return json.decodeFromJsonElement(Conversation.serializer(), result)
-    }
+    suspend fun getConversation(id: ConversationId): Conversation =
+        conversationRpc(ConversationRpcCall("conversation.get", "/v1/conversations/${id.value}"))
 
     suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
         val body = buildJsonObject {
             put("agent_id", agentId.value)
             summary?.let { put("summary", it) }
         }
-        val response = channelTransport.adminRpc(
-            method = "conversation.create",
-            path = "/v1/conversations",
-            body = body.toString(),
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.create failed")
-        val result = response.result ?: error("Iroh admin_rpc conversation.create returned no result")
-        return json.decodeFromJsonElement(Conversation.serializer(), result)
+        return conversationRpc(ConversationRpcCall("conversation.create", "/v1/conversations", body.toString()))
     }
 
     suspend fun updateConversation(id: ConversationId, summary: String): Conversation {
         val body = buildJsonObject { put("summary", summary) }
-        val response = channelTransport.adminRpc(
-            method = "conversation.update",
-            path = "/v1/conversations/${id.value}",
-            body = body.toString(),
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.update failed")
-        val result = response.result ?: error("Iroh admin_rpc conversation.update returned no result")
-        return json.decodeFromJsonElement(Conversation.serializer(), result)
+        return conversationRpc(ConversationRpcCall("conversation.update", "/v1/conversations/${id.value}", body.toString()))
     }
+
+    /** letta-mobile-bzvro.15: the host's `conversation.fork`, which answers with the full fork. */
+    suspend fun forkConversation(request: ConversationForkRequest): Conversation =
+        conversationRpc(
+            ConversationRpcCall(
+                method = IrohConversationForkRpc.METHOD,
+                path = IrohConversationForkRpc.path(request.conversationId),
+                body = IrohConversationForkRpc.params(request).toString(),
+            ),
+        )
 
     suspend fun deleteConversation(id: ConversationId) {
         // App Server v2 has no conversation_delete; archive is the supported lifecycle.
@@ -134,13 +124,16 @@ class IrohAdminRpcConversationListSource(
      */
     suspend fun setConversationArchived(id: ConversationId, archived: Boolean): Conversation {
         val method = if (archived) "conversation.archive" else "conversation.restore"
-        val response = channelTransport.adminRpc(
-            method = method,
-            path = "/v1/conversations/${id.value}",
-            body = null,
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
-        val result = response.result ?: error("Iroh admin_rpc $method returned no result")
+        return conversationRpc(ConversationRpcCall(method, "/v1/conversations/${id.value}"))
+    }
+
+    /** One conversation read or write; each answers with the conversation. */
+    private data class ConversationRpcCall(val method: String, val path: String, val body: String? = null)
+
+    private suspend fun conversationRpc(call: ConversationRpcCall): Conversation {
+        val response = channelTransport.adminRpc(method = call.method, path = call.path, body = call.body)
+        if (!response.success) error(response.error ?: "Iroh admin_rpc ${call.method} failed")
+        val result = response.result ?: error("Iroh admin_rpc ${call.method} returned no result")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 }

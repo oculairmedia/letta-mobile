@@ -1,6 +1,11 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.branch.ConversationForkGateway
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
@@ -100,6 +105,8 @@ class DesktopHybridAppServerChatGateway internal constructor(
     },
 ) : DesktopChatGateway,
     ChatGatewayExtras by adminGateway,
+    ConversationSummaryGateway,
+    ConversationForkGateway,
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
@@ -379,6 +386,17 @@ class DesktopHybridAppServerChatGateway internal constructor(
         agentIdByConversation.remove(ConversationId(conversationId))
     }
 
+    /** letta-mobile-bzvro.17: titles (rename, generated) are the admin gateway's to write. */
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
+        adminGateway.requireCapability<ConversationSummaryGateway>("rename conversations")
+            .setConversationSummary(update)
+
+    /** letta-mobile-bzvro.15: forks go through the admin gateway (`conversation_fork` or REST). */
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
+        adminGateway.requireCapability<ConversationForkGateway>("fork conversations")
+            .forkConversation(request)
+            .also { agentIdByConversation[it.id] = it.agentId }
+
     override fun close() {
         onClose?.invoke()
         adminGateway.close()
@@ -421,10 +439,16 @@ class DesktopHybridAppServerChatGateway internal constructor(
     }
 }
 
+/** The gateway as [T], or a failure naming what this backend cannot do ([what]). */
+internal inline fun <reified T> ChatGateway.requireCapability(what: String): T =
+    this as? T ?: throw UnsupportedOperationException("This backend cannot $what")
+
 internal class DesktopRuntimeOwnedChatGateway(
     private val delegate: DesktopChatGateway,
     private val runtimeLease: com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLease,
 ) : DesktopChatGateway by delegate,
+    ConversationSummaryGateway,
+    ConversationForkGateway,
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
@@ -468,6 +492,12 @@ internal class DesktopRuntimeOwnedChatGateway(
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
         (delegate as? ChatGatewayExtras)?.setConversationArchived(conversationId, archived)
             ?: error("The local App Server gateway cannot archive conversations")
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
+        delegate.requireCapability<ConversationSummaryGateway>("rename conversations").setConversationSummary(update)
+
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
+        delegate.requireCapability<ConversationForkGateway>("fork conversations").forkConversation(request)
 
     override fun close() {
         try {

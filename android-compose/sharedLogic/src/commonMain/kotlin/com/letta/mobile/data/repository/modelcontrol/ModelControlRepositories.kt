@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository.modelcontrol
 
+import com.letta.mobile.data.model.RecentModelsStore
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -103,7 +106,12 @@ class ModelCatalogRepository(private val rpc: AdminRpcInvoker) {
 class ConversationModelRepository(
     private val rpc: AdminRpcInvoker,
     val selections: ConversationModelSelections = ConversationModelSelections(),
+    /** letta-mobile-bzvro.18: a switched-to model becomes recent once the host accepts it. */
+    private val recents: RecentModelsStore? = null,
 ) {
+    /** The models switched to most recently (handles, newest first) for the picker's "Recent" group. */
+    val recentModels: Flow<List<String>> get() = recents?.recent ?: flowOf(emptyList())
+
     suspend fun updateModel(
         target: ConversationModelTarget,
         modelHandle: ModelHandle?,
@@ -113,6 +121,7 @@ class ConversationModelRepository(
         val params = ModelControlWire.updateParams(target, modelHandle, effort)
         val update = ModelControlWire.modelUpdate(rpc.invoke(ModelControlWire.MODEL_UPDATE, params))
         if (modelHandle != null) {
+            recents?.record(modelHandle.value)
             if (update.appliedTo == APPLIED_TO_AGENT) {
                 // The agent's own model moved; the refreshed agent is the source of truth.
                 selections.clear(target.conversationId)

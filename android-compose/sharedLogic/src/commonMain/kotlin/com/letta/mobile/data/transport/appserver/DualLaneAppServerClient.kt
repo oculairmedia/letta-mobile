@@ -52,6 +52,7 @@ class DualLaneAppServerClient(
         runtime.conversationCreate(command)
     override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
         runtime.conversationUpdate(command)
+    override suspend fun conversationFork(command: AppServerConversationFork) = runtime.conversationFork(command)
     override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
         admin.conversationMessagesList(command)
     override suspend fun conversationCompact(command: AppServerCommand.ConversationCompact) =

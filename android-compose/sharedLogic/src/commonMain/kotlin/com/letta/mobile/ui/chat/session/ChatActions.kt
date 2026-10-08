@@ -52,6 +52,18 @@ interface ChatActions {
 
     fun rerun(message: UiMessage)
 
+    /**
+     * letta-mobile-bzvro.15 (F15): branch the conversation from [message] into a new one and open
+     * it ([ChatSurfaceCapabilities.fork]). The original conversation is not changed.
+     */
+    fun forkFromMessage(message: UiMessage) = Unit
+
+    /**
+     * letta-mobile-bzvro.16 (F16): fork just before the user's [message], open the fork, and put
+     * the prompt's text in its composer to edit and send ([ChatSurfaceCapabilities.editAndResend]).
+     */
+    fun editAndResend(message: UiMessage) = Unit
+
     fun submitApproval(answer: ChatApprovalAnswer)
 
     fun submitA2uiAction(action: A2uiAction)
@@ -119,6 +131,10 @@ data class ChatSurfaceCapabilities(
     val fontScale: Boolean = true,
     /** Goal refresh/continue ([ChatActions.refreshGoalStatus], [ChatActions.continueGoal]). */
     val goals: Boolean = false,
+    /** "Fork from here" on a message ([ChatActions.forkFromMessage]). */
+    val fork: Boolean = false,
+    /** "Edit and resend" on the user's prompt ([ChatActions.editAndResend]). */
+    val editAndResend: Boolean = false,
 ) {
     companion object {
         val Default = ChatSurfaceCapabilities()

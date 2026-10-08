@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import com.letta.mobile.data.chat.projection.BranchActionSupport
 import com.letta.mobile.data.chat.projection.MessageActionAvailability
 import com.letta.mobile.data.chat.projection.messageActionAvailability
 import com.letta.mobile.data.model.UiMessage
@@ -45,7 +46,9 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_collapse_prompt
 import com.letta.mobile.sharedui.resources.rows_copy
 import com.letta.mobile.sharedui.resources.rows_copy_message
+import com.letta.mobile.sharedui.resources.rows_edit_and_resend
 import com.letta.mobile.sharedui.resources.rows_expand_prompt
+import com.letta.mobile.sharedui.resources.rows_fork_from_here
 import com.letta.mobile.sharedui.resources.rows_message_actions
 import com.letta.mobile.sharedui.resources.rows_role_inter_agent
 import com.letta.mobile.sharedui.resources.rows_role_not_sent
@@ -153,8 +156,14 @@ internal fun UserPromptRow(
     grouping: PromptGrouping = PromptGrouping.Alone,
 ) {
     val state = remember(message.id) { PromptCardState() }
-    val availability = remember(message, context.capabilities.rerun) {
-        messageActionAvailability(message, message.content, sendAgainAvailable = context.capabilities.rerun)
+    val capabilities = context.capabilities
+    val availability = remember(message, capabilities.rerun, capabilities.fork, capabilities.editAndResend) {
+        messageActionAvailability(
+            message,
+            message.content,
+            sendAgainAvailable = capabilities.rerun,
+            branching = BranchActionSupport(fork = capabilities.fork, edit = capabilities.editAndResend),
+        )
     }
     val hoverSource = remember(message.id) { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
@@ -339,10 +348,18 @@ private fun MessageActionsMenu(
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     val sendAgain = stringResource(Res.string.rows_send_again)
+    val edit = stringResource(Res.string.rows_edit_and_resend)
+    val fork = stringResource(Res.string.rows_fork_from_here)
     val copy = stringResource(Res.string.rows_copy)
     val items = buildList {
+        if (availability.canEdit) {
+            add(LettaMenuItem(label = edit, icon = LettaIcons.Edit) { callbacks.actions.editAndResend(message) })
+        }
         if (availability.canSendAgain) {
             add(LettaMenuItem(label = sendAgain, icon = LettaIcons.Send) { callbacks.actions.rerun(message) })
+        }
+        if (availability.canFork) {
+            add(LettaMenuItem(label = fork, icon = LettaIcons.ForkRight) { callbacks.actions.forkFromMessage(message) })
         }
         if (availability.canCopy) {
             add(LettaMenuItem(label = copy, icon = LettaIcons.Copy) { clipboard.setText(AnnotatedString(message.content)) })

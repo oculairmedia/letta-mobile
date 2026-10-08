@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -110,6 +111,24 @@ class ModelControlUiTest {
         onNodeWithTag("${ModelPickerTags.ROW_PREFIX}${ModelControlUiFixtures.SELECTED}").assertIsSelected()
         assertTrue(onAllNodesWithText("Med").fetchSemanticsNodes().isNotEmpty(), "tiers show after the name")
         onNodeWithTag("${ModelPickerTags.ROW_PREFIX}minimax/minimax-m3-lightning").performClick()
+
+        assertEquals("minimax/minimax-m3-lightning", selected.single().handle.value)
+    }
+
+    @Test
+    fun recentModelsHeadThePickerAndPickLikeAnyRow() = runComposeUiTest {
+        // letta-mobile-bzvro.18: the "Recent" group comes first and its rows select the model.
+        val selected = mutableListOf<ModelPickerEntry>()
+        val base = ModelControlUiFixtures.pickerState()
+        val state = base.copy(
+            groups = com.letta.mobile.data.repository.modelcontrol.ModelPickerCatalog
+                .withRecents(base.groups, listOf("minimax/minimax-m3-lightning")),
+        )
+        setContent { Frame { Column { ModelPickerContent(state, pickerActions(selected = selected)) } } }
+
+        onNodeWithTag("${ModelPickerTags.GROUP_PREFIX}recent").assert(isHeading())
+        onNodeWithText("RECENT").assertIsDisplayed()
+        onAllNodesWithTag("${ModelPickerTags.ROW_PREFIX}minimax/minimax-m3-lightning")[0].performClick()
 
         assertEquals("minimax/minimax-m3-lightning", selected.single().handle.value)
     }

@@ -334,6 +334,26 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "conversation.fork",
+      "handler": "ConversationAdminHandlers.kt",
+      "current_backend": "app_server_v2 only (letta-mobile-bzvro.15)",
+      "owner": "app_server_v2",
+      "public_contract": "conversation_fork",
+      "native_contract": [
+        "conversation_fork",
+        "conversation_fork_response",
+        "conversation_retrieve",
+        "conversation_retrieve_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "lgns8.7",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

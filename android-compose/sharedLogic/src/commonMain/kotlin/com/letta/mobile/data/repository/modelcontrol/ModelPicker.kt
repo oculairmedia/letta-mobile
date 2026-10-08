@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.modelcontrol
 
+import com.letta.mobile.data.composer.ComposerEffort
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import kotlinx.coroutines.CancellationException
@@ -80,6 +81,25 @@ object ModelPickerCatalog {
             }
     }
 
+    /** Key of the "Recent" group [withRecents] puts first. */
+    const val RECENTS_GROUP_KEY = "recent"
+    const val RECENTS_GROUP_TITLE = "Recent"
+
+    /**
+     * letta-mobile-bzvro.18: [groups] headed by a "Recent" group of the [recent] models (newest
+     * first) that the catalog still offers. A recent entry is a handle or a picker value; one the
+     * catalog no longer lists is skipped. No recents, no group.
+     */
+    fun withRecents(groups: List<ModelPickerGroup>, recent: List<String>): List<ModelPickerGroup> {
+        if (recent.isEmpty()) return groups
+        val offered = groups.flatMap { it.entries }
+        val entries = recent
+            .mapNotNull { wanted -> offered.firstOrNull { it.handle.value == wanted || it.value == wanted } }
+            .distinctBy { it.value }
+        if (entries.isEmpty()) return groups
+        return listOf(ModelPickerGroup(RECENTS_GROUP_KEY, RECENTS_GROUP_TITLE, entries)) + groups
+    }
+
     /** A blank query keeps everything; otherwise rows match by name or handle, groups by title. */
     fun filter(groups: List<ModelPickerGroup>, query: String): List<ModelPickerGroup> {
         val needle = query.trim()
@@ -96,7 +116,7 @@ object ModelPickerCatalog {
         handle = model.handle,
         displayName = model.model.displayName,
         tier = ReasoningTier.of(model.reasoningEffort ?: model.model.reasoningEffort),
-        efforts = model.reasoningEfforts,
+        efforts = ComposerEffort.sorted(model.reasoningEfforts),
         selected = selected != null && selected == model.model,
     )
 
@@ -124,7 +144,13 @@ interface ModelPickerSource {
     /** True while exposure can be edited from the picker ("Edit Models…"). */
     val canEditModels: Flow<Boolean>
 
+    /** letta-mobile-bzvro.18: recently used models (handles), newest first; they head the list. */
+    val recents: Flow<List<String>> get() = flowOf(emptyList())
+
     suspend fun load(mode: ModelLoad)
+
+    /** This source with [recents] heading its list. */
+    fun withRecents(recents: Flow<List<String>>): ModelPickerSource = RecentsPickerSource(this, recents)
 
     companion object {
         /**
@@ -179,6 +205,11 @@ private class CatalogPickerSource(
     }
 }
 
+private class RecentsPickerSource(
+    private val delegate: ModelPickerSource,
+    override val recents: Flow<List<String>>,
+) : ModelPickerSource by delegate
+
 private class FallbackPickerSource(
     private val primary: ModelPickerSource,
     private val fallback: ModelPickerSource,
@@ -186,6 +217,10 @@ private class FallbackPickerSource(
     private val primaryWorks = MutableStateFlow(true)
     override val providers: Flow<List<ConnectableProvider>> = preferPrimary(primary.providers, fallback.providers)
     override val models: Flow<List<CatalogModel>> = preferPrimary(primary.models, fallback.models)
+
+    /** Recents name handles, which either list resolves; the primary's own store wins when it has one. */
+    override val recents: Flow<List<String>> =
+        combine(primary.recents, fallback.recents) { p, f -> p.ifEmpty { f } }
     override val canEditModels: Flow<Boolean> =
         combine(primaryWorks, primary.canEditModels) { works, editable -> works && editable }
 
@@ -233,7 +268,8 @@ data class ModelPickerState(
 
     val selected: ModelPickerEntry? get() = groups.firstNotNullOfOrNull { g -> g.entries.firstOrNull { it.selected } }
 
-    val modelCount: Int get() = groups.sumOf { it.entries.size }
+    /** The catalog's models; the "Recent" group repeats some of them and is not counted. */
+    val modelCount: Int get() = groups.filter { it.key != ModelPickerCatalog.RECENTS_GROUP_KEY }.sumOf { it.entries.size }
 
     fun isCollapsed(group: ModelPickerGroup): Boolean = !searching && group.key in collapsed
 }
@@ -254,8 +290,8 @@ class ModelPickerController(
 
     init {
         scope.launch {
-            combine(source.providers, source.models, selectedValue) { providers, models, selected ->
-                ModelPickerCatalog.groups(providers, models, selected)
+            combine(source.providers, source.models, selectedValue, source.recents) { providers, models, selected, recent ->
+                ModelPickerCatalog.withRecents(ModelPickerCatalog.groups(providers, models, selected), recent)
             }.collect { groups -> _state.update { it.copy(groups = groups) } }
         }
         scope.launch { source.canEditModels.collect { editable -> _state.update { it.copy(canEditModels = editable) } } }

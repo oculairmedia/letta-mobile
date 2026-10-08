@@ -60,6 +60,9 @@ class SessionScopedConversationRepository @Inject constructor(
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         sessionManager.withCurrentSession { it.conversationRepository.forkConversation(id, agentId) }
 
+    override suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation =
+        sessionManager.withCurrentSession { it.conversationRepository.forkConversation(id, agentId, throughMessageId) }
+
     // letta-mobile-i9h61.3.4: without this override the interface default
     // (emptyList) silently wins — SessionScopedConversationRepository is
     // what Hilt injects as IConversationRepository, so the tap-to-navigate

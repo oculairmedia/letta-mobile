@@ -12,20 +12,70 @@ class ShellRowMenusTest {
     @Test
     fun aConversationOffersArchiveOrRestoreThenDelete() {
         val events = mutableListOf<String>()
-        val active = ShellRowMenus.conversation(archived = false, deleting = false, onArchiveToggle = { events += "archive" }) {
-            events += "delete?"
-        }
+        val active = ShellRowMenus.conversation(
+            archived = false,
+            deleting = false,
+            actions = ShellConversationMenuActions(
+                onArchiveToggle = { events += "archive" },
+                onRequestDelete = { events += "delete?" },
+            ),
+        )
         assertEquals(listOf("Archive chat", "Delete chat"), active.map { it.label })
         active.forEach { it.onClick() }
         assertEquals(listOf("archive", "delete?"), events)
 
-        val archived = ShellRowMenus.conversation(archived = true, deleting = false, onArchiveToggle = {}, onRequestDelete = {})
+        val archived = ShellRowMenus.conversation(
+            archived = true,
+            deleting = false,
+            actions = ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}),
+        )
         assertEquals(listOf("Restore chat", "Delete chat"), archived.map { it.label })
     }
 
     @Test
+    fun aConversationOffersRenameAndPinWhenTheHostDoes() {
+        // letta-mobile-bzvro.17
+        val events = mutableListOf<String>()
+        val manage = ShellConversationManageMenu(pinned = false, onRenameRequest = { events += "rename" }, onPinToggle = { events += "pin" })
+        val menu = ShellRowMenus.conversation(
+            archived = false,
+            deleting = false,
+            actions = ShellConversationMenuActions(
+                onArchiveToggle = {},
+                onRequestDelete = {},
+                manage = manage,
+            ),
+        )
+        assertEquals(listOf("Rename chat", "Pin chat", "Archive chat", "Delete chat"), menu.map { it.label })
+        menu.take(2).forEach { it.onClick() }
+        assertEquals(listOf("rename", "pin"), events)
+
+        assertEquals(
+            "Unpin chat",
+            ShellRowMenus.conversation(
+                false,
+                false,
+                ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}, manage = manage.copy(pinned = true)),
+            )[1].label,
+        )
+        assertTrue(
+            ShellRowMenus.conversation(
+                archived = false,
+                deleting = true,
+                actions = ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}, manage = manage),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
     fun aConversationBeingDeletedOffersNothing() {
-        assertTrue(ShellRowMenus.conversation(archived = false, deleting = true, onArchiveToggle = {}, onRequestDelete = {}).isEmpty())
+        assertTrue(
+            ShellRowMenus.conversation(
+                archived = false,
+                deleting = true,
+                actions = ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}),
+            ).isEmpty(),
+        )
     }
 
     @Test

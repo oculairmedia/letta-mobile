@@ -192,6 +192,51 @@ class ChatRowInteractionUiTest {
     }
 
     @Test
+    fun longPressOnAUserPromptOffersEditAndForkWhenTheOwnerCanBranch() = runComposeUiTest {
+        // letta-mobile-bzvro.15 / .16: the prompt's existing message menu carries both actions.
+        val actions = RecordingChatActions()
+        var capabilities by mutableStateOf(ChatSurfaceCapabilities(fork = true, editAndResend = true))
+        val prompt = message("user-3", "user", "Fix the typo")
+        setContent {
+            MaterialTheme { RenderRow(single(prompt), rowContext(capabilities = capabilities), rowCallbacks(actions)) }
+        }
+
+        onNodeWithTag(ChatRowTestTags.USER_PROMPT).performTouchInput { longClick() }
+        onNodeWithText("Edit and resend").performClick()
+        onNodeWithTag(ChatRowTestTags.USER_PROMPT).performTouchInput { longClick() }
+        onNodeWithText("Fork from here").performClick()
+        runOnIdle {
+            assertEquals(listOf(prompt), actions.edits)
+            assertEquals(listOf(prompt), actions.forks)
+        }
+
+        runOnIdle { capabilities = ChatSurfaceCapabilities.Default }
+        onNodeWithTag(ChatRowTestTags.USER_PROMPT).performTouchInput { longClick() }
+        onNodeWithText("Copy").assertExists()
+        onNodeWithText("Edit and resend").assertDoesNotExist()
+        onNodeWithText("Fork from here").assertDoesNotExist()
+    }
+
+    @Test
+    fun aPromptStillSendingOffersNeitherEditNorFork() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val pending = message("local-1", "user", "Sending…").copy(isPending = true)
+        setContent {
+            MaterialTheme {
+                RenderRow(
+                    single(pending),
+                    rowContext(capabilities = ChatSurfaceCapabilities(fork = true, editAndResend = true)),
+                    rowCallbacks(actions),
+                )
+            }
+        }
+
+        onNodeWithTag(ChatRowTestTags.USER_PROMPT).performTouchInput { longClick() }
+        onNodeWithText("Edit and resend").assertDoesNotExist()
+        onNodeWithText("Fork from here").assertDoesNotExist()
+    }
+
+    @Test
     fun aSettledRunSummaryIsAPlainLabelThatNeverCollapsesTheRun() = runComposeUiTest {
         val actions = RecordingChatActions()
         val block = ChatRenderItem.RunBlock(

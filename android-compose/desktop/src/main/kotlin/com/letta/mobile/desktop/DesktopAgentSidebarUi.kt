@@ -78,6 +78,7 @@ internal fun DesktopAgentSidebarState.toShellPanelState(): ShellAgentPanelState 
             selectedId = selectedConversationId.takeIf { selectedDestination == DesktopDestination.Conversations },
             thinkingId = thinkingConversationId,
             deletingIds = deletingConversationIds,
+            pinnedIds = pinnedConversationIds,
         ),
         timeLabel = ::formatRelativeTimestamp,
     ),
@@ -101,6 +102,8 @@ internal fun DesktopAgentSidebarActions.toShellPanelActions(mode: WorkPlayMode):
     onConversationSelected = onConversationSelected,
     onArchiveConversation = onArchiveConversation,
     onDeleteConversation = onDeleteConversation,
+    onRenameConversation = onRenameConversation,
+    onPinConversation = onPinConversation,
     onOpenCanvas = onOpenCanvas,
     onArchiveCanvas = onArchiveCanvas,
 )

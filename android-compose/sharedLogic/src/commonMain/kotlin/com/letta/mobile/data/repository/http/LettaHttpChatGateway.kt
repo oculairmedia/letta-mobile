@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository.http
 
+import com.letta.mobile.data.chat.branch.ConversationForkGateway
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -43,7 +45,10 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Platform-neutral Ktor implementation of the chat [ChatGateway] (conversations,
@@ -58,7 +63,7 @@ import kotlinx.serialization.json.buildJsonObject
 open class LettaHttpChatGateway(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, AutoCloseable {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ConversationForkGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     private data class MessageListQuery(
@@ -253,6 +258,23 @@ open class LettaHttpChatGateway(
         }
         response.requireSuccess()
         return response.body()
+    }
+
+    /**
+     * letta-mobile-bzvro.15: `POST /v1/conversations/{id}/fork`, its options as query parameters
+     * (letta-code's API backend sends them the same way), then a read of the fork.
+     */
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation {
+        val response = httpClient.post("$baseUrl/v1/conversations/${request.conversationId}/fork") {
+            applyAuth()
+            contentType(ContentType.Application.Json)
+            request.agentId?.let { parameter("agent_id", it) }
+            request.throughMessageId?.let { parameter("message_id", it) }
+        }
+        response.requireSuccess()
+        val forkedId = response.body<JsonObject>()["id"]?.jsonPrimitive?.contentOrNull
+            ?: throw TimelineTransportHttpException(response.status.value, "fork returned no conversation id")
+        return getConversation(forkedId)
     }
 
     override fun close() {

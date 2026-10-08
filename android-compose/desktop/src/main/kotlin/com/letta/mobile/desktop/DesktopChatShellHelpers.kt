@@ -533,6 +533,7 @@ internal fun createDesktopOverlayActions(
         chatModels = params.chatController.availableModels,
         reloadChatModels = params.chatController::reloadModelCatalog,
         onModelSelected = params.chatController::setConversationModel,
+        recentModels = params.chatController.conversationManagement.recentModels,
     ),
     onSelectConversation = {
         params.chatController.selectConversation(it)

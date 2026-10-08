@@ -1,5 +1,9 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.branch.ConversationForkGateway
+import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
@@ -15,7 +19,7 @@ import kotlinx.coroutines.flow.flowOf
 
 internal class DesktopLocalBackendAdminGateway(
     appServerClient: AppServerClient,
-) : DesktopAdminChatGateway {
+) : DesktopAdminChatGateway, ConversationSummaryGateway, ConversationForkGateway {
     private val shared = AppServerLocalAdminGateway(appServerClient) { operation ->
         "desktop-local-$operation-${UUID.randomUUID()}"
     }
@@ -61,9 +65,21 @@ internal class DesktopLocalBackendAdminGateway(
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
         shared.setConversationArchived(conversationId, archived)
 
-    override suspend fun deleteConversation(conversationId: String): Unit = throw UnsupportedOperationException(
-        "Bundled App Server does not support conversation deletion; archive explicitly instead",
-    )
+    /**
+     * letta-mobile-bzvro.17: the bundled App Server has no `conversation_delete`, so a delete
+     * archives and hides the conversation; it leaves every list and stays recoverable on disk.
+     */
+    override suspend fun deleteConversation(conversationId: String) {
+        shared.setConversationRemoved(com.letta.mobile.data.model.ConversationId(conversationId), removed = true)
+    }
+
+    /** letta-mobile-bzvro.17: rename (and the generated title) is the conversation's `summary`. */
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
+        shared.renameConversation(update)
+
+    /** letta-mobile-bzvro.15: `conversation_fork` through the bundled App Server. */
+    override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
+        shared.forkConversation(request)
 
     override suspend fun createAgent(params: AgentCreateParams): Agent =
         shared.createAgent(params)

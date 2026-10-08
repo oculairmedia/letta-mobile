@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.runtime.TurnIdentityLedger
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -225,6 +226,12 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversation else null
             }.also { if (it is JsonObject) notifyChanged(it, fallbackId = id, ConversationChangeKind.Archived) }
+        }
+        router.register(IrohConversationForkRpc.METHOD) { params ->
+            val sourceId = params.requireParam(AdminParamKey(IrohConversationForkRpc.CONVERSATION_ID))
+            // notifyChanged reads the fork's id from the result, so only a real fork notifies.
+            ConversationForkHandler.fork(nativeClient, sourceId, params)
+                .also { notifyChanged(it, fallbackId = null, ConversationChangeKind.Created) }
         }
         router.register("conversation.restore") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
