@@ -39,14 +39,24 @@ class TimelineExactCanonicalWriter(
             return mergeEvent(transaction, incoming)
         }
         // Opaque protocol records must survive even when the current renderer cannot project them.
-        val key = transaction.locate(record.identity) ?: TimelinePageKey(
+        val located = transaction.locate(record.identity)
+        val key = located ?: TimelinePageKey(
             record.message.date?.let(::parseTimelineInstantOrNull)?.let {
                 timelineInstantDurationMillis(parseTimelineInstant("1970-01-01T00:00:00Z"), it)
             } ?: 0, record.identity,
         )
         val bytes = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.model.LettaMessage.serializer(), record.message).encodeToByteArray()
+        // Replaying the row the ledger already holds is not a change (letta-mobile-bglj6.1.12).
+        if (located != null && transaction.holdsIdentical(record.identity, key, bytes)) return false
         transaction.put(TimelineStoredRecord(key, TIMELINE_OPAQUE_MESSAGE_CONTENT_TYPE, bytes))
         return true
+    }
+
+    /** True when the row stored under [key] already carries exactly [bytes]. */
+    private suspend fun TimelineStoreTransaction.holdsIdentical(identity: TimelineMessageId, key: TimelinePageKey, bytes: ByteArray): Boolean {
+        val stored = metadata(TimelineReadPosition.Around(key), 1).rows.singleOrNull { it.key == key } ?: return false
+        if (stored.body.encodedBytes != bytes.size.toLong() || stored.body.encodedBytes > maxHistoricalBytes) return false
+        return readHistoricalBody(identity, stored.body).contentEquals(bytes)
     }
 
     private suspend fun mergeToolReturn(

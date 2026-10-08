@@ -90,6 +90,58 @@ class TimelineExactCanonicalWriterTest {
             "Live and reopened render items must have the same identity multiplicity and content")
     }
 
+    /**
+     * letta-mobile-bglj6.1.12: the post-turn maintenance reconciles the same recent page again a few
+     * seconds after every turn. A page that changes nothing must not advance the durable revision,
+     * because every revision replaces the Paging generation under the chat and the list redraws.
+     * Rows with tool calls used to be rewritten on every pass: the bare tool_call event from the page
+     * dropped the return facts the stored row already had, and the page's tool_return put them back.
+     */
+    @Test fun reconcilingAnUnchangedToolTurnKeepsTheDurableRevision() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val page = toolTurnPage(
+            returned = com.letta.mobile.data.model.ToolReturnMessage(
+                id = "ui-msg-3", toolCallId = "call-1", date = "2026-01-01T00:00:02Z",
+                toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("agent_not_found"),
+            ),
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
+        val settled = engine.publication.value.durableRevision
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
+        assertEquals(settled, engine.publication.value.durableRevision, "an unchanged page advanced the durable revision")
+    }
+
+    /** As above, for a return the server projected down to a preview (letta-mobile-fe51r). */
+    @Test fun reconcilingAnUnchangedTruncatedToolTurnKeepsTheDurableRevision() = runTest {
+        val store = InMemoryTimelineStore()
+        val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)
+        val selection = assertIs<TimelineEngineOpen.Opened>(engine.open(scope)).selection
+        val page = toolTurnPage(
+            returned = com.letta.mobile.data.model.ToolReturnMessage(
+                id = "ui-msg-3", toolCallId = "call-1", date = "2026-01-01T00:00:02Z",
+                toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("{\"ok\":true,\"agents\":[" + "x".repeat(2_000) + "]}"),
+                toolReturnTruncated = true, toolReturnByteLen = 5_668,
+            ),
+        )
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
+        val settled = engine.publication.value.durableRevision
+        assertEquals(TimelineEnginePageOutcome.Applied, reconcile(engine, selection, *page))
+        assertEquals(settled, engine.publication.value.durableRevision, "an unchanged page advanced the durable revision")
+    }
+
+    /** One approval-gated tool turn as the App Server's `message.list` returns it. */
+    private fun toolTurnPage(returned: com.letta.mobile.data.model.ToolReturnMessage): Array<TimelineRemoteRecord> {
+        val call = com.letta.mobile.data.model.ToolCall(id = "call-1", name = "agent_discover", arguments = "{\"query\":\"PM\"}")
+        return listOf(
+            UserMessage(id = "ui-msg-1", contentRaw = kotlinx.serialization.json.JsonPrimitive("find the PM"), date = "2026-01-01T00:00:00Z", otid = "cm-1"),
+            com.letta.mobile.data.model.ApprovalRequestMessage(id = "ui-msg-2", toolCalls = listOf(call), date = "2026-01-01T00:00:01Z"),
+            returned,
+            AssistantMessage(id = "ui-msg-4", contentRaw = kotlinx.serialization.json.JsonPrimitive("Not found."), date = "2026-01-01T00:00:03Z"),
+        ).map(::record).toTypedArray()
+    }
+
     @Test fun reasoningLiveSettleAndReconcileHaveOneCanonicalRowPerIdentity() = runTest {
         val store = InMemoryTimelineStore()
         val engine = CanonicalTimelineEngine(store, TimelineExactCanonicalWriter(scope, 100_000), enabled = true)

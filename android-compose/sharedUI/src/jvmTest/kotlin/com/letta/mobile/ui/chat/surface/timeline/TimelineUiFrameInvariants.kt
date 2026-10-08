@@ -18,6 +18,21 @@ internal fun heightJumps(frames: List<UiFrame>, maxDp: Float): List<String> =
     }
 
 /**
+ * Rows drawn in one frame and gone from the next while the list did not move: a row the reader was
+ * looking at left the list, however briefly (letta-mobile-bglj6.1.12). Footer rows come and go by
+ * design and are not counted.
+ */
+internal fun vanishedRows(frames: List<UiFrame>): List<String> =
+    frames.zipWithNext().flatMap { (before, after) ->
+        if (before.firstVisibleItemIndex != after.firstVisibleItemIndex || before.scrollOffset != after.scrollOffset) {
+            return@flatMap emptyList()
+        }
+        val remaining = after.keys.toSet()
+        before.keys.filter { !it.isFooterKey() && it !in remaining }
+            .map { "frame ${after.index} [${after.step}]: $it was drawn in frame ${before.index} and is gone" }
+    }
+
+/**
  * Frames that show a spinner after the list has already drawn rows: once there is something to
  * read, a refresh must not put the loading state back over it.
  */
