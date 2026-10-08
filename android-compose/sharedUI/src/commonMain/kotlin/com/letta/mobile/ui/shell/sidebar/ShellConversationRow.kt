@@ -46,6 +46,7 @@ import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
+import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -79,13 +80,15 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val menuItems = ShellRowMenus.conversation(
         archived = model.archived,
         deleting = model.deleting,
-        onArchiveToggle = actions.onArchiveToggle,
-        manage = ShellConversationManageMenu(
-            pinned = model.pinned,
-            onRenameRequest = onRename?.let { { renaming = true } },
-            onPinToggle = actions.onPinToggle,
+        actions = ShellConversationMenuActions(
+            onArchiveToggle = actions.onArchiveToggle,
+            onRequestDelete = { confirmDelete = true },
+            manage = ShellConversationManageMenu(
+                pinned = model.pinned,
+                onRenameRequest = onRename?.let { { renaming = true } },
+                onPinToggle = actions.onPinToggle,
+            ),
         ),
-        onRequestDelete = { confirmDelete = true },
     )
     decorations.rowMenu(menuItems) {
         decorations.tooltip(model.title) {

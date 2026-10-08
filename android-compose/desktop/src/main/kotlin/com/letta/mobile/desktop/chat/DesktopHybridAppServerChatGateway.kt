@@ -439,7 +439,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
 }
 
 /** The gateway as [T], or a failure naming what this backend cannot do ([what]). */
-internal inline fun <reified T> Any.requireCapability(what: String): T =
+internal inline fun <reified T> ChatGateway.requireCapability(what: String): T =
     this as? T ?: throw UnsupportedOperationException("This backend cannot $what")
 
 internal class DesktopRuntimeOwnedChatGateway(

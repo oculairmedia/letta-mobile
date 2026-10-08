@@ -34,16 +34,14 @@ object ShellRowMenus {
     fun conversation(
         archived: Boolean,
         deleting: Boolean,
-        onArchiveToggle: () -> Unit,
-        manage: ShellConversationManageMenu = ShellConversationManageMenu.None,
-        onRequestDelete: () -> Unit,
+        actions: ShellConversationMenuActions,
     ): List<ShellRowMenuItem> =
         if (deleting) {
             emptyList()
         } else {
-            manage.items() + listOf(
-                ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", onArchiveToggle),
-                ShellRowMenuItem("Delete chat", onRequestDelete),
+            actions.manage.items() + listOf(
+                ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", actions.onArchiveToggle),
+                ShellRowMenuItem("Delete chat", actions.onRequestDelete),
             )
         }
 
@@ -63,6 +61,13 @@ object ShellRowMenus {
             actions.onAgentSettings?.let { onSettings -> ShellRowMenuItem("Agent settings") { onSettings(entry.agentId) } },
         )
 }
+
+/** A conversation row's secondary actions (archive, delete, optional rename/pin manage menu). */
+data class ShellConversationMenuActions(
+    val onArchiveToggle: () -> Unit,
+    val onRequestDelete: () -> Unit,
+    val manage: ShellConversationManageMenu = ShellConversationManageMenu.None,
+)
 
 /** A conversation row's rename and pin entries; a null action is one the host does not offer. */
 data class ShellConversationManageMenu(
