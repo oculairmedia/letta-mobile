@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -185,7 +186,14 @@ internal class AdminChatViewModel @Inject constructor(
      */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
 
+    /**
+     * letta-mobile-bzvro.7: the status line's detail for this screen's conversation, as the shared
+     * reducer folded it into the registry. Read under the key this screen publishes with.
+     */
+    val liveStatus: StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> = createLiveStatusFlow()
+
     companion object {
+        private const val LIVE_STATUS_STOP_TIMEOUT_MS = 5_000L
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
 
@@ -327,28 +335,30 @@ internal class AdminChatViewModel @Inject constructor(
     private var pipelineLifetime = com.letta.mobile.feature.chat.coordination.ChatPipelineLifetime(viewModelScope)
 
     private val sendPipeline: AdminChatSendPipeline
-        get() {
-            if (!runtimeCollectorStarted) {
-                runtimeCollectorStarted = true
-                val runtimes = selectedRuntimeProvider?.runtimes(agentId.value)
-                selectedRuntime = runtimes?.value
-                selectedSendOwner = selectedRuntime?.let(::newSendOwner)
-                currentSendPipeline = createSendPipeline()
-                if (runtimes != null) viewModelScope.launch {
-                    try {
-                        runtimes.collect { next -> if (next !== selectedRuntime) replaceSendRuntime(next) }
-                    } finally {
-                        replacingSendRuntime = true
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            pipelineLifetime.retire()
-                            selectedSendOwner?.retire()
-                            selectedRuntime?.retire()
-                        }
+        get() = ensureSendPipeline()
+
+    private fun ensureSendPipeline(): AdminChatSendPipeline {
+        if (!runtimeCollectorStarted) {
+            runtimeCollectorStarted = true
+            val runtimes = selectedRuntimeProvider?.runtimes(agentId.value)
+            selectedRuntime = runtimes?.value
+            selectedSendOwner = selectedRuntime?.let(::newSendOwner)
+            currentSendPipeline = createSendPipeline()
+            if (runtimes != null) viewModelScope.launch {
+                try {
+                    runtimes.collect { next -> if (next !== selectedRuntime) replaceSendRuntime(next) }
+                } finally {
+                    replacingSendRuntime = true
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        pipelineLifetime.retire()
+                        selectedSendOwner?.retire()
+                        selectedRuntime?.retire()
                     }
                 }
             }
-            return checkNotNull(currentSendPipeline)
         }
+        return checkNotNull(currentSendPipeline)
+    }
 
     /** Retires the current send generation and builds the next one on [next]. */
     private suspend fun replaceSendRuntime(next: com.letta.mobile.feature.chat.coordination.SelectedChatRuntime?) {
@@ -1205,6 +1215,17 @@ internal class AdminChatViewModel @Inject constructor(
             addAttachment(image)
         }
     }
+
+    private fun createLiveStatusFlow(): StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> =
+        runRegistry.runs
+            .map(::liveStatusIn)
+            .distinctUntilChanged()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(LIVE_STATUS_STOP_TIMEOUT_MS), com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle)
+
+    private fun liveStatusIn(
+        runs: Map<String, com.letta.mobile.data.presence.ConversationRunState>,
+    ): com.letta.mobile.data.runtime.RuntimeLiveStatus =
+        publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle
 
     /** The registry key for this screen's conversation; the agent stands in until the conversation has an id. */
     private var publishedRunKey: String? = null

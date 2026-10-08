@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,18 @@ interface ChatSessionPort {
      */
     val capabilities: StateFlow<ChatSurfaceCapabilities>
         get() = DefaultCapabilities
+
+    /**
+     * letta-mobile-bzvro.7/.8: the visible conversation's live status (loop phase, retry, server
+     * notices, server-side commands). Separate from [uiState] so its ticks never recompose the
+     * timeline. An owner that cannot observe it leaves the default, and the status line stays hidden.
+     */
+    val liveStatus: StateFlow<RuntimeLiveStatus>
+        get() = DefaultLiveStatus
 }
 
 private val DefaultCapabilities: StateFlow<ChatSurfaceCapabilities> =
     MutableStateFlow(ChatSurfaceCapabilities.Default).asStateFlow()
+
+private val DefaultLiveStatus: StateFlow<RuntimeLiveStatus> =
+    MutableStateFlow(RuntimeLiveStatus.Idle).asStateFlow()

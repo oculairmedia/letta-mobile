@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -75,6 +76,14 @@ internal class DesktopChatSessionPort(
     override val composer: StateFlow<ChatComposerUiState> = composerInputs()
         .map(::desktopChatComposerUiState)
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), desktopChatComposerUiState(currentComposerInputs()))
+
+    /** letta-mobile-bzvro.7: the selected conversation's live status, from the window's run registry. */
+    override val liveStatus: StateFlow<RuntimeLiveStatus> = combine(
+        controller.runs,
+        controller.state.map { it.selectedConversationId }.distinctUntilChanged(),
+    ) { runs, selected -> selected?.let(runs::get)?.live ?: RuntimeLiveStatus.Idle }
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RuntimeLiveStatus.Idle)
 
     override val actions: ChatActions = DesktopChatActions(
         controller = controller,

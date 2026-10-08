@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.fanout
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -22,7 +23,7 @@ import kotlinx.coroutines.launch
  */
 class AppServerRuntimeEventRouter(
     private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
-    private val connectionGenerationProvider: () -> Long = { 0L },
+    val connectionGenerationProvider: () -> Long = { 0L },
     /** letta-mobile-qygvv.5: decisions sent by this client, shared with the turn engine. */
     private val approvalDecisionCache: ApprovalDecisionCache = ApprovalDecisionCache(),
     private val fanout: RuntimeEventFanout = RuntimeEventFanout(
@@ -32,6 +33,23 @@ class AppServerRuntimeEventRouter(
 ) {
     private val collectorJob = atomic<Job?>(null)
     private val attachLock = SynchronizedObject()
+    private val integrity = atomic<StreamIntegrityMonitor?>(null)
+
+    /**
+     * letta-mobile-bzvro.6: every inbound frame is shown to [monitor] (gap detection, sync cadence)
+     * before it is fanned out. One monitor per router; binding again replaces it.
+     */
+    fun bindStreamIntegrity(monitor: StreamIntegrityMonitor) {
+        integrity.value = monitor
+    }
+
+    /** letta-mobile-bzvro.6: ask the bound monitor to resync what is on screen; no-op without one. */
+    fun requestResync() {
+        integrity.value?.requestResync()
+    }
+
+    /** The runtimes someone is watching right now: what a resync should cover. */
+    fun watchedRuntimes(): List<AppServerRuntimeScope> = fanout.watchedRuntimes()
 
     fun inboundControlRegistry(): InboundControlRequestRegistry = inboundControlRegistry
 
@@ -58,7 +76,10 @@ class AppServerRuntimeEventRouter(
             val existing = collectorJob.value
             if (existing != null && existing.isActive) return
             val newJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                inbound.collect { received -> fanout.route(received) }
+                inbound.collect { received ->
+                    integrity.value?.observe(received)
+                    fanout.route(received)
+                }
             }
             collectorJob.value = newJob
         }

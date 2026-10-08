@@ -210,16 +210,34 @@ open class AppServerRuntimeEventMapper {
                     ),
                 ),
             )
-            else -> listOf(command.remoteStreamFrame(ref))
+            else -> listOfNotNull(command.remoteStreamFrame(ref), command.liveStatusDraft(messageType, deltaObject, runId))
         }
     }
 
-    private fun AppServerInboundFrame.UpdateLoopStatus.toLoopStatusDraft(command: TurnCommand): List<RuntimeEventDraft> =
-        if (loopStatus.activeRunIds.isNotEmpty()) {
-            listOf(command.runLifecycleDraft(RuntimeRunStatus.Running, runId = RunId(loopStatus.activeRunIds.first())))
-        } else {
-            emptyList()
+    /**
+     * letta-mobile-bzvro.7/.8/.10: the typed reading of a run-describing delta (`retry`, `status`,
+     * command lifecycle, `approval_classification_end`), emitted ALONGSIDE the raw remote stream
+     * frame those deltas always produced, so every existing consumer of that frame (relay fanout,
+     * Iroh projection) is unchanged.
+     */
+    private fun TurnCommand.liveStatusDraft(messageType: String?, delta: JsonObject, runId: RunId?): RuntimeEventDraft? =
+        AppServerLiveStatusDeltas.payloadFor(messageType, delta)?.let { payload ->
+            turnDraft(runId = runId, source = RuntimeEventSource.LocalRuntime, payload = payload)
         }
+
+    private fun AppServerInboundFrame.UpdateLoopStatus.toLoopStatusDraft(command: TurnCommand): List<RuntimeEventDraft> {
+        val running = loopStatus.activeRunIds.firstOrNull()?.let { runId ->
+            command.runLifecycleDraft(RuntimeRunStatus.Running, runId = RunId(runId))
+        }
+        // letta-mobile-bzvro.7: the phase itself, for the status line. Advisory: turn bookkeeping
+        // ignores it (see RuntimeEventPayload.isAdvisory).
+        val phase = command.turnDraft(
+            runId = running?.runId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.LoopPhaseChanged(status = loopStatus.status),
+        )
+        return listOfNotNull(running, phase)
+    }
 
     private fun AppServerInboundFrame.ExternalToolCallRequest.toToolCallDraft(command: TurnCommand): List<RuntimeEventDraft> =
         listOf(

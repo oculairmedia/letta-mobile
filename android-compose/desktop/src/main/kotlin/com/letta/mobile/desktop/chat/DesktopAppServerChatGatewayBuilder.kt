@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
@@ -108,6 +109,7 @@ class DesktopAppServerChatGatewayBuilder(
             }
             val router = AppServerRuntimeEventRouter()
             eventRouter = router
+            if (!isIroh) startStreamIntegrity(router, client, clientScope)
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
@@ -138,6 +140,23 @@ class DesktopAppServerChatGatewayBuilder(
             transportResources.close()
             throw error
         }
+    }
+
+    /**
+     * letta-mobile-bzvro.6: on a direct App Server socket every frame of the connection reaches
+     * this client, so an `event_seq` gap is a lost frame: resync, and keep the watched runtimes on
+     * the busy/idle sync cadence. Iroh dials go through the host's per-viewer relay, whose
+     * filtered sequence has legitimate holes, so they are left to the reconnect path.
+     */
+    private fun startStreamIntegrity(router: AppServerRuntimeEventRouter, client: AppServerClient, scope: CoroutineScope) {
+        val monitor = StreamIntegrityMonitor.forRouter(
+            router = router,
+            client = client,
+            detectGaps = true,
+            requestIdFactory = { "desktop-sync-${UUID.randomUUID()}" },
+        )
+        router.bindStreamIntegrity(monitor)
+        monitor.start(scope)
     }
 
     private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =

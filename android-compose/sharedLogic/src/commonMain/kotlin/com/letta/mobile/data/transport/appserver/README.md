@@ -5,6 +5,20 @@ WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.32.10`
 (`APP_SERVER_PROTOCOL_VERSION = 1`); the deployed server runs 0.32.3, whose command and message
 unions are identical.
 
+## letta-code version pins
+
+Each pin has one job and one source of truth; everything else cites it (letta-mobile-bzvro.10).
+
+| Pin | Version | Source of truth | What it means |
+|---|---|---|---|
+| Desktop bundled runtime | 0.29.12 | `desktop/build.gradle.kts` (`desktopLettaCodeVersion`), mirrored in `desktop/runtime/package.json` and `runtime-manifest.json` | The App Server the Windows desktop installs and runs locally. Also the appserver-cli restart-replay evidence pin (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`). `LettaCodeVersionPinsTest` keeps them equal. |
+| Wire contract baseline | 0.32.10 | `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` | The protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`, `appserver-contract` workflow). |
+| Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | What the deployed host ran when the golden was captured; unions identical to 0.32.10. |
+| Forward compatibility | 0.33.6 | `commonTest/.../LettaCode0336Frames.kt` | The version the official Letta desktop app ships. Not a runtime: decoders are proven tolerant of its frames (agent-free scopes, `removed[]`, new toolsets and process kinds, `retry` provider fields, `approval_classification_end`, unknown new frame types). |
+
+Bumping the bundled runtime is a separate, deliberate change: update `desktopLettaCodeVersion`, the
+runtime package files and the replay evidence together.
+
 Source of truth, in order: the package's `dist/types/types/protocol_v2.d.ts` (+ siblings), then
 [protocol lifecycle](https://docs.letta.com/platform/app-server/protocol-lifecycle/index.md).
 The docs changelog lags releases; prefer the `.d.ts`.

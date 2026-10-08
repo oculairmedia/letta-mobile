@@ -58,6 +58,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
+import com.letta.mobile.ui.chat.surface.status.RunStatusLine
 import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
@@ -633,8 +634,19 @@ private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: M
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
         if (mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
+        LiveRunStatus(frame)
         ComposerPanel(frame, mode, Modifier.fillMaxWidth())
     }
+}
+
+/**
+ * letta-mobile-bzvro.7: what the agent is doing right now, above the composer. Collected here, not
+ * in the frame, so a status tick recomposes this line alone.
+ */
+@Composable
+private fun LiveRunStatus(frame: ChatSurfaceFrame) {
+    val status by frame.port.liveStatus.collectForChatSurface()
+    RunStatusLine(status)
 }
 
 /** The A2UI surfaces above the docked composer, where no timeline shows them. */

@@ -106,6 +106,7 @@ class AppServerTurnEngineTurnBoundaryTest {
         engine(client).runTurn(command).test {
             awaitStarted()
             client.emit(TestLoopState.WaitingOnInput.frame())
+            awaitLoopPhase("WAITING_ON_INPUT")
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
             client.emit(run1.stopDelta())
@@ -121,6 +122,7 @@ class AppServerTurnEngineTurnBoundaryTest {
             awaitStarted()
             client.emit(run1.stopDelta(TestStopReason.RequiresApproval))
             client.emit(TestLoopState.WaitingOnApproval.frame())
+            awaitLoopPhase("WAITING_ON_APPROVAL")
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
             cancelAndIgnoreRemainingEvents()
@@ -162,6 +164,7 @@ class AppServerTurnEngineTurnBoundaryTest {
             assertEquals("run-1", lingeringDraft.runId?.value)
             // ...but an idle loop status right after must not complete this lease because run-1 draft is not evidence for this lease.
             client.emit(TestLoopState.WaitingOnInput.frame())
+            awaitLoopPhase("WAITING_ON_INPUT")
             advanceTimeBy(SETTLE_WINDOW_PASSED_MS)
             expectNoEvents()
             // Valid new-run frames proceed and are not dropped as superseded_run.
@@ -179,6 +182,11 @@ class AppServerTurnEngineTurnBoundaryTest {
         turnIdleTimeoutMs = 600_000,
         nowMs = { testScheduler.currentTime },
     )
+
+    /** letta-mobile-bzvro.7: a loop status projects only its advisory phase, never a terminal. */
+    private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitLoopPhase(status: String) {
+        assertEquals(status, assertIs<RuntimeEventPayload.LoopPhaseChanged>(awaitItem().payload).status)
+    }
 
     private suspend fun ReceiveTurbine<RuntimeEventDraft>.awaitStarted() {
         val started = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)

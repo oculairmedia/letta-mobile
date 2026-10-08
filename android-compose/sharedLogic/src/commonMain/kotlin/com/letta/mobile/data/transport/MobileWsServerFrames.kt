@@ -656,6 +656,24 @@ sealed interface ServerFrame {
         val type: String,
         val raw: JsonObject,
     ) : ServerFrame
+
+    /**
+     * letta-mobile-bzvro.7/.8: what the run is doing (loop phase, provider retry, server status
+     * notice, server-side command progress), carried in-process from an App Server turn engine to
+     * the chat coordinator on transports that project runtime events into [ServerFrame]s (the
+     * Android Iroh path). Never on the wire and never deserialized: [payload] is one of the
+     * advisory [com.letta.mobile.runtime.RuntimeEventPayload]s.
+     */
+    data class RunActivity(
+        override val v: Int = 1,
+        val type: String = "run_activity",
+        override val id: String,
+        override val ts: String,
+        val agentId: String? = null,
+        val conversationId: String? = null,
+        val runId: String? = null,
+        val payload: com.letta.mobile.runtime.RuntimeEventPayload,
+    ) : ServerFrame
 }
 
 @Serializable

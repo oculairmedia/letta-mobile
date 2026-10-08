@@ -12,6 +12,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +59,12 @@ internal fun ChatTimeline(
     topInset: Dp = 0.dp,
 ) {
     var viewer by remember { mutableStateOf<ImageViewerRequest?>(null) }
-    val callbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
+    val latestState = rememberUpdatedState(state)
+    val rowCallbacks = rememberRowCallbacks(actions, host) { images, index -> viewer = ImageViewerRequest(images, index) }
+    // letta-mobile-bzvro.9: an error card's Retry reads the newest prompt when pressed.
+    val callbacks = remember(rowCallbacks) {
+        rowCallbacks.withLastPrompt { latestState.value.messages.lastOrNull { it.role == "user" } }
+    }
     val (pinch, pinchModifier) = rememberTimelinePinch(
         enabled = capabilities.fontScale,
         committedScale = TextScale(appearance.fontScale),

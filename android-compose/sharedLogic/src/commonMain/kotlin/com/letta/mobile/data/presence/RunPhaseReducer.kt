@@ -1,6 +1,7 @@
 package com.letta.mobile.data.presence
 
 import com.letta.mobile.data.runtime.RuntimeFrameKind
+import com.letta.mobile.data.runtime.RuntimeLiveStatusReducer
 import com.letta.mobile.data.runtime.frameKind
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -25,7 +26,7 @@ object RunPhaseReducer {
         // DONE is momentary: any next event means a new turn is under way, so the run starts from
         // rest rather than inheriting the finished turn's tool counters.
         val base = if (state.phase == RunPhase.DONE) state.reset() else state
-        return when (event) {
+        val phased = when (event) {
             is RuntimeEventPayload.LocalUserAppend -> base.reset().at(RunPhase.QUEUED, nowMs)
             is RuntimeEventPayload.RetryRequested -> base.reset().at(RunPhase.QUEUED, nowMs)
             is RuntimeEventPayload.SendMarkedFailed -> base.reset().at(RunPhase.FAILED, nowMs)
@@ -63,8 +64,19 @@ object RunPhaseReducer {
             is RuntimeEventPayload.MemFsCommitObserved,
             is RuntimeEventPayload.AgentFileImported,
             is RuntimeEventPayload.AgentFileExported,
+            // Loop status, retries, notices and commands feed [ConversationRunState.live] only: the
+            // phase the mascots read keeps following the content (letta-mobile-bzvro.7).
+            is RuntimeEventPayload.LoopPhaseChanged,
+            is RuntimeEventPayload.RetryNotice,
+            is RuntimeEventPayload.StatusNotice,
+            is RuntimeEventPayload.CommandStarted,
+            is RuntimeEventPayload.CommandFinished,
+            is RuntimeEventPayload.ApprovalClassified,
             -> base
         }
+        // letta-mobile-bzvro.7: the status line's detail, folded from the same event.
+        val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
+        return if (live == phased.live) phased else phased.copy(live = live)
     }
 
     /**

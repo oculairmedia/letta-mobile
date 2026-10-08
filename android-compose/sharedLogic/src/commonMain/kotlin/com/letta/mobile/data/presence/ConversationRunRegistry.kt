@@ -1,5 +1,6 @@
 package com.letta.mobile.data.presence
 
+import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +26,11 @@ data class ConversationRunState(
     val phaseSinceEpochMs: Long = 0L,
     /** The user is composing to this conversation. Orthogonal to [phase]. */
     val userTyping: Boolean = false,
+    /**
+     * letta-mobile-bzvro.7: the status line's detail (loop phase, retry, server notices and
+     * commands), reduced from the same events by [com.letta.mobile.data.runtime.RuntimeLiveStatusReducer].
+     */
+    val live: RuntimeLiveStatus = RuntimeLiveStatus.Idle,
 ) {
     /** How many tool calls are in flight; tools overlap, so this is a count, not a flag. */
     val openToolCalls: Int get() = openToolCallIds.size
