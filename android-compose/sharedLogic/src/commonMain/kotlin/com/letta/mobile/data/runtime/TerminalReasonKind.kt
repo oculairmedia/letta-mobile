@@ -36,7 +36,34 @@ private val TERMINAL_REASON_FAMILIES = listOf(
     ReasonFamily("invalid_tool_call_ids", anyOf = listOf("invalid tool call ids")),
     ReasonFamily("conversation_busy", allOf = listOf("conversation", "busy")),
     ReasonFamily("empty_response", anyOf = listOf("empty content in", "empty response")),
-    ReasonFamily("rate_limited", anyOf = listOf("rate limit", "429", "overloaded", "529")),
+    // letta-mobile-bzvro.9 (F09): the actionable families. Credit before rate limiting: an
+    // exhausted quota is often sent as a 429 too, and the fix is different (top up, not wait).
+    ReasonFamily(
+        "credit_limit",
+        anyOf = listOf("credit_limit", "credit limit", "insufficient credit", "insufficient_quota", "out of credits", "billing", "payment required"),
+    ),
+    ReasonFamily(
+        "context_window_exceeded",
+        anyOf = listOf(
+            "context_window", "context window", "context length", "context_length", "maximum context",
+            "prompt is too long", "too many tokens", "token limit",
+        ),
+    ),
+    ReasonFamily(
+        "model_not_supported",
+        anyOf = listOf(
+            "model_not_supported", "model not supported", "unsupported model", "model_not_found",
+            "model not found", "not a supported model", "does not support this model",
+        ),
+    ),
+    ReasonFamily("rate_limited", anyOf = listOf("rate limit", "rate_limit", "429", "overloaded", "529")),
+    ReasonFamily(
+        "network_error",
+        anyOf = listOf(
+            "network_error", "network error", "econnreset", "econnrefused", "enotfound", "etimedout",
+            "socket hang up", "fetch failed", "connection reset", "connection refused",
+        ),
+    ),
     ReasonFamily("timeout", anyOf = listOf("timed out", "timeout")),
     ReasonFamily("provider_error", anyOf = listOf("model provider error", "provider")),
     ReasonFamily("aborted", anyOf = listOf("abort", "cancel", "interrupt")),

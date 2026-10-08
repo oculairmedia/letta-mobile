@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-bzvro.7: the live status line above the composer. -->
+    <string name="run_status_sending">Sending request…</string>
+    <string name="run_status_waiting">Waiting for the model…</string>
+    <string name="run_status_processing">Processing the response…</string>
+    <string name="run_status_tool">Running a tool…</string>
+    <string name="run_status_command">Running a command…</string>
+    <string name="run_status_approval">Waiting for your approval</string>
+    <string name="run_status_working">Working…</string>
+    <string name="run_status_retrying">Retrying…</string>
+    <!-- Retry with attempt counts and the seconds left: "Retrying (2/5) in 4 s". -->
+    <string name="run_status_retry_in">Retrying (%1$d/%2$d) in %3$d s</string>
+    <string name="run_status_retry_now">Retrying (%1$d/%2$d)…</string>
+    <!-- A provider name after the retry line: "· anthropic". -->
+    <string name="run_status_retry_provider">· %1$s</string>
+    <!-- letta-mobile-bzvro.8: server-side command progress. -->
+    <string name="run_status_command_running">Running %1$s…</string>
+    <string name="run_status_command_succeeded">%1$s finished</string>
+    <string name="run_status_command_failed">%1$s failed</string>
+    <string name="run_status_command_dismiss">Dismiss</string>
+    <!-- letta-mobile-bzvro.9: the one action an error card offers. -->
+    <string name="run_error_action_retry">Retry</string>
+    <string name="run_error_action_switch_model">Switch model</string>
+    <string name="run_error_action_compact">Compact</string>
+</resources>

@@ -15,6 +15,7 @@ import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import com.letta.mobile.runtime.isPresentationOnly
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,7 +99,10 @@ internal class AdminChatSendPipeline(
             },
             runtimeEventSink = { drafts ->
                 runtimeEventObserver(drafts)
-                runtimeEventOutbox.appendAll(drafts)
+                // letta-mobile-bzvro.7: status-line events feed the run state, not the durable outbox.
+                drafts.filterNot { it.payload.isPresentationOnly }
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { runtimeEventOutbox.appendAll(it) }
             },
         )
     }

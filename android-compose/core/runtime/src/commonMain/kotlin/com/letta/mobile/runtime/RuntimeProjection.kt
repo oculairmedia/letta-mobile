@@ -168,7 +168,9 @@ object RuntimeEventProjector {
                 agentFiles = next.agentFiles + (payload.file.id to payload.file),
             )
 
-            is RuntimeEventPayload.AgentFileExported -> next
+            // Exports, and the presentation-only live status and command progress
+            // (letta-mobile-bzvro.7/.8/.10), leave no durable record.
+            else -> next
         }
     }
 

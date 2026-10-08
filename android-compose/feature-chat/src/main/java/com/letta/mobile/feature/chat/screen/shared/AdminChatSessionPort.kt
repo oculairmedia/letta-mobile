@@ -4,6 +4,7 @@ import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -40,6 +41,9 @@ internal class AdminChatSessionPort(
             .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport)
+
+    /** letta-mobile-bzvro.7: the run state the view model folds from this screen's runtime events. */
+    override val liveStatus: StateFlow<RuntimeLiveStatus> = viewModel.liveStatus
 
     /** Android's support does not change while the page is open. */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(Capabilities)

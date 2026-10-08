@@ -546,8 +546,13 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 ### App Server contract / probe toolchain (epic letta-mobile-lgns8)
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
-  `~/.nvm/versions/node/v24.18.0/bin/node`) and **`@letta-ai/letta-code@0.29.9`**
-  (`~/letta-code-install/node_modules/@letta-ai/letta-code`) are provisioned in the snapshot.
+  `~/.nvm/versions/node/v24.18.0/bin/node`). The contract verifier pins the wire baseline
+  **`@letta-ai/letta-code@0.32.10`** (`app-server-v2-contract-matrix.json`); runtime probes and the
+  restart-replay evidence use the desktop's bundled **`0.29.12`**. One table lists every pin:
+  `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`
+  ("letta-code version pins"). Install the package under test at
+  `~/letta-code-install/node_modules/@letta-ai/letta-code` (older VM snapshots carry 0.29.9 there;
+  replace it with the version the task needs).
 - The contract verifier pins the exact Node + package versions, so run it with Node 24.18.0:
   `~/.nvm/versions/node/v24.18.0/bin/node scripts/appserver/verify-contract-baseline.mjs --package-root ~/letta-code-install/node_modules/@letta-ai/letta-code`.
 - Launch the local App Server for probes with

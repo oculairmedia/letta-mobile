@@ -263,8 +263,6 @@ class ChatSendCoordinator(
     private fun isOtidSettledLocked(otid: String?): Boolean =
         otid?.let { it in settledOtids } ?: false
 
-    private fun isOtidSettled(otid: String?): Boolean =
-        synchronized(turnStateLock) { isOtidSettledLocked(otid) }
 
     private fun stateForLocked(conversationId: String): ConversationTurnState {
         val targetId = conversationAliases[conversationId] ?: conversationId
@@ -915,9 +913,15 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.GoalsUpdated, is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
-            is WsTimelineEvent.UserActionOutcome ->
-                runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
+            // letta-mobile-bzvro.7: status-line events, like action outcomes, go to the run state only.
+            is WsTimelineEvent.UserActionOutcome, is WsTimelineEvent.RunActivity -> recordRunStateOnly(event)
         }
+    }
+
+    private fun recordRunStateOnly(event: WsTimelineEvent) {
+        val named = (event as? WsTimelineEvent.RunActivity)?.conversationId
+            ?: (event as? WsTimelineEvent.UserActionOutcome)?.conversationId
+        runtimeEventBatcher.enqueue(event, resolveConversationId(named) ?: named ?: lastActiveConversationId)
     }
 
     /** A delta naming a turn this conversation has already finished is that turn's tail. */

@@ -111,7 +111,7 @@ private fun AssistantPrimaryContent(
     when {
         notification != null -> SubagentNotificationCard(notification, callbacks.openSubagent)
         message.content.isBlank() -> Unit
-        message.isError -> ErrorBubble(message.content)
+        message.isError -> ErrorBubble(message.content) { RunErrorActionButton(message.content, context, callbacks) }
         else -> AgentText(
             AgentTextParams(
                 text = message.content,
@@ -174,7 +174,7 @@ private fun SpeakerHeader(message: UiMessage, context: ChatRowContext) {
 
 /** A server error frame: the error-container bubble with its "Error" label (bubbleStyle isError). */
 @Composable
-private fun ErrorBubble(text: String) {
+private fun ErrorBubble(text: String, action: @Composable () -> Unit = {}) {
     Surface(
         shape = ChatBubbleShapes.agent(),
         color = MaterialTheme.colorScheme.errorContainer,
@@ -188,6 +188,7 @@ private fun ErrorBubble(text: String) {
             SelectionContainer {
                 SharedMarkdownText(text = text, textColor = MaterialTheme.colorScheme.onErrorContainer)
             }
+            action()
         }
     }
 }

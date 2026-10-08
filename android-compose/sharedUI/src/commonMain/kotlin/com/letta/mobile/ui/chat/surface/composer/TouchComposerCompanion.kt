@@ -88,6 +88,18 @@ internal fun TouchCompanionSlot(model: ComposerModel) {
 }
 
 /**
+ * Whether the composer companion (mascot, elapsed time, status) is on screen right now, so other
+ * lines above the composer need not repeat what it says. False on hosts with no mascot.
+ */
+@Composable
+internal fun companionIndicatorShowing(uiState: ChatUiState): Boolean {
+    if (!LocalComposerCompanion.current) return false
+    val agentId = uiState.agentId ?: return false
+    if (!mascotAvailable(agentId)) return false
+    return companionWorking(uiState, LocalMascotRegistry.current.presence[agentId])
+}
+
+/**
  * The companion is up while a turn is live: streaming, typing, an A2UI delay line, or any
  * presence activity other than idle (legacy ChatComposerCompanion used presence; the shared
  * page previously missed a working tool that had not yet flipped isStreaming).
