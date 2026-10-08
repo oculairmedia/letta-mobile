@@ -130,6 +130,7 @@ private fun rememberConfigContentCallbacks(
                 onModeChange = { viewModel.updateMode(it) },
                 onServerUrlChange = { viewModel.updateServerUrl(it) },
                 onApiTokenChange = { viewModel.updateApiToken(it) },
+                onTestConnection = { viewModel.testConnection() },
             ),
             localModel = localModelCallbacks(viewModel),
             embeddedModel = EmbeddedModelCallbacks(

@@ -3,12 +3,15 @@ package com.letta.mobile.ui.screens.config
 import android.net.Uri
 import app.cash.turbine.test
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.api.AppServerConnectionTester
 import com.letta.mobile.data.api.CloudConnectionValidationResult
 import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.transport.appserver.AppServerIdentity
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
@@ -50,6 +53,7 @@ class ConfigViewModelTest {
     private lateinit var fakeModelImporter: FakeOnDeviceModelImporter
     private lateinit var fakeEmbeddedModelRepository: FakeEmbeddedModelRepository
     private lateinit var fakeEndpointCatalog: FakeEndpointOpenAiModelCatalog
+    private val fakeConnectionTester = FakeAppServerConnectionTester()
     private lateinit var viewModel: ConfigViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -77,11 +81,84 @@ class ConfigViewModelTest {
             fakeModelImporter,
             fakeEmbeddedModelRepository,
             fakeEndpointCatalog,
+            fakeConnectionTester,
         )
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    private fun selfHosted(url: String, token: String = "") {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        viewModel.updateServerUrl(url)
+        viewModel.updateApiToken(token)
+    }
+
+    private fun connectionTest(): ConnectionTestUiState =
+        (viewModel.uiState.value as UiState.Success).data.connectionTest
+
+    @Test
+    fun testConnection_reportsTheClassifiedProbeResultForTheFormValues() = runTest {
+        // letta-mobile-bzvro.1 (F01): the form is tested before it is saved.
+        selfHosted("wss://appserver.example/ws", token = " tkn ")
+        val gate = CompletableDeferred<AppServerProbeResult?>()
+        fakeConnectionTester.next = { gate.await() }
+
+        viewModel.testConnection()
+        assertEquals(ConnectionTestUiState.Running, connectionTest())
+        gate.complete(AppServerProbeResult.Authentication("HTTP 401"))
+
+        assertEquals(ConnectionTestUiState.Finished(AppServerProbeResult.Authentication("HTTP 401")), connectionTest())
+        assertEquals(listOf("wss://appserver.example/ws" to "tkn"), fakeConnectionTester.calls)
+        assertEquals("testing never saves", null, fakeRepository.activeConfigState.value)
+    }
+
+    @Test
+    fun testConnection_okCarriesTheServerIdentity() = runTest {
+        selfHosted("ws://10.0.0.2:4500")
+        val ok = AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
+        fakeConnectionTester.next = { ok }
+
+        viewModel.testConnection()
+
+        assertEquals(ConnectionTestUiState.Finished(ok), connectionTest())
+    }
+
+    @Test
+    fun testConnection_unprobeableUrlIsNotSupported() = runTest {
+        selfHosted("iroh://node-ticket")
+        fakeConnectionTester.next = { null }
+
+        viewModel.testConnection()
+
+        assertEquals(ConnectionTestUiState.NotSupported, connectionTest())
+    }
+
+    @Test
+    fun testConnection_resultForAnEditedUrlIsDropped() = runTest {
+        selfHosted("ws://old:4500")
+        val gate = CompletableDeferred<AppServerProbeResult?>()
+        fakeConnectionTester.next = { gate.await() }
+
+        viewModel.testConnection()
+        viewModel.updateServerUrl("ws://new:4500")
+        gate.complete(AppServerProbeResult.Unavailable("refused"))
+
+        assertEquals(ConnectionTestUiState.Idle, connectionTest())
+    }
+
+    @Test
+    fun testConnection_isOnlyForSelfHosted() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.testConnection()
+
+        assertEquals(ConnectionTestUiState.Idle, connectionTest())
+        assertTrue(fakeConnectionTester.calls.isEmpty())
     }
 
     @Test
@@ -1010,6 +1087,16 @@ class ConfigViewModelTest {
         }
 
         override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? = null
+    }
+
+    private class FakeAppServerConnectionTester : AppServerConnectionTester() {
+        val calls = mutableListOf<Pair<String, String?>>()
+        var next: suspend () -> AppServerProbeResult? = { null }
+
+        override suspend fun test(serverUrl: String, accessToken: String?): AppServerProbeResult? {
+            calls += serverUrl to accessToken
+            return next()
+        }
     }
 
     private class FakeCloudConnectionValidator(
