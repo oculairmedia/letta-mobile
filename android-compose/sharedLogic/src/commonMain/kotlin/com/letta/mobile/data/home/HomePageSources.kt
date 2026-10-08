@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -97,19 +98,27 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsJob = scope.launch { loadStats(graph) }
     }
 
-    /** Each figure lands as soon as it is known; [HomeStats.loading] clears once all have settled. */
+    /**
+     * Each figure lands as soon as it is known; [HomeStats.loading] clears once all have settled. A
+     * figure that fails (say a route the backend has no admin_rpc path for under iroh://) stays null,
+     * so its tile drops out; [HomeStats.error] is raised only when every figure failed.
+     */
     private suspend fun loadStats(graph: Graph) {
         if (graph.localRuntimeBackend != null) {
             statsFlow.value = HomeStats(loading = false, toolCount = 0, blockCount = 0, usage = HomeUsageCalculator.calculate(emptyList()))
             return
         }
         statsFlow.value = HomeStats(loading = true)
-        coroutineScope {
-            launch { record(attempt { graph.toolRepository.countTools() }) { stats, count -> stats.copy(toolCount = count) } }
-            launch { (graph.blockRepository as? IBlockRepository)?.let { record(attempt { loadBlocks(it) }) { stats, count -> stats.copy(blockCount = count) } } }
-            launch { record(attempt { loadUsage(graph.runRepository) }) { stats, usage -> stats.copy(usage = usage) } }
+        val blockRepository = graph.blockRepository as? IBlockRepository
+        val failures = coroutineScope {
+            listOfNotNull(
+                async { record(attempt { graph.toolRepository.countTools() }) { stats, count -> stats.copy(toolCount = count) } },
+                blockRepository?.let { async { record(attempt { loadBlocks(it) }) { stats, count -> stats.copy(blockCount = count) } } },
+                async { record(attempt { loadUsage(graph.runRepository) }) { stats, usage -> stats.copy(usage = usage) } },
+            ).awaitAll()
         }
-        statsFlow.update { it.copy(loading = false) }
+        val error = failures.takeIf { results -> results.all { it != null } }?.firstNotNullOfOrNull { it?.message }
+        statsFlow.update { it.copy(loading = false, error = error) }
     }
 
     private suspend fun loadBlocks(repository: IBlockRepository): Int {
@@ -132,16 +141,16 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         return HomeUsageCalculator.calculate(steps.flatten())
     }
 
-    private fun <T> record(result: Result<T>, apply: (HomeStats, T) -> HomeStats) {
-        statsFlow.update { stats ->
-            result.fold(
-                onSuccess = { apply(stats, it) },
-                onFailure = { stats.copy(error = stats.error ?: it.message) },
-            )
-        }
+    /** Applies a figure that loaded; returns the failure of one that did not. */
+    private fun <T> record(result: Result<T>, apply: (HomeStats, T) -> HomeStats): Throwable? {
+        result.onSuccess { value -> statsFlow.update { apply(it, value) } }
+        result.onFailure { Telemetry.error(TAG, "stat.failed", it) }
+        return result.exceptionOrNull()
     }
 
     private companion object {
+        const val TAG = "SessionHomePageSource"
+
         /** Runs sampled for the usage summary. */
         const val USAGE_RUN_LIMIT = 100
 
