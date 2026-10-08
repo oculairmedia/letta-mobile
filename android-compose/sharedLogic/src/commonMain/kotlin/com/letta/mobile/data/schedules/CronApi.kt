@@ -38,6 +38,16 @@ class CronApi(
         response.requireSuccess()
     }
 
+    suspend fun pauseCron(id: String) {
+        val response = httpClient.post("$baseUrl/v1/crons/$id/pause") { applyAuth() }
+        response.requireSuccess()
+    }
+
+    suspend fun resumeCron(id: String) {
+        val response = httpClient.post("$baseUrl/v1/crons/$id/resume") { applyAuth() }
+        response.requireSuccess()
+    }
+
     /** Create a recurring cron task for [agentId]. */
     suspend fun createCron(
         agentId: String,

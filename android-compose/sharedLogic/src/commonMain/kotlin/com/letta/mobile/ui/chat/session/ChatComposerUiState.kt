@@ -45,6 +45,7 @@ data class ChatComposerUiState(
     val model: ChatModelUiState? = null,
     val contextUsage: ContextWindowUsageState? = null,
     val workingDirectory: ChatWorkingDirectoryUiState? = null,
+    val backgroundProcesses: ImmutableList<com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess> = persistentListOf(),
 ) {
     val hasPayload: Boolean get() = text.isNotBlank() || attachments.isNotEmpty()
 }

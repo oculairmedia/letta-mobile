@@ -362,6 +362,22 @@ internal class DesktopCronPanelState(
         }
     }
 
+    fun pause(id: DesktopCronTaskId) {
+        val api = cronApi ?: return
+        scope.launch {
+            runCatching { api.pauseCron(id.value) }
+            refresh()
+        }
+    }
+
+    fun resume(id: DesktopCronTaskId) {
+        val api = cronApi ?: return
+        scope.launch {
+            runCatching { api.resumeCron(id.value) }
+            refresh()
+        }
+    }
+
     fun create(draft: CronDraft) {
         val api = cronApi ?: return
         scope.launch {

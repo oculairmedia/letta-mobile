@@ -518,6 +518,28 @@ sealed interface ServerFrame {
         val error: String? = null,
     ) : ServerFrame
 
+    @Serializable
+    data class CronPauseResponse(
+        override val v: Int = 1,
+        val type: String = "cron_pause_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val error: String? = null,
+    ) : ServerFrame
+
+    @Serializable
+    data class CronResumeResponse(
+        override val v: Int = 1,
+        val type: String = "cron_resume_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val error: String? = null,
+    ) : ServerFrame
+
     /**
      * Push notification emitted whenever the shim's `crons.json` changes
      * (a task fired, an external write moved mtime, a peer client did a

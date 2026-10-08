@@ -87,6 +87,7 @@ fun DesktopScheduleSurface(
     canCreate: Boolean = false,
     onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit =
         { _, _, _, _, _, _ -> },
+    onTogglePauseCron: ((String, Boolean) -> Unit)? = null,
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
     // Keep `now` advancing so countdown labels, the now-line, and the
@@ -237,6 +238,7 @@ fun DesktopScheduleSurface(
                             onSelectSchedule = { rail = RailState.Detail(it) },
                             onBackToOverview = { rail = RailState.Overview },
                             onDelete = { onDeleteCron(it); rail = RailState.Overview },
+                            onTogglePause = onTogglePauseCron,
                         ),
                     )
                 }

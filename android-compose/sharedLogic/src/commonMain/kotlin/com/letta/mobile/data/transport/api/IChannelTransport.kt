@@ -106,6 +106,29 @@ interface IChannelTransport {
         timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronDeleteAllResponse
 
+    suspend fun sendCronPause(
+        taskId: String,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronPauseResponse = ServerFrame.CronPauseResponse(
+        id = "",
+        ts = "",
+        requestId = null,
+        success = false,
+        error = "Unsupported by transport",
+    )
+
+    suspend fun sendCronResume(
+        taskId: String,
+        scheduledFor: String? = null,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronResumeResponse = ServerFrame.CronResumeResponse(
+        id = "",
+        ts = "",
+        requestId = null,
+        success = false,
+        error = "Unsupported by transport",
+    )
+
     suspend fun sendSubagentList(
         all: Boolean = false,
         timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,

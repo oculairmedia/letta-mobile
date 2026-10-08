@@ -82,6 +82,12 @@ open class NoOpChannelTransport : IChannelTransport {
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
         unsupported()
 
+    override suspend fun sendCronPause(taskId: String, timeoutMs: Long): ServerFrame.CronPauseResponse =
+        unsupported()
+
+    override suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
+        unsupported()
+
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         unsupported()
 

@@ -243,6 +243,36 @@ class CronRepositoryTest {
         assertEquals(1, transport.cronListCalls.count { it.agentId == "agent-x" })
     }
 
+    @Test
+    fun `pauseSchedule updates cached task status and sends cron_pause`() = runTest {
+        val initialTask = task("t1", "agent-p")
+        transport.enqueueCronList("agent-p", responses = arrayOf(successList("agent-p", listOf(initialTask))))
+        val repo = CronRepository(transport, backgroundScope)
+        repo.refresh("agent-p")
+
+        val result = repo.pauseSchedule("agent-p", "t1")
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("t1"), transport.cronPauseCalls)
+
+        val updated = repo.schedulesFlow("agent-p").first()
+        assertEquals(com.letta.mobile.data.model.CronTaskStatus.PAUSED, updated.first().status)
+    }
+
+    @Test
+    fun `resumeSchedule updates cached task status and sends cron_resume`() = runTest {
+        val pausedTask = task("t1", "agent-r").copy(status = com.letta.mobile.data.model.CronTaskStatus.PAUSED)
+        transport.enqueueCronList("agent-r", responses = arrayOf(successList("agent-r", listOf(pausedTask))))
+        val repo = CronRepository(transport, backgroundScope)
+        repo.refresh("agent-r")
+
+        val result = repo.resumeSchedule("agent-r", "t1", "2026-10-10T00:00:00Z")
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("t1" to "2026-10-10T00:00:00Z"), transport.cronResumeCalls)
+
+        val updated = repo.schedulesFlow("agent-r").first()
+        assertEquals(com.letta.mobile.data.model.CronTaskStatus.ACTIVE, updated.first().status)
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────
 
     private fun connectedState() = ChannelTransportState.Connected(

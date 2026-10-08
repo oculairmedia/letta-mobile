@@ -47,6 +47,9 @@ interface ChatActions {
     /** Stops the active run. A second call while a stop is outstanding force-clears locally. */
     fun stopRun()
 
+    /** Stops a background process or monitor on the server (letta-mobile-bzvro.21). */
+    fun stopBackgroundProcess(processId: String) = Unit
+
     fun rerun(message: UiMessage)
 
     fun submitApproval(answer: ChatApprovalAnswer)

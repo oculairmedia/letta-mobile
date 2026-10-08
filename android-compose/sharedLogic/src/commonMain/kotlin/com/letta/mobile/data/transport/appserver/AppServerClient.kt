@@ -178,6 +178,21 @@ interface AppServerClient {
     suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
         throw UnsupportedOperationException("CronDeleteAll is not supported by this client")
 
+    suspend fun cronPause(command: AppServerCommand.CronPause): AppServerInboundFrame.CronPauseResponse =
+        throw UnsupportedOperationException("CronPause is not supported by this client")
+
+    suspend fun cronResume(command: AppServerCommand.CronResume): AppServerInboundFrame.CronResumeResponse =
+        throw UnsupportedOperationException("CronResume is not supported by this client")
+
+    suspend fun executeCommand(command: AppServerCommand.ExecuteCommand): AppServerInboundFrame.ExecuteCommandResponse =
+        throw UnsupportedOperationException("execute_command is not supported by this client")
+
+    suspend fun monitorStop(command: AppServerCommand.MonitorStop): AppServerInboundFrame.MonitorStopResponse =
+        throw UnsupportedOperationException("monitor_stop is not supported by this client")
+
+    suspend fun updateToolset(command: AppServerCommand.UpdateToolset): AppServerInboundFrame.UpdateToolsetResponse =
+        throw UnsupportedOperationException("update_toolset is not supported by this client")
+
     suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings): AppServerInboundFrame.GetReflectionSettingsResponse =
         throw UnsupportedOperationException("GetReflectionSettings is not supported by this client")
 
@@ -441,6 +456,26 @@ class DefaultAppServerClient(
 
     override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.CronDeleteAllResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronPause(command: AppServerCommand.CronPause): AppServerInboundFrame.CronPauseResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronPauseResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronResume(command: AppServerCommand.CronResume): AppServerInboundFrame.CronResumeResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronResumeResponse }) { transport.sendControl(command) }
+
+    override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand): AppServerInboundFrame.ExecuteCommandResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ExecuteCommandResponse }) { transport.sendControl(command) }
+
+    override suspend fun monitorStop(command: AppServerCommand.MonitorStop): AppServerInboundFrame.MonitorStopResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.MonitorStopResponse }) { transport.sendControl(command) }
+
+    override suspend fun updateToolset(command: AppServerCommand.UpdateToolset): AppServerInboundFrame.UpdateToolsetResponse =
+        command.requestId?.let { id ->
+            registry.request(id, { it as? AppServerInboundFrame.UpdateToolsetResponse }) { transport.sendControl(command) }
+        } ?: run {
+            transport.sendControl(command)
+            AppServerInboundFrame.UpdateToolsetResponse(requestId = "", success = true)
+        }
 
     override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings): AppServerInboundFrame.GetReflectionSettingsResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.GetReflectionSettingsResponse }) { transport.sendControl(command) }

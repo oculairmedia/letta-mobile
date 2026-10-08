@@ -52,6 +52,8 @@ object WsFrameMapper {
         is ServerFrame.CronGetResponse,
         is ServerFrame.CronDeleteResponse,
         is ServerFrame.CronDeleteAllResponse,
+        is ServerFrame.CronPauseResponse,
+        is ServerFrame.CronResumeResponse,
         is ServerFrame.CronsUpdated,
         is ServerFrame.GoalsUpdated,
         is ServerFrame.AgentUpdated,

@@ -61,6 +61,7 @@ internal data class ScheduleRailParams(
     val onSelectSchedule: (String) -> Unit,
     val onBackToOverview: () -> Unit,
     val onDelete: (String) -> Unit,
+    val onTogglePause: ((String, Boolean) -> Unit)? = null,
 )
 
 @Composable
@@ -101,6 +102,7 @@ private fun ScheduleRailContent(params: ScheduleRailParams) {
                         canDelete = true,
                         onBack = params.onBackToOverview,
                         onDelete = params.onDelete,
+                        onTogglePause = params.onTogglePause,
                     ),
                 )
             } else {
@@ -213,6 +215,7 @@ internal data class DetailRailParams(
     val canDelete: Boolean,
     val onBack: () -> Unit,
     val onDelete: (String) -> Unit,
+    val onTogglePause: ((String, Boolean) -> Unit)? = null,
 )
 
 @Composable
@@ -265,7 +268,14 @@ internal fun DetailRail(params: DetailRailParams) {
         }
         Spacer(Modifier.height(LettaDimens.Space.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            DesktopOutlinedButton(onClick = {}, enabled = false) { DesktopButtonContent("Pause") }
+            val isPaused = !def.active
+            val pauseLabel = if (isPaused) "Resume" else "Pause"
+            DesktopOutlinedButton(
+                onClick = { params.onTogglePause?.invoke(def.id, isPaused) },
+                enabled = params.onTogglePause != null && params.canDelete,
+            ) {
+                DesktopButtonContent(pauseLabel)
+            }
             // Delete only for cron-backed schedules — the wired callback hits
             // the cron API, which can't delete native schedule-admin schedules.
             if (params.canDelete) {

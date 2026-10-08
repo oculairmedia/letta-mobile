@@ -9,4 +9,6 @@ interface ICronRepository {
     suspend fun refresh(agentId: String): Result<List<CronTask>>
     suspend fun addSchedule(params: CronAddParams): Result<CronTask>
     suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit>
+    suspend fun pauseSchedule(agentId: String, taskId: String): Result<Unit>
+    suspend fun resumeSchedule(agentId: String, taskId: String, scheduledFor: String? = null): Result<Unit>
 }

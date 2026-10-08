@@ -52,6 +52,8 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "cron_get_response" -> ServerFrame.CronGetResponse.serializer()
             "cron_delete_response" -> ServerFrame.CronDeleteResponse.serializer()
             "cron_delete_all_response" -> ServerFrame.CronDeleteAllResponse.serializer()
+            "cron_pause_response" -> ServerFrame.CronPauseResponse.serializer()
+            "cron_resume_response" -> ServerFrame.CronResumeResponse.serializer()
             "crons_updated" -> ServerFrame.CronsUpdated.serializer()
             "goals_updated" -> ServerFrame.GoalsUpdated.serializer()
             "agent_updated" -> ServerFrame.AgentUpdated.serializer()

@@ -240,6 +240,30 @@ class FakeChannelTransport(
             ?: error("No fake cron_delete_all response queued for $agentId")
     }
 
+    val cronPauseCalls = mutableListOf<String>()
+    val cronResumeCalls = mutableListOf<Pair<String, String?>>()
+    val cronPauseResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronPauseResponse>>()
+    val cronResumeResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronResumeResponse>>()
+
+    override suspend fun sendCronPause(
+        taskId: String,
+        timeoutMs: Long,
+    ): ServerFrame.CronPauseResponse {
+        cronPauseCalls += taskId
+        return cronPauseResponses[taskId]?.removeFirstOrNull()
+            ?: ServerFrame.CronPauseResponse(id = "cp", ts = "ts", requestId = null, success = true)
+    }
+
+    override suspend fun sendCronResume(
+        taskId: String,
+        scheduledFor: String?,
+        timeoutMs: Long,
+    ): ServerFrame.CronResumeResponse {
+        cronResumeCalls += taskId to scheduledFor
+        return cronResumeResponses[taskId]?.removeFirstOrNull()
+            ?: ServerFrame.CronResumeResponse(id = "cr", ts = "ts", requestId = null, success = true)
+    }
+
     override suspend fun sendSubagentList(
         all: Boolean,
         timeoutMs: Long,

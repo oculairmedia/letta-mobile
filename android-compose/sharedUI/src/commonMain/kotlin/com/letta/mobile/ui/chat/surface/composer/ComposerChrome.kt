@@ -65,12 +65,14 @@ internal fun ComposerWorkingDirectoryRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(LettaDimens.Control.iconSm),
         )
+        val branch = state.branch
+        val path = state.path
         Text(
             text = when {
                 state.isLoading -> stringResource(Res.string.composer_working_directory_loading)
-                state.branch != null && state.path != null -> "${state.path} (${state.branch})"
-                state.branch != null -> state.branch
-                else -> state.path ?: stringResource(Res.string.composer_working_directory_unknown)
+                branch != null && path != null -> "$path ($branch)"
+                branch != null -> branch
+                else -> path ?: stringResource(Res.string.composer_working_directory_unknown)
             },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

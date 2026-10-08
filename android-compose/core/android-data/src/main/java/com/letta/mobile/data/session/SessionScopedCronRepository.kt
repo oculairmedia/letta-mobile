@@ -19,4 +19,6 @@ class SessionScopedCronRepository @Inject constructor(
     override suspend fun refresh(agentId: String): Result<List<CronTask>> = sessionManager.withCurrentSession { it.cronRepository.refresh(agentId) }
     override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = sessionManager.withCurrentSession { it.cronRepository.addSchedule(params) }
     override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.deleteSchedule(agentId, taskId) }
+    override suspend fun pauseSchedule(agentId: String, taskId: String): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.pauseSchedule(agentId, taskId) }
+    override suspend fun resumeSchedule(agentId: String, taskId: String, scheduledFor: String?): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.resumeSchedule(agentId, taskId, scheduledFor) }
 }

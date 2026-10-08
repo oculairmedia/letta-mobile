@@ -844,6 +844,42 @@ class IrohChannelTransport(
             onFailure = IrohTransportSupport::cronDeleteAllFailure,
         )
     }
+
+    override suspend fun sendCronPause(taskId: String, timeoutMs: Long): ServerFrame.CronPauseResponse {
+        val requestId = "iroh-cron-pause-${UUID.randomUUID()}"
+        return cronInvoke(
+            op = "cron.pause",
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            body = buildJsonObject { put("task_id", taskId) },
+            mapSuccess = { _ ->
+                ServerFrame.CronPauseResponse(id = IrohTransportSupport.frameId("cron_pause"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true)
+            },
+            onFailure = { failure ->
+                ServerFrame.CronPauseResponse(id = IrohTransportSupport.frameId("cron_pause"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = failure.error)
+            },
+        )
+    }
+
+    override suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse {
+        val requestId = "iroh-cron-resume-${UUID.randomUUID()}"
+        return cronInvoke(
+            op = "cron.resume",
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            body = buildJsonObject {
+                put("task_id", taskId)
+                scheduledFor?.let { put("scheduled_for", it) }
+            },
+            mapSuccess = { _ ->
+                ServerFrame.CronResumeResponse(id = IrohTransportSupport.frameId("cron_resume"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true)
+            },
+            onFailure = { failure ->
+                ServerFrame.CronResumeResponse(id = IrohTransportSupport.frameId("cron_resume"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = failure.error)
+            },
+        )
+    }
+
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
         invokeSubagentRpc(subagentListCall(all), currentSubagentScope(), timeoutMs)
 

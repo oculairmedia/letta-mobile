@@ -55,6 +55,13 @@ internal fun destinationScheduleActions(deps: ScheduleWiringDeps): DestinationSc
                 )
             }
         },
+        onTogglePauseCron = { id, isCurrentlyPaused ->
+            if (isCurrentlyPaused) {
+                deps.cronPanel.resume(DesktopCronTaskId(id))
+            } else {
+                deps.cronPanel.pause(DesktopCronTaskId(id))
+            }
+        },
     )
 
 internal fun destinationSkillsActions(

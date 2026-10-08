@@ -48,6 +48,9 @@ data class ModelPickerActions(
     val onEditModels: (() -> Unit)?,
     /** Picks a model at a reasoning effort (null = provider default); null shows no effort chips. */
     val onEffortSelected: ((ModelPickerEntry, String?) -> Unit)? = null,
+    val availableToolsets: List<com.letta.mobile.data.transport.appserver.AppServerToolset> = emptyList(),
+    val currentToolset: String? = null,
+    val onSelectToolset: ((String) -> Unit)? = null,
 ) {
     companion object {
         fun bind(
@@ -118,6 +121,16 @@ fun ColumnScope.ModelPickerContent(
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        actions.onSelectToolset?.let { onSelect ->
+            if (actions.availableToolsets.isNotEmpty()) {
+                ToolsetSelectorRow(
+                    toolsets = actions.availableToolsets,
+                    selectedId = actions.currentToolset,
+                    onSelect = onSelect,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+        }
         PickerFooter(state, actions)
     }
 }

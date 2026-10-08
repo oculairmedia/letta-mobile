@@ -100,6 +100,35 @@ internal class IrohCronRpcClient(
             },
         )
 
+    suspend fun sendCronPause(taskId: String, timeoutMs: Long): ServerFrame.CronPauseResponse =
+        executeCronOp<Unit, ServerFrame.CronPauseResponse>(
+            op = "cron.pause",
+            body = buildJsonObject { put("task_id", taskId) },
+            timeoutMs = timeoutMs,
+            onSuccess = { id, ts, reqId, _ ->
+                ServerFrame.CronPauseResponse(id = id, ts = ts, requestId = reqId, success = true)
+            },
+            onFailure = { id, ts, reqId, error ->
+                ServerFrame.CronPauseResponse(id = id, ts = ts, requestId = reqId, success = false, error = error)
+            },
+        )
+
+    suspend fun sendCronResume(taskId: String, scheduledFor: String?, timeoutMs: Long): ServerFrame.CronResumeResponse =
+        executeCronOp<Unit, ServerFrame.CronResumeResponse>(
+            op = "cron.resume",
+            body = buildJsonObject {
+                put("task_id", taskId)
+                scheduledFor?.let { put("scheduled_for", it) }
+            },
+            timeoutMs = timeoutMs,
+            onSuccess = { id, ts, reqId, _ ->
+                ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = true)
+            },
+            onFailure = { id, ts, reqId, error ->
+                ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = false, error = error)
+            },
+        )
+
     private suspend inline fun <reified R, T> executeCronOp(
         op: String,
         body: JsonObject,

@@ -162,6 +162,28 @@ open class CronRepository(
             stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
         }
 
+    override suspend fun pauseSchedule(agentId: String, taskId: String): Result<Unit> =
+        runCatchingCancellable {
+            val response = transport.sendCronPause(taskId)
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "cron_pause failed")
+            }
+            stateFor(agentId).update { list ->
+                list.map { if (it.id == taskId) it.copy(status = com.letta.mobile.data.model.CronTaskStatus.PAUSED) else it }
+            }
+        }
+
+    override suspend fun resumeSchedule(agentId: String, taskId: String, scheduledFor: String?): Result<Unit> =
+        runCatchingCancellable {
+            val response = transport.sendCronResume(taskId, scheduledFor)
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "cron_resume failed")
+            }
+            stateFor(agentId).update { list ->
+                list.map { if (it.id == taskId) it.copy(status = com.letta.mobile.data.model.CronTaskStatus.ACTIVE) else it }
+            }
+        }
+
     private suspend fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =
         stateMutex.withLock { stateForUnlocked(agentId) }
 
