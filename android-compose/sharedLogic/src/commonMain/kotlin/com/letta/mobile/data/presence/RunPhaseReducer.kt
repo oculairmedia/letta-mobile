@@ -1,6 +1,7 @@
 package com.letta.mobile.data.presence
 
 import com.letta.mobile.data.runtime.RuntimeFrameKind
+import com.letta.mobile.data.runtime.RuntimeLiveStatusReducer
 import com.letta.mobile.data.runtime.frameKind
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -22,6 +23,12 @@ object RunPhaseReducer {
 
     /** Apply one event to [state]. Returns [state] unchanged when the event says nothing about phase. */
     fun reduce(state: ConversationRunState, event: RuntimeEventPayload, nowMs: Long): ConversationRunState {
+        val phased = reducePhase(state, event, nowMs)
+        val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
+        return if (live == phased.live) phased else phased.copy(live = live)
+    }
+
+    private fun reducePhase(state: ConversationRunState, event: RuntimeEventPayload, nowMs: Long): ConversationRunState {
         // DONE is momentary: any next event means a new turn is under way, so the run starts from
         // rest rather than inheriting the finished turn's tool counters.
         val base = if (state.phase == RunPhase.DONE) state.reset() else state
@@ -63,6 +70,14 @@ object RunPhaseReducer {
             is RuntimeEventPayload.MemFsCommitObserved,
             is RuntimeEventPayload.AgentFileImported,
             is RuntimeEventPayload.AgentFileExported,
+            // Loop status, retries, notices and commands feed [ConversationRunState.live] only: the
+            // phase the mascots read keeps following the content (letta-mobile-bzvro.7).
+            is RuntimeEventPayload.LoopPhaseChanged,
+            is RuntimeEventPayload.RetryNotice,
+            is RuntimeEventPayload.StatusNotice,
+            is RuntimeEventPayload.CommandStarted,
+            is RuntimeEventPayload.CommandFinished,
+            is RuntimeEventPayload.ApprovalClassified,
             -> base
         }
     }

@@ -109,6 +109,15 @@ object TurnFailureNotices {
         return TurnFailureNotice(kind = kind, message = messageFor(kind))
     }
 
+    /**
+     * letta-mobile-bzvro.9: the family whose fixed copy [text] is, or null. A failure row carries
+     * only that copy (never the raw reason), so this is how a renderer recovers its family.
+     */
+    fun kindForMessage(text: String?): String? {
+        val trimmed = text?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return KNOWN_KINDS.firstOrNull { it != OTHER_KIND && messageFor(it) == trimmed }
+    }
+
     /** A cancelled terminal is distinct from a failed terminal. */
     fun forCancelledTerminal(): TurnFailureNotice =
         TurnFailureNotice(kind = CANCELLED_KIND, message = CANCELLED_MESSAGE)
@@ -134,6 +143,16 @@ object TurnFailureNotices {
             "The model provider returned an error, so this turn produced no reply."
         "empty_response" ->
             "The model returned an empty response, so this turn produced no reply."
+        "credit_limit" ->
+            "The model provider says this account is out of credit or over its quota, so no reply " +
+                "was generated. Top up or switch to another model, then send again."
+        "context_window_exceeded" ->
+            "This conversation no longer fits in the model's context window. " +
+                "Compact the conversation, then send again."
+        "model_not_supported" ->
+            "The selected model is not available for this agent. Pick another model, then send again."
+        "network_error" ->
+            "The agent host could not reach the model provider. Check the connection and send again."
         "conversation_busy" ->
             "This conversation is still busy with another run. " +
                 "Wait for it to finish, then send again."
@@ -164,6 +183,10 @@ object TurnFailureNotices {
         "conversation_busy",
         "empty_response",
         "rate_limited",
+        "credit_limit",
+        "context_window_exceeded",
+        "model_not_supported",
+        "network_error",
         "timeout",
         "provider_error",
         "aborted",

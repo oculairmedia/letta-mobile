@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
@@ -73,4 +74,6 @@ internal class ChatRowCallbacks(
      * dispatch identity instead. Null hides the affordance.
      */
     val openSubagent: ((ChatSubagentTarget) -> Unit)? = null,
+    /** letta-mobile-bzvro.9: the newest user prompt, for an error card's Retry. */
+    val lastPrompt: () -> UiMessage? = { null },
 )

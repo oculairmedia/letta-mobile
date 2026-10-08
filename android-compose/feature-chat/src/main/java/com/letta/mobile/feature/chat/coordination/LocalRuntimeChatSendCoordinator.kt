@@ -280,6 +280,13 @@ internal class LocalRuntimeChatSendCoordinator(
             is RuntimeEventPayload.MemFsCommitObserved,
             is RuntimeEventPayload.AgentFileImported,
             is RuntimeEventPayload.AgentFileExported,
+            // letta-mobile-bzvro.7/.8: status-line events are not timeline content.
+            is RuntimeEventPayload.LoopPhaseChanged,
+            is RuntimeEventPayload.RetryNotice,
+            is RuntimeEventPayload.StatusNotice,
+            is RuntimeEventPayload.CommandStarted,
+            is RuntimeEventPayload.CommandFinished,
+            is RuntimeEventPayload.ApprovalClassified,
             -> Unit
         }
         return false

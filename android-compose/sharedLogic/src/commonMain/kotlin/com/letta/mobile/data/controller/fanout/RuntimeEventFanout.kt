@@ -483,6 +483,17 @@ class RuntimeEventFanout(
         subscribers.size
     }
 
+    /** letta-mobile-bzvro.6: one scope per runtime with at least one subscriber (passive included). */
+    fun watchedRuntimes(): List<com.letta.mobile.data.transport.appserver.AppServerRuntimeScope> =
+        synchronized(stateLock) {
+            subscribers.values.map { it.key }.distinct().map {
+                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                    agentId = it.agentId,
+                    conversationId = it.conversationId,
+                )
+            }
+        }
+
     fun runtimeFlowCount(): Int = synchronized(stateLock) {
         subscribers.values.map { it.key }.toSet().size
     }

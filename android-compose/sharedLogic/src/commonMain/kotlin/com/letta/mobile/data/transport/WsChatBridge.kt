@@ -329,6 +329,17 @@ sealed interface WsTimelineEvent {
         val at: String,
     ) : WsTimelineEvent
 
+    /**
+     * letta-mobile-bzvro.7/.8: an advisory runtime event (loop phase, retry, status notice, command
+     * progress) for the status line. Folded into the run state only; never a timeline row.
+     */
+    data class RunActivity(
+        val payload: com.letta.mobile.runtime.RuntimeEventPayload,
+        val agentId: String? = null,
+        val conversationId: String? = null,
+        val runId: String? = null,
+    ) : WsTimelineEvent
+
     data class UserActionOutcome(
         val frameId: String,
         val outcome: String,
@@ -420,6 +431,12 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     // turn-lifecycle frames above) when no turn_done arrived in the replay.
     is ServerFrame.SubscribeFrameMessage -> null
     is ServerFrame.Unknown -> null
+    is ServerFrame.RunActivity -> WsTimelineEvent.RunActivity(
+        payload = payload,
+        agentId = agentId,
+        conversationId = conversationId,
+        runId = runId,
+    )
 }
 
 private fun ServerFrame.TurnStarted.turnStartedEvent(isReplay: Boolean): WsTimelineEvent.TurnStarted =

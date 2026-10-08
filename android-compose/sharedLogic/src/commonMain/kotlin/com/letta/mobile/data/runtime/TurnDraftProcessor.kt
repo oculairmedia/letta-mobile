@@ -4,6 +4,7 @@ import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.isAdvisory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -289,8 +290,13 @@ private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val even
     else -> false
 }
 
-/** A frame that carries the turn on past a closed round tail: neither a tail frame nor a terminal. */
-private fun RuntimeEventDraft.continuesTurn(): Boolean = !isTailFrame() && !isTerminalLifecycle()
+/**
+ * A frame that carries the turn on past a closed round tail: neither a tail frame nor a terminal,
+ * nor an advisory status (letta-mobile-bzvro.7: a loop status or retry notice after a round's
+ * stop_reason says nothing about another round starting).
+ */
+private fun RuntimeEventDraft.continuesTurn(): Boolean =
+    !isTailFrame() && !isTerminalLifecycle() && !payload.isAdvisory
 
 private fun RuntimeEventDraft.isTailFrame(): Boolean = isStopReasonFrame() || isUsageStatisticsFrame()
 

@@ -71,6 +71,8 @@ object WsFrameMapper {
         is ServerFrame.SubscribeDone,
         // letta-mobile-1n5py.1: queue state for the send coordinator, not timeline content.
         is ServerFrame.TurnQueued,
+        // letta-mobile-bzvro.7: status-line events feed the run state, not the timeline.
+        is ServerFrame.RunActivity,
         is ServerFrame.Unknown -> null
     }
 

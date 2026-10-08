@@ -19,15 +19,15 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.9 --listen ws://127.0.0.1:4500
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.12 --listen ws://127.0.0.1:4500
 .\bin\meridian-app-server.bat app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.9 --dry-run
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.12 --dry-run
 ```
 
 Loopback development uses no WebSocket auth. Non-loopback listeners require
 `--ws-auth`; the client then sends `Authorization: Bearer <token>`.
 
-Each 0.29.9 client opens one bidirectional `/ws` connection. Never add the
+Each 0.29.12 client opens one bidirectional `/ws` connection. Never add the
 removed `?channel=control|stream` query. Upstream supports concurrent clients;
 Iroh deployments still use the Kotlin wrapper as their authorization, runtime
 ownership, and fanout boundary.
@@ -72,7 +72,7 @@ version you are capturing):
 
 ```bash
 NODE=~/.nvm/versions/node/v24.18.0/bin/node
-LETTA_JS=~/letta-code-0.29.9/node_modules/@letta-ai/letta-code/letta.js
+LETTA_JS=~/letta-code-0.29.12/node_modules/@letta-ai/letta-code/letta.js
 "$NODE" --version   # must match the `source.node` you are about to record
 ```
 

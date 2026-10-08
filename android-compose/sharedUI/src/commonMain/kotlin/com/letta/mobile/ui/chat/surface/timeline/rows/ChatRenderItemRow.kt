@@ -77,6 +77,8 @@ internal fun ChatImageViewer(
 
 /** Test tags shared with the desktop row tests (the tool ones keep desktop's names). */
 internal object ChatRowTestTags {
+    /** letta-mobile-bzvro.9: the contextual action under a run error. */
+    const val ERROR_ACTION = "run-error-action"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
     const val TOOL_FAILURE_BADGE = "tool-failure-badge"

@@ -917,6 +917,9 @@ class ChatSendCoordinator(
             is WsTimelineEvent.TurnQueued -> serverQueueMarks.markQueuedOnServer(event)
             is WsTimelineEvent.UserActionOutcome ->
                 runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
+            // letta-mobile-bzvro.7: status-line events go to the run state only.
+            is WsTimelineEvent.RunActivity ->
+                runtimeEventBatcher.enqueue(event, resolveConversationId(event.conversationId) ?: event.conversationId ?: lastActiveConversationId)
         }
     }
 

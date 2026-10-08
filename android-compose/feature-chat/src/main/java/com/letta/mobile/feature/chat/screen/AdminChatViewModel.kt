@@ -52,6 +52,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -185,7 +186,17 @@ internal class AdminChatViewModel @Inject constructor(
      */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
 
+    /**
+     * letta-mobile-bzvro.7: the status line's detail for this screen's conversation, as the shared
+     * reducer folded it into the registry. Read under the key this screen publishes with.
+     */
+    val liveStatus: StateFlow<com.letta.mobile.data.runtime.RuntimeLiveStatus> = runRegistry.runs
+        .map { runs -> publishedRunKey?.let(runs::get)?.live ?: com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(LIVE_STATUS_STOP_TIMEOUT_MS), com.letta.mobile.data.runtime.RuntimeLiveStatus.Idle)
+
     companion object {
+        private const val LIVE_STATUS_STOP_TIMEOUT_MS = 5_000L
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
 

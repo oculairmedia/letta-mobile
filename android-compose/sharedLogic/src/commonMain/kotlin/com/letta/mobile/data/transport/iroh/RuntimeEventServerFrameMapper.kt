@@ -83,8 +83,25 @@ object RuntimeEventServerFrameMapper {
             ).copy(type = "approval_request_message"),
         )
         is RuntimeEventPayload.RunLifecycleChanged -> lifecycleFrames(payload, context)
+        // letta-mobile-bzvro.7/.8: the status line's events ride to the coordinator as-is.
+        is RuntimeEventPayload.LoopPhaseChanged,
+        is RuntimeEventPayload.RetryNotice,
+        is RuntimeEventPayload.StatusNotice,
+        is RuntimeEventPayload.CommandStarted,
+        is RuntimeEventPayload.CommandFinished,
+        -> listOf(runActivity(payload, context))
         else -> emptyList()
     }
+
+    private fun runActivity(payload: RuntimeEventPayload, context: Context): ServerFrame.RunActivity =
+        ServerFrame.RunActivity(
+            id = "run_activity-${Uuid.random()}",
+            ts = nowIso(),
+            agentId = context.agentId,
+            conversationId = context.conversationId,
+            runId = context.runId,
+            payload = payload,
+        )
 
     private fun toolReturnFrame(
         payload: RuntimeEventPayload.ToolReturnObserved,
