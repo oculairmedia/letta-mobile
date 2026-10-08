@@ -3,7 +3,6 @@ package com.letta.mobile.ui.screens.config
 import android.net.Uri
 import app.cash.turbine.test
 import androidx.lifecycle.SavedStateHandle
-import com.letta.mobile.data.api.AppServerConnectionTester
 import com.letta.mobile.data.api.CloudConnectionValidationResult
 import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
@@ -89,11 +88,10 @@ class ConfigViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun selfHosted(url: String) {
+    private fun selfHostedForm() {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
         viewModel.updateMode(ServerMode.SELF_HOSTED)
-        viewModel.updateServerUrl(url)
     }
 
     private fun connectionTest(): ConnectionTestUiState =
@@ -102,7 +100,8 @@ class ConfigViewModelTest {
     @Test
     fun testConnection_reportsTheClassifiedProbeResultForTheFormValues() = runTest {
         // letta-mobile-bzvro.1 (F01): the form is tested before it is saved.
-        selfHosted("wss://appserver.example/ws")
+        selfHostedForm()
+        viewModel.updateServerUrl("wss://appserver.example/ws")
         viewModel.updateApiToken(" tkn ")
         val gate = CompletableDeferred<AppServerProbeResult?>()
         fakeConnectionTester.next = { gate.await() }
@@ -118,7 +117,8 @@ class ConfigViewModelTest {
 
     @Test
     fun testConnection_okCarriesTheServerIdentity() = runTest {
-        selfHosted("ws://10.0.0.2:4500")
+        selfHostedForm()
+        viewModel.updateServerUrl("ws://10.0.0.2:4500")
         val ok = AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
         fakeConnectionTester.next = { ok }
 
@@ -129,7 +129,8 @@ class ConfigViewModelTest {
 
     @Test
     fun testConnection_unprobeableUrlIsNotSupported() = runTest {
-        selfHosted("iroh://node-ticket")
+        selfHostedForm()
+        viewModel.updateServerUrl("iroh://node-ticket")
         fakeConnectionTester.next = { null }
 
         viewModel.testConnection()
@@ -139,7 +140,8 @@ class ConfigViewModelTest {
 
     @Test
     fun testConnection_resultForAnEditedUrlIsDropped() = runTest {
-        selfHosted("ws://old:4500")
+        selfHostedForm()
+        viewModel.updateServerUrl("ws://old:4500")
         val gate = CompletableDeferred<AppServerProbeResult?>()
         fakeConnectionTester.next = { gate.await() }
 
@@ -1087,16 +1089,6 @@ class ConfigViewModelTest {
         }
 
         override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? = null
-    }
-
-    private class FakeAppServerConnectionTester : AppServerConnectionTester() {
-        val calls = mutableListOf<Pair<String, String?>>()
-        var next: suspend () -> AppServerProbeResult? = { null }
-
-        override suspend fun test(serverUrl: String, accessToken: String?): AppServerProbeResult? {
-            calls += serverUrl to accessToken
-            return next()
-        }
     }
 
     private class FakeCloudConnectionValidator(
