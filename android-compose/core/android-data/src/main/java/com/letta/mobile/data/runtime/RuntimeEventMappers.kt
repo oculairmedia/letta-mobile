@@ -49,31 +49,16 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
         ),
     )
 
-    is WsTimelineEvent.TurnDone -> listOf(
+    is WsTimelineEvent.TurnDone,
+    is WsTimelineEvent.StopReason,
+    is WsTimelineEvent.Error -> listOf(
         runtimeDraft(
             backend = backend,
             agentId = fallbackAgentId,
             conversationId = fallbackConversationId,
-            runId = runId.toRunIdOrNull(),
+            runId = lifecycleRunId(),
             source = RuntimeEventSource.ExternalTransport,
-            payload = RuntimeEventPayload.RunLifecycleChanged(
-                status = status.toRuntimeRunStatus(),
-                reason = if (lossy) "lossy:$dropCount" else null,
-            ),
-        ),
-    )
-
-    is WsTimelineEvent.StopReason -> listOf(
-        runtimeDraft(
-            backend = backend,
-            agentId = fallbackAgentId,
-            conversationId = fallbackConversationId,
-            runId = runId.toRunIdOrNull(),
-            source = RuntimeEventSource.ExternalTransport,
-            payload = RuntimeEventPayload.RunLifecycleChanged(
-                status = RuntimeRunStatus.Running,
-                reason = stopReason,
-            ),
+            payload = toLifecyclePayload(),
         ),
     )
 
@@ -88,20 +73,6 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
                 frameId = "usage-$turnId",
                 transportMessageId = runId,
                 body = "usage:$totalTokens",
-            ),
-        ),
-    )
-
-    is WsTimelineEvent.Error -> listOf(
-        runtimeDraft(
-            backend = backend,
-            agentId = fallbackAgentId,
-            conversationId = fallbackConversationId,
-            runId = runId?.toRunIdOrNull(),
-            source = RuntimeEventSource.ExternalTransport,
-            payload = RuntimeEventPayload.RunLifecycleChanged(
-                status = RuntimeRunStatus.Failed,
-                reason = "$code: $message",
             ),
         ),
     )
@@ -131,9 +102,33 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
     is WsTimelineEvent.RunActivity -> listOf(toRuntimeEventDraft(backend, fallbackAgentId, fallbackConversationId))
 
     is WsTimelineEvent.GoalsUpdated,
-    is WsTimelineEvent.AgentUpdated, is WsTimelineEvent.TurnQueued,
+    is WsTimelineEvent.AgentUpdated,
+    is WsTimelineEvent.TurnQueued,
     is WsTimelineEvent.SubscribeDone,
     is WsTimelineEvent.Disconnected -> emptyList()
+}
+
+private fun WsTimelineEvent.lifecycleRunId(): RunId? = when (this) {
+    is WsTimelineEvent.TurnDone -> runId.toRunIdOrNull()
+    is WsTimelineEvent.StopReason -> runId.toRunIdOrNull()
+    is WsTimelineEvent.Error -> runId?.toRunIdOrNull()
+    else -> null
+}
+
+private fun WsTimelineEvent.toLifecyclePayload(): RuntimeEventPayload.RunLifecycleChanged = when (this) {
+    is WsTimelineEvent.TurnDone -> RuntimeEventPayload.RunLifecycleChanged(
+        status = status.toRuntimeRunStatus(),
+        reason = if (lossy) "lossy:$dropCount" else null,
+    )
+    is WsTimelineEvent.StopReason -> RuntimeEventPayload.RunLifecycleChanged(
+        status = RuntimeRunStatus.Running,
+        reason = stopReason,
+    )
+    is WsTimelineEvent.Error -> RuntimeEventPayload.RunLifecycleChanged(
+        status = RuntimeRunStatus.Failed,
+        reason = "$code: $message",
+    )
+    else -> RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running)
 }
 
 fun LettaMessage.toRuntimeEventDrafts(

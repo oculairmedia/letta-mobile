@@ -263,8 +263,6 @@ class ChatSendCoordinator(
     private fun isOtidSettledLocked(otid: String?): Boolean =
         otid?.let { it in settledOtids } ?: false
 
-    private fun isOtidSettled(otid: String?): Boolean =
-        synchronized(turnStateLock) { isOtidSettledLocked(otid) }
 
     private fun stateForLocked(conversationId: String): ConversationTurnState {
         val targetId = conversationAliases[conversationId] ?: conversationId
