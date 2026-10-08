@@ -2,6 +2,8 @@ package com.letta.mobile.data.session
 
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.repository.CronAddParams
+import com.letta.mobile.data.repository.api.AgentScheduleScope
+import com.letta.mobile.data.repository.api.CronResumeTarget
 import com.letta.mobile.data.repository.api.CronScheduleRef
 import com.letta.mobile.data.repository.api.ICronRepository
 import javax.inject.Inject
@@ -14,12 +16,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 class SessionScopedCronRepository @Inject constructor(
     private val sessionManager: SessionManager,
 ) : ICronRepository {
-    override fun schedulesFlow(agentId: String): Flow<List<CronTask>> =
-        sessionManager.currentGraph.flatMapLatest { it.cronRepository.schedulesFlow(agentId) }
+    override fun schedulesFlow(scope: AgentScheduleScope): Flow<List<CronTask>> =
+        sessionManager.currentGraph.flatMapLatest { it.cronRepository.schedulesFlow(scope) }
 
-    override suspend fun refresh(agentId: String): Result<List<CronTask>> = sessionManager.withCurrentSession { it.cronRepository.refresh(agentId) }
+    override suspend fun refresh(scope: AgentScheduleScope): Result<List<CronTask>> = sessionManager.withCurrentSession { it.cronRepository.refresh(scope) }
     override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = sessionManager.withCurrentSession { it.cronRepository.addSchedule(params) }
-    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.deleteSchedule(agentId, taskId) }
+    override suspend fun deleteSchedule(target: CronScheduleRef): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.deleteSchedule(target) }
     override suspend fun pauseSchedule(target: CronScheduleRef): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.pauseSchedule(target) }
-    override suspend fun resumeSchedule(target: CronScheduleRef, scheduledFor: String?): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.resumeSchedule(target, scheduledFor) }
+    override suspend fun resumeSchedule(target: CronResumeTarget): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.resumeSchedule(target) }
 }

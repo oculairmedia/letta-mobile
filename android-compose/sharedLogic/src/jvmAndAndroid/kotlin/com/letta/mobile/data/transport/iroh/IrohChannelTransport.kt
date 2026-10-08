@@ -846,29 +846,12 @@ class IrohChannelTransport(
     }
 
     override suspend fun sendCronPause(command: CronPauseCommand): ServerFrame.CronPauseResponse =
-        cronTaskAction(
-            op = "cron.pause",
-            frameType = "cron_pause",
-            timeoutMs = command.timeoutMs,
-            body = buildJsonObject { put("task_id", command.taskId) },
-            createSuccess = { id, ts, reqId -> ServerFrame.CronPauseResponse(id = id, ts = ts, requestId = reqId, success = true) },
-            onFailure = IrohTransportSupport::cronPauseFailure,
-        )
+        IrohTransportSupport.executeCronPause(this, command)
 
     override suspend fun sendCronResume(command: CronResumeCommand): ServerFrame.CronResumeResponse =
-        cronTaskAction(
-            op = "cron.resume",
-            frameType = "cron_resume",
-            timeoutMs = command.timeoutMs,
-            body = buildJsonObject {
-                put("task_id", command.taskId)
-                command.scheduledFor?.let { put("scheduled_for", it) }
-            },
-            createSuccess = { id, ts, reqId -> ServerFrame.CronResumeResponse(id = id, ts = ts, requestId = reqId, success = true) },
-            onFailure = IrohTransportSupport::cronResumeFailure,
-        )
+        IrohTransportSupport.executeCronResume(this, command)
 
-    private suspend fun <T : ServerFrame> cronTaskAction(
+    internal suspend fun <T : ServerFrame> cronTaskAction(
         op: String,
         frameType: String,
         timeoutMs: Long,

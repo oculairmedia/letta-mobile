@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.CronTask
+import com.letta.mobile.data.repository.api.AgentScheduleScope
+import com.letta.mobile.data.repository.api.CronResumeTarget
 import com.letta.mobile.data.repository.api.CronScheduleRef
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -39,6 +41,55 @@ fun defaultCronScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
+ * Thread-safe cache and in-flight refresh coordinator for agent schedules.
+ */
+private class CronScheduleStateStore {
+    private val mutex = Mutex()
+    private val mapLock = SynchronizedObject()
+    private val stateByAgent = mutableMapOf<String, MutableStateFlow<List<CronTask>>>()
+    private val inFlightRefresh = mutableMapOf<String, CompletableDeferred<Result<List<CronTask>>>>()
+    private val initialized = mutableSetOf<String>()
+
+    fun stateForUnlocked(agentId: String): MutableStateFlow<List<CronTask>> =
+        synchronized(mapLock) {
+            stateByAgent.getOrPut(agentId) { MutableStateFlow(emptyList()) }
+        }
+
+    suspend fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =
+        mutex.withLock { stateForUnlocked(agentId) }
+
+    suspend fun markInitialized(agentId: String): Boolean =
+        mutex.withLock { initialized.add(agentId) }
+
+    suspend fun initializedAgents(): List<String> =
+        mutex.withLock { initialized.toList() }
+
+    suspend fun existingInFlight(agentId: String): CompletableDeferred<Result<List<CronTask>>>? =
+        mutex.withLock { inFlightRefresh[agentId]?.takeIf { !it.isCompleted } }
+
+    suspend fun claimRefresh(
+        agentId: String,
+        deferred: CompletableDeferred<Result<List<CronTask>>>,
+    ): CompletableDeferred<Result<List<CronTask>>>? = mutex.withLock {
+        val existing = inFlightRefresh[agentId]
+        if (existing != null && !existing.isCompleted) {
+            existing
+        } else {
+            inFlightRefresh[agentId] = deferred
+            null
+        }
+    }
+
+    suspend fun completeRefresh(agentId: String, deferred: CompletableDeferred<Result<List<CronTask>>>) {
+        mutex.withLock {
+            if (inFlightRefresh[agentId] === deferred) {
+                inFlightRefresh.remove(agentId)
+            }
+        }
+    }
+}
+
+/**
  * letta-mobile-d52f.2: single source of truth for scheduled cron tasks.
  *
  * letta-mobile-lgns8.10.4.1 — TRANSPORT: this repository speaks only the
@@ -59,44 +110,28 @@ open class CronRepository(
     private val transport: IChannelTransport,
     private val scope: CoroutineScope = defaultCronScope(),
 ) : ICronRepository {
-    private val stateMutex = Mutex()
-    private val stateMapLock = SynchronizedObject()
-    private val stateByAgent = mutableMapOf<String, MutableStateFlow<List<CronTask>>>()
-    private val inFlightRefresh = mutableMapOf<String, CompletableDeferred<Result<List<CronTask>>>>()
-    private val initialized = mutableSetOf<String>()
+    private val store = CronScheduleStateStore()
 
     init {
         scope.launch { observePushEvents() }
         scope.launch { observeReconnects() }
     }
 
-    override fun schedulesFlow(agentId: String): Flow<List<CronTask>> {
-        val state = stateForUnlocked(agentId)
-        scope.launch {
-            val shouldRefresh = stateMutex.withLock { initialized.add(agentId) }
-            if (shouldRefresh) refresh(agentId)
+    override fun schedulesFlow(scope: AgentScheduleScope): Flow<List<CronTask>> {
+        val state = store.stateForUnlocked(scope.agentId)
+        this.scope.launch {
+            val shouldRefresh = store.markInitialized(scope.agentId)
+            if (shouldRefresh) refresh(scope)
         }
         return state.asStateFlow()
     }
 
-    override suspend fun refresh(agentId: String): Result<List<CronTask>> {
-        // Join any in-flight refresh WITHOUT holding [stateMutex] across await —
-        // holding the lock while awaiting deadlocks the owner (it needs the mutex
-        // to publish results / clear inFlightRefresh).
-        stateMutex.withLock {
-            inFlightRefresh[agentId]?.takeIf { !it.isCompleted }
-        }?.let { return it.await() }
+    override suspend fun refresh(scope: AgentScheduleScope): Result<List<CronTask>> {
+        val agentId = scope.agentId
+        store.existingInFlight(agentId)?.let { return it.await() }
 
         val deferred = CompletableDeferred<Result<List<CronTask>>>()
-        val lostRace = stateMutex.withLock {
-            val existing = inFlightRefresh[agentId]
-            if (existing != null && !existing.isCompleted) {
-                existing
-            } else {
-                inFlightRefresh[agentId] = deferred
-                null
-            }
-        }
+        val lostRace = store.claimRefresh(agentId, deferred)
         if (lostRace != null) {
             return lostRace.await()
         }
@@ -107,29 +142,18 @@ open class CronRepository(
                 throw IllegalStateException(response.error ?: "cron_list failed")
             }
             val tasks = response.tasks
-            stateFor(agentId).value = tasks
+            store.stateFor(agentId).value = tasks
             Result.success(tasks)
         } catch (cancelled: CancellationException) {
-            // Propagate cancellation; do not complete the shared deferred as
-            // Result.failure(CancellationException) — that swallows structured
-            // cancellation and leaves waiters / test scopes hanging.
             deferred.cancel(cancelled)
-            stateMutex.withLock {
-                if (inFlightRefresh[agentId] === deferred) {
-                    inFlightRefresh.remove(agentId)
-                }
-            }
+            store.completeRefresh(agentId, deferred)
             throw cancelled
         } catch (t: Throwable) {
             Result.failure(t)
         }
 
         deferred.complete(result)
-        stateMutex.withLock {
-            if (inFlightRefresh[agentId] === deferred) {
-                inFlightRefresh.remove(agentId)
-            }
-        }
+        store.completeRefresh(agentId, deferred)
         return result
     }
 
@@ -151,38 +175,38 @@ open class CronRepository(
             if (!response.success || task == null) {
                 throw IllegalStateException(response.error ?: "cron_add failed")
             }
-            stateFor(params.agentId).update { current ->
+            store.stateFor(params.agentId).update { current ->
                 if (current.any { it.id == task.id }) current else current + task
             }
             task
         }
 
-    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> =
+    override suspend fun deleteSchedule(target: CronScheduleRef): Result<Unit> =
         runCatchingCancellable {
-            val response = transport.sendCronDelete(taskId)
+            val response = transport.sendCronDelete(target.taskId)
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "cron_delete failed")
             }
-            stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
+            store.stateFor(target.agentId).update { list -> list.filterNot { it.id == target.taskId } }
         }
 
     override suspend fun pauseSchedule(target: CronScheduleRef): Result<Unit> =
-        mutateScheduleStatus(target, com.letta.mobile.data.model.CronTaskStatus.PAUSED) {
+        applyCronStatusMutation(target, com.letta.mobile.data.model.CronTaskStatus.PAUSED) {
             val control = transport as? CronControlTransport
             val command = CronPauseCommand(taskId = target.taskId)
             control?.sendCronPause(command)?.let { it.success to it.error }
                 ?: (false to "Unsupported by transport")
         }
 
-    override suspend fun resumeSchedule(target: CronScheduleRef, scheduledFor: String?): Result<Unit> =
-        mutateScheduleStatus(target, com.letta.mobile.data.model.CronTaskStatus.ACTIVE) {
+    override suspend fun resumeSchedule(target: CronResumeTarget): Result<Unit> =
+        applyCronStatusMutation(target.target, com.letta.mobile.data.model.CronTaskStatus.ACTIVE) {
             val control = transport as? CronControlTransport
-            val command = CronResumeCommand(taskId = target.taskId, scheduledFor = scheduledFor)
+            val command = CronResumeCommand(taskId = target.target.taskId, scheduledFor = target.scheduledFor)
             control?.sendCronResume(command)?.let { it.success to it.error }
                 ?: (false to "Unsupported by transport")
         }
 
-    private suspend fun mutateScheduleStatus(
+    private suspend fun applyCronStatusMutation(
         target: CronScheduleRef,
         newStatus: String,
         execute: suspend () -> Pair<Boolean, String?>,
@@ -191,26 +215,18 @@ open class CronRepository(
         if (!success) {
             throw IllegalStateException(error ?: "cron status update failed")
         }
-        stateFor(target.agentId).update { list ->
+        store.stateFor(target.agentId).update { list ->
             list.map { if (it.id == target.taskId) it.copy(status = newStatus) else it }
         }
     }
 
-    private suspend fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =
-        stateMutex.withLock { stateForUnlocked(agentId) }
-
-    private fun stateForUnlocked(agentId: String): MutableStateFlow<List<CronTask>> =
-        synchronized(stateMapLock) {
-            stateByAgent.getOrPut(agentId) { MutableStateFlow(emptyList()) }
-        }
-
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
             if (frame !is ServerFrame.CronsUpdated) return@collect
-            val agents = stateMutex.withLock { initialized.toList() }
+            val agents = store.initializedAgents()
             agents.forEach { agentId ->
                 try {
-                    refresh(agentId)
+                    refresh(AgentScheduleScope(agentId))
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (e: Throwable) {
@@ -231,10 +247,10 @@ open class CronRepository(
         transport.state.collect { state ->
             val nowConnected = state is ChannelTransportState.Connected
             if (wasConnected == false && nowConnected) {
-                val agents = stateMutex.withLock { initialized.toList() }
+                val agents = store.initializedAgents()
                 agents.forEach { agentId ->
                     try {
-                        refresh(agentId)
+                        refresh(AgentScheduleScope(agentId))
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (e: Throwable) {
@@ -256,4 +272,3 @@ open class CronRepository(
         private const val TAG = "CronRepository"
     }
 }
-
