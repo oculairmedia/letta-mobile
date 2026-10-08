@@ -54,6 +54,12 @@ object ChatTimelineDimens {
     val scrollToLatestMaxOvershoot: Dp = LettaDimens.Space.md
 
     /**
+     * The scroll-to-latest button waits until the reader is at least this far from the newest
+     * content (or 40% of the viewport, whichever is more), so nudging the list never raises it.
+     */
+    val scrollToLatestMinShowDistance: Dp = 200.dp
+
+    /**
      * The Touch scroll-to-latest button (designsystem ScrollToBottomFab): its inset from the
      * list's bottom-end corner (feature-chat LettaSpacing.INNER_PADDING) and its lift.
      */

@@ -21,6 +21,8 @@ internal data class UiFrame(
     val scrollCommands: Int,
     /** Times a timeline row's content was composed (first composition or recomposition) since the previous frame. */
     val rowCompositions: Int,
+    /** The scroll-to-latest button is on screen. */
+    val scrollToLatestShown: Boolean = false,
 ) {
     val keys: List<String> get() = rows.map { it.key }
     val atNewestEdge: Boolean get() = firstVisibleItemIndex == 0 && scrollOffset == 0
@@ -30,5 +32,5 @@ internal data class UiFrame(
 
     override fun toString() =
         "#$index [$step] edge=$atNewestEdge($firstVisibleItemIndex/$scrollOffset) spinner=$spinnerVisible " +
-            "scrolls=$scrollCommands composed=$rowCompositions rows=" + rows.joinToString { "${it.key}@${it.top}+${it.height}" }
+            "latestButton=$scrollToLatestShown scrolls=$scrollCommands composed=$rowCompositions rows=" + rows.joinToString { "${it.key}@${it.top}+${it.height}" }
 }
