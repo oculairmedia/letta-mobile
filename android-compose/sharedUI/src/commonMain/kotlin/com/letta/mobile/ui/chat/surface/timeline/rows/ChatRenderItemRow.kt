@@ -39,7 +39,7 @@ internal fun ChatRenderItemRow(
                     if (inRun) {
                         RunBlockRow(listOf(item.message), context, callbacks)
                     } else {
-                        ChatMessageRow(item.message, context, callbacks)
+                        ChatMessageRow(item.message, context, callbacks, item.groupPosition)
                     }
                 }
             }
@@ -80,6 +80,10 @@ internal object ChatRowTestTags {
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
     const val TOOL_FAILURE_BADGE = "tool-failure-badge"
+    const val TOOL_STATUS_GLYPH = "tool-status-glyph"
+    const val TOOL_OUTCOME = "tool-outcome"
+    const val TOOL_EMOJI = "tool-emoji"
+    const val TOOL_EXECUTING = "tool-executing"
     const val TOOL_OUTPUT = "tool-output"
     const val TOOL_RESULT_PREVIEW = "tool-result-preview"
     const val CANVAS_ARTIFACT = "chat-canvas-artifact"
@@ -97,10 +101,17 @@ internal object ChatRowTestTags {
     const val PROMPT_PROVENANCE = "chat-user-prompt-provenance"
     const val AGENT_TEXT = "chat-agent-text"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
+    /** The reasoning header's loading indicator while it streams. */
+    const val REASONING_SPINNER = "chat-reasoning-spinner"
     const val RUN_BLOCK = "chat-run-block"
     const val RUN_HEADER = "chat-run-header"
     const val APPROVAL_REASON = "chat-approval-reason"
+    const val APPROVAL_REJECT_DIALOG = "chat-approval-reject-dialog"
+    const val APPROVAL_REJECT_CONFIRM = "chat-approval-reject-confirm"
+    const val APPROVAL_TOOL_CALL = "chat-approval-tool-call"
+    const val APPROVAL_REQUESTING_INPUT = "chat-approval-requesting-input"
     const val IMAGE_GRID = "chat-image-grid"
     const val IMAGE_VIEWER = "chat-image-viewer"
     const val CLOCK = "chat-row-clock"
+    const val SPEAKER_HEADER = "chat-row-speaker-header"
 }

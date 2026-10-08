@@ -1,9 +1,13 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,8 +27,11 @@ import com.letta.mobile.feature.chat.screen.openSubagentTodoSheet
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
+import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 
 /** letta-mobile-bglj6.1: where the shared page's subagent affordances read from. */
 internal data class SharedChatSubagentInputs(
@@ -45,6 +52,12 @@ internal class SharedChatSubagentSheetState(
     private val scope: CoroutineScope,
 ) {
     var target: SubagentTodoSheetTarget? by mutableStateOf(null)
+
+    /**
+     * The legacy layout's floating banner text ("conversation is not available yet"), blank when
+     * none shows; [SharedChatSubagentBanner] draws it and clears it (letta-mobile-bglj6.1.22).
+     */
+    var bannerMessage: String by mutableStateOf("")
 
     /** Opens [target]'s sheet (from a ring or a resolved row). */
     fun open(target: SubagentTodoSheetTarget) = openSubagentTodoSheet(target, source, scope) { this.target = it }
@@ -83,8 +96,8 @@ internal fun SharedChatSubagentRings(
                 barState = inputs.barState,
                 resolvedSubagentSource = inputs.source,
                 navigation = navigation,
-                // The shared page has no floating banner; the fallback still opens the sheet.
-                onFloatingBannerMessageChange = {},
+                // The fallback opens the sheet and says why ([SharedChatSubagentBanner]).
+                onFloatingBannerMessageChange = { state.bannerMessage = it },
                 openSubagentTarget = state::open,
                 onTargetChange = { state.target = it },
                 subagentNavigationScope = scope,
@@ -94,6 +107,34 @@ internal fun SharedChatSubagentRings(
         )
     }
 }
+
+/**
+ * The legacy layout's floating banner over the top of the page (canvas or full screen), shown for
+ * a few seconds when a ring's subagent conversation cannot be opened yet.
+ */
+@Composable
+internal fun SharedChatSubagentBanner(state: SharedChatSubagentSheetState) {
+    val message = state.bannerMessage
+    LaunchedEffect(message) {
+        if (message.isNotBlank()) {
+            delay(SUBAGENT_BANNER_MILLIS.milliseconds)
+            state.bannerMessage = ""
+        }
+    }
+    Box(Modifier.fillMaxSize()) {
+        FloatingBanner(
+            visible = message.isNotBlank(),
+            text = message,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(LettaDimens.Space.lg),
+        )
+    }
+}
+
+/** As long as the legacy layout's banner stays (ChatScreenFloatingBannerDismissEffect). */
+private const val SUBAGENT_BANNER_MILLIS = 2_600
 
 /** The open sheet, if any; reuses the legacy layout's [ChatScreenSubagentTodoSheet]. */
 @Composable

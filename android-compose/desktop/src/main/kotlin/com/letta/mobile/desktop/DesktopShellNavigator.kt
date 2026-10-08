@@ -16,12 +16,12 @@ import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.desktop.home.FleetSort
-import com.letta.mobile.desktop.home.preferredComposerConversationId
+import com.letta.mobile.data.home.preferredComposerConversationId
+import com.letta.mobile.desktop.home.toFleetConversation
 
 /**
  * letta-mobile-bglj6.1.10: what the desktop shell shows - the destination, the rail, the agent
- * editor, the background-tasks pane, the Work | Play lens and the Home sort - in one holder, so
+ * editor, the background-tasks pane and the Work | Play lens - in one holder, so
  * every piece of [LettaDesktopApp] reads and changes the same state.
  *
  * [destinationState] and [railExpandedState] come from `rememberSaveable` in [LettaDesktopApp].
@@ -49,8 +49,6 @@ internal class DesktopShellNavigator(
 
     /** Work | Play presentation lens over the same agents/memory/conversations. */
     var workPlayMode: WorkPlayMode by mutableStateOf(WorkPlayMode.Work)
-
-    var homeSort: FleetSort by mutableStateOf(FleetSort())
 
     /** Leaves any agent editor, then shows [destination]. */
     fun navigate(destination: DesktopDestination) {
@@ -130,7 +128,8 @@ internal class DesktopShellRouter(
         val text = prompt.text.trim()
         if (text.isEmpty()) return
         navigator.editAgentId = null
-        val target = preferredComposerConversationId(chatState.value.conversations, prompt.focusedAgentId)
+        val conversations = chatState.value.conversations.map { it.toFleetConversation() }
+        val target = preferredComposerConversationId(conversations, prompt.focusedAgentId)
         if (target != null) {
             chatController.replyFromNotification(target, text)
         } else {

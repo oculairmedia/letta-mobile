@@ -40,6 +40,7 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.timeline_history_error
 import com.letta.mobile.sharedui.resources.timeline_missing_target
 import com.letta.mobile.sharedui.resources.timeline_retry_history
+import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -107,13 +108,8 @@ private fun PagedTimelineBody(
     val scope = rememberCoroutineScope()
     val anchoredTarget by presentation.target.collectAsState()
     val restoreAnchor = remember(presentation) { presentation.viewport }
-    var following by remember(presentation) { mutableStateOf(restoreAnchor == null && listState.isAtNewestEdge()) }
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
-
-    FollowTheNewestEdge(listState, settled.loadState.prepend.endOfPaginationReached) { following = it }
-    LaunchedEffect(rows.identity, following) {
-        if (following && !listState.isScrollInProgress) listState.scrollToItem(0)
-    }
+    val follow = rememberPagedListFollow(params, settled, rows, restoring = restoreAnchor != null)
     if (!anchorRestored) {
         RestoreReadingPosition(listState, rows, restoreAnchor) { anchorRestored = true }
     } else {
@@ -134,15 +130,19 @@ private fun PagedTimelineBody(
             bindings = bindings,
             overlays = TimelineFrameOverlays(
                 pinnedPrompt = pinned,
-                showScrollToLatest = !following,
+                // Anchored on a search target, index 0 is the newest row of THAT window, not the conversation's.
+                showScrollToLatest = rememberScrollToLatestVisible(
+                    listState,
+                    eligible = !follow.following,
+                    newerContentPending = anchoredTarget != null,
+                ),
                 onScrollToLatest = {
-                    following = true
+                    follow.following = true
                     scope.launch {
-                        // Anchored on a search target, index 0 is the newest row of THAT window.
                         if (anchoredTarget != null) presentation.navigate(null)
-                        glide.toNewest()
-                        // The glide's own scroll stopped the follow; it ends on the newest edge.
-                        following = true
+                        follow.ownScroll { glide.toNewest() }
+                        // It ends on the newest edge.
+                        follow.following = true
                     }
                 },
                 glide = glide,
@@ -150,6 +150,9 @@ private fun PagedTimelineBody(
                 topReserve = params.topReserve,
             ),
             modifier = Modifier.fillMaxSize(),
+            // Paging appends older history and prepends newer: a page boundary is not an edge.
+            olderHistoryComplete = { settled.loadState.append.endOfPaginationReached },
+            newerHistoryComplete = { settled.loadState.prepend.endOfPaginationReached },
         ) {
             pagedRows(PagedRowsScope(rows, settled, params, today, bindings))
         }
@@ -162,6 +165,35 @@ private fun PagedTimelineBody(
             )
         }
     }
+}
+
+/**
+ * The paged list's follow over its rows. letta-mobile-bglj6.1.18: a NEW user prompt at the head
+ * is the user's own send: always bring them to it, exactly as the legacy list does
+ * (LegacyTimelineList's force-follow).
+ */
+@Composable
+private fun rememberPagedListFollow(
+    params: PagedTimelineParams,
+    settled: LazyPagingItems<CanonicalTimelinePresentation.Row>,
+    rows: PagedRows,
+    restoring: Boolean,
+): PagedFollow {
+    val newestKey = remember(rows.identity) { rows.key(rows.leading) }
+    val newestIsUserPrompt = remember(rows.identity) {
+        val newest = rows.itemAt(rows.leading)
+        newest is ChatRenderItem.Single && isUserRole(newest.message.role)
+    }
+    return rememberPagedFollow(
+        params.presentation,
+        PagedFollowInputs(
+            listState = params.listState,
+            restoring = restoring,
+            newerHistoryComplete = settled.loadState.prepend.endOfPaginationReached,
+            newestKey = newestKey,
+            newestIsUserPrompt = newestIsUserPrompt,
+        ),
+    )
 }
 
 /** Opening states the paged list decides from Paging's own load states. */
@@ -252,9 +284,12 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     items(count = rows.size - rows.leading, key = { rows.key(it + rows.leading) }) { offset ->
         val index = offset + rows.leading
         if (offset < rows.liveCount) {
-            PagedRow(rows.assembly.live[offset], rows.itemAt(index + 1), scope)
+            val item = rows.assembly.live[offset]
+            PagedRow(item, rows.itemAt(index + 1), scope, timelineRowMotion(fadesIn = !item.isUserPrompt()))
         } else {
-            SettledRow(scope, index)
+            // Settled rows page in from history: they glide when displaced but never fade in,
+            // or every page load would flash its rows.
+            SettledRow(scope, index, timelineRowMotion(fadesIn = false))
         }
     }
     pagedLoadFooter(scope)
@@ -266,20 +301,20 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
  * while a page loads and drag the reader with it.
  */
 @Composable
-private fun SettledRow(scope: PagedRowsScope, index: Int) {
+private fun SettledRow(scope: PagedRowsScope, index: Int, modifier: Modifier) {
     val settledIndex = index - scope.rows.leading - scope.rows.liveCount
     val row = scope.settled[settledIndex]
     if (row == null) {
-        Box(Modifier.height(ChatTimelineDimens.placeholderRowHeight))
+        Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
     } else {
-        PagedRow(row.item, scope.rows.itemAt(index + 1), scope)
+        PagedRow(row.item, scope.rows.itemAt(index + 1), scope, modifier)
     }
 }
 
 /** A row plus the divider that begins its day, decided against its older neighbour only. */
 @Composable
-private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope) {
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun PagedRow(item: ChatRenderItem, older: ChatRenderItem?, scope: PagedRowsScope, modifier: Modifier) {
+    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         pagedBoundaryDate(item, older)?.let { date ->
             DayDividerRow(date, scope.today)
         }
@@ -331,26 +366,6 @@ internal fun ObserveResidentRows(
 /** What a view reports as resident: nothing (null) while its first page is still loading. */
 internal fun <T> residentReport(rows: List<T>, refresh: LoadState): List<T>? =
     rows.takeUnless { it.isEmpty() && refresh is LoadState.Loading }
-
-/**
- * Leaving the newest edge stops following; coming back resumes, but only once that edge is the
- * true end of the list rather than a page boundary, or a mid-history page load would re-arm the
- * follow and yank the reader to the tail (desktop FollowTheNewestEdge).
- */
-@Composable
-private fun FollowTheNewestEdge(listState: LazyListState, atNewestEdge: Boolean, onFollowChanged: (Boolean) -> Unit) {
-    LaunchedEffect(listState, atNewestEdge) {
-        var wasScrolling = false
-        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (scrolling) {
-                onFollowChanged(false)
-            } else if (wasScrolling && !listState.canScrollBackward && atNewestEdge) {
-                onFollowChanged(true)
-            }
-            wasScrolling = scrolling
-        }
-    }
-}
 
 /** Puts the reader back where they left off, once, from resident rows only. */
 @Composable

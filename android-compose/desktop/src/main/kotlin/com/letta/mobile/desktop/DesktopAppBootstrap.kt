@@ -21,6 +21,9 @@ import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.home.DesktopHome
+import com.letta.mobile.data.home.HomePageController
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
@@ -119,6 +122,7 @@ internal class DesktopLibraryControllers(
     val schedules: DesktopScheduleLibraryController,
     val channels: ChannelsPageController,
     val tools: DesktopToolLibraryController,
+    val home: HomePageController,
 )
 
 @Composable
@@ -126,6 +130,7 @@ internal fun rememberDesktopLibraryControllers(
     sessionGraphId: Long,
     sessionGraphProvider: DesktopSessionGraphProvider,
     chatScope: CoroutineScope,
+    settingsStore: SecureSettingsStore,
 ): DesktopLibraryControllers {
     val memory = remember(sessionGraphId, chatScope) {
         MemoryPageController.forSession(
@@ -143,7 +148,11 @@ internal fun rememberDesktopLibraryControllers(
     val tools = remember(sessionGraphId, chatScope) {
         DesktopToolLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
-    return DesktopLibraryControllers(memory, schedules, channels, tools)
+    // The Home source follows the provider's current graph itself, so a backend switch reloads it in place.
+    val home = remember(sessionGraphProvider, settingsStore, chatScope) {
+        DesktopHome.controller(sessionGraphProvider = sessionGraphProvider, settingsStore = settingsStore, scope = chatScope)
+    }
+    return DesktopLibraryControllers(memory, schedules, channels, tools, home)
 }
 
 private fun desktopMemoryErrorMessage(throwable: Throwable): String =
@@ -222,6 +231,11 @@ private fun LibraryControllerLifecycles(
     )
     ControllerLifecycleEffect(
         controller = libraries.tools,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.home,
         onStart = { start() },
         onClose = { close() },
     )

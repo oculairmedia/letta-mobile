@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -15,8 +18,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,7 +33,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -53,14 +57,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.max
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_open
 import com.letta.mobile.sharedui.resources.composer_attach_image
@@ -68,10 +70,13 @@ import com.letta.mobile.sharedui.resources.composer_open_canvas
 import com.letta.mobile.sharedui.resources.composer_send
 import com.letta.mobile.sharedui.resources.composer_stop
 import com.letta.mobile.sharedui.resources.composer_stopping
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatComposerDimens
+import com.letta.mobile.ui.theme.ChatExpressiveMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -116,7 +121,7 @@ internal fun TouchComposerBar(
         TouchBarSurface(model) {
             leading?.invoke()
             TouchPlusButton(
-                visible = sheetItems.isNotEmpty(),
+                items = sheetItems,
                 onClick = { if (sheetItems.size == 1) sheetItems.single().onClick() else sheetOpen = true },
             )
             Box(Modifier.weight(1f).padding(horizontal = TouchComposerDimens.fieldPadding, vertical = TouchComposerDimens.fieldPadding)) {
@@ -219,26 +224,34 @@ private fun <T> chipSpec(): AnimationSpec<T> {
 
 /**
  * Top and bottom padding. Legacy: 24 dp at rest, easing to 12 dp as the keyboard rises (driven by
- * the inset itself, so it tracks the keyboard frame by frame). The bottom never drops under the
- * navigation bar's inset while the keyboard is down, so three-button navigation does not cover
- * the controls either; with gesture navigation the handle draws over the padding, as legacy.
+ * the inset itself, so it tracks the keyboard frame by frame). The bar runs flush to the screen's
+ * bottom edge (legacy ChatScreen's bottomInsetDp = 0, letta-mobile-bglj6.1.9): the opaque bar sits
+ * under the navigation bar, which draws over its bottom padding, instead of growing by the
+ * navigation inset and floating its controls ~48 dp up on three-button devices.
  */
 @Composable
 private fun touchBarPadding(): Pair<Dp, Dp> {
-    val density = LocalDensity.current
-    val imePx = WindowInsets.ime.getBottom(density)
-    val compact = (imePx / TouchComposerDimens.imeInsetForCompactPx).coerceIn(0f, 1f)
-    val vertical = lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
-    val navigation = with(density) { WindowInsets.navigationBars.getBottom(density).toDp() }
-    val bottom = if (imePx > 0) vertical else max(vertical, navigation)
-    return vertical to bottom
+    val imePx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val vertical = touchBarVerticalPadding(imePx)
+    return vertical to vertical
 }
 
-/** The round tonal "+": the action sheet, or (with one thing to do) that thing directly. */
+/** The bar's vertical padding for an IME inset of [imePx]: resting, easing to compact as it rises. */
+internal fun touchBarVerticalPadding(imePx: Int): Dp {
+    val compact = (imePx / TouchComposerDimens.imeInsetForCompactPx).coerceIn(0f, 1f)
+    return lerp(TouchComposerDimens.restingVerticalPadding, TouchComposerDimens.compactVerticalPadding, compact)
+}
+
+/**
+ * The round tonal "+": the action sheet, or (with one thing to do) that thing directly. It is
+ * announced as what it does (letta-mobile-bglj6.1.9): "Add to message" when it opens the sheet,
+ * the single item's own label ("Attach image") when it does that directly, as legacy.
+ */
 @Composable
-private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
-    if (!visible) return
-    val haptics = LocalHapticFeedback.current
+private fun TouchPlusButton(items: List<TouchSheetItem>, onClick: () -> Unit) {
+    if (items.isEmpty()) return
+    val description = items.singleOrNull()?.label ?: stringResource(Res.string.composer_actions_open)
+    val haptics = LocalHaptics.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val reducedMotion = LocalReducedMotion.current
@@ -252,7 +265,7 @@ private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
             .size(TouchComposerDimens.actionTarget)
             .clip(CircleShape)
             .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button) {
-                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                haptics.play(LettaHapticCue.ContextClick)
                 onClick()
             }
             .testTag(ComposerTestTags.TOUCH_PLUS),
@@ -270,7 +283,7 @@ private fun TouchPlusButton(visible: Boolean, onClick: () -> Unit) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     LettaIcons.Add,
-                    contentDescription = stringResource(Res.string.composer_actions_open),
+                    contentDescription = description,
                     modifier = Modifier.size(TouchComposerDimens.attachIcon),
                 )
             }
@@ -290,35 +303,83 @@ private fun touchSheetItems(model: ComposerModel, onAttachImage: () -> Unit): Li
 }
 
 /**
+ * The slot is the mic: the platform can dictate, nothing is drafted or running, and the field takes
+ * input (no dictating into a field that takes none: the slot falls back to the greyed Send, legacy).
+ */
+private fun touchSlotDictates(model: ComposerModel): Boolean {
+    if (model.platform.voiceInput == null || !model.composer.acceptsInput) return false
+    return !model.streaming && !model.composer.hasPayload
+}
+
+/**
  * The right-hand slot. Empty and idle, it is the platform's hold-to-dictate mic; otherwise Send,
  * or Stop while a run streams with nothing to queue. While the keyboard is up Send steps aside
  * (the keyboard's own action key sends), but Stop and the mic stay.
  */
 @Composable
 private fun TouchTrailingSlot(model: ComposerModel) {
-    val voice = model.platform.voiceInput
-    val dictates = voice != null && !model.streaming && !model.composer.hasPayload
+    val dictates = touchSlotDictates(model)
     val keyboard = keyboardOpen()
     val visible = dictates || model.streaming || !keyboard
-    val reducedMotion = LocalReducedMotion.current
+    val shown = rememberRetainedTrailingContent(visible, if (dictates) TouchTrailingContent.Voice else TouchTrailingContent.Action)
     AnimatedVisibility(
         visible = visible,
-        enter = if (reducedMotion) fadeIn(snap()) else fadeIn(tween(LettaMotionTokens.CHIP_MILLIS)) + expandHorizontally(expandFrom = Alignment.End),
-        exit = if (reducedMotion) {
-            fadeOut(snap())
-        } else {
-            fadeOut(tween(LettaMotionTokens.CHIP_MILLIS)) + scaleOut(targetScale = EXIT_SCALE) + shrinkHorizontally(shrinkTowards = Alignment.End)
-        },
+        enter = touchSlotEnter(),
+        exit = touchSlotExit(),
         label = "touchTrailingSlot",
     ) {
-        if (dictates) {
-            Box(Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE), contentAlignment = Alignment.Center) {
+        when (shown) {
+            TouchTrailingContent.Voice -> Box(
+                Modifier.size(TouchComposerDimens.actionTarget).testTag(ComposerTestTags.TOUCH_VOICE),
+                contentAlignment = Alignment.Center,
+            ) {
                 ComposerVoiceButton(model)
             }
-        } else {
-            TouchActionButton(model)
+            TouchTrailingContent.Action -> TouchActionButton(model)
         }
     }
+}
+
+/** What the right-hand slot holds: the dictation mic, or the Send / Stop button. */
+internal enum class TouchTrailingContent { Voice, Action }
+
+/**
+ * letta-mobile-bglj6.1.19: the slot keeps what it showed while its exit runs (legacy
+ * LettaInputBar's retained custom slot). AnimatedVisibility composes its content through the exit,
+ * and typing the first character with the keyboard up both hides the slot and ends dictation: read
+ * live, the leaving mic would turn into Send for a frame.
+ */
+internal fun retainedTrailingContent(
+    visible: Boolean,
+    current: TouchTrailingContent,
+    retained: TouchTrailingContent,
+): TouchTrailingContent = if (visible) current else retained
+
+/** Not snapshot state: it only remembers the last visible content for the frames of an exit. */
+private class TrailingContentMemory(var last: TouchTrailingContent)
+
+@Composable
+private fun rememberRetainedTrailingContent(visible: Boolean, current: TouchTrailingContent): TouchTrailingContent {
+    val memory = remember { TrailingContentMemory(current) }
+    val shown = retainedTrailingContent(visible, current, memory.last)
+    memory.last = shown
+    return shown
+}
+
+/** The slot easing in from its end (legacy composerActionEnterTransition: the expressive fast springs). */
+@Composable
+private fun touchSlotEnter(): EnterTransition {
+    if (LocalReducedMotion.current) return fadeIn(snap())
+    return fadeIn(ChatExpressiveMotion.fastEffects()) +
+        expandHorizontally(ChatExpressiveMotion.fastSpatial(), expandFrom = Alignment.End)
+}
+
+@Composable
+private fun touchSlotExit(): ExitTransition {
+    if (LocalReducedMotion.current) return fadeOut(snap())
+    return fadeOut(ChatExpressiveMotion.fastEffects()) +
+        scaleOut(ChatExpressiveMotion.fastSpatial(), targetScale = EXIT_SCALE) +
+        shrinkHorizontally(ChatExpressiveMotion.fastSpatial(), shrinkTowards = Alignment.End)
 }
 
 private const val EXIT_SCALE = 0.76f
@@ -327,7 +388,7 @@ private const val EXIT_SCALE = 0.76f
 @Composable
 private fun TouchActionButton(model: ComposerModel) {
     val stops = model.decisions.action == ComposerAction.Stop
-    val haptics = LocalHapticFeedback.current
+    val haptics = LocalHaptics.current
     val size by animateFloatAsState(
         if (stops) TouchComposerDimens.stopScale else 1f,
         chipSpec(),
@@ -336,7 +397,8 @@ private fun TouchActionButton(model: ComposerModel) {
     val pulse = rememberStopPulse(stopPulses(model))
     FilledIconButton(
         onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            // A send launches the flight; stopping the run reads as a plain confirm.
+            haptics.play(if (stops) LettaHapticCue.Confirm else LettaHapticCue.SendLaunch)
             model.runAction()
         },
         enabled = stops || model.decisions.sendEnabled,
@@ -350,13 +412,34 @@ private fun TouchActionButton(model: ComposerModel) {
             .testTag(if (stops) ComposerTestTags.STOP else ComposerTestTags.SEND),
         colors = touchActionColors(stops),
     ) {
-        Icon(
-            imageVector = if (stops) LettaIcons.Close else LettaIcons.Send,
-            contentDescription = stringResource(touchActionLabel(model.decisions)),
-            modifier = Modifier.size(TouchComposerDimens.actionIcon),
-        )
+        TouchActionIcon(stops = stops, contentDescription = stringResource(touchActionLabel(model.decisions)))
     }
 }
+
+/**
+ * letta-mobile-bglj6.1.19: Send and Stop morph into each other (legacy LettaInputBar
+ * ComposerActionIcon): the leaving glyph fades and shrinks to 0.76 while the arriving one fades
+ * and grows from it, on the expressive fast springs. A plain swap under reduced motion.
+ */
+@Composable
+private fun TouchActionIcon(stops: Boolean, contentDescription: String) {
+    val iconModifier = Modifier.size(TouchComposerDimens.actionIcon)
+    if (LocalReducedMotion.current) {
+        Icon(touchActionIcon(stops), contentDescription = contentDescription, modifier = iconModifier)
+        return
+    }
+    val enter = fadeIn(ChatExpressiveMotion.fastEffects()) + scaleIn(ChatExpressiveMotion.fastSpatial(), initialScale = EXIT_SCALE)
+    val exit = fadeOut(ChatExpressiveMotion.fastEffects()) + scaleOut(ChatExpressiveMotion.fastSpatial(), targetScale = EXIT_SCALE)
+    AnimatedContent(
+        targetState = stops,
+        transitionSpec = { enter togetherWith exit },
+        label = "touchActionIconMorph",
+    ) { stopping ->
+        Icon(touchActionIcon(stopping), contentDescription = contentDescription, modifier = iconModifier)
+    }
+}
+
+private fun touchActionIcon(stops: Boolean): ImageVector = if (stops) LettaIcons.Close else LettaIcons.Send
 
 /** Stop beats while the run is live and not yet asked to stop; never under reduced motion. */
 @Composable

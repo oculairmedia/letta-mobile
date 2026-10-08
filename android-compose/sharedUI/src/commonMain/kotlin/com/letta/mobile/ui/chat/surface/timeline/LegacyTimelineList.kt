@@ -152,7 +152,8 @@ private fun LazyListScope.legacyRows(
 ) {
     if (edges.thinking) item(key = THINKING_KEY) { ThinkingRow(edges.messages) }
     items(count = rows.size, key = { rows[it].key }, contentType = { rows[it]::class.simpleName }) { index ->
-        TimelineRowContent(rows[index], bindings, today)
+        val row = rows[index]
+        TimelineRowContent(row, bindings, today, timelineRowMotion(fadesIn = !row.isUserPrompt()))
     }
     if (edges.loadingOlder) {
         item(key = LOADING_OLDER_KEY) { TimelineOlderHistoryLoading(edges.agentId) }
@@ -160,11 +161,11 @@ private fun LazyListScope.legacyRows(
 }
 
 @Composable
-private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate) {
+private fun TimelineRowContent(row: TimelineRow, bindings: TimelineRowBindings, today: LocalDate, modifier: Modifier) {
     when (row) {
-        is TimelineRow.Item -> TimelineItemRow(row.item, bindings)
-        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks)
-        is TimelineRow.DayDivider -> DayDividerRow(row.date, today)
+        is TimelineRow.Item -> TimelineItemRow(row.item, bindings, modifier)
+        is TimelineRow.ToolGroup -> ToolGroupRow(row, bindings.contexts, bindings.callbacks, modifier)
+        is TimelineRow.DayDivider -> DayDividerRow(row.date, today, modifier)
     }
 }
 
@@ -198,7 +199,11 @@ private fun rememberLegacyFollow(
     }
     FollowTailEffect(listState, tail) { following }
     ForceFollowOnSendEffect(listState, tail.newest) { following = true }
-    val showButton = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged))
+    // Off the newest rows by the shared policy, and then a meaningful distance off (with hysteresis).
+    val showButton = rememberScrollToLatestVisible(
+        listState,
+        eligible = ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.reversedViewportSnapshot(isDragged)),
+    )
     return TimelineFollow(showScrollToLatest = showButton) {
         following = true
         scope.launch { glide.toNewest() }

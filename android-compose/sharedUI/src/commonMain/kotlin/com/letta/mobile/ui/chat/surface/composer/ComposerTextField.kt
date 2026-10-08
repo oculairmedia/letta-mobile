@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_placeholder
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
+import com.letta.mobile.ui.haptics.LettaHapticCue
+import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.LettaDimens
@@ -104,7 +107,9 @@ internal fun ComposerTextField(
     val text = model.composer.text
     var fieldValue by remember { mutableStateOf(TextFieldValue(text, selection = TextRange(text.length))) }
     LaunchedEffect(text) { fieldValue = reconcileComposerFieldValue(fieldValue, text) }
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+    // letta-mobile-bglj6.1.23: greyed and unfocusable while the owner takes no input (legacy canSendMessages).
+    val enabled = model.composer.acceptsInput
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(color = composerFieldTextColor(enabled))
     val primary = LocalComposerPrimary.current
     val handoff = LocalComposerFocusHandoff.current
     val focus = remember(primary, handoff) { FieldFocus(primary, handoff) }
@@ -112,12 +117,22 @@ internal fun ComposerTextField(
     LaunchedEffect(primary, handoff) {
         if (focus.restores()) focusRequester.requestFocus()
     }
+    // A keyboard send (IME action, Enter) launches the flight like the bar's button does.
+    val haptics = LocalHaptics.current
+    val sendFromKeyboard = {
+        if (model.decisions.sendEnabled) {
+            haptics.play(LettaHapticCue.SendLaunch)
+            model.actions.send()
+        }
+        true
+    }
     BasicTextField(
         value = fieldValue,
         onValueChange = { next ->
             fieldValue = next
             if (next.text != text) model.actions.updateComposerText(next.text)
         },
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = LettaDimens.Space.xl, max = style.maxHeight)
@@ -136,7 +151,7 @@ internal fun ComposerTextField(
                         matchedCommands = model.decisions.autocomplete.matchedCommands,
                         canSend = model.decisions.sendEnabled,
                         onRunCommand = { chooseComposerCommand(model.composer, model.decisions.autocomplete, model.actions, it) },
-                        onSend = model.actions::send,
+                        onSend = { sendFromKeyboard() },
                     ),
                 )
             },
@@ -145,7 +160,7 @@ internal fun ComposerTextField(
         singleLine = style.singleLine,
         maxLines = style.maxLines,
         keyboardOptions = style.keyboardOptions(),
-        keyboardActions = KeyboardActions(onSend = { if (model.decisions.sendEnabled) model.actions.send() }),
+        keyboardActions = KeyboardActions(onSend = { sendFromKeyboard() }),
         decorationBox = { inner ->
             // Centred in the field's height, so a one-line bar's text sits mid-bar, not at its top.
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
@@ -180,13 +195,21 @@ private class FieldFocus(private val primary: Boolean, private val handoff: Comp
     }
 }
 
-/** The owner's placeholder, else the platform's own copy. */
+/** The field's text colour: onSurface, faded to the disabled alpha while the field is off. */
+@Composable
+private fun composerFieldTextColor(enabled: Boolean): Color {
+    val color = MaterialTheme.colorScheme.onSurface
+    return if (enabled) color else color.copy(alpha = LettaDimens.Alpha.disabled)
+}
+
+/** The owner's placeholder, else the platform's own copy; faded with the field while it is off. */
 @Composable
 private fun FieldPlaceholder(model: ComposerModel, style: ComposerFieldStyle, textStyle: TextStyle) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
     Text(
         text = model.composer.placeholder ?: stringResource(style.placeholderRes()),
         style = textStyle,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (model.composer.acceptsInput) color else color.copy(alpha = LettaDimens.Alpha.disabled),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )

@@ -32,11 +32,26 @@ internal class PagedSendLiftRig private constructor(
         rig.send(UserMessage(id = "pending-$otid", contentRaw = JsonPrimitive(text), date = SENT_AT, otid = otid))
     }
 
+    /** The server's echo of the prompt sent with [otid], as the stream carries it first. */
+    fun echo(text: String, otid: String): UserMessage =
+        UserMessage(id = "cm-user-$otid", contentRaw = JsonPrimitive(text), date = SENT_AT, otid = otid)
+
+    /** One cumulative frame of the agent's reply. */
+    fun reply(text: String): AssistantMessage =
+        AssistantMessage(id = "reply-stream", contentRaw = JsonPrimitive(text), date = REPLIED_AT)
+
+    /** Begins the agent's turn: the live stream its frames go through. */
+    fun beginStream(): TimelineDomainRig.Stream = runBlocking { rig.beginStream() }
+
+    /** One stream frame, delivered as the host delivers it. */
+    fun emit(stream: TimelineDomainRig.Stream, message: LettaMessage) = runBlocking { stream.emit(message) }
+
     override fun close() = runBlocking { rig.close() }
 
     companion object {
         private const val REAL_MILLIS_PER_FRAME = 12L
         private const val SENT_AT = "2026-09-25T04:00:00.000Z"
+        private const val REPLIED_AT = "2026-09-25T04:00:01.000Z"
         private val scope = TimelineScope("backend", "conv-send-lift", "agent")
 
         fun open(main: ManualMainDispatcher, pairs: Int): PagedSendLiftRig = runBlocking {

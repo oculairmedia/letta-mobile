@@ -27,5 +27,8 @@ object ComposerTestTags {
     const val TOUCH_PLUS = "composer-touch-plus"
     const val TOUCH_VOICE = "composer-touch-voice"
     const val TOUCH_SHEET = "composer-touch-sheet"
+    const val TOUCH_SHEET_ROW = "composer-touch-sheet-row"
     const val TOUCH_RESTORE = "composer-touch-restore"
+    /** letta-mobile-bglj6.1.21: elapsed + running-tool readout beside the Touch companion. */
+    const val TOUCH_COMPANION_STATUS = "composer-touch-companion-status"
 }

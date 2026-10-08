@@ -61,6 +61,8 @@
     <string name="rows_role_you">You</string>
     <string name="rows_role_error">Error</string>
     <string name="rows_role_inter_agent">Inter-agent</string>
+    <string name="rows_role_tool_output">Tool output</string>
+    <string name="rows_role_tool_activity">Tool activity</string>
     <string name="rows_role_not_sent">%1$s · Not sent</string>
     <string name="rows_step_done">done</string>
     <string name="rows_step_failed">failed</string>
@@ -71,6 +73,13 @@
     <string name="rows_tool_argument_line">$ %1$s</string>
     <string name="rows_tool_status_duration">%1$s · %2$d ms</string>
     <string name="rows_tool_done">Done</string>
+    <string name="rows_tool_awaiting_approval">Awaiting approval</string>
+    <string name="rows_tool_outcome_succeeded">Succeeded</string>
+    <string name="rows_tool_outcome_failed">Failed</string>
+    <string name="rows_tool_outcome_rejected">Rejected</string>
+    <string name="rows_tool_outcome_warning">Warning</string>
+    <string name="rows_tool_status_running">Running</string>
+    <string name="rows_tool_executing">Executing %1$s…</string>
     <string name="rows_tool_step_label">%1$s  %2$s</string>
     <string name="rows_tool_verb_ran">Ran</string>
     <string name="rows_tool_verb_read">Read</string>
@@ -91,6 +100,9 @@
     <string name="rows_cancel">Cancel</string>
     <string name="rows_sending">Sending…</string>
     <string name="rows_reject_reason">Reason (optional)</string>
+    <string name="rows_reject_title">Reject approval request</string>
+    <string name="rows_reject_reason_placeholder">Optional context for the agent</string>
+    <string name="rows_requesting_input">requesting input</string>
     <string name="rows_approved">Approved</string>
     <string name="rows_rejected">Rejected</string>
     <string name="rows_approval_response">Approval response</string>
@@ -111,6 +123,8 @@
     <string name="rows_image_decode_failed">Image could not be decoded</string>
     <string name="rows_image_counter">%1$d / %2$d</string>
     <string name="rows_close_viewer">Close image viewer</string>
+    <string name="rows_save_image">Save image</string>
+    <string name="rows_share_image">Share image</string>
     <string name="rows_more_count">+%1$d</string>
 
     <!-- Subagents -->

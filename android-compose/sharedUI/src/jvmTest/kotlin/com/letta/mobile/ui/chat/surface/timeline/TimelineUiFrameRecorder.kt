@@ -123,6 +123,7 @@ internal class TimelineUiFrameRecorder(
             scrollOffset = listState.firstVisibleItemScrollOffset,
             scrollCommands = scrollProbeOf(listState).takeDelta(),
             rowCompositions = compositions.takeDelta(),
+            scrollToLatestShown = test.onAllNodesWithTag(ChatTimelineTags.SCROLL_TO_LATEST).fetchSemanticsNodes().isNotEmpty(),
         )
     }
 

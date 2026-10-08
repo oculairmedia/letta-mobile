@@ -142,11 +142,24 @@ class SendLiftFramesTest {
     @Test
     fun renamedPromptChevronNeverBlinks() = assertNoViolations("chevron", chevronNeverBlinks(framesOf(renameCase())))
 
-    @Ignore("red until letta-mobile-86njl.3")
+    /** letta-mobile-bglj6.1.18: green — the paged list now force-follows a send (ForceFollowOnSend). */
     @Test
     fun pagedSendWhileScrolledUpLandsAtTheNewestEdge() {
         val frames = framesOf(pagedScrolledUpCase())
         assertTrue(frames.first().firstVisibleItemIndex > 0, "the list starts scrolled away from the newest edge")
+        assertNoViolations("the list ends on the newest edge", listEndsAtNewestEdge(frames))
+    }
+
+    /**
+     * A brand-new chat: the first send swaps the welcome for the list and the reply streams far past
+     * one screen. The reader never scrolled, so the list follows the reply to its newest line and the
+     * scroll-to-latest button never shows.
+     */
+    @Test
+    fun pagedNewChatSendFollowsTheStreamingReply() {
+        val frames = newChatFrames()
+        val buttons = frames.filter { it.t >= 0 && it.latestButton }
+        assertNoViolations("scroll-to-latest showed though the reader never scrolled", buttons.map { it.toString() })
         assertNoViolations("the list ends on the newest edge", listEndsAtNewestEdge(frames))
     }
 
@@ -205,6 +218,35 @@ class SendLiftFramesTest {
         before = { scrollListAwayFromTheEdge() },
     )
 
+    private fun newChatFrames(): List<SendFrame> {
+        var frames = emptyList<SendFrame>()
+        runDesktopComposeUiTest(width = SendLiftFrameRecorder.WIDTH, height = SendLiftFrameRecorder.HEIGHT) {
+            val rig = PagedSendLiftRig.open(main, 0)
+            try {
+                val port = SendLiftPort(0, SHORT, rig::send)
+                SendLiftFrameRecorder(this, port, rig::pump).use { recorder ->
+                    recorder.mount(SendLiftMount(paged = rig.presentation))
+                    recorder.step(PAGED_OPEN_FRAMES)
+                    recorder.tapSend(SHORT)
+                    recorder.advance(FRAMES_TO_FIRST_REPLY)
+                    port.typing(true)
+                    val stream = rig.beginStream()
+                    rig.emit(stream, rig.echo(SHORT, port.otid))
+                    LONG_REPLY.forEach { text ->
+                        rig.emit(stream, rig.reply(text))
+                        recorder.advance(FRAMES_PER_REPLY_FRAME)
+                    }
+                    recorder.advance(FRAMES_AFTER)
+                    recorder.writeFrameLog("paged-new-chat")
+                    frames = recorder.frames
+                }
+            } finally {
+                rig.close()
+            }
+        }
+        return frames
+    }
+
     private fun framesOf(case: SendLiftCase): List<SendFrame> = run(case).frames
 
     private fun run(case: SendLiftCase): SendLiftRun {
@@ -251,6 +293,11 @@ class SendLiftFramesTest {
         const val FRAMES_TO_FIRST_REPLY = 6
         const val FRAMES_AFTER = 34
         const val CANVAS_FRAMES = 100
+        const val FRAMES_PER_REPLY_FRAME = 3
+        private const val REPLY_SENTENCE = "Tacos for six need about two pounds of filling, three dozen tortillas and plenty of salsa. "
+
+        /** A reply streamed in growing frames until it is several screens tall. */
+        val LONG_REPLY: List<String> = (1..16).map { REPLY_SENTENCE.repeat(it * 3) }
         const val SETTLED_MILLIS = 600
         const val DEPART_MILLIS = 160
 

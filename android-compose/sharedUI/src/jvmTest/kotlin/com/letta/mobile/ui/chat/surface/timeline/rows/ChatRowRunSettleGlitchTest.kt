@@ -83,7 +83,7 @@ class ChatRowRunSettleGlitchTest {
             }
         }
 
-        val activeHeight = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
+        val activeHeight = awaitStableRunHeight()
 
         // Settle, then draw ONE frame: nothing animated can have advanced.
         streamingState = renderState(isStreaming = false)
@@ -97,6 +97,7 @@ class ChatRowRunSettleGlitchTest {
     fun aRunComposedSettledHasTheSameShapeAsAWorkingOne() = runComposeUiTest {
         // Control case: a settled run composed cold (history scroll, never streamed). Pairs with
         // the transition test: the settled shape is structural, not where an animation stopped.
+        mainClock.autoAdvance = false
         val settledState = renderState(isStreaming = false)
         setContent {
             MaterialTheme {
@@ -105,7 +106,7 @@ class ChatRowRunSettleGlitchTest {
                 }
             }
         }
-        val settledFromCold = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
+        val settledFromCold = awaitStableRunHeight()
 
         val activeState = renderState(isStreaming = true)
         setContent {
@@ -115,9 +116,32 @@ class ChatRowRunSettleGlitchTest {
                 }
             }
         }
-        val activeHeight = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
+        val activeHeight = awaitStableRunHeight()
 
         // Cold (history scroll, never streamed) or settled live, the row is one shape.
         assertEquals(activeHeight, settledFromCold, "a settled run is not the working run's shape (active=$activeHeight, settled=$settledFromCold)")
+    }
+
+    /**
+     * The streaming reveal runs on the wall clock, not this test clock, so a streaming row's
+     * height measures deterministically only once its reveal has stopped growing (this race is
+     * what flaked both cases across CI and local runs in both directions). Advances frames
+     * until the height is unchanged [STABLE_FRAMES] times, then reads it. A settled row has no
+     * reveal and converges immediately.
+     */
+    private fun androidx.compose.ui.test.ComposeUiTest.awaitStableRunHeight(): Float {
+        var stable = 0
+        var last = Float.NaN
+        while (stable < STABLE_FRAMES) {
+            mainClock.advanceTimeByFrame()
+            val height = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).getUnclippedBoundsInRoot().height.value
+            if (height == last) stable++ else stable = 0
+            last = height
+        }
+        return last
+    }
+
+    private companion object {
+        const val STABLE_FRAMES = 3
     }
 }

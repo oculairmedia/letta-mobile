@@ -475,7 +475,7 @@ private fun ZoomableAttachmentImage(
     }
 }
 
-private suspend fun saveAttachment(context: Context, attachment: UiImageAttachment) {
+internal suspend fun saveAttachment(context: Context, attachment: UiImageAttachment) {
     val saved = withContext(Dispatchers.IO) { saveAttachmentToMediaStore(context, attachment) }
     context.toast(
         if (saved) {
@@ -486,7 +486,7 @@ private suspend fun saveAttachment(context: Context, attachment: UiImageAttachme
     )
 }
 
-private suspend fun shareAttachment(context: Context, attachment: UiImageAttachment) {
+internal suspend fun shareAttachment(context: Context, attachment: UiImageAttachment) {
     val uri = withContext(Dispatchers.IO) { writeAttachmentForSharing(context, attachment) }
     if (uri == null) {
         context.toast(context.getString(R.string.screen_chat_image_share_error))

@@ -4,7 +4,9 @@ import androidx.paging.CombinedLoadStates
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
 import com.letta.mobile.data.timeline.TimelineMessageId
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -224,6 +226,44 @@ class ChatTimelineLogicTest {
         assertEquals(3, canonicalRowIndex(live, settled, "s-1"))
         assertEquals(1, canonicalRowIndex(live, emptyList(), "live-1"))
         assertNull(canonicalRowIndex(listOf(item("live-0")), listOf(settledRow("s-0")), "gone"))
+    }
+
+    @Test
+    fun theNewestRunNamesItsRunningTool() {
+        val thinking = activeRunActivity(
+            listOf(UiMessage(id = "u1", role = "user", content = "go", timestamp = "2026-10-06T16:00:00Z")),
+        )
+        assertNull(thinking.runningToolName)
+
+        val running = activeRunActivity(
+            listOf(
+                UiMessage(id = "u1", role = "user", content = "go", timestamp = "2026-10-06T16:00:00Z"),
+                UiMessage(
+                    id = "a1",
+                    role = "assistant",
+                    content = "",
+                    timestamp = "2026-10-06T16:00:05Z",
+                    runId = "run-1",
+                    toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = null, status = "running")),
+                ),
+            ),
+        )
+        assertEquals("Bash", running.runningToolName)
+        assertEquals(parseTimestampEpochMillis("2026-10-06T16:00:05Z"), running.startedAtEpochMs)
+
+        val settled = activeRunActivity(
+            listOf(
+                UiMessage(
+                    id = "a1",
+                    role = "assistant",
+                    content = "done",
+                    timestamp = "2026-10-06T16:00:05Z",
+                    runId = "run-1",
+                    toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = "ok", status = "success")),
+                ),
+            ),
+        )
+        assertNull(settled.runningToolName)
     }
 }
 

@@ -1,16 +1,15 @@
-package com.letta.mobile.desktop.home
+package com.letta.mobile.data.home
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.desktop.chat.DesktopConversationSummary
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
 
-class DesktopFleetOverviewTest {
+class FleetModelsTest {
 
     private val now: Instant = Instant.parse("2026-07-26T12:00:00Z")
 
@@ -25,18 +24,17 @@ class DesktopFleetOverviewTest {
         agentId: String,
         agentName: String = agentId,
         updatedAt: String,
-        preview: String = "",
-    ) = DesktopConversationSummary(
+    ) = FleetConversation(
         id = id,
-        title = id,
-        agentName = agentName,
-        updatedAtLabel = updatedAt,
-        lastMessagePreview = preview,
         agentId = agentId,
+        agentName = agentName,
+        title = id,
+        preview = "",
+        updatedAtLabel = updatedAt,
     )
 
     private fun overview(
-        conversations: List<DesktopConversationSummary>,
+        conversations: List<FleetConversation>,
         agents: List<Agent>,
         running: Set<String> = emptySet(),
     ) = buildFleetOverview(
@@ -45,14 +43,14 @@ class DesktopFleetOverviewTest {
             rosterAgents = agents,
             runningAgentIds = running,
             now = now,
-            zone = ZoneOffset.UTC,
+            zone = TimeZone.UTC,
             days = 7,
             hours = 6,
         ),
     )
 
     @Test
-    fun `roster-only agents still get a row`() {
+    fun rosterOnlyAgentsStillGetARow() {
         val result = overview(
             conversations = emptyList(),
             agents = listOf(agent("a-1", "Scout", "openai/gpt-5")),
@@ -60,6 +58,7 @@ class DesktopFleetOverviewTest {
         val row = result.agents.single()
         assertEquals("Scout", row.name)
         assertEquals("openai/gpt-5", row.model)
+        assertEquals("gpt-5", row.modelLabel)
         assertEquals(0, row.conversationCount)
         assertNull(row.lastActivity)
         assertEquals(1, result.summary.totalAgents)
@@ -67,7 +66,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `conversation-only agents are merged into the fleet`() {
+    fun conversationOnlyAgentsAreMergedIntoTheFleet() {
         val result = overview(
             conversations = listOf(
                 conversation("c-1", "a-2", "Ops", "2026-07-26T10:00:00Z"),
@@ -85,7 +84,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `activity buckets are oldest-first and windowed`() {
+    fun activityBucketsAreOldestFirstAndWindowed() {
         val result = overview(
             conversations = listOf(
                 conversation("c-1", "a-1", updatedAt = "2026-07-26T09:00:00Z"), // today
@@ -107,7 +106,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `running agents are counted from the running id set`() {
+    fun runningAgentsAreCountedFromTheRunningIdSet() {
         val result = overview(
             conversations = emptyList(),
             agents = listOf(agent("a-1", "Scout"), agent("a-2", "Ops")),
@@ -118,7 +117,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `hourly buckets are oldest-first and windowed to the last hours`() {
+    fun hourlyBucketsAreOldestFirstAndWindowedToTheLastHours() {
         val result = overview(
             conversations = listOf(
                 conversation("c-1", "a-1", updatedAt = "2026-07-26T11:30:00Z"), // this hour
@@ -138,11 +137,11 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `recent conversations are fleet-wide and newest first`() {
+    fun recentConversationsAreFleetWideAndNewestFirst() {
         val result = overview(
             conversations = listOf(
                 conversation("old", "a-1", updatedAt = "2026-07-20T10:00:00Z"),
-                conversation("newest", "a-2", "Ops", "2026-07-26T11:00:00Z", preview = " hi "),
+                conversation("newest", "a-2", "Ops", "2026-07-26T11:00:00Z").copy(preview = " hi "),
                 conversation("mid", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
             ),
             agents = listOf(agent("a-1", "Scout"), agent("a-2", "Ops")),
@@ -155,18 +154,11 @@ class DesktopFleetOverviewTest {
     }
 
     /**
-     * Home keys its LazyColumn by conversationId, and Compose throws "Key already used" on a
-     * duplicate — which would crash the DEFAULT destination. The conversation endpoint does
-     * repeat rows during an active run, so this pins the guarantee that Home never receives
-     * a duplicate key.
-     *
-     * buildFleetOverview already dedups by id up front, so this test documents that contract
-     * rather than adding a second one. It keeps the FIRST occurrence, so the surviving row can
-     * carry a staler timestamp and preview than the newest copy — cosmetic, and asserted below
-     * so a change to that rule is a deliberate decision rather than a silent one.
+     * Home keys its lazy list by conversationId and Compose throws on a duplicate key; the
+     * conversation endpoint repeats rows during an active run. Dedup keeps the FIRST occurrence.
      */
     @Test
-    fun `duplicate conversation rows are collapsed to one`() {
+    fun duplicateConversationRowsAreCollapsedToOne() {
         val result = overview(
             conversations = listOf(
                 conversation("dupe", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
@@ -176,7 +168,7 @@ class DesktopFleetOverviewTest {
             agents = listOf(agent("a-1", "Scout")),
         )
         val ids = result.recent.map { it.conversationId }
-        assertEquals(ids.size, ids.toSet().size, "Home would crash on a duplicate LazyColumn key")
+        assertEquals(ids.size, ids.toSet().size, "Home would crash on a duplicate lazy key")
         assertEquals(listOf("other", "dupe"), ids)
         assertEquals(
             Instant.parse("2026-07-26T08:00:00Z"),
@@ -186,7 +178,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `recent conversations prefer the resolved roster name over a raw id`() {
+    fun recentConversationsPreferTheResolvedRosterNameOverARawId() {
         val result = overview(
             conversations = listOf(
                 conversation("c-1", "agent-abc", agentName = "agent-abc", updatedAt = "2026-07-26T11:00:00Z"),
@@ -197,7 +189,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `an unresolved agent name is flagged as an id fallback`() {
+    fun anUnresolvedAgentNameIsFlaggedAsAnIdFallback() {
         val result = overview(
             conversations = listOf(
                 conversation("c-1", "agent-abc", agentName = "agent-abc", updatedAt = "2026-07-26T11:00:00Z"),
@@ -208,7 +200,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `the composer target prefers the focused agent's newest conversation`() {
+    fun theComposerTargetPrefersTheFocusedAgentsNewestConversation() {
         val conversations = listOf(
             conversation("a1-old", "a-1", updatedAt = "2026-07-20T10:00:00Z"),
             conversation("a1-new", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
@@ -224,6 +216,36 @@ class DesktopFleetOverviewTest {
         assertNull(preferredComposerConversationId(emptyList(), "a-1"))
     }
 
+    @Test
+    fun aQueuedRowIsTheNewestComposerTarget() {
+        val conversations = listOf(
+            conversation("dated", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
+            conversation("queued", "a-1", updatedAt = "Queued"),
+        )
+        assertEquals("queued", preferredComposerConversationId(conversations, "a-1"))
+    }
+
+    @Test
+    fun truncatedCountsRenderAsLowerBounds() {
+        val summary = FleetSummary(totalAgents = 22, totalConversations = 50, rosterTruncated = true, conversationsTruncated = true)
+        assertEquals("22+", summary.agentsLabel)
+        assertEquals("50+", summary.conversationsLabel)
+        assertEquals("22+ agents · 50+ conversations", summary.subtitle)
+        assertEquals("3 agents · 4 conversations", FleetSummary(totalAgents = 3, totalConversations = 4).subtitle)
+    }
+
+    @Test
+    fun relativeAgeUsesCompactUnits() {
+        assertEquals("now", relativeAge(now, now))
+        assertEquals("5m", relativeAge(Instant.parse("2026-07-26T11:55:00Z"), now))
+        assertEquals("3h", relativeAge(Instant.parse("2026-07-26T09:00:00Z"), now))
+        assertEquals("2d", relativeAge(Instant.parse("2026-07-24T12:00:00Z"), now))
+        assertEquals("1w", relativeAge(Instant.parse("2026-07-18T12:00:00Z"), now))
+        assertEquals("2mo", relativeAge(Instant.parse("2026-05-26T12:00:00Z"), now))
+        assertEquals("Queued", relativeAgeLabel("Queued", now))
+        assertEquals("3h", relativeAgeLabel("2026-07-26T09:00:00Z", now))
+    }
+
     private fun stat(name: String, count: Int, last: Instant?) = FleetAgentStat(
         agentId = name,
         name = name,
@@ -235,7 +257,7 @@ class DesktopFleetOverviewTest {
     )
 
     @Test
-    fun `sorting by name respects direction`() {
+    fun sortingByNameRespectsDirection() {
         val rows = listOf(stat("Zed", 1, null), stat("alice", 9, null), stat("Mid", 5, null))
         assertEquals(
             listOf("alice", "Mid", "Zed"),
@@ -248,7 +270,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `agents without activity sort last in both directions`() {
+    fun agentsWithoutActivitySortLastInBothDirections() {
         val rows = listOf(
             stat("old", 1, Instant.parse("2026-07-20T00:00:00Z")),
             stat("never", 0, null),
@@ -265,7 +287,7 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `conversation sort is descending with a stable name tie-break`() {
+    fun conversationSortIsDescendingWithAStableNameTieBreak() {
         val rows = listOf(stat("b", 3, null), stat("a", 3, null), stat("c", 8, null))
         assertEquals(
             listOf("c", "b", "a"),
@@ -274,16 +296,10 @@ class DesktopFleetOverviewTest {
     }
 
     @Test
-    fun `header clicks flip the active column and adopt natural direction otherwise`() {
+    fun headerClicksFlipTheActiveColumnAndAdoptNaturalDirectionOtherwise() {
         val start = FleetSort(FleetSortKey.LastActivity, descending = true)
-        assertEquals(
-            FleetSort(FleetSortKey.LastActivity, descending = false),
-            start.toggled(FleetSortKey.LastActivity),
-        )
+        assertEquals(FleetSort(FleetSortKey.LastActivity, descending = false), start.toggled(FleetSortKey.LastActivity))
         assertEquals(FleetSort(FleetSortKey.Agent, descending = false), start.toggled(FleetSortKey.Agent))
-        assertEquals(
-            FleetSort(FleetSortKey.Conversations, descending = true),
-            start.toggled(FleetSortKey.Conversations),
-        )
+        assertEquals(FleetSort(FleetSortKey.Conversations, descending = true), start.toggled(FleetSortKey.Conversations))
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -29,8 +30,15 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.getBoundsInRoot
 import kotlinx.collections.immutable.toPersistentList
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,6 +48,9 @@ import kotlin.test.assertTrue
 class ChatTimelineUiTest {
 
     private val ready = ChatUiState(conversationState = ConversationState.Ready("c1"), isLoadingMessages = false)
+
+    /** Half the 640 dp test viewport. */
+    private val halfViewportDp = 320f
 
     private fun conversation(count: Int): List<UiMessage> = (0 until count).map { i ->
         UiMessage(
@@ -138,6 +149,21 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertDoesNotExist()
     }
 
+    /** A nudge a few rows into history is not "far from the latest": the button waits for real distance. */
+    @Test
+    fun aNudgeIntoHistoryDoesNotOfferScrollToLatest() = runComposeUiTest {
+        show(ready.copy(messages = conversation(160).toPersistentList()), RecordingChatActions())
+        // Reversed list: dragging down reads older rows. Held still before lifting, so nothing flings.
+        onNodeWithTag(ChatTimelineTags.LIST).performTouchInput {
+            down(center)
+            repeat(NUDGE_STEPS) { moveBy(Offset(0f, NUDGE_STEP_PX)) }
+            advanceEventTime(HOLD_BEFORE_LIFT_MILLIS)
+            up()
+        }
+        waitForIdle()
+        onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertDoesNotExist()
+    }
+
     @Test
     fun reachingTheTopLoadsOlderHistory() = runComposeUiTest {
         val actions = RecordingChatActions()
@@ -167,6 +193,34 @@ class ChatTimelineUiTest {
         onNodeWithTag(ChatTimelineTags.GOAL).assertExists()
         onNodeWithText("Pause").performClick()
         assertEquals(listOf(GoalCommands.PAUSE), actions.sent)
+    }
+
+    /** letta-mobile-bglj6.1.22: thumb reach on Touch, as the legacy composer column; the top on a pointer host. */
+    @Test
+    fun goalCardSitsAtTheBottomOnTouchAndTheTopOtherwise() = runComposeUiTest {
+        val goal = GoalStatusUi(objective = "Ship the shared page", status = "active", tokensUsed = 10)
+        var style by mutableStateOf(ChatPlatformStyle.Touch)
+        setContent {
+            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
+                MaterialTheme {
+                    Box(Modifier.size(width = 420.dp, height = 640.dp)) {
+                        ChatTimeline(
+                            state = ready.copy(messages = conversation(2).toPersistentList(), goalStatus = goal),
+                            pagedTimeline = null,
+                            actions = RecordingChatActions(),
+                            capabilities = ChatSurfaceCapabilities.Default,
+                            host = ChatSurfaceHost(),
+                            appearance = ChatSurfaceAppearance(),
+                        )
+                    }
+                }
+            }
+        }
+        val touch = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
+        assertTrue(touch.bottom.value > halfViewportDp, "the goal card is not at the bottom on Touch: $touch")
+        runOnIdle { style = ChatPlatformStyle.Pointer }
+        val pointer = onNodeWithTag(ChatTimelineTags.GOAL).getBoundsInRoot()
+        assertTrue(pointer.top.value < halfViewportDp, "the goal card is not at the top on a pointer host: $pointer")
     }
 
     @Test
@@ -255,5 +309,12 @@ class ChatTimelineUiTest {
         waitUntil(timeoutMillis = 5_000L) {
             onAllNodesWithTag(ChatTimelineTags.PINNED_PROMPT).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private companion object {
+        /** Six 40px steps: about 220px past the touch slop, a few rows but under the button's show distance (40% of 640dp). */
+        const val NUDGE_STEPS = 6
+        const val NUDGE_STEP_PX = 40f
+        const val HOLD_BEFORE_LIFT_MILLIS = 500L
     }
 }

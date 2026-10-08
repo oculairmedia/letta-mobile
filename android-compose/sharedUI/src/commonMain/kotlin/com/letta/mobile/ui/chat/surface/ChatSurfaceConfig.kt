@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.model.UiImageAttachment
 
 /**
  * letta-mobile-bglj6.1: how the shared chat page looks, set by the host from its own
@@ -97,6 +98,13 @@ data class ChatSurfacePlatform(
      */
     val timelineOverlay: (@Composable () -> Unit)? = null,
     /**
+     * Drawn over the Touch canvas while it is the view (a box over the board, below
+     * [topChromeInset] and above the chat bar): host chrome the canvas mode must keep in sight,
+     * such as Android's active-subagent rings (letta-mobile-bglj6.1.22). Not drawn on the
+     * full-screen page, which has [timelineOverlay].
+     */
+    val canvasOverlay: (@Composable () -> Unit)? = null,
+    /**
      * Told the full-screen composer's measured height whenever it changes, so a [pageBackground]
      * that keeps clear of the composer (Android's ambient glow) can follow it.
      */
@@ -108,8 +116,23 @@ data class ChatSurfacePlatform(
      * head keeps below it. Zero where nothing floats over the page (desktop).
      */
     val topChromeInset: Dp = 0.dp,
+    /**
+     * Save and share for the full-screen image viewer (Android: MediaStore and the share sheet).
+     * Null hides both actions (desktop).
+     */
+    val imageActions: ChatImageActions? = null,
 ) {
     companion object {
         val Default = ChatSurfacePlatform()
     }
 }
+
+/** letta-mobile-bglj6.1.23: what the image viewer can do with the image on screen, beyond looking at it. */
+@Immutable
+class ChatImageActions(
+    val save: (UiImageAttachment) -> Unit,
+    val share: (UiImageAttachment) -> Unit,
+)
+
+/** The page's [ChatSurfacePlatform.imageActions], for the viewer deep under the timeline. */
+internal val LocalChatImageActions = androidx.compose.runtime.staticCompositionLocalOf<ChatImageActions?> { null }

@@ -31,6 +31,7 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.sendflight.LocalSendFlight
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRenderItemRow
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowCallbacks
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalDockedPromptCompaction
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.ChatTimelineDimens
@@ -75,8 +76,17 @@ internal fun TimelineListFrame(
     bindings: TimelineRowBindings,
     overlays: TimelineFrameOverlays,
     modifier: Modifier = Modifier,
+    /** Whether the older / newer end of the history is fully loaded, so a fling may bounce there. */
+    olderHistoryComplete: () -> Boolean = { true },
+    newerHistoryComplete: () -> Boolean = { true },
     content: LazyListScope.() -> Unit,
 ) {
+    // Reversed list: a fling with the finger moving down (positive) runs toward the oldest rows.
+    val overscroll = rememberTimelineElasticOverscroll(
+        pinching = bindings.pinch?.isPinching == true,
+        canBouncePastPositiveEdge = { !listState.canScrollForward && olderHistoryComplete() },
+        canBouncePastNegativeEdge = { !listState.canScrollBackward && newerHistoryComplete() },
+    )
     val pinned = overlays.pinnedPrompt
     val fades = rememberTimelineFadeAlphas(
         canScrollTowardOlder = listState.canScrollForward,
@@ -96,6 +106,8 @@ internal fun TimelineListFrame(
             LazyColumn(
                 state = listState,
                 reverseLayout = true,
+                // Replaces the platform's stretch, so the two never bounce together.
+                overscrollEffect = overscroll,
                 modifier = Modifier
                     .fillMaxSize()
                     // The glide's springback lifts the rows inside the list's bounds and fades.
@@ -171,6 +183,8 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
         Modifier
             .padding(horizontal = ChatRowSpacing.contentPaddingHorizontal)
             .stickyCopyPlacement(pinned)
+            // Pushed out past the visible top, it dissolves instead of running under the header.
+            .stickyCopyHeaderFade(pinned)
     } else {
         Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
     }
@@ -181,8 +195,9 @@ private fun PinnedPromptCopy(prompt: ChatRenderItem, pinned: PinnedPrompt, bindi
             .testTag(ChatTimelineTags.PINNED_PROMPT),
         contentAlignment = Alignment.TopCenter,
     ) {
-        // A copy, never a send flight's landing spot: only the prompt's own row can be.
-        CompositionLocalProvider(LocalSendFlight provides null) {
+        // A copy, never a send flight's landing spot: only the prompt's own row can be. Its images
+        // shrink to thumbnails as it docks (letta-mobile-bglj6.1).
+        CompositionLocalProvider(LocalSendFlight provides null, LocalDockedPromptCompaction provides pinned.compaction) {
             // The bubble alone: without the row's leading space it holds snug under the chrome,
             // and bottom-aligned with its row it still rides the row seamlessly.
             TimelineItemRow(prompt, bindings, leadingSpace = false)
@@ -220,8 +235,14 @@ internal fun TimelineItemRow(
  */
 internal fun timelineLeadingSpace(item: ChatRenderItem): Dp = when (item) {
     // A run is a new turn: the section break above it, the same one the next speaker takes
-    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11).
-    is ChatRenderItem.RunBlock -> ChatRowSpacing.ungrouped
+    // below it, so its summary line sits evenly between the two (letta-mobile-bglj6.1.11). A run
+    // of nothing but tool calls continues the turn above it and takes the tight beat, as the
+    // legacy list's ChatMessageListRenderRunParams did (letta-mobile-bglj6.1.23).
+    is ChatRenderItem.RunBlock -> if (item.messages.all { !it.first.toolCalls.isNullOrEmpty() }) {
+        ChatRowSpacing.grouped
+    } else {
+        ChatRowSpacing.ungrouped
+    }
     is ChatRenderItem.Single -> when {
         item.stableRunKey != null -> ChatRowSpacing.ungrouped
         item.message.isReasoning || !item.message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped

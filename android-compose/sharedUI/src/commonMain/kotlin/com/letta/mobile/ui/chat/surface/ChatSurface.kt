@@ -69,8 +69,11 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_agent_menu
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_switch_agent
+import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
+import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalRequestCard
+import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalDecider
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -169,6 +172,7 @@ fun ChatSurface(
         LocalComposerFocusHandoff provides focusHandoff,
         LocalChatPlatformStyle provides appearance.platformStyle,
         LocalAmbientGlowShaders provides glowShaders,
+        LocalChatImageActions provides stablePlatform.imageActions,
     ) {
         SendFlightLayer(rememberSendFlightState(), modifier) {
             if (appearance.platformStyle == ChatPlatformStyle.Touch) {
@@ -219,6 +223,7 @@ private fun PageWithoutCanvas(frame: ChatSurfaceFrame) {
 /** Test tags for the page's own layers. */
 internal object ChatSurfaceTags {
     const val TIMELINE_OVERLAY = "chat_surface_timeline_overlay"
+    const val CANVAS_OVERLAY = "chat_surface_canvas_overlay"
 }
 
 /** One composition's worth of what every part of the page reads. */
@@ -333,6 +338,16 @@ private fun TouchCanvasWithChat(frame: ChatSurfaceFrame, canvas: (@Composable ()
                     LocalCanvasHostChrome provides hostChrome,
                 ) { canvas() }
             }
+            val overlay = frame.platform.canvasOverlay
+            if (overlay != null && frame.mode != ChatSurfaceMode.FullScreen) {
+                // The host's canvas-mode chrome (Android: the subagent rings), clear of the bar.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(top = frame.platform.topChromeInset, bottom = barDp)
+                        .testTag(ChatSurfaceTags.CANVAS_OVERLAY),
+                ) { overlay() }
+            }
         }
         TouchChatLayers(frame, layers, bar)
     }
@@ -350,13 +365,7 @@ private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers,
             LocalComposerPrimary provides layers.dockedPrimary,
             LocalChatWorkingCueAnimated provides false,
         ) {
-            TouchDockLayer(
-                bar = bar,
-                morph = morph,
-                topChromeInset = frame.platform.topChromeInset,
-                head = frame.dock?.let { touchHeadContent(frame, it) },
-                composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
-            )
+            TouchDock(frame, morph, bar)
         }
     }
     if (layers.showPage) {
@@ -375,6 +384,49 @@ private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers,
         }
     }
     CompanionSeat(frame, interactive = frame.mode == ChatSurfaceMode.FullScreen, pageWeight = morph.fraction)
+}
+
+/**
+ * The Touch canvas's bar, its chat head and, over the canvas above the bar, the input tray: the
+ * turn's pending question and the generated forms, answered in place without opening the page
+ * (letta-mobile-bglj6.1.22). The turn is read once here for the head and the tray, so the history
+ * behind it is collected once.
+ */
+@Composable
+private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, bar: TouchBarMetrics) {
+    val turn = rememberCollapsedTurn(dockedReplyParams(frame))
+    TouchDockLayer(
+        bar = bar,
+        morph = morph,
+        topChromeInset = frame.platform.topChromeInset,
+        head = frame.dock?.let { touchHeadContent(frame, it) { turn } },
+        inputTray = { TouchCanvasInput(frame, turn.pendingApproval) },
+        composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
+    )
+}
+
+/** The pending question (with its approve, reject and answer controls) and the A2UI forms, if any. */
+@Composable
+private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalRequest?) {
+    val surfaces = frame.uiState.a2uiSurfaces
+    if (approval == null && surfaces.isEmpty()) return
+    TouchInputTray {
+        if (approval != null) {
+            val decider = rememberApprovalDecider(
+                approval = approval,
+                activeApprovalRequestId = frame.uiState.activeApprovalRequestId,
+                approvalsEnabled = frame.capabilities.approvals,
+                actions = frame.port.actions,
+            )
+            ApprovalRequestCard(approval, decider)
+        }
+        A2uiSurfaceStack(
+            surfaces = surfaces,
+            resolvedActionCounters = frame.uiState.a2uiResolvedActionCounters,
+            actions = frame.port.actions,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /**
@@ -399,14 +451,14 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
 }
 
 /** What the chat head shows and does, from the page's frame. */
-private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState): TouchHeadContent {
+private fun touchHeadContent(frame: ChatSurfaceFrame, dock: ChatDockState, turn: @Composable () -> CollapsedTurn): TouchHeadContent {
     return TouchHeadContent(
         dock = dock,
         agentId = frame.uiState.agentId,
         agentName = frame.uiState.agentName,
         openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
         openAgent = frame.host.openAgentPane,
-        turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
+        turn = turn,
     )
 }
 
@@ -495,7 +547,7 @@ private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
  * leaves the prompt (its text, focus and caret) alone. It never has a companion beside it: open,
  * the mascot sits in the panel's top-centre badge; minimised, it stands above the bar. So the bar
  * keeps the panel's whole width either way. Minimised it has no A2UI stack (the bubble's "needs
- * your input" chip opens the panel for it).
+ * your input" chip opens the panel for it; on Touch the canvas's input tray carries it instead).
  */
 @Composable
 private fun DockComposer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, collapsed: Boolean) {
