@@ -81,6 +81,11 @@ class DualLaneAppServerClient(
         runtime.setReflectionSettings(command)
     override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap) = admin.getCwdMap(command)
 
+    // Workspace reads (MemFS listings, file search) take the admin lane; their writes stay with
+    // the runtime lane, whose events carry the memory_updated invalidations they cause.
+    override suspend fun workspaceRequest(command: AppServerWorkspaceCommand) =
+        if (command.isRead) admin.workspaceRequest(command) else runtime.workspaceRequest(command)
+
     // Channel discovery and mutation stay with the runtime lane because
     // channel_start binds ingress to the connection that issued it.
     override suspend fun channelsList(command: AppServerCommand.ChannelsList) = runtime.channelsList(command)

@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInfoData
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -388,6 +389,8 @@ class ReconnectingAppServerClient(
     override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) = ready().getReflectionSettings(command)
 
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) = ready().setReflectionSettings(command)
+
+    override suspend fun workspaceRequest(command: AppServerWorkspaceCommand) = ready().workspaceRequest(command)
 
     // lgns8.23: admitted while Recovering so ChannelRestoreCoordinator can run
     // inside onRecovered, on the same generation whose socket ingress binds to.
