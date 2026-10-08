@@ -15,6 +15,7 @@ class SecretValue(private val plaintext: String) {
 
     fun reveal(): String = plaintext
 
+    @Suppress("NoAnyType")
     override fun equals(other: Any?): Boolean = other is SecretValue && other.plaintext == plaintext
 
     override fun hashCode(): Int = plaintext.hashCode()
