@@ -27,10 +27,11 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
- * Sections Android has no page for yet: their rows stay out of the drawer until it does.
- * Channels is desktop-only today.
+ * Sections the host has no page for: their rows stay out of the drawer. Channels shows once the
+ * host wires the shared Channels page (letta-mobile-c3np7.5.7).
  */
-internal val AndroidHiddenDrawerSections: Set<LensDestination> = setOf(LensDestination.Channels)
+internal fun androidHiddenDrawerSections(navigation: AgentScaffoldNavigationCallbacks): Set<LensDestination> =
+    if (navigation.onNavigateToChannels == null) setOf(LensDestination.Channels) else emptySet()
 
 /**
  * The hamburger's drawer when the shared navigation drawer is on (letta-mobile-c3np7.5.5): the
@@ -66,7 +67,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
         canvases = canvases,
-        hiddenSections = AndroidHiddenDrawerSections,
+        hiddenSections = androidHiddenDrawerSections(state.params.navigation),
     ).withRoster(roster)
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(open) { Clock.System.now() }
@@ -164,7 +165,7 @@ internal fun openSection(navigation: AgentScaffoldNavigationCallbacks, agentId: 
         LensDestination.Schedules -> navigation.onNavigateToSchedules?.invoke(agentId)
         LensDestination.Skills -> navigation.onNavigateToTools?.invoke()
         LensDestination.Conversations -> navigation.onNavigateToConversationList?.invoke()
-        LensDestination.Channels -> Unit
+        LensDestination.Channels -> navigation.onNavigateToChannels?.invoke()
     }
 }
 

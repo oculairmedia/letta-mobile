@@ -153,13 +153,13 @@ object ChannelDisplayMapper {
 class ChannelLibraryController<Graph : SessionRepositoryGraph>(
     private val sessionGraphProvider: SessionRepositoryGraphProvider<Graph>,
     private val scope: CoroutineScope,
-) : AutoCloseable {
+) : ChannelLibrarySource {
     private val stateFlow = MutableStateFlow(snapshotState())
-    val state: StateFlow<ChannelLibraryState> = stateFlow
+    override val state: StateFlow<ChannelLibraryState> = stateFlow
 
     private var stateJob: Job? = null
 
-    fun start() {
+    override fun start() {
         if (stateJob != null) return
         stateJob = scope.launch {
             sessionGraphProvider.currentGraph.collectLatest { graph ->
@@ -173,7 +173,7 @@ class ChannelLibraryController<Graph : SessionRepositoryGraph>(
         }
     }
 
-    fun refresh() {
+    override fun refresh() {
         stateFlow.value = snapshotState()
     }
 

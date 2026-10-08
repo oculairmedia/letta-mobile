@@ -20,6 +20,8 @@ internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateToAppSettings: (() -> Unit)? = null,
     /** letta-mobile-c3np7.5.5: opens one canvas by id, from the shared drawer's Canvases list. */
     val onOpenCanvas: ((canvasId: String) -> Unit)? = null,
+    /** letta-mobile-c3np7.5.7: the shared Channels page, from the shared drawer's Channels row. */
+    val onNavigateToChannels: (() -> Unit)? = null,
 )
 
 /** What the chat's model picker sheet reports back (letta-mobile-w4q4p.6.1). */
