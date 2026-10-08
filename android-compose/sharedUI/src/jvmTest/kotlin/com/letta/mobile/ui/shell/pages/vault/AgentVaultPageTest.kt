@@ -26,6 +26,7 @@ import com.letta.mobile.data.secrets.AgentSecretDraft
 import com.letta.mobile.data.secrets.AgentVaultActions
 import com.letta.mobile.data.secrets.AgentVaultLoad
 import com.letta.mobile.data.secrets.AgentVaultState
+import com.letta.mobile.data.secrets.SecretKey
 import com.letta.mobile.data.secrets.SecretValue
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -128,16 +129,16 @@ class AgentVaultPageTest {
         val calls = mutableListOf<String>()
 
         override fun refresh() { calls += "refresh" }
-        override fun toggleReveal(key: String) { calls += "reveal:$key"; onReveal(key) }
+        override fun toggleReveal(key: SecretKey) { calls += "reveal:${key.name}"; onReveal(key.name) }
         override fun hideAll() { calls += "hideAll" }
         override fun startAdding() { calls += "add" }
-        override fun startEditing(key: String) { calls += "edit:$key" }
+        override fun startEditing(key: SecretKey) { calls += "edit:${key.name}" }
         override fun updateDraftKey(key: String) { calls += "key" }
         override fun updateDraftValue(value: String) { calls += "value" }
         override fun toggleDraftValueVisible() { calls += "showValue" }
         override fun cancelDraft() { calls += "cancel" }
         override fun saveDraft() { calls += "save" }
-        override fun requestDelete(key: String) { calls += "delete:$key" }
+        override fun requestDelete(key: SecretKey) { calls += "delete:${key.name}" }
         override fun confirmDelete() { calls += "confirmDelete" }
         override fun cancelDelete() { calls += "cancelDelete" }
         override fun dismissError() { calls += "dismissError" }

@@ -90,7 +90,7 @@ class AppServerAgentSecretsSourceTest {
         val controller = AgentVaultController(source, backgroundScope)
         controller.selectAgent("agent-1")
         testScheduler.runCurrent()
-        controller.toggleReveal("OPENAI_API_KEY")
+        controller.toggleReveal(SecretKey("OPENAI_API_KEY"))
         controller.startAdding()
         controller.updateDraftKey("NEW_KEY")
         controller.updateDraftValue(githubToken)

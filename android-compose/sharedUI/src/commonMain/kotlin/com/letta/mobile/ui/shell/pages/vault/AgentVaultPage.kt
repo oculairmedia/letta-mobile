@@ -61,7 +61,7 @@ fun AgentVaultPage(
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(AgentVaultPageTags.PAGE)) {
         val page = AgentVaultPageScope(state, actions, options, wide = maxWidth >= LettaDimens.Pane.wideBreakpoint)
         if (page.wide) WideVaultLayout(page) else CompactVaultLayout(page)
-        state.pendingDelete?.let { key -> DeleteSecretDialog(key, page) }
+        if (state.pendingDelete != null) DeleteSecretDialog(page)
     }
 }
 
@@ -157,12 +157,13 @@ private fun VaultHeader(page: AgentVaultPageScope) {
         }
         Text(STORAGE_NOTE, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (page.state.load == AgentVaultLoad.Loading || page.state.saving) LinearProgressIndicator(Modifier.fillMaxWidth())
-        page.state.error?.let { message -> VaultError(message, page) }
+        if (page.state.error != null) VaultError(page)
     }
 }
 
 @Composable
-private fun VaultError(message: String, page: AgentVaultPageScope) {
+private fun VaultError(page: AgentVaultPageScope) {
+    val message = page.state.error ?: return
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag(AgentVaultPageTags.ERROR)) {
         Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
         TextButton(onClick = page.actions::dismissError) { Text(DISMISS_LABEL) }
@@ -202,7 +203,8 @@ private fun VaultMessage(message: String, modifier: Modifier, actions: @Composab
 }
 
 @Composable
-private fun DeleteSecretDialog(key: String, page: AgentVaultPageScope) {
+private fun DeleteSecretDialog(page: AgentVaultPageScope) {
+    val key = page.state.pendingDelete ?: return
     AlertDialog(
         onDismissRequest = page.actions::cancelDelete,
         title = { Text("Delete $key?") },

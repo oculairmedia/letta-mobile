@@ -43,22 +43,22 @@ class AgentVaultControllerTest {
         assertEquals(listOf("GITHUB_TOKEN", "OPENAI_API_KEY"), state.secrets.map { it.key })
         assertEquals(SecretValue.MASK, state.displayValue("OPENAI_API_KEY"))
 
-        controller.toggleReveal("OPENAI_API_KEY")
+        controller.toggleReveal(SecretKey("OPENAI_API_KEY"))
         assertEquals("sk-one", controller.state.value.displayValue("OPENAI_API_KEY"))
         assertEquals(SecretValue.MASK, controller.state.value.displayValue("GITHUB_TOKEN"))
 
-        controller.toggleReveal("OPENAI_API_KEY")
+        controller.toggleReveal(SecretKey("OPENAI_API_KEY"))
         assertEquals(SecretValue.MASK, controller.state.value.displayValue("OPENAI_API_KEY"))
     }
 
     @Test
     fun hideAllAndAgentSwitchesMaskEverythingAgain() = runTest {
         val (controller, _) = vault()
-        controller.toggleReveal("OPENAI_API_KEY")
+        controller.toggleReveal(SecretKey("OPENAI_API_KEY"))
         controller.hideAll()
         assertTrue(controller.state.value.revealed.isEmpty())
 
-        controller.toggleReveal("GITHUB_TOKEN")
+        controller.toggleReveal(SecretKey("GITHUB_TOKEN"))
         controller.selectAgent("agent-2")
         assertTrue(controller.state.value.revealed.isEmpty())
         assertEquals("agent-2", controller.state.value.agentId)
@@ -101,7 +101,7 @@ class AgentVaultControllerTest {
     @Test
     fun replacingAValueStartsBlankAndKeepsTheKey() = runTest {
         val (controller, source) = vault()
-        controller.startEditing("GITHUB_TOKEN")
+        controller.startEditing(SecretKey("GITHUB_TOKEN"))
         val draft = controller.state.value.draft!!
         assertFalse(draft.isNew)
         assertTrue(draft.value.isBlank, "the old value is never copied into the editor")
@@ -117,12 +117,12 @@ class AgentVaultControllerTest {
     @Test
     fun deletingIsConfirmedThenUnset() = runTest {
         val (controller, source) = vault()
-        controller.requestDelete("GITHUB_TOKEN")
+        controller.requestDelete(SecretKey("GITHUB_TOKEN"))
         assertEquals("GITHUB_TOKEN", controller.state.value.pendingDelete)
         controller.cancelDelete()
         assertNull(controller.state.value.pendingDelete)
 
-        controller.requestDelete("GITHUB_TOKEN")
+        controller.requestDelete(SecretKey("GITHUB_TOKEN"))
         controller.confirmDelete()
         runCurrent()
         assertEquals(setOf("GITHUB_TOKEN"), source.applied.single().unset)
@@ -148,7 +148,7 @@ class AgentVaultControllerTest {
     @Test
     fun closingDropsEveryValueFromMemory() = runTest {
         val (controller, _) = vault()
-        controller.toggleReveal("OPENAI_API_KEY")
+        controller.toggleReveal(SecretKey("OPENAI_API_KEY"))
         controller.close()
         val state = controller.state.value
         assertTrue(state.secrets.isEmpty())

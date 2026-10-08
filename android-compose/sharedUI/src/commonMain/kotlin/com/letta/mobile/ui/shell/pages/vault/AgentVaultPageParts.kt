@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.secrets.AgentSecretDraft
+import com.letta.mobile.data.secrets.SecretKey
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** One key: its name, its masked (or revealed) value, and the reveal, replace and delete actions. */
@@ -58,16 +59,16 @@ internal fun SecretRow(key: String, page: AgentVaultPageScope) {
                     modifier = Modifier.testTag(AgentVaultPageTags.value(key)),
                 )
             }
-            IconButton(onClick = { page.actions.toggleReveal(key) }, modifier = actionModifier.testTag(AgentVaultPageTags.reveal(key))) {
+            IconButton(onClick = { page.actions.toggleReveal(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.reveal(key))) {
                 Icon(
                     if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
                     contentDescription = if (revealed) "Hide $key" else "Reveal $key",
                 )
             }
-            IconButton(onClick = { page.actions.startEditing(key) }, modifier = actionModifier.testTag(AgentVaultPageTags.edit(key))) {
+            IconButton(onClick = { page.actions.startEditing(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.edit(key))) {
                 Icon(Icons.Outlined.Edit, contentDescription = "Replace $key")
             }
-            IconButton(onClick = { page.actions.requestDelete(key) }, modifier = actionModifier.testTag(AgentVaultPageTags.delete(key))) {
+            IconButton(onClick = { page.actions.requestDelete(SecretKey(key)) }, modifier = actionModifier.testTag(AgentVaultPageTags.delete(key))) {
                 Icon(Icons.Outlined.Delete, contentDescription = "Delete $key", tint = MaterialTheme.colorScheme.error)
             }
         }

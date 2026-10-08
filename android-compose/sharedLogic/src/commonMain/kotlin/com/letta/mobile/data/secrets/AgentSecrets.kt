@@ -1,6 +1,7 @@
 package com.letta.mobile.data.secrets
 
 import androidx.compose.runtime.Immutable
+import kotlin.jvm.JvmInline
 
 /**
  * A secret's plaintext, held only in memory (letta-mobile-bzvro.25). Its [toString] never shows
@@ -29,6 +30,10 @@ class SecretValue(private val plaintext: String) {
         val Empty: SecretValue = SecretValue("")
     }
 }
+
+/** A secret's name, as the vault's row actions address it. */
+@JvmInline
+value class SecretKey(val name: String)
 
 /** One key in an agent's vault. */
 @Immutable

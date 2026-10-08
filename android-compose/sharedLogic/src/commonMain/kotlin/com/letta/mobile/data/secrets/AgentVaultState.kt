@@ -76,14 +76,14 @@ data class AgentVaultState(
 interface AgentVaultActions {
     fun refresh()
 
-    fun toggleReveal(key: String)
+    fun toggleReveal(key: SecretKey)
 
     /** Masks every value again; hosts call it when the page goes away. */
     fun hideAll()
 
     fun startAdding()
 
-    fun startEditing(key: String)
+    fun startEditing(key: SecretKey)
 
     fun updateDraftKey(key: String)
 
@@ -95,7 +95,7 @@ interface AgentVaultActions {
 
     fun saveDraft()
 
-    fun requestDelete(key: String)
+    fun requestDelete(key: SecretKey)
 
     fun confirmDelete()
 
