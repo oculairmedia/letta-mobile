@@ -132,6 +132,11 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.ChannelAccountsList -> SafeRead
             is AppServerCommand.ChannelStart -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ChannelAccountUpdate -> AmbiguousMutation(dedupKey = null)
+
+            // Agent workspace (letta-mobile-bzvro.24–.26): each command says whether it reads.
+            // Memory-file and secret writes commit server-side, so they never replay blindly.
+            is AppServerWorkspaceCommand ->
+                if (command.isRead) SafeRead else AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */
