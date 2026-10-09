@@ -22,7 +22,7 @@ import com.letta.mobile.runtime.ApprovalDiffPreview
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_approval_always_allow
 import com.letta.mobile.sharedui.resources.rows_approval_blocked_path
-import com.letta.mobile.sharedui.resources.rows_approval_diff_show_all
+import com.letta.mobile.sharedui.resources.rows_approval_diff_show_more
 import com.letta.mobile.sharedui.resources.rows_approval_diff_stats
 import com.letta.mobile.sharedui.resources.rows_approval_diff_unavailable
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -36,6 +36,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Diff lines shown before "Show all". */
 private const val DIFF_COLLAPSED_LINES = 40
+
+/** Further diff lines revealed per "Show more" press. */
+private const val DIFF_PAGE_LINES = 200
 
 /** The blocked path and the previewed diffs of [details]. */
 @Composable
@@ -94,20 +97,24 @@ internal fun ApprovalDiffPreviewBlock(preview: ApprovalDiffPreview) {
     }
 }
 
+/**
+ * The diff a person approves must be reachable in full, so it is paged: [DIFF_COLLAPSED_LINES] first,
+ * then [DIFF_PAGE_LINES] more per press, until every line (up to the parse-time cap) has been shown.
+ * Rows are composed only for what has been revealed, and what is still hidden is always counted.
+ */
 @Composable
 private fun CollapsibleDiff(diff: String) {
-    var expanded by remember(diff) { mutableStateOf(false) }
-    val lineCount = remember(diff) { diff.count { it == '\n' } + 1 }
-    val shown = remember(diff, expanded) {
-        if (expanded || lineCount <= DIFF_COLLAPSED_LINES) diff else diff.lineSequence().take(DIFF_COLLAPSED_LINES).joinToString("\n")
-    }
-    DiffBlock(shown)
-    if (!expanded && lineCount > DIFF_COLLAPSED_LINES) {
+    var revealed by remember(diff) { mutableStateOf(DIFF_COLLAPSED_LINES) }
+    val lines = remember(diff) { diff.lines() }
+    val shown = remember(diff, revealed) { if (revealed >= lines.size) diff else lines.take(revealed).joinToString("\n") }
+    DiffBlock(shown, maxRows = Int.MAX_VALUE)
+    val hidden = lines.size - revealed
+    if (hidden > 0) {
         TextButton(
-            onClick = { expanded = true },
+            onClick = { revealed += DIFF_PAGE_LINES },
             modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_DIFF_SHOW_ALL),
         ) {
-            Text(stringResource(Res.string.rows_approval_diff_show_all, lineCount))
+            Text(stringResource(Res.string.rows_approval_diff_show_more, hidden))
         }
     }
 }

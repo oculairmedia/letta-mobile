@@ -19,15 +19,15 @@ import kotlinx.serialization.json.intOrNull
  */
 internal object ApprovalRequestPayloadParser {
     fun suggestions(request: JsonObject): List<PermissionSuggestion> =
-        (request["permission_suggestions"] as? JsonArray).orEmpty().mapNotNull { entry ->
+        (request["permission_suggestions"] as? JsonArray).orEmpty().asSequence().mapNotNull { entry ->
             val obj = entry as? JsonObject ?: return@mapNotNull null
             val id = obj.string("id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val text = obj.string("text")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            PermissionSuggestion(id = id, text = text)
-        }
+            PermissionSuggestion(id = id.take(MAX_ID_CHARS), text = text.take(MAX_SUGGESTION_CHARS))
+        }.take(MAX_SUGGESTIONS).toList()
 
     fun blockedPath(request: JsonObject): String? =
-        request.string("blocked_path")?.takeIf { it.isNotBlank() }
+        request.string("blocked_path")?.takeIf { it.isNotBlank() }?.take(MAX_LABEL_CHARS)
 
     /**
      * The server's text is untrusted and shown on the UI thread, so it is bounded HERE, once:
@@ -44,12 +44,20 @@ internal object ApprovalRequestPayloadParser {
     const val MAX_DIFF_LINES = 2_000
     const val MAX_DIFF_CHARS = 200_000
     const val MAX_LABEL_CHARS = 1_000
+    const val MAX_SUGGESTIONS = 10
+    const val MAX_SUGGESTION_CHARS = 500
+    const val MAX_ID_CHARS = 200
+    const val MAX_TOOL_NAME_CHARS = 200
+    private const val MAX_HUNKS = 200
     const val TRUNCATION_MARKER = "... diff truncated"
 
+    /** [text] cut to the line and char budget (any of \n, \r\n, \r separates lines), with a marker when cut. */
     internal fun capDiff(text: String): String {
-        if (text.length <= MAX_DIFF_CHARS && text.count { it == '\n' } < MAX_DIFF_LINES) return text
-        val lines = text.take(MAX_DIFF_CHARS).lineSequence().take(MAX_DIFF_LINES).joinToString("\n")
-        return lines + "\n" + TRUNCATION_MARKER
+        val clipped = text.take(MAX_DIFF_CHARS)
+        // A trailing newline ends the last line; it does not start one more.
+        val lines = clipped.lineSequence().take(MAX_DIFF_LINES + 2).toList().let { if (it.lastOrNull() == "") it.dropLast(1) else it }
+        if (text.length <= MAX_DIFF_CHARS && lines.size <= MAX_DIFF_LINES) return text
+        return lines.take(MAX_DIFF_LINES).joinToString("\n") + "\n" + TRUNCATION_MARKER
     }
 
     private fun JsonObject.toPreview(): ApprovalDiffPreview? {
@@ -61,14 +69,16 @@ internal object ApprovalRequestPayloadParser {
 
     /** `structuredPatch`-style hunks: `{oldStart, oldLines, newStart, newLines, lines: ["+x", "-y", " z"]}`. */
     private fun hunkText(hunks: JsonElement?): String? {
-        val text = (hunks as? JsonArray).orEmpty()
+        val text = (hunks as? JsonArray).orEmpty().asSequence()
             .mapNotNull { (it as? JsonObject)?.hunkLines() }
+            .take(MAX_HUNKS)
             .joinToString("\n")
         return text.ifBlank { null }
     }
 
     private fun JsonObject.hunkLines(): String? {
-        val lines = (this["lines"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: return null
+        val lines = (this["lines"] as? JsonArray)?.asSequence()?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            ?.take(MAX_DIFF_LINES + 1)?.toList() ?: return null
         val oldStart = firstInt("oldStart", "old_start") ?: 1
         val newStart = firstInt("newStart", "new_start") ?: 1
         val oldCount = firstInt("oldLines", "old_lines") ?: lines.count { !it.startsWith("+") }
