@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.repository.api.ToolUnavailableException
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 open class ToolRepository @Inject constructor(
@@ -77,6 +79,35 @@ open class ToolRepository @Inject constructor(
             return irohSource.listTools(limit = limit, offset = offset)
         }
         return toolApi.listTools(limit = limit, offset = offset)
+    }
+
+    /**
+     * HTTP backends read `GET /v1/tools/{id}`. Under iroh:// that route has no admin_rpc path (the
+     * guard rejects it), so the tool comes from `tool.get`, falling back to the cached `tool.list`
+     * catalog when the host does not expose it. A miss is a typed NOT_FOUND, not a generic failure.
+     */
+    override suspend fun getTool(toolId: String): Tool {
+        val irohSource = irohToolSource
+        if (irohSource == null || !irohSource.shouldUseIroh()) {
+            return toolApi.getTool(toolId)
+        }
+        _tools.value.firstOrNull { it.id.value == toolId }?.let { return it }
+        try {
+            return irohSource.getTool(toolId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val detail = e.message.orEmpty()
+            when {
+                detail.contains("not found", ignoreCase = true) ->
+                    throw ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found", e)
+                detail.contains("capability_unavailable") || detail.contains("unknown method", ignoreCase = true) -> Unit
+                else -> throw e
+            }
+        }
+        refreshMutex.withLock { refreshToolsLocked() }
+        return _tools.value.firstOrNull { it.id.value == toolId }
+            ?: throw ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found")
     }
 
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {

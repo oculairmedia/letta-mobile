@@ -77,6 +77,24 @@ class ToolDetailViewModelTest {
     }
 
     @Test
+    fun `loadTool resolves through the repository not the HTTP api`() = runTest {
+        fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
+        val viewModel = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "t1")), fakeToolApi, toolRepository, agentRepository)
+        awaitToolSuccess(viewModel)
+        assertEquals(listOf("getTool:t1"), fakeToolApi.calls.filter { it.startsWith("getTool") })
+    }
+
+    @Test
+    fun `loadTool missing tool surfaces a not found message and retry refetches`() = runTest {
+        val vm = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "nonexistent")), fakeToolApi, toolRepository, agentRepository)
+        val error = vm.uiState.first { it is UiState.Error } as UiState.Error
+        assertTrue(error.message, error.message.contains("Not found"))
+        fakeToolApi.tools.add(TestData.tool(id = "nonexistent"))
+        vm.loadTool()
+        assertTrue(vm.uiState.first { it is UiState.Success } is UiState.Success)
+    }
+
+    @Test
     fun `updateTool updates current tool`() = runTest {
         fakeToolApi.tools.add(
             TestData.tool(id = "t1", name = "my_tool", description = "Does things").copy(

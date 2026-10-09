@@ -47,6 +47,18 @@ class IrohAdminRpcToolSource(
         return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
     }
 
+    /** `tool.get` by id; the host answers an admin error containing "not found" for an unknown id. */
+    suspend fun getTool(toolId: String): Tool {
+        val response = channelTransport.adminRpc(
+            method = "tool.get",
+            path = "/v1/tools/$toolId",
+            body = buildJsonObject { put("tool_id", toolId) }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.get failed")
+        val result = response.result ?: error("Iroh admin_rpc tool.get returned no result")
+        return json.decodeFromJsonElement(Tool.serializer(), result)
+    }
+
     suspend fun createTool(params: ToolCreateParams): Tool {
         val response = channelTransport.adminRpc(
             method = "tool.create",

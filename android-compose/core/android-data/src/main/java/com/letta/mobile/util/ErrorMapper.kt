@@ -1,9 +1,16 @@
 package com.letta.mobile.util
 
 import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.repository.api.ToolUnavailableException
 
 fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong"): String {
     return when (e) {
+        is ToolUnavailableException -> when (e.reason) {
+            ToolUnavailableException.Reason.NOT_FOUND -> "Not found. The tool may have been deleted."
+            ToolUnavailableException.Reason.NOT_SUPPORTED -> "Not available over Iroh. ${e.message.orEmpty()}".trim()
+        }
+        is IrohAdminApiUnavailableException -> "Not available over Iroh. This action has no Iroh route yet."
         is ApiException -> when (e.code) {
             401 -> "Authentication failed. Check your Letta API key in Settings."
             403 -> "Access denied. This API key does not have permission for that Letta resource."
@@ -18,6 +25,10 @@ fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong
         is java.net.SocketTimeoutException -> "Connection timed out. Try again."
         is java.net.ConnectException -> "Cannot reach server. Check your connection."
         is java.io.IOException -> "Network error. Check your connection."
-        else -> fallback
+        else -> if (e.message.orEmpty().contains("capability_unavailable")) {
+            "Not supported by this host over Iroh."
+        } else {
+            fallback
+        }
     }
 }

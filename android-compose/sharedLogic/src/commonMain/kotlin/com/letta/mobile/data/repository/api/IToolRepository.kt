@@ -8,6 +8,19 @@ import com.letta.mobile.data.model.ToolUpdateParams
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
+/**
+ * Why a single-tool lookup/mutation failed, so the UI can say something more specific than a
+ * generic "Failed to load tool": the tool is gone ([NOT_FOUND]) versus the active backend simply
+ * has no route for it ([NOT_SUPPORTED], e.g. an HTTP-only route under iroh://).
+ */
+class ToolUnavailableException(
+    val reason: Reason,
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause) {
+    enum class Reason { NOT_FOUND, NOT_SUPPORTED }
+}
+
 interface IToolRepository {
     fun getTools(): StateFlow<List<Tool>>
     fun getAgentTools(agentId: AgentId): Flow<List<Tool>>
@@ -16,6 +29,16 @@ interface IToolRepository {
     suspend fun refreshTools()
     suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean
     suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool>
+    /**
+     * Resolves one tool by id. Default: the cached catalog (refreshed once on a miss); throws
+     * [ToolUnavailableException] with [ToolUnavailableException.Reason.NOT_FOUND] when absent.
+     */
+    suspend fun getTool(toolId: String): Tool {
+        getTools().value.firstOrNull { it.id.value == toolId }?.let { return it }
+        refreshTools()
+        return getTools().value.firstOrNull { it.id.value == toolId }
+            ?: throw ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found")
+    }
     suspend fun attachTool(agentId: AgentId, toolId: ToolId)
     suspend fun attachTool(agentId: String, toolId: String) = attachTool(AgentId(agentId), ToolId(toolId))
     suspend fun detachTool(agentId: AgentId, toolId: ToolId)

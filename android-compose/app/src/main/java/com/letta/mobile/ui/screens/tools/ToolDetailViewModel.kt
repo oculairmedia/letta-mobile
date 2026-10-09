@@ -16,6 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,11 +56,12 @@ class ToolDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val tool = toolApi.getTool(toolId)
+                val tool = toolRepository.getTool(toolId)
                 _uiState.value = UiState.Success(tool)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = UiState.Error(
-                    mapErrorToUserMessage(e, "Failed to load tool")
+                    mapErrorToUserMessage(e, "Failed to load tool: ${e.message ?: e::class.simpleName}")
                 )
             }
         }
