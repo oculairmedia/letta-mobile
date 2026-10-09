@@ -102,6 +102,7 @@ internal fun DesktopAgentSidebarActions.toShellPanelActions(mode: WorkPlayMode):
     onConversationSelected = onConversationSelected,
     onArchiveConversation = onArchiveConversation,
     onDeleteConversation = onDeleteConversation,
+    deleteArchivesConversation = deleteArchivesConversation,
     onRenameConversation = onRenameConversation,
     onPinConversation = onPinConversation,
     onOpenCanvas = onOpenCanvas,

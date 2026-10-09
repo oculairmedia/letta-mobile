@@ -35,6 +35,8 @@ internal data class DesktopAgentSidebarActions(
     val onDestinationSelected: (DesktopDestination) -> Unit,
     val onConversationSelected: (String) -> Unit,
     val onDeleteConversation: (String) -> Unit,
+    /** The backend's delete only archives (no delete command), so the confirm dialog says archive. */
+    val deleteArchivesConversation: Boolean = false,
     /** letta-mobile-bzvro.17: rename (persists the conversation's summary) and pin. */
     val onRenameConversation: (id: String, title: String) -> Unit = { _, _ -> },
     val onPinConversation: (id: String, pinned: Boolean) -> Unit = { _, _ -> },

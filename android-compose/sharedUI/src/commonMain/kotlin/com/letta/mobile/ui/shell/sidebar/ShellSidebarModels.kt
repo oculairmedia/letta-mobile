@@ -92,6 +92,11 @@ data class ShellAgentPanelActions(
     val onConversationSelected: (String) -> Unit = {},
     val onArchiveConversation: (id: String, archived: Boolean) -> Unit = { _, _ -> },
     val onDeleteConversation: (String) -> Unit = {},
+    /**
+     * True where the backend has no delete command, so [onDeleteConversation] archives: the
+     * confirm dialog then says so instead of promising a permanent removal.
+     */
+    val deleteArchivesConversation: Boolean = false,
     /** letta-mobile-bzvro.17: rename a conversation; null means the host cannot, so rows offer no rename. */
     val onRenameConversation: ((id: String, title: String) -> Unit)? = null,
     /** letta-mobile-bzvro.17: pin or unpin a conversation; null means the host keeps no pins. */

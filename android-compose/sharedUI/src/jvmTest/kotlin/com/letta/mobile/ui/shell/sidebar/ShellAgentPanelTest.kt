@@ -136,6 +136,45 @@ class ShellAgentPanelTest {
         onNodeWithText("confirm:Delete").assertDoesNotExist()
     }
 
+    @Test
+    fun deleteOnABackendThatOnlyArchivesSaysArchive() = runComposeUiTest {
+        val deleted = mutableListOf<String>()
+        val decorations = ShellChromeDecorations(
+            rowMenu = { items, content ->
+                Column {
+                    content()
+                    items.forEach { Text("menu:${it.label}", Modifier.clickable(onClick = it.onClick)) }
+                }
+            },
+            confirm = { request, onConfirm, _ ->
+                Text("confirm:${request.title}|${request.message}|${request.confirmLabel}", Modifier.clickable(onClick = onConfirm))
+            },
+        )
+        setContent {
+            CompositionLocalProvider(LocalShellChromeDecorations provides decorations) {
+                Panel(
+                    state,
+                    ShellAgentPanelActions(onDeleteConversation = { deleted += it }, deleteArchivesConversation = true),
+                )
+            }
+        }
+        onNodeWithText("menu:Delete chat").performClick()
+        val copy = ShellDeleteConversationCopy.request("Handoff from local-code", archives = true)
+        assertEquals("Archive chat?", copy.title)
+        assertEquals("Archive", copy.confirmLabel)
+        assertEquals(false, copy.message.contains("permanently removed"))
+        onNodeWithText("confirm:${copy.title}|${copy.message}|${copy.confirmLabel}").performClick()
+        assertEquals(listOf("c1"), deleted)
+    }
+
+    @Test
+    fun deleteCopyIsPermanentOnlyWhereDeleteIsReal() {
+        val real = ShellDeleteConversationCopy.request("Plans", archives = false)
+        assertEquals("Delete chat?", real.title)
+        assertEquals("Delete", real.confirmLabel)
+        assertEquals(true, real.message.contains("permanently removed"))
+    }
+
     /** A stand-in host: the row menu's entries as plain buttons under the row. */
     private val menuAsButtons = ShellChromeDecorations(
         rowMenu = { items, content ->

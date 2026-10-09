@@ -57,7 +57,27 @@ data class ShellConversationRowActions(
     val onDelete: () -> Unit,
     val onRename: ((String) -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
+    /** The backend has no delete command, so [onDelete] archives; the confirm dialog says so. */
+    val deleteArchives: Boolean = false,
 )
+
+/** The delete confirm dialog's wording: honest about whether delete is permanent on this backend. */
+internal object ShellDeleteConversationCopy {
+    fun request(title: String, archives: Boolean): ShellConfirmRequest =
+        if (archives) {
+            ShellConfirmRequest(
+                title = "Archive chat?",
+                message = "\"$title\" will be archived and hidden from your chats. It isn't permanently deleted.",
+                confirmLabel = "Archive",
+            )
+        } else {
+            ShellConfirmRequest(
+                title = "Delete chat?",
+                message = "\"$title\" will be permanently removed. This can't be undone.",
+                confirmLabel = "Delete",
+            )
+        }
+}
 
 /**
  * One conversation: icon, title over a one-line preview, a pin when pinned, and its time. While its
@@ -97,11 +117,7 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     }
     if (confirmDelete) {
         decorations.confirm(
-            ShellConfirmRequest(
-                title = "Delete chat?",
-                message = "\"${model.title}\" will be permanently removed. This can't be undone.",
-                confirmLabel = "Delete",
-            ),
+            ShellDeleteConversationCopy.request(model.title, actions.deleteArchives),
             {
                 confirmDelete = false
                 actions.onDelete()
