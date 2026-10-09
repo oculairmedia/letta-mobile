@@ -1,9 +1,7 @@
 package com.letta.mobile.ui.screens.runs
 
-import com.letta.mobile.ui.theme.LettaCodeFont
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,9 +20,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +34,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +41,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -55,7 +49,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
@@ -101,20 +94,15 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
-import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
-import androidx.compose.ui.graphics.Color
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import com.letta.mobile.ui.icons.LettaIcons
 import java.time.Instant
-import java.util.Locale
 
-import kotlin.time.Duration.Companion.seconds
 import com.letta.mobile.ui.theme.LettaDimens
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -238,19 +226,18 @@ fun RunMonitorScreen(
             usage = state?.selectedRunUsage,
             metrics = state?.selectedRunMetrics,
             steps = state?.selectedRunSteps.orEmpty(),
-            detailLimited = state?.runDetailLimited == true,
-            onInspectStep = viewModel::inspectStep,
+            detailLimited = state.isDetailLimited(), onInspectStep = viewModel::inspectStep,
             onDismiss = { viewModel.clearSelectedRun() },
             onTagClick = { stepId, tag ->
                 tagDrillInViewModel.showTag(tag, TagDrillInSource(TagDrillInEntityType.STEP, stepId))
             },
-            onCancel = if (state?.runDetailLimited == true || run.isTerminalStatus()) null else {
+            onCancel = if (!state.canCancel(run)) null else {
                 {
                     viewModel.clearSelectedRun()
                     cancelTarget = run
                 }
             },
-            onDelete = if (state?.runDetailLimited != true && run.isTerminalStatus()) {
+            onDelete = if (state.canDelete(run)) {
                 {
                     viewModel.clearSelectedRun()
                     deleteTarget = run
@@ -329,185 +316,6 @@ fun RunMonitorScreen(
 }
 
 @Composable
-private fun RunCard(
-    run: Run,
-    onInspect: () -> Unit,
-) {
-    val clipboard = LocalClipboardManager.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    val active = isActiveRunStatus(run.status)
-    val containerColor = runCardContainerColor(run.status)
-
-    val startEpochMs = remember(run.createdAt) { parseInstantMillis(run.createdAt) }
-    val frozenDuration = remember(run.totalDurationNs, run.completedAt, startEpochMs) {
-        val totalNs = run.totalDurationNs
-        val completedAt = run.completedAt
-        when {
-            totalNs != null -> formatElapsedDuration(totalNs / 1_000_000L)
-            startEpochMs != null && completedAt != null -> {
-                val end = parseInstantMillis(completedAt)
-                if (end != null) formatElapsedDuration(end - startEpochMs) else "--:--"
-            }
-            else -> "--:--"
-        }
-    }
-    var liveDuration by remember(run.id, run.status) { mutableStateOf(frozenDuration) }
-    if (active && startEpochMs != null) {
-        LaunchedEffect(run.id, startEpochMs) {
-            while (true) {
-                liveDuration = formatElapsedDuration(System.currentTimeMillis() - startEpochMs)
-                delay(1.seconds)
-            }
-        }
-    }
-    val durationText = if (active && startEpochMs != null) liveDuration else frozenDuration
-
-    Card(
-        onClick = onInspect,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(LettaDimens.Space.lg),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            // Row 1 — primary: status chip + live/frozen duration
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    run.status?.let { status -> StatusChip(status = status) }
-                    if (run.background == true) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(stringResource(R.string.screen_runs_background_chip)) },
-                        )
-                    }
-                }
-                Text(
-                    text = durationText,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        fontFamily = LettaCodeFont,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                )
-            }
-
-            // Row 2 — supporting: agent id, optional conversation id
-            Text(
-                text = stringResource(R.string.screen_runs_agent_label, run.agentId),
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            run.conversationId?.let { conversationId ->
-                Text(
-                    text = stringResource(R.string.screen_runs_conversation_label, conversationId),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
-            )
-
-            // Row 3 — metadata: timestamp + low-contrast truncated UUID pill (click-to-copy)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = run.createdAt
-                        ?.let { stringResource(R.string.screen_runs_created_label, formatRelativeTime(it)) }
-                        .orEmpty(),
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = truncateRunId(run.id),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = LettaCodeFont,
-                        fontSize = LettaDimens.Type.caption,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-                        .clickable {
-                            clipboard.setText(AnnotatedString(run.id))
-                            HapticEffects.longPress(haptic, view)
-                        }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
-                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun runCardContainerColor(status: String?): Color {
-    return when (status?.trim()?.lowercase(Locale.ROOT)) {
-        "error", "failed", "cancelled", "expired" -> MaterialTheme.colorScheme.errorContainer
-        "completed" -> MaterialTheme.colorScheme.secondaryContainer
-        "running", "active", "created", "pending", "processing", "working", "busy" ->
-            MaterialTheme.colorScheme.tertiaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
-    }
-}
-
-private fun isActiveRunStatus(status: String?): Boolean {
-    val normalized = status?.trim()?.lowercase(Locale.ROOT) ?: return false
-    return normalized in activeRunStatuses
-}
-
-private val activeRunStatuses = setOf(
-    "running", "active", "created", "pending", "processing", "working", "busy",
-)
-
-private fun parseInstantMillis(iso: String?): Long? {
-    if (iso.isNullOrBlank()) return null
-    return try {
-        Instant.parse(iso).toEpochMilli()
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private fun formatElapsedDuration(elapsedMs: Long): String {
-    val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds / 60) % 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) "%02d:%02d:%02d".format(hours, minutes, seconds)
-    else "%02d:%02d".format(minutes, seconds)
-}
-
-private fun truncateRunId(id: String): String =
-    if (id.length <= 18) id else id.take(8) + "…" + id.takeLast(8)
-
-@Composable
 private fun RunDetailDialog(
     run: Run,
     messages: List<LettaMessage>,
@@ -530,15 +338,7 @@ private fun RunDetailDialog(
         onDismiss = onDismiss,
     ) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            if (detailLimited) {
-                item {
-                    Text(
-                        stringResource(R.string.screen_runs_detail_unavailable_iroh),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            runDetailLimitedNote(detailLimited)
             item {
                 CardGroup {
                     run.status?.let {
@@ -743,7 +543,7 @@ private fun RunDetailDialog(
                 }
                 items(steps.take(5), key = { it.id }) { step ->
                     Card(
-                        onClick = { if (!detailLimited) onInspectStep(step.id) },
+                        onClick = { onInspectStep(step.id) },
                         colors = LettaCardDefaults.listCardColors(),
                     ) {
                         Column(
@@ -1369,10 +1169,6 @@ private fun messageSummary(message: LettaMessage): String {
 }
 
 @Suppress("UnusedReceiverParameter")
-private fun Run.isTerminalStatus(): Boolean {
-    return status in setOf("completed", "failed", "cancelled", "expired")
-}
-
 @PreviewLightDark
 @Composable
 private fun PreviewRunCardRunning() {

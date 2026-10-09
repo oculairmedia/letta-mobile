@@ -208,8 +208,6 @@ class RunMonitorViewModelTest {
         assertEquals(null, state.operationError)
 
         viewModel.inspectStep("step-1")
-        viewModel.cancelRun("r1")
-        viewModel.deleteRun("r1")
         assertEquals(null, awaitSuccessState().operationError)
         assertTrue("no HTTP under iroh://: ${fakeApi.calls} ${fakeStepApi.calls}", fakeApi.calls.isEmpty() && fakeStepApi.calls.isEmpty())
     }

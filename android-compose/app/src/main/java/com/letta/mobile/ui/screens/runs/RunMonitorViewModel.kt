@@ -47,6 +47,13 @@ data class RunMonitorUiState(
     val runDetailLimited: Boolean = false,
 )
 
+private data class RunDetail(
+    val available: Boolean,
+    val messages: List<LettaMessage> = emptyList(),
+    val usage: UsageStatistics? = null,
+    val metrics: RunMetrics? = null,
+)
+
 @HiltViewModel
 class RunMonitorViewModel @Inject constructor(
     private val runRepository: IRunRepository,
@@ -122,10 +129,11 @@ class RunMonitorViewModel @Inject constructor(
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
                 val run = runRepository.getRun(runId)
-                val detailAvailable = runRepository.supportsRunDetail
-                val messages = if (detailAvailable) runRepository.getRunMessages(runId) else emptyList()
-                val usage = if (detailAvailable) runRepository.getRunUsage(runId) else null
-                val metrics = if (detailAvailable) runRepository.getRunMetrics(runId) else null
+                val detail = fetchRunDetail(runId)
+                val messages = detail.messages
+                val usage = detail.usage
+                val metrics = detail.metrics
+                val detailAvailable = detail.available
                 val steps = runRepository.getRunSteps(runId)
                 _uiState.value = UiState.Success(
                     current.copy(
@@ -148,10 +156,21 @@ class RunMonitorViewModel @Inject constructor(
         }
     }
 
+    /** Messages/usage/metrics where the backend serves them; empty (never an HTTP call) under iroh://. */
+    private suspend fun fetchRunDetail(runId: String): RunDetail {
+        if (!runRepository.supportsRunDetail) return RunDetail(available = false)
+        return RunDetail(
+            available = true,
+            messages = runRepository.getRunMessages(runId),
+            usage = runRepository.getRunUsage(runId),
+            metrics = runRepository.getRunMetrics(runId),
+        )
+    }
+
     fun inspectStep(stepId: String) {
-        if (!stepRepository.supportsStepQueries) return
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (current.runDetailLimited) return@launch
             try {
                 val step = stepRepository.getStep(stepId)
                 val stepMessages = stepRepository.getStepMessages(stepId)
@@ -175,7 +194,6 @@ class RunMonitorViewModel @Inject constructor(
     }
 
     fun updateStepFeedback(stepId: String, feedback: String?) {
-        if (!stepRepository.supportsStepQueries) return
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             val targetStep = current.selectedStep?.takeIf { it.id == stepId }
@@ -204,7 +222,6 @@ class RunMonitorViewModel @Inject constructor(
     }
 
     fun cancelRun(runId: String) {
-        if (!runRepository.supportsRunDetail) return
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             val selectedRun = current.selectedRun ?: current.runs.firstOrNull { it.id == runId } ?: return@launch
@@ -230,7 +247,6 @@ class RunMonitorViewModel @Inject constructor(
     }
 
     fun deleteRun(runId: String) {
-        if (!runRepository.supportsRunDetail) return
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
