@@ -88,27 +88,36 @@ open class ToolRepository @Inject constructor(
      */
     override suspend fun getTool(toolId: String): Tool {
         val irohSource = irohToolSource
-        if (irohSource == null || !irohSource.shouldUseIroh()) {
-            return toolApi.getTool(toolId)
-        }
-        _tools.value.firstOrNull { it.id.value == toolId }?.let { return it }
+        if (irohSource == null || !irohSource.shouldUseIroh()) return toolApi.getTool(toolId)
+        return findCached(toolId)
+            ?: irohGetOrNull(irohSource, toolId)
+            ?: refreshAndFind(toolId)
+    }
+
+    private fun findCached(toolId: String): Tool? = _tools.value.firstOrNull { it.id.value == toolId }
+
+    private suspend fun refreshAndFind(toolId: String): Tool {
+        refreshMutex.withLock { refreshToolsLocked() }
+        return findCached(toolId) ?: throw toolNotFound(toolId)
+    }
+
+    /** `tool.get`, or null when the host cannot answer it (caller falls back to the catalog). */
+    private suspend fun irohGetOrNull(source: IrohAdminRpcToolSource, toolId: String): Tool? =
         try {
-            return irohSource.getTool(toolId)
+            source.getTool(toolId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             val detail = e.message.orEmpty()
             when {
-                detail.contains("not found", ignoreCase = true) ->
-                    throw ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found", e)
-                detail.contains("capability_unavailable") || detail.contains("unknown method", ignoreCase = true) -> Unit
+                detail.contains("not found", ignoreCase = true) -> throw toolNotFound(toolId, e)
+                detail.contains("capability_unavailable") || detail.contains("unknown method", ignoreCase = true) -> null
                 else -> throw e
             }
         }
-        refreshMutex.withLock { refreshToolsLocked() }
-        return _tools.value.firstOrNull { it.id.value == toolId }
-            ?: throw ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found")
-    }
+
+    private fun toolNotFound(toolId: String, cause: Throwable? = null) =
+        ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found", cause)
 
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource

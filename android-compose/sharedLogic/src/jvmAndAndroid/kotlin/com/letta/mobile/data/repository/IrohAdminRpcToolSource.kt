@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -54,9 +55,7 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools/$toolId",
             body = buildJsonObject { put("tool_id", toolId) }.toString(),
         )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.get failed")
-        val result = response.result ?: error("Iroh admin_rpc tool.get returned no result")
-        return json.decodeFromJsonElement(Tool.serializer(), result)
+        return decodeTool(response, "tool.get")
     }
 
     suspend fun createTool(params: ToolCreateParams): Tool {
@@ -65,9 +64,7 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools",
             body = json.encodeToString(ToolCreateParams.serializer(), params),
         )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.create failed")
-        val result = response.result ?: error("Iroh admin_rpc tool.create returned no result")
-        return json.decodeFromJsonElement(Tool.serializer(), result)
+        return decodeTool(response, "tool.create")
     }
 
     suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
@@ -84,8 +81,12 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools/$toolId",
             body = requestBody.toString(),
         )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.update failed")
-        val result = response.result ?: error("Iroh admin_rpc tool.update returned no result")
+        return decodeTool(response, "tool.update")
+    }
+
+    private fun decodeTool(response: AppServerInboundFrame.AdminRpcResponse, method: String): Tool {
+        if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
+        val result = response.result ?: error("Iroh admin_rpc $method returned no result")
         return json.decodeFromJsonElement(Tool.serializer(), result)
     }
 
