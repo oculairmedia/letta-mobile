@@ -3,6 +3,7 @@ package com.letta.mobile.data.runtime
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,19 +65,17 @@ class PermissionModeRegistry(private val defaultMode: StateFlow<AppServerPermiss
         val failed: Boolean = false,
     )
 
-    private val entries = MutableStateFlow<Map<TurnRuntimeKey, Entry>>(emptyMap())
+    private val entries = MutableStateFlow<Map<AppServerRuntimeScope, Entry>>(emptyMap())
 
     /** The mode in force for the runtime, confirmed or inherited; never a pending request. */
-    fun modeFor(agentId: String, conversationId: String): AppServerPermissionMode =
-        entries.value[TurnRuntimeKey(agentId, conversationId)]?.mode ?: defaultMode.value
+    fun modeFor(runtime: AppServerRuntimeScope): AppServerPermissionMode =
+        entries.value[runtime]?.mode ?: defaultMode.value
 
-    fun observe(agentId: String, conversationId: String): Flow<PermissionModeState> {
-        val key = TurnRuntimeKey(agentId, conversationId)
-        return combine(entries, defaultMode) { all, default ->
-            val entry = all[key]
+    fun observe(runtime: AppServerRuntimeScope): Flow<PermissionModeState> =
+        combine(entries, defaultMode) { all, default ->
+            val entry = all[runtime]
             PermissionModeState(entry?.mode ?: default, entry?.pending, entry?.failed == true)
         }
-    }
 
     /**
      * Asks for [mode] on the runtime. [apply] performs the change and returns true when it was
@@ -84,12 +83,11 @@ class PermissionModeRegistry(private val defaultMode: StateFlow<AppServerPermiss
      * reads [modeFor]), so its `apply` just returns true.
      */
     suspend fun change(
-        agentId: String,
-        conversationId: String,
+        runtime: AppServerRuntimeScope,
         mode: AppServerPermissionMode,
         apply: suspend (AppServerPermissionMode) -> Boolean,
     ): Boolean {
-        val key = TurnRuntimeKey(agentId, conversationId)
+        val key = runtime
         update(key) { it.copy(pending = mode, failed = false) }
         val confirmed = try {
             apply(mode)
@@ -104,11 +102,11 @@ class PermissionModeRegistry(private val defaultMode: StateFlow<AppServerPermiss
     }
 
     /** The server reported [mode] for the runtime on its own (another client changed it). */
-    fun observed(agentId: String, conversationId: String, mode: AppServerPermissionMode) {
-        update(TurnRuntimeKey(agentId, conversationId)) { it.copy(mode = mode, failed = false) }
+    fun observed(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode) {
+        update(runtime) { it.copy(mode = mode, failed = false) }
     }
 
-    private fun update(key: TurnRuntimeKey, change: (Entry) -> Entry) {
+    private fun update(key: AppServerRuntimeScope, change: (Entry) -> Entry) {
         entries.update { all -> all + (key to change(all[key] ?: Entry())) }
     }
 }

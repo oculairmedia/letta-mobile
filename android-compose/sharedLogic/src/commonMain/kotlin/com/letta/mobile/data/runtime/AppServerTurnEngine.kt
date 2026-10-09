@@ -628,8 +628,8 @@ class AppServerTurnEngine(
      * from the matching `update_device_status`. A runtime this engine has not started needs no wire
      * change: its `runtime_start` carries the mode the provider returns.
      */
-    suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean {
-        val started = leases.peek(TurnRuntimeKey(agentId, conversationId))?.runtimeScope ?: return true
+    suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
+        val started = leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.runtimeScope ?: return true
         return deviceState.changePermissionMode(started, mode)
     }
 

@@ -95,8 +95,7 @@ interface DesktopPermissionModeController {
 
     /** Asks for [mode] on the conversation's runtime; true once the server echoed it. */
     suspend fun setPermissionMode(
-        agentId: String,
-        conversationId: String,
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode,
     ): Boolean
 }

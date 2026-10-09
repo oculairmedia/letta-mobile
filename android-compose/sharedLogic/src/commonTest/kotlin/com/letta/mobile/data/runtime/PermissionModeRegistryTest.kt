@@ -2,6 +2,7 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,6 +13,10 @@ import kotlinx.coroutines.test.runTest
 
 /** letta-mobile-bzvro.13 (F13): the default stays Unrestricted; the machinery to change it is in place. */
 class PermissionModeRegistryTest {
+    private val runtime = AppServerRuntimeScope("agent", "conv")
+    private val elsewhere = AppServerRuntimeScope("agent", "elsewhere")
+    private val otherConversation = AppServerRuntimeScope("agent", "other-conv")
+
     @Test
     fun anInstallThatNeverTouchedTheSettingRunsUnrestricted() {
         val settings = PermissionModeSettings(MapSettingsStore())
@@ -20,7 +25,7 @@ class PermissionModeRegistryTest {
         assertEquals(AppServerPermissionMode.Unrestricted, RuntimePermissionDefaults.DEFAULT_MODE)
         assertEquals(
             AppServerPermissionMode.Unrestricted,
-            PermissionModeRegistry(settings.defaultMode).modeFor("agent", "conv"),
+            PermissionModeRegistry(settings.defaultMode).modeFor(runtime),
         )
     }
 
@@ -40,10 +45,10 @@ class PermissionModeRegistryTest {
         val restarted = PermissionModeSettings(store)
         assertEquals(AppServerPermissionMode.Standard, restarted.defaultMode.value)
         val registry = PermissionModeRegistry(restarted.defaultMode)
-        assertEquals(AppServerPermissionMode.Standard, registry.modeFor("agent", "conv"))
+        assertEquals(AppServerPermissionMode.Standard, registry.modeFor(runtime))
 
         restarted.setDefaultMode(AppServerPermissionMode.AcceptEdits)
-        assertEquals(AppServerPermissionMode.AcceptEdits, registry.modeFor("agent", "other-conv"))
+        assertEquals(AppServerPermissionMode.AcceptEdits, registry.modeFor(otherConversation))
     }
 
     @Test
@@ -61,9 +66,9 @@ class PermissionModeRegistryTest {
         var whileApplying: PermissionModeState? = null
         var modeWhileApplying: AppServerPermissionMode? = null
 
-        val confirmed = registry.change("agent", "conv", AppServerPermissionMode.Standard) {
-            whileApplying = registry.observe("agent", "conv").first()
-            modeWhileApplying = registry.modeFor("agent", "conv")
+        val confirmed = registry.change(runtime, AppServerPermissionMode.Standard) {
+            whileApplying = registry.observe(runtime).first()
+            modeWhileApplying = registry.modeFor(runtime)
             true
         }
 
@@ -74,19 +79,19 @@ class PermissionModeRegistryTest {
             "the chip shows the request as pending",
         )
         assertEquals(AppServerPermissionMode.Unrestricted, modeWhileApplying, "turns still run the confirmed mode")
-        assertEquals(PermissionModeState(AppServerPermissionMode.Standard), registry.observe("agent", "conv").first())
-        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor("agent", "elsewhere"))
+        assertEquals(PermissionModeState(AppServerPermissionMode.Standard), registry.observe(runtime).first())
+        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor(elsewhere))
     }
 
     @Test
     fun aChangeTheServerDoesNotConfirmLeavesTheModeAndSaysSo() = runTest {
         val registry = PermissionModeRegistry(PermissionModeSettings(MapSettingsStore()).defaultMode)
 
-        val confirmed = registry.change("agent", "conv", AppServerPermissionMode.Strict) { false }
+        val confirmed = registry.change(runtime, AppServerPermissionMode.Strict) { false }
 
         assertFalse(confirmed)
-        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor("agent", "conv"))
-        val state = registry.observe("agent", "conv").first()
+        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor(runtime))
+        val state = registry.observe(runtime).first()
         assertNull(state.pending)
         assertTrue(state.failed)
     }
@@ -95,18 +100,18 @@ class PermissionModeRegistryTest {
     fun aFailingApplyIsAnUnconfirmedChangeNotACrash() = runTest {
         val registry = PermissionModeRegistry(PermissionModeSettings(MapSettingsStore()).defaultMode)
 
-        val confirmed = registry.change("agent", "conv", AppServerPermissionMode.Standard) { error("socket closed") }
+        val confirmed = registry.change(runtime, AppServerPermissionMode.Standard) { error("socket closed") }
 
         assertFalse(confirmed)
-        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor("agent", "conv"))
+        assertEquals(AppServerPermissionMode.Unrestricted, registry.modeFor(runtime))
     }
 
     @Test
     fun aModeTheServerReportsOnItsOwnIsAdopted() {
         val registry = PermissionModeRegistry(PermissionModeSettings(MapSettingsStore()).defaultMode)
 
-        registry.observed("agent", "conv", AppServerPermissionMode.Strict)
+        registry.observed(runtime, AppServerPermissionMode.Strict)
 
-        assertEquals(AppServerPermissionMode.Strict, registry.modeFor("agent", "conv"))
+        assertEquals(AppServerPermissionMode.Strict, registry.modeFor(runtime))
     }
 }

@@ -111,8 +111,7 @@ internal object DesktopAppServerChatGateways {
 internal suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
-    permissionModeSettings: PermissionModeSettings? = null,
-    appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(permissionModeSettings),
+    appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),
     localRuntime: DesktopLocalRuntimeLifecycle = DesktopLocalRuntimeHost,
 ): DesktopChatGateway = DesktopAppServerChatGateways.createDefault(config, appServerConfig, appServerGatewayFactory, localRuntime)
 

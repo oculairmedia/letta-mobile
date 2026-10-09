@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -216,7 +217,8 @@ internal class DesktopChatSessionPort(
                 if (agentId == null || modes == null) {
                     flowOf(null)
                 } else {
-                    modes.permissionModes.observe(agentId, target.second).map { it.toUiState(modes.permissionModeUnavailableReason) }
+                    modes.permissionModes.observe(AppServerRuntimeScope(agentId, target.second))
+                        .map { it.toUiState(modes.permissionModeUnavailableReason) }
                 }
             }
 
@@ -226,7 +228,7 @@ internal class DesktopChatSessionPort(
         val agentId = conversation.agentId?.takeIf(String::isNotBlank) ?: return
         val modes = controller.activeGateway as? DesktopPermissionModeController ?: return
         if (modes.permissionModeUnavailableReason != null) return
-        scope.launch { modes.setPermissionMode(agentId, conversation.id, mode) }
+        scope.launch { modes.setPermissionMode(AppServerRuntimeScope(agentId, conversation.id), mode) }
     }
 
     private fun workingDirectoryInputs(): Flow<DesktopWorkingDirectoryInputs> = combine(

@@ -18,6 +18,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -71,9 +72,7 @@ class DesktopAppServerChatGatewayBuilder(
     /** letta-mobile-bzvro.13: the persisted default permission mode; null runs every runtime Unrestricted. */
     permissionModeSettings: PermissionModeSettings? = null,
 ) : DesktopAppServerChatGatewayFactory {
-    private val permissionModes = PermissionModeRegistry(
-        permissionModeSettings?.defaultMode ?: MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE),
-    )
+    private val permissionModes = permissionModeRegistryFor(permissionModeSettings)
 
 
     override suspend fun create(
@@ -292,7 +291,7 @@ internal fun buildDesktopAppServerTurnEngine(
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
         permissionModeProvider = { command ->
-            config.permissionModes?.modeFor(command.agentId.value, command.conversationId.value)
+            config.permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
                 ?: AppServerPermissionMode.Unrestricted
         },
         turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
@@ -332,3 +331,7 @@ internal suspend fun authenticateDesktopIrohAppServer(
 
 /** Shown on the composer's mode chip: `change_device_state` is not confirmed to be relayed by an Iroh node. */
 private const val IROH_PERMISSION_MODE_UNAVAILABLE = "The mode is set by the connected node; changing it over Iroh is not supported yet."
+
+/** The registry over the settings' default; with no settings every runtime follows the product default (Unrestricted). */
+private fun permissionModeRegistryFor(settings: PermissionModeSettings?): PermissionModeRegistry =
+    PermissionModeRegistry(settings?.defaultMode ?: MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))

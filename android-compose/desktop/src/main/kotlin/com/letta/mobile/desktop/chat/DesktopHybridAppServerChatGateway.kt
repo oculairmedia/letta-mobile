@@ -149,9 +149,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
-    override suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean =
-        permissionModes.change(agentId, conversationId, mode) { requested ->
-            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(agentId, conversationId, requested) ?: false
+    override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
+        permissionModes.change(runtime, mode) { requested ->
+            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(runtime, requested) ?: false
         }
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
@@ -498,8 +498,8 @@ internal class DesktopRuntimeOwnedChatGateway(
     override val permissionModeUnavailableReason: String?
         get() = (delegate as? DesktopPermissionModeController)?.permissionModeUnavailableReason
 
-    override suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean =
-        (delegate as? DesktopPermissionModeController)?.setPermissionMode(agentId, conversationId, mode) ?: false
+    override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
+        (delegate as? DesktopPermissionModeController)?.setPermissionMode(runtime, mode) ?: false
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         (delegate as? DesktopTurnAborter)?.abortConversationTurn(conversationId) ?: false

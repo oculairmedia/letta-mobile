@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatMessageId
@@ -353,7 +354,7 @@ class DesktopChatSessionPortTest {
 
         port.actions.setPermissionMode(AppServerPermissionMode.Standard)
         runCurrent()
-        assertEquals(listOf(Triple("agent-0", "conv-1", AppServerPermissionMode.Standard)), gateway.requested)
+        assertEquals(listOf(AppServerRuntimeScope("agent-0", "conv-1") to AppServerPermissionMode.Standard), gateway.requested)
         assertEquals(AppServerPermissionMode.Standard, port.composer.value.permissionMode?.selected)
 
         controller.close()
@@ -376,11 +377,11 @@ class DesktopChatSessionPortTest {
         override val permissionModeUnavailableReason: String? = null,
     ) : FakeDesktopChatGateway(), DesktopPermissionModeController {
         override val permissionModes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))
-        val requested = mutableListOf<Triple<String, String, AppServerPermissionMode>>()
+        val requested = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
 
-        override suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean {
-            requested += Triple(agentId, conversationId, mode)
-            return permissionModes.change(agentId, conversationId, mode) { true }
+        override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
+            requested += runtime to mode
+            return permissionModes.change(runtime, mode) { true }
         }
     }
 

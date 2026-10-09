@@ -3,6 +3,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -20,22 +21,28 @@ import kotlin.test.assertEquals
 
 /** letta-mobile-bzvro.13 (F13): the permission-mode chip above the composer. */
 class ComposerPermissionModeUiTest {
-    private fun composer(state: ChatPermissionModeUiState?) =
-        ChatComposerUiState(text = "ready", canSend = true, permissionMode = state)
+    private val unrestricted = ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)
+
+    private fun ComposeUiTest.showPanel(
+        state: ChatPermissionModeUiState?,
+        actions: RecordingChatActions = RecordingChatActions(),
+        mode: ChatSurfaceMode = ChatSurfaceMode.FullScreen,
+    ) = setContent {
+        MaterialTheme {
+            ChatComposerPanel(
+                ComposerInputs(
+                    composer = ChatComposerUiState(text = "ready", canSend = true, permissionMode = state),
+                    actions = actions,
+                    mode = mode,
+                ),
+            )
+        }
+    }
 
     @Test
     fun theChipShowsTheConfirmedModeAndOpensThePicker() = runComposeUiTest {
         val actions = RecordingChatActions()
-        setContent {
-            MaterialTheme {
-                ChatComposerPanel(
-                    ComposerInputs(
-                        composer = composer(ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted)),
-                        actions = actions,
-                    ),
-                )
-            }
-        }
+        showPanel(unrestricted, actions)
 
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
         onNodeWithText("Approve all").assertExists()
@@ -53,21 +60,7 @@ class ComposerPermissionModeUiTest {
 
     @Test
     fun aRequestedChangeShowsPendingUntilTheServerEchoesIt() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                ChatComposerPanel(
-                    ComposerInputs(
-                        composer = composer(
-                            ChatPermissionModeUiState(
-                                selected = AppServerPermissionMode.Unrestricted,
-                                pending = AppServerPermissionMode.Standard,
-                            ),
-                        ),
-                        actions = RecordingChatActions(),
-                    ),
-                )
-            }
-        }
+        showPanel(unrestricted.copy(pending = AppServerPermissionMode.Standard))
 
         onNodeWithText("Changing to Ask for approval…").assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsNotEnabled()
@@ -75,21 +68,7 @@ class ComposerPermissionModeUiTest {
 
     @Test
     fun whereTheModeCannotBeChangedTheChipIsLockedWithItsReason() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                ChatComposerPanel(
-                    ComposerInputs(
-                        composer = composer(
-                            ChatPermissionModeUiState(
-                                selected = AppServerPermissionMode.Unrestricted,
-                                unavailableReason = "Not supported over Iroh yet",
-                            ),
-                        ),
-                        actions = RecordingChatActions(),
-                    ),
-                )
-            }
-        }
+        showPanel(unrestricted.copy(unavailableReason = "Not supported over Iroh yet"))
 
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsNotEnabled()
         onNodeWithText("Not supported over Iroh yet").assertExists()
@@ -97,16 +76,7 @@ class ComposerPermissionModeUiTest {
 
     @Test
     fun anUnconfirmedChangeSaysSo() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                ChatComposerPanel(
-                    ComposerInputs(
-                        composer = composer(ChatPermissionModeUiState(selected = AppServerPermissionMode.Unrestricted, failed = true)),
-                        actions = RecordingChatActions(),
-                    ),
-                )
-            }
-        }
+        showPanel(unrestricted.copy(failed = true))
 
         onNodeWithText("The server did not confirm the change").assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
@@ -114,24 +84,14 @@ class ComposerPermissionModeUiTest {
 
     @Test
     fun noChipForAnOwnerWithoutAMode() = runComposeUiTest {
-        setContent { MaterialTheme { ChatComposerPanel(ComposerInputs(composer = composer(null), actions = RecordingChatActions())) } }
+        showPanel(null)
 
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
     }
 
     @Test
     fun theCompactDockStaysOneBarWithoutTheChip() = runComposeUiTest {
-        setContent {
-            MaterialTheme {
-                ChatComposerPanel(
-                    ComposerInputs(
-                        composer = composer(ChatPermissionModeUiState(AppServerPermissionMode.Unrestricted)),
-                        actions = RecordingChatActions(),
-                        mode = ChatSurfaceMode.Docked,
-                    ),
-                )
-            }
-        }
+        showPanel(unrestricted, mode = ChatSurfaceMode.Docked)
 
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
     }
