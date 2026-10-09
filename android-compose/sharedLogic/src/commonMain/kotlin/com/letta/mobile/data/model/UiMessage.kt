@@ -2,6 +2,7 @@ package com.letta.mobile.data.model
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.messaging.AgentMessageProvenance
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 
 @Immutable
 data class UiMessage(
@@ -212,6 +213,12 @@ data class UiGeneratedComponent(
 data class UiApprovalRequest(
     val requestId: String,
     val toolCalls: List<UiApprovalToolCall>,
+    /**
+     * letta-mobile-bzvro.11/.12: what the server's `can_use_tool` control request offered
+     * (always-allow rules, blocked path, diffs). Non-null only while that request genuinely waits
+     * on the person, which is also what makes the card draw for a tool that is not a user-input tool.
+     */
+    val details: PendingApprovalDetails? = null,
 )
 
 @Immutable

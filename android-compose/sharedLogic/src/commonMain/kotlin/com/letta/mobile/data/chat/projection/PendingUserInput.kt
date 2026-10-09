@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
 
 /**
@@ -25,10 +26,36 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
 
 /**
  * letta-mobile-bglj6.1.25: whether this request waits on the person: it carries a runtime
- * user-input tool (AskUserQuestion). Every other request (a Bash call under approve-all, say) is
- * resolved by the runtime, even while the projection still holds it as undecided because its tool
- * has not returned yet, so it must render as its plain tool row, never as an approval card. The
- * legacy Android chat applied the same gate (ChatApprovals.requiresUserInput).
+ * user-input tool (AskUserQuestion), or (letta-mobile-bzvro.11) the server's `can_use_tool`
+ * control request for it is parked, which only happens under a permission mode that does not
+ * approve everything. Every other request (a Bash call under approve-all, say) is resolved by the
+ * runtime, even while the projection still holds it as undecided because its tool has not
+ * returned yet, so it must render as its plain tool row, never as an approval card. The legacy
+ * Android chat applied the same gate (ChatApprovals.requiresUserInput).
  */
 fun UiApprovalRequest.requiresUserInput(): Boolean =
-    toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
+    details != null || toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
+
+/**
+ * [messages] with each approval request joined to the parked control request that [details]
+ * (by tool call id) holds for it. Returns the same list when nothing joins, so an idle
+ * conversation keeps its list identity.
+ */
+fun withPendingApprovalDetails(
+    messages: List<UiMessage>,
+    details: Map<String, PendingApprovalDetails>,
+): List<UiMessage> {
+    if (details.isEmpty()) return messages
+    var changed = false
+    val joined = messages.map { message ->
+        val request = message.approvalRequest ?: return@map message
+        val match = request.toolCalls.firstNotNullOfOrNull { details[it.toolCallId] }
+        if (match == null || match == request.details) {
+            message
+        } else {
+            changed = true
+            message.copy(approvalRequest = request.copy(details = match))
+        }
+    }
+    return if (changed) joined else messages
+}

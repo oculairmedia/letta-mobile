@@ -128,6 +128,7 @@ internal class DesktopChatSessionPort(
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
         submittingApprovals = controller.submittingApprovals.value,
+        approvalDetails = controller.pendingApprovalDetails.value,
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
@@ -135,9 +136,9 @@ internal class DesktopChatSessionPort(
         controller.replyPresence,
         controller.cancellingConversationId,
         selectedSendQueue(),
-        combine(localTimeline, controller.submittingApprovals, ::Pair),
-    ) { surface, presence, cancelling, queue, (local, submitting) ->
-        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting)
+        combine(localTimeline, controller.submittingApprovals, controller.pendingApprovalDetails, ::Triple),
+    ) { surface, presence, cancelling, queue, (local, submitting, details) ->
+        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting, details)
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
         if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
@@ -283,7 +284,13 @@ internal class DesktopChatActions(
         // A second press while the first answer is in flight must not answer twice.
         if (answer.requestId in controller.submittingApprovals.value) return
         if (controller.canSubmitApprovals.value) {
-            controller.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
+            controller.submitApprovalWithRules(
+                answer.requestId,
+                answer.toolCallIds,
+                answer.approve,
+                answer.reason,
+                answer.selectedSuggestionIds,
+            )
         }
     }
 

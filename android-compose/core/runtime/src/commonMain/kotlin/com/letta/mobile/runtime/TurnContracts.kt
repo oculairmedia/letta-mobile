@@ -120,6 +120,31 @@ data class ToolApprovalRequest(
     val toolName: ToolName,
     val prompt: String,
     val argumentsPreview: String? = null,
+    /** letta-mobile-bzvro.11: reusable "always allow" rules the server offered for this call. */
+    val suggestions: List<PermissionSuggestion> = emptyList(),
+    /** letta-mobile-bzvro.11: the path that tripped the permission check, when the server named one. */
+    val blockedPath: String? = null,
+    /** letta-mobile-bzvro.12: the change the call would make (Edit/Write), when previewable. */
+    val diffs: List<ApprovalDiffPreview> = emptyList(),
+)
+
+/** One `permission_suggestions` entry: choosing [id] approves the call and persists the rule [text]. */
+@Serializable
+data class PermissionSuggestion(
+    val id: String,
+    val text: String,
+)
+
+/**
+ * One `diffs` entry of a `can_use_tool` control request, normalised to unified-diff text so the
+ * shared diff renderer can draw it. [unifiedDiff] is null for a file the server could not preview
+ * (then [note] says why, when it did).
+ */
+@Serializable
+data class ApprovalDiffPreview(
+    val path: String? = null,
+    val unifiedDiff: String? = null,
+    val note: String? = null,
 )
 
 @Serializable

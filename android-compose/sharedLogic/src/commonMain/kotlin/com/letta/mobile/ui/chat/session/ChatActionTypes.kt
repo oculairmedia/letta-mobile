@@ -39,4 +39,6 @@ data class ChatApprovalAnswer(
     val toolCallIds: List<String>,
     val approve: Boolean,
     val reason: String?,
+    /** letta-mobile-bzvro.11: the `permission_suggestions` ids chosen with an approval ("always allow"). */
+    val selectedSuggestionIds: List<String> = emptyList(),
 )

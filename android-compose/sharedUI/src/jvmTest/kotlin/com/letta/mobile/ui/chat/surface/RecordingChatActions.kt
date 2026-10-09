@@ -49,7 +49,13 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
     val releaseOlderCalls: Int get() = count("releaseOlderMessages")
     val clearedErrors: Int get() = count("clearError")
 
-    data class Approval(val requestId: String, val toolCallIds: List<String>, val approve: Boolean, val reason: String?)
+    data class Approval(
+        val requestId: String,
+        val toolCallIds: List<String>,
+        val approve: Boolean,
+        val reason: String?,
+        val selectedSuggestionIds: List<String> = emptyList(),
+    )
 
     fun count(name: String): Int = calls.count { it == name }
 
@@ -117,7 +123,7 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         record("submitApproval")
-        approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
+        approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds)
     }
 
     override fun submitA2uiAction(action: A2uiAction) = record("submitA2uiAction")

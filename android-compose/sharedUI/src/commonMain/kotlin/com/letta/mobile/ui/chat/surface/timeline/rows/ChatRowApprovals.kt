@@ -91,6 +91,8 @@ internal class ApprovalDecider(
     val requestId: String,
     val isSubmitting: Boolean,
     val submit: ((toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit)?,
+    /** Approves and persists the server-offered rule [suggestionId] (letta-mobile-bzvro.11). */
+    val submitAlwaysAllow: ((toolCallIds: List<String>, suggestionId: String) -> Unit)? = null,
 ) {
     val enabled: Boolean get() = !isSubmitting && submit != null
 }
@@ -113,6 +115,15 @@ internal fun rememberApprovalDecider(
             isSubmitting = isSubmitting,
             submit = if (approvalsEnabled) {
                 { ids, approve, reason -> actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
+            } else {
+                null
+            },
+            submitAlwaysAllow = if (approvalsEnabled) {
+                { ids, suggestionId ->
+                    actions.submitApproval(
+                        ChatApprovalAnswer(approval.requestId, ids, approve = true, reason = null, selectedSuggestionIds = listOf(suggestionId)),
+                    )
+                }
             } else {
                 null
             },
@@ -168,6 +179,7 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
     // Android leads with what it asks, then the calls; desktop lists the calls first.
     if (touch && actionable) ApprovalBody()
     approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
+    approval.details?.let { ApprovalOfferedDetails(it) }
     if (actionable) {
         if (!touch) ApprovalBody()
         ApprovalActionRow(approval, decider)
@@ -288,6 +300,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
             onDismiss = { rejecting = false },
         )
     }
+    approval.details?.let { AlwaysAllowButtons(it.suggestions, decider, toolCallIds) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(
             onClick = {

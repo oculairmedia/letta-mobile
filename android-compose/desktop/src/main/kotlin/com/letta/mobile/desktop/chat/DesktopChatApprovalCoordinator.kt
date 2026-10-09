@@ -4,7 +4,9 @@ import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.coroutines.CancellationException
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +20,7 @@ internal data class ApprovalSubmissionRequest(
     val toolCallIds: List<String>,
     val approve: Boolean,
     val reason: String?,
+    val selectedSuggestionIds: List<String> = emptyList(),
 )
 
 /**
@@ -34,8 +37,18 @@ internal class DesktopChatApprovalCoordinator(
     private val _canSubmitApprovals = MutableStateFlow(false)
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
 
+    private val _pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
+
+    /** What each parked control request of the bound gateway offered, by tool call id (empty when it reports none). */
+    val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = _pendingApprovalDetails.asStateFlow()
+    private var detailsJob: Job? = null
+
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
+        detailsJob?.cancel()
+        _pendingApprovalDetails.value = emptyMap()
+        val source = gateway as? DesktopPendingApprovalSource ?: return
+        detailsJob = scope.launch { source.pendingApprovalDetails.collect { _pendingApprovalDetails.value = it } }
     }
 
     private data class SubmissionTarget(
@@ -96,6 +109,7 @@ internal class DesktopChatApprovalCoordinator(
                     toolCallId = toolCallId,
                     approve = request.approve,
                     reason = request.reason,
+                    selectedSuggestionIds = request.selectedSuggestionIds,
                 ),
             )
         }

@@ -21,6 +21,8 @@ import kotlinx.serialization.json.JsonObject
  *   payload) that closes the call via `Allow(updated_input=…)`. Ignored when
  *   [approve] is false.
  * @param message the human-readable reason to attach to a plain allow/deny.
+ * @param selectedSuggestionIds `permission_suggestions` ids chosen with an approval
+ *   (letta-mobile-bzvro.11); sent as `selected_permission_suggestion_ids` on a plain allow only.
  */
 object AppServerApprovalDecisions {
     fun decide(
@@ -29,11 +31,15 @@ object AppServerApprovalDecisions {
         message: String?,
         defaultApproveMessage: String,
         defaultDenyMessage: String,
+        selectedSuggestionIds: List<String> = emptyList(),
     ): AppServerApprovalResponseDecision = when {
         approve && updatedInput != null ->
             AppServerApprovalResponseDecision.Allow(message = null, updatedInput = updatedInput)
         approve ->
-            AppServerApprovalResponseDecision.Allow(message = message ?: defaultApproveMessage)
+            AppServerApprovalResponseDecision.Allow(
+                message = message ?: defaultApproveMessage,
+                selectedPermissionSuggestionIds = selectedSuggestionIds.takeIf { it.isNotEmpty() },
+            )
         else ->
             AppServerApprovalResponseDecision.Deny(message = message ?: defaultDenyMessage)
     }

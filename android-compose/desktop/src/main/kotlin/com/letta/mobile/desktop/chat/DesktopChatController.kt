@@ -126,6 +126,8 @@ class DesktopChatController(
      * structured AskUserQuestion card can disable its buttons while submitting.
      */
     val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
+    val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
+        approvalCoordinator.pendingApprovalDetails
 
     /**
      * Whether the active gateway can actually submit approvals (i.e. is a
@@ -825,6 +827,15 @@ class DesktopChatController(
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String?,
+    ) = submitApprovalWithRules(requestId, toolCallIds, approve, reason, selectedSuggestionIds = emptyList())
+
+    /** As above, approving with the `permission_suggestions` ids in [selectedSuggestionIds] (letta-mobile-bzvro.11). */
+    fun submitApprovalWithRules(
+        requestId: String,
+        toolCallIds: List<String>,
+        approve: Boolean,
+        reason: String?,
+        selectedSuggestionIds: List<String>,
     ) {
         if (closed) return
         approvalCoordinator.submitApproval(
@@ -835,6 +846,7 @@ class DesktopChatController(
                 toolCallIds = toolCallIds,
                 approve = approve,
                 reason = reason,
+                selectedSuggestionIds = selectedSuggestionIds,
             ),
         )
     }

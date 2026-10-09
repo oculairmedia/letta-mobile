@@ -194,6 +194,33 @@ class AppServerTurnEngineToolSettlementTest {
         }
     }
 
+    /** letta-mobile-bzvro.11: a parked, non-user-input approval is published while it waits and dropped when the turn ends. */
+    @Test
+    fun parkedApprovalDetailsArePublishedWhileItWaitsAndClearedWhenTheTurnEnds() = runTest {
+        val client = SettlementTestClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = { "req" },
+            turnIdleTimeoutMs = 500L,
+            permissionMode = AppServerPermissionMode.Standard,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emitApprovalRequest("call-1", "sensitive_tool")
+            assertIs<RuntimeEventPayload.ApprovalRequested>(awaitItem().payload)
+
+            val parked = engine.pendingApprovalDetails.value.getValue("call-1")
+            assertEquals("sensitive_tool", parked.toolName)
+
+            // The idle timeout ends the turn (the call is settled, then the run fails).
+            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+        assertEquals(emptyMap(), engine.pendingApprovalDetails.value)
+    }
+
     @Test
     fun cleanCompletionWithDanglingSecondCallNoSyntheticReturn() = runTest {
         // fix(no-settle-on-clean-completion, letta-mobile-oqfbj): two tool calls

@@ -108,10 +108,14 @@ class DesktopHybridAppServerChatGateway internal constructor(
     ConversationSummaryGateway,
     ConversationForkGateway,
     DesktopApprovalSubmitter,
+    DesktopPendingApprovalSource,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,
     AutoCloseable {
+
+    override val pendingApprovalDetails =
+        (turnEngine as? AppServerTurnEngine)?.pendingApprovalDetails ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
 
     /**
      * The turns' own runtime events, republished for presence. The timeline takes the same drafts
@@ -158,7 +162,12 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val answerUpdatedInput =
             if (submission.approve) AskUserQuestion.decodeAnswerReason(submission.reason) else null
         val appServerEngine = turnEngine as? AppServerTurnEngine
-        val capturedRequestId = submission.toolCallId?.let { appServerEngine?.userInputApprovalId(it) }
+        // letta-mobile-bzvro.11: a parked control request that is not a user-input tool is answered
+        // against the control request's own id too (the card's id is the streamed message's).
+        val capturedRequestId = submission.toolCallId?.let { callId ->
+            appServerEngine?.userInputApprovalId(callId)
+                ?: appServerEngine?.pendingApprovalDetails?.value?.get(callId)?.approvalId
+        }
         val effectiveRequestId = capturedRequestId ?: requestId.value
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
@@ -166,6 +175,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             message = submission.reason,
             defaultApproveMessage = "Approved by desktop client.",
             defaultDenyMessage = "Denied by desktop client.",
+            selectedSuggestionIds = submission.selectedSuggestionIds,
         )
         if (appServerEngine == null) {
             client.input(
@@ -450,11 +460,15 @@ internal class DesktopRuntimeOwnedChatGateway(
     ConversationSummaryGateway,
     ConversationForkGateway,
     DesktopApprovalSubmitter,
+    DesktopPendingApprovalSource,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,
     ChatGatewayExtras,
     AutoCloseable {
+    override val pendingApprovalDetails = (delegate as? DesktopPendingApprovalSource)?.pendingApprovalDetails
+        ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
+
     /** Pass the wrapped gateway's runtime events through; a delegate that has none reports none. */
     override val runtimeEvents = (delegate as? DesktopRuntimeEventSource)?.runtimeEvents
         ?: DesktopRuntimeEventRelay().runtimeEvents

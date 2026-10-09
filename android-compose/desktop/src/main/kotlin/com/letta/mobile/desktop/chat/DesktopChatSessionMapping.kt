@@ -2,11 +2,13 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
@@ -49,6 +51,8 @@ internal data class DesktopChatTimelineInputs(
     val local: DesktopChatLocalTimelineState,
     /** Approval request ids whose answer is in flight (the controller's submittingApprovals). */
     val submittingApprovals: Set<String> = emptySet(),
+    /** letta-mobile-bzvro.11/.12: what each parked control request offered, by tool call id. */
+    val approvalDetails: Map<String, PendingApprovalDetails> = emptyMap(),
 )
 
 /**
@@ -57,7 +61,10 @@ internal data class DesktopChatTimelineInputs(
  */
 internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: ChatUiState?): ChatUiState {
     val surface = inputs.surface
-    val messages = nextMessages(previous?.messages, surface.selectedMessages)
+    val messages = nextMessages(
+        previous?.messages,
+        withPendingApprovalDetails(surface.selectedMessages, inputs.approvalDetails),
+    )
     val selected = surface.selectedConversation
     return ChatUiState(
         conversationState = surface.runtimeState.toConversationState(),
