@@ -182,6 +182,38 @@ class RunMonitorViewModelTest {
         assertEquals("r1", state.selectedRun?.id)
     }
 
+    @Test
+    fun `inspectRun under iroh loads run and steps only and flags limited detail with no HTTP`() = runTest {
+        val irohSource = object : com.letta.mobile.data.repository.api.RunIrohSource {
+            override fun shouldUseIroh() = true
+            override suspend fun listRuns(params: com.letta.mobile.data.model.RunListParams) =
+                listOf(sampleRun("r1", "completed"))
+            override suspend fun getRun(runId: String) = sampleRun(runId, "completed")
+            override suspend fun getRunSteps(runId: String) = listOf(fakeStepApi.sampleStep("step-1"))
+        }
+        val irohRepository = com.letta.mobile.data.repository.CachedRunRepository(fakeApi, irohSource)
+        val irohStepRepository = StepRepository(fakeStepApi, isIrohBackend = { true })
+        fakeApi.calls.clear()
+        fakeStepApi.calls.clear()
+        viewModel = RunMonitorViewModel(irohRepository, irohStepRepository)
+        awaitSuccessState()
+
+        viewModel.inspectRun("r1")
+        val state = viewModel.uiState.first { it is UiState.Success && it.data.selectedRun != null }
+            .let { (it as UiState.Success).data }
+
+        assertTrue(state.runDetailLimited)
+        assertEquals(1, state.selectedRunSteps.size)
+        assertEquals(null, state.selectedRunUsage)
+        assertEquals(null, state.operationError)
+
+        viewModel.inspectStep("step-1")
+        viewModel.cancelRun("r1")
+        viewModel.deleteRun("r1")
+        assertEquals(null, awaitSuccessState().operationError)
+        assertTrue("no HTTP under iroh://: ${fakeApi.calls} ${fakeStepApi.calls}", fakeApi.calls.isEmpty() && fakeStepApi.calls.isEmpty())
+    }
+
     private suspend fun awaitSuccessState(): RunMonitorUiState {
         return viewModel.uiState.first { it is UiState.Success }.let { (it as UiState.Success).data }
     }

@@ -41,6 +41,21 @@ class IrohAdminRpcToolSource(
         return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
     }
 
+    /** One page of `tool.list`; the handler honors `limit`/`offset` (ToolAdminHandlers). */
+    suspend fun listTools(limit: Int, offset: Int): List<Tool> {
+        val response = channelTransport.adminRpc(
+            method = "tool.list",
+            path = "/v1/tools",
+            body = buildJsonObject {
+                put("limit", limit)
+                put("offset", offset)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.list failed")
+        val result = response.result ?: return emptyList()
+        return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
+    }
+
     suspend fun createTool(params: ToolCreateParams): Tool {
         val response = channelTransport.adminRpc(
             method = "tool.create",

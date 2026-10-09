@@ -494,6 +494,8 @@ internal class IrohRunRepository(
     private val _runs = MutableStateFlow<List<Run>>(emptyList())
     override val runs: StateFlow<List<Run>> = _runs.asStateFlow()
 
+    override val supportsRunDetail: Boolean = false
+
     override suspend fun refreshRuns(params: RunListParams) {
         _runs.value = source.listRuns(params)
     }

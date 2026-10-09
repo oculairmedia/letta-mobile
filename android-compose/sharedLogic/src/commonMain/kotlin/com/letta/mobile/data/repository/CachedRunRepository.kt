@@ -22,6 +22,9 @@ open class CachedRunRepository(
     private val _runs = MutableStateFlow<List<Run>>(emptyList())
     override val runs: StateFlow<List<Run>> = _runs.asStateFlow()
 
+    override val supportsRunDetail: Boolean
+        get() = irohRunSource?.shouldUseIroh() != true
+
     override suspend fun refreshRuns(params: RunListParams) {
         val irohSource = irohRunSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
@@ -52,14 +55,20 @@ open class CachedRunRepository(
         return remote.retrieveRun(runId)
     }
 
-    override suspend fun getRunMessages(runId: String): List<LettaMessage> =
-        remote.listRunMessages(runId = runId, order = "asc")
+    override suspend fun getRunMessages(runId: String): List<LettaMessage> {
+        if (!supportsRunDetail) irohUnsupported("run.messages($runId)")
+        return remote.listRunMessages(runId = runId, order = "asc")
+    }
 
-    override suspend fun getRunUsage(runId: String): UsageStatistics =
-        remote.retrieveRunUsage(runId)
+    override suspend fun getRunUsage(runId: String): UsageStatistics {
+        if (!supportsRunDetail) irohUnsupported("run.usage($runId)")
+        return remote.retrieveRunUsage(runId)
+    }
 
-    override suspend fun getRunMetrics(runId: String): RunMetrics =
-        remote.retrieveRunMetrics(runId)
+    override suspend fun getRunMetrics(runId: String): RunMetrics {
+        if (!supportsRunDetail) irohUnsupported("run.metrics($runId)")
+        return remote.retrieveRunMetrics(runId)
+    }
 
     override suspend fun getRunSteps(runId: String): List<Step> {
         val irohSource = irohRunSource
@@ -70,6 +79,7 @@ open class CachedRunRepository(
     }
 
     override suspend fun cancelRun(run: Run): Run {
+        if (!supportsRunDetail) irohUnsupported("run.cancel(${run.id})")
         remote.cancelRun(agentId = run.agentId, runId = run.id)
         val refreshed = remote.retrieveRun(run.id)
         upsertRun(refreshed)
@@ -77,9 +87,13 @@ open class CachedRunRepository(
     }
 
     override suspend fun deleteRun(runId: String) {
+        if (!supportsRunDetail) irohUnsupported("run.delete($runId)")
         remote.deleteRun(runId)
         _runs.update { current -> current.filterNot { it.id == runId } }
     }
+
+    private fun irohUnsupported(operation: String): Nothing =
+        throw UnsupportedOperationException("Iroh admin_rpc does not support $operation yet")
 
     override fun upsertRun(run: Run) {
         _runs.update { current ->

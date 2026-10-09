@@ -238,18 +238,19 @@ fun RunMonitorScreen(
             usage = state?.selectedRunUsage,
             metrics = state?.selectedRunMetrics,
             steps = state?.selectedRunSteps.orEmpty(),
+            detailLimited = state?.runDetailLimited == true,
             onInspectStep = viewModel::inspectStep,
             onDismiss = { viewModel.clearSelectedRun() },
             onTagClick = { stepId, tag ->
                 tagDrillInViewModel.showTag(tag, TagDrillInSource(TagDrillInEntityType.STEP, stepId))
             },
-            onCancel = if (run.isTerminalStatus()) null else {
+            onCancel = if (state?.runDetailLimited == true || run.isTerminalStatus()) null else {
                 {
                     viewModel.clearSelectedRun()
                     cancelTarget = run
                 }
             },
-            onDelete = if (run.isTerminalStatus()) {
+            onDelete = if (state?.runDetailLimited != true && run.isTerminalStatus()) {
                 {
                     viewModel.clearSelectedRun()
                     deleteTarget = run
@@ -513,6 +514,7 @@ private fun RunDetailDialog(
     usage: UsageStatistics?,
     metrics: RunMetrics?,
     steps: List<Step>,
+    detailLimited: Boolean,
     onInspectStep: (String) -> Unit,
     onDismiss: () -> Unit,
     onTagClick: (String, String) -> Unit,
@@ -528,6 +530,15 @@ private fun RunDetailDialog(
         onDismiss = onDismiss,
     ) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
+            if (detailLimited) {
+                item {
+                    Text(
+                        stringResource(R.string.screen_runs_detail_unavailable_iroh),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             item {
                 CardGroup {
                     run.status?.let {
@@ -732,7 +743,7 @@ private fun RunDetailDialog(
                 }
                 items(steps.take(5), key = { it.id }) { step ->
                     Card(
-                        onClick = { onInspectStep(step.id) },
+                        onClick = { if (!detailLimited) onInspectStep(step.id) },
                         colors = LettaCardDefaults.listCardColors(),
                     ) {
                         Column(

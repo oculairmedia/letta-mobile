@@ -58,6 +58,7 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
+import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
@@ -158,7 +159,10 @@ class SessionGraphAssembler @Inject constructor(
                 transport = request.channelTransport,
                 scope = request.scope,
             ),
-            stepRepository = StepRepository(stepApi),
+            stepRepository = StepRepository(
+                stepApi = stepApi,
+                isIrohBackend = { request.settingsRepository?.activeBackendIsIroh() == true },
+            ),
             subagentRepository = SubagentRepository(
                 transport = request.channelTransport,
                 scope = request.scope,
