@@ -61,7 +61,7 @@ internal class DeviceStateChanger(
     suspend fun changePermissionMode(
         scope: AppServerRuntimeScope,
         mode: AppServerPermissionMode,
-        report: (AppServerRuntimeScope, AppServerPermissionMode) -> Any?,
+        report: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode?,
     ) {
         if (changePermissionMode(scope, mode)) report(scope, mode)
     }
