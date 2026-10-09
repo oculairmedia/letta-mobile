@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -56,7 +58,7 @@ class SharedNavDrawerBindingTest {
 
     private val now = Instant.parse("2026-10-17T12:00:00Z")
 
-    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, conversations, allConversations)
+    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, allConversations)
 
     @Test
     fun followsTheSettingsFlag() = runTest(mainDispatcherRule.dispatcher) {
@@ -88,8 +90,8 @@ class SharedNavDrawerBindingTest {
     fun rowActionsReachTheConversationRepository() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
         vm.setArchiveFilter(ShellArchiveFilter.Archived)
-        vm.setConversationArchived("c1", "agent-1", archived = true)
-        vm.deleteConversation("c2", "agent-1")
+        vm.setConversationArchived(conversations, "c1", "agent-1", archived = true)
+        vm.deleteConversation(conversations, "c2", "agent-1")
         advanceUntilIdle()
         assertEquals(ShellArchiveFilter.Archived, vm.archiveFilter.value)
         coVerify { conversations.setConversationArchived("c1", "agent-1", true) }
@@ -105,9 +107,9 @@ class SharedNavDrawerBindingTest {
                 Conversation(id = ConversationId("c2"), agentId = agent, summary = "Keep"),
             ),
         )
-        val vm = SharedNavDrawerViewModel(settings, canvasStore, fake, allConversations)
-        vm.renameConversation(ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
-        vm.renameConversation(ConversationId("c2"), agent, ConversationSummary("   "))
+        val vm = SharedNavDrawerViewModel(settings, canvasStore, allConversations)
+        vm.renameConversation(fake, ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
+        vm.renameConversation(fake, ConversationId("c2"), agent, ConversationSummary("   "))
         advanceUntilIdle()
         assertEquals(listOf("Plan B", "Keep"), fake.getCachedConversations(agent).map { it.summary })
     }
@@ -139,12 +141,50 @@ class SharedNavDrawerBindingTest {
     @Test
     fun theDrawerPanelBindsRenameAndPin() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
-        val actions = sharedDrawerPanelActions(mockk<AgentScaffoldRuntimeState>(relaxed = true) { every { agentIdValue } returns "agent-1" }, vm)
+        val scaffold = mockk<AgentScaffoldRuntimeState>(relaxed = true) {
+            every { agentIdValue } returns "agent-1"
+            every { drawerConversationRepo } returns conversations
+        }
+        val actions = sharedDrawerPanelActions(scaffold, vm)
         actions.onRenameConversation!!.invoke("c1", "Renamed")
         actions.onPinConversation!!.invoke("c1", true)
         advanceUntilIdle()
         coVerify { conversations.updateConversation(ConversationId("c1"), AgentId("agent-1"), "Renamed") }
         assertEquals(setOf("c1"), settings.getPinnedConversationIds().first())
+    }
+
+    @Test
+    fun theDrawerActionsWriteThroughTheRepositoryTheDrawerListsFrom() = runTest(mainDispatcherRule.dispatcher) {
+        // The scaffold's own repository, not any other: a rename through another would miss its cache.
+        val agent = AgentId("agent-1")
+        val listed = FakeConversationRepository(listOf(Conversation(id = ConversationId("c1"), agentId = agent, summary = "Old")))
+        val scaffold = mockk<AgentScaffoldRuntimeState>(relaxed = true) {
+            every { agentIdValue } returns "agent-1"
+            every { drawerConversationRepo } returns listed
+        }
+        sharedDrawerPanelActions(scaffold, viewModel()).onRenameConversation!!.invoke("c1", "Renamed")
+        advanceUntilIdle()
+        assertEquals(listOf("Renamed"), listed.getCachedConversations(agent).map { it.summary })
+        coVerify(exactly = 0) { conversations.updateConversation(any<ConversationId>(), any<AgentId>(), any()) }
+    }
+
+    @Test
+    fun aFailedConversationActionIsSurfacedNotSwallowed() = runTest(mainDispatcherRule.dispatcher) {
+        val failing: IConversationRepository = mockk(relaxed = true) {
+            coEvery { updateConversation(ConversationId("c1"), AgentId("agent-1"), "Name") } throws IllegalStateException("offline")
+        }
+        val vm = viewModel()
+        val messages = mutableListOf<String>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.failures.collect { messages += it } }
+        advanceUntilIdle()
+        vm.renameConversation(failing, ConversationId("c1"), AgentId("agent-1"), ConversationSummary("Name"))
+        advanceUntilIdle()
+        assertEquals(listOf("Couldn't rename the chat"), messages)
+    }
+
+    @Test
+    fun deleteIsPermanentExceptWhereTheBackendOnlyArchives() {
+        assertEquals(ConversationDeleteBehavior.Permanent, viewModel().deleteBehavior)
     }
 
     @Test

@@ -24,6 +24,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
@@ -154,12 +155,12 @@ class ShellAgentPanelTest {
             CompositionLocalProvider(LocalShellChromeDecorations provides decorations) {
                 Panel(
                     state,
-                    ShellAgentPanelActions(onDeleteConversation = { deleted += it }, deleteArchivesConversation = true),
+                    ShellAgentPanelActions(onDeleteConversation = { deleted += it }, deleteBehavior = ConversationDeleteBehavior.MovesToArchived),
                 )
             }
         }
         onNodeWithText("menu:Delete chat").performClick()
-        val copy = ShellDeleteConversationCopy.request("Handoff from local-code", archives = true)
+        val copy = ShellDeleteConversationCopy.request("Handoff from local-code", ConversationDeleteBehavior.MovesToArchived)
         assertEquals("Archive chat?", copy.title)
         assertEquals("Archive", copy.confirmLabel)
         assertEquals(false, copy.message.contains("permanently removed"))
@@ -169,10 +170,20 @@ class ShellAgentPanelTest {
 
     @Test
     fun deleteCopyIsPermanentOnlyWhereDeleteIsReal() {
-        val real = ShellDeleteConversationCopy.request("Plans", archives = false)
+        val real = ShellDeleteConversationCopy.request("Plans", ConversationDeleteBehavior.Permanent)
         assertEquals("Delete chat?", real.title)
         assertEquals("Delete", real.confirmLabel)
         assertEquals(true, real.message.contains("permanently removed"))
+    }
+
+    @Test
+    fun deleteCopyDoesNotPromiseAnArchiveWhereTheChatLeavesEveryList() {
+        val removes = ShellDeleteConversationCopy.request("Plans", ConversationDeleteBehavior.RemovesFromLists)
+        assertEquals("Remove chat?", removes.title)
+        assertEquals(true, removes.message.contains("won't appear under Archived"))
+        assertEquals(true, removes.message.contains("Undo"))
+        val archives = ShellDeleteConversationCopy.request("Plans", ConversationDeleteBehavior.MovesToArchived)
+        assertEquals(true, archives.message.contains("moved to Archived"))
     }
 
     /** A stand-in host: the row menu's entries as plain buttons under the row. */

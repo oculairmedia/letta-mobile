@@ -186,6 +186,19 @@ class AppServerLocalAdminGateway(
         )
 
     /**
+     * The undo of [setConversationRemoved]: un-hides the conversation and puts `archived` back to
+     * what it was before the delete ([archived] true for a chat that was already archived).
+     */
+    suspend fun restoreRemovedConversation(conversationId: ConversationId, archived: Boolean): Conversation =
+        updateConversation(
+            conversationId.value,
+            buildJsonObject {
+                put("archived", archived)
+                put("hidden", false)
+            },
+        )
+
+    /**
      * letta-mobile-bzvro.15: `conversation_fork`, then a read of the fork (upstream answers with
      * its id only). The options go in the body: without it the whole conversation is copied.
      */

@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
@@ -29,19 +30,22 @@ import com.letta.mobile.ui.shell.rail.ShellRailEntry
 object ShellRowMenus {
     /**
      * A conversation: rename and pin or unpin when the host offers them (letta-mobile-bzvro.17),
-     * archive or restore, and delete (the row asks before it deletes).
+     * archive or restore, and delete (the row asks before it deletes). Where delete only moves a
+     * chat to Archived, an archived chat has nothing left to delete, so it offers no Delete.
      */
     fun conversation(
         archived: Boolean,
         deleting: Boolean,
         actions: ShellConversationMenuActions,
+        deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
     ): List<ShellRowMenuItem> =
         if (deleting) {
             emptyList()
         } else {
-            actions.manage.items() + listOf(
+            val offersDelete = !(archived && deleteBehavior == ConversationDeleteBehavior.MovesToArchived)
+            actions.manage.items() + listOfNotNull(
                 ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", actions.onArchiveToggle),
-                ShellRowMenuItem("Delete chat", actions.onRequestDelete),
+                ShellRowMenuItem("Delete chat", actions.onRequestDelete).takeIf { offersDelete },
             )
         }
 

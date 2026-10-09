@@ -295,7 +295,7 @@ private fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: 
                     onClick = { actions.onConversationSelected(conversation.id) },
                     onArchiveToggle = { actions.onArchiveConversation(conversation.id, !conversation.archived) },
                     onDelete = { actions.onDeleteConversation(conversation.id) },
-                    deleteArchives = actions.deleteArchivesConversation,
+                    deleteBehavior = actions.deleteBehavior,
                     onRename = actions.onRenameConversation?.let { rename -> { title -> rename(conversation.id, title) } },
                     onPinToggle = actions.onPinConversation?.let { pin -> { pin(conversation.id, !conversation.pinned) } },
                 ),

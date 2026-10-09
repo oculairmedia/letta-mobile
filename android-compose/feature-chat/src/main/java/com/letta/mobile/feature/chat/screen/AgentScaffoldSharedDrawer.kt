@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import android.widget.Toast
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.Composable
@@ -7,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.agents.RecentAgents
@@ -48,6 +50,10 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
     val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
+    val context = LocalContext.current
+    LaunchedEffect(drawer) {
+        drawer.failures.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
     val open = state.drawerState.isOpen
     LaunchedEffect(open) {
         if (open) {
@@ -154,10 +160,13 @@ internal fun sharedDrawerPanelActions(
         onConversationSelected = { id ->
             closeDrawerAndRun(state) { navigation.onSwitchConversation?.invoke(agentId, id, agentName) }
         },
-        onArchiveConversation = { id, archived -> drawer.setConversationArchived(id, agentId, archived) },
-        onDeleteConversation = { id -> drawer.deleteConversation(id, agentId) },
-        deleteArchivesConversation = drawer.deleteArchivesConversation,
-        onRenameConversation = { id, title -> drawer.renameConversation(ConversationId(id), AgentId(agentId), ConversationSummary(title)) },
+        // The drawer lists from drawerConversationRepo, so the actions write through the same one.
+        onArchiveConversation = { id, archived -> drawer.setConversationArchived(state.drawerConversationRepo, id, agentId, archived) },
+        onDeleteConversation = { id -> drawer.deleteConversation(state.drawerConversationRepo, id, agentId) },
+        deleteBehavior = drawer.deleteBehavior,
+        onRenameConversation = { id, title ->
+            drawer.renameConversation(state.drawerConversationRepo, ConversationId(id), AgentId(agentId), ConversationSummary(title))
+        },
         onPinConversation = { id, pinned -> drawer.setConversationPinned(ConversationId(id), pinned) },
         onOpenCanvas = { canvasId -> closeDrawerAndRun(state) { navigation.onOpenCanvas?.invoke(canvasId.value) } },
         // onArchiveCanvas stays null: Android keeps no canvas archive yet (letta-mobile-c3np7.5.7),

@@ -55,9 +55,9 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 val chatController = context.core.chatController
                 val undoable by chatController.deletionUndo.pending.collectAsState()
                 DesktopUndoDeleteSnackbar(
-                    pendingConversationId = undoable,
+                    offer = undoable,
                     onUndo = chatController::undoDeleteConversation,
-                    onExpire = chatController.deletionUndo::clear,
+                    onExpire = { chatController.deletionUndo.clear(it.conversationId) },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -168,6 +168,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
     val canvasDocuments by canvasShell.library.documents.collectAsState()
     val archivedCanvasIds by canvasShell.library.archived.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val deleteBehavior by chatController.deleteBehavior.collectAsState()
     val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
     val archiveFilter = frame.lists.archiveFilter
     DesktopAgentSidebar(
@@ -196,7 +197,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onDestinationSelected = navigator::navigate,
             onConversationSelected = { context.router.openConversation(ConversationId(it)) },
             onDeleteConversation = chatController::deleteConversation,
-            deleteArchivesConversation = chatController.deleteArchivesConversation,
+            deleteBehavior = deleteBehavior,
             onRenameConversation = { id, title ->
                 chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
             },

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Palette
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
@@ -57,24 +58,29 @@ data class ShellConversationRowActions(
     val onDelete: () -> Unit,
     val onRename: ((String) -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
-    /** The backend has no delete command, so [onDelete] archives; the confirm dialog says so. */
-    val deleteArchives: Boolean = false,
+    /** What [onDelete] really does on this backend; the confirm dialog and the row menu follow it. */
+    val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
 )
 
-/** The delete confirm dialog's wording: honest about whether delete is permanent on this backend. */
+/** The delete confirm dialog's wording: honest about what delete does on this backend. */
 internal object ShellDeleteConversationCopy {
-    fun request(title: String, archives: Boolean): ShellConfirmRequest =
-        if (archives) {
-            ShellConfirmRequest(
-                title = "Archive chat?",
-                message = "\"$title\" will be archived and hidden from your chats. It isn't permanently deleted.",
-                confirmLabel = "Archive",
-            )
-        } else {
-            ShellConfirmRequest(
+    fun request(title: String, behavior: ConversationDeleteBehavior): ShellConfirmRequest =
+        when (behavior) {
+            ConversationDeleteBehavior.Permanent -> ShellConfirmRequest(
                 title = "Delete chat?",
                 message = "\"$title\" will be permanently removed. This can't be undone.",
                 confirmLabel = "Delete",
+            )
+            ConversationDeleteBehavior.MovesToArchived -> ShellConfirmRequest(
+                title = "Archive chat?",
+                message = "\"$title\" will be moved to Archived. You can restore it from there.",
+                confirmLabel = "Archive",
+            )
+            ConversationDeleteBehavior.RemovesFromLists -> ShellConfirmRequest(
+                title = "Remove chat?",
+                message = "\"$title\" will be removed from your chats and won't appear under Archived. " +
+                    "Undo, offered right after, is the only way back.",
+                confirmLabel = "Remove",
             )
         }
 }
@@ -100,6 +106,7 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val menuItems = ShellRowMenus.conversation(
         archived = model.archived,
         deleting = model.deleting,
+        deleteBehavior = actions.deleteBehavior,
         actions = ShellConversationMenuActions(
             onArchiveToggle = actions.onArchiveToggle,
             onRequestDelete = { confirmDelete = true },
@@ -117,7 +124,7 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     }
     if (confirmDelete) {
         decorations.confirm(
-            ShellDeleteConversationCopy.request(model.title, actions.deleteArchives),
+            ShellDeleteConversationCopy.request(model.title, actions.deleteBehavior),
             {
                 confirmDelete = false
                 actions.onDelete()

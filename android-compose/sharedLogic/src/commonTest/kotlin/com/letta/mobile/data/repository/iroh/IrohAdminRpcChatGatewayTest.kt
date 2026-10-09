@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.AgentId
@@ -98,7 +99,25 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
-    fun listConversationMessagesBuildsQueryStringPath() = runTest(UnconfinedTestDispatcher()) {
+    fun undoingADeleteRestoresTheStateTheChatHadBefore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        val methods = mutableListOf<String>()
+        transport.rpcResponder = { call ->
+            methods += call.method
+            ok("""{"id":"conv-1","agent_id":"agent-1"}""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        assertEquals(ConversationDeleteBehavior.MovesToArchived, gateway.deleteBehavior)
+        gateway.restoreDeletedConversation("conv-1", wasArchived = false)
+        gateway.restoreDeletedConversation("conv-1", wasArchived = true)
+
+        // An active chat is un-archived; one that was already archived stays archived.
+        assertEquals(listOf("conversation.restore", "conversation.archive"), methods)
+    }
+
+    @Test
+    fun listConversationMessagesBuildsQueryStringPath()= runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->
             assertEquals("message.list", call.method)

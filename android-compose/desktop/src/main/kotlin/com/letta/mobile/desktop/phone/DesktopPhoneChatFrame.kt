@@ -22,6 +22,7 @@ import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -57,9 +58,10 @@ private val PhoneChatAppearance = ChatSurfaceAppearance(
 
 /**
  * Hosts the shared chat [page] as this window draws it. Without a phone it is exactly
- * `page(modifier, ChatPageFrame())`. On the phone the page fills the screen edge to edge and the
- * floating header ([PhoneChatHeader]) shows over the full-screen chat only: the canvas mode keeps
- * the top of the board clear, as on Android.
+ * `page(modifier, ChatPageFrame())`. On the phone the page fills the screen edge to edge. Over the
+ * full-screen chat the floating header ([PhoneChatHeader]) shows; in canvas mode only the shared
+ * agent pill does ([PhoneCanvasIdentityPill], Android's canvas identity pill), narrow enough to
+ * leave the board's own actions clear.
  */
 @Composable
 internal fun DesktopPhoneChatFrame(
@@ -90,7 +92,9 @@ private fun PhoneChatPageHeader(
     onHeightChange: (Dp) -> Unit,
 ) {
     val state by inputs.uiState.collectAsState()
-    val identity = phoneAgentIdentity(state.agentId, state.agentName) { phone.drawerOpen = true }
+    val identity = remember(state.agentId, state.agentName, phone) {
+        phoneAgentIdentity(state.agentId, state.agentName) { phone.drawerOpen = true }
+    }
     if (fullScreen) {
         PhoneChatHeader(
             identity = identity,
@@ -99,7 +103,7 @@ private fun PhoneChatPageHeader(
             onHeightChange = onHeightChange,
         )
     } else {
-        PhoneCanvasIdentityPill(identity)
+        PhoneCanvasIdentityPill(identity, onHeightChange = onHeightChange)
     }
 }
 
@@ -118,10 +122,11 @@ internal fun phoneAgentIdentity(agentId: String?, agentName: String?, onSwitch: 
         onLongClick = {},
     )
 
-/** The status bar, plus the floating header while the full-screen page shows it. */
+/** The status bar, plus the floating header (full-screen page) or the canvas mode's agent pill. */
 @Composable
 private fun phoneTopChromeInset(fullScreen: Boolean, headerHeight: Dp): Dp {
     val density = LocalDensity.current
     val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar
+    // The canvas mode reserves the room its pill takes (status bar, the pill and its gaps), so the board starts below it.
+    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar + headerHeight + LettaDimens.Space.sm * 2
 }

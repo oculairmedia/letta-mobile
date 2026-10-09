@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.shell
 
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailEntry
 import kotlin.test.Test
@@ -30,6 +31,19 @@ class ShellRowMenusTest {
             actions = ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {}),
         )
         assertEquals(listOf("Restore chat", "Delete chat"), archived.map { it.label })
+    }
+
+    @Test
+    fun anArchivedChatOffersNoDeleteWhereDeleteOnlyMovesItToArchived() {
+        val actions = ShellConversationMenuActions(onArchiveToggle = {}, onRequestDelete = {})
+        fun labels(archived: Boolean, behavior: ConversationDeleteBehavior) =
+            ShellRowMenus.conversation(archived, deleting = false, actions = actions, deleteBehavior = behavior).map { it.label }
+
+        assertEquals(listOf("Restore chat"), labels(true, ConversationDeleteBehavior.MovesToArchived))
+        assertEquals(listOf("Archive chat", "Delete chat"), labels(false, ConversationDeleteBehavior.MovesToArchived))
+        // Removing hides it from Archived too, so an archived chat can still be removed.
+        assertEquals(listOf("Restore chat", "Delete chat"), labels(true, ConversationDeleteBehavior.RemovesFromLists))
+        assertEquals(listOf("Restore chat", "Delete chat"), labels(true, ConversationDeleteBehavior.Permanent))
     }
 
     @Test
