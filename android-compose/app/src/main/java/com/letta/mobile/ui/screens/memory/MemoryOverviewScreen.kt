@@ -54,10 +54,15 @@ fun MemoryOverviewScreen(
     val files by filesViewModel.state.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(MemoryView.Blocks) }
     BackHandler(enabled = view == MemoryView.Blocks && state.selection != null) { viewModel.actions.clearSelection() }
-    // An open file closes first, through the shared unsaved-changes guard, so back never drops a draft.
-    val fileOpen = view == MemoryView.Files && files.editor != null
-    BackHandler(enabled = fileOpen) { filesViewModel.controller.closeFile() }
-    val onBack = { if (fileOpen) filesViewModel.controller.closeFile() else onNavigateBack() }
+    // An open file closes first, through the shared unsaved-changes guard, so back never drops a
+    // draft — also from Blocks: an unsaved draft brings Files back to show the guard.
+    val closesFileFirst = files.editor?.let { view == MemoryView.Files || it.dirty } == true
+    val closeFile = {
+        view = MemoryView.Files
+        filesViewModel.controller.closeFile()
+    }
+    BackHandler(enabled = closesFileFirst, onBack = closeFile)
+    val onBack = { if (closesFileFirst) closeFile() else onNavigateBack() }
     val agentId = state.parity.memory.selectedAgentId
     LaunchedEffect(agentId) { filesViewModel.selectAgent(agentId) }
 
