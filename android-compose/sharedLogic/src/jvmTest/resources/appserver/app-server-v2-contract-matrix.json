@@ -30,7 +30,7 @@
       "dist/types/types/teleport-protocol.d.ts",
       "dist/types/types/toolset-protocol.d.ts"
     ],
-    "captured_at": "2026-09-15",
+    "captured_at": "2026-10-08",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
@@ -50,7 +50,7 @@
     "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
   },
   "upstream_socket_behavior": {
-    "source": "installed letta.js 0.29.12 one-socket app-server listener and dist/app-server-client.js",
+    "source": "installed letta.js 0.33.6 (re-checked 2026-10-09; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
     "multiple_clients": "the listener accepts independent concurrent /ws clients; request correlation and runtime subscriptions are connection-local",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",

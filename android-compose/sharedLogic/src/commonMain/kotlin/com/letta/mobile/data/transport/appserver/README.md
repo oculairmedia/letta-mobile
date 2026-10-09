@@ -2,8 +2,9 @@
 
 Kotlin client for the Letta App Server (Protocol V2, alpha hard-cut): one bidirectional
 WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.33.6`
-(`APP_SERVER_PROTOCOL_VERSION = 1`); the deployed server runs 0.32.3, whose command and message
-unions equal the 0.32.10 baseline (0.33.6 adds only `launch_subagent`).
+(`APP_SERVER_PROTOCOL_VERSION = 1`); the deployed server runs 0.32.3. Its command and message
+unions are identical to those of 0.32.10 (the previous pin), and 0.33.6 adds only
+`launch_subagent` and `launch_subagent_response` on top of them.
 
 ## letta-code version pins
 

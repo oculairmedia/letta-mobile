@@ -262,6 +262,7 @@
         "abort_message",
         "change_device_state",
         "remove_queue_item",
+        "launch_subagent",
         "app_server_info",
         "resume_queue",
         "teleport_request",
@@ -279,6 +280,7 @@
         "control_request",
         "update_subagent_state",
         "remove_queue_item_response",
+        "launch_subagent_response",
         "app_server_info_response",
         "input_accepted",
         "turn_finished",
@@ -516,7 +518,6 @@
         "search_branches",
         "checkout_branch",
         "monitor_stop",
-        "launch_subagent",
         "set_boot_working_directory"
       ],
       "messages": [
@@ -536,7 +537,6 @@
         "search_branches_response",
         "checkout_branch_response",
         "monitor_stop_response",
-        "launch_subagent_response",
         "set_boot_working_directory_response"
       ]
     },
