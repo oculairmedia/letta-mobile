@@ -54,12 +54,14 @@ data class ContextMeter(
                 val total = streamedTotal ?: return null
                 return ContextMeter(ContextWindowUsage.total(total, window), ContextProvenance.TotalOnly, autoCompactAt(window), totalIsEstimate)
             }
-            val exactTotal = streamedTotal?.takeUnless { totalIsEstimate }
-            val matched = if (exactTotal != null) estimate.calibratedTo(exactTotal) else estimate
-            val calibrated = exactTotal != null || (estimate.calibrated == true && !totalIsEstimate)
-            val usage = ContextWindowUsage.from(matched.copy(contextWindowSizeMax = window ?: 0)).withEstimateLabels()
+            return estimated(estimate, exactTotal = streamedTotal?.takeUnless { totalIsEstimate }, window, totalIsEstimate)
+        }
+
+        private fun estimated(estimate: ContextWindowOverview, exactTotal: Int?, window: Int?, totalIsEstimate: Boolean): ContextMeter {
+            val matched = exactTotal?.let(estimate::calibratedTo) ?: estimate
+            val calibrated = matched.calibrated == true && !totalIsEstimate
             return ContextMeter(
-                usage = usage,
+                usage = ContextWindowUsage.from(matched.copy(contextWindowSizeMax = window ?: 0)).withEstimateLabels(),
                 provenance = if (calibrated) ContextProvenance.EstimatedCalibrated else ContextProvenance.Estimated,
                 autoCompactAt = autoCompactAt(window),
                 totalIsEstimate = totalIsEstimate,

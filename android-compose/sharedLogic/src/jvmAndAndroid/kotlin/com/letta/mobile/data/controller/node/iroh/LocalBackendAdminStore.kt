@@ -157,8 +157,11 @@ open class LocalBackendAdminStore(
     fun runExists(runId: String): Boolean = runReader.runExists(runId)
 
     /** See [LocalBackendContextReader.agentContextProjected]. */
-    fun agentContextProjected(agentId: String, conversationId: String?, reportedTotal: Int? = null): JsonObject? =
-        contextReader.agentContextProjected(agentId, conversationId, reportedTotal)
+    fun agentContextProjected(agentId: String, conversationId: String?): JsonObject? =
+        agentContextProjected(AgentContextQuery(agentId, conversationId))
+
+    /** letta-mobile-cyh28: as above, matched to the client's streamed total when it sends one. */
+    fun agentContextProjected(query: AgentContextQuery): JsonObject? = contextReader.agentContextProjected(query)
 
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.context.ContextBreakdownRequest
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -93,7 +94,7 @@ class AppServerAgentRepository(
         conversationId: ConversationId?,
         reportedTotal: Int?,
     ): ContextWindowOverview {
-        val context = transport.getContextBreakdown(agentId.value, conversationId?.value, reportedTotal)
+        val context = transport.getContextBreakdown(ContextBreakdownRequest(agentId, conversationId, reportedTotal))
             ?: throw NoSuchElementException("Local context for agent ${agentId.value} was not found")
         return AppServerProtocol.json.decodeFromJsonElement(ContextWindowOverview.serializer(), context)
     }

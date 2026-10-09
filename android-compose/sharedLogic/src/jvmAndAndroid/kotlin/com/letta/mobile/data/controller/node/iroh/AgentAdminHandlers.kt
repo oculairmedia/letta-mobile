@@ -227,7 +227,9 @@ object AgentAdminHandlers {
         router.register("agent.context") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
             val reportedTotal = param(params, AdminParamKey("reported_total"))?.toIntOrNull()?.takeIf { it > 0 }
-            val context = store.agentContextProjected(id, param(params, AdminParamKey("conversation_id")), reportedTotal)
+            val context = store.agentContextProjected(
+                AgentContextQuery(id, param(params, AdminParamKey("conversation_id")), reportedTotal),
+            )
                 ?: adminError("agent $id not found")
             MessageListPageGuard.boundObjectStringFields(
                 MessageListPageGuard.dropField(context, "messages"),

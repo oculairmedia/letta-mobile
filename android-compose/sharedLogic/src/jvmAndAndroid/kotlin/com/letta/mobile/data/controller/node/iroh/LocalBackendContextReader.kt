@@ -8,6 +8,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.File
 
+/** letta-mobile-cyh28: one `agent.context` request. */
+data class AgentContextQuery(
+    val agentId: String,
+    val conversationId: String?,
+    /** The client's latest streamed `context_tokens`, to match the sections to. */
+    val reportedTotal: Int? = null,
+)
+
 /**
  * lgns8.9 / letta-mobile-cyh28: on-disk `agent.context` reader.
  *
@@ -33,16 +41,16 @@ internal class LocalBackendContextReader(
      * Returns null when the agent is unknown or the store cannot be read, so the caller fails
      * closed rather than serving a hollow context window.
      */
-    fun agentContextProjected(agentId: String, conversationId: String?, reportedTotal: Int? = null): JsonObject? =
+    fun agentContextProjected(query: AgentContextQuery): JsonObject? =
         runCatching {
-            val agent = readJson(File(File(support.baseDir, "agents"), "$agentId.json")) ?: return@runCatching null
-            val dir = messageReader.contextConversationDir(conversationId, agentId) ?: return@runCatching null
+            val agent = readJson(File(File(support.baseDir, "agents"), "${query.agentId}.json")) ?: return@runCatching null
+            val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
             val inputs = LocalContextInputs(
                 systemPromptSidecar = readJson(File(dir, "system-prompt.json")),
                 agent = agent,
                 conversation = readJson(File(dir, "conversation.json")),
                 transcript = readTranscript(File(dir, "messages.jsonl")) ?: return@runCatching null,
-                reportedTotal = reportedTotal,
+                reportedTotal = query.reportedTotal,
             )
             ContextBreakdownEstimator.estimate(inputs).toAgentContextJson()
         }.getOrNull()

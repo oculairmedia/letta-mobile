@@ -51,11 +51,16 @@ data class LocalTranscriptContext(
     }
 
     /** letta-code's `getAssistantUsageInfo` test, with its compaction-boundary staleness rule. */
-    private fun JsonObject.reportsFreshUsage(boundary: Long?): Boolean {
-        if (text("role") != "assistant" || text("stopReason") in UNUSABLE_STOP_REASONS) return false
-        val stamp = number("timestamp")
-        if (boundary != null && stamp != null && stamp <= boundary) return false
-        return usageTokens(this) != null
+    private fun JsonObject.reportsFreshUsage(boundary: Long?): Boolean =
+        isSettledReply() && !predates(boundary) && usageTokens(this) != null
+
+    private fun JsonObject.isSettledReply(): Boolean =
+        text("role") == "assistant" && text("stopReason") !in UNUSABLE_STOP_REASONS
+
+    /** At or before the latest compaction: letta-code treats such usage as stale. */
+    private fun JsonObject.predates(boundary: Long?): Boolean {
+        val stamp = number("timestamp") ?: return false
+        return boundary != null && stamp <= boundary
     }
 
     companion object {

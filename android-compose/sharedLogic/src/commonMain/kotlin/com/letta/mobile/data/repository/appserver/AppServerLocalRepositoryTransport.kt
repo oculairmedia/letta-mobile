@@ -1,5 +1,8 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.context.ContextBreakdownRequest
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -17,8 +20,8 @@ interface AppServerLocalRepositoryTransport {
     suspend fun getContext(agentId: String, conversationId: String?): JsonObject?
 
     /** letta-mobile-cyh28: `agent.context` with the client's streamed total to match. */
-    suspend fun getContextBreakdown(agentId: String, conversationId: String?, reportedTotal: Int?): JsonObject? =
-        getContext(agentId, conversationId)
+    suspend fun getContextBreakdown(request: ContextBreakdownRequest): JsonObject? =
+        getContext(request.agentId.value, request.conversationId?.value)
     suspend fun listAgentBlocks(agentId: String): JsonArray
 
     /** `block.update_agent`: the App Server writes and commits `memory/system/<label>.md`. */
@@ -50,17 +53,17 @@ class DefaultAppServerLocalRepositoryTransport(
     }
 
     override suspend fun getContext(agentId: String, conversationId: String?): JsonObject? =
-        getContextBreakdown(agentId, conversationId, reportedTotal = null)
+        getContextBreakdown(ContextBreakdownRequest(AgentId(agentId), conversationId?.let(::ConversationId), reportedTotal = null))
 
-    override suspend fun getContextBreakdown(agentId: String, conversationId: String?, reportedTotal: Int?): JsonObject? =
+    override suspend fun getContextBreakdown(request: ContextBreakdownRequest): JsonObject? =
         adminRpc(
             LocalAdminCall(
                 operation = "agent-context",
                 method = "agent.context",
                 params = buildJsonObject {
-                    put("agent_id", agentId)
-                    conversationId?.let { put("conversation_id", it) }
-                    reportedTotal?.let { put("reported_total", it) }
+                    put("agent_id", request.agentId.value)
+                    request.conversationId?.let { put("conversation_id", it.value) }
+                    request.reportedTotal?.let { put("reported_total", it) }
                 },
             ),
         ) as? JsonObject

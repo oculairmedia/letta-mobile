@@ -63,8 +63,7 @@ class ContextBreakdownLoader(
     private val lock = Mutex()
 
     suspend fun load(request: ContextBreakdownRequest, force: Boolean = false): ContextBreakdownState = lock.withLock {
-        val current = mutableState.value
-        if (!force && current is ContextBreakdownState.Loaded && current.request == request) return@withLock current
+        if (!force) answeredFor(request)?.let { return@withLock it }
         mutableState.value = ContextBreakdownState.Loading(request)
         val next = runCatchingCancellable { fetch(request) }.fold(
             onSuccess = { ContextBreakdownState.Loaded(request, it) },
@@ -73,6 +72,9 @@ class ContextBreakdownLoader(
         mutableState.value = next
         next
     }
+
+    private fun answeredFor(request: ContextBreakdownRequest): ContextBreakdownState.Loaded? =
+        (mutableState.value as? ContextBreakdownState.Loaded)?.takeIf { it.request == request }
 
     /** Forget the last answer, e.g. when the focused conversation changes. */
     fun clear() {

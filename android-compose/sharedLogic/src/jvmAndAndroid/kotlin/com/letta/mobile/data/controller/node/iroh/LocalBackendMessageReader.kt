@@ -75,26 +75,22 @@ internal class LocalBackendMessageReader(
     /**
      * letta-mobile-cyh28: the directory holding the conversation `agent.context` describes, without
      * reading or projecting its transcript. Null when the store cannot be read.
-     */
-    fun contextConversationDir(conversationId: String?, agentId: String): File? = runCatching {
-        val (internalConvId, resolvedAgentId) = contextConversation(conversationId, agentId)
-        conversationDir(internalConvId, resolvedAgentId)
-    }.getOrNull()
-
-    /**
+     *
      * admin-shim: `url.searchParams.get("conversation_id") ?? "default"`, and the bare literal
      * "default" resolves to (default, <agentId>); an unknown id falls back to the default too.
      */
-    private fun contextConversation(conversationId: String?, agentId: String): Pair<String, String> {
+    fun contextConversationDir(conversationId: String?, agentId: String): File? = runCatching {
         val requested = conversationId?.takeIf { it.isNotEmpty() } ?: "default"
-        if (requested == "default") return "default" to agentId
-        return resolveConversation(requested, agentId) ?: ("default" to agentId)
-    }
-
-    private fun conversationDir(internalConvId: String, agentId: String): File = File(
-        File(support.baseDir, "conversations"),
-        support.b64UrlEncode(support.conversationKey(internalConvId, agentId)),
-    )
+        val (internalConvId, resolvedAgentId) = if (requested == "default") {
+            "default" to agentId
+        } else {
+            resolveConversation(requested, agentId) ?: ("default" to agentId)
+        }
+        File(
+            File(support.baseDir, "conversations"),
+            support.b64UrlEncode(support.conversationKey(internalConvId, resolvedAgentId)),
+        )
+    }.getOrNull()
 
     /** Inline only a snapshot-safe budget; references are resolved inside this conversation. */
     private fun hydrateSmallImages(dir: File, message: JsonObject): JsonObject {

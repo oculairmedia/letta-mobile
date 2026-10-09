@@ -221,7 +221,7 @@ class LocalBackendAdminStoreEntityReaderTest {
         File(root, "agents/${LocalBackendFixtureStore.AGENT_ID}.json").writeText(
             """{"id":"${LocalBackendFixtureStore.AGENT_ID}","name":"F","model_settings":{"context_window_limit":200000}}""",
         )
-        val context = assertNotNull(store.agentContextProjected(LocalBackendFixtureStore.AGENT_ID, null, reportedTotal = 12_000))
+        val context = assertNotNull(store.agentContextProjected(AgentContextQuery(LocalBackendFixtureStore.AGENT_ID, null, reportedTotal = 12_000)))
         assertEquals(12_000, context.getValue("context_window_size_current").jsonPrimitive.content.toInt())
         assertEquals(200_000, context.getValue("context_window_size_max").jsonPrimitive.content.toInt())
         val sections = listOf("num_tokens_system", "num_tokens_core_memory", "num_tokens_summary_memory", "num_tokens_messages", "num_tokens_functions_definitions")
