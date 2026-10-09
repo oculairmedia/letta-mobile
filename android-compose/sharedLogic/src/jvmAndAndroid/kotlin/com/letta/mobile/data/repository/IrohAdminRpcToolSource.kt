@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.AdminRpcMethod
@@ -50,11 +51,11 @@ class IrohAdminRpcToolSource(
     }
 
     /** `tool.get` by id; the host answers an admin error containing "not found" for an unknown id. */
-    suspend fun getTool(toolId: String): Tool {
+    suspend fun getTool(toolId: ToolId): Tool {
         val response = channelTransport.adminRpc(
             method = "tool.get",
-            path = "/v1/tools/$toolId",
-            body = buildJsonObject { put("tool_id", toolId) }.toString(),
+            path = "/v1/tools/${toolId.value}",
+            body = buildJsonObject { put("tool_id", toolId.value) }.toString(),
         )
         return decodeTool(response, AdminRpcMethod("tool.get"))
     }

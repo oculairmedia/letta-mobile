@@ -104,7 +104,7 @@ open class ToolRepository @Inject constructor(
     /** `tool.get`, or null when the host cannot answer it (caller falls back to the catalog). */
     private suspend fun irohGetOrNull(source: IrohAdminRpcToolSource, toolId: String): Tool? =
         try {
-            source.getTool(toolId)
+            source.getTool(ToolId(toolId))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
