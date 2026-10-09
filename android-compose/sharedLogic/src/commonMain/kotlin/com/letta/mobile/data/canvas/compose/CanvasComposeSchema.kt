@@ -33,6 +33,8 @@ object CanvasComposeSchema {
     ).json()
     private val color = StringSchema(
         pattern = Contract.COLOR_PATTERN,
+        // Short, but present: a provider that ignores `pattern` must still see the presets.
+        description = Contract.COLOR_PRESETS.joinToString() + " or #rrggbb",
     ).json()
     private val title = StringSchema(maxLength = Contract.MAX_TITLE_CHARS).json()
 

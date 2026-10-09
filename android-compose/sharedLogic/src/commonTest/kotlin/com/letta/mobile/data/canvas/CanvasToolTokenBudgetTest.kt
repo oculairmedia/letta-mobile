@@ -53,6 +53,33 @@ class CanvasToolTokenBudgetTest {
         assertTrue(advertisedTotal <= TOTAL_BUDGET_CHARS, "Total $advertisedTotal chars is over $TOTAL_BUDGET_CHARS\n$table")
     }
 
+    /**
+     * canvas_apply_ops points at canvas_replace_scene's description for the scene format instead of
+     * repeating it, so the two must always be advertised together (app tools and host tools alike).
+     */
+    @Test
+    fun applyOpsIsAlwaysAdvertisedWithReplaceSceneWhichCarriesTheSceneFormat() {
+        val store = InMemoryCanvasRelayStore()
+        val backend = HostCanvasBackend(CanvasRelayHost(store, hostId = { "host-1" }), store, InMemoryHostCanvasDirectory())
+        val advertised = mapOf(
+            "CanvasExternalTools" to CanvasExternalTools.all(InMemoryCanvasDocumentStore(), CanvasSessionRegistry()).map { it.name },
+            "HostCanvasTools" to HostCanvasTools.all(backend).map { it.name },
+        )
+        advertised.forEach { (source, names) ->
+            assertTrue(CanvasToolContract.APPLY_OPS in names, "$source advertises apply_ops")
+            assertTrue(CanvasToolContract.REPLACE_SCENE in names, "$source must advertise replace_scene beside apply_ops: $names")
+        }
+        assertTrue(CanvasToolContract.REPLACE_SCENE in CanvasToolContract.applyOps.description, "apply_ops points at replace_scene")
+        // scene_json's own description is short because the shape is here.
+        assertTrue("{\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}" in CanvasToolContract.replaceScene.description)
+    }
+
+    @Test
+    fun theComposeColorKeepsItsPresetNamesInTheSchema() {
+        val schema = CanvasToolContract.compose.inputSchema.toString()
+        assertTrue("red, orange, yellow, green, cyan, purple or #rrggbb" in schema, "a provider that ignores pattern still sees the presets")
+    }
+
     private companion object {
         const val CHARS_PER_TOKEN = 3.5
 
@@ -63,10 +90,11 @@ class CanvasToolTokenBudgetTest {
             "canvas_replace_scene" to 4400,
             "canvas_apply_ops" to 3350,
             "canvas_list" to 380,
-            "canvas_compose" to 6500,
+            // 6800: the colour schema repeats its preset names (letta-mobile-jna0o.1 review) for providers that ignore `pattern`.
+            "canvas_compose" to 6800,
             "canvas_compose_guide" to 340,
             "canvas_render_preview" to 1250,
         )
-        const val TOTAL_BUDGET_CHARS = 17000
+        const val TOTAL_BUDGET_CHARS = 17100
     }
 }

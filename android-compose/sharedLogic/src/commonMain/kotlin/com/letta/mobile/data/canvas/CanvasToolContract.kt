@@ -94,8 +94,8 @@ object CanvasToolContract {
             "label and pluginKind are cut at 60 UTF-16 units. A note with no stored frame is reported where the board " +
             "places it. An ARROW's bindings are {from, to}: a note id, an element id, or null. limit defaults to 200, " +
             "at most 500; a page also ends at 16 KiB and returns nextCursor (r<revision>:<index>). A cursor from " +
-            "another revision is refused as {\"error\":\"stale_cursor\",\"revision\":<current>}, as is any cursor " +
-            "that was not a nextCursor; call again with no cursor.",
+            "another revision is refused as {\"error\":\"stale_cursor\",\"revision\":<current>}; any other cursor " +
+            "that was not a nextCursor is refused. Then call again with no cursor.",
         objectSchema(
             canvasIdParam,
             ToolParam("cursor", description = "The previous page's nextCursor; omit for the first page."),
