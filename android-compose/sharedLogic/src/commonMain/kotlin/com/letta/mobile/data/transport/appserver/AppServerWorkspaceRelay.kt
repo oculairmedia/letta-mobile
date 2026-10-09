@@ -131,11 +131,17 @@ object WorkspaceRelay {
      * Host side: a missing-file answer (Node's `ENOENT: no such file or directory, open '<path>'`)
      * becomes a typed `error_code: not_found` without the host path; every other frame is unchanged.
      */
-    fun normalizeFrame(frame: JsonObject): JsonObject {
-        val failed = (frame["success"] as? JsonPrimitive)?.contentOrNull == "false"
-        val error = (frame["error"] as? JsonPrimitive)?.contentOrNull
-        if (!failed || error == null || !isMissingFile(error)) return frame
-        return JsonObject(frame + mapOf("error" to JsonPrimitive(NOT_FOUND_MESSAGE), "error_code" to JsonPrimitive(NOT_FOUND_CODE)))
+    fun normalizeFrame(frame: JsonObject): JsonObject =
+        if (frame.isMissingFileAnswer()) {
+            JsonObject(frame + mapOf("error" to JsonPrimitive(NOT_FOUND_MESSAGE), "error_code" to JsonPrimitive(NOT_FOUND_CODE)))
+        } else {
+            frame
+        }
+
+    private fun JsonObject.isMissingFileAnswer(): Boolean {
+        if ((this["success"] as? JsonPrimitive)?.contentOrNull != "false") return false
+        val error = (this["error"] as? JsonPrimitive)?.contentOrNull ?: return false
+        return isMissingFile(error)
     }
 
     const val NOT_FOUND_CODE: String = "not_found"
