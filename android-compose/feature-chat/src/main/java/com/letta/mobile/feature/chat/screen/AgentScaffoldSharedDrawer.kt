@@ -44,6 +44,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val archiveFilter by drawer.archiveFilter.collectAsStateWithLifecycle()
     val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
+    val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
     val open = state.drawerState.isOpen
     LaunchedEffect(open) {
@@ -66,6 +67,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         conversations = state.drawerConversations,
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
+        pinnedConversationIds = pinnedConversationIds,
         canvases = canvases,
         hiddenSections = androidHiddenDrawerSections(state.params.navigation),
     ).withRoster(roster)
@@ -152,6 +154,9 @@ internal fun sharedDrawerPanelActions(
         },
         onArchiveConversation = { id, archived -> drawer.setConversationArchived(id, agentId, archived) },
         onDeleteConversation = { id -> drawer.deleteConversation(id, agentId) },
+        deleteArchivesConversation = drawer.deleteArchivesConversation,
+        onRenameConversation = { id, title -> drawer.renameConversation(id, agentId, title) },
+        onPinConversation = drawer::setConversationPinned,
         onOpenCanvas = { canvasId -> closeDrawerAndRun(state) { navigation.onOpenCanvas?.invoke(canvasId.value) } },
         // onArchiveCanvas stays null: Android keeps no canvas archive yet (letta-mobile-c3np7.5.7),
         // so canvas rows offer no archive, by hover or by long-press.

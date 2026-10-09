@@ -24,6 +24,7 @@ import io.mockk.mockk
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -91,6 +92,51 @@ class SharedNavDrawerBindingTest {
         assertEquals(ShellArchiveFilter.Archived, vm.archiveFilter.value)
         coVerify { conversations.setConversationArchived("c1", "agent-1", true) }
         coVerify { conversations.deleteConversation("c2", "agent-1") }
+    }
+
+    @Test
+    fun conversationRenameReachesTheRepositoryTrimmedAndIgnoresBlank() = runTest(mainDispatcherRule.dispatcher) {
+        val vm = viewModel()
+        vm.renameConversation("c1", "agent-1", "  Plan B  ")
+        vm.renameConversation("c2", "agent-1", "   ")
+        advanceUntilIdle()
+        coVerify { conversations.updateConversation("c1", "agent-1", "Plan B") }
+        coVerify(exactly = 0) { conversations.updateConversation("c2", any<String>(), any<String>()) }
+    }
+
+    @Test
+    fun conversationPinsRoundTripThroughTheSettingsStoreAndOrderTheRows() = runTest(mainDispatcherRule.dispatcher) {
+        val vm = viewModel()
+        backgroundScope.launch { vm.pinnedConversationIds.collect {} }
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), vm.pinnedConversationIds.value)
+        vm.setConversationPinned("c2", pinned = true)
+        advanceUntilIdle()
+        assertEquals(setOf("c2"), vm.pinnedConversationIds.value)
+
+        val input = ShellNavDrawerInput(
+            agent = ShellPanelAgent(name = "Agent 1", agentId = "a1"),
+            conversations = listOf(conversation("c1", "a1", "2026-10-17T11:00:00Z"), conversation("c2", "a1", "2026-10-17T10:00:00Z")),
+            pinnedConversationIds = vm.pinnedConversationIds.value,
+        )
+        val rows = ShellNavDrawerMapping.state(input, now).panel.conversations
+        assertEquals(listOf("c2", "c1"), rows.map { it.id })
+        assertEquals(listOf(true, false), rows.map { it.pinned })
+
+        vm.setConversationPinned("c2", pinned = false)
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), vm.pinnedConversationIds.value)
+    }
+
+    @Test
+    fun theDrawerPanelBindsRenameAndPin() = runTest(mainDispatcherRule.dispatcher) {
+        val vm = viewModel()
+        val actions = sharedDrawerPanelActions(mockk<AgentScaffoldRuntimeState>(relaxed = true) { every { agentIdValue } returns "agent-1" }, vm)
+        actions.onRenameConversation!!.invoke("c1", "Renamed")
+        actions.onPinConversation!!.invoke("c1", true)
+        advanceUntilIdle()
+        coVerify { conversations.updateConversation("c1", "agent-1", "Renamed") }
+        assertEquals(setOf("c1"), settings.getPinnedConversationIds().first())
     }
 
     @Test
