@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.testutil.FakeConversationRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.MainDispatcherRule
 import com.letta.mobile.ui.shell.ShellNavDrawerInput
@@ -97,12 +98,18 @@ class SharedNavDrawerBindingTest {
 
     @Test
     fun conversationRenameReachesTheRepositoryTrimmedAndIgnoresBlank() = runTest(mainDispatcherRule.dispatcher) {
-        val vm = viewModel()
-        vm.renameConversation(ConversationId("c1"), AgentId("agent-1"), ConversationSummary("  Plan B  "))
-        vm.renameConversation(ConversationId("c2"), AgentId("agent-1"), ConversationSummary("   "))
+        val agent = AgentId("agent-1")
+        val fake = FakeConversationRepository(
+            listOf(
+                Conversation(id = ConversationId("c1"), agentId = agent, summary = "Old"),
+                Conversation(id = ConversationId("c2"), agentId = agent, summary = "Keep"),
+            ),
+        )
+        val vm = SharedNavDrawerViewModel(settings, canvasStore, fake, allConversations)
+        vm.renameConversation(ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
+        vm.renameConversation(ConversationId("c2"), agent, ConversationSummary("   "))
         advanceUntilIdle()
-        coVerify { conversations.updateConversation(ConversationId("c1"), AgentId("agent-1"), "Plan B") }
-        coVerify(exactly = 0) { conversations.updateConversation(ConversationId("c2"), any<AgentId>(), any<String>()) }
+        assertEquals(listOf("Plan B", "Keep"), fake.getCachedConversations(agent).map { it.summary })
     }
 
     @Test
