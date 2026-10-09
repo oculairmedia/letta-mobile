@@ -10,8 +10,8 @@ import kotlinx.coroutines.test.runTest
 /** The desktop binds workspace files to its direct App Server session (letta-mobile-bzvro.26). */
 class DesktopWorkspaceFilesTest {
     @Test
-    fun `without a direct session file search explains why`() = runTest {
-        val sources = DesktopWorkspaceSources(DesktopLocalAppServerClientRegistry())
+    fun `with neither a direct session nor an iroh host file search explains why`() = runTest {
+        val sources = DesktopWorkspaceSources(DesktopLocalAppServerClientRegistry(), irohTransport = { null })
         val error = assertFailsWith<WorkspaceFileException> { sources.files().search("main", "/repo", 25) }
         assertEquals(DesktopWorkspaceSources.NO_DIRECT_SESSION, error.message)
     }

@@ -60,13 +60,39 @@ Decisions: F19 (PR-4) not built → cwd is a caller argument; today the conversa
 
 Tests (pass locally): `AppServerWorkspaceFileSourceTest` (7), `WorkspaceFilesControllersTest` (9), `WorkspaceFileViewerTest` (7), `DesktopWorkspaceFilesTest` (1). CI at handoff: #1815 required checks passing so far, `perf-gate` pending.
 
+## Over Iroh: the workspace relay (letta-mobile-bzvro.37) — DONE, needs a host redeploy
+
+#1813–#1815 merged desktop-only: an Iroh host relayed a fixed set of admin_rpc methods, so the pages showed "This needs a direct App Server connection…". The host now relays the workspace commands as **typed, allowlisted admin_rpc methods** (not a generic pass-through):
+
+| admin_rpc method | App Server command | Capability (`IrohPeerCapabilities.forWorkspaceMethod`) |
+|---|---|---|
+| `memfs.list` | `list_memory` (every page merged) | `memory.read` |
+| `memfs.read` | `read_memory_file` | `memory.read` |
+| `memfs.history` | `memory_history` | `memory.read` |
+| `memfs.commit_diff` | `memory_commit_diff` | `memory.read` |
+| `memfs.file_at_ref` | `memory_file_at_ref` | `memory.read` |
+| `memfs.enable` | `enable_memfs` | `memory.write` |
+| `memfs.write` | `write_memory_file` (the editor's save) | `memory.write` |
+| `secret.list` | `secret_list` | `admin.full` |
+| `secret.apply` | `secret_apply` | `admin.full` |
+| `workspace.search_files` | `search_files` | `chat.send` |
+| `workspace.read_file` | `read_file` | `chat.send` |
+
+- **Contract** (`sharedLogic/commonMain/.../transport/appserver/AppServerWorkspaceRelay.kt`, `WorkspaceRelay` + `WorkspaceRelayMethod`): params = the command's own fields minus `type`/`request_id` (the host sets both, so a method cannot carry another command); result = `{"frames":[…]}`, the App Server's raw answering frames. `WorkspaceRelay.decodeCommand` is the allowlist + caps: agent ids ≤128 chars with no separators; MemFS paths relative, no `..`/drive/absolute, ≤1024; refs/SHAs `[A-Za-z0-9._/~^@{}-]` ≤200; history limit ≤500; search ≤512 chars / ≤200 results; read paths ≤4096; writes ≤1M chars; secret batches ≤100 keys, keys `^[A-Z_][A-Z0-9_]*$`, values ≤64 KiB; relayed answer ≤8 MiB. Every error names the field, never the value; a decode failure has no cause (kotlinx quotes its input).
+- **Host** (`jvmAndAndroid/.../node/iroh/WorkspaceAdminHandlers.kt`, registered in `AdminRpcRegistry.buildRouter`): forwards through the node's own `AppServerClient.workspaceRequest` / `writeMemoryFile` (the `DualLaneAppServerClient` the direct path also uses) and advertises `workspace_relay_v1` on auth. Without a native client the methods answer `capability_unavailable`. Upstream failures become fixed sentences; telemetry carries the method and exception class only. Ownership rows: `iroh-admin-ownership-matrix.json` (11 `app_server_v2` rows); `AdminRpcContractTest` lists them.
+- **Client** (`commonMain/.../data/workspace/relay/`): `WorkspaceRelayClient` is an `AppServerClient` that carries only `workspaceRequest` + `writeMemoryFile` as admin_rpc; `WorkspaceClientRoute` picks the direct session, else the relay, else fails with `NO_CONNECTION`. "Unknown method" → "Update the host (meridian-iroh-wrapper)…"; "forbidden" → a per-family sentence. The feature sources are unchanged. Workspace reads are retry-safe in `IrohAdminRpcExecutor`; none fall back to the control channel.
+- **Desktop**: `DesktopWorkspaceSources` routes through `WorkspaceClientRoute`; the shell publishes the Iroh transport in `DesktopIrohWorkspaceRelay` (`DesktopShellServices.rememberDesktopIrohLink`). MemFS `memory_updated` pushes are not relayed — the page refreshes on demand over Iroh.
+- **Android**: `di/WorkspaceModule.kt` binds the three sources over the session transport; the Memory screen has a Blocks | Files switch (shared `MemfsPage`, `MemoryFilesViewModel`); the shared chat page provides the read-only file viewer for tool-card file links and merges `@` file suggestions into the composer (`WorkspaceFilesViewModel`, `SharedChatWorkspaceFiles.kt`). The vault's source is bound but `AgentSecretsFeature.Android` stays **off** and there is no Android entry point yet.
+- **Secrets**: values ride the encrypted, authenticated Iroh connection in plaintext; nothing logs params or frames; `AgentSecretsRedaction.redact` now also blanks `admin_rpc` `secret.apply` params and `admin_rpc_response` `result.frames`. Tests: `WorkspaceRelayTest` (commonTest), `WorkspaceRelayClientTest` (commonTest), `WorkspaceRelayRoundTripTest` (jvmTest: real `AdminRpcStreamServer` + capability gate, faked App Server; asserts values never reach telemetry), `DesktopMemfsBindingTest`, `MemfsPageTest` (relay vs no connection).
+
+**Deploy:** the user's `meridian-iroh-wrapper` service must be rebuilt and restarted from the PR's merge commit — step-by-step host instructions (layout check, build, restart, verify log lines, rollback): `docs/deploy/workspace-relay-host-redeploy.md`. Until then clients get "Unknown method" and show the "Update the host" message.
+
 ## Not done / remaining (prioritised)
 
-1. Diagnose and fix #1814 CI failure (`test`, `shared-multiplatform`).
-2. Wait for `perf-gate` on all three; rerun infra flakes.
-3. Rebase the other two after the first merges (shared commit 1).
-4. `letta-mobile-bzvro.37`: Iroh node relay for workspace commands (IrohNodeConnection answers unknown types with "Unknown command type"); capability classes in `IrohPeerCapabilities` (memfs read/write → MEMORY_READ/WRITE, files → CHAT_SEND?, secrets → ADMIN_FULL); then Android bindings (MemFS page, file mentions; vault stays off). Until then Android has no source and shows nothing.
-5. F29/F30 must use `AgentSecretsRedaction`.
+1. Redeploy `meridian-iroh-wrapper` on the host (above), then verify end to end from desktop-over-Iroh and Android.
+2. `letta-mobile-bzvro.38`: Android vault entry point behind `AgentSecretsFeature.Android` (source already bound).
+3. `letta-mobile-bzvro.39`: relay `memory_updated` pushes to Iroh viewers (today: manual refresh).
+4. F29/F30 must use `AgentSecretsRedaction` (it now covers relayed envelopes too).
 
 ## Commands (Windows, PowerShell)
 

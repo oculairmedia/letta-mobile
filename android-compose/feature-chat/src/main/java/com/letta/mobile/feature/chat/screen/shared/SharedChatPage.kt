@@ -54,7 +54,9 @@ import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
+import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFileOpener
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /** letta-mobile-bglj6.1: what the Android chat screen hands the shared chat page. */
@@ -97,7 +99,8 @@ internal data class SharedChatPageParams(
  */
 @Composable
 internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier) {
-    val port = rememberAdminChatSessionPort(params.viewModel, params.navigation)
+    val workspaceFiles = rememberSharedChatWorkspaceFiles()
+    val port = rememberAdminChatSessionPort(params.viewModel, params.navigation, workspaceFiles)
     val canvasSlot = LocalChatCanvasSlot.current
     val presentationState = rememberSaveable(stateSaver = PresentationSaver) {
         mutableStateOf(ChatSurfacePresentation.initial(params.openOnCanvas, hasCanvas = canvasSlot != null))
@@ -149,6 +152,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
         LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
         LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
+        LocalWorkspaceFileOpener provides rememberWorkspaceFileOpener(workspaceFiles),
     ) {
         Box(modifier) {
             ChatSurface(
@@ -172,6 +176,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             )
             SharedChatSubagentBanner(subagentSheet)
             ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
+            SharedChatWorkspaceFiles(workspaceFiles, port)
         }
     }
 }
@@ -236,12 +241,14 @@ internal fun routesToCanvasNavigation(
 private fun rememberAdminChatSessionPort(
     viewModel: AdminChatViewModel,
     navigation: ChatScreenNavigationCallbacks,
+    workspaceFiles: WorkspaceFilesViewModel?,
 ): AdminChatSessionPort {
     val currentOnBugCommand by rememberUpdatedState(navigation.onBugCommand)
     val currentOpenConversation by rememberUpdatedState(navigation.onOpenConversation)
     val canOpenConversation = navigation.onOpenConversation != null
-    return remember(viewModel, canOpenConversation) {
+    return remember(viewModel, canOpenConversation, workspaceFiles) {
         AdminChatSessionPort(
+            fileMentions = workspaceFiles?.mentionables ?: flowOf(emptyList()),
             viewModel = viewModel,
             scope = viewModel.viewModelScope,
             onOpenBugReport = { currentOnBugCommand?.invoke() },

@@ -83,21 +83,39 @@ private data class SecretApplyResponse(
 
 /**
  * Blanks secret values out of a `secret_list_response` or `secret_apply` frame, for anything that
- * records or exports wire frames (a frame inspector, a diagnostics bundle). Other frames pass
- * through untouched.
+ * records or exports wire frames (a frame inspector, a diagnostics bundle, an Iroh trace). Over an
+ * Iroh host the same values ride the workspace relay (letta-mobile-bzvro.37): a `secret.apply`
+ * admin_rpc carries them in `params.set`, and an `admin_rpc_response` carries the relayed
+ * `secret_list_response` in `result.frames`; both are blanked too. Other frames pass through
+ * untouched.
  */
 object AgentSecretsRedaction {
     private const val SECRET_LIST_RESPONSE = "secret_list_response"
     private const val SECRET_APPLY = "secret_apply"
+    private const val ADMIN_RPC = "admin_rpc"
+    private const val ADMIN_RPC_RESPONSE = "admin_rpc_response"
+    private const val RELAYED_SECRET_APPLY = "secret.apply"
     private val Redacted = JsonPrimitive(AppServerProtocol.REDACTED_PLACEHOLDER)
 
     fun redact(frame: JsonObject): JsonObject = when ((frame["type"] as? JsonPrimitive)?.content) {
         SECRET_LIST_RESPONSE -> frame.replace("secrets") { secrets ->
             JsonArray((secrets as? JsonArray).orEmpty().map { entry -> (entry as? JsonObject)?.replace("value") { Redacted } ?: Redacted })
         }
-        SECRET_APPLY -> frame.replace("set") { set -> JsonObject((set as? JsonObject).orEmpty().mapValues { Redacted }) }
+        SECRET_APPLY -> frame.replace("set", ::redactValues)
+        ADMIN_RPC -> if ((frame["method"] as? JsonPrimitive)?.content == RELAYED_SECRET_APPLY) {
+            frame.replace("params") { params -> (params as? JsonObject)?.replace("set", ::redactValues) ?: Redacted }
+        } else {
+            frame
+        }
+        ADMIN_RPC_RESPONSE -> frame.replace("result") { result ->
+            (result as? JsonObject)?.replace("frames") { frames ->
+                JsonArray((frames as? JsonArray).orEmpty().map { relayed -> (relayed as? JsonObject)?.let(::redact) ?: relayed })
+            } ?: result
+        }
         else -> frame
     }
+
+    private fun redactValues(set: JsonElement): JsonElement = JsonObject((set as? JsonObject).orEmpty().mapValues { Redacted })
 
     private fun JsonObject.replace(key: String, transform: (JsonElement) -> JsonElement): JsonObject {
         val current = this[key] ?: return this

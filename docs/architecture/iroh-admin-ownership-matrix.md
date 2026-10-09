@@ -137,3 +137,19 @@ approval.submit shim-fallback removal at cutover.
   project rows, an explicit decision on message search over Iroh, and either
   adapters or deliberate deprecation for the shim-era goal/slash-command
   routes. No adapter may bypass its public contract to reach Letta storage.
+
+## Workspace relay (letta-mobile-bzvro.37)
+
+The agent-workspace commands (MemFS browser, secrets vault, workspace files) are
+11 explicit `app_server_v2` rows owned by `WorkspaceAdminHandlers`: `memfs.list`,
+`memfs.read`, `memfs.history`, `memfs.commit_diff`, `memfs.file_at_ref`,
+`memfs.enable`, `memfs.write`, `secret.list`, `secret.apply`,
+`workspace.search_files`, `workspace.read_file`. Each method fixes one App Server
+command (`WorkspaceRelayMethod`); `WorkspaceRelay.decodeCommand` applies the field
+caps before forwarding through the node's own `AppServerClient.workspaceRequest`.
+Authorization: MemFS reads `memory.read`, MemFS writes `memory.write`, files
+`chat.send`, secrets `admin.full` (`IrohPeerCapabilities.forWorkspaceMethod`). The
+host advertises `workspace_relay_v1` on auth. Secret values cross the encrypted
+Iroh connection but never telemetry or error text. Clients need a host built with
+this change: redeploy `meridian-iroh-wrapper`. Details:
+`docs/handoff/letta-desktop-parity-pr6-memory-workspace.md`.

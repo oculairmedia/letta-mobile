@@ -1778,6 +1778,215 @@
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.list",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 list_memory relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "list_memory",
+      "native_contract": [
+        "list_memory",
+        "list_memory_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.read",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 read_memory_file relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "read_memory_file",
+      "native_contract": [
+        "read_memory_file",
+        "read_memory_file_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.history",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 memory_history relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "memory_history",
+      "native_contract": [
+        "memory_history",
+        "memory_history_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.commit_diff",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 memory_commit_diff relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "memory_commit_diff",
+      "native_contract": [
+        "memory_commit_diff",
+        "memory_commit_diff_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.file_at_ref",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 memory_file_at_ref relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "memory_file_at_ref",
+      "native_contract": [
+        "memory_file_at_ref",
+        "memory_file_at_ref_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.enable",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 enable_memfs relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "enable_memfs",
+      "native_contract": [
+        "enable_memfs",
+        "enable_memfs_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "memfs.write",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 write_memory_file relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "write_memory_file",
+      "native_contract": [
+        "write_memory_file",
+        "write_memory_file_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "secret.list",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 secret_list relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "secret_list",
+      "native_contract": [
+        "secret_list",
+        "secret_list_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "secret.apply",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 secret_apply relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "secret_apply",
+      "native_contract": [
+        "secret_apply",
+        "secret_apply_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "workspace.search_files",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 search_files relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "search_files",
+      "native_contract": [
+        "search_files",
+        "search_files_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "workspace.read_file",
+      "handler": "WorkspaceAdminHandlers.kt",
+      "current_backend": "native App Server v2 read_file relayed for Iroh clients (no shim path)",
+      "owner": "app_server_v2",
+      "public_contract": "read_file",
+      "native_contract": [
+        "read_file",
+        "read_file_response"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.37: workspace relay (MemFS browser, secrets vault, workspace files). The method fixes the command type; WorkspaceRelay.decodeCommand applies the field caps.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
     }
   ],
   "unsupported_native_operations": [

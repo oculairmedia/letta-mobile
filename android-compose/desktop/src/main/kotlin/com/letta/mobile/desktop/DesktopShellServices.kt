@@ -158,6 +158,8 @@ private fun rememberDesktopIrohLink(bootstrap: DesktopConfigBootstrap, chatScope
     }
     SideEffect {
         bootstrap.irohAgentDirectorySlot.value = agentDirectory
+        // letta-mobile-bzvro.37: MemFS, secrets and workspace files go through the host's relay.
+        com.letta.mobile.desktop.workspace.DesktopIrohWorkspaceRelay.transport = transport
     }
     rememberAndPublishGraphChannelTransport(
         irohTransport = transport,

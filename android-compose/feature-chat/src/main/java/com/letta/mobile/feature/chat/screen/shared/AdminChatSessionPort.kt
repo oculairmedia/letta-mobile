@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
@@ -13,12 +14,14 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -34,13 +37,16 @@ internal class AdminChatSessionPort(
     onOpenBugReport: () -> Unit = {},
     /** letta-mobile-bzvro.15/.16: navigates to a fork; null leaves fork and edit off. */
     onOpenConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
+    /** letta-mobile-bzvro.37: workspace files for the composer's `@` suggestions. */
+    fileMentions: Flow<List<Mentionable>> = flowOf(emptyList()),
 ) : ChatSessionPort {
 
     override val uiState: StateFlow<ChatUiState> = viewModel.uiState
 
     override val composer: StateFlow<ChatComposerUiState> =
-        combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), ::composerSnapshot)
-            .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
+        combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), fileMentions) { composer, ui, model, usage, files ->
+            composerSnapshot(composer, ui, model, usage).copy(mentionables = files.toImmutableList())
+        }.stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport, onOpenConversation)
 

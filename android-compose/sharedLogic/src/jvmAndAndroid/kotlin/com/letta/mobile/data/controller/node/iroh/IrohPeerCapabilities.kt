@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
+import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
+
 /**
  * Server-side per-peer authorization after authentication
  * (letta-mobile-d6e8g.6). Endpoint authentication alone does not imply
@@ -78,6 +81,8 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in CHAT_READ_METHODS -> CHAT_READ
+        // letta-mobile-bzvro.37: the workspace relay's explicit allowlist.
+        method in WorkspaceRelayMethod.methods -> forWorkspaceMethod(requireNotNull(WorkspaceRelayMethod.forMethod(method)))
         // P0.5 (audit): read-only server metadata (providers, goals, groups,
         // folders, archives, run/step history, identities) reclassified from the
         // deny-by-default admin.full bucket into the CHAT_READ tier — the same
@@ -126,6 +131,18 @@ object IrohPeerCapabilities {
         method in SUBAGENT_SPAWN_METHODS -> SUBAGENT_SPAWN
         method in WORKACTIVITY_METHODS -> WORKACTIVITY_REPORT
         else -> ADMIN_FULL
+    }
+
+    /**
+     * letta-mobile-bzvro.37: MemFS reads and writes ride the memory tier like blocks. Workspace files
+     * need chat.send: a peer that may run the agent (whose tools read the same files) may read them.
+     * Secrets are plaintext credentials, so only an admin.full peer manages them.
+     */
+    fun forWorkspaceMethod(method: WorkspaceRelayMethod): String = when (method.access) {
+        WorkspaceRelayAccess.MemoryRead -> MEMORY_READ
+        WorkspaceRelayAccess.MemoryWrite -> MEMORY_WRITE
+        WorkspaceRelayAccess.Files -> CHAT_SEND
+        WorkspaceRelayAccess.Secrets -> ADMIN_FULL
     }
 
     fun isAllowed(capabilities: Set<String>, required: String): Boolean =
