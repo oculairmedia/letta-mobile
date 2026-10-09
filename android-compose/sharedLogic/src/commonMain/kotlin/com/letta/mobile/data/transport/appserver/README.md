@@ -1,9 +1,10 @@
 # App Server protocol client
 
 Kotlin client for the Letta App Server (Protocol V2, alpha hard-cut): one bidirectional
-WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.32.10`
-(`APP_SERVER_PROTOCOL_VERSION = 1`); the deployed server runs 0.32.3, whose command and message
-unions are identical.
+WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.33.6`
+(`APP_SERVER_PROTOCOL_VERSION = 1`); the deployed server runs 0.32.3. Its command and message
+unions are identical to those of 0.32.10 (the previous pin), and 0.33.6 adds only
+`launch_subagent` and `launch_subagent_response` on top of them.
 
 ## letta-code version pins
 
@@ -11,13 +12,26 @@ Each pin has one job and one source of truth; everything else cites it (letta-mo
 
 | Pin | Version | Source of truth | What it means |
 |---|---|---|---|
-| Desktop bundled runtime | 0.29.12 | `desktop/build.gradle.kts` (`desktopLettaCodeVersion`), mirrored in `desktop/runtime/package.json` and `runtime-manifest.json` | The App Server the Windows desktop installs and runs locally. Also the appserver-cli restart-replay evidence pin (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`). `LettaCodeVersionPinsTest` keeps them equal. |
-| Wire contract baseline | 0.32.10 | `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` | The protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`, `appserver-contract` workflow). |
-| Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | What the deployed host ran when the golden was captured; unions identical to 0.32.10. |
-| Forward compatibility | 0.33.6 | `commonTest/.../LettaCode0336Frames.kt` | The version the official Letta desktop app ships. Not a runtime: decoders are proven tolerant of its frames (agent-free scopes, `removed[]`, new toolsets and process kinds, `retry` provider fields, `approval_classification_end`, unknown new frame types). |
+| Desktop bundled runtime | 0.33.6 | `desktop/build.gradle.kts` (`desktopLettaCodeVersion`), mirrored in `desktop/runtime/package.json`, `package-lock.json` and `runtime-manifest.json` | The App Server the Windows desktop installs and runs locally. `LettaCodeVersionPinsTest` keeps these equal, and equal to the contract baseline. |
+| Wire contract baseline | 0.33.6 | `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` | The protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`, `appserver-contract` workflow). 101 commands, 112 messages; 0.33.6 adds `launch_subagent` / `launch_subagent_response` over 0.32.10. |
+| Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | What the deployed host ran when the golden was captured. Kept as-is: re-capturing needs a live server (`scripts/appserver/capture-live-goldens.mjs`). Its unions equal 0.32.10, so it does not cover `launch_subagent`. |
+| Restart-replay evidence | 0.29.12 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Deliberately NOT bumped with the runtime: it is captured by a live probe against a real local server plus a model provider, which a pin bump cannot fake. Durability and identity observations (restart, reconnect, `client_message_id`) were measured on 0.29.12 and are not re-measured on 0.33.6 yet (letta-mobile-340tc). |
+| Android embedded runtime (ceiling) | 0.26.1 | `app/build.gradle.kts` (`embeddedLettaCodeVersion`) | The letta-code the Android app runs in-process on nodejs-mobile. This is a ceiling, not a lag: nodejs-mobile ships Node 18 and letta-code 0.26.2+ needs Node >= 22.19, so the embedded runtime cannot move until nodejs-mobile does. It stays below the baseline on purpose. |
+| Forward compatibility | 0.33.6 | `commonTest/.../LettaCode0336Frames.kt` | The version the official Letta desktop app ships (now also the baseline). Decoders are proven tolerant of its frames (agent-free scopes, `removed[]`, new toolsets and process kinds, `retry` provider fields, `approval_classification_end`, unknown new frame types). |
 
-Bumping the bundled runtime is a separate, deliberate change: update `desktopLettaCodeVersion`, the
-runtime package files and the replay evidence together.
+### What "verified against a 0.33 server" means
+
+The desktop bundled runtime and any remote 0.33.x App Server speak the 0.33.6 wire. The Android
+embedded runtime does not: it is 0.26.1 and never emits the 0.33-only shapes (for example
+`execute_command_response`, `approval_classification_end`, `removed[]` on scope updates,
+`cron_pause`). So any acceptance criterion of the form "verified against a 0.33 server" is
+**desktop / remote-only**; on the embedded runtime those features must degrade (absent, not
+failing), and no work is held for the embedded runtime to catch up.
+
+Bumping the bundled runtime or the baseline is a deliberate change: update `desktopLettaCodeVersion`,
+the runtime package files (`npm install --package-lock-only` in `desktop/runtime`) and the contract
+fixtures (`scripts/appserver/verify-contract-baseline.mjs` must pass under the Node version in the
+matrix) together. The replay evidence and the golden capture move only when re-captured live.
 
 Source of truth, in order: the package's `dist/types/types/protocol_v2.d.ts` (+ siblings), then
 [protocol lifecycle](https://docs.letta.com/platform/app-server/protocol-lifecycle/index.md).

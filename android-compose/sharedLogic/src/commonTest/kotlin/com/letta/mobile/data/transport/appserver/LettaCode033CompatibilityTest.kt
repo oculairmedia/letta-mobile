@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 /**
  * letta-mobile-bzvro.10 (F10): letta-code 0.33.6 server frames decode and map on a client whose
- * contract baseline is 0.32.10. Nothing here may become a DecodeFailure.
+ * contract baseline is 0.33.6. Nothing here may become a DecodeFailure.
  */
 class LettaCode033CompatibilityTest {
     private fun decode(json: String) = AppServerProtocol.decodeFrame(json.trimIndent())

@@ -1,12 +1,12 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.32.10",
+    "version": "0.33.6",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "09138d9e5dc36b8a22575a24c35e4bc6768892e7e41a753400d047b3ee37f86a",
-    "protocol_corpus_sha256": "872e5dbcaf851bc679915f9a3fbb18456151e3ce25f7d8bde361289a668b4477",
+    "protocol_sha256": "b9147297cba4b64a7f2db68c3df2e2dd54e427eb2c8b915178e2f60a1392d506",
+    "protocol_corpus_sha256": "0768e96d46a567794d66aa425764ab04a0a79aef7c8a48dc20faf6e5fcfb9804",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -20,10 +20,12 @@
       "dist/types/types/external-tool-protocol.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
+      "dist/types/types/provider-oauth-config.d.ts",
       "dist/types/types/queue-update-protocol.d.ts",
       "dist/types/types/runtime-scope.d.ts",
       "dist/types/types/runtime-start-protocol.d.ts",
       "dist/types/types/schedule-protocol.d.ts",
+      "dist/types/types/subagent-protocol.d.ts",
       "dist/types/types/task-control-protocol.d.ts",
       "dist/types/types/teleport-protocol.d.ts",
       "dist/types/types/toolset-protocol.d.ts"
@@ -128,6 +130,7 @@
     "channel_route_update",
     "execute_command",
     "remove_queue_item",
+    "launch_subagent",
     "monitor_stop",
     "search_branches",
     "checkout_branch",
@@ -245,7 +248,8 @@
     "secret_list_response",
     "secret_apply_response",
     "remove_queue_item_response",
-    "monitor_stop_response"
+    "monitor_stop_response",
+    "launch_subagent_response"
   ],
   "capabilities": [
     {
@@ -258,6 +262,7 @@
         "abort_message",
         "change_device_state",
         "remove_queue_item",
+        "launch_subagent",
         "app_server_info",
         "resume_queue",
         "teleport_request",
@@ -275,6 +280,7 @@
         "control_request",
         "update_subagent_state",
         "remove_queue_item_response",
+        "launch_subagent_response",
         "app_server_info_response",
         "input_accepted",
         "turn_finished",

@@ -28,7 +28,7 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
 // against Jewel AND Nucleus together (both are compiled against different
 // Compose baselines) â€” do it as its own change, not as a drive-by bump.
 val desktopNodeVersion = "24.13.1"
-val desktopLettaCodeVersion = "0.29.12"
+val desktopLettaCodeVersion = "0.33.6"
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
 val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
 // Desktop packages bundle JetBrains Runtime 25.0.4 (JBR) rather than Temurin.

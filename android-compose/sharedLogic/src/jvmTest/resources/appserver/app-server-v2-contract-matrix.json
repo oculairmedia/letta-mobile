@@ -1,12 +1,12 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.32.10",
+    "version": "0.33.6",
     "node": "v24.18.0",
     "package_engine": ">=22.19.0",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "09138d9e5dc36b8a22575a24c35e4bc6768892e7e41a753400d047b3ee37f86a",
-    "protocol_corpus_sha256": "872e5dbcaf851bc679915f9a3fbb18456151e3ce25f7d8bde361289a668b4477",
+    "protocol_sha256": "b9147297cba4b64a7f2db68c3df2e2dd54e427eb2c8b915178e2f60a1392d506",
+    "protocol_corpus_sha256": "0768e96d46a567794d66aa425764ab04a0a79aef7c8a48dc20faf6e5fcfb9804",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -20,26 +20,28 @@
       "dist/types/types/external-tool-protocol.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
+      "dist/types/types/provider-oauth-config.d.ts",
       "dist/types/types/queue-update-protocol.d.ts",
       "dist/types/types/runtime-scope.d.ts",
       "dist/types/types/runtime-start-protocol.d.ts",
       "dist/types/types/schedule-protocol.d.ts",
+      "dist/types/types/subagent-protocol.d.ts",
       "dist/types/types/task-control-protocol.d.ts",
       "dist/types/types/teleport-protocol.d.ts",
       "dist/types/types/toolset-protocol.d.ts"
     ],
-    "captured_at": "2026-09-15",
+    "captured_at": "2026-10-08",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.32.10 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.33.6 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
     "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage",
     "live_server_golden_fixture": "golden/letta-code-0.32.3-live.jsonl",
-    "live_server_note": "The deployed App Server runs 0.32.3; its WsProtocolCommand/WsProtocolMessage unions are identical to 0.32.10 (100 commands, 111 messages)."
+    "live_server_note": "The deployed App Server runs 0.32.3; its WsProtocolCommand/WsProtocolMessage unions equal the 0.32.10 baseline (100 commands, 111 messages); the 0.33.6 baseline adds exactly launch_subagent and launch_subagent_response (101 commands, 112 messages)."
   },
   "downstream_ownership_policy": {
     "status": "mobile migration policy, not an upstream protocol limitation",
@@ -48,7 +50,7 @@
     "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
   },
   "upstream_socket_behavior": {
-    "source": "installed letta.js 0.29.12 one-socket app-server listener and dist/app-server-client.js",
+    "source": "installed letta.js 0.33.6 (re-checked 2026-10-09; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
     "multiple_clients": "the listener accepts independent concurrent /ws clients; request correlation and runtime subscriptions are connection-local",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",
@@ -115,7 +117,7 @@
       ],
       "not_capabilities": [],
       "fixture": "cli-app-server-help.txt",
-      "note": "0.29.x-0.32.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout"
+      "note": "0.29.x-0.33.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout"
     }
   ],
   "frames": [
