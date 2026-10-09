@@ -62,7 +62,8 @@ class DesktopLocalAppServerClientRegistry {
         /**
          * letta-mobile-bzvro.24–.26: the session whenever the desktop speaks the App Server
          * protocol directly (bundled runtime or an App Server URL), for workspace commands
-         * (MemFS, secrets, device files). Empty over Iroh, whose host does not relay them.
+         * (MemFS, secrets, device files). Empty over Iroh, whose host relays them instead
+         * (letta-mobile-bzvro.37, see `DesktopWorkspaceSources`).
          */
         val direct: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry()
     }

@@ -161,6 +161,8 @@ object AdminRpcRegistry {
         PairingAdminHandlers.register(router, pairingService)
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)
+        // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
+        WorkspaceAdminHandlers.register(router, nativeClient)
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

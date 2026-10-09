@@ -228,6 +228,16 @@ class ShimOffParityGateTest {
 
         override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) =
             AppServerInboundFrame.CronDeleteAllResponse(command.requestId, true)
+
+        // letta-mobile-bzvro.37: the workspace relay forwards these natively.
+        override suspend fun workspaceRequest(command: com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand) =
+            listOf(
+                buildJsonObject {
+                    put("type", command.responseType)
+                    put("request_id", command.requestId)
+                    put("success", true)
+                },
+            )
     }
 
     /**
@@ -352,6 +362,14 @@ class ShimOffParityGateTest {
             put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
             put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))
         }
+        // letta-mobile-bzvro.37 workspace relay rows.
+        put("path", "system/persona.md")
+        put("file_path", "system/persona.md")
+        put("sha", "abc123")
+        put("ref", "HEAD")
+        put("content", "persona")
+        put("query", "main")
+        if (method == "workspace.read_file") put("path", "/repo/README.md")
         // native opt-ins / skill path installs
         if (method == "skill.install") put("skill_path", "/skills/demo")
         // bfooy.5: a create must target a label the fixture store does not hold.

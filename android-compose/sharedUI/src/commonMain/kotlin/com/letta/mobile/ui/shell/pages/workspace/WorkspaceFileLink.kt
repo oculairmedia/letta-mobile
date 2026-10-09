@@ -33,11 +33,11 @@ object WorkspaceFileLinkTags {
  * names no file or the host provides no [LocalWorkspaceFileOpener].
  */
 @Composable
-fun ToolCallFileLink(arguments: String, modifier: Modifier = Modifier) {
+fun ToolCallFileLink(arguments: String, modifier: Modifier = Modifier, toolName: String = "") {
     val opener = LocalWorkspaceFileOpener.current ?: return
     val path = remember(arguments) { ToolFileTargets.pathOf(arguments) } ?: return
     AssistChip(
-        onClick = { opener.open(path) },
+        onClick = { opener.open(path, memoryTool = ToolFileTargets.isMemoryTool(toolName)) },
         label = { Text(WorkspacePaths.fileName(path), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = {
             Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))

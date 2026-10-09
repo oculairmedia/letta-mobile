@@ -34,7 +34,7 @@ internal fun DesktopWorkspaceFileViewerHost(
 ) {
     val viewer = remember(scope) { WorkspaceFileViewerController(DesktopWorkspaceSources().files(), scope) }
     DisposableEffect(viewer) { onDispose { viewer.close() } }
-    val opener = remember(viewer, workingDirectory) { WorkspaceFileOpener { path -> viewer.open(path, workingDirectory) } }
+    val opener = remember(viewer, workingDirectory) { WorkspaceFileOpener { path, _ -> viewer.open(path, workingDirectory) } }
     CompositionLocalProvider(LocalWorkspaceFileOpener provides opener) { content() }
     val state by viewer.state.collectAsState()
     WorkspaceFileViewer(state = state, actions = viewer)

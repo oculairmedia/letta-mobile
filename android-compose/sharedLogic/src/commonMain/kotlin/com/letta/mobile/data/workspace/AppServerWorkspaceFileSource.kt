@@ -2,11 +2,13 @@ package com.letta.mobile.data.workspace
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerFileCommand
+import com.letta.mobile.data.transport.appserver.AppServerMemfsCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
 import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -24,12 +26,28 @@ class AppServerWorkspaceFileSource(
         call(AppServerFileCommand.SearchFiles(requestId("search-files"), query, maxResults = limit, cwd = cwd), SearchResponse.serializer())
             .files.map { it.path.replace('\\', '/') }
 
-    override suspend fun read(path: String): WorkspaceFileContent {
-        val frame = guarded { client().workspaceRequest(AppServerFileCommand.ReadFile(requestId("read-file"), path)) }.single()
-        val response = decode(frame, ReadResponse.serializer(), "read_file_response")
+    override suspend fun read(path: String): WorkspaceFileContent =
+        readVia(AppServerFileCommand.ReadFile(requestId("read-file"), path))
+
+    /** `read_memory_file`: the server joins [path] to [agentId]'s memory root (letta-mobile-bzvro.37). */
+    override suspend fun readMemory(agentId: String, path: String): WorkspaceFileContent =
+        readVia(AppServerMemfsCommand.ReadMemoryFile(requestId("read-memory-file"), agentId, path))
+
+    private suspend fun readVia(command: AppServerWorkspaceCommand): WorkspaceFileContent {
+        val frame = guarded { client().workspaceRequest(command) }.single()
+        return content(command, decode(frame, ReadResponse.serializer(), command))
+    }
+
+    private fun content(command: AppServerWorkspaceCommand, response: ReadResponse): WorkspaceFileContent {
+        val path = when (command) {
+            is AppServerMemfsCommand.ReadMemoryFile -> command.path
+            is AppServerFileCommand.ReadFile -> command.path
+            else -> ""
+        }
         val text = response.content
         return when {
             !response.success && response.error.orEmpty().startsWith(NOT_UTF8) -> WorkspaceFileContent.Binary(path)
+            !response.success && response.isMissingFile -> throw WorkspaceFileException(WorkspaceFileErrors.NOT_FOUND)
             !response.success -> throw WorkspaceFileException(response.error ?: "The file could not be read.")
             text == null -> WorkspaceFileContent.Binary(path)
             text.length > maxViewChars -> WorkspaceFileContent.TooLarge(path, text.length)
@@ -40,14 +58,14 @@ class AppServerWorkspaceFileSource(
 
     private suspend fun <T : FileResponse> call(command: AppServerWorkspaceCommand, serializer: KSerializer<T>): T {
         val frame = guarded { client().workspaceRequest(command) }.single()
-        val response = decode(frame, serializer, command.responseType)
+        val response = decode(frame, serializer, command)
         if (!response.success) throw WorkspaceFileException(response.error ?: "The App Server refused ${command.responseType}.")
         return response
     }
 
-    private fun <T> decode(frame: JsonObject, serializer: KSerializer<T>, type: String): T =
+    private fun <T> decode(frame: JsonObject, serializer: KSerializer<T>, command: AppServerWorkspaceCommand): T =
         runCatching { AppServerProtocol.json.decodeFromJsonElement(serializer, frame) }
-            .getOrElse { throw WorkspaceFileException("The App Server sent an unreadable $type.", it) }
+            .getOrElse { throw WorkspaceFileException("The App Server sent an unreadable ${command.responseType}.", it) }
 
     private suspend fun <T> guarded(call: suspend () -> T): T = try {
         call()
@@ -84,9 +102,15 @@ private data class SearchResponse(
 @Serializable
 private data class SearchEntry(val path: String)
 
+/** `read_file_response` and `read_memory_file_response`. */
 @Serializable
 private data class ReadResponse(
     val content: String? = null,
     override val success: Boolean = false,
     override val error: String? = null,
-) : FileResponse
+    @SerialName("error_code") val errorCode: String? = null,
+) : FileResponse {
+    /** A missing file: the relay's typed code, or a raw `ENOENT` from a direct session. */
+    val isMissingFile: Boolean
+        get() = errorCode == WorkspaceFileErrors.NOT_FOUND_CODE || WorkspaceFileErrors.isMissingFile(error)
+}

@@ -13,8 +13,8 @@ import kotlinx.coroutines.test.runTest
 /** The desktop binds the secrets vault to its direct App Server session (letta-mobile-bzvro.25). */
 class DesktopSecretsBindingTest {
     @Test
-    fun `without a direct session the vault explains why`() = runTest {
-        val sources = DesktopWorkspaceSources(DesktopLocalAppServerClientRegistry())
+    fun `with neither a direct session nor an iroh host the vault explains why`() = runTest {
+        val sources = DesktopWorkspaceSources(DesktopLocalAppServerClientRegistry(), irohTransport = { null })
         val error = assertFailsWith<AgentSecretsException> { sources.secrets().list("agent-1") }
         assertEquals(DesktopWorkspaceSources.NO_DIRECT_SESSION, error.message)
     }

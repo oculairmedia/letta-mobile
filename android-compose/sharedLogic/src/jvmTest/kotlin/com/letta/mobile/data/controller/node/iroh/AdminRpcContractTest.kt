@@ -37,7 +37,15 @@ class AdminRpcContractTest {
                 conversationMethods() +
                 projectMethods() +
                 toolMethods() +
-                miscMethods()
+                miscMethods() +
+                workspaceMethods()
+
+        /** letta-mobile-bzvro.37: the workspace relay's allowlist, spelled out. */
+        fun workspaceMethods() = setOf(
+            "memfs.list", "memfs.read", "memfs.history", "memfs.commit_diff", "memfs.file_at_ref",
+            "memfs.enable", "memfs.write", "secret.list", "secret.apply",
+            "workspace.search_files", "workspace.read_file",
+        )
 
         fun agentMethods() = setOf(
             "agent.context", "agent.count", "agent.create", "agent.delete", "agent.get", "agent.list", "agent.update",

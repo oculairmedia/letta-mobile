@@ -69,10 +69,19 @@ class AppServerWorkspaceFileSourceTest {
     }
 
     @Test
-    fun aMissingFileFailsWithTheServerReason() = runTest {
-        val (source, _) = source { listOf(readResponse(it, """"content":null,"success":false,"error":"ENOENT: no such file"""")) }
+    fun aMissingFileFailsWithAFriendlyReasonNotTheRawHostError() = runTest {
+        val (source, _) = source {
+            listOf(readResponse(it, """"content":null,"success":false,"error":"ENOENT: no such file or directory, open '/w/a.kt'""""))
+        }
         val error = assertFailsWith<WorkspaceFileException> { source.read("/w/a.kt") }
-        assertEquals("ENOENT: no such file", error.message)
+        assertEquals(WorkspaceFileErrors.NOT_FOUND, error.message)
+    }
+
+    @Test
+    fun anotherServerFailureKeepsItsReason() = runTest {
+        val (source, _) = source { listOf(readResponse(it, """"content":null,"success":false,"error":"EACCES: permission denied"""")) }
+        val error = assertFailsWith<WorkspaceFileException> { source.read("/w/a.kt") }
+        assertEquals("EACCES: permission denied", error.message)
     }
 
     @Test

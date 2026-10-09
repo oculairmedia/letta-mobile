@@ -126,6 +126,35 @@ class WorkspaceFilesControllersTest {
     }
 
     @Test
+    fun aRelativeNonMemoryPathWithoutAWorkingDirectoryIsNeverRead() = runTest {
+        val source = FakeWorkspace()
+        val viewer = WorkspaceFileViewerController(source, backgroundScope)
+
+        // A Read of src/foo.kt on the phone: no cwd, not a memory tool, so no read at all.
+        viewer.open("src/foo.kt", cwd = null, memoryAgentId = null)
+        runCurrent()
+        assertEquals(WorkspaceFileErrors.NO_WORKING_DIRECTORY, viewer.state.value.error)
+        viewer.retry()
+        runCurrent()
+        assertEquals(WorkspaceFileErrors.NO_WORKING_DIRECTORY, viewer.state.value.error)
+        assertEquals(emptyList(), source.reads)
+    }
+
+    @Test
+    fun aSourceWithoutMemoryReadsSaysNotSupportedNotNotFound() = runTest {
+        val viewer = WorkspaceFileViewerController(FakeWorkspace(), backgroundScope)
+        viewer.open("system/human/x.md", cwd = null, memoryAgentId = "agent-1")
+        runCurrent()
+        assertEquals(WorkspaceFileErrors.NOT_SUPPORTED, viewer.state.value.error)
+    }
+
+    @Test
+    fun onlyMemoryToolCallsCarryMemoryPaths() {
+        listOf("memory", "memory_insert", "memory_replace", "core_memory_append", "Memory").forEach { assertTrue(ToolFileTargets.isMemoryTool(it), it) }
+        listOf("Read", "Edit", "Write", "read_file", "", "shell").forEach { assertFalse(ToolFileTargets.isMemoryTool(it), it) }
+    }
+
+    @Test
     fun aReadForAFileNoLongerOpenIsDropped() {
         val open = WorkspaceFileViewerReducer.opening("/b.kt")
         assertEquals(open, WorkspaceFileViewerReducer.read(open, WorkspaceFileContent.Text("/a.kt", "x")))

@@ -381,7 +381,7 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
             )
         }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolArgumentLine(it) }
-        ToolCallFileLink(toolCall.arguments)
+        ToolCallFileLink(toolCall.arguments, toolName = toolCall.name)
         toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(view, it, isError, callbacks) }
         ToolGeneratedImages(toolCall, callbacks)
         ToolExecutionFooter(toolCall)
