@@ -20,6 +20,7 @@ import com.letta.mobile.data.controller.ApprovalRejectedException
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.withSelectedSuggestions
+import com.letta.mobile.data.runtime.approvalIdForSuggestions
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -166,11 +167,14 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val appServerEngine = turnEngine as? AppServerTurnEngine
         // letta-mobile-bzvro.11: a parked control request that is not a user-input tool is answered
         // against the control request's own id too (the card's id is the streamed message's).
-        val capturedRequestId = submission.toolCallId?.let { callId ->
-            appServerEngine?.userInputApprovalId(callId)
-                ?: appServerEngine?.pendingApprovalDetails?.value?.get(callId)?.approvalId
+        val capturedRequestId = capturedApprovalId(appServerEngine, submission)
+        // An always-allow is bound to the exact request its card offered the rule for; the streamed
+        // message id is never a stand-in for it, so a rule can't be persisted against another call.
+        val effectiveRequestId = if (submission.selectedSuggestionIds.isNotEmpty()) {
+            capturedRequestId ?: throw ApprovalRejectedException("the permission rule is no longer offered for this request")
+        } else {
+            capturedRequestId ?: requestId.value
         }
-        val effectiveRequestId = capturedRequestId ?: requestId.value
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
             updatedInput = answerUpdatedInput,
@@ -193,11 +197,33 @@ class DesktopHybridAppServerChatGateway internal constructor(
             // a server replay is re-answered. A rejection reaches the approval
             // coordinator's error path instead of vanishing.
             val result = appServerEngine.submitApprovalResponse(ApprovalSubmission(scope, effectiveRequestId, decision))
-            if (result is ApprovalSubmitResult.Rejected) throw ApprovalRejectedException(result.error)
+            if (result is ApprovalSubmitResult.Rejected) {
+                // The server no longer holds this request: drop its parked details so the card stops being live.
+                if (result.error.contains("no longer pending", ignoreCase = true)) {
+                    submission.toolCallId?.let { appServerEngine.clearUserInputApprovalId(it, effectiveRequestId) }
+                }
+                throw ApprovalRejectedException(result.error)
+            }
         }
         submission.toolCallId?.let { toolCallId ->
             capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(toolCallId, it) }
         }
+    }
+
+    /**
+     * The real control-request id to answer [submission] with: the registry's gate id, else the parked
+     * details'. With suggestion ids it is only the id the card's own details carried, and only while
+     * those are still the parked details for that call ([approvalIdForSuggestions]).
+     */
+    private fun capturedApprovalId(engine: AppServerTurnEngine?, submission: DesktopApprovalSubmission): String? {
+        val callId = submission.toolCallId ?: return null
+        val parked = engine?.pendingApprovalDetails?.value?.get(callId)
+        if (submission.selectedSuggestionIds.isNotEmpty()) {
+            return parked.approvalIdForSuggestions(
+                submission.suggestionToolCallId, submission.suggestionApprovalId, submission.selectedSuggestionIds,
+            )
+        }
+        return engine?.userInputApprovalId(callId) ?: parked?.approvalId
     }
 
     private val agentIdByConversation = ConcurrentHashMap<ConversationId, AgentId>()

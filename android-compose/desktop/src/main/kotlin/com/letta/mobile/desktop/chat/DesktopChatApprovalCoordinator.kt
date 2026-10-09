@@ -21,6 +21,8 @@ internal data class ApprovalSubmissionRequest(
     val approve: Boolean,
     val reason: String?,
     val selectedSuggestionIds: List<String> = emptyList(),
+    val suggestionToolCallId: String? = null,
+    val suggestionApprovalId: String? = null,
 )
 
 /**
@@ -91,7 +93,8 @@ internal class DesktopChatApprovalCoordinator(
         conversationId: String,
         request: ApprovalSubmissionRequest,
     ) {
-        val toolCallId = request.toolCallIds.firstOrNull()
+        // An always-allow targets exactly the call whose card offered the rule, not the first of the row.
+        val toolCallId = request.suggestionToolCallId ?: request.toolCallIds.firstOrNull()
         when (gw) {
             is ApprovalSubmittingGateway -> gw.submitApproval(
                 agentId = agentId,
@@ -110,6 +113,8 @@ internal class DesktopChatApprovalCoordinator(
                     approve = request.approve,
                     reason = request.reason,
                     selectedSuggestionIds = request.selectedSuggestionIds,
+                    suggestionToolCallId = request.suggestionToolCallId,
+                    suggestionApprovalId = request.suggestionApprovalId,
                 ),
             )
         }

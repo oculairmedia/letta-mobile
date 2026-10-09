@@ -132,7 +132,9 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * successful send for the OLD id must not delete.
      */
     fun clearIfMatches(gate: Gate) {
-        parked.resolve(gate.toolCallId)
+        // The parked details follow the same guard: only the request this gate answered is dropped,
+        // never a newer one that replaced it under a new approval id.
+        parked.resolveIfApproval(gate.toolCallId, gate.approvalId)
         synchronized(lock) {
             val victims = gates.entries
                 .filter { it.value[gate.toolCallId] == gate.approvalId }
@@ -151,6 +153,8 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
         while (gates.size > cap) {
             val victim = gates.keys.firstOrNull { it != keep } ?: return
             val dropped = gates.remove(victim)?.size ?: 0
+            // Its parked details go with it, or they would outlive any gate that could resolve them.
+            parked.clearKey(victim)
             // Repo convention: a bounded collection reports what it drops. This is
             // the same bound the lease registry applies, and matches the previous
             // storage (gates lived on TurnLeaseSlot, which evicts at the same cap).

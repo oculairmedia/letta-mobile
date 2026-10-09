@@ -85,6 +85,22 @@ class ApprovalRequestDetailsTest {
     }
 
     @Test
+    fun aHostileHugeDiffIsBoundedAtParseTime() {
+        val huge = "+x\\n".repeat(1_000_000)
+        val many = (1..50).joinToString(",") { """{"path":"f$it","unified_diff":"@@ -1 +1 @@\\n-a\\n+b"}""" }
+        val big = approvalFor("""{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"c1","diffs":[{"path":"${"p".repeat(50_000)}","unified_diff":"$huge"}]}""")
+        val diff = big.diffs.single()
+        val text = diff.unifiedDiff!!
+        assertTrue(text.length <= ApprovalRequestPayloadParser.MAX_DIFF_CHARS + 64, "chars bounded: ${text.length}")
+        assertTrue(text.lines().size <= ApprovalRequestPayloadParser.MAX_DIFF_LINES + 1)
+        assertTrue(text.endsWith(ApprovalRequestPayloadParser.TRUNCATION_MARKER))
+        assertEquals(ApprovalRequestPayloadParser.MAX_LABEL_CHARS, diff.path!!.length)
+
+        val capped = approvalFor("""{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"c2","diffs":[$many]}""")
+        assertEquals(ApprovalRequestPayloadParser.MAX_DIFFS, capped.diffs.size)
+    }
+
+    @Test
     fun aRequestWithoutTheOptionalFieldsKeepsTheOldShape() {
         val request = approvalFor(
             """{"subtype":"can_use_tool","tool_name":"Bash","tool_call_id":"c1","input":{"command":"ls"},
@@ -182,6 +198,33 @@ class ApprovalRequestDetailsTest {
     fun joinReturnsTheSameListWhenNothingIsParked() {
         val messages = listOf(message("m1", approval("call-1", "Edit")))
         assertSame(messages, withPendingApprovalDetails(messages, emptyMap()))
+    }
+
+    @Test
+    fun anAlwaysAllowIsHonouredOnlyForTheRequestItsCardOffered() {
+        val a = details("call-a")
+        val b = details("call-b")
+        // Parallel calls [A, B]: A's card was drawn, A resolved, the card redraws for B.
+        assertEquals("perm-call-b", b.approvalIdForSuggestions("call-b", "perm-call-b", listOf("s1")))
+        // A rule offered on A's card must never be attached to B (nor to a missing request).
+        assertNull(b.approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
+        assertNull(null.approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
+        // A re-surfaced request (new approval id) or a suggestion no longer offered is refused.
+        assertNull(a.copy(approvalId = "perm-new").approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
+        assertNull(a.approvalIdForSuggestions("call-a", "perm-call-a", listOf("gone")))
+        assertNull(a.approvalIdForSuggestions(null, null, listOf("s1")))
+    }
+
+    @Test
+    fun resolvingByApprovalIdKeepsANewerRequestForTheSameCall() {
+        val store = PendingApprovalDetailsStore()
+        val key = TurnRuntimeKey("agent", "conv-a")
+        store.record(key, details("call-a").copy(approvalId = "perm-new"))
+
+        store.resolveIfApproval("call-a", "perm-old")
+        assertEquals(setOf("call-a"), store.pending.value.keys)
+        store.resolveIfApproval("call-a", "perm-new")
+        assertTrue(store.pending.value.isEmpty())
     }
 
     private fun details(toolCallId: String) = PendingApprovalDetails(

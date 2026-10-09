@@ -49,6 +49,9 @@ class ChatRowApprovalDetailsUiTest {
             assertEquals(listOf("call-edit"), decision.toolCallIds)
             assertTrue(decision.approve)
             assertEquals(listOf("allow-edit-repo"), decision.selectedSuggestionIds)
+            // Bound to the details the card drew, so the gateway can refuse it if they changed.
+            assertEquals("call-edit", decision.suggestionToolCallId)
+            assertEquals("perm-call-edit", decision.suggestionApprovalId)
         }
     }
 

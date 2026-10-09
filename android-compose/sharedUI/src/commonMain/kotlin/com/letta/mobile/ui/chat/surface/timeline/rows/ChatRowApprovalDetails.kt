@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.ApprovalDiffPreview
-import com.letta.mobile.runtime.PermissionSuggestion
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_approval_always_allow
 import com.letta.mobile.sharedui.resources.rows_approval_blocked_path
@@ -73,7 +72,13 @@ internal fun ApprovalDiffPreviewBlock(preview: ApprovalDiffPreview) {
                 overflow = TextOverflow.Ellipsis,
             )
         } else if (title != null) {
-            Text(text = title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         if (diff != null) {
             CollapsibleDiff(diff)
@@ -82,6 +87,8 @@ internal fun ApprovalDiffPreviewBlock(preview: ApprovalDiffPreview) {
                 text = preview.note ?: stringResource(Res.string.rows_approval_diff_unavailable),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -111,11 +118,11 @@ private fun CollapsibleDiff(diff: String) {
  */
 @Composable
 internal fun AlwaysAllowButtons(
-    suggestions: List<PermissionSuggestion>,
+    details: PendingApprovalDetails,
     decider: ApprovalDecider,
-    toolCallIds: List<String>,
 ) {
     val submit = decider.submitAlwaysAllow ?: return
+    val suggestions = details.suggestions
     if (suggestions.isEmpty()) return
     val haptics = LocalHaptics.current
     Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
@@ -123,16 +130,13 @@ internal fun AlwaysAllowButtons(
             OutlinedButton(
                 onClick = {
                     haptics.play(LettaHapticCue.Confirm)
-                    submit(toolCallIds, suggestion.id)
+                    submit(details, suggestion.id)
                 },
                 enabled = decider.enabled,
                 modifier = Modifier.fillMaxWidth().testTag("${ChatRowTestTags.APPROVAL_ALWAYS_ALLOW}-${suggestion.id}"),
             ) {
-                Text(
-                    text = stringResource(Res.string.rows_approval_always_allow, suggestion.text),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                // The whole rule is shown: a persisted permission must be readable in full before it is granted.
+                Text(text = stringResource(Res.string.rows_approval_always_allow, suggestion.text))
             }
         }
     }

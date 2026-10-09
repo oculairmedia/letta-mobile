@@ -29,14 +29,33 @@ internal object ApprovalRequestPayloadParser {
     fun blockedPath(request: JsonObject): String? =
         request.string("blocked_path")?.takeIf { it.isNotBlank() }
 
+    /**
+     * The server's text is untrusted and shown on the UI thread, so it is bounded HERE, once:
+     * at most [MAX_DIFFS] previews, each cut to [MAX_DIFF_LINES] lines / [MAX_DIFF_CHARS] chars
+     * (with a marker), and paths/notes to [MAX_LABEL_CHARS]. Nothing downstream re-bounds it.
+     */
     fun diffs(request: JsonObject): List<ApprovalDiffPreview> =
-        (request["diffs"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.toPreview() }
+        (request["diffs"] as? JsonArray).orEmpty().asSequence()
+            .mapNotNull { (it as? JsonObject)?.toPreview() }
+            .take(MAX_DIFFS)
+            .toList()
+
+    const val MAX_DIFFS = 20
+    const val MAX_DIFF_LINES = 2_000
+    const val MAX_DIFF_CHARS = 200_000
+    const val MAX_LABEL_CHARS = 1_000
+    const val TRUNCATION_MARKER = "... diff truncated"
+
+    internal fun capDiff(text: String): String {
+        if (text.length <= MAX_DIFF_CHARS && text.count { it == '\n' } < MAX_DIFF_LINES) return text
+        val lines = text.take(MAX_DIFF_CHARS).lineSequence().take(MAX_DIFF_LINES).joinToString("\n")
+        return lines + "\n" + TRUNCATION_MARKER
+    }
 
     private fun JsonObject.toPreview(): ApprovalDiffPreview? {
-        val path = firstString("fileName", "file_name", "file_path", "path")
-        val unified = firstString("unified_diff", "unifiedDiff", "diff", "patch")
-            ?: hunkText(this["hunks"])
-        val note = firstString("reason", "message")
+        val path = firstString("fileName", "file_name", "file_path", "path")?.take(MAX_LABEL_CHARS)
+        val unified = (firstString("unified_diff", "unifiedDiff", "diff", "patch") ?: hunkText(this["hunks"]))?.let(::capDiff)
+        val note = firstString("reason", "message")?.take(MAX_LABEL_CHARS)
         return ApprovalDiffPreview(path = path, unifiedDiff = unified, note = note).takeUnless { it.isEmpty() }
     }
 

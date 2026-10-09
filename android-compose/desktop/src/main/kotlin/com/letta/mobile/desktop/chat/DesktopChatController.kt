@@ -834,6 +834,8 @@ class DesktopChatController(
                 approve = answer.approve,
                 reason = answer.reason,
                 selectedSuggestionIds = answer.selectedSuggestionIds,
+                suggestionToolCallId = answer.suggestionToolCallId,
+                suggestionApprovalId = answer.suggestionApprovalId,
             ),
         )
     }
