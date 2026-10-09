@@ -116,7 +116,6 @@ fun timelineEventToUiMessage(
             if (ev.messageType == TimelineMessageType.TOOL_RETURN) return null
             if (ev.messageType == TimelineMessageType.OTHER) return null
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
-            if (ev.messageType == TimelineMessageType.COMPACTION) return null
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
                 TimelineMessageType.ASSISTANT -> "assistant"
@@ -230,25 +229,7 @@ fun timelineEventToUiMessage(
         }
         is TimelineEvent.Confirmed -> {
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
-            if (ev.messageType == TimelineMessageType.COMPACTION) return compactionUiMessage(ev)
-
-            val projectedSubagentNotification = when (ev.messageType) {
-                TimelineMessageType.USER, TimelineMessageType.ASSISTANT -> extractSubagentNotification(ev.content)
-                else -> null
-            }
-            if (projectedSubagentNotification != null) {
-                return UiMessage(
-                    id = ev.serverId,
-                    role = "assistant",
-                    content = "",
-                    timestamp = ev.date.toString(),
-                    runId = ev.runId,
-                    agentId = ev.agentId,
-                    stepId = ev.stepId,
-                    clientMessageId = ev.otid.takeIf { it.isNotBlank() },
-                    subagentNotification = projectedSubagentNotification,
-                )
-            }
+            confirmedStructuredRow(ev)?.let { return it }
 
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
@@ -367,17 +348,6 @@ fun timelineEventToUiMessage(
         }
     }
 }
-
-/** letta-mobile-kr39h: a compaction summary row; a blank summary still marks where it happened. */
-private fun compactionUiMessage(ev: TimelineEvent.Confirmed): UiMessage = UiMessage(
-    id = ev.serverId,
-    role = "system",
-    content = ev.content,
-    timestamp = ev.date.toString(),
-    agentId = ev.agentId,
-    clientMessageId = ev.otid.takeIf { it.isNotBlank() },
-    isCompaction = true,
-)
 
 /** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */
 private fun pendingApprovalRequest(

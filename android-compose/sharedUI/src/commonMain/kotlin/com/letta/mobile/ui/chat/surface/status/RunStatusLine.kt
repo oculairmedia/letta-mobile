@@ -91,7 +91,7 @@ fun RunStatusLine(
     var dismissed by remember { mutableStateOf(emptySet<String>()) }
     val commands = status.commands.filter { it.running || it.commandId !in dismissed }
     val phase = phaseLabel(status).takeUnless { companionShowing && it is PhaseLabel.Fixed }
-    if (phase == null && commands.isEmpty() && status.notice == null && status.compaction == null) return
+    if (nothingToShow(phase, status, commands)) return
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -102,11 +102,22 @@ fun RunStatusLine(
         commands.forEach { command ->
             CommandCard(command, onDismiss = { dismissed = dismissed + command.commandId })
         }
-        status.compaction?.let { CompactionRow(it) }
-        if (phase != null) PhaseRow(phase, now)
-        status.notice?.let { NoticeText(it) }
+        StatusDetails(status, phase, now)
     }
 }
+
+/** The compaction, phase and notice lines, in that order; each only when it has something to say. */
+@Composable
+private fun StatusDetails(status: RuntimeLiveStatus, phase: PhaseLabel?, now: () -> Long) {
+    status.compaction?.let { CompactionRow(it) }
+    if (phase != null) PhaseRow(phase, now)
+    status.notice?.let { NoticeText(it) }
+}
+
+private fun nothingToShow(phase: PhaseLabel?, status: RuntimeLiveStatus, commands: List<CommandActivity>): Boolean =
+    phase == null && commands.isEmpty() && status.hasNoDetail()
+
+private fun RuntimeLiveStatus.hasNoDetail(): Boolean = notice == null && compaction == null
 
 /** What the phase row says, before any retry countdown is filled in; null when nothing runs. */
 internal sealed interface PhaseLabel {

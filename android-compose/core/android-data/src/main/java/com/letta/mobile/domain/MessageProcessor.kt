@@ -133,10 +133,7 @@ class MessageProcessor @Inject constructor(
                             onEmit(appMessage)
                         }
 
-                        is EventMessage -> Unit
-
-                        // letta-mobile-kr39h: compaction summaries render on the timeline path only.
-                        is com.letta.mobile.data.model.SummaryMessage -> Unit
+                        is EventMessage, is com.letta.mobile.data.model.SummaryMessage -> Unit
 
                         is HiddenReasoningMessage -> {
                         }
