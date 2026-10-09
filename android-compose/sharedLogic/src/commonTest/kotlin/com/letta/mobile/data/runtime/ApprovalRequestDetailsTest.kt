@@ -101,6 +101,35 @@ class ApprovalRequestDetailsTest {
     }
 
     @Test
+    fun suggestionsBlockedPathAndLineEndingsAreBoundedToo() {
+        val suggestions = (1..50).joinToString(",") { """{"id":"s$it","text":"${"r".repeat(100_000)}"}""" }
+        val request = approvalFor(
+            """{"subtype":"can_use_tool","tool_name":"Edit","tool_call_id":"c1","blocked_path":"${"b".repeat(50_000)}",
+               "permission_suggestions":[$suggestions]}""",
+        )
+        assertEquals(ApprovalRequestPayloadParser.MAX_SUGGESTIONS, request.suggestions.size)
+        assertTrue(request.suggestions.all { it.text.length == ApprovalRequestPayloadParser.MAX_SUGGESTION_CHARS })
+        assertEquals(ApprovalRequestPayloadParser.MAX_LABEL_CHARS, request.blockedPath!!.length)
+
+        val cr = ApprovalRequestPayloadParser.capDiff("+x\r".repeat(10_000))
+        assertTrue(cr.lines().size <= ApprovalRequestPayloadParser.MAX_DIFF_LINES + 2, "a \\r-separated diff is still line-capped")
+        assertTrue(cr.endsWith(ApprovalRequestPayloadParser.TRUNCATION_MARKER))
+
+        val exact = (1..ApprovalRequestPayloadParser.MAX_DIFF_LINES).joinToString("\n", postfix = "\n") { "+$it" }
+        assertEquals(exact, ApprovalRequestPayloadParser.capDiff(exact), "a diff of exactly the cap, newline-terminated, is not marked truncated")
+    }
+
+    @Test
+    fun theParkedStoreIsBoundedToTheNewestRequests() {
+        val store = PendingApprovalDetailsStore()
+        val key = TurnRuntimeKey("agent", "conv-a")
+        repeat(300) { store.record(key, details("call-$it")) }
+
+        assertEquals(200, store.pending.value.size)
+        assertTrue("call-299" in store.pending.value && "call-0" !in store.pending.value)
+    }
+
+    @Test
     fun aRequestWithoutTheOptionalFieldsKeepsTheOldShape() {
         val request = approvalFor(
             """{"subtype":"can_use_tool","tool_name":"Bash","tool_call_id":"c1","input":{"command":"ls"},

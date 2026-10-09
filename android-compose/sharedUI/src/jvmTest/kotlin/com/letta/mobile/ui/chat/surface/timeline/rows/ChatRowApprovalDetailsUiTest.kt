@@ -121,6 +121,40 @@ class ChatRowApprovalDetailsUiTest {
     }
 
     @Test
+    fun everyLineOfALongDiffCanBeReachedBeforeApproving() = runComposeUiTest {
+        // The harmful change sits far past the old 200-row window.
+        val lines = (1..1_500).joinToString("\n") { if (it == 900) "+harmful change" else "+line $it" }
+        val diff = "@@ -0,0 +1,1500 @@\n$lines"
+        setContent { MaterialTheme { RenderRow(single(editApproval(parked = true, diff = diff))) } }
+
+        onNodeWithText("harmful change", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithText("Show more (1461 lines not shown)").assertExists()
+        repeat(5) { onNodeWithTag(ChatRowTestTags.APPROVAL_DIFF_SHOW_ALL).performSemanticsAction(SemanticsActions.OnClick) }
+        onNodeWithText("harmful change", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun plainApproveAnswersTheParallelCallTheCardIsDrawnFor() = runComposeUiTest {
+        // [A, B] in one request; A has resolved, so the card is drawn from B's parked details.
+        val parallel = editApproval(parked = true).let { message ->
+            val request = message.approvalRequest!!
+            message.copy(
+                approvalRequest = request.copy(
+                    toolCalls = listOf(UiApprovalToolCall("call-a", "Edit", "{}")) + request.toolCalls,
+                ),
+            )
+        }
+        val actions = RecordingChatActions()
+        setContent { MaterialTheme { RenderRow(single(parallel), rowContext(), rowCallbacks(actions)) } }
+
+        onNodeWithText("Approve").performClick()
+
+        runOnIdle {
+            assertEquals(ApprovalBinding("call-edit", "perm-call-edit"), actions.approvals.single().suggestionBinding)
+        }
+    }
+
+    @Test
     fun anUnpreviewableFileShowsTheServersReason() = runComposeUiTest {
         setContent {
             MaterialTheme {

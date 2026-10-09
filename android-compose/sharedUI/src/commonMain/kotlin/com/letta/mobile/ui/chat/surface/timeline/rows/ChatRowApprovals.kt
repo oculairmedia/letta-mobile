@@ -112,12 +112,18 @@ internal fun rememberApprovalDecider(
     actions: ChatActions,
 ): ApprovalDecider {
     val isSubmitting = activeApprovalRequestId == approval.requestId
-    return remember(approval.requestId, isSubmitting, approvalsEnabled, actions) {
+    return remember(approval.requestId, approval.details?.binding, isSubmitting, approvalsEnabled, actions) {
         ApprovalDecider(
             requestId = approval.requestId,
             isSubmitting = isSubmitting,
             submit = if (approvalsEnabled) {
-                { ids, approve, reason -> actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
+                // Bound to the call the card is drawn for: a request with parallel calls is answered one
+                // gate at a time, and the card redraws for the next once this one resolves.
+                { ids, approve, reason ->
+                    actions.submitApproval(
+                        ChatApprovalAnswer(approval.requestId, ids, approve, reason, suggestionBinding = approval.details?.binding),
+                    )
+                }
             } else {
                 null
             },
@@ -126,7 +132,7 @@ internal fun rememberApprovalDecider(
                     actions.submitApproval(
                         ChatApprovalAnswer(
                             requestId = approval.requestId,
-                            toolCallIds = listOf(details.toolCallId),
+                            toolCallIds = approval.toolCalls.map { it.toolCallId },
                             approve = true,
                             reason = null,
                             selectedSuggestionIds = listOf(suggestionId),

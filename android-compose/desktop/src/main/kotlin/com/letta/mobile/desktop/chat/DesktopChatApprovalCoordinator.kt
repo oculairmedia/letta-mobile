@@ -45,12 +45,33 @@ internal class DesktopChatApprovalCoordinator(
     val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = _pendingApprovalDetails.asStateFlow()
     private var detailsJob: Job? = null
 
+    /**
+     * Requests answered one parallel call at a time: request id to (the call answered, its sibling
+     * calls). The tracker holds a request "submitting" until the whole request is decided; once the
+     * answered call's gate has resolved and a sibling is parked in its place, the card is for that
+     * sibling and must be actionable again.
+     */
+    private val answeredCalls = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Set<String>>>()
+
+    private fun releaseAnsweredCalls(parked: Map<String, PendingApprovalDetails>) {
+        answeredCalls.entries.removeIf { (requestId, calls) ->
+            val release = calls.first !in parked && calls.second.any { it in parked }
+            if (release) tracker.clear(requestId)
+            release
+        }
+    }
+
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
         detailsJob?.cancel()
         _pendingApprovalDetails.value = emptyMap()
         val source = gateway as? DesktopPendingApprovalSource ?: return
-        detailsJob = scope.launch { source.pendingApprovalDetails.collect { _pendingApprovalDetails.value = it } }
+        detailsJob = scope.launch {
+            source.pendingApprovalDetails.collect {
+                _pendingApprovalDetails.value = it
+                releaseAnsweredCalls(it)
+            }
+        }
     }
 
     private data class SubmissionTarget(
@@ -62,6 +83,7 @@ internal class DesktopChatApprovalCoordinator(
     fun submitApproval(request: ApprovalSubmissionRequest) {
         val target = validateSubmissionTarget(request) ?: return
         tracker.begin(request.requestId, target.conversationId)
+        request.suggestionBinding?.let { answeredCalls[request.requestId] = it.toolCallId to (request.toolCallIds - it.toolCallId).toSet() }
         launchSubmission(target, request)
     }
 
@@ -119,7 +141,10 @@ internal class DesktopChatApprovalCoordinator(
         }
     }
 
-    fun clearSubmittedApproval(requestId: String) = tracker.clear(requestId)
+    fun clearSubmittedApproval(requestId: String) {
+        answeredCalls.remove(requestId)
+        tracker.clear(requestId)
+    }
 
     fun reconcileSubmittedApprovals(conversationId: String, messages: List<UiMessage>) {
         if (tracker.submitting.value.isEmpty()) return

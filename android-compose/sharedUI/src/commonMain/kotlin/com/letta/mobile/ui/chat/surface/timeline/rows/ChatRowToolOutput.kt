@@ -37,6 +37,7 @@ import com.letta.mobile.data.diff.DiffLine
 import com.letta.mobile.data.diff.DiffLineKind
 import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.rows_diff_not_shown
 import com.letta.mobile.sharedui.resources.rows_tool_output_scroll_hint
 import com.letta.mobile.sharedui.resources.rows_tool_output_truncated
 import com.letta.mobile.ui.theme.ChatRowAlpha
@@ -155,7 +156,7 @@ private fun outputLineColor(kind: OutputLineKind): Color = when (kind) {
  * headers. Git metadata (diff/index/---/+++) is dropped.
  */
 @Composable
-internal fun DiffBlock(text: String) {
+internal fun DiffBlock(text: String, maxRows: Int = ChatRowDimens.diffVisibleLines) {
     val lines = remember(text) {
         UnifiedDiff.parse(text).filterNot { it.kind == DiffLineKind.FileHeader }
     }
@@ -166,7 +167,15 @@ internal fun DiffBlock(text: String) {
     ) {
         SelectionContainer {
             Column(modifier = Modifier.padding(vertical = LettaDimens.Space.sm)) {
-                lines.take(ChatRowDimens.diffVisibleLines).forEach { DiffBlockRow(it) }
+                lines.take(maxRows).forEach { DiffBlockRow(it) }
+                if (lines.size > maxRows) {
+                    Text(
+                        text = stringResource(Res.string.rows_diff_not_shown, lines.size - maxRows),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
+                    )
+                }
             }
         }
     }

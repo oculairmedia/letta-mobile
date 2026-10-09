@@ -33,7 +33,7 @@ data class PendingApprovalDetails(
         fun of(request: ToolApprovalRequest) = PendingApprovalDetails(
             approvalId = request.approvalId.value,
             toolCallId = request.callId.value,
-            toolName = request.toolName.value,
+            toolName = request.toolName.value.take(ApprovalRequestPayloadParser.MAX_TOOL_NAME_CHARS),
             suggestions = request.suggestions,
             blockedPath = request.blockedPath,
             diffs = request.diffs,
@@ -59,8 +59,12 @@ internal class PendingApprovalDetailsStore {
     val pending: StateFlow<Map<String, PendingApprovalDetails>> = view.asStateFlow()
 
     fun record(key: TurnRuntimeKey, details: PendingApprovalDetails) {
-        publish { it + (details.toolCallId to Entry(key, details)) }
+        // Re-recording a call moves it to the newest slot; past the cap the oldest request is dropped.
+        publish { (it - details.toolCallId + (details.toolCallId to Entry(key, details))).let(::boundedToNewest) }
     }
+
+    private fun boundedToNewest(entries: Map<String, Entry>): Map<String, Entry> =
+        if (entries.size <= MAX_PARKED) entries else entries.entries.drop(entries.size - MAX_PARKED).associate { it.toPair() }
 
     fun resolve(toolCallId: String) {
         publish { it - toolCallId }
@@ -78,6 +82,11 @@ internal class PendingApprovalDetailsStore {
      */
     fun clearKey(key: TurnRuntimeKey) {
         publish { current -> current.filterValues { it.key != key } }
+    }
+
+    private companion object {
+        /** Requests waiting on the person at once; a turn cannot meaningfully hold more. */
+        const val MAX_PARKED = 200
     }
 
     private fun publish(change: (Map<String, Entry>) -> Map<String, Entry>) {
