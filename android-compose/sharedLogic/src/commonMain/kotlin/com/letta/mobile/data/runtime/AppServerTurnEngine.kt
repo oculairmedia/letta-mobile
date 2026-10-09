@@ -886,13 +886,8 @@ class AppServerTurnEngine(
                     // close the gate against THIS id, which is not derivable
                     // from the tool_call_id across LLM providers (call_… vs
                     // toolu_…).
-                    approvals.record(
-                        key,
-                        ApprovalRegistry.Gate(
-                            toolCallId = payload.request.callId.value,
-                            approvalId = payload.request.approvalId.value,
-                        ),
-                    )
+                    val gate = ApprovalRegistry.Gate(payload.request.callId.value, payload.request.approvalId.value)
+                    approvals.record(key, gate)
                 }
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
