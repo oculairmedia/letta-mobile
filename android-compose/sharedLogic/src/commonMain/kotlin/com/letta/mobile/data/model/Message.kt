@@ -518,6 +518,34 @@ data class EventMessage(
     @SerialName("message_type") override val messageType: String = "event_message",
 ) : LettaMessage
 
+/**
+ * letta-mobile-kr39h: a conversation compaction's summary row. letta-code's local backend lists it
+ * in history (`projectLocalMessageToStoredMessages`) in place of the user-role row that carries
+ * `metadata.compaction`; [compactionStats] holds its `compaction_stats` when present.
+ *
+ * A row without an id keeps the old [UnknownMessage] behaviour (a generated id, never rendered)
+ * so one malformed element cannot fail a whole history page.
+ */
+@Serializable
+data class SummaryMessage(
+    override val id: String = generatedMessageId(GENERATED_SUMMARY_ID_PREFIX),
+    val summary: String? = null,
+    @SerialName("compaction_stats") val compactionStats: JsonElement? = null,
+    override val date: String? = null,
+    @SerialName("run_id") override val runId: String? = null,
+    @SerialName("step_id") override val stepId: String? = null,
+    override val otid: String? = null,
+    @SerialName("sender_id") override val senderId: String? = null,
+    @SerialName("is_err") override val isErr: Boolean? = null,
+    @SerialName("seq_id") override val seqId: Int? = null,
+    @SerialName("message_type") override val messageType: String = "summary_message",
+) : LettaMessage {
+    /** False for a row the server sent without an id: it has no stable identity to render under. */
+    val hasServerId: Boolean get() = !id.startsWith("$GENERATED_SUMMARY_ID_PREFIX-")
+}
+
+private const val GENERATED_SUMMARY_ID_PREFIX = "summary-unidentified"
+
 @Serializable
 data class ApprovalResponseMessage(
     override val id: String,
@@ -777,6 +805,7 @@ object LettaMessageSerializer : JsonContentPolymorphicSerializer<LettaMessage>(L
         "hidden_reasoning_message",
         "hidden_reasoning" -> HiddenReasoningMessage.serializer()
         "event_message" -> EventMessage.serializer()
+        "summary_message" -> SummaryMessage.serializer()
         "ping" -> PingMessage.serializer()
         "stop_reason" -> StopReason.serializer()
         "usage_statistics" -> UsageStatistics.serializer()

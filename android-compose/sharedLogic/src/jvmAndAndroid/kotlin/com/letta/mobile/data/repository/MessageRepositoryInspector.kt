@@ -82,6 +82,9 @@ internal fun LettaMessage.toInspectorMessage(): ConversationInspectorMessage {
         is ApprovalResponseMessage -> toApprovalResponseInspector(envelope)
         is HiddenReasoningMessage -> toHiddenReasoningInspector(envelope)
         is EventMessage -> toEventInspector(envelope)
+        is com.letta.mobile.data.model.SummaryMessage -> envelope.toMessage(
+            summary = summary?.takeIf { it.isNotBlank() } ?: "Compaction summary",
+        )
         is SystemMessage -> envelope.toMessage(
             summary = content.ifBlank { "System message" },
             extraDetails = senderId.senderDetail(),

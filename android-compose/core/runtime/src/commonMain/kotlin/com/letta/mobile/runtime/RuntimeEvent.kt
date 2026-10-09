@@ -221,7 +221,41 @@ sealed interface RuntimeEventPayload {
         val autoDeniedToolCallIds: List<String> = emptyList(),
         val userInputToolCallIds: List<String> = emptyList(),
     ) : RuntimeEventPayload
+
+    /**
+     * letta-mobile-kr39h: the server began compacting the conversation (`event_message` with
+     * `event_type: "compaction"`). letta-code streams this marker only for an automatic compaction;
+     * a manual compact reports through the command lifecycle instead.
+     */
+    @Serializable
+    @SerialName("compaction_started")
+    data class CompactionStarted(
+        val trigger: String? = null,
+    ) : RuntimeEventPayload
+
+    /**
+     * letta-mobile-kr39h: the compaction's `summary_message`. [stats] is letta-code's
+     * `compaction_stats`, absent on servers that do not report it. In local-backend mode its token
+     * counts are chars/4 estimates of the transcript only (system prompt and tools excluded).
+     */
+    @Serializable
+    @SerialName("compaction_finished")
+    data class CompactionFinished(
+        val summary: String = "",
+        val stats: CompactionStats? = null,
+    ) : RuntimeEventPayload
 }
+
+/** letta-code's `compaction_stats`; every field is optional on the wire. */
+@Serializable
+data class CompactionStats(
+    val trigger: String? = null,
+    val contextTokensBefore: Long? = null,
+    val contextTokensAfter: Long? = null,
+    val contextWindow: Long? = null,
+    val messagesCountBefore: Int? = null,
+    val messagesCountAfter: Int? = null,
+)
 
 /**
  * letta-mobile-bzvro.7: payloads that describe the run without being part of it. They never carry
@@ -234,6 +268,8 @@ val RuntimeEventPayload.isAdvisory: Boolean
         is RuntimeEventPayload.RetryNotice,
         is RuntimeEventPayload.StatusNotice,
         is RuntimeEventPayload.ApprovalClassified,
+        is RuntimeEventPayload.CompactionStarted,
+        is RuntimeEventPayload.CompactionFinished,
         -> true
         else -> false
     }
