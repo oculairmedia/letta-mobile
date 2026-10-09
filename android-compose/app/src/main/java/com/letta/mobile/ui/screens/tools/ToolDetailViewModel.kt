@@ -90,6 +90,7 @@ class ToolDetailViewModel @Inject constructor(
                 )
                 _uiState.value = UiState.Success(updated)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to update tool")
                 )
@@ -104,6 +105,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.deleteTool(toolId)
                 _deleteState.value = UiState.Success(Unit)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to delete tool")
                 )
@@ -125,6 +127,7 @@ class ToolDetailViewModel @Inject constructor(
                     availableAgents = agents.filter { agent -> agent.tools.none { it.id.value == toolId } }.toImmutableList(),
                 )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load agent attachments"))
             }
         }
@@ -136,6 +139,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.attachTool(agentId, toolId)
                 loadAgentAttachments()
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to attach tool to agent"))
             }
         }
@@ -147,6 +151,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.detachTool(agentId, toolId)
                 loadAgentAttachments()
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to detach tool from agent"))
             }
         }
