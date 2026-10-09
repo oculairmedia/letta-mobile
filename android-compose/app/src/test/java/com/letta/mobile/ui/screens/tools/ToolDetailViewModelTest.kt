@@ -78,10 +78,19 @@ class ToolDetailViewModelTest {
 
     @Test
     fun `loadTool resolves through the repository not the HTTP api`() = runTest {
-        fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
-        val viewModel = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "t1")), fakeToolApi, toolRepository, agentRepository)
-        awaitToolSuccess(viewModel)
-        assertEquals(listOf("getTool:t1"), fakeToolApi.calls.filter { it.startsWith("getTool") })
+        val tool = TestData.tool(id = "t1", name = "my_tool")
+        val api = FakeToolApi().apply { shouldFail = true } // any direct HTTP access would error
+        val requested = mutableListOf<String>()
+        val repo = object : ToolRepository(api) {
+            override suspend fun getTool(toolId: String): Tool {
+                requested.add(toolId)
+                return tool
+            }
+        }
+        val viewModel = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "t1")), api, repo, agentRepository)
+        assertEquals("my_tool", awaitToolSuccess(viewModel).name)
+        assertEquals(listOf("t1"), requested)
+        assertTrue(api.calls.none { it.startsWith("getTool") })
     }
 
     @Test

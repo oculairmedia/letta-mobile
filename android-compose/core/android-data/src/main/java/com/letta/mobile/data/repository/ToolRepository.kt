@@ -89,8 +89,10 @@ open class ToolRepository @Inject constructor(
     override suspend fun getTool(toolId: String): Tool {
         val irohSource = irohToolSource
         if (irohSource == null || !irohSource.shouldUseIroh()) return toolApi.getTool(toolId)
-        return findCached(toolId)
-            ?: irohGetOrNull(irohSource, toolId)
+        // tool.get first so a tool changed/deleted since the catalog loaded is not served stale;
+        // the cached catalog is only the fallback for hosts without tool.get.
+        return irohGetOrNull(irohSource, toolId)
+            ?: findCached(toolId)
             ?: refreshAndFind(toolId)
     }
 

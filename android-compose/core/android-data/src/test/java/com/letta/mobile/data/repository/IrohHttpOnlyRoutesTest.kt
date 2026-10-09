@@ -88,6 +88,27 @@ class IrohHttpOnlyRoutesTest {
     }
 
     @Test
+    fun `getTool under iroh asks the host even when the catalog is cached so deleted tools are not served stale`() = runTest {
+        val stale = TestData.tool(id = "gone")
+        var listed = false
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                when (method) {
+                    "tool.list" -> { listed = true; ok(json.encodeToJsonElement(ListSerializer(Tool.serializer()), listOf(stale))) }
+                    "tool.get" -> AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "tool gone not found")
+                    else -> error("unexpected $method")
+                }
+            }
+        }
+        val repository = ToolRepository(FakeToolApi(), IrohAdminRpcToolSource(transport, irohSettings()))
+        repository.refreshTools()
+        assertTrue(listed)
+
+        val e = assertThrows(ToolUnavailableException::class.java) { runBlockingUnit { repository.getTool("gone") } }
+        assertEquals(ToolUnavailableException.Reason.NOT_FOUND, e.reason)
+    }
+
+    @Test
     fun `getTool under iroh reports not found for an unknown id`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ ->
