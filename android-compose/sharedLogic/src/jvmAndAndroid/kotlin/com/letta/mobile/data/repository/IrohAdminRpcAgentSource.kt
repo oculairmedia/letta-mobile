@@ -72,10 +72,18 @@ class IrohAdminRpcAgentSource(
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
-    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
+        getContextBreakdown(agentId, conversationId, reportedTotal = null)
+
+    override suspend fun getContextBreakdown(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        reportedTotal: Int?,
+    ): ContextWindowOverview {
         val params = buildJsonObject {
             put("agent_id", agentId.value)
             conversationId?.let { put("conversation_id", it.value) }
+            reportedTotal?.let { put("reported_total", it) }
         }
         val path = buildString {
             append("/v1/agents/${agentId.value}/context")

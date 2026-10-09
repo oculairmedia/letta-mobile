@@ -157,8 +157,8 @@ open class LocalBackendAdminStore(
     fun runExists(runId: String): Boolean = runReader.runExists(runId)
 
     /** See [LocalBackendContextReader.agentContextProjected]. */
-    fun agentContextProjected(agentId: String, conversationId: String?): JsonObject? =
-        contextReader.agentContextProjected(agentId, conversationId)
+    fun agentContextProjected(agentId: String, conversationId: String?, reportedTotal: Int? = null): JsonObject? =
+        contextReader.agentContextProjected(agentId, conversationId, reportedTotal)
 
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"
