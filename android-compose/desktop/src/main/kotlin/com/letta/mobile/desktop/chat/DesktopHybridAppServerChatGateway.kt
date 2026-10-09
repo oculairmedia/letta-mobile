@@ -19,12 +19,14 @@ import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.controller.ApprovalRejectedException
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
+import com.letta.mobile.data.controller.withSelectedSuggestions
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -175,8 +177,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             message = submission.reason,
             defaultApproveMessage = "Approved by desktop client.",
             defaultDenyMessage = "Denied by desktop client.",
-            selectedSuggestionIds = submission.selectedSuggestionIds,
-        )
+        ).withSelectedSuggestions(submission.selectedSuggestionIds)
         if (appServerEngine == null) {
             client.input(
                 AppServerCommand.Input(

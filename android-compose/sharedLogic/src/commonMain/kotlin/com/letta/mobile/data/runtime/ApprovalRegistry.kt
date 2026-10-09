@@ -1,8 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.runtime.ToolApprovalRequest
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-lgns8.22.5: runtime-key-scoped store of OUTSTANDING user-input
@@ -47,6 +49,15 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     private val gates = linkedMapOf<TurnRuntimeKey, Map<String, String>>()
 
     /**
+     * letta-mobile-bzvro.11/.12: what each parked `can_use_tool` request offered, for any tool. It
+     * follows the gates' lifecycle (resolved with the tool call, dropped with the runtime's turn).
+     */
+    private val parked = PendingApprovalDetailsStore()
+    val parkedDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = parked.pending
+
+    fun park(key: TurnRuntimeKey, request: ToolApprovalRequest) = parked.record(key, PendingApprovalDetails.of(request))
+
+    /**
      * One parked interactive tool call. [approvalId] is the REAL can_use_tool
      * control-request id; pairing the two in a type keeps callers from
      * transposing two same-typed identifiers at the call site.
@@ -72,6 +83,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * the submit path already consumed it.
      */
     fun resolve(key: TurnRuntimeKey, toolCallId: String) {
+        parked.resolve(toolCallId)
         synchronized(lock) {
             val current = gates[key] ?: return
             val next = current - toolCallId
@@ -86,6 +98,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * Scoped to one key — a sibling runtime's parked question survives.
      */
     fun clearKey(key: TurnRuntimeKey) {
+        parked.clearKey(key)
         synchronized(lock) { gates.remove(key) }
     }
 
@@ -119,6 +132,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * successful send for the OLD id must not delete.
      */
     fun clearIfMatches(gate: Gate) {
+        parked.resolve(gate.toolCallId)
         synchronized(lock) {
             val victims = gates.entries
                 .filter { it.value[gate.toolCallId] == gate.approvalId }

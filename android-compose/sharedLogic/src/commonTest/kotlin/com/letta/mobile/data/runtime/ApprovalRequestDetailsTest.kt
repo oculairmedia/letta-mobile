@@ -3,6 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.controller.AppServerApprovalDecisions
+import com.letta.mobile.data.controller.withSelectedSuggestions
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -28,7 +29,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /** letta-mobile-bzvro.11 / .12: the optional parts of a 0.33.6 `can_use_tool` control request. */
@@ -119,29 +122,19 @@ class ApprovalRequestDetailsTest {
 
     @Test
     fun choosingARuleSendsItsIdOnTheAllowDecision() {
-        val decision = AppServerApprovalDecisions.decide(
-            approve = true,
-            updatedInput = null,
-            message = null,
-            defaultApproveMessage = "ok",
-            defaultDenyMessage = "no",
-            selectedSuggestionIds = listOf("allow-edit-repo"),
-        )
-        val allow = assertIs<AppServerApprovalResponseDecision.Allow>(decision)
-        val wire = Json.encodeToString(AppServerApprovalResponseDecision.serializer(), allow)
-        assertEquals(
-            listOf("allow-edit-repo"),
-            Json.parseToJsonElement(wire).jsonObject["selected_permission_suggestion_ids"]
-                ?.let { (it as kotlinx.serialization.json.JsonArray).map { e -> (e as kotlinx.serialization.json.JsonPrimitive).content } },
-        )
-        assertEquals("allow", Json.parseToJsonElement(wire).jsonObject["behavior"]?.toString()?.trim('"'))
+        val decision = AppServerApprovalDecisions.decide(true, null, null, "ok", "no")
+            .withSelectedSuggestions(listOf("allow-edit-repo"))
+
+        val wire = Json.parseToJsonElement(Json.encodeToString(AppServerApprovalResponseDecision.serializer(), decision)).jsonObject
+        assertEquals("allow", (wire["behavior"] as JsonPrimitive).content)
+        assertEquals(listOf("allow-edit-repo"), (wire["selected_permission_suggestion_ids"] as JsonArray).map { (it as JsonPrimitive).content })
     }
 
     @Test
     fun aPlainApprovalOrDenialCarriesNoRuleIds() {
-        val allow = AppServerApprovalDecisions.decide(true, null, null, "ok", "no")
+        val allow = AppServerApprovalDecisions.decide(true, null, null, "ok", "no").withSelectedSuggestions(emptyList())
         assertNull(assertIs<AppServerApprovalResponseDecision.Allow>(allow).selectedPermissionSuggestionIds)
-        val deny = AppServerApprovalDecisions.decide(false, null, null, "ok", "no", selectedSuggestionIds = listOf("x"))
+        val deny = AppServerApprovalDecisions.decide(false, null, null, "ok", "no").withSelectedSuggestions(listOf("x"))
         assertIs<AppServerApprovalResponseDecision.Deny>(deny)
     }
 

@@ -284,13 +284,7 @@ internal class DesktopChatActions(
         // A second press while the first answer is in flight must not answer twice.
         if (answer.requestId in controller.submittingApprovals.value) return
         if (controller.canSubmitApprovals.value) {
-            controller.submitApprovalWithRules(
-                answer.requestId,
-                answer.toolCallIds,
-                answer.approve,
-                answer.reason,
-                answer.selectedSuggestionIds,
-            )
+            controller.submitApproval(answer)
         }
     }
 

@@ -71,3 +71,7 @@ internal class PendingApprovalDetailsStore {
         }
     }
 }
+
+/** letta-mobile-bzvro.11/.12: what each parked control request of [this] engine offered, by tool call id. */
+val AppServerTurnEngine.pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>>
+    get() = approvals.parkedDetails

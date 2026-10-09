@@ -37,8 +37,7 @@ internal object ApprovalRequestPayloadParser {
         val unified = firstString("unified_diff", "unifiedDiff", "diff", "patch")
             ?: hunkText(this["hunks"])
         val note = firstString("reason", "message")
-        if (path == null && unified == null && note == null) return null
-        return ApprovalDiffPreview(path = path, unifiedDiff = unified, note = note)
+        return ApprovalDiffPreview(path = path, unifiedDiff = unified, note = note).takeUnless { it.isEmpty() }
     }
 
     /** `structuredPatch`-style hunks: `{oldStart, oldLines, newStart, newLines, lines: ["+x", "-y", " z"]}`. */

@@ -12,6 +12,7 @@ import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
@@ -471,7 +472,13 @@ internal fun createDesktopChatDetailPaneActions(
     return ChatDetailPaneActions(
         onComposerTextChanged = chatController::updateComposerText,
         onSend = chatController::send,
-        onSubmitApproval = chatController::submitApproval.takeIf { params.canSubmitApprovals },
+        onSubmitApproval = if (params.canSubmitApprovals) {
+            { requestId, toolCallIds, approve, reason ->
+                chatController.submitApproval(ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
+            }
+        } else {
+            null
+        },
         onA2uiAction = params.onA2uiAction,
         onAttachImage = params.onAttachImage,
         onOpenCanvas = params.onOpenCanvas,

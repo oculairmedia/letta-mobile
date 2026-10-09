@@ -199,11 +199,7 @@ class AppServerTurnEngine(
      * Owns what `TurnLeaseSlot.approvalIds` used to hold; see [ApprovalRegistry]
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
-    private val approvals = ApprovalRegistry()
-
-    /** letta-mobile-bzvro.11/.12: what each parked control request offered (suggestions, blocked path, diffs). */
-    private val pendingDetails = PendingApprovalDetailsStore()
-    val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = pendingDetails.pending
+    internal val approvals = ApprovalRegistry()
     private val queueHygiene = AppServerQueueHygiene(
         client,
         requestIdFactory,
@@ -451,7 +447,6 @@ class AppServerTurnEngine(
 
     fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
         approvals.clearIfMatches(ApprovalRegistry.Gate(toolCallId, requestId))
-        pendingDetails.resolve(toolCallId)
     }
 
     /**
@@ -874,19 +869,13 @@ class AppServerTurnEngine(
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
             is RuntimeEventPayload.ApprovalRequested -> {
                 ledger.emitted.add(payload.request.callId.value)
-                // letta-mobile-vilsn.6: this ApprovalRequested reached
-                // the collect body, which means it was NOT auto-approved
-                // (auto-approved drafts are swallowed above via
-                // autoApprovedToolCallDraft). If it is a runtime
-                // user-input tool (AskUserQuestion / ExitPlanMode) the
-                // turn is now parked awaiting the user's answer — record
-                // an outstanding gate so the idle watchdog is paused and
-                // the unanswered question does not synthesize a Failed
-                // idle timeout.
-                // letta-mobile-bzvro.11: a control request that reaches here under a permission
-                // mode that does not approve everything genuinely waits on the person, whatever
-                // the tool. Record what it offered so the card can show it.
-                pendingDetails.record(key, PendingApprovalDetails.of(payload.request))
+                // letta-mobile-vilsn.6: this ApprovalRequested reached the collect body, so it was
+                // NOT auto-approved (those are swallowed above via autoApprovedToolCallDraft). A
+                // runtime user-input tool (AskUserQuestion / ExitPlanMode) now parks the turn
+                // awaiting the answer: record an outstanding gate so the idle watchdog is paused and
+                // the unanswered question does not synthesize a Failed idle timeout. Any tool's
+                // request genuinely waits on the person, so park what it offered (bzvro.11).
+                approvals.park(key, payload.request)
                 if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
                     // letta-mobile-vilsn: record the REAL approval id
                     // (the can_use_tool control-request request_id, e.g.
@@ -914,7 +903,6 @@ class AppServerTurnEngine(
                 // lift the pause for this specific id (no-op if the submit
                 // path already consumed it).
                 approvals.resolve(key, payload.toolCallId.value)
-                pendingDetails.resolve(payload.toolCallId.value)
             }
             is RuntimeEventPayload.RemoteStreamFrame -> {
                 // Extract tool_call_id from tool_call_message and approval_request_message frames
@@ -940,7 +928,6 @@ class AppServerTurnEngine(
         extractToolCallId(payload.body)?.let {
             ledger.returned.add(it)
             approvals.resolve(key, it)
-            pendingDetails.resolve(it)
         }
     }
 
@@ -1012,10 +999,7 @@ class AppServerTurnEngine(
                     }
                 },
                 track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring.lease.slot.key, ledger) },
-                clearApprovals = {
-                    approvals.clearKey(wiring.lease.slot.key)
-                    pendingDetails.clearKey(wiring.lease.slot.key)
-                },
+                clearApprovals = { approvals.clearKey(wiring.lease.slot.key) },
                 emit = emitDraft,
                 settle = { ledger, reason ->
                     settleDanglingToolCalls(wiring.command, ledger.emitted, ledger.returned, emitDraft, reason)
@@ -1332,7 +1316,6 @@ class AppServerTurnEngine(
             // user-input gate so none leaks into a later turn and keeps a fresh
             // watchdog wrongly paused.
             approvals.clearKey(slot.key)
-            pendingDetails.clearKey(slot.key)
             fanoutSubscriberId?.let { subId ->
                 withContext(NonCancellable) {
                     inboundSource.unsubscribe(subId)

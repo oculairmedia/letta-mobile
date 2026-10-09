@@ -145,7 +145,10 @@ data class ApprovalDiffPreview(
     val path: String? = null,
     val unifiedDiff: String? = null,
     val note: String? = null,
-)
+) {
+    /** Nothing to show: no file, no diff and no note. */
+    fun isEmpty(): Boolean = path == null && unifiedDiff == null && note == null
+}
 
 @Serializable
 data class ToolApprovalDecision(

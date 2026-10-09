@@ -32,6 +32,7 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
@@ -822,31 +823,17 @@ class DesktopChatController(
      * Answer or dismiss a parked approval (e.g. AskUserQuestion) surfaced in the
      * selected conversation.
      */
-    fun submitApproval(
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ) = submitApprovalWithRules(requestId, toolCallIds, approve, reason, selectedSuggestionIds = emptyList())
-
-    /** As above, approving with the `permission_suggestions` ids in [selectedSuggestionIds] (letta-mobile-bzvro.11). */
-    fun submitApprovalWithRules(
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-        selectedSuggestionIds: List<String>,
-    ) {
+    fun submitApproval(answer: ChatApprovalAnswer) {
         if (closed) return
         approvalCoordinator.submitApproval(
             ApprovalSubmissionRequest(
                 gateway = gateway,
                 conversation = _state.value.selectedConversation,
-                requestId = requestId,
-                toolCallIds = toolCallIds,
-                approve = approve,
-                reason = reason,
-                selectedSuggestionIds = selectedSuggestionIds,
+                requestId = answer.requestId,
+                toolCallIds = answer.toolCallIds,
+                approve = answer.approve,
+                reason = answer.reason,
+                selectedSuggestionIds = answer.selectedSuggestionIds,
             ),
         )
     }
