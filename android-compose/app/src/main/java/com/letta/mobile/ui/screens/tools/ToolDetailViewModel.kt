@@ -16,6 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,11 +56,12 @@ class ToolDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val tool = toolApi.getTool(toolId)
+                val tool = toolRepository.getTool(toolId)
                 _uiState.value = UiState.Success(tool)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = UiState.Error(
-                    mapErrorToUserMessage(e, "Failed to load tool")
+                    mapErrorToUserMessage(e, "Failed to load tool: ${e.message ?: e::class.simpleName}")
                 )
             }
         }
@@ -88,6 +90,7 @@ class ToolDetailViewModel @Inject constructor(
                 )
                 _uiState.value = UiState.Success(updated)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _uiState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to update tool")
                 )
@@ -102,6 +105,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.deleteTool(toolId)
                 _deleteState.value = UiState.Success(Unit)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to delete tool")
                 )
@@ -123,6 +127,7 @@ class ToolDetailViewModel @Inject constructor(
                     availableAgents = agents.filter { agent -> agent.tools.none { it.id.value == toolId } }.toImmutableList(),
                 )
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load agent attachments"))
             }
         }
@@ -134,6 +139,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.attachTool(agentId, toolId)
                 loadAgentAttachments()
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to attach tool to agent"))
             }
         }
@@ -145,6 +151,7 @@ class ToolDetailViewModel @Inject constructor(
                 toolRepository.detachTool(agentId, toolId)
                 loadAgentAttachments()
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to detach tool from agent"))
             }
         }

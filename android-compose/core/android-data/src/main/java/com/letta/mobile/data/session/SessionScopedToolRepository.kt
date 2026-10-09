@@ -84,6 +84,7 @@ class SessionScopedToolRepository internal constructor(
     override suspend fun refreshTools(): Unit = sessionManager.withCurrentSession { it.toolRepository.refreshTools() }
     override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.toolRepository.refreshToolsIfStale(maxAgeMs) }
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = sessionManager.withCurrentSession { it.toolRepository.fetchToolsPage(limit, offset) }
+    override suspend fun getTool(toolId: String): Tool = sessionManager.withCurrentSession { it.toolRepository.getTool(toolId) }
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId): Unit = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
     override suspend fun detachTool(agentId: AgentId, toolId: ToolId): Unit = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
     override suspend fun upsertTool(params: ToolCreateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.upsertTool(params) }

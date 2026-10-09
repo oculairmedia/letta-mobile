@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.repository.api.ToolUnavailableException
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 open class ToolRepository @Inject constructor(
@@ -79,10 +81,50 @@ open class ToolRepository @Inject constructor(
         return toolApi.listTools(limit = limit, offset = offset)
     }
 
+    /**
+     * HTTP backends read `GET /v1/tools/{id}`. Under iroh:// that route has no admin_rpc path (the
+     * guard rejects it), so the tool comes from `tool.get`, falling back to the cached `tool.list`
+     * catalog when the host does not expose it. A miss is a typed NOT_FOUND, not a generic failure.
+     */
+    override suspend fun getTool(toolId: String): Tool {
+        val irohSource = irohToolSource
+        if (irohSource == null || !irohSource.shouldUseIroh()) return toolApi.getTool(toolId)
+        // tool.get first so a tool changed/deleted since the catalog loaded is not served stale;
+        // the cached catalog is only the fallback for hosts without tool.get.
+        return irohGetOrNull(irohSource, toolId)
+            ?: findCached(toolId)
+            ?: refreshAndFind(toolId)
+    }
+
+    private fun findCached(toolId: String): Tool? = _tools.value.firstOrNull { it.id.value == toolId }
+
+    private suspend fun refreshAndFind(toolId: String): Tool {
+        refreshMutex.withLock { refreshToolsLocked() }
+        return findCached(toolId) ?: throw toolNotFound(toolId)
+    }
+
+    /** `tool.get`, or null when the host cannot answer it (caller falls back to the catalog). */
+    private suspend fun irohGetOrNull(source: IrohAdminRpcToolSource, toolId: String): Tool? =
+        try {
+            source.getTool(ToolId(toolId))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val detail = e.message.orEmpty()
+            when {
+                detail.contains("not found", ignoreCase = true) -> throw toolNotFound(toolId, e)
+                detail.contains("capability_unavailable") || detail.contains("unknown method", ignoreCase = true) -> null
+                else -> throw e
+            }
+        }
+
+    private fun toolNotFound(toolId: String, cause: Throwable? = null) =
+        ToolUnavailableException(ToolUnavailableException.Reason.NOT_FOUND, "Tool $toolId was not found", cause)
+
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.attachTool(agentId.value, toolId.value)
+            irohSource.attachTool(agentId, toolId)
         } else {
             toolApi.attachTool(agentId.value, toolId.value)
         }
@@ -98,7 +140,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.detachTool(agentId.value, toolId.value)
+            irohSource.detachTool(agentId, toolId)
         } else {
             toolApi.detachTool(agentId.value, toolId.value)
         }
@@ -125,7 +167,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
         val irohSource = irohToolSource
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.updateTool(toolId.value, params)
+            irohSource.updateTool(toolId, params)
         } else {
             toolApi.updateTool(toolId.value, params)
         }
@@ -143,7 +185,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun deleteTool(toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteTool(toolId.value)
+            irohSource.deleteTool(toolId)
         } else {
             toolApi.deleteTool(toolId.value)
         }

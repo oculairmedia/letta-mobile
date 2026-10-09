@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepFeedbackUpdateParams
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.repository.api.ToolUnavailableException
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeRunApi
@@ -67,6 +68,96 @@ class IrohHttpOnlyRoutesTest {
         assertEquals(listOf("t5"), last.map { it.id.value })
         assertEquals(3, transport.adminRpcCalls.size)
         assertTrue("no HTTP under iroh://", fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getTool under iroh resolves over tool get admin rpc without HTTP`() = runTest {
+        val tool = TestData.tool(id = "t7", name = "seven")
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, body ->
+                assertEquals("tool.get", method)
+                assertEquals("\"t7\"", json.parseToJsonElement(body!!).jsonObject.getValue("tool_id").jsonPrimitive.toString())
+                ok(json.encodeToJsonElement(Tool.serializer(), tool))
+            }
+        }
+        val fakeApi = FakeToolApi()
+        val repository = ToolRepository(fakeApi, IrohAdminRpcToolSource(transport, irohSettings()))
+
+        assertEquals("seven", repository.getTool("t7").name)
+        assertTrue("no HTTP under iroh://", fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getTool under iroh asks the host even when the catalog is cached so deleted tools are not served stale`() = runTest {
+        val stale = TestData.tool(id = "gone")
+        var listed = false
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                when (method) {
+                    "tool.list" -> { listed = true; ok(json.encodeToJsonElement(ListSerializer(Tool.serializer()), listOf(stale))) }
+                    "tool.get" -> AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "tool gone not found")
+                    else -> error("unexpected $method")
+                }
+            }
+        }
+        val repository = ToolRepository(FakeToolApi(), IrohAdminRpcToolSource(transport, irohSettings()))
+        repository.refreshTools()
+        assertTrue(listed)
+
+        val e = assertThrows(ToolUnavailableException::class.java) { runBlockingUnit { repository.getTool("gone") } }
+        assertEquals(ToolUnavailableException.Reason.NOT_FOUND, e.reason)
+    }
+
+    @Test
+    fun `getTool under iroh reports not found for an unknown id`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "tool nope not found")
+            }
+        }
+        val fakeApi = FakeToolApi()
+        val repository = ToolRepository(fakeApi, IrohAdminRpcToolSource(transport, irohSettings()))
+
+        val e = assertThrows(ToolUnavailableException::class.java) { runBlockingUnit { repository.getTool("nope") } }
+        assertEquals(ToolUnavailableException.Reason.NOT_FOUND, e.reason)
+        assertTrue(fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getTool under iroh falls back to the tool list catalog when tool get is unavailable`() = runTest {
+        val catalog = listOf(TestData.tool(id = "a"), TestData.tool(id = "b"))
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                when (method) {
+                    "tool.get" -> AppServerInboundFrame.AdminRpcResponse(
+                        requestId = "req", success = false, error = "capability_unavailable: tool.get",
+                    )
+                    "tool.list" -> ok(json.encodeToJsonElement(ListSerializer(Tool.serializer()), catalog))
+                    else -> error("unexpected $method")
+                }
+            }
+        }
+        val fakeApi = FakeToolApi()
+        val repository = ToolRepository(fakeApi, IrohAdminRpcToolSource(transport, irohSettings()))
+
+        assertEquals("b", repository.getTool("b").id.value)
+        val e = assertThrows(ToolUnavailableException::class.java) { runBlockingUnit { repository.getTool("zzz") } }
+        assertEquals(ToolUnavailableException.Reason.NOT_FOUND, e.reason)
+        assertTrue(fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getTool on an HTTP backend still reads over HTTP`() = runTest {
+        val fakeApi = FakeToolApi().apply { tools.add(TestData.tool(id = "h1")) }
+        val transport = FakeChannelTransport()
+        val httpSettings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(id = "http", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://letta.example.com"),
+        )
+        val repository = ToolRepository(fakeApi, IrohAdminRpcToolSource(transport, httpSettings))
+
+        assertEquals("h1", repository.getTool("h1").id.value)
+        assertEquals(listOf("getTool:h1"), fakeApi.calls)
+        assertTrue(transport.adminRpcCalls.isEmpty())
     }
 
     @Test
