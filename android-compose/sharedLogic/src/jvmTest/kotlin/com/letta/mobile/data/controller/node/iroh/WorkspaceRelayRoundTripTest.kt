@@ -113,11 +113,14 @@ class WorkspaceRelayRoundTripTest {
     fun theCapabilityMatrixGatesEachFamily() = runTest {
         val server = FakeAppServer()
         val desktopRole = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE
-        // A paired desktop reads and writes memory and reads files ...
+        // A paired desktop reads and writes memory ...
         AppServerMemfsSource(client = { client(server, desktopRole) }, events = emptyFlow(), requestId = { it }).list("agent-1")
-        AppServerWorkspaceFileSource(client = { client(server, desktopRole) }, requestId = { it }).read("/repo/README.md")
-        // ... but manages secrets only with admin.full, and the denial never reaches the App Server.
+        // ... but reads host files and manages secrets only with admin.full; a denial never reaches the App Server.
         val before = server.received.size
+        val filesDenied = assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException> {
+            AppServerWorkspaceFileSource(client = { client(server, desktopRole) }, requestId = { it }).read("/etc/passwd")
+        }
+        assertEquals(WorkspaceRelayClient.forbidden(WorkspaceRelayAccess.Files), filesDenied.message)
         val denied = assertFailsWith<AgentSecretsException> {
             AppServerAgentSecretsSource(client = { client(server, desktopRole) }, requestId = { it }).list("agent-1")
         }

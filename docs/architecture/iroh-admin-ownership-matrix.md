@@ -148,7 +148,7 @@ The agent-workspace commands (MemFS browser, secrets vault, workspace files) are
 command (`WorkspaceRelayMethod`); `WorkspaceRelay.decodeCommand` applies the field
 caps before forwarding through the node's own `AppServerClient.workspaceRequest`.
 Authorization: MemFS reads `memory.read`, MemFS writes `memory.write`, files
-`chat.send`, secrets `admin.full` (`IrohPeerCapabilities.forWorkspaceMethod`). The
+`admin.full` (they read any host path), secrets `admin.full` (`IrohPeerCapabilities.forWorkspaceMethod`). The
 host advertises `workspace_relay_v1` on auth. Secret values cross the encrypted
 Iroh connection but never telemetry or error text. Clients need a host built with
 this change: redeploy `meridian-iroh-wrapper`. Details:

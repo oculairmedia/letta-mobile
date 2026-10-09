@@ -135,13 +135,14 @@ object IrohPeerCapabilities {
 
     /**
      * letta-mobile-bzvro.37: MemFS reads and writes ride the memory tier like blocks. Workspace files
-     * need chat.send: a peer that may run the agent (whose tools read the same files) may read them.
-     * Secrets are plaintext credentials, so only an admin.full peer manages them.
+     * take an absolute host path (`read_file`) or any host directory (`search_files` cwd) and the App
+     * Server reads whatever its process can, so they are admin.full, like secrets (plaintext
+     * credentials): neither is scoped to the agent's workspace.
      */
     fun forWorkspaceMethod(method: WorkspaceRelayMethod): String = when (method.access) {
         WorkspaceRelayAccess.MemoryRead -> MEMORY_READ
         WorkspaceRelayAccess.MemoryWrite -> MEMORY_WRITE
-        WorkspaceRelayAccess.Files -> CHAT_SEND
+        WorkspaceRelayAccess.Files -> ADMIN_FULL
         WorkspaceRelayAccess.Secrets -> ADMIN_FULL
     }
 

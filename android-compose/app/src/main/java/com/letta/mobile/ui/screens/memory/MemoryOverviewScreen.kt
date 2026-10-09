@@ -51,8 +51,13 @@ fun MemoryOverviewScreen(
     filesViewModel: MemoryFilesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val files by filesViewModel.state.collectAsStateWithLifecycle()
     var view by rememberSaveable { mutableStateOf(MemoryView.Blocks) }
     BackHandler(enabled = view == MemoryView.Blocks && state.selection != null) { viewModel.actions.clearSelection() }
+    // An open file closes first, through the shared unsaved-changes guard, so back never drops a draft.
+    val fileOpen = view == MemoryView.Files && files.editor != null
+    BackHandler(enabled = fileOpen) { filesViewModel.controller.closeFile() }
+    val onBack = { if (fileOpen) filesViewModel.controller.closeFile() else onNavigateBack() }
     val agentId = state.parity.memory.selectedAgentId
     LaunchedEffect(agentId) { filesViewModel.selectAgent(agentId) }
 
@@ -62,7 +67,7 @@ fun MemoryOverviewScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_memory_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = onBack) {
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
@@ -73,7 +78,6 @@ fun MemoryOverviewScreen(
         Column(Modifier.padding(paddingValues).fillMaxSize()) {
             MemoryViewSwitch(view = view, onSelect = { view = it })
             if (view == MemoryView.Files) {
-                val files by filesViewModel.state.collectAsStateWithLifecycle()
                 MemfsPage(
                     state = files,
                     actions = filesViewModel.controller,

@@ -13,7 +13,8 @@ builds. **No new flags, env vars, config or allowlist files**: the methods regis
 whenever the wrapper has its native App Server client (it always does in production:
 `--app-server-url ws://127.0.0.1:4500`). Authorization uses the existing paired-peer capabilities
 (`/etc/meridian/paired-peers.json`): MemFS reads `memory.read`, MemFS writes `memory.write`,
-workspace files `chat.send`, secrets `admin.full`. Bearer-token peers keep full access as today.
+workspace files and secrets `admin.full` (default-role paired devices get "not allowed" for those two;
+grant `admin.full` with `pair.peer.set_capabilities` if wanted). Bearer-token peers keep full access as today.
 
 Until the host runs this build, clients show "The Iroh host does not relay this yet. Update the
 host (meridian-iroh-wrapper)…" in the Memory → Files tab, the file viewer and `@` file search.

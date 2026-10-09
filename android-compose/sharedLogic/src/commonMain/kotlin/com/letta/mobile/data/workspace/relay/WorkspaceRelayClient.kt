@@ -86,7 +86,7 @@ class WorkspaceRelayClient(private val relay: WorkspaceRelayCall) : AppServerCli
         fun forbidden(access: WorkspaceRelayAccess): String = when (access) {
             WorkspaceRelayAccess.MemoryRead -> "This device is not allowed to read memory on the Iroh host."
             WorkspaceRelayAccess.MemoryWrite -> "This device is not allowed to change memory on the Iroh host."
-            WorkspaceRelayAccess.Files -> "This device is not allowed to read workspace files on the Iroh host."
+            WorkspaceRelayAccess.Files -> "This device is not allowed to read files on the Iroh host (it needs admin access)."
             WorkspaceRelayAccess.Secrets -> "This device is not allowed to manage secrets on the Iroh host (it needs admin access)."
         }
     }
