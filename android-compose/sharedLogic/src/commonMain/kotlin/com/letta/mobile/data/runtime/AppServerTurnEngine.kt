@@ -869,12 +869,11 @@ class AppServerTurnEngine(
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
             is RuntimeEventPayload.ApprovalRequested -> {
                 ledger.emitted.add(payload.request.callId.value)
-                // letta-mobile-vilsn.6: this ApprovalRequested reached the collect body, so it was
-                // NOT auto-approved (those are swallowed above via autoApprovedToolCallDraft). A
-                // runtime user-input tool (AskUserQuestion / ExitPlanMode) now parks the turn
-                // awaiting the answer: record an outstanding gate so the idle watchdog is paused and
-                // the unanswered question does not synthesize a Failed idle timeout. Any tool's
-                // request genuinely waits on the person, so park what it offered (bzvro.11).
+                // vilsn.6: reaching the collect body means NOT auto-approved (swallowed above via
+                // autoApprovedToolCallDraft). A user-input tool (AskUserQuestion / ExitPlanMode)
+                // parks the turn: record an outstanding gate so the idle watchdog pauses instead of
+                // synthesizing a Failed idle timeout. Any tool's request waits on the person, so
+                // park what it offered (bzvro.11).
                 approvals.park(key, payload.request)
                 if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
                     // letta-mobile-vilsn: record the REAL approval id
