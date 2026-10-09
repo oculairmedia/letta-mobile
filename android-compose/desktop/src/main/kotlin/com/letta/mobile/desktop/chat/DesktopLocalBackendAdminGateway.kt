@@ -73,6 +73,13 @@ internal class DesktopLocalBackendAdminGateway(
         shared.setConversationRemoved(com.letta.mobile.data.model.ConversationId(conversationId), removed = true)
     }
 
+    override val deleteArchivesConversation: Boolean get() = true
+
+    /** The undo of [deleteConversation]: un-archive and un-hide. */
+    override suspend fun restoreDeletedConversation(conversationId: String) {
+        shared.setConversationRemoved(com.letta.mobile.data.model.ConversationId(conversationId), removed = false)
+    }
+
     /** letta-mobile-bzvro.17: rename (and the generated title) is the conversation's `summary`. */
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
         shared.renameConversation(update)

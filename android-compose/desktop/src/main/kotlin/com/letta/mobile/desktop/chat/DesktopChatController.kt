@@ -156,6 +156,19 @@ class DesktopChatController(
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
 
     /**
+     * letta-mobile-bzvro.31: the conversation a delete just archived, which the shell offers to
+     * bring back (an undo snackbar). Null when nothing is pending, or where delete is permanent.
+     */
+    private val _undoableDeletion = MutableStateFlow<String?>(null)
+    val undoableDeletion: StateFlow<String?> = _undoableDeletion.asStateFlow()
+
+    /**
+     * Whether the active backend's delete only archives (the bundled App Server has no delete
+     * command), so the confirm dialog can say so instead of "permanently removed".
+     */
+    val deleteArchivesConversation: Boolean get() = gateway?.deleteArchivesConversation == true
+
+    /**
      * Conversation awaiting the agent's reply. Set the moment a prompt is sent
      * and cleared once the agent's response starts landing (or on failure/
      * timeout). Drives the "thinking" indicator — `isSending` alone is too brief
@@ -555,6 +568,7 @@ class DesktopChatController(
             try {
                 nextGateway.deleteConversation(conversationId)
                 if (closed) return@launch
+                _undoableDeletion.value = conversationId.takeIf { nextGateway.deleteArchivesConversation }
                 val wasSelected = _state.value.selectedConversationId == conversationId
                 _state.update {
                     it.withRuntimeState(
@@ -581,6 +595,32 @@ class DesktopChatController(
                 _state.update { current -> current.copy(errorMessage = message) }
             } finally {
                 _deletingConversationIds.update { it - conversationId }
+            }
+        }
+    }
+
+    /** The snackbar timed out or was dismissed: the deletion can no longer be undone from the shell. */
+    fun clearUndoableDeletion(conversationId: String) {
+        _undoableDeletion.update { if (it == conversationId) null else it }
+    }
+
+    /**
+     * letta-mobile-bzvro.31: brings back the conversation a delete archived, then re-reads the
+     * roster so it rejoins the list. The current selection is left alone.
+     */
+    fun undoDeleteConversation(conversationId: String) {
+        if (closed) return
+        clearUndoableDeletion(conversationId)
+        scope.launch {
+            val nextGateway = gateway ?: return@launch
+            try {
+                nextGateway.restoreDeletedConversation(conversationId)
+                refreshConversationRoster()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                val message = t.message ?: t::class.simpleName ?: "Restore failed"
+                _state.update { current -> current.copy(errorMessage = message) }
             }
         }
     }

@@ -26,6 +26,18 @@ interface ChatGateway : TimelineTransport {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")
     }
 
+    /**
+     * True when the backend has no delete command and [deleteConversation] archives (and hides)
+     * the conversation instead (bundled App Server, Iroh admin_rpc). UIs then word the confirm
+     * dialog as an archive and may offer [restoreDeletedConversation] as an undo.
+     */
+    val deleteArchivesConversation: Boolean get() = false
+
+    /** Undoes a [deleteConversation] that only archived; unsupported where delete is real. */
+    suspend fun restoreDeletedConversation(conversationId: String) {
+        throw UnsupportedOperationException("restoreDeletedConversation is not supported by this gateway")
+    }
+
     companion object {
         const val DEFAULT_CONVERSATION_LIMIT = 40
         const val DEFAULT_AGENT_CONVERSATION_LIMIT = 500

@@ -386,6 +386,12 @@ class DesktopHybridAppServerChatGateway internal constructor(
         agentIdByConversation.remove(ConversationId(conversationId))
     }
 
+    override val deleteArchivesConversation: Boolean get() = adminGateway.deleteArchivesConversation
+
+    override suspend fun restoreDeletedConversation(conversationId: String) {
+        adminGateway.restoreDeletedConversation(conversationId)
+    }
+
     /** letta-mobile-bzvro.17: titles (rename, generated) are the admin gateway's to write. */
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation =
         adminGateway.requireCapability<ConversationSummaryGateway>("rename conversations")

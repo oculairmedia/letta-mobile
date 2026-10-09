@@ -130,6 +130,22 @@ class DesktopLocalBackendAdminGatewayTest {
     }
 
     @Test
+    fun `restoring a deleted conversation un-archives and un-hides it`() = runTest {
+        // letta-mobile-bzvro.31: the undo of the archiving delete.
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            retrieveConversation = conversation("conversation-1", archived = true)
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        assertEquals(true, gateway.deleteArchivesConversation)
+        gateway.restoreDeletedConversation("conversation-1")
+
+        assertEquals("conversation-1", client.updateCommand?.conversationId)
+        assertEquals(false, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
+        assertEquals(false, client.updateCommand?.body?.get("hidden")?.jsonPrimitive?.boolean)
+    }
+
+    @Test
     fun `rename writes the conversation summary`() = runTest {
         val client = FakeAppServerClient(failedCreateResponse())
         val gateway = DesktopLocalBackendAdminGateway(client)

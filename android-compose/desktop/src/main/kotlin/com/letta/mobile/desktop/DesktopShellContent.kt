@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasLibrary
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -51,6 +52,14 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     DesktopShellLayoutBody(context, frame)
                 }
                 DesktopShellOverlays(context, frame)
+                val chatController = context.core.chatController
+                val undoable by chatController.undoableDeletion.collectAsState()
+                DesktopUndoDeleteSnackbar(
+                    pendingConversationId = undoable,
+                    onUndo = chatController::undoDeleteConversation,
+                    onExpire = chatController::clearUndoableDeletion,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }
@@ -187,6 +196,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onDestinationSelected = navigator::navigate,
             onConversationSelected = { context.router.openConversation(ConversationId(it)) },
             onDeleteConversation = chatController::deleteConversation,
+            deleteArchivesConversation = chatController.deleteArchivesConversation,
             onRenameConversation = { id, title ->
                 chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
             },

@@ -219,6 +219,13 @@ class IrohAdminRpcChatGateway(
         agentIdByConversation.remove(ConversationId(conversationId))
     }
 
+    /** `conversation_delete` is not exposed over admin_rpc, so a delete archives. */
+    override val deleteArchivesConversation: Boolean get() = true
+
+    override suspend fun restoreDeletedConversation(conversationId: String) {
+        setConversationArchived(conversationId, archived = false)
+    }
+
     override suspend fun listConversationMessages(
         conversationId: String,
         limit: Int?,
