@@ -151,6 +151,9 @@ class DesktopChatController(
     private val _workingDirectoryLoading = MutableStateFlow(false)
     val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
 
+    /** The active gateway, for capabilities a port reads off it (the permission mode). */
+    internal val activeGateway: DesktopChatGateway? get() = gateway
+
     /** Whether the active gateway can report/change a conversation's working directory. */
     val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
 

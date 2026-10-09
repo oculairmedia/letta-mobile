@@ -433,6 +433,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     onRecencyDaysChange = settings.onRailRecencyDaysChange,
                 )
             }
+            item { DesktopPermissionModeSettingsCard() }
             item {
                 DesktopNucleusSettingsCard(
                     state = inputs.nucleus,

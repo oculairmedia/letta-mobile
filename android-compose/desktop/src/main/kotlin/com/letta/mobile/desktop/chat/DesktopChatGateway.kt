@@ -83,6 +83,25 @@ interface DesktopPendingApprovalSource {
 }
 
 /**
+ * letta-mobile-bzvro.13: a gateway that runs the App Server turn engine itself can read and change a
+ * conversation's permission mode. A gateway that cannot (HTTP-only, relayed over an admin RPC) does not
+ * implement this, and the composer shows no mode chip for it.
+ */
+interface DesktopPermissionModeController {
+    val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry
+
+    /** Why this connection cannot change the mode (the chip then shows it, locked), or null when it can. */
+    val permissionModeUnavailableReason: String?
+
+    /** Asks for [mode] on the conversation's runtime; true once the server echoed it. */
+    suspend fun setPermissionMode(
+        agentId: String,
+        conversationId: String,
+        mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode,
+    ): Boolean
+}
+
+/**
  * A decision for a parked approval. [reason] carries an AskUserQuestion answer
  * when encoded via [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason];
  * otherwise it's a plain allow/deny message.

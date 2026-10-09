@@ -623,6 +623,16 @@ class AppServerTurnEngine(
     suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
         deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
 
+    /**
+     * letta-mobile-bzvro.13: changes the permission mode with `change_device_state{mode}` and confirms it
+     * from the matching `update_device_status`. A runtime this engine has not started needs no wire
+     * change: its `runtime_start` carries the mode the provider returns.
+     */
+    suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean {
+        val started = leases.peek(TurnRuntimeKey(agentId, conversationId))?.runtimeScope ?: return true
+        return deviceState.changePermissionMode(started, mode)
+    }
+
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
         val acquiredAtMs = currentTimeMs()
         val ownerProcessRole = permissionModeProvider(command).name
@@ -870,25 +880,14 @@ class AppServerTurnEngine(
             is RuntimeEventPayload.ApprovalRequested -> {
                 ledger.emitted.add(payload.request.callId.value)
                 // vilsn.6: reaching the collect body means NOT auto-approved (swallowed above via
-                // autoApprovedToolCallDraft). A user-input tool (AskUserQuestion / ExitPlanMode)
-                // parks the turn: record an outstanding gate so the idle watchdog pauses instead of
-                // synthesizing a Failed idle timeout. Any tool's request waits on the person, so
-                // park what it offered (bzvro.11).
+                // autoApprovedToolCallDraft), so the turn is parked on the person. bzvro.13: that holds
+                // for any tool once a permission mode other than approve-all can be chosen, not only
+                // AskUserQuestion / ExitPlanMode. Park what the request offered (bzvro.11) and record
+                // an outstanding gate: it pauses the idle watchdog instead of synthesizing a Failed idle
+                // timeout, and holds the REAL can_use_tool request id (e.g. perm-call_..., not derivable
+                // from the tool_call_id across providers) the answer must carry; submitApproval clears it.
                 approvals.park(key, payload.request)
-                if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
-                    // letta-mobile-vilsn: record the REAL approval id
-                    // (the can_use_tool control-request request_id, e.g.
-                    // perm-call_...) keyed by tool_call_id. This map is
-                    // BOTH the submit path's source (submitApproval
-                    // clears it after a successful response) AND the
-                    // watchdog's outstanding-gate set (vilsn.6): a non-empty
-                    // map pauses the idle watchdog. Interactive answers must
-                    // close the gate against THIS id, which is not derivable
-                    // from the tool_call_id across LLM providers (call_… vs
-                    // toolu_…).
-                    val gate = ApprovalRegistry.Gate(payload.request.callId.value, payload.request.approvalId.value)
-                    approvals.record(key, gate)
-                }
+                approvals.record(key, ApprovalRegistry.Gate(payload.request.callId.value, payload.request.approvalId.value))
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
                 ledger.returned.add(payload.toolCallId.value)

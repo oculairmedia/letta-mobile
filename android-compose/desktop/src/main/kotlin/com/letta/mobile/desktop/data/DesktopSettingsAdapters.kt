@@ -314,6 +314,9 @@ data class DesktopDataBindings(
      */
     val modelControl: com.letta.mobile.data.repository.modelcontrol.ModelControlSession? =
         modelControlRpc?.let { com.letta.mobile.data.repository.modelcontrol.ModelControlSession(it) },
+    /** letta-mobile-bzvro.13: the persisted default permission mode, shared by the gateway and the settings card. */
+    val permissionModeSettings: com.letta.mobile.data.runtime.PermissionModeSettings =
+        com.letta.mobile.data.runtime.PermissionModeSettings(secureSettingsStore),
 )
 
 fun createDefaultDesktopDataBindings(

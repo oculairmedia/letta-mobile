@@ -126,6 +126,13 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
         approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds)
     }
 
+    val permissionModes = mutableListOf<com.letta.mobile.data.transport.appserver.AppServerPermissionMode>()
+
+    override fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) {
+        record("setPermissionMode")
+        permissionModes += mode
+    }
+
     override fun submitA2uiAction(action: A2uiAction) = record("submitA2uiAction")
 
     override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) {

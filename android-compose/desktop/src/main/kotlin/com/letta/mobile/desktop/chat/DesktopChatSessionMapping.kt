@@ -15,6 +15,7 @@ import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
+import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -136,6 +137,7 @@ internal data class DesktopChatComposerInputs(
     val workingDirectory: DesktopWorkingDirectoryInputs,
     val canQueueWhileStreaming: Boolean,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
+    val permissionMode: ChatPermissionModeUiState? = null,
 )
 
 internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): ChatComposerUiState {
@@ -154,6 +156,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions),
         contextUsage = inputs.host.contextUsage,
         workingDirectory = inputs.workingDirectory.toUiState(),
+        permissionMode = inputs.permissionMode,
     )
 }
 

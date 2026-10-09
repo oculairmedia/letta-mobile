@@ -160,6 +160,10 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
+    // The mode chip sits with the directory: chrome of the full page, not of the compact dock.
+    if (model.mode != ChatSurfaceMode.Docked) {
+        model.composer.permissionMode?.let { ComposerPermissionModeRow(it, actions::setPermissionMode) }
+    }
     if (model.composer.backgroundProcesses.isNotEmpty()) {
         BackgroundProcessShelf(
             processes = model.composer.backgroundProcesses,

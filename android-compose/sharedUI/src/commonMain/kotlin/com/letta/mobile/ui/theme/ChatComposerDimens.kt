@@ -26,6 +26,7 @@ object ChatComposerDimens {
     val popoverGap: Dp = 6.dp
 
     val effortPopoverWidth: Dp = 230.dp
+    val permissionModePopoverWidth: Dp = 280.dp
     val contextPopoverWidth: Dp = 330.dp
 
     /** The share column in the context breakdown, wide enough for "100%". */

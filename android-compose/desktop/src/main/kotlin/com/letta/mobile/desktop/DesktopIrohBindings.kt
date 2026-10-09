@@ -269,7 +269,10 @@ private fun buildDesktopChatController(
         scope = runtime.chatScope,
         gatewayFactory = {
             bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
-                ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
+                ?: createDefaultDesktopChatGateway(
+                    runtime.bootstrapState.config,
+                    permissionModeSettings = runtime.dataBindings.permissionModeSettings,
+                )
         },
         agentNamesByIdProvider = { agentIds ->
             resolveDesktopAgentNames(agentIds, agentRepository())

@@ -6,8 +6,11 @@ import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
+import com.letta.mobile.data.runtime.PermissionModeState
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 
 /**
  * letta-mobile-bglj6.1: everything the shared chat page's composer draws.
@@ -45,6 +48,7 @@ data class ChatComposerUiState(
     val model: ChatModelUiState? = null,
     val contextUsage: ContextWindowUsageState? = null,
     val workingDirectory: ChatWorkingDirectoryUiState? = null,
+    val permissionMode: ChatPermissionModeUiState? = null,
     val backgroundProcesses: ImmutableList<com.letta.mobile.data.transport.appserver.AppServerBackgroundProcess> = persistentListOf(),
 ) {
     val hasPayload: Boolean get() = text.isNotBlank() || attachments.isNotEmpty()
@@ -104,3 +108,24 @@ data class ChatWorkingDirectoryUiState(
     val isLoading: Boolean = false,
     val branch: String? = null,
 )
+
+/**
+ * letta-mobile-bzvro.13: the permission-mode chip. [selected] is the mode the server confirmed;
+ * [pending] a request still waiting for the server's `update_device_status` echo. The chip is
+ * shown disabled, with [unavailableReason], where this owner cannot change the mode.
+ */
+@Immutable
+data class ChatPermissionModeUiState(
+    val selected: AppServerPermissionMode,
+    val pending: AppServerPermissionMode? = null,
+    /** The last requested change was not confirmed. */
+    val failed: Boolean = false,
+    val unavailableReason: String? = null,
+    val options: ImmutableList<AppServerPermissionMode> = AppServerPermissionMode.entries.toImmutableList(),
+) {
+    val canChange: Boolean get() = unavailableReason == null && pending == null
+}
+
+/** The chip's state for a runtime's [PermissionModeState]; [unavailableReason] locks it. */
+fun PermissionModeState.toUiState(unavailableReason: String? = null): ChatPermissionModeUiState =
+    ChatPermissionModeUiState(selected = mode, pending = pending, failed = failed, unavailableReason = unavailableReason)

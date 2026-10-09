@@ -9,6 +9,9 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.RuntimePermissionDefaults
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatMessageId
@@ -17,6 +20,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -329,8 +333,61 @@ class DesktopChatSessionPortTest {
         assertFalse(escapeCollapsesToCanvas(ChatSurfaceMode.FullScreen, Key.Enter, KeyEventType.KeyDown))
     }
 
-    private fun TestScope.startedPort(): Pair<DesktopChatController, DesktopChatSessionPort> {
-        val controller = testController()
+    @Test
+    fun aGatewayWithoutPermissionModesShowsNoChip() = runTest {
+        val (controller, port) = startedPort()
+
+        assertNull(port.composer.value.permissionMode)
+
+        controller.close()
+    }
+
+    @Test
+    fun theChipFollowsTheGatewaysModeAndTheDefaultStaysUnrestricted() = runTest {
+        val gateway = ModeGateway()
+        val (controller, port) = startedPort(gateway)
+
+        val chip = port.composer.value.permissionMode
+        assertEquals(AppServerPermissionMode.Unrestricted, chip?.selected, "the default is Unrestricted")
+        assertNull(chip?.unavailableReason)
+
+        port.actions.setPermissionMode(AppServerPermissionMode.Standard)
+        runCurrent()
+        assertEquals(listOf(Triple("agent-0", "conv-1", AppServerPermissionMode.Standard)), gateway.requested)
+        assertEquals(AppServerPermissionMode.Standard, port.composer.value.permissionMode?.selected)
+
+        controller.close()
+    }
+
+    @Test
+    fun aLockedGatewayShowsTheReasonAndIgnoresRequests() = runTest {
+        val gateway = ModeGateway(permissionModeUnavailableReason = "Not supported over Iroh yet")
+        val (controller, port) = startedPort(gateway)
+
+        assertEquals("Not supported over Iroh yet", port.composer.value.permissionMode?.unavailableReason)
+        port.actions.setPermissionMode(AppServerPermissionMode.Strict)
+        runCurrent()
+        assertEquals(emptyList(), gateway.requested)
+
+        controller.close()
+    }
+
+    private class ModeGateway(
+        override val permissionModeUnavailableReason: String? = null,
+    ) : FakeDesktopChatGateway(), DesktopPermissionModeController {
+        override val permissionModes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))
+        val requested = mutableListOf<Triple<String, String, AppServerPermissionMode>>()
+
+        override suspend fun setPermissionMode(agentId: String, conversationId: String, mode: AppServerPermissionMode): Boolean {
+            requested += Triple(agentId, conversationId, mode)
+            return permissionModes.change(agentId, conversationId, mode) { true }
+        }
+    }
+
+    private fun TestScope.startedPort(
+        gateway: DesktopChatGateway = FakeDesktopChatGateway(),
+    ): Pair<DesktopChatController, DesktopChatSessionPort> {
+        val controller = testController(gateway)
         val port = DesktopChatSessionPort(controller = controller, scope = backgroundScope)
         // The page always collects both; the port shares only while it does.
         backgroundScope.launch { port.uiState.collect {} }
@@ -340,11 +397,11 @@ class DesktopChatSessionPortTest {
         return controller to port
     }
 
-    private fun TestScope.testController(): DesktopChatController =
+    private fun TestScope.testController(gateway: DesktopChatGateway = FakeDesktopChatGateway()): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
-            gatewayFactory = { FakeDesktopChatGateway() },
+            gatewayFactory = { gateway },
             timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
