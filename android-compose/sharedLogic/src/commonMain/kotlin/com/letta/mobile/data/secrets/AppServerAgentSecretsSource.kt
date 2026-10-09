@@ -97,25 +97,34 @@ object AgentSecretsRedaction {
     private const val RELAYED_SECRET_APPLY = "secret.apply"
     private val Redacted = JsonPrimitive(AppServerProtocol.REDACTED_PLACEHOLDER)
 
-    fun redact(frame: JsonObject): JsonObject = when ((frame["type"] as? JsonPrimitive)?.content) {
-        SECRET_LIST_RESPONSE -> frame.replace("secrets") { secrets ->
-            JsonArray((secrets as? JsonArray).orEmpty().map { entry -> (entry as? JsonObject)?.replace("value") { Redacted } ?: Redacted })
-        }
+    fun redact(frame: JsonObject): JsonObject = when (frame.text("type")) {
+        SECRET_LIST_RESPONSE -> frame.replace("secrets", ::redactEntries)
         SECRET_APPLY -> frame.replace("set", ::redactValues)
-        ADMIN_RPC -> if ((frame["method"] as? JsonPrimitive)?.content == RELAYED_SECRET_APPLY) {
-            frame.replace("params") { params -> (params as? JsonObject)?.replace("set", ::redactValues) ?: Redacted }
-        } else {
-            frame
-        }
-        ADMIN_RPC_RESPONSE -> frame.replace("result") { result ->
-            (result as? JsonObject)?.replace("frames") { frames ->
-                JsonArray((frames as? JsonArray).orEmpty().map { relayed -> (relayed as? JsonObject)?.let(::redact) ?: relayed })
-            } ?: result
-        }
+        ADMIN_RPC -> redactRelayedRequest(frame)
+        ADMIN_RPC_RESPONSE -> frame.replace("result", ::redactRelayedResult)
         else -> frame
     }
 
+    private fun redactEntries(secrets: JsonElement): JsonElement =
+        JsonArray((secrets as? JsonArray).orEmpty().map { entry -> (entry as? JsonObject)?.replace("value") { Redacted } ?: Redacted })
+
     private fun redactValues(set: JsonElement): JsonElement = JsonObject((set as? JsonObject).orEmpty().mapValues { Redacted })
+
+    /** A `secret.apply` admin_rpc carries the values in `params.set`. */
+    private fun redactRelayedRequest(frame: JsonObject): JsonObject {
+        if (frame.text("method") != RELAYED_SECRET_APPLY) return frame
+        return frame.replace("params") { params -> (params as? JsonObject)?.replace("set", ::redactValues) ?: Redacted }
+    }
+
+    /** A relayed answer carries the App Server's frames in `result.frames`. */
+    private fun redactRelayedResult(result: JsonElement): JsonElement {
+        val obj = result as? JsonObject ?: return result
+        return obj.replace("frames") { frames ->
+            JsonArray((frames as? JsonArray).orEmpty().map { relayed -> (relayed as? JsonObject)?.let(::redact) ?: relayed })
+        }
+    }
+
+    private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.content
 
     private fun JsonObject.replace(key: String, transform: (JsonElement) -> JsonElement): JsonObject {
         val current = this[key] ?: return this

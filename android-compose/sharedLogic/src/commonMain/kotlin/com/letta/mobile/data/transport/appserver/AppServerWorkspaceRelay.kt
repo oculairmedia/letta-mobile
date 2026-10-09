@@ -143,88 +143,90 @@ object WorkspaceRelay {
             is AppServerSecretCommand -> validateSecret(command)
             is AppServerFileCommand -> validateFile(command)
             is AppServerCommand.WriteMemoryFile -> {
-                requireAgentId(command.agentId)
-                requireMemoryPath(command.path, "path")
-                require(command.content.length <= MAX_WRITE_CHARS, "content")
-                requireEncoding(command.encoding)
-                require((command.commitMessage?.length ?: 0) <= MAX_MEMORY_PATH_CHARS, "commit_message")
+                RelayField.AgentId.requires(command.agentId.isAgentId())
+                RelayField.Path.requires(command.path.isMemoryPath())
+                RelayField.Content.requires(command.content.length <= MAX_WRITE_CHARS)
+                RelayField.Encoding.requires(command.encoding.isEncoding())
+                RelayField.CommitMessage.requires((command.commitMessage?.length ?: 0) <= MAX_MEMORY_PATH_CHARS)
             }
             else -> throw WorkspaceRelayException("this command is not relayed over Iroh")
         }
     }
 
     private fun validateMemfs(command: AppServerMemfsCommand) {
-        requireAgentId(command.agentId)
+        RelayField.AgentId.requires(command.agentId.isAgentId())
         when (command) {
             is AppServerMemfsCommand.ListMemory, is AppServerMemfsCommand.EnableMemfs -> Unit
             is AppServerMemfsCommand.ReadMemoryFile -> {
-                requireMemoryPath(command.path, "path")
-                requireEncoding(command.encoding)
+                RelayField.Path.requires(command.path.isMemoryPath())
+                RelayField.Encoding.requires(command.encoding.isEncoding())
             }
             is AppServerMemfsCommand.MemoryHistory -> {
-                command.filePath?.let { requireMemoryPath(it, "file_path") }
-                command.limit?.let { require(it in 1..MAX_HISTORY_LIMIT, "limit") }
+                RelayField.FilePath.requires(command.filePath?.isMemoryPath() != false)
+                RelayField.Limit.requires(command.limit?.let { it in 1..MAX_HISTORY_LIMIT } != false)
             }
-            is AppServerMemfsCommand.MemoryCommitDiff -> requireRef(command.sha, "sha")
+            is AppServerMemfsCommand.MemoryCommitDiff -> RelayField.Sha.requires(command.sha.isRef())
             is AppServerMemfsCommand.MemoryFileAtRef -> {
-                requireMemoryPath(command.filePath, "file_path")
-                requireRef(command.ref, "ref")
+                RelayField.FilePath.requires(command.filePath.isMemoryPath())
+                RelayField.Ref.requires(command.ref.isRef())
             }
         }
     }
 
     private fun validateSecret(command: AppServerSecretCommand) {
-        requireAgentId(command.agentId)
+        RelayField.AgentId.requires(command.agentId.isAgentId())
         if (command !is AppServerSecretCommand.SecretApply) return
-        require(command.set.size + command.unset.size <= MAX_SECRET_KEYS, "set/unset")
-        command.set.forEach { (key, value) ->
-            require(SECRET_KEY.matches(key), "set key")
-            require(value.length <= MAX_SECRET_VALUE_CHARS, "set value")
-        }
-        command.unset.forEach { key -> require(SECRET_KEY.matches(key), "unset key") }
+        RelayField.SecretBatch.requires(command.set.size + command.unset.size <= MAX_SECRET_KEYS)
+        RelayField.SetKey.requires(command.set.keys.all(SECRET_KEY::matches))
+        RelayField.SetValue.requires(command.set.values.all { it.length <= MAX_SECRET_VALUE_CHARS })
+        RelayField.UnsetKey.requires(command.unset.all(SECRET_KEY::matches))
     }
 
     private fun validateFile(command: AppServerFileCommand) {
         when (command) {
             is AppServerFileCommand.SearchFiles -> {
-                require(command.query.length <= MAX_QUERY_CHARS && command.query.isPlain(), "query")
-                command.maxResults?.let { require(it in 1..MAX_SEARCH_RESULTS, "max_results") }
-                command.cwd?.let { require(it.isNotBlank() && it.length <= MAX_FILE_PATH_CHARS && it.isPlain(), "cwd") }
+                RelayField.Query.requires(command.query.length <= MAX_QUERY_CHARS && command.query.isPlain())
+                RelayField.MaxResults.requires(command.maxResults?.let { it in 1..MAX_SEARCH_RESULTS } != false)
+                RelayField.Cwd.requires(command.cwd?.isFilePath() != false)
             }
             is AppServerFileCommand.ReadFile -> {
-                require(command.path.isNotBlank() && command.path.length <= MAX_FILE_PATH_CHARS && command.path.isPlain(), "path")
-                requireEncoding(command.encoding)
+                RelayField.Path.requires(command.path.isFilePath())
+                RelayField.Encoding.requires(command.encoding.isEncoding())
             }
         }
     }
 
-    private fun requireAgentId(agentId: String) =
-        require(
-            agentId.isNotBlank() && agentId.length <= MAX_ID_CHARS && agentId.isPlain() && '/' !in agentId && '\\' !in agentId,
-            "agent_id",
-        )
+    /** The relayed fields the caps name in their errors. */
+    private enum class RelayField(val wireName: String) {
+        AgentId("agent_id"), Path("path"), FilePath("file_path"), Content("content"), Encoding("encoding"),
+        CommitMessage("commit_message"), Limit("limit"), Sha("sha"), Ref("ref"), SecretBatch("set/unset"),
+        SetKey("set key"), SetValue("set value"), UnsetKey("unset key"), Query("query"), MaxResults("max_results"),
+        Cwd("cwd"),
+        ;
+
+        fun requires(ok: Boolean) {
+            if (!ok) throw WorkspaceRelayException("$wireName is not allowed by the workspace relay")
+        }
+    }
+
+    private fun String.isAgentId(): Boolean =
+        isNotBlank() && length <= MAX_ID_CHARS && isPlain() && '/' !in this && '\\' !in this
 
     /** Relative to the agent's memory root: no absolute path, drive, or `..` segment. */
-    private fun requireMemoryPath(path: String, field: String) {
-        val segments = path.replace('\\', '/').split('/')
-        val ok = path.isNotBlank() &&
-            path.length <= MAX_MEMORY_PATH_CHARS &&
-            path.isPlain() &&
-            !path.startsWith('/') && !path.startsWith('\\') && ':' !in path &&
-            segments.none { it == ".." }
-        require(ok, field)
-    }
+    private fun String.isMemoryPath(): Boolean =
+        isNotBlank() &&
+            length <= MAX_MEMORY_PATH_CHARS &&
+            isPlain() &&
+            !startsWith('/') && !startsWith('\\') && ':' !in this &&
+            replace('\\', '/').split('/').none { it == ".." }
 
-    private fun requireRef(ref: String, field: String) =
-        require(ref.length in 1..MAX_REF_CHARS && REF.matches(ref) && ".." !in ref, field)
+    private fun String.isFilePath(): Boolean = isNotBlank() && length <= MAX_FILE_PATH_CHARS && isPlain()
 
-    private fun requireEncoding(encoding: String?) = require(encoding == null || encoding in ENCODINGS, "encoding")
+    private fun String.isRef(): Boolean = length in 1..MAX_REF_CHARS && REF.matches(this) && ".." !in this
+
+    private fun String?.isEncoding(): Boolean = this == null || this in ENCODINGS
 
     private fun String.isPlain(): Boolean = none { it.isISOControl() }
-
-    private fun require(ok: Boolean, field: String) {
-        if (!ok) throw WorkspaceRelayException("$field is not allowed by the workspace relay")
-    }
 
     private fun encode(command: AppServerCommand): JsonObject =
         AppServerProtocol.json.encodeToJsonElement(AppServerCommand.serializer(), command).jsonObject

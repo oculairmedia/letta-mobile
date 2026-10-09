@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
@@ -54,7 +53,6 @@ import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
-import com.letta.mobile.ui.shell.pages.workspace.LocalWorkspaceFileOpener
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
@@ -128,9 +126,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         agentId = params.viewModel.agentId.value,
         conversationId = params.viewModel.conversationId?.value,
     )
-    val topChromeInset = params.topChromeInset
-    val canvas: (@Composable (ChatCanvasActions) -> Unit)? =
-        canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
+    val canvas = canvasContent(canvasSlot, target, params.topChromeInset)
     val appearance = rememberSharedChatAppearance(params)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
@@ -139,7 +135,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         onComposerHeightChange = params.onComposerHeightChange,
         // The rings show on the canvas too: subagent activity stays in sight in canvas mode.
         subagentRings = { SharedChatSubagentRings(subagentSheet, currentSubagents, params.navigation) },
-        topChromeInset = topChromeInset,
+        topChromeInset = params.topChromeInset,
     )
     // letta-mobile-bglj6.1.16: the shared rows render markdown through the designsystem
     // renderer the legacy chat used (highlighted code fences + copy, KaTeX, Mermaid,
@@ -152,9 +148,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
         LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
         LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
-        LocalWorkspaceFileOpener provides rememberWorkspaceFileOpener(workspaceFiles),
     ) {
-        Box(modifier) {
+        SharedChatWorkspaceFilesBox(workspaceFiles, port, modifier) {
             ChatSurface(
                 port = port,
                 presentation = presentation,
@@ -176,10 +171,17 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
             )
             SharedChatSubagentBanner(subagentSheet)
             ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
-            SharedChatWorkspaceFiles(workspaceFiles, port)
         }
     }
 }
+
+/** The canvas the page docks the chat under, or null without the app's canvas slot. */
+private fun canvasContent(
+    canvasSlot: ChatCanvasSlot?,
+    target: ChatCanvasTarget,
+    topChromeInset: Dp,
+): (@Composable (ChatCanvasActions) -> Unit)? =
+    canvasSlot?.let { slot -> { actions -> slot.content(target, actions, topChromeInset) } }
 
 /**
  * The page's intent handler. One instance for the page's lifetime: ChatScreen recomposes per
