@@ -29,11 +29,12 @@ object CanvasComposeSchema {
 
     private val key = StringSchema(
         pattern = Contract.KEY_PATTERN,
-        description = "Optional id for this item, unique in the request: lowercase letters, digits, _ and -, at most 32.",
+        description = "Optional id, unique in the request.",
     ).json()
     private val color = StringSchema(
         pattern = Contract.COLOR_PATTERN,
-        description = Contract.COLOR_PRESETS.joinToString() + " or #rrggbb.",
+        // Short, but present: a provider that ignores `pattern` must still see the presets.
+        description = Contract.COLOR_PRESETS.joinToString() + " or #rrggbb",
     ).json()
     private val title = StringSchema(maxLength = Contract.MAX_TITLE_CHARS).json()
 
@@ -44,7 +45,7 @@ object CanvasComposeSchema {
         "title" to title,
         "markdown" to StringSchema(
             maxLength = Contract.MAX_MARKDOWN_CHARS, minLength = 1,
-            description = "The note, in the markdown subset ${CanvasToolContract.COMPOSE_GUIDE} lists.",
+            description = "Markdown subset: see ${CanvasToolContract.COMPOSE_GUIDE}.",
         ).json(),
         "color" to color,
     )
@@ -79,7 +80,7 @@ object CanvasComposeSchema {
             maxItems = Contract.MAX_CARD_FIELDS,
             minItems = 0,
         ).json(),
-        "markdown" to StringSchema(maxLength = Contract.MAX_CARD_BODY_CHARS, description = "A short body under the fields.").json(),
+        "markdown" to StringSchema(maxLength = Contract.MAX_CARD_BODY_CHARS, description = "Short body under the fields.").json(),
         "color" to color,
     )
 
@@ -99,7 +100,7 @@ object CanvasComposeSchema {
         "children" to ArraySchema(
             anyOf(note, checklist, card, text),
             maxItems = Contract.MAX_ITEMS - 1,
-            description = "The grouped items; a GROUP cannot hold a GROUP.",
+            description = "A GROUP cannot hold a GROUP.",
         ).json(),
     )
 
@@ -114,16 +115,15 @@ object CanvasComposeSchema {
         "canvas_id" to StringSchema(description = CanvasToolContract.CANVAS_ID_DESCRIPTION).json(),
         "artifact_id" to StringSchema(
             pattern = Contract.ARTIFACT_ID_PATTERN,
-            description = "Optional id for the whole artifact (lowercase, digits, _ and -, at most 48). " +
-                "Sending the same id and content again is a safe retry.",
+            description = "Optional id for the whole artifact; resending the same id and content is a safe retry.",
         ).json(),
         "title" to title,
         "items" to ArraySchema(
             item,
             maxItems = Contract.MAX_ITEMS,
-            description = "What to put on the board, in reading order (at most ${Contract.MAX_ITEMS}, group children counted).",
+            description = "In reading order; group children count toward the cap.",
         ).json(),
-        "dry_run" to TypeSchema("boolean", description = "true to check the request and see the receipt without publishing.").json(),
+        "dry_run" to TypeSchema("boolean", description = "true to get the receipt without publishing.").json(),
     )
 
     private val checker = JsonSchemaCheck(input, discriminator = KIND, hooks = ComposeSchemaHooks)
