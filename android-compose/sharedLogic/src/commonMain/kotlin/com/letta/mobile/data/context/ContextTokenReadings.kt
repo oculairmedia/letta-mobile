@@ -119,6 +119,17 @@ class ContextTokenReadings(
         }
     }
 
+    /**
+     * letta-mobile-3kble: a compaction ran that reported no token estimate (a direct App Server
+     * compaction streams none), so this conversation's total is stale until its next exact
+     * reading. The number stays; only its provenance changes. A conversation with no reading is
+     * left alone.
+     */
+    suspend fun markStale(agentId: String?, conversationId: String?) = recordLock.withLock {
+        val key = contextReadingKeyOf(agentId, conversationId) ?: return@withLock
+        if (key in state.value) estimatedKeys.value = estimatedKeys.value + key
+    }
+
     /** letta-mobile-kr39h: true while this conversation's reading is a post-compaction estimate. */
     fun isEstimated(agentId: String?, conversationId: String?): Boolean =
         contextReadingKeyOf(agentId, conversationId)?.let { it in estimated.value } ?: false
