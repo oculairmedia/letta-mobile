@@ -37,10 +37,14 @@ internal fun rememberSharedChatWorkspaceFiles(): WorkspaceFilesViewModel? {
 internal fun SharedChatWorkspaceFilesBox(
     files: WorkspaceFilesViewModel?,
     port: ChatSessionPort,
+    agentId: String,
     modifier: Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val opener = remember(files) { files?.let { WorkspaceFileOpener { path -> it.viewer.open(path, cwd = null) } } }
+    // The phone knows no working directory: a relative path is the agent's memory file.
+    val opener = remember(files, agentId) {
+        files?.let { WorkspaceFileOpener { path -> it.viewer.open(path, cwd = null, memoryAgentId = agentId) } }
+    }
     CompositionLocalProvider(LocalWorkspaceFileOpener provides opener) {
         Box(modifier) {
             content()

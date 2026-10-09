@@ -44,7 +44,7 @@ internal object WorkspaceAdminHandlers {
 
     private suspend fun relay(client: AppServerClient, method: WorkspaceRelayMethod, params: JsonObject?): JsonElement {
         val command = WorkspaceRelay.decodeCommand(method, params, NativeAdmin.requestId())
-        val frames = forward(client, method, command)
+        val frames = forward(client, method, command).map(WorkspaceRelay::normalizeFrame)
         val result = WorkspaceRelay.encodeResult(frames)
         Telemetry.event("IrohNode", "workspace_relay.ok", "method" to method.method, "frames" to frames.size)
         return result

@@ -90,6 +90,7 @@ object WorkspaceRelay {
     private val ENCODINGS = setOf("utf8", "base64")
     private val REF = Regex("^[A-Za-z0-9._/~^@{}-]+$")
     private val SECRET_KEY = Regex("^[A-Z_][A-Z0-9_]*$")
+    private val WINDOWS_DRIVE = Regex("^[A-Za-z]:[\\\\/]")
 
     /** The method that relays [command]; fails for a command the relay does not carry. */
     fun methodFor(command: AppServerCommand): WorkspaceRelayMethod {
@@ -125,6 +126,22 @@ object WorkspaceRelay {
         }
         return result
     }
+
+    /**
+     * Host side: a missing-file answer (Node's `ENOENT: no such file or directory, open '<path>'`)
+     * becomes a typed `error_code: not_found` without the host path; every other frame is unchanged.
+     */
+    fun normalizeFrame(frame: JsonObject): JsonObject {
+        val failed = (frame["success"] as? JsonPrimitive)?.contentOrNull == "false"
+        val error = (frame["error"] as? JsonPrimitive)?.contentOrNull
+        if (!failed || error == null || !isMissingFile(error)) return frame
+        return JsonObject(frame + mapOf("error" to JsonPrimitive(NOT_FOUND_MESSAGE), "error_code" to JsonPrimitive(NOT_FOUND_CODE)))
+    }
+
+    const val NOT_FOUND_CODE: String = "not_found"
+    const val NOT_FOUND_MESSAGE: String = "not found"
+
+    private fun isMissingFile(error: String): Boolean = "ENOENT" in error || error.contains("no such file", ignoreCase = true)
 
     /** Client side: the relayed frames, each carrying the client's own [requestId]. */
     fun decodeResult(result: JsonElement?, requestId: String): List<JsonObject> {
@@ -187,10 +204,12 @@ object WorkspaceRelay {
             is AppServerFileCommand.SearchFiles -> {
                 RelayField.Query.requires(command.query.length <= MAX_QUERY_CHARS && command.query.isPlain())
                 RelayField.MaxResults.requires(command.maxResults?.let { it in 1..MAX_SEARCH_RESULTS } != false)
-                RelayField.Cwd.requires(command.cwd?.isFilePath() != false)
+                RelayField.Cwd.requires(command.cwd?.isAbsoluteFilePath() != false)
             }
             is AppServerFileCommand.ReadFile -> {
-                RelayField.Path.requires(command.path.isFilePath())
+                // Absolute only: a relative path would resolve against the host process's cwd. A
+                // memory tool's relative path is read with memfs.read, against the agent's root.
+                RelayField.Path.requires(command.path.isAbsoluteFilePath())
                 RelayField.Encoding.requires(command.encoding.isEncoding())
             }
         }
@@ -212,15 +231,21 @@ object WorkspaceRelay {
     private fun String.isAgentId(): Boolean =
         isNotBlank() && length <= MAX_ID_CHARS && isPlain() && '/' !in this && '\\' !in this
 
-    /** Relative to the agent's memory root: no absolute path, drive, or `..` segment. */
+    /**
+     * Relative to the agent's memory root: no absolute path, drive, `..` segment, or percent-encoding
+     * (`%2e%2e`). The App Server joins it to the root and rejects what still escapes.
+     */
     private fun String.isMemoryPath(): Boolean =
         isNotBlank() &&
             length <= MAX_MEMORY_PATH_CHARS &&
             isPlain() &&
-            !startsWith('/') && !startsWith('\\') && ':' !in this &&
+            !startsWith('/') && !startsWith('\\') && ':' !in this && '%' !in this &&
             replace('\\', '/').split('/').none { it == ".." }
 
-    private fun String.isFilePath(): Boolean = isNotBlank() && length <= MAX_FILE_PATH_CHARS && isPlain()
+    /** A POSIX, UNC or drive-letter absolute path. */
+    private fun String.isAbsoluteFilePath(): Boolean =
+        isNotBlank() && length <= MAX_FILE_PATH_CHARS && isPlain() &&
+            (startsWith('/') || startsWith("\\\\") || WINDOWS_DRIVE.containsMatchIn(this))
 
     private fun String.isRef(): Boolean = length in 1..MAX_REF_CHARS && REF.matches(this) && ".." !in this
 

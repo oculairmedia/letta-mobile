@@ -149,7 +149,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
         LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
     ) {
-        SharedChatWorkspaceFilesBox(workspaceFiles, port, modifier) {
+        SharedChatWorkspaceFilesBox(workspaceFiles, port, target.agentId, modifier) {
             ChatSurface(
                 port = port,
                 presentation = presentation,

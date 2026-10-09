@@ -36,9 +36,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
 /**
@@ -154,6 +156,75 @@ class WorkspaceRelayRoundTripTest {
     }
 
     @Test
+    fun aToolCardsRelativeMemoryPathResolvesUnderTheAgentsMemoryRoot() = runTest {
+        val root = memoryRoot()
+        val server = FakeAppServer(memoryRoot = root)
+        val viewer = com.letta.mobile.data.workspace.WorkspaceFileViewerController(
+            AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it }),
+            backgroundScope,
+        )
+
+        viewer.open("system/human/communication_style.md", cwd = null, memoryAgentId = "agent-1")
+        // The host's stream server answers on its own dispatcher; wait for the read to settle.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlinx.coroutines.withTimeout(5_000) { viewer.state.first { !it.loading } }
+        }
+
+        assertEquals(
+            WorkspaceFileContent.Text("system/human/communication_style.md", "Be brief."),
+            viewer.state.value.content,
+            "viewer state: ${viewer.state.value}",
+        )
+        // Read from the agent's memory root (read_memory_file), never relative to the host's cwd (read_file).
+        assertEquals(listOf("read_memory_file"), server.received.map { it.first })
+    }
+
+    @Test
+    fun memoryPathsThatEscapeTheRootNeverReachTheAppServer() = runTest {
+        val server = FakeAppServer(memoryRoot = memoryRoot())
+        val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
+
+        listOf("../../etc/passwd", "/etc/passwd", "%2e%2e/%2e%2e/etc/passwd", "system/../../../etc/passwd", "C:\\Windows\\win.ini").forEach { path ->
+            val error = assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException>(path) { files.readMemory("agent-1", path) }
+            assertTrue(error.message.orEmpty().contains("not allowed"), "$path: ${error.message}")
+        }
+        // A relative read_file would resolve against the host process's cwd: refused too.
+        assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException> { files.read("system/human/communication_style.md") }
+        assertEquals(emptyList(), server.received)
+    }
+
+    @Test
+    fun aMissingMemoryFileIsATypedNotFoundWithoutTheHostPath() = runTest {
+        val root = memoryRoot()
+        val files = AppServerWorkspaceFileSource(client = { client(FakeAppServer(memoryRoot = root)) }, requestId = { it })
+
+        val error = assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException> { files.readMemory("agent-1", "system/missing.md") }
+
+        assertEquals(com.letta.mobile.data.workspace.WorkspaceFileErrors.NOT_FOUND, error.message)
+        assertFalse(error.toString().contains("ENOENT") || error.toString().contains(root.toString()))
+    }
+
+    @Test
+    fun theHostTypesAMissingFileAnswer() {
+        val raw = Json.parseToJsonElement(
+            """{"type":"read_file_response","request_id":"h","success":false,"error":"ENOENT: no such file or directory, open '/root/x'"}""",
+        ).jsonObject
+        val normalized = WorkspaceRelay.normalizeFrame(raw)
+        assertEquals(WorkspaceRelay.NOT_FOUND_CODE, (normalized["error_code"] as JsonPrimitive).content)
+        assertFalse(normalized.toString().contains("/root/x"))
+        val ok = Json.parseToJsonElement("""{"type":"read_file_response","success":true,"content":"no such file in prose"}""").jsonObject
+        assertEquals(ok, WorkspaceRelay.normalizeFrame(ok))
+    }
+
+    private fun memoryRoot(): java.nio.file.Path {
+        val root = java.nio.file.Files.createTempDirectory("memfs-root").toRealPath()
+        val file = root.resolve("system/human/communication_style.md")
+        java.nio.file.Files.createDirectories(file.parent)
+        java.nio.file.Files.writeString(file, "Be brief.")
+        return root
+    }
+
+    @Test
     fun theHostAdvertisesTheRelay() {
         val router = AdminRpcRouter().also { WorkspaceAdminHandlers.register(it, FakeAppServer()) }
         assertTrue(WorkspaceRelay.CAPABILITY in IrohNodeConnection.advertisedCapabilities(router))
@@ -189,7 +260,11 @@ class WorkspaceRelayRoundTripTest {
     }
 
     /** The App Server behind the host: answers each workspace command as letta-code 0.32 does. */
-    private class FakeAppServer(private val failWith: Exception? = null) : AppServerClient {
+    private class FakeAppServer(
+        private val failWith: Exception? = null,
+        /** When set, `read_memory_file` reads `<memoryRoot>/<path>` as letta-code 0.32 does. */
+        private val memoryRoot: java.nio.file.Path? = null,
+    ) : AppServerClient {
         val received = mutableListOf<Pair<String, String>>()
         val applied = mutableListOf<Map<String, String>>()
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
@@ -203,8 +278,10 @@ class WorkspaceRelayRoundTripTest {
                     frame("""{"type":"list_memory_response","request_id":"$id","entries":[{"relative_path":"system/human/communication_style.md","is_system":true,"content":"style","size":5}],"done":false,"success":true}"""),
                     frame("""{"type":"list_memory_response","request_id":"$id","entries":[{"relative_path":"notes.md","content":"n","size":1}],"done":true,"success":true}"""),
                 )
-                is AppServerMemfsCommand.ReadMemoryFile ->
-                    listOf(frame("""{"type":"read_memory_file_response","request_id":"$id","content":"---\nstyle\n","success":true}"""))
+                is AppServerMemfsCommand.ReadMemoryFile -> listOf(
+                    memoryRoot?.let { readFromMemoryRoot(it, command) }
+                        ?: frame("""{"type":"read_memory_file_response","request_id":"$id","content":"---\nstyle\n","success":true}"""),
+                )
                 is AppServerMemfsCommand.MemoryHistory ->
                     listOf(frame("""{"type":"memory_history_response","request_id":"$id","commits":[{"sha":"abc123","message":"m","timestamp":"t"}],"success":true}"""))
                 is AppServerMemfsCommand.MemoryCommitDiff ->
@@ -237,6 +314,29 @@ class WorkspaceRelayRoundTripTest {
         private fun unused(): Nothing = error("unused")
 
         private fun frame(raw: String): JsonObject = Json.parseToJsonElement(raw).jsonObject
+
+        /** letta-code's read_memory_file: join to the agent's memory root, refuse escapes, Node's ENOENT. */
+        private fun readFromMemoryRoot(root: java.nio.file.Path, command: AppServerMemfsCommand.ReadMemoryFile): JsonObject {
+            val target = root.resolve(command.path).normalize()
+            val answer = kotlinx.serialization.json.buildJsonObject {
+                put("type", JsonPrimitive("read_memory_file_response"))
+                put("request_id", JsonPrimitive(command.requestId))
+                when {
+                    !target.startsWith(root) -> fail("path must resolve inside the memory root")
+                    !java.nio.file.Files.exists(target) -> fail("ENOENT: no such file or directory, open '$target'")
+                    else -> {
+                        put("content", JsonPrimitive(java.nio.file.Files.readString(target)))
+                        put("success", JsonPrimitive(true))
+                    }
+                }
+            }
+            return answer
+        }
+
+        private fun kotlinx.serialization.json.JsonObjectBuilder.fail(error: String) {
+            put("success", JsonPrimitive(false))
+            put("error", JsonPrimitive(error))
+        }
     }
 
     private class FakeBiStream : AdminRpcBiStream {

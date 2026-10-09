@@ -56,9 +56,18 @@ class WorkspaceFileViewerController(
 
     private var readJob: Job? = null
 
-    /** Opens [path]; a relative one resolves against [cwd]. */
-    fun open(path: String, cwd: String?) {
-        load(WorkspacePaths.resolve(path, cwd))
+    /** The open file's memory agent, when it is read from that agent's MemFS (see [open]). */
+    private var memoryAgentId: String? = null
+
+    /**
+     * Opens [path]; a relative one resolves against [cwd]. With no [cwd], a relative path is
+     * [memoryAgentId]'s memory file (letta-mobile-bzvro.37: a memory tool's `system/human/…`),
+     * never a path on the host's own working directory.
+     */
+    fun open(path: String, cwd: String?, memoryAgentId: String? = null) {
+        val inMemory = cwd.isNullOrBlank() && !WorkspacePaths.isAbsolute(path) && !memoryAgentId.isNullOrBlank()
+        this.memoryAgentId = memoryAgentId.takeIf { inMemory }
+        load(if (inMemory) path.removePrefix("./") else WorkspacePaths.resolve(path, cwd))
     }
 
     override fun retry() {
@@ -67,15 +76,17 @@ class WorkspaceFileViewerController(
 
     override fun close() {
         readJob?.cancel()
+        memoryAgentId = null
         stateFlow.value = WorkspaceFileViewerState()
     }
 
     private fun load(path: String) {
         readJob?.cancel()
         stateFlow.value = WorkspaceFileViewerReducer.opening(path)
+        val agentId = memoryAgentId
         readJob = scope.launch {
             try {
-                val content = source.read(path)
+                val content = if (agentId != null) source.readMemory(agentId, path) else source.read(path)
                 stateFlow.update { WorkspaceFileViewerReducer.read(it, content) }
             } catch (cancelled: CancellationException) {
                 throw cancelled

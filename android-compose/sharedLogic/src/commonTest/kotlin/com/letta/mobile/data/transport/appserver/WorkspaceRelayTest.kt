@@ -67,7 +67,7 @@ class WorkspaceRelayTest {
 
     @Test
     fun memoryPathsMustStayInsideTheAgentsMemoryRoot() {
-        listOf("../escape.md", "system/../../etc/passwd", "/etc/passwd", "\\\\server\\share", "C:/x.md", "", "a\u0000b").forEach { path ->
+        listOf("../escape.md", "system/../../etc/passwd", "/etc/passwd", "\\\\server\\share", "C:/x.md", "", "a\u0000b", "%2e%2e/%2e%2e/etc/passwd").forEach { path ->
             assertFailsWith<WorkspaceRelayException>(path) {
                 decode(WorkspaceRelayMethod.ReadMemoryFile, buildJsonObject { put("agent_id", "agent-1"); put("path", path) })
             }
@@ -83,6 +83,10 @@ class WorkspaceRelayTest {
         assertRejected(WorkspaceRelayMethod.SearchFiles, buildJsonObject { put("query", "x"); put("max_results", 10_000) })
         assertRejected(WorkspaceRelayMethod.SearchFiles, buildJsonObject { put("query", "q".repeat(WorkspaceRelay.MAX_QUERY_CHARS + 1)) })
         assertRejected(WorkspaceRelayMethod.ReadFile, buildJsonObject { put("path", "/x"); put("encoding", "latin1") })
+        // Relative read_file / search cwd would resolve against the host process's working directory.
+        assertRejected(WorkspaceRelayMethod.ReadFile, buildJsonObject { put("path", "system/human/communication_style.md") })
+        assertRejected(WorkspaceRelayMethod.SearchFiles, buildJsonObject { put("query", "x"); put("cwd", "repo") })
+        decode(WorkspaceRelayMethod.ReadFile, buildJsonObject { put("path", "C:\\repo\\README.md") })
         assertRejected(WorkspaceRelayMethod.WriteMemoryFile, buildJsonObject {
             put("agent_id", "a"); put("path", "x.md"); put("content", "c".repeat(WorkspaceRelay.MAX_WRITE_CHARS + 1))
         })

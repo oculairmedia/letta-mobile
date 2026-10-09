@@ -28,7 +28,11 @@ The **merge commit of the PR on `main`** (squash merge). Once merged:
 git fetch origin && git log -1 --format='%H %s' origin/main   # confirm it is the bzvro.37 squash commit
 ```
 
-Call it `<DEPLOY_SHA>` below. Do not deploy the PR branch head.
+Call it `<DEPLOY_SHA>` below. Before the merge, to test the PR on the device, deploy the PR's
+current head of `feat/workspace-over-iroh` instead (its SHA is stated at the top of the PR's
+deploy section). A host built from an older head of the branch still relays relative `read_file`
+paths (resolved against its own cwd) and raw `ENOENT` text, so redeploy it; the client from the
+same commit is what reads a tool card's `system/…` path from the agent's memory root.
 
 ## 0. Find out which launch layout is live (host)
 
@@ -140,7 +144,13 @@ re-capture the classpath from `/proc/<pid>/cmdline` of the running JVM, as the
    `pair.peer.set_capabilities` from an admin peer, not a deploy issue). The log never contains
    secret values; `grep` for a known secret value must return nothing.
 
-4. Chat still works: send one message from a client and watch it stream (regression check).
+4. Memory file from a tool card (client, Android): in a chat, tap the file link of a memory tool
+   card naming `system/human/communication_style.md`. Expected: the file's text. Not expected:
+   `ENOENT: no such file or directory, open 'system/human/…'` (the pre-fix host or client). A file
+   that does not exist shows "This file does not exist." — never the raw host error or path.
+   Host log: `workspace_relay.ok method=memfs.read`.
+
+5. Chat still works: send one message from a client and watch it stream (regression check).
 
 ## Rollback (host)
 
