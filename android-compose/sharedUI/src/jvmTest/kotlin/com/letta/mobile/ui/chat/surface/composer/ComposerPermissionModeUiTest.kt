@@ -93,6 +93,13 @@ class ComposerPermissionModeUiTest {
     }
 
     @Test
+    fun aChoiceThatCouldNotBeSavedSaysSo() = runComposeUiTest {
+        showPanel(unrestricted.copy(selected = AppServerPermissionMode.Strict, notSaved = true))
+
+        onNodeWithText("Could not be saved; applies to this session only").assertExists()
+    }
+
+    @Test
     fun noChipForAnOwnerWithoutAMode() = runComposeUiTest {
         showPanel(null)
 

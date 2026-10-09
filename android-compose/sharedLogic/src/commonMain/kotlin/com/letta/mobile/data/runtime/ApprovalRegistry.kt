@@ -176,3 +176,16 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
         const val MAX_TRACKED_RUNTIME_KEYS: Int = TurnLeaseRegistry.MAX_TRACKED_RUNTIME_KEYS
     }
 }
+
+/**
+ * Whether a streamed-only `approval_request_message` (no control request) waits on the person. A user-input
+ * tool always does. Another tool's does only where the server asks rather than decides: under Standard and
+ * Strict. Under AcceptEdits letta-code decides edits itself and streams the message for information, and
+ * approve-all is auto-answered before here. (Whether Standard also streams messages for calls its own rules
+ * allow is not verified; the gate is lifted by the tool's return, and a replay after the return is ignored.)
+ */
+internal fun gatesStreamedApproval(toolName: String?, mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode): Boolean = when {
+    com.letta.mobile.runtime.RuntimeUserInputTools.requiresUserInput(toolName) -> true
+    else -> mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Standard ||
+        mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Strict
+}

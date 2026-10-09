@@ -71,13 +71,10 @@ class AppServerTurnEngine(
     // letta-mobile-h5t1g: same default source as the controller — an engine built
     // without an explicit mode approves tool calls instead of parking the turn.
     private val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
-    /**
-     * The mode in force for [TurnCommand]'s runtime, read at runtime_start AND again for every approval,
-     * so a mode tightened while a turn runs governs the next approval, not only the next turn.
-     */
+    /** The mode in force for the runtime, read at runtime_start and again for every approval (bzvro.13). */
     private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
-    /** bzvro.13: told the mode a runtime is in: the one its runtime_start carried, or an `update_device_status` reported. */
-    private val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> Unit = { _, _ -> },
+    /** bzvro.13: told a runtime's mode (runtime_start's, or a device status); answers the mode still wanted, if it differs. */
+    private val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
     private val requestIdFactory: () -> String = ::defaultRequestId,
     /**
      * Idle-liveness window (ms). If NO event frame for the current turn arrives
@@ -182,10 +179,10 @@ class AppServerTurnEngine(
      * and executes them in parallel. Same-key exclusion is preserved — that IS
      * the server contract — but different keys now acquire independently.
      */
-    private val leases = TurnLeaseRegistry()
+    internal val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
-    private val deviceState = DeviceStateChanger(client, inboundSource)
+    internal val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
      * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
@@ -452,8 +449,8 @@ class AppServerTurnEngine(
     fun userInputApprovalId(toolCallId: String): String? =
         approvals.approvalIdFor(toolCallId)
 
-    fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
-        approvals.clearIfMatches(ApprovalRegistry.Gate(toolCallId, requestId))
+    fun clearUserInputApprovalId(request: ApprovalBinding) {
+        approvals.clearIfMatches(ApprovalRegistry.Gate(request.toolCallId, request.approvalId))
     }
 
     /**
@@ -632,17 +629,6 @@ class AppServerTurnEngine(
      */
     suspend fun setWorkingDirectory(agentId: String, conversationId: String, cwd: String): Boolean =
         deviceState.changeWorkingDirectory(AppServerRuntimeScope(agentId, conversationId), cwd)
-
-    /**
-     * letta-mobile-bzvro.13: changes the permission mode with `change_device_state{mode}` and confirms it
-     * from the matching `update_device_status`. A runtime this engine has not started is NOT confirmed
-     * by anything: nothing is sent, and its `runtime_start` carries the mode the provider returns.
-     */
-    suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): ModeChangeResult {
-        val started = leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.runtimeScope
-            ?: return ModeChangeResult.AppliesOnStart
-        return if (deviceState.changePermissionMode(started, mode)) ModeChangeResult.Confirmed else ModeChangeResult.Unconfirmed
-    }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
         val acquiredAtMs = currentTimeMs()
@@ -882,20 +868,17 @@ class AppServerTurnEngine(
      */
     private fun trackToolCallAndApprovalIds(
         draft: RuntimeEventDraft,
-        key: TurnRuntimeKey,
+        wiring: TurnDraftWiring,
         ledger: TurnToolCallLedger,
     ) {
+        val key = wiring.lease.slot.key
         when (val payload = draft.payload) {
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
             is RuntimeEventPayload.ApprovalRequested -> {
                 ledger.emitted.add(payload.request.callId.value)
-                // vilsn.6: reaching the collect body means NOT auto-approved (swallowed above via
-                // autoApprovedToolCallDraft), so the turn is parked on the person. bzvro.13: that holds
-                // for any tool once a permission mode other than approve-all can be chosen, not only
-                // AskUserQuestion / ExitPlanMode. Park what the request offered (bzvro.11) and record
-                // an outstanding gate: it pauses the idle watchdog instead of synthesizing a Failed idle
-                // timeout, and holds the REAL can_use_tool request id (e.g. perm-call_..., not derivable
-                // from the tool_call_id across providers) the answer must carry; submitApproval clears it.
+                // vilsn.6/bzvro.13: not auto-approved, so the turn waits on the person for ANY tool. Park what
+                // was offered and record a gate: it pauses the idle watchdog and holds the REAL request id
+                // (not derivable from the tool_call_id) that the answer must carry.
                 approvals.park(key, payload.request)
                 approvals.record(key, ApprovalRegistry.Gate(payload.request.callId.value, payload.request.approvalId.value))
             }
@@ -911,7 +894,7 @@ class AppServerTurnEngine(
                 // Extract tool_call_id from tool_call_message and approval_request_message frames
                 extractToolCallId(payload.body)?.let { ledger.emitted.add(it) }
                 resolveStreamedToolReturn(payload, key, ledger)
-                recordStreamedApprovalGate(draft, payload, key)
+                recordStreamedApprovalGate(draft, payload, wiring, ledger)
             }
             else -> {}
         }
@@ -947,15 +930,16 @@ class AppServerTurnEngine(
     private fun recordStreamedApprovalGate(
         draft: RuntimeEventDraft,
         payload: RuntimeEventPayload.RemoteStreamFrame,
-        key: TurnRuntimeKey,
+        wiring: TurnDraftWiring,
+        ledger: TurnToolCallLedger,
     ) {
         if (payload.messageType != "approval_request_message") return
         val approval = draft.toApprovalAutoAllowRequest() ?: return
         val callId = approval.toolCallId ?: return
-        // Reaching here means it was not auto-approved (any tool, not only the user-input ones, once a
-        // mode other than approve-all can be chosen). A control request for the same call carries the
-        // real id, so it is never overwritten by this message's own id.
-        if (approvals.approvalIdFor(callId) != null) return
+        val key = wiring.lease.slot.key
+        // Never park a finished call again (replay), nor replace a control request's real id with this one.
+        if (callId in ledger.returned || approvals.approvalIdFor(callId) != null) return
+        if (!gatesStreamedApproval(approval.toolName, permissionModeProvider(wiring.command))) return
         approvals.park(key, PendingApprovalDetails(approval.requestId, callId, approval.toolName ?: "tool"))
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
@@ -1004,7 +988,7 @@ class AppServerTurnEngine(
                         wiring.command.draftFor(runId = draft.runId, payload = approved)
                     }
                 },
-                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring.lease.slot.key, ledger) },
+                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring, ledger) },
                 clearApprovals = { approvals.clearKey(wiring.lease.slot.key) },
                 emit = emitDraft,
                 settle = { ledger, reason ->
@@ -1540,6 +1524,7 @@ class AppServerTurnEngine(
         }
         slot.runtimeScope = returnedRuntime
         onPermissionModeInForce(returnedRuntime, turnPermissionMode)
+            ?.let { deviceState.changePermissionMode(returnedRuntime, it, report = onPermissionModeInForce) }
         onRuntimeEnsured(command, response, generationAtStart)
         return returnedRuntime
     }

@@ -122,6 +122,7 @@ data class ChatPermissionModeUiState(
     val pending: AppServerPermissionMode? = null,
     val unconfirmed: AppServerPermissionMode? = null,
     val appliesOnStart: Boolean = false,
+    val notSaved: Boolean = false,
     val unavailableReason: String? = null,
     val options: ImmutableList<AppServerPermissionMode> = AppServerPermissionMode.entries.toImmutableList(),
 ) {
@@ -135,5 +136,6 @@ fun PermissionModeState.toUiState(unavailableReason: String? = null): ChatPermis
         pending = pending,
         unconfirmed = unconfirmed,
         appliesOnStart = appliesOnStart,
+        notSaved = notSaved,
         unavailableReason = unavailableReason,
     )

@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 
 /** One approval answer for an App Server conversation. */
@@ -48,6 +49,6 @@ class AppServerRunControls(
         val scope = AppServerRuntimeScope(agentId = answer.agentId, conversationId = answer.conversationId)
         val result = engine.submitApprovalResponse(ApprovalSubmission(scope, captured ?: answer.requestId, decision))
         if (result is ApprovalSubmitResult.Rejected) throw ApprovalRejectedException(result.error)
-        if (captured != null) engine.clearUserInputApprovalId(answer.toolCallId, captured)
+        if (captured != null) engine.clearUserInputApprovalId(ApprovalBinding(answer.toolCallId, captured))
     }
 }

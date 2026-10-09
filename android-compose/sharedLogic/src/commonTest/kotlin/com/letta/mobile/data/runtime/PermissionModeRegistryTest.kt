@@ -210,6 +210,68 @@ class PermissionModeRegistryTest {
     }
 
     @Test
+    fun aChoiceMadeWhileRuntimeStartIsInFlightIsNeitherStuckNorLost() = runTest {
+        val store = MapSettingsStore()
+        val modes = PermissionModeSettings(store).modes
+        val carried = modes.modeFor(runtime) // what runtime_start goes out with
+        modes.change(runtime, Strict) { ModeChangeResult.AppliesOnStart } // picked while it is in flight
+
+        val stillWanted = modes.observed(runtime, carried) // runtime_start returns
+
+        assertEquals(Strict, stillWanted, "the engine is told what to send")
+        assertNull(modes.observe(runtime).first().pending, "never left pending")
+        assertEquals(Strict, modes.observe(runtime).first().unconfirmed)
+        assertEquals(Strict, modes.modeFor(runtime), "enforced meanwhile")
+        assertEquals(Strict, PermissionModeSettings(store).modes.modeFor(runtime), "the stored choice is not overwritten")
+
+        // The engine sends it and the server echoes it.
+        modes.observed(runtime, Strict)
+        assertEquals(PermissionModeState(Strict), modes.observe(runtime).first())
+    }
+
+    @Test
+    fun aCoveringDifferentChoiceIsKeptWhenALooserOneWasWantedAtStart() = runTest {
+        val modes = registry()
+        modes.change(runtime, Unrestricted) { ModeChangeResult.AppliesOnStart }
+
+        assertEquals(Unrestricted, modes.observed(runtime, Strict), "started stricter than wanted: send the wanted mode")
+        assertEquals(Strict, modes.modeFor(runtime), "until the server confirms, the stricter mode governs")
+    }
+
+    @Test
+    fun aChoiceTheStoreRefusesIsFlaggedNotSavedButStillApplies() = runTest {
+        val modes = PermissionModeSettings(FailingStore()).modes
+
+        val confirmed = modes.change(runtime, Strict) { ModeChangeResult.Confirmed }
+
+        assertTrue(confirmed)
+        assertTrue(modes.observe(runtime).first().notSaved)
+    }
+
+    @Test
+    fun anUnreadableStoredChoiceIsReadAsTheStricterOfTheDefaultAndStandard() {
+        val store = MapSettingsStore()
+        val modes = PermissionModeSettings(store).modes
+        val key = "runtime.permission_mode.${runtime.agentId.length}:${runtime.agentId}:${runtime.conversationId}"
+        store.putString(key, "someFutureMode")
+
+        assertEquals(Standard, modes.modeFor(runtime), "never the looser Unrestricted default")
+        assertEquals(Unrestricted, modes.modeFor(elsewhere))
+    }
+
+    @Test
+    fun storeKeysOfDifferentIdPairsCannotCollide() = runTest {
+        val store = MapSettingsStore()
+        val modes = PermissionModeSettings(store).modes
+        val a = AppServerRuntimeScope("a.b", "c")
+        val b = AppServerRuntimeScope("a", "b.c")
+
+        modes.change(a, Strict) { ModeChangeResult.AppliesOnStart }
+
+        assertEquals(Unrestricted, PermissionModeSettings(store).modes.modeFor(b))
+    }
+
+    @Test
     fun overlappingChangesLetOnlyTheLatestSettleTheEntry() = runTest {
         val modes = registry()
         modes.observed(runtime, Unrestricted)

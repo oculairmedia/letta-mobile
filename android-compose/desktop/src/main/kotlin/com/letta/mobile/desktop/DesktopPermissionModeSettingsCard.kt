@@ -50,7 +50,8 @@ internal fun DesktopPermissionModeSettingsCard() {
             Text(
                 "How tool calls are approved in conversations that have not started yet and have not picked a mode " +
                     "of their own. Running conversations keep the mode they started with; change one from the " +
-                    "chip above the composer. Not used over Iroh, where the connected node decides.",
+                    "chip above the composer. Iroh connections ignore it: a connected node decides its own mode, " +
+                    "and a direct Iroh App Server always runs as Approve all.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -51,6 +51,7 @@
     <string name="composer_permission_mode_changing">Changing to %1$s…</string>
     <string name="composer_permission_mode_failed">The server did not confirm the change</string>
     <string name="composer_permission_mode_unconfirmed">%1$s (unconfirmed)</string>
+    <string name="composer_permission_mode_not_saved">Could not be saved; applies to this session only</string>
     <string name="composer_permission_mode_on_start">Applies when the conversation starts</string>
     <!-- letta-mobile-bglj6.1.9: the Touch (phone) composer bar and its "+" sheet. -->
     <string name="composer_touch_placeholder">Type a message…</string>

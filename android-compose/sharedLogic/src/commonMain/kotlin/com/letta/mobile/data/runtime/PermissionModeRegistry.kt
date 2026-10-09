@@ -70,6 +70,8 @@ data class PermissionModeState(
     val unconfirmed: AppServerPermissionMode? = null,
     /** Chosen before the conversation's runtime exists: carried by its `runtime_start`. */
     val appliesOnStart: Boolean = false,
+    /** The choice could not be written to the store: it holds for this session only. */
+    val notSaved: Boolean = false,
 ) {
     /** The last requested change was not confirmed by the server. */
     val failed: Boolean get() = unconfirmed != null
@@ -114,6 +116,7 @@ class PermissionModeRegistry(
         val requested: AppServerPermissionMode? = null,
         val unconfirmed: Boolean = false,
         val seq: Int = 0,
+        val unsaved: Boolean = false,
     )
 
     private val entries = MutableStateFlow<Map<AppServerRuntimeScope, Entry>>(emptyMap())
@@ -141,6 +144,7 @@ class PermissionModeRegistry(
                 pending = entry.requested.takeIf { running != null && !entry.unconfirmed },
                 unconfirmed = entry.requested.takeIf { running != null && entry.unconfirmed },
                 appliesOnStart = running == null && entry.requested != null,
+                notSaved = entry.unsaved,
             )
         }
 
@@ -154,8 +158,9 @@ class PermissionModeRegistry(
         apply: suspend (AppServerPermissionMode) -> ModeChangeResult,
     ): Boolean {
         val seq = seqs.incrementAndGet()
-        update(runtime) { it.copy(requested = mode, unconfirmed = false, seq = seq) }
-        persist(runtime, mode)
+        // Memory follows the store: a choice that could not be written is flagged, not silently kept.
+        val saved = persist(runtime, mode)
+        update(runtime) { it.copy(requested = mode, unconfirmed = false, seq = seq, unsaved = !saved) }
         val result = try {
             apply(mode)
         } catch (cancelled: CancellationException) {
@@ -183,16 +188,31 @@ class PermissionModeRegistry(
     /**
      * The runtime is in [mode]: its `runtime_start` carried it, or the server reported it (this
      * client's change echoed, or another client changed it). An outstanding request is settled by it
-     * when it is that mode, or when its outcome was unknown.
+     * when it is that mode, or when its outcome was unknown. Returns the choice a runtime that has just
+     * started still wants (it was made while the runtime was starting), for the caller to send.
      */
-    fun observed(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode) {
+    fun observed(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): AppServerPermissionMode? {
+        var wasStarted = true
+        var next = Entry()
         update(runtime) { entry ->
-            val settles = entry.requested == mode || entry.unconfirmed
-            entry.copy(mode = mode, requested = entry.requested.takeUnless { settles }, unconfirmed = false)
+            wasStarted = entry.mode != null
+            next = when {
+                entry.requested == mode || entry.unconfirmed -> entry.copy(mode = mode, requested = null, unconfirmed = false)
+                // A runtime that started without the choice made while it was starting: the choice is
+                // still wanted, and its outcome is not known until it is sent.
+                !wasStarted && entry.requested != null -> entry.copy(mode = mode, unconfirmed = true)
+                else -> entry.copy(mode = mode)
+            }
+            next
         }
-        // Anything stricter than the product default is remembered: a restart must not relax it.
-        if (mode != RuntimePermissionDefaults.DEFAULT_MODE || persistedChoice(runtime) != null) persist(runtime, mode)
+        // Anything stricter than the product default is remembered (a restart must not relax it), but
+        // never while a different choice is outstanding: that would overwrite what the person picked.
+        if (next.requested == null && worthRemembering(runtime, mode)) persist(runtime, mode)
+        return next.requested.takeUnless { wasStarted }
     }
+
+    private fun worthRemembering(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode) =
+        mode != RuntimePermissionDefaults.DEFAULT_MODE || persistedChoice(runtime) != null
 
     /** Drops what is held for [runtime] (its conversation was removed). */
     fun forget(runtime: AppServerRuntimeScope) {
@@ -204,15 +224,25 @@ class PermissionModeRegistry(
         entries.update { all -> all + (key to change(entryOf(all, key))) }
     }
 
-    private fun storeKey(runtime: AppServerRuntimeScope) = "$KEY_PREFIX${runtime.agentId}.${runtime.conversationId}"
+    /** Length-prefixed, so no pair of ids can spell another pair's key. */
+    private fun storeKey(runtime: AppServerRuntimeScope) =
+        "$KEY_PREFIX${runtime.agentId.length}:${runtime.agentId}:${runtime.conversationId}"
 
-    private fun persistedChoice(runtime: AppServerRuntimeScope): AppServerPermissionMode? =
-        runCatching { store?.getString(storeKey(runtime)) }.getOrNull()?.let(AppServerPermissionMode::fromWireValue)
+    /**
+     * The stored choice. A value that is present but unreadable (corrupt, or written by a newer
+     * version) is read as the stricter of the default and Standard: never looser than the person may
+     * have asked for. (The default key itself falls back to the product default, as before.)
+     */
+    private fun persistedChoice(runtime: AppServerRuntimeScope): AppServerPermissionMode? {
+        val raw = runCatching { store?.getString(storeKey(runtime)) }.getOrNull() ?: return null
+        return AppServerPermissionMode.fromWireValue(raw) ?: stricter(defaultMode.value, AppServerPermissionMode.Standard)
+    }
 
-    private fun persist(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode) {
+    /** True when the choice is in the store. */
+    private fun persist(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
         runCatching { store?.putString(storeKey(runtime), mode.wireValue()) }
             .onFailure { Telemetry.event("PermissionModeRegistry", "choice.writeFailed", "error" to it.message, level = Telemetry.Level.WARN) }
-    }
+            .isSuccess
 
     private companion object {
         const val KEY_PREFIX = "runtime.permission_mode."
@@ -235,4 +265,14 @@ internal fun AppServerPermissionMode.wireValue(): String = when (this) {
     AppServerPermissionMode.AcceptEdits -> "acceptEdits"
     AppServerPermissionMode.Strict -> "strict"
     AppServerPermissionMode.Unrestricted -> "unrestricted"
+}
+
+/**
+ * bzvro.13: `change_device_state{mode}` confirmed by the echo. A runtime this engine has not started is NOT
+ * confirmed by anything: nothing is sent, and its `runtime_start` carries the mode the provider returns.
+ */
+suspend fun AppServerTurnEngine.setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): ModeChangeResult {
+    val started = leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.runtimeScope
+        ?: return ModeChangeResult.AppliesOnStart
+    return if (deviceState.changePermissionMode(started, mode)) ModeChangeResult.Confirmed else ModeChangeResult.Unconfirmed
 }

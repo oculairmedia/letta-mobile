@@ -28,7 +28,9 @@ import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.ModeChangeResult
+import com.letta.mobile.data.runtime.setPermissionMode
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -204,7 +206,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             if (result is ApprovalSubmitResult.Rejected) failRejected(appServerEngine, submission, effectiveRequestId, result.error)
         }
         submission.toolCallId?.let { toolCallId ->
-            capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(toolCallId, it) }
+            capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(ApprovalBinding(toolCallId, it)) }
         }
     }
 
@@ -223,7 +225,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
      */
     private fun failRejected(engine: AppServerTurnEngine, submission: DesktopApprovalSubmission, approvalId: String, error: String): Nothing {
         if (error.contains("no longer pending", ignoreCase = true)) {
-            submission.toolCallId?.let { engine.clearUserInputApprovalId(it, approvalId) }
+            submission.toolCallId?.let { engine.clearUserInputApprovalId(ApprovalBinding(it, approvalId)) }
         }
         throw ApprovalRejectedException(error)
     }
@@ -436,7 +438,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     override suspend fun deleteConversation(conversationId: String) {
         adminGateway.deleteConversation(conversationId)
+        // Its stored mode goes with it (when the owning agent is known from an earlier send or read).
         agentIdByConversation.remove(ConversationId(conversationId))
+            ?.let { permissionModes?.forget(AppServerRuntimeScope(it.value, conversationId)) }
     }
 
     /** letta-mobile-bzvro.17: titles (rename, generated) are the admin gateway's to write. */

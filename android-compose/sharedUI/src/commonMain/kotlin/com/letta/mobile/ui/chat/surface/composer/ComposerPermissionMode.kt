@@ -34,6 +34,7 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits
 import com.letta.mobile.sharedui.resources.composer_permission_mode_accept_edits_hint
 import com.letta.mobile.sharedui.resources.composer_permission_mode_changing
 import com.letta.mobile.sharedui.resources.composer_permission_mode_failed
+import com.letta.mobile.sharedui.resources.composer_permission_mode_not_saved
 import com.letta.mobile.sharedui.resources.composer_permission_mode_on_start
 import com.letta.mobile.sharedui.resources.composer_permission_mode_unconfirmed
 import com.letta.mobile.sharedui.resources.composer_permission_mode_standard
@@ -133,6 +134,7 @@ private fun chipText(state: ChatPermissionModeUiState, label: String): String = 
 @Composable
 private fun permissionModeNote(state: ChatPermissionModeUiState): String? = state.unavailableReason
     ?: stringResource(Res.string.composer_permission_mode_failed).takeIf { state.unconfirmed != null }
+    ?: stringResource(Res.string.composer_permission_mode_not_saved).takeIf { state.notSaved }
     ?: stringResource(Res.string.composer_permission_mode_on_start).takeIf { state.appliesOnStart }
 
 @Composable

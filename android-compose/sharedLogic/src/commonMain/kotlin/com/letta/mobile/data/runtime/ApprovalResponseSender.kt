@@ -203,7 +203,7 @@ fun AppServerTurnEngine.releaseUserInputGateUnlessRejected(
 ) {
     if (result is ApprovalSubmitResult.Rejected) return
     if (toolCallId == null || capturedRequestId == null) return
-    clearUserInputApprovalId(toolCallId, capturedRequestId)
+    clearUserInputApprovalId(ApprovalBinding(toolCallId, capturedRequestId))
 }
 
 /** letta-mobile-qygvv.5: re-sends [cached] for a server replay of the same request (awaits `input_accepted`). */

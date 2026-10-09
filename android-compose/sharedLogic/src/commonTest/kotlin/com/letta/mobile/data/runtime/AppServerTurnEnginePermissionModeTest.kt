@@ -2,6 +2,7 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import kotlinx.coroutines.flow.first
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
@@ -62,7 +63,7 @@ class AppServerTurnEnginePermissionModeTest {
         val engine = engine(
             client,
             modeProvider = { AppServerPermissionMode.Strict },
-            onInForce = { scope, mode -> reported += scope to mode },
+            onInForce = { scope, mode -> reported += scope to mode; null },
         )
         collect(engine)
         assertEquals(listOf(runtime to AppServerPermissionMode.Strict), reported, "runtime_start carried Strict")
@@ -135,6 +136,78 @@ class AppServerTurnEnginePermissionModeTest {
         assertEquals("perm-real", engine.pendingApprovalDetails.value.getValue("tool-call-1").approvalId)
     }
 
+    @Test
+    fun aChoiceMadeWhileRuntimeStartIsInFlightIsSentOnceItReturns() = runTest {
+        val startGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val changes = mutableListOf<AppServerPermissionMode?>()
+        val client = object : TurnEngineTestStreamClient() {
+            override suspend fun runtimeStart(command: com.letta.mobile.data.transport.appserver.AppServerCommand.RuntimeStart):
+                AppServerInboundFrame.RuntimeStartResponse {
+                startGate.await()
+                return super.runtimeStart(command)
+            }
+
+            override suspend fun changeDeviceState(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ChangeDeviceState) {
+                changes += command.payload.mode
+                command.payload.mode?.let { emit(DeviceStatusFixture.inMode(it).frame(runtime)) }
+            }
+        }
+        val modes = PermissionModeSettings(com.letta.mobile.data.chat.runtime.MapSettingsStore()).modes
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionModeProvider = { modes.modeFor(AppServerRuntimeScope(it.agentId.value, it.conversationId.value)) },
+            onPermissionModeInForce = { scope, mode -> modes.observed(scope, mode) },
+            turnIdleTimeoutMs = 600_000,
+            nowMs = { testScheduler.currentTime },
+        )
+        collect(engine) // runtime_start is now waiting on the gate, carrying Unrestricted
+
+        // The person picks Strict while it is in flight: no runtime yet, so nothing is sent.
+        modes.change(runtime, AppServerPermissionMode.Strict) { engine.setPermissionMode(runtime, it) }
+        assertEquals(emptyList(), changes)
+
+        startGate.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf<AppServerPermissionMode?>(AppServerPermissionMode.Strict), changes, "sent as a change on the started runtime")
+        assertEquals(PermissionModeState(AppServerPermissionMode.Strict), modes.observe(runtime).first())
+    }
+
+    @Test
+    fun aStreamedOnlyApprovalIsGatedUnderStandardButNotUnderAcceptEdits() = runTest {
+        val accept = TurnEngineTestStreamClient()
+        val acceptEngine = engine(accept, modeProvider = { AppServerPermissionMode.AcceptEdits })
+        collect(acceptEngine)
+        accept.emit(frames.approvalRequestMessage("Edit"))
+        runCurrent()
+        assertEquals(emptyMap(), acceptEngine.pendingApprovalDetails.value, "the server decides edits itself there")
+
+        val standard = TurnEngineTestStreamClient()
+        val standardEngine = engine(standard, modeProvider = { AppServerPermissionMode.Standard })
+        collect(standardEngine)
+        standard.emit(frames.approvalRequestMessage("Edit"))
+        runCurrent()
+        assertTrue("tool-call-1" in standardEngine.pendingApprovalDetails.value)
+    }
+
+    @Test
+    fun aStreamedApprovalReplayedAfterTheToolReturnedIsNotParkedAgain() = runTest {
+        val client = TurnEngineTestStreamClient()
+        val engine = engine(client, modeProvider = { AppServerPermissionMode.Standard })
+        collect(engine)
+        client.emit(frames.approvalRequestMessage("Bash"))
+        runCurrent()
+        client.emit(frames.streamDelta("tool_return_message").let { toolReturn(it) })
+        runCurrent()
+        assertEquals(emptyMap(), engine.pendingApprovalDetails.value)
+
+        client.emit(frames.approvalRequestMessage("Bash")) // resync / replay of the old message
+        runCurrent()
+
+        assertEquals(emptyMap(), engine.pendingApprovalDetails.value, "a finished call is not parked, and gets no gate that pauses the watchdog")
+        assertFalse(engine.pendingApprovalDetails.value.isNotEmpty())
+    }
+
     private fun toolReturn(base: AppServerInboundFrame.StreamDelta) = base.copy(
         delta = buildJsonObject {
             put("message_type", "tool_return_message")
@@ -162,7 +235,7 @@ class AppServerTurnEnginePermissionModeTest {
         client: TurnEngineTestStreamClient,
         modeProvider: (TurnCommand) -> AppServerPermissionMode,
         idleMs: Long = 600_000,
-        onInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> Unit = { _, _ -> },
+        onInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
     ) = AppServerTurnEngine(
         client = client,
         permissionModeProvider = modeProvider,
