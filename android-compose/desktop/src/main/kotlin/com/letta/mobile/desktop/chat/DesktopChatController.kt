@@ -567,7 +567,7 @@ class DesktopChatController(
             try {
                 nextGateway.deleteConversation(conversationId)
                 if (closed) return@launch
-                if (nextGateway.deleteArchivesConversation) deletionUndo.offer(conversationId)
+                deletionUndo.offer(conversationId, archived = nextGateway.deleteArchivesConversation)
                 val wasSelected = _state.value.selectedConversationId == conversationId
                 _state.update {
                     it.withRuntimeState(

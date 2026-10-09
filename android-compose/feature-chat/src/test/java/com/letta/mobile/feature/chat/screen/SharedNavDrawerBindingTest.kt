@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -97,11 +98,11 @@ class SharedNavDrawerBindingTest {
     @Test
     fun conversationRenameReachesTheRepositoryTrimmedAndIgnoresBlank() = runTest(mainDispatcherRule.dispatcher) {
         val vm = viewModel()
-        vm.renameConversation("c1", "agent-1", "  Plan B  ")
-        vm.renameConversation("c2", "agent-1", "   ")
+        vm.renameConversation(ConversationId("c1"), AgentId("agent-1"), ConversationSummary("  Plan B  "))
+        vm.renameConversation(ConversationId("c2"), AgentId("agent-1"), ConversationSummary("   "))
         advanceUntilIdle()
-        coVerify { conversations.updateConversation("c1", "agent-1", "Plan B") }
-        coVerify(exactly = 0) { conversations.updateConversation("c2", any<String>(), any<String>()) }
+        coVerify { conversations.updateConversation(ConversationId("c1"), AgentId("agent-1"), "Plan B") }
+        coVerify(exactly = 0) { conversations.updateConversation(ConversationId("c2"), any<AgentId>(), any<String>()) }
     }
 
     @Test
@@ -110,7 +111,7 @@ class SharedNavDrawerBindingTest {
         backgroundScope.launch { vm.pinnedConversationIds.collect {} }
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedConversationIds.value)
-        vm.setConversationPinned("c2", pinned = true)
+        vm.setConversationPinned(ConversationId("c2"), pinned = true)
         advanceUntilIdle()
         assertEquals(setOf("c2"), vm.pinnedConversationIds.value)
 
@@ -123,7 +124,7 @@ class SharedNavDrawerBindingTest {
         assertEquals(listOf("c2", "c1"), rows.map { it.id })
         assertEquals(listOf(true, false), rows.map { it.pinned })
 
-        vm.setConversationPinned("c2", pinned = false)
+        vm.setConversationPinned(ConversationId("c2"), pinned = false)
         advanceUntilIdle()
         assertEquals(emptySet<String>(), vm.pinnedConversationIds.value)
     }
@@ -135,7 +136,7 @@ class SharedNavDrawerBindingTest {
         actions.onRenameConversation!!.invoke("c1", "Renamed")
         actions.onPinConversation!!.invoke("c1", true)
         advanceUntilIdle()
-        coVerify { conversations.updateConversation("c1", "agent-1", "Renamed") }
+        coVerify { conversations.updateConversation(ConversationId("c1"), AgentId("agent-1"), "Renamed") }
         assertEquals(setOf("c1"), settings.getPinnedConversationIds().first())
     }
 

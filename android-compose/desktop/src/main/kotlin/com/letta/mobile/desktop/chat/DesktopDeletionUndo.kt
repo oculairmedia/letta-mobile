@@ -13,8 +13,9 @@ class DesktopDeletionUndo {
     private val _pending = MutableStateFlow<String?>(null)
     val pending: StateFlow<String?> = _pending.asStateFlow()
 
-    fun offer(conversationId: String) {
-        _pending.value = conversationId
+    /** Offers an undo only when the delete archived ([archived]); a permanent delete has none. */
+    fun offer(conversationId: String, archived: Boolean) {
+        _pending.value = conversationId.takeIf { archived }
     }
 
     /** The snackbar timed out, was dismissed or was acted on: the offer is spent. */

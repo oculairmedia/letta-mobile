@@ -9,6 +9,9 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
@@ -102,15 +105,15 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     val deleteArchivesConversation: Boolean
         get() = settingsRepository.activeBackendIsIroh()
 
-    fun setConversationPinned(conversationId: String, pinned: Boolean) {
+    fun setConversationPinned(conversationId: ConversationId, pinned: Boolean) {
         viewModelScope.launch {
-            runCatchingNonCancel { settingsRepository.setConversationPinned(conversationId, pinned) }
+            runCatchingNonCancel { settingsRepository.setConversationPinned(conversationId.value, pinned) }
         }
     }
 
     /** A blank title is ignored; the row keeps its name. */
-    fun renameConversation(conversationId: String, agentId: String, title: String) {
-        val trimmed = title.trim()
+    fun renameConversation(conversationId: ConversationId, agentId: AgentId, title: ConversationSummary) {
+        val trimmed = title.value.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             runCatchingNonCancel { conversationRepository.updateConversation(conversationId, agentId, trimmed) }

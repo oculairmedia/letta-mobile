@@ -13,7 +13,9 @@ import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellNavDrawer
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
@@ -155,8 +157,8 @@ internal fun sharedDrawerPanelActions(
         onArchiveConversation = { id, archived -> drawer.setConversationArchived(id, agentId, archived) },
         onDeleteConversation = { id -> drawer.deleteConversation(id, agentId) },
         deleteArchivesConversation = drawer.deleteArchivesConversation,
-        onRenameConversation = { id, title -> drawer.renameConversation(id, agentId, title) },
-        onPinConversation = drawer::setConversationPinned,
+        onRenameConversation = { id, title -> drawer.renameConversation(ConversationId(id), AgentId(agentId), ConversationSummary(title)) },
+        onPinConversation = { id, pinned -> drawer.setConversationPinned(ConversationId(id), pinned) },
         onOpenCanvas = { canvasId -> closeDrawerAndRun(state) { navigation.onOpenCanvas?.invoke(canvasId.value) } },
         // onArchiveCanvas stays null: Android keeps no canvas archive yet (letta-mobile-c3np7.5.7),
         // so canvas rows offer no archive, by hover or by long-press.
