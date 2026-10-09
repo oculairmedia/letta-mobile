@@ -49,6 +49,7 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
+import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
@@ -195,10 +196,16 @@ fun defaultDesktopChatSessionGraphFactory(
     configProvider: () -> LettaConfig? = { null },
     repositoryGraphFactory: SessionRepositoryGraphFactory<DesktopSessionGraph> =
         DesktopSessionGraphFactory(configProvider = configProvider),
+    permissionModeSettings: com.letta.mobile.data.runtime.PermissionModeSettings? = null,
 ): DesktopChatSessionGraphFactory =
     DesktopChatSessionGraphFactory(
         repositoryGraphFactory = repositoryGraphFactory,
-        gatewayFactory = { createDefaultDesktopChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
+        gatewayFactory = {
+            createDefaultDesktopChatGateway(
+                configProvider() ?: defaultDesktopLettaConfig(),
+                appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(permissionModeSettings),
+            )
+        },
     )
 
 @Suppress("NoDetachedCoroutineLifecycle")

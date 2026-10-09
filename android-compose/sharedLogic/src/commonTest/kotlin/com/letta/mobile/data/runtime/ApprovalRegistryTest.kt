@@ -1,5 +1,9 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.runtime.ToolApprovalId
+import com.letta.mobile.runtime.ToolApprovalRequest
+import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.runtime.ToolName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -45,6 +49,40 @@ class ApprovalRegistryTest {
         assertEquals("perm-call_a", registry.approvalIdFor("call_a"))
         assertNull(registry.approvalIdFor("call_b"))
     }
+
+    @Test
+    fun lateSuccessfulSendForAnOldIdKeepsTheNewerGateAndItsParkedDetails() {
+        val registry = ApprovalRegistry()
+        registry.park(keyA, request("call_1", "perm-new"))
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-new"))
+
+        // A late send for the OLD id (before a reconnect re-surfaced the call) must not delete either.
+        registry.clearIfMatches(ApprovalRegistry.Gate("call_1", "perm-old"))
+        assertEquals("perm-new", registry.approvalIdFor("call_1"))
+        assertEquals(setOf("call_1"), registry.parkedDetails.value.keys)
+
+        registry.clearIfMatches(ApprovalRegistry.Gate("call_1", "perm-new"))
+        assertNull(registry.approvalIdFor("call_1"))
+        assertTrue(registry.parkedDetails.value.isEmpty())
+    }
+
+    @Test
+    fun evictingARuntimeOverTheCapDropsItsParkedDetails() {
+        val registry = ApprovalRegistry(cap = 1)
+        registry.park(keyA, request("call_a", "perm-a"))
+        registry.record(keyA, ApprovalRegistry.Gate("call_a", "perm-a"))
+        registry.park(keyB, request("call_b", "perm-b"))
+        registry.record(keyB, ApprovalRegistry.Gate("call_b", "perm-b"))
+
+        assertEquals(setOf("call_b"), registry.parkedDetails.value.keys, "A was evicted with its details")
+    }
+
+    private fun request(callId: String, approvalId: String) = ToolApprovalRequest(
+        approvalId = ToolApprovalId(approvalId),
+        callId = ToolCallId(callId),
+        toolName = ToolName("Edit"),
+        prompt = "Allow Edit?",
+    )
 
     @Test
     fun resolveClearsOnlyTheMatchingGate() {

@@ -38,3 +38,11 @@ object AppServerApprovalDecisions {
             AppServerApprovalResponseDecision.Deny(message = message ?: defaultDenyMessage)
     }
 }
+
+/**
+ * letta-mobile-bzvro.11: this decision with the `permission_suggestions` ids the person chose
+ * ("always allow"), sent as `selected_permission_suggestion_ids`. Only an allow carries them; a
+ * denial, or no ids, is returned unchanged.
+ */
+fun AppServerApprovalResponseDecision.withSelectedSuggestions(ids: List<String>): AppServerApprovalResponseDecision =
+    if (this is AppServerApprovalResponseDecision.Allow && ids.isNotEmpty()) copy(selectedPermissionSuggestionIds = ids) else this

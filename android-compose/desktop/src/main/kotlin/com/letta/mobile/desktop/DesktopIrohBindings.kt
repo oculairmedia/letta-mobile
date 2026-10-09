@@ -14,6 +14,7 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.data.transport.iroh.NotebookPeerProvisioning
+import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
 import java.nio.file.Path
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -269,7 +270,10 @@ private fun buildDesktopChatController(
         scope = runtime.chatScope,
         gatewayFactory = {
             bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
-                ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
+                ?: createDefaultDesktopChatGateway(
+                    runtime.bootstrapState.config,
+                    appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(runtime.dataBindings.permissionModeSettings),
+                )
         },
         agentNamesByIdProvider = { agentIds ->
             resolveDesktopAgentNames(agentIds, agentRepository())

@@ -1,8 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.runtime.ToolApprovalRequest
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-lgns8.22.5: runtime-key-scoped store of OUTSTANDING user-input
@@ -47,6 +49,18 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     private val gates = linkedMapOf<TurnRuntimeKey, Map<String, String>>()
 
     /**
+     * letta-mobile-bzvro.11/.12: what each parked `can_use_tool` request offered, for any tool. It
+     * follows the gates' lifecycle (resolved with the tool call, dropped with the runtime's turn).
+     */
+    private val parked = PendingApprovalDetailsStore()
+    val parkedDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = parked.pending
+
+    fun park(key: TurnRuntimeKey, request: ToolApprovalRequest) = parked.record(key, PendingApprovalDetails.of(request))
+
+    /** Parks a request that arrived only as a streamed `approval_request_message` (no suggestions or diffs). */
+    fun park(key: TurnRuntimeKey, details: PendingApprovalDetails) = parked.record(key, details)
+
+    /**
      * One parked interactive tool call. [approvalId] is the REAL can_use_tool
      * control-request id; pairing the two in a type keeps callers from
      * transposing two same-typed identifiers at the call site.
@@ -72,6 +86,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * the submit path already consumed it.
      */
     fun resolve(key: TurnRuntimeKey, toolCallId: String) {
+        parked.resolve(toolCallId)
         synchronized(lock) {
             val current = gates[key] ?: return
             val next = current - toolCallId
@@ -86,6 +101,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * Scoped to one key — a sibling runtime's parked question survives.
      */
     fun clearKey(key: TurnRuntimeKey) {
+        parked.clearKey(key)
         synchronized(lock) { gates.remove(key) }
     }
 
@@ -119,6 +135,9 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      * successful send for the OLD id must not delete.
      */
     fun clearIfMatches(gate: Gate) {
+        // The parked details follow the same guard: only the request this gate answered is dropped,
+        // never a newer one that replaced it under a new approval id.
+        parked.resolveIfApproval(ApprovalBinding(gate.toolCallId, gate.approvalId))
         synchronized(lock) {
             val victims = gates.entries
                 .filter { it.value[gate.toolCallId] == gate.approvalId }
@@ -137,6 +156,8 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
         while (gates.size > cap) {
             val victim = gates.keys.firstOrNull { it != keep } ?: return
             val dropped = gates.remove(victim)?.size ?: 0
+            // Its parked details go with it, or they would outlive any gate that could resolve them.
+            parked.clearKey(victim)
             // Repo convention: a bounded collection reports what it drops. This is
             // the same bound the lease registry applies, and matches the previous
             // storage (gates lived on TurnLeaseSlot, which evicts at the same cap).
@@ -154,4 +175,17 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
         /** Same cap as [TurnLeaseRegistry], which previously held these gates. */
         const val MAX_TRACKED_RUNTIME_KEYS: Int = TurnLeaseRegistry.MAX_TRACKED_RUNTIME_KEYS
     }
+}
+
+/**
+ * Whether a streamed-only `approval_request_message` (no control request) waits on the person. A user-input
+ * tool always does. Another tool's does only where the server asks rather than decides: under Standard and
+ * Strict. Under AcceptEdits letta-code decides edits itself and streams the message for information, and
+ * approve-all is auto-answered before here. (Whether Standard also streams messages for calls its own rules
+ * allow is not verified; the gate is lifted by the tool's return, and a replay after the return is ignored.)
+ */
+internal fun gatesStreamedApproval(toolName: String?, mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode): Boolean = when {
+    com.letta.mobile.runtime.RuntimeUserInputTools.requiresUserInput(toolName) -> true
+    else -> mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Standard ||
+        mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Strict
 }

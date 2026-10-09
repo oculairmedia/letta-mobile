@@ -105,6 +105,12 @@
     <string name="rows_reject_title">Reject approval request</string>
     <string name="rows_reject_reason_placeholder">Optional context for the agent</string>
     <string name="rows_requesting_input">requesting input</string>
+    <string name="rows_approval_always_allow">Always allow %1$s</string>
+    <string name="rows_approval_blocked_path">Blocked path: %1$s</string>
+    <string name="rows_approval_diff_stats">%1$s · +%2$d -%3$d</string>
+    <string name="rows_approval_diff_show_more">Show more (%1$d lines not shown)</string>
+    <string name="rows_diff_not_shown">%1$d more lines not shown</string>
+    <string name="rows_approval_diff_unavailable">No preview available</string>
     <string name="rows_approved">Approved</string>
     <string name="rows_rejected">Rejected</string>
     <string name="rows_approval_response">Approval response</string>

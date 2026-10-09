@@ -33,6 +33,7 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
@@ -127,6 +128,8 @@ class DesktopChatController(
      * structured AskUserQuestion card can disable its buttons while submitting.
      */
     val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
+    val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
+        approvalCoordinator.pendingApprovalDetails
 
     /**
      * Whether the active gateway can actually submit approvals (i.e. is a
@@ -148,6 +151,9 @@ class DesktopChatController(
 
     private val _workingDirectoryLoading = MutableStateFlow(false)
     val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
+
+    /** The active gateway, for capabilities a port reads off it (the permission mode). */
+    internal val activeGateway: DesktopChatGateway? get() = gateway
 
     /** Whether the active gateway can report/change a conversation's working directory. */
     val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
@@ -883,21 +889,18 @@ class DesktopChatController(
      * Answer or dismiss a parked approval (e.g. AskUserQuestion) surfaced in the
      * selected conversation.
      */
-    fun submitApproval(
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ) {
+    fun submitApproval(answer: ChatApprovalAnswer) {
         if (closed) return
         approvalCoordinator.submitApproval(
             ApprovalSubmissionRequest(
                 gateway = gateway,
                 conversation = _state.value.selectedConversation,
-                requestId = requestId,
-                toolCallIds = toolCallIds,
-                approve = approve,
-                reason = reason,
+                requestId = answer.requestId,
+                toolCallIds = answer.toolCallIds,
+                approve = answer.approve,
+                reason = answer.reason,
+                selectedSuggestionIds = answer.selectedSuggestionIds,
+                suggestionBinding = answer.suggestionBinding,
             ),
         )
     }

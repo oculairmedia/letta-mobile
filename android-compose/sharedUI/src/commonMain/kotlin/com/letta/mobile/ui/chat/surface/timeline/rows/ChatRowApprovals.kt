@@ -64,6 +64,9 @@ import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.data.runtime.PendingApprovalDetails
+import com.letta.mobile.runtime.RuntimeUserInputTools
+import com.letta.mobile.data.runtime.binding
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -91,6 +94,8 @@ internal class ApprovalDecider(
     val requestId: String,
     val isSubmitting: Boolean,
     val submit: ((toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit)?,
+    /** Approves and persists the server-offered rule [suggestionId] (letta-mobile-bzvro.11). */
+    val submitAlwaysAllow: ((details: PendingApprovalDetails, suggestionId: String) -> Unit)? = null,
 ) {
     val enabled: Boolean get() = !isSubmitting && submit != null
 }
@@ -107,12 +112,34 @@ internal fun rememberApprovalDecider(
     actions: ChatActions,
 ): ApprovalDecider {
     val isSubmitting = activeApprovalRequestId == approval.requestId
-    return remember(approval.requestId, isSubmitting, approvalsEnabled, actions) {
+    return remember(approval.requestId, approval.details?.binding, isSubmitting, approvalsEnabled, actions) {
         ApprovalDecider(
             requestId = approval.requestId,
             isSubmitting = isSubmitting,
             submit = if (approvalsEnabled) {
-                { ids, approve, reason -> actions.submitApproval(ChatApprovalAnswer(approval.requestId, ids, approve, reason)) }
+                // Bound to the call the card is drawn for: a request with parallel calls is answered one
+                // gate at a time, and the card redraws for the next once this one resolves.
+                { ids, approve, reason ->
+                    actions.submitApproval(
+                        ChatApprovalAnswer(approval.requestId, ids, approve, reason, suggestionBinding = approval.details?.binding),
+                    )
+                }
+            } else {
+                null
+            },
+            submitAlwaysAllow = if (approvalsEnabled) {
+                { details, suggestionId ->
+                    actions.submitApproval(
+                        ChatApprovalAnswer(
+                            requestId = approval.requestId,
+                            toolCallIds = approval.toolCalls.map { it.toolCallId },
+                            approve = true,
+                            reason = null,
+                            selectedSuggestionIds = listOf(suggestionId),
+                            suggestionBinding = details.binding,
+                        ),
+                    )
+                }
             } else {
                 null
             },
@@ -154,8 +181,11 @@ internal fun ApprovalRequestCard(
  */
 @Composable
 internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalDecider) {
-    // A structured AskUserQuestion takes precedence over the generic disclosure.
-    if (AskUserQuestionCard(approval, decider)) return
+    // A structured AskUserQuestion takes precedence over the generic disclosure, unless the request
+    // parked now is another tool's (a bundled [Bash, AskUserQuestion]): that gate is answered first,
+    // and the question's card takes over once it resolves.
+    val parkedOtherTool = approval.details?.let { !RuntimeUserInputTools.requiresUserInput(it.toolName) } == true
+    if (!parkedOtherTool && AskUserQuestionCard(approval, decider)) return
     val actionable = decider.submit != null
     ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
         ApprovalCardContent(approval, decider, actionable)
@@ -168,6 +198,7 @@ private fun ColumnScope.ApprovalCardContent(approval: UiApprovalRequest, decider
     // Android leads with what it asks, then the calls; desktop lists the calls first.
     if (touch && actionable) ApprovalBody()
     approval.toolCalls.forEach { if (touch) ApprovalToolCallCard(it) else ApprovalToolCallLine(it) }
+    approval.details?.let { ApprovalOfferedDetails(it) }
     if (actionable) {
         if (!touch) ApprovalBody()
         ApprovalActionRow(approval, decider)
@@ -288,6 +319,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
             onDismiss = { rejecting = false },
         )
     }
+    approval.details?.let { AlwaysAllowButtons(it, decider) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(
             onClick = {

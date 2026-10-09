@@ -39,6 +39,20 @@
     <string name="composer_working_directory_loading">Loading working directory…</string>
     <string name="composer_working_directory_unknown">Working directory unknown</string>
     <string name="composer_working_directory_change">Change…</string>
+    <string name="composer_permission_mode">Permission mode</string>
+    <string name="composer_permission_mode_standard">Ask for approval</string>
+    <string name="composer_permission_mode_accept_edits">Accept edits</string>
+    <string name="composer_permission_mode_strict">Strict</string>
+    <string name="composer_permission_mode_unrestricted">Approve all</string>
+    <string name="composer_permission_mode_standard_hint">Asks before running tools that change things</string>
+    <string name="composer_permission_mode_accept_edits_hint">Edits files without asking, asks for the rest</string>
+    <string name="composer_permission_mode_strict_hint">Asks before every tool call</string>
+    <string name="composer_permission_mode_unrestricted_hint">Runs every tool without asking</string>
+    <string name="composer_permission_mode_changing">Changing to %1$s…</string>
+    <string name="composer_permission_mode_failed">The server did not confirm the change</string>
+    <string name="composer_permission_mode_unconfirmed">%1$s (unconfirmed)</string>
+    <string name="composer_permission_mode_not_saved">Could not be saved; applies to this session only</string>
+    <string name="composer_permission_mode_on_start">Applies when the conversation starts</string>
     <!-- letta-mobile-bglj6.1.9: the Touch (phone) composer bar and its "+" sheet. -->
     <string name="composer_touch_placeholder">Type a message…</string>
     <string name="composer_actions_open">Add to message</string>

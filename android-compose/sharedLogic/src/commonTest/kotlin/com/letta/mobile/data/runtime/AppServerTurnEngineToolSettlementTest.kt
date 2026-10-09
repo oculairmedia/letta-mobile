@@ -167,7 +167,9 @@ class AppServerTurnEngineToolSettlementTest {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "req" },
-            turnIdleTimeoutMs = 50L,
+            // letta-mobile-bzvro.13: a surfaced approval parks the turn on the person and pauses the
+            // idle watchdog (it used to time out here), so the turn ends on a stream error instead.
+            turnIdleTimeoutMs = 60_000L,
             // letta-mobile-h5t1g: this case intentionally exercises a SURFACED,
             // never-answered approval, so it must opt out of the approve-all
             // default that would otherwise auto-allow the call.
@@ -181,8 +183,9 @@ class AppServerTurnEngineToolSettlementTest {
             client.emitApprovalRequest("call-1", "sensitive_tool")
             assertIs<RuntimeEventPayload.ApprovalRequested>(awaitItem().payload)
 
-            // Wait for idle timeout (approval never answered, tool never returned)
-            // Expect synthetic return for call-1
+            // The turn ends with the approval never answered and the tool never returned:
+            // expect a synthetic return for call-1
+            client.emitErrorMessage("server exploded")
             val syntheticReturn = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
             assertEquals(ToolCallId("call-1"), syntheticReturn.toolCallId)
             assertEquals(ToolExecutionStatus.Failed, syntheticReturn.status)
@@ -192,6 +195,34 @@ class AppServerTurnEngineToolSettlementTest {
 
             awaitComplete()
         }
+    }
+
+    /** letta-mobile-bzvro.11: a parked, non-user-input approval is published while it waits and dropped when the turn ends. */
+    @Test
+    fun parkedApprovalDetailsArePublishedWhileItWaitsAndClearedWhenTheTurnEnds() = runTest {
+        val client = SettlementTestClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = { "req" },
+            turnIdleTimeoutMs = 60_000L,
+            permissionMode = AppServerPermissionMode.Standard,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emitApprovalRequest("call-1", "sensitive_tool")
+            assertIs<RuntimeEventPayload.ApprovalRequested>(awaitItem().payload)
+
+            val parked = engine.pendingApprovalDetails.value.getValue("call-1")
+            assertEquals("sensitive_tool", parked.toolName)
+
+            // The turn ends on a stream error (the call is settled, then the run fails).
+            client.emitErrorMessage("server exploded")
+            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+        assertEquals(emptyMap(), engine.pendingApprovalDetails.value)
     }
 
     @Test

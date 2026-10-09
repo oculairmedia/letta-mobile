@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLifecycle
@@ -98,9 +99,9 @@ internal object DesktopAppServerChatGateways {
             ?: throw DesktopAppServerClientUnavailableException()
     }
 
-    fun defaultFactory(): DesktopAppServerChatGatewayFactory? {
+    fun defaultFactory(permissionModeSettings: PermissionModeSettings? = null): DesktopAppServerChatGatewayFactory? {
         return try {
-            DesktopAppServerChatGatewayBuilder()
+            DesktopAppServerChatGatewayBuilder(permissionModeSettings = permissionModeSettings)
         } catch (_: Throwable) {
             null
         }
@@ -114,6 +115,8 @@ internal suspend fun createDefaultDesktopChatGateway(
     localRuntime: DesktopLocalRuntimeLifecycle = DesktopLocalRuntimeHost,
 ): DesktopChatGateway = DesktopAppServerChatGateways.createDefault(config, appServerConfig, appServerGatewayFactory, localRuntime)
 
-internal fun defaultDesktopAppServerGatewayFactory(): DesktopAppServerChatGatewayFactory? =
-    DesktopAppServerChatGateways.defaultFactory()
+internal fun defaultDesktopAppServerGatewayFactory(
+    permissionModeSettings: PermissionModeSettings? = null,
+): DesktopAppServerChatGatewayFactory? =
+    DesktopAppServerChatGateways.defaultFactory(permissionModeSettings)
 

@@ -147,13 +147,21 @@ internal class TurnBoundaryGate {
         frame: AppServerInboundFrame.UpdateLoopStatus,
         input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
-        if (!evidenceSeen || input.approvalOutstanding) return TurnBoundaryDecision.Project
+        if (!evidenceSeen || heldByApproval(input)) return TurnBoundaryDecision.Project
         if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
         if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
-        if (roundContinues && !abortRequested) return TurnBoundaryDecision.Project
+        if (continuesAfterIdle()) return TurnBoundaryDecision.Project
         val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
+
+    /**
+     * A parked approval holds the turn open, unless the turn was aborted: nobody can answer it then,
+     * and a server that sends no turn_finished must still be able to end the turn.
+     */
+    private fun heldByApproval(input: TurnBoundaryInput) = input.approvalOutstanding && !abortRequested
+
+    private fun continuesAfterIdle() = roundContinues && !abortRequested
 
     /** Insertion-ordered, bounded set: the oldest id is evicted once [capacity] is exceeded. */
     private class RecentIds<T>(private val capacity: Int) {

@@ -10,11 +10,14 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -64,7 +67,10 @@ class DesktopAppServerChatGatewayBuilder(
     private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
     /** HTTP `/app-server-info` probe run before every remote WebSocket dial (letta-mobile-bzvro.2). */
     private val preflightProbe: DesktopAppServerProbe = defaultDesktopAppServerProbe,
+    /** letta-mobile-bzvro.13: the app's one permission-mode settings; null runs every runtime Unrestricted, with no chip. */
+    permissionModeSettings: PermissionModeSettings? = null,
 ) : DesktopAppServerChatGatewayFactory {
+    private val permissionModes = permissionModeSettings?.modes
 
     override suspend fun create(
         lettaConfig: LettaConfig,
@@ -121,6 +127,9 @@ class DesktopAppServerChatGatewayBuilder(
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,
                     turnContextPreflight = turnContextPreflightFor(isIroh, client),
+                    // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
+                    // Unrestricted, as it always did, and the persisted default does not reach it.
+                    permissionModes = permissionModes.takeUnless { isIroh },
                 ),
             )
             val adminGateway = adminGatewayFor(lettaConfig, client)
@@ -129,6 +138,7 @@ class DesktopAppServerChatGatewayBuilder(
                 client = client,
                 adminGateway = adminGateway,
                 transportResources = transportResources,
+                permissionModes = permissionModes.takeUnless { isIroh },
                 onClose = {
                     eventRouter.detach()
                     localClientLease?.close()
@@ -232,9 +242,10 @@ class DesktopAppServerChatGatewayBuilder(
 }
 
 /**
- * Desktop runs every turn Unrestricted: no approval UI, so a Standard-mode
- * approval_request would stall the turn; the engine auto-allows instead
- * (parity with the Android iroh engine). Baking the mode into the engine lets
+ * Desktop runs every turn Unrestricted unless a permission mode was chosen (letta-mobile-bzvro.13:
+ * the composer chip per conversation, the settings card for the default); the default stays
+ * Unrestricted. Under Unrestricted a Standard-mode approval_request would stall the turn, so the
+ * engine auto-allows instead (parity with the Android iroh engine). Baking the mode into the engine lets
  * ensureRuntime's single runtime_start carry it — no eager
  * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
  *
@@ -246,6 +257,7 @@ class DesktopAppServerChatGatewayBuilder(
 internal data class DesktopAppServerEngineConfig(
     val eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
     val turnContextPreflight: TurnContextPreflight? = null,
+    val permissionModes: PermissionModeRegistry? = null,
 )
 
 /**
@@ -276,6 +288,11 @@ internal fun buildDesktopAppServerTurnEngine(
             version = "0.2.0",
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
+        permissionModeProvider = { command ->
+            config.permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
+                ?: AppServerPermissionMode.Unrestricted
+        },
+        onPermissionModeInForce = { runtime, mode -> config.permissionModes?.observed(runtime, mode) },
         turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
         eventRouter = router,
         externalToolRegistry = externalToolRegistry,

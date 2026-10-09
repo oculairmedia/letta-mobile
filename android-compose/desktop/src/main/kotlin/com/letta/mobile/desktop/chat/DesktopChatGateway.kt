@@ -74,6 +74,31 @@ interface DesktopWorkingDirectoryController {
 }
 
 /**
+ * letta-mobile-bzvro.11/.12: a gateway that can say what each parked `can_use_tool` request offered
+ * (always-allow rules, blocked path, diffs), by tool call id. Only a gateway that runs the App Server
+ * turn engine itself sees the control requests; a gateway that does not simply never implements this.
+ */
+interface DesktopPendingApprovalSource {
+    val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
+}
+
+/**
+ * letta-mobile-bzvro.13: a gateway that runs the App Server turn engine itself can read and change a
+ * conversation's permission mode. A gateway that cannot (HTTP-only, relayed over an admin RPC, an Iroh
+ * node that sets its own) reports no [permissionModes], and the composer shows no mode chip for it.
+ */
+interface DesktopPermissionModeController {
+    /** The registry this gateway's turns are governed by, or null when it has no mode support. */
+    val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
+
+    /** Asks for [mode] on the conversation's runtime; true once the server echoed it. */
+    suspend fun setPermissionMode(
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode,
+    ): Boolean
+}
+
+/**
  * A decision for a parked approval. [reason] carries an AskUserQuestion answer
  * when encoded via [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason];
  * otherwise it's a plain allow/deny message.
@@ -85,6 +110,9 @@ data class DesktopApprovalSubmission(
     val toolCallId: String?,
     val approve: Boolean,
     val reason: String?,
+    val selectedSuggestionIds: List<String> = emptyList(),
+    /** The parked request [selectedSuggestionIds] were offered by; see [com.letta.mobile.data.runtime.approvalIdForSuggestions]. */
+    val suggestionBinding: com.letta.mobile.data.runtime.ApprovalBinding? = null,
 )
 
 /**

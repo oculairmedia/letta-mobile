@@ -14,6 +14,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.appserver.snapshot
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -70,7 +71,10 @@ class AppServerTurnEngine(
     // letta-mobile-h5t1g: same default source as the controller — an engine built
     // without an explicit mode approves tool calls instead of parking the turn.
     private val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
+    /** The mode in force for the runtime, read at runtime_start and again for every approval (bzvro.13). */
     private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
+    /** bzvro.13: told a runtime's mode (runtime_start's, or a device status); answers the mode still wanted, if it differs. */
+    private val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
     private val requestIdFactory: () -> String = ::defaultRequestId,
     /**
      * Idle-liveness window (ms). If NO event frame for the current turn arrives
@@ -175,10 +179,10 @@ class AppServerTurnEngine(
      * and executes them in parallel. Same-key exclusion is preserved — that IS
      * the server contract — but different keys now acquire independently.
      */
-    private val leases = TurnLeaseRegistry()
+    internal val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
-    private val deviceState = DeviceStateChanger(client, inboundSource)
+    internal val deviceState = DeviceStateChanger(client, inboundSource)
 
     /**
      * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
@@ -199,7 +203,7 @@ class AppServerTurnEngine(
      * Owns what `TurnLeaseSlot.approvalIds` used to hold; see [ApprovalRegistry]
      * for why claim/generation ownership stays in [InboundControlRequestRegistry].
      */
-    private val approvals = ApprovalRegistry()
+    internal val approvals = ApprovalRegistry()
     private val queueHygiene = AppServerQueueHygiene(
         client,
         requestIdFactory,
@@ -445,8 +449,8 @@ class AppServerTurnEngine(
     fun userInputApprovalId(toolCallId: String): String? =
         approvals.approvalIdFor(toolCallId)
 
-    fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
-        approvals.clearIfMatches(ApprovalRegistry.Gate(toolCallId, requestId))
+    fun clearUserInputApprovalId(request: ApprovalBinding) {
+        approvals.clearIfMatches(ApprovalRegistry.Gate(request.toolCallId, request.approvalId))
     }
 
     /**
@@ -586,6 +590,9 @@ class AppServerTurnEngine(
             ),
         )
         queueHygiene.onAbortResponse(runtime, response)
+        // A turn parked on an approval can no longer be answered once the abort is confirmed: its
+        // gates (which also hold off the idle watchdog) must not outlive it.
+        if (response.success && response.aborted) approvals.clearKey(TurnRuntimeKey(runtime.agentId, runtime.conversationId))
         return response
     }
 
@@ -688,7 +695,6 @@ class AppServerTurnEngine(
                     collectTurnWithIdleWatchdog(
                         scope,
                         command,
-                        turnPermissionMode,
                         collectorReady,
                         leaseRef,
                     ) { draft -> send(draft) }
@@ -862,41 +868,19 @@ class AppServerTurnEngine(
      */
     private fun trackToolCallAndApprovalIds(
         draft: RuntimeEventDraft,
-        key: TurnRuntimeKey,
+        wiring: TurnDraftWiring,
         ledger: TurnToolCallLedger,
     ) {
+        val key = wiring.lease.slot.key
         when (val payload = draft.payload) {
             is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
             is RuntimeEventPayload.ApprovalRequested -> {
                 ledger.emitted.add(payload.request.callId.value)
-                // letta-mobile-vilsn.6: this ApprovalRequested reached
-                // the collect body, which means it was NOT auto-approved
-                // (auto-approved drafts are swallowed above via
-                // autoApprovedToolCallDraft). If it is a runtime
-                // user-input tool (AskUserQuestion / ExitPlanMode) the
-                // turn is now parked awaiting the user's answer — record
-                // an outstanding gate so the idle watchdog is paused and
-                // the unanswered question does not synthesize a Failed
-                // idle timeout.
-                if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
-                    // letta-mobile-vilsn: record the REAL approval id
-                    // (the can_use_tool control-request request_id, e.g.
-                    // perm-call_...) keyed by tool_call_id. This map is
-                    // BOTH the submit path's source (submitApproval
-                    // clears it after a successful response) AND the
-                    // watchdog's outstanding-gate set (vilsn.6): a non-empty
-                    // map pauses the idle watchdog. Interactive answers must
-                    // close the gate against THIS id, which is not derivable
-                    // from the tool_call_id across LLM providers (call_… vs
-                    // toolu_…).
-                    approvals.record(
-                        key,
-                        ApprovalRegistry.Gate(
-                            toolCallId = payload.request.callId.value,
-                            approvalId = payload.request.approvalId.value,
-                        ),
-                    )
-                }
+                // vilsn.6/bzvro.13: not auto-approved, so the turn waits on the person for ANY tool. Park what
+                // was offered and record a gate: it pauses the idle watchdog and holds the REAL request id
+                // (not derivable from the tool_call_id) that the answer must carry.
+                approvals.park(key, payload.request)
+                approvals.record(key, ApprovalRegistry.Gate(payload.request.callId.value, payload.request.approvalId.value))
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
                 ledger.returned.add(payload.toolCallId.value)
@@ -910,7 +894,7 @@ class AppServerTurnEngine(
                 // Extract tool_call_id from tool_call_message and approval_request_message frames
                 extractToolCallId(payload.body)?.let { ledger.emitted.add(it) }
                 resolveStreamedToolReturn(payload, key, ledger)
-                recordStreamedApprovalGate(draft, payload, key)
+                recordStreamedApprovalGate(draft, payload, wiring, ledger)
             }
             else -> {}
         }
@@ -946,12 +930,17 @@ class AppServerTurnEngine(
     private fun recordStreamedApprovalGate(
         draft: RuntimeEventDraft,
         payload: RuntimeEventPayload.RemoteStreamFrame,
-        key: TurnRuntimeKey,
+        wiring: TurnDraftWiring,
+        ledger: TurnToolCallLedger,
     ) {
         if (payload.messageType != "approval_request_message") return
         val approval = draft.toApprovalAutoAllowRequest() ?: return
         val callId = approval.toolCallId ?: return
-        if (!RuntimeUserInputTools.requiresUserInput(approval.toolName)) return
+        val key = wiring.lease.slot.key
+        // Never park a finished call again (replay), nor replace a control request's real id with this one.
+        if (callId in ledger.returned || approvals.approvalIdFor(callId) != null) return
+        if (!gatesStreamedApproval(approval.toolName, permissionModeProvider(wiring.command))) return
+        approvals.park(key, PendingApprovalDetails(approval.requestId, callId, approval.toolName ?: "tool"))
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
 
@@ -983,7 +972,6 @@ class AppServerTurnEngine(
     private class TurnDraftWiring(
         val scope: AppServerRuntimeScope,
         val command: TurnCommand,
-        val permissionMode: AppServerPermissionMode,
         val lease: LeaseRef,
     )
 
@@ -996,11 +984,11 @@ class AppServerTurnEngine(
         TurnDraftProcessor(
             callbacks = TurnDraftCallbacks(
                 autoApprovedDraft = { draft ->
-                    autoApprovedToolCallDraft(wiring.scope, wiring.permissionMode, wiring.command, draft)?.let { approved ->
+                    autoApprovedToolCallDraft(wiring.scope, wiring.command, draft)?.let { approved ->
                         wiring.command.draftFor(runId = draft.runId, payload = approved)
                     }
                 },
-                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring.lease.slot.key, ledger) },
+                track = { draft, ledger -> trackToolCallAndApprovalIds(draft, wiring, ledger) },
                 clearApprovals = { approvals.clearKey(wiring.lease.slot.key) },
                 emit = emitDraft,
                 settle = { ledger, reason ->
@@ -1080,6 +1068,8 @@ class AppServerTurnEngine(
         budget: FrameProjectionErrorBudget,
     ) {
         if (!admitFrame(received, context)) return
+        (received.frame as? AppServerInboundFrame.UpdateDeviceStatus)?.snapshot?.currentPermissionMode
+            ?.let { onPermissionModeInForce(context.runtimeScope, it) }
         // letta-mobile-qygvv.8: a run bound to another client_message_id never reaches this lease.
         val ownership = context.lease.slot.bindRun(received, context.lease.token)
         if (ownership == RunOwnership.Foreign) return
@@ -1231,7 +1221,6 @@ class AppServerTurnEngine(
     private suspend fun collectTurnWithIdleWatchdog(
         scope: AppServerRuntimeScope,
         command: TurnCommand,
-        turnPermissionMode: AppServerPermissionMode,
         collectorReady: CompletableDeferred<Unit>,
         lease: LeaseRef,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
@@ -1240,7 +1229,7 @@ class AppServerTurnEngine(
         val idleWatchdog = TurnIdleWatchdog(slot.key) { lease.queuedInput.isWatchdogPaused(isConnectionGenerationSuperseded(lease)) }
         val watchdog = idleWatchdog.launchIn(this)
         val draftProcessor = newTurnDraftProcessor(
-            TurnDraftWiring(scope, command, turnPermissionMode, lease),
+            TurnDraftWiring(scope, command, lease),
             emitDraft,
             coroutineScope = this,
         )
@@ -1409,11 +1398,10 @@ class AppServerTurnEngine(
      */
     private suspend fun autoApprovedToolCallDraft(
         scope: AppServerRuntimeScope,
-        turnPermissionMode: AppServerPermissionMode,
         command: TurnCommand,
         draft: RuntimeEventDraft,
     ): RuntimeEventPayload.ToolCallObserved? {
-        if (!autoApproveIfAllowed(scope, turnPermissionMode, draft)) return null
+        if (!autoApproveIfAllowed(scope, command, draft)) return null
         val approval = draft.toApprovalAutoAllowRequest() ?: return null
         return RuntimeEventPayload.ToolCallObserved(
             toolCallId = ToolCallId(approval.toolCallId ?: approval.requestId),
@@ -1448,10 +1436,11 @@ class AppServerTurnEngine(
 
     private suspend fun autoApproveIfAllowed(
         scope: AppServerRuntimeScope,
-        turnPermissionMode: AppServerPermissionMode,
+        command: TurnCommand,
         draft: RuntimeEventDraft,
     ): Boolean {
-        if (turnPermissionMode != AppServerPermissionMode.Unrestricted) return false
+        // Read now, not at turn start: a mode tightened mid-turn must govern this approval.
+        if (permissionModeProvider(command) != AppServerPermissionMode.Unrestricted) return false
         val approval = draft.toApprovalAutoAllowRequest() ?: return false
         // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion,
         // ExitPlanMode) must NEVER be auto-approved — auto-approving closes them
@@ -1534,6 +1523,8 @@ class AppServerTurnEngine(
             error("Connection generation superseded during runtime_start")
         }
         slot.runtimeScope = returnedRuntime
+        onPermissionModeInForce(returnedRuntime, turnPermissionMode)
+            ?.let { deviceState.changePermissionMode(returnedRuntime, it, report = onPermissionModeInForce) }
         onRuntimeEnsured(command, response, generationAtStart)
         return returnedRuntime
     }

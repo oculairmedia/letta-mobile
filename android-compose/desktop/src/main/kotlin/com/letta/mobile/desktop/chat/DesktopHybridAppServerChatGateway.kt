@@ -20,12 +20,20 @@ import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.controller.ApprovalRejectedException
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
+import com.letta.mobile.data.controller.withSelectedSuggestions
+import com.letta.mobile.data.runtime.approvalIdForSuggestions
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.runtime.ApprovalBinding
+import com.letta.mobile.data.runtime.ModeChangeResult
+import com.letta.mobile.data.runtime.setPermissionMode
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -100,6 +108,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val adminGateway: DesktopAdminChatGateway,
     private val transportResources: DesktopTransportResources? = null,
     private val onClose: (() -> Unit)? = null,
+    override val permissionModes: PermissionModeRegistry? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         adminGateway.getConversation(conversationId).agentId.value
@@ -109,10 +118,15 @@ class DesktopHybridAppServerChatGateway internal constructor(
     ConversationSummaryGateway,
     ConversationForkGateway,
     DesktopApprovalSubmitter,
+    DesktopPendingApprovalSource,
+    DesktopPermissionModeController,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,
     AutoCloseable {
+
+    override val pendingApprovalDetails =
+        (turnEngine as? AppServerTurnEngine)?.pendingApprovalDetails ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
 
     /**
      * The turns' own runtime events, republished for presence. The timeline takes the same drafts
@@ -137,6 +151,11 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
+    override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
+        permissionModes?.change(runtime, mode) { requested ->
+            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(runtime, requested) ?: ModeChangeResult.Unconfirmed
+        } ?: false
+
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         abortConversationTurn(ConversationId(conversationId))
 
@@ -159,15 +178,17 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val answerUpdatedInput =
             if (submission.approve) AskUserQuestion.decodeAnswerReason(submission.reason) else null
         val appServerEngine = turnEngine as? AppServerTurnEngine
-        val capturedRequestId = submission.toolCallId?.let { appServerEngine?.userInputApprovalId(it) }
-        val effectiveRequestId = capturedRequestId ?: requestId.value
+        // letta-mobile-bzvro.11: a parked control request that is not a user-input tool is answered
+        // against the control request's own id too (the card's id is the streamed message's).
+        val capturedRequestId = capturedApprovalId(appServerEngine, submission)
+        val effectiveRequestId = effectiveApprovalId(capturedRequestId, submission, requestId.value)
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
             updatedInput = answerUpdatedInput,
             message = submission.reason,
             defaultApproveMessage = "Approved by desktop client.",
             defaultDenyMessage = "Denied by desktop client.",
-        )
+        ).withSelectedSuggestions(submission.selectedSuggestionIds)
         if (appServerEngine == null) {
             client.input(
                 AppServerCommand.Input(
@@ -183,11 +204,45 @@ class DesktopHybridAppServerChatGateway internal constructor(
             // a server replay is re-answered. A rejection reaches the approval
             // coordinator's error path instead of vanishing.
             val result = appServerEngine.submitApprovalResponse(ApprovalSubmission(scope, effectiveRequestId, decision))
-            if (result is ApprovalSubmitResult.Rejected) throw ApprovalRejectedException(result.error)
+            if (result is ApprovalSubmitResult.Rejected) failRejected(appServerEngine, submission, effectiveRequestId, result.error)
         }
         submission.toolCallId?.let { toolCallId ->
-            capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(toolCallId, it) }
+            capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(ApprovalBinding(toolCallId, it)) }
         }
+    }
+
+    /**
+     * An always-allow is bound to the exact request its card offered the rule for; the streamed
+     * message id ([fallback]) is never a stand-in for it, so a rule can't be persisted against another call.
+     */
+    private fun effectiveApprovalId(captured: String?, submission: DesktopApprovalSubmission, fallback: String): String {
+        if (submission.selectedSuggestionIds.isEmpty()) return captured ?: fallback
+        return captured ?: throw ApprovalRejectedException("the permission rule is no longer offered for this request")
+    }
+
+    /**
+     * The server refused the answer. When it no longer holds the request at all, its parked details are
+     * dropped too, so the card stops being live.
+     */
+    private fun failRejected(engine: AppServerTurnEngine, submission: DesktopApprovalSubmission, approvalId: String, error: String): Nothing {
+        if (error.contains("no longer pending", ignoreCase = true)) {
+            submission.toolCallId?.let { engine.clearUserInputApprovalId(ApprovalBinding(it, approvalId)) }
+        }
+        throw ApprovalRejectedException(error)
+    }
+
+    /**
+     * The real control-request id to answer [submission] with: the registry's gate id, else the parked
+     * details'. With suggestion ids it is only the id the card's own details carried, and only while
+     * those are still the parked details for that call ([approvalIdForSuggestions]).
+     */
+    private fun capturedApprovalId(engine: AppServerTurnEngine?, submission: DesktopApprovalSubmission): String? {
+        val callId = submission.toolCallId ?: return null
+        val parked = engine?.pendingApprovalDetails?.value?.get(callId)
+        if (submission.selectedSuggestionIds.isNotEmpty()) {
+            return parked.approvalIdForSuggestions(submission.suggestionBinding, submission.selectedSuggestionIds)
+        }
+        return engine?.userInputApprovalId(callId) ?: parked?.approvalId
     }
 
     private val agentIdByConversation = ConcurrentHashMap<ConversationId, AgentId>()
@@ -384,7 +439,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     override suspend fun deleteConversation(conversationId: String) {
         adminGateway.deleteConversation(conversationId)
+        // Its stored mode goes with it (when the owning agent is known from an earlier send or read).
         agentIdByConversation.remove(ConversationId(conversationId))
+            ?.let { permissionModes?.forget(AppServerRuntimeScope(it.value, conversationId)) }
     }
 
     override val deleteBehavior: ConversationDeleteBehavior get() = adminGateway.deleteBehavior
@@ -457,11 +514,16 @@ internal class DesktopRuntimeOwnedChatGateway(
     ConversationSummaryGateway,
     ConversationForkGateway,
     DesktopApprovalSubmitter,
+    DesktopPendingApprovalSource,
+    DesktopPermissionModeController,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,
     ChatGatewayExtras,
     AutoCloseable {
+    override val pendingApprovalDetails = (delegate as? DesktopPendingApprovalSource)?.pendingApprovalDetails
+        ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
+
     /** Pass the wrapped gateway's runtime events through; a delegate that has none reports none. */
     override val runtimeEvents = (delegate as? DesktopRuntimeEventSource)?.runtimeEvents
         ?: DesktopRuntimeEventRelay().runtimeEvents
@@ -470,6 +532,13 @@ internal class DesktopRuntimeOwnedChatGateway(
         (delegate as? DesktopApprovalSubmitter)?.submitApproval(submission)
             ?: error("The local App Server gateway cannot submit approvals")
     }
+
+    // null (no chip) unless the delegate itself has mode support: never a registry nothing reads.
+    override val permissionModes: PermissionModeRegistry?
+        get() = (delegate as? DesktopPermissionModeController)?.permissionModes
+
+    override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
+        (delegate as? DesktopPermissionModeController)?.setPermissionMode(runtime, mode) ?: false
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         (delegate as? DesktopTurnAborter)?.abortConversationTurn(conversationId) ?: false

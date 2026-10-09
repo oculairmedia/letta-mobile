@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,8 +49,12 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
             ) {
                 // Plugin elements render live where a plugin view is bound (letta-mobile-s416w.14);
                 // until the host's plugin catalog reaches the client, none is, and every element is its card.
-                ProvideDesktopPluginViews(DesktopPluginBindings.None) {
-                    DesktopShellLayoutBody(context, frame)
+                CompositionLocalProvider(
+                    LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
+                ) {
+                    ProvideDesktopPluginViews(DesktopPluginBindings.None) {
+                        DesktopShellLayoutBody(context, frame)
+                    }
                 }
                 DesktopShellOverlays(context, frame)
                 val chatController = context.core.chatController

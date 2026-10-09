@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 
 /**
  * letta-mobile-bglj6.1: every user intent the shared chat page can raise against the
@@ -101,6 +102,9 @@ interface ChatActions {
     fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice)
 
     fun changeWorkingDirectory(directory: ChatWorkingDirectory)
+
+    /** letta-mobile-bzvro.13: asks for another permission mode on this conversation (owners with a mode chip). */
+    fun setPermissionMode(mode: AppServerPermissionMode) = Unit
 
     // Search
     fun updateSearchQuery(query: String)
