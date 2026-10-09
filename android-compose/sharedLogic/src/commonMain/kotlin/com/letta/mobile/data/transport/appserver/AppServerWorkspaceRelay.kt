@@ -90,7 +90,8 @@ object WorkspaceRelay {
     private val ENCODINGS = setOf("utf8", "base64")
     // First character not `-`: a ref becomes a `git show <sha>` argument, and `--output=…` is an option.
     private val REF = Regex("^[A-Za-z0-9._/~^@{}][A-Za-z0-9._/~^@{}-]*$")
-    private val AGENT_ID = Regex("^[A-Za-z0-9_-]{1,128}$")
+    private val GIT_CONFIG_FILES = setOf(".gitattributes", ".gitmodules")
+    private val AGENT_ID =Regex("^[A-Za-z0-9_-]{1,128}$")
     private val SECRET_KEY = Regex("^[A-Z_][A-Z0-9_]*$")
     private val WINDOWS_DRIVE = Regex("^[A-Za-z]:[\\\\/]")
 
@@ -135,16 +136,21 @@ object WorkspaceRelay {
      * other failure (EACCES, EISDIR, git errors…) also becomes a fixed sentence, because Node and
      * git errors quote absolute host paths. Every other frame is unchanged.
      */
-    fun normalizeFrame(method: WorkspaceRelayMethod, frame: JsonObject): JsonObject = when {
-        frame.isMissingFileAnswer() ->
-            JsonObject(frame + mapOf("error" to JsonPrimitive(NOT_FOUND_MESSAGE), "error_code" to JsonPrimitive(NOT_FOUND_CODE)))
-        frame.isFailure() && method.isMemfs ->
-            JsonObject(frame + mapOf("error" to JsonPrimitive(MEMFS_FAILED_MESSAGE), "error_code" to JsonPrimitive(FAILED_CODE)))
-        else -> frame
+    fun normalizeFrame(method: WorkspaceRelayMethod, frame: JsonObject): JsonObject {
+        if (frame.isMissingFileAnswer()) return frame.rewritten(NOT_FOUND_ERROR)
+        if (frame.isFailure() && method.isMemfs()) return frame.rewritten(MEMFS_FAILED_ERROR)
+        return frame
     }
 
-    private val WorkspaceRelayMethod.isMemfs: Boolean
-        get() = access == WorkspaceRelayAccess.MemoryRead || access == WorkspaceRelayAccess.MemoryWrite
+    private val NOT_FOUND_ERROR = JsonPrimitive(NOT_FOUND_MESSAGE) to JsonPrimitive(NOT_FOUND_CODE)
+    private val MEMFS_FAILED_ERROR = JsonPrimitive(MEMFS_FAILED_MESSAGE) to JsonPrimitive(FAILED_CODE)
+
+    private fun JsonObject.rewritten(error: Pair<JsonPrimitive, JsonPrimitive>): JsonObject =
+        JsonObject(this + mapOf("error" to error.first, "error_code" to error.second))
+
+    private fun WorkspaceRelayMethod.isMemfs(): Boolean {
+        return access == WorkspaceRelayAccess.MemoryRead || access == WorkspaceRelayAccess.MemoryWrite
+    }
 
     private fun JsonObject.isFailure(): Boolean = (this["success"] as? JsonPrimitive)?.contentOrNull == "false"
 
@@ -257,17 +263,25 @@ object WorkspaceRelay {
      * config can name a filter or fsmonitor command), compared case-insensitively after trimming
      * trailing dots and spaces; a write may not create `.gitattributes` / `.gitmodules` either.
      */
-    private fun String.isMemoryPath(write: Boolean = false): Boolean =
-        isNotBlank() &&
-            length <= MAX_MEMORY_PATH_CHARS &&
-            isPlain() &&
-            !startsWith('/') && !startsWith('\\') && ':' !in this && '%' !in this &&
-            replace('\\', '/').split('/').all { segment ->
-                val name = segment.trimEnd('.', ' ').lowercase()
-                (name.isNotEmpty() || segment.isEmpty()) &&
-                    name != ".git" &&
-                    !(write && (name == ".gitattributes" || name == ".gitmodules"))
-            }
+    private fun String.isMemoryPath(write: Boolean = false): Boolean {
+        if (!isRelativePlainPath()) return false
+        val segments = replace('\\', '/').split('/')
+        if (!segments.all { it.isSafeSegment() }) return false
+        return !write || segments.none { it.segmentName() in GIT_CONFIG_FILES }
+    }
+
+    private fun String.isRelativePlainPath(): Boolean =
+        isNotBlank() && length <= MAX_MEMORY_PATH_CHARS && isPlain() &&
+            !startsWith('/') && !startsWith('\\') && ':' !in this && '%' !in this
+
+    /** A path segment as the host's filesystem may see it: case-folded, trailing dots and spaces dropped. */
+    private fun String.segmentName(): String = trimEnd('.', ' ').lowercase()
+
+    private fun String.isSafeSegment(): Boolean {
+        val name = segmentName()
+        if (name.isEmpty()) return isEmpty()
+        return name != ".git"
+    }
 
     /** A POSIX, UNC or drive-letter absolute path. */
     private fun String.isAbsoluteFilePath(): Boolean =
