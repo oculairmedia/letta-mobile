@@ -34,7 +34,7 @@ internal fun DesktopPermissionModeSettingsCard() {
     val current by settings.defaultMode.collectAsState()
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
