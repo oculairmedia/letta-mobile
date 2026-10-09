@@ -31,9 +31,13 @@ interface WorkspaceFileViewerActions {
     fun retry()
 }
 
-/** Opens a workspace file by path; hosts hand [open] to tool cards and other path affordances. */
+/**
+ * Opens a workspace file by path; hosts hand [open] to tool cards and other path affordances.
+ * [memoryTool] is true when the path comes from a memory tool call, whose relative paths are the
+ * agent's memory files; any other relative path needs a working directory.
+ */
 fun interface WorkspaceFileOpener {
-    fun open(path: String)
+    fun open(path: String, memoryTool: Boolean)
 }
 
 /** Pure transitions of [WorkspaceFileViewerState]; a read for a file no longer open is dropped. */
@@ -61,8 +65,9 @@ class WorkspaceFileViewerController(
 
     /**
      * Opens [path]; a relative one resolves against [cwd]. With no [cwd], a relative path is
-     * [memoryAgentId]'s memory file (letta-mobile-bzvro.37: a memory tool's `system/human/…`),
-     * never a path on the host's own working directory.
+     * [memoryAgentId]'s memory file only when the caller passes it (a memory tool's
+     * `system/human/…`, letta-mobile-bzvro.37); any other relative path cannot be opened, and is
+     * never read from the host's own working directory.
      */
     fun open(path: String, cwd: String?, memoryAgentId: String? = null) {
         val inMemory = cwd.isNullOrBlank() && !WorkspacePaths.isAbsolute(path) && !memoryAgentId.isNullOrBlank()
@@ -84,6 +89,10 @@ class WorkspaceFileViewerController(
         readJob?.cancel()
         stateFlow.value = WorkspaceFileViewerReducer.opening(path)
         val agentId = memoryAgentId
+        if (agentId == null && !WorkspacePaths.isAbsolute(path)) {
+            stateFlow.update { WorkspaceFileViewerReducer.failed(it, path, WorkspaceFileErrors.NO_WORKING_DIRECTORY) }
+            return
+        }
         readJob = scope.launch {
             try {
                 val content = if (agentId != null) source.readMemory(agentId, path) else source.read(path)
@@ -100,6 +109,9 @@ class WorkspaceFileViewerController(
 
 /** The file a tool call works on, read from its arguments (`file_path`, `path`, …), or null. */
 object ToolFileTargets {
+    /** Letta's memory tools (`memory`, `memory_insert`, `core_memory_append`…): their paths are MemFS paths. */
+    fun isMemoryTool(toolName: String): Boolean = toolName.lowercase().let { it == "memory" || it.startsWith("memory_") || it.endsWith("_memory") || "core_memory" in it }
+
     private val PATH_KEYS = listOf("file_path", "filePath", "notebook_path", "target_file", "path")
     private val json = Json { ignoreUnknownKeys = true }
 

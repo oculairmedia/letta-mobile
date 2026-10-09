@@ -5,7 +5,9 @@ import com.letta.mobile.data.memory.memfs.MemfsSource
 import com.letta.mobile.data.secrets.AgentSecretsFeature
 import com.letta.mobile.data.secrets.AgentSecretsSource
 import com.letta.mobile.data.secrets.AppServerAgentSecretsSource
+import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.workspace.AppServerWorkspaceFileSource
 import com.letta.mobile.data.workspace.WorkspaceFileSource
 import com.letta.mobile.data.workspace.relay.WorkspaceClientRoute
@@ -30,8 +32,18 @@ import kotlinx.coroutines.flow.emptyFlow
 object WorkspaceModule {
     @Provides
     @Singleton
-    fun provideWorkspaceClientRoute(transport: IChannelTransport): WorkspaceClientRoute =
-        WorkspaceClientRoute(relay = { WorkspaceRelayCall.overTransport { transport } })
+    fun provideWorkspaceClientRoute(transport: IChannelTransport, sessionManager: SessionManager): WorkspaceClientRoute =
+        // Only an Iroh session has a host that relays; on any other the pages show NO_CONNECTION
+        // rather than the transport's raw "admin_rpc is not supported".
+        WorkspaceClientRoute(
+            relay = {
+                if (sessionManager.current.channelTransport is IrohChannelTransport) {
+                    WorkspaceRelayCall.overTransport { transport }
+                } else {
+                    null
+                }
+            },
+        )
 
     /** The relay pushes no `memory_updated`; the page refreshes on demand. */
     @Provides

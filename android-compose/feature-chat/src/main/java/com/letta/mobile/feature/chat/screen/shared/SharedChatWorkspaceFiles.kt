@@ -1,5 +1,8 @@
 package com.letta.mobile.feature.chat.screen.shared
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
@@ -24,9 +27,16 @@ import kotlinx.coroutines.flow.map
  */
 @Composable
 internal fun rememberSharedChatWorkspaceFiles(): WorkspaceFilesViewModel? {
-    val activity = LocalContext.current as? android.app.Activity
+    val activity = LocalContext.current.findActivity()
     if (activity !is dagger.hilt.internal.GeneratedComponentManager<*>) return null
     return hiltViewModel()
+}
+
+/** The Activity under a ContextWrapper chain (themed, dialog and lifecycle wrappers hide it). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**
@@ -41,9 +51,14 @@ internal fun SharedChatWorkspaceFilesBox(
     modifier: Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    // The phone knows no working directory: a relative path is the agent's memory file.
+    // The phone knows no working directory: a memory tool's relative path is the agent's memory
+    // file; any other relative path cannot be opened.
     val opener = remember(files, agentId) {
-        files?.let { WorkspaceFileOpener { path -> it.viewer.open(path, cwd = null, memoryAgentId = agentId) } }
+        files?.let {
+            WorkspaceFileOpener { path, memoryTool ->
+                it.viewer.open(path, cwd = null, memoryAgentId = agentId.takeIf { memoryTool })
+            }
+        }
     }
     CompositionLocalProvider(LocalWorkspaceFileOpener provides opener) {
         Box(modifier) {

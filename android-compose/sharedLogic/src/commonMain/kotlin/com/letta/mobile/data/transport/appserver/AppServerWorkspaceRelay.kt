@@ -88,7 +88,9 @@ object WorkspaceRelay {
     private const val TYPE = "type"
     private const val REQUEST_ID = "request_id"
     private val ENCODINGS = setOf("utf8", "base64")
-    private val REF = Regex("^[A-Za-z0-9._/~^@{}-]+$")
+    // First character not `-`: a ref becomes a `git show <sha>` argument, and `--output=…` is an option.
+    private val REF = Regex("^[A-Za-z0-9._/~^@{}][A-Za-z0-9._/~^@{}-]*$")
+    private val AGENT_ID = Regex("^[A-Za-z0-9_-]{1,128}$")
     private val SECRET_KEY = Regex("^[A-Z_][A-Z0-9_]*$")
     private val WINDOWS_DRIVE = Regex("^[A-Za-z]:[\\\\/]")
 
@@ -121,7 +123,7 @@ object WorkspaceRelay {
     /** Host side: the admin_rpc result carrying [frames]; fails past [MAX_RESULT_BYTES]. */
     fun encodeResult(frames: List<JsonObject>): JsonObject {
         val result = buildJsonObject { put(FRAMES, JsonArray(frames)) }
-        if (result.toString().length > MAX_RESULT_BYTES) {
+        if (result.toString().encodeToByteArray().size > MAX_RESULT_BYTES) {
             throw WorkspaceRelayException("the App Server's answer is larger than the relay's ${MAX_RESULT_BYTES / (1024 * 1024)} MiB cap")
         }
         return result
@@ -129,14 +131,22 @@ object WorkspaceRelay {
 
     /**
      * Host side: a missing-file answer (Node's `ENOENT: no such file or directory, open '<path>'`)
-     * becomes a typed `error_code: not_found` without the host path; every other frame is unchanged.
+     * becomes a typed `error_code: not_found` without the host path. On the MemFS methods every
+     * other failure (EACCES, EISDIR, git errors…) also becomes a fixed sentence, because Node and
+     * git errors quote absolute host paths. Every other frame is unchanged.
      */
-    fun normalizeFrame(frame: JsonObject): JsonObject =
-        if (frame.isMissingFileAnswer()) {
+    fun normalizeFrame(method: WorkspaceRelayMethod, frame: JsonObject): JsonObject = when {
+        frame.isMissingFileAnswer() ->
             JsonObject(frame + mapOf("error" to JsonPrimitive(NOT_FOUND_MESSAGE), "error_code" to JsonPrimitive(NOT_FOUND_CODE)))
-        } else {
-            frame
-        }
+        frame.isFailure() && method.isMemfs ->
+            JsonObject(frame + mapOf("error" to JsonPrimitive(MEMFS_FAILED_MESSAGE), "error_code" to JsonPrimitive(FAILED_CODE)))
+        else -> frame
+    }
+
+    private val WorkspaceRelayMethod.isMemfs: Boolean
+        get() = access == WorkspaceRelayAccess.MemoryRead || access == WorkspaceRelayAccess.MemoryWrite
+
+    private fun JsonObject.isFailure(): Boolean = (this["success"] as? JsonPrimitive)?.contentOrNull == "false"
 
     private fun JsonObject.isMissingFileAnswer(): Boolean {
         if ((this["success"] as? JsonPrimitive)?.contentOrNull != "false") return false
@@ -146,6 +156,8 @@ object WorkspaceRelay {
 
     const val NOT_FOUND_CODE: String = "not_found"
     const val NOT_FOUND_MESSAGE: String = "not found"
+    const val FAILED_CODE: String = "failed"
+    const val MEMFS_FAILED_MESSAGE: String = "the memory operation failed on the host"
 
     private fun isMissingFile(error: String): Boolean = "ENOENT" in error || error.contains("no such file", ignoreCase = true)
 
@@ -167,7 +179,7 @@ object WorkspaceRelay {
             is AppServerFileCommand -> validateFile(command)
             is AppServerCommand.WriteMemoryFile -> {
                 RelayField.AgentId.requires(command.agentId.isAgentId())
-                RelayField.Path.requires(command.path.isMemoryPath())
+                RelayField.Path.requires(command.path.isMemoryPath(write = true))
                 RelayField.Content.requires(command.content.length <= MAX_WRITE_CHARS)
                 RelayField.Encoding.requires(command.encoding.isEncoding())
                 RelayField.CommitMessage.requires((command.commitMessage?.length ?: 0) <= MAX_MEMORY_PATH_CHARS)
@@ -234,19 +246,28 @@ object WorkspaceRelay {
         }
     }
 
-    private fun String.isAgentId(): Boolean =
-        isNotBlank() && length <= MAX_ID_CHARS && isPlain() && '/' !in this && '\\' !in this
+    /** Letta ids look like `agent-<uuid>`; `.` and `..` would escape the per-agent memory root. */
+    private fun String.isAgentId(): Boolean = AGENT_ID.matches(this)
 
     /**
      * Relative to the agent's memory root: no absolute path, drive, `..` segment, or percent-encoding
      * (`%2e%2e`). The App Server joins it to the root and rejects what still escapes.
+     *
+     * The root is a git work tree whose `git add` the host runs: no segment may be `.git` (its
+     * config can name a filter or fsmonitor command), compared case-insensitively after trimming
+     * trailing dots and spaces; a write may not create `.gitattributes` / `.gitmodules` either.
      */
-    private fun String.isMemoryPath(): Boolean =
+    private fun String.isMemoryPath(write: Boolean = false): Boolean =
         isNotBlank() &&
             length <= MAX_MEMORY_PATH_CHARS &&
             isPlain() &&
             !startsWith('/') && !startsWith('\\') && ':' !in this && '%' !in this &&
-            replace('\\', '/').split('/').none { it == ".." }
+            replace('\\', '/').split('/').all { segment ->
+                val name = segment.trimEnd('.', ' ').lowercase()
+                (name.isNotEmpty() || segment.isEmpty()) &&
+                    name != ".git" &&
+                    !(write && (name == ".gitattributes" || name == ".gitmodules"))
+            }
 
     /** A POSIX, UNC or drive-letter absolute path. */
     private fun String.isAbsoluteFilePath(): Boolean =

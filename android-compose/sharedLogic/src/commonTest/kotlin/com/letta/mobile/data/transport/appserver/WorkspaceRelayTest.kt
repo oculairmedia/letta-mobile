@@ -75,6 +75,60 @@ class WorkspaceRelayTest {
     }
 
     @Test
+    fun gitInternalsAreNeverReadableOrWritableThroughMemfs() {
+        // A peer with only memory.write must not plant .git/config (filter / fsmonitor command) or .gitattributes.
+        val internals = listOf(
+            ".git/config", ".GIT/config", ".Git/config", ".git./config", ".git /config", ".git.. . /config", ".git",
+            "sub/.git/hooks/x", "a/.git", ".git\\config", ".GIT\\config", ".git.\\config", "sub\\.git\\hooks\\x", "a/..\\.git/config",
+        )
+        internals.forEach { path ->
+            assertRejected(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(path))
+            assertRejected(WorkspaceRelayMethod.WriteMemoryFile, memfsParams(path, "content" to "[filter \"x\"]"))
+            assertRejected(WorkspaceRelayMethod.MemoryHistory, buildJsonObject { put("agent_id", "agent-1"); put("file_path", path) })
+            assertRejected(WorkspaceRelayMethod.MemoryFileAtRef, buildJsonObject { put("agent_id", "agent-1"); put("file_path", path); put("ref", "HEAD") })
+        }
+        // .gitattributes / .gitmodules: refused for writes (any segment, any case), still readable.
+        listOf(".gitattributes", ".GITATTRIBUTES", ".gitmodules", "sub/.gitattributes", "sub\\.gitmodules", ".gitattributes.", ".gitmodules ").forEach { path ->
+            assertRejected(WorkspaceRelayMethod.WriteMemoryFile, memfsParams(path, "content" to "x"))
+        }
+        decode(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(".gitattributes"))
+        // Names that merely contain "git" are ordinary memory files.
+        listOf("notes/.github/x.md", "git.md", "my.git.notes/a.md", ".gitignore", "system/human/communication_style.md").forEach { path ->
+            decode(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(path))
+            decode(WorkspaceRelayMethod.WriteMemoryFile, memfsParams(path, "content" to "x"))
+        }
+    }
+
+    @Test
+    fun agentIdsAreLettaIdsThatCannotEscapeTheMemoryRoot() {
+        listOf(".", "..", "...", "a/b", "a\\b", "../x", "a b", "agent:1", "agent\u0000", "agent%2e", "a".repeat(WorkspaceRelay.MAX_ID_CHARS + 1), "").forEach { id ->
+            assertRejected(WorkspaceRelayMethod.ListMemory, buildJsonObject { put("agent_id", id) })
+            assertRejected(WorkspaceRelayMethod.SecretList, buildJsonObject { put("agent_id", id) })
+            assertRejected(WorkspaceRelayMethod.ReadMemoryFile, memfsParams("x.md", agentId = id))
+        }
+        listOf("agent-1", "agent-0b5f1a52-9c4e-4a41-8f43-0123456789ab", "a_b-C", "a".repeat(WorkspaceRelay.MAX_ID_CHARS)).forEach { id ->
+            decode(WorkspaceRelayMethod.ListMemory, buildJsonObject { put("agent_id", id) })
+        }
+    }
+
+    @Test
+    fun refsCannotBeGitOptions() {
+        listOf("--output=/tmp/x", "-1", "--format=%H", "-").forEach { sha ->
+            assertRejected(WorkspaceRelayMethod.MemoryCommitDiff, buildJsonObject { put("agent_id", "a"); put("sha", sha) })
+            assertRejected(WorkspaceRelayMethod.MemoryFileAtRef, buildJsonObject { put("agent_id", "a"); put("file_path", "x.md"); put("ref", sha) })
+        }
+        decode(WorkspaceRelayMethod.MemoryCommitDiff, buildJsonObject { put("agent_id", "a"); put("sha", "abc-def") })
+    }
+
+    @Test
+    fun theResultCapCountsUtf8BytesNotCharacters() {
+        // 3 bytes per character: under the cap as characters, over it as bytes.
+        val chars = WorkspaceRelay.MAX_RESULT_BYTES / 2
+        val frame = buildJsonObject { put("content", "\u20ac".repeat(chars)) }
+        assertFailsWith<WorkspaceRelayException> { WorkspaceRelay.encodeResult(listOf(frame)) }
+    }
+
+    @Test
     fun agentIdsRefsLimitsAndSearchesAreCapped() {
         assertRejected(WorkspaceRelayMethod.ListMemory, buildJsonObject { put("agent_id", "agent/../2") })
         assertRejected(WorkspaceRelayMethod.ListMemory, buildJsonObject { put("agent_id", "a".repeat(WorkspaceRelay.MAX_ID_CHARS + 1)) })
@@ -152,6 +206,12 @@ class WorkspaceRelayTest {
         assertFalse(AgentSecretsRedaction.redact(response).toString().contains("S3CRET"))
         assertTrue(AgentSecretsRedaction.redact(response).toString().contains("API_KEY"), "keys stay visible")
         assertEquals(other, AgentSecretsRedaction.redact(other))
+    }
+
+    private fun memfsParams(path: String, vararg extra: Pair<String, String>, agentId: String = "agent-1"): JsonObject = buildJsonObject {
+        put("agent_id", agentId)
+        put("path", path)
+        extra.forEach { (k, v) -> put(k, v) }
     }
 
     private fun decode(method: WorkspaceRelayMethod, params: JsonObject): AppServerCommand =

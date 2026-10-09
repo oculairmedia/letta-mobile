@@ -73,7 +73,7 @@ class WorkspaceFileViewerTest {
         val opened = mutableListOf<String>()
         setContent {
             MaterialTheme {
-                CompositionLocalProvider(LocalWorkspaceFileOpener provides WorkspaceFileOpener { opened += it }) {
+                CompositionLocalProvider(LocalWorkspaceFileOpener provides WorkspaceFileOpener { path, _ -> opened += path }) {
                     ToolCallFileLink("""{"file_path":"/repo/a.kt"}""")
                 }
             }

@@ -20,6 +20,7 @@ import com.letta.mobile.data.transport.appserver.AppServerSecretCommand
 import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import com.letta.mobile.data.transport.appserver.WorkspaceRelay
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
+import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.data.workspace.AppServerWorkspaceFileSource
 import com.letta.mobile.data.workspace.WorkspaceFileContent
@@ -205,15 +206,52 @@ class WorkspaceRelayRoundTripTest {
     }
 
     @Test
+    fun gitInternalsAndUnsafeAgentIdsNeverReachTheAppServer() = runTest {
+        val server = FakeAppServer(memoryRoot = memoryRoot())
+        val memfs = AppServerMemfsSource(client = { client(server) }, events = emptyFlow(), requestId = { it })
+        val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
+        val readPaths = listOf(
+            ".git/config", ".GIT/config", ".git./config", ".git /config", "sub/.git/hooks/x", ".git\\config", "sub\\.git\\hooks\\x", ".Git...\\config",
+        )
+        readPaths.forEach { path ->
+            assertFailsWith<MemfsException>(path) { memfs.read(MemfsFileRef("agent-1", path)) }
+            assertFailsWith<MemfsException>(path) { memfs.write(MemfsFileRef("agent-1", path), "[filter \"x\"]") }
+            assertFailsWith<MemfsException>(path) { memfs.history(com.letta.mobile.data.memory.memfs.MemfsHistoryScope("agent-1", path)) }
+            assertFailsWith<MemfsException>(path) { memfs.fileAtRef(MemfsFileRef("agent-1", path), "HEAD") }
+            assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException>(path) { files.readMemory("agent-1", path) }
+        }
+        listOf(".gitattributes", ".GITATTRIBUTES", "sub/.gitmodules", "sub\\.gitattributes.", ".gitmodules ").forEach { path ->
+            assertFailsWith<MemfsException>(path) { memfs.write(MemfsFileRef("agent-1", path), "* filter=x") }
+        }
+        listOf(".", "..", "../agent-2", "a/b", "a\\b", "a".repeat(WorkspaceRelay.MAX_ID_CHARS + 1), "a b", "").forEach { agentId ->
+            assertFailsWith<MemfsException>("agent id '$agentId'") { memfs.list(agentId) }
+            assertFailsWith<MemfsException>("agent id '$agentId'") { memfs.read(MemfsFileRef(agentId, "x.md")) }
+        }
+        assertEquals(emptyList(), server.received)
+    }
+
+    @Test
+    fun everyMemfsFailureIsAFixedSentenceWithoutTheHostPath() {
+        val raw = Json.parseToJsonElement(
+            """{"type":"read_memory_file_response","request_id":"h","success":false,"error":"EACCES: permission denied, open '/root/.letta/agents/a/memory/x.md'"}""",
+        ).jsonObject
+        val memfs = WorkspaceRelay.normalizeFrame(WorkspaceRelayMethod.ReadMemoryFile, raw)
+        assertEquals(WorkspaceRelay.MEMFS_FAILED_MESSAGE, (memfs["error"] as JsonPrimitive).content)
+        assertFalse(memfs.toString().contains("/root"))
+        // Not a memfs method: only the missing-file answer is rewritten.
+        assertEquals(raw, WorkspaceRelay.normalizeFrame(WorkspaceRelayMethod.SecretList, raw))
+    }
+
+    @Test
     fun theHostTypesAMissingFileAnswer() {
         val raw = Json.parseToJsonElement(
             """{"type":"read_file_response","request_id":"h","success":false,"error":"ENOENT: no such file or directory, open '/root/x'"}""",
         ).jsonObject
-        val normalized = WorkspaceRelay.normalizeFrame(raw)
+        val normalized = WorkspaceRelay.normalizeFrame(WorkspaceRelayMethod.ReadFile, raw)
         assertEquals(WorkspaceRelay.NOT_FOUND_CODE, (normalized["error_code"] as JsonPrimitive).content)
         assertFalse(normalized.toString().contains("/root/x"))
         val ok = Json.parseToJsonElement("""{"type":"read_file_response","success":true,"content":"no such file in prose"}""").jsonObject
-        assertEquals(ok, WorkspaceRelay.normalizeFrame(ok))
+        assertEquals(ok, WorkspaceRelay.normalizeFrame(WorkspaceRelayMethod.ReadFile, ok))
     }
 
     private fun memoryRoot(): java.nio.file.Path {

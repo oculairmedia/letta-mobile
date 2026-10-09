@@ -34,6 +34,21 @@ deploy section). A host built from an older head of the branch still relays rela
 paths (resolved against its own cwd) and raw `ENOENT` text, so redeploy it; the client from the
 same commit is what reads a tool card's `system/…` path from the agent's memory root.
 
+**Do NOT deploy `00c8cf6778f90ec8fc3cf56eac47275fe9b846ad`, or any head of this branch before the
+security fix.** Those builds let a peer holding only `memory.write` write `.git/config` (a
+`[filter …] clean = <cmd>` or `core.fsmonitor` entry) plus `.gitattributes` into an agent's memory
+repo; the next `git add` run by letta-code, as the wrapper user (root), would execute the command.
+The fixed relay refuses any `.git` path segment for every `memfs.*` method and `.gitattributes` /
+`.gitmodules` for writes, and requires agent ids to match `^[A-Za-z0-9_-]{1,128}$`. The PR body names
+the exact commit to deploy.
+
+### Known issue in letta-code (upstream)
+
+`write_memory_file` in `@letta-ai/letta-code` does not block `.git` paths itself, so the App Server
+will write `<memory root>/.git/config` for any caller that reaches it. The relay's refusal above is
+the only guard on the Iroh path; a direct App Server client is unaffected by it. Report upstream.
+Tracked here as bead `letta-mobile-k79nu`.
+
 ## 0. Find out which launch layout is live (host)
 
 The service has used three layouts over time; the steps differ. Check first:
