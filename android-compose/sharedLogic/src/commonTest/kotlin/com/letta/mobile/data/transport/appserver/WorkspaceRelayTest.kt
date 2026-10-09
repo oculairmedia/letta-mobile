@@ -80,6 +80,8 @@ class WorkspaceRelayTest {
         val internals = listOf(
             ".git/config", ".GIT/config", ".Git/config", ".git./config", ".git /config", ".git.. . /config", ".git",
             "sub/.git/hooks/x", "a/.git", ".git\\config", ".GIT\\config", ".git.\\config", "sub\\.git\\hooks\\x", "a/..\\.git/config",
+            // NTFS 8.3 short name of .git: writes through to the real .git directory on Windows hosts.
+            "GIT~1/config", "git~1/config", "GIT~2/hooks/x", "sub\\GIT~1\\config", "GIT~1", "sub/Git~12/config",
         )
         internals.forEach { path ->
             assertRejected(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(path))
@@ -88,12 +90,12 @@ class WorkspaceRelayTest {
             assertRejected(WorkspaceRelayMethod.MemoryFileAtRef, buildJsonObject { put("agent_id", "agent-1"); put("file_path", path); put("ref", "HEAD") })
         }
         // .gitattributes / .gitmodules: refused for writes (any segment, any case), still readable.
-        listOf(".gitattributes", ".GITATTRIBUTES", ".gitmodules", "sub/.gitattributes", "sub\\.gitmodules", ".gitattributes.", ".gitmodules ").forEach { path ->
+        listOf(".gitattributes", ".GITATTRIBUTES", ".gitmodules", "sub/.gitattributes", "sub\\.gitmodules", ".gitattributes.", ".gitmodules ", "GITATT~1", "gitatt~1", "sub/GITATT~2", "GITMOD~1", "sub\\gitmod~1").forEach { path ->
             assertRejected(WorkspaceRelayMethod.WriteMemoryFile, memfsParams(path, "content" to "x"))
         }
         decode(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(".gitattributes"))
         // Names that merely contain "git" are ordinary memory files.
-        listOf("notes/.github/x.md", "git.md", "my.git.notes/a.md", ".gitignore", "system/human/communication_style.md").forEach { path ->
+        listOf("notes/.github/x.md", "git.md", "my.git.notes/a.md", "notes~backup.md", "notes~1.md", "gitnotes~1.md", "gi~1/a.md", ".gitignore", "system/human/communication_style.md").forEach { path ->
             decode(WorkspaceRelayMethod.ReadMemoryFile, memfsParams(path))
             decode(WorkspaceRelayMethod.WriteMemoryFile, memfsParams(path, "content" to "x"))
         }

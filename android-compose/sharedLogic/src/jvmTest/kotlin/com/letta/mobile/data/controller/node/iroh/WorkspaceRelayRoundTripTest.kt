@@ -212,6 +212,7 @@ class WorkspaceRelayRoundTripTest {
         val files = AppServerWorkspaceFileSource(client = { client(server) }, requestId = { it })
         val readPaths = listOf(
             ".git/config", ".GIT/config", ".git./config", ".git /config", "sub/.git/hooks/x", ".git\\config", "sub\\.git\\hooks\\x", ".Git...\\config",
+            "GIT~1/config", "git~1/config", "GIT~2/hooks/x", "sub\\GIT~1\\config",
         )
         readPaths.forEach { path ->
             assertFailsWith<MemfsException>(path) { memfs.read(MemfsFileRef("agent-1", path)) }
@@ -220,7 +221,7 @@ class WorkspaceRelayRoundTripTest {
             assertFailsWith<MemfsException>(path) { memfs.fileAtRef(MemfsFileRef("agent-1", path), "HEAD") }
             assertFailsWith<com.letta.mobile.data.workspace.WorkspaceFileException>(path) { files.readMemory("agent-1", path) }
         }
-        listOf(".gitattributes", ".GITATTRIBUTES", "sub/.gitmodules", "sub\\.gitattributes.", ".gitmodules ").forEach { path ->
+        listOf(".gitattributes", ".GITATTRIBUTES", "sub/.gitmodules", "sub\\.gitattributes.", ".gitmodules ", "GITATT~1", "GITMOD~1").forEach { path ->
             assertFailsWith<MemfsException>(path) { memfs.write(MemfsFileRef("agent-1", path), "* filter=x") }
         }
         listOf(".", "..", "../agent-2", "a/b", "a\\b", "a".repeat(WorkspaceRelay.MAX_ID_CHARS + 1), "a b", "").forEach { agentId ->

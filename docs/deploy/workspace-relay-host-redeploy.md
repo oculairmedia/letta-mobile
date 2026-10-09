@@ -42,6 +42,11 @@ The fixed relay refuses any `.git` path segment for every `memfs.*` method and `
 `.gitmodules` for writes, and requires agent ids to match `^[A-Za-z0-9_-]{1,128}$`. The PR body names
 the exact commit to deploy.
 
+**Also do NOT deploy `e238eea70f9666bdec25729f419066c2e27b006a`** on a Windows host: it did not
+refuse NTFS 8.3 short-name aliases, so `GIT~1/config` wrote through to the real `.git/config`.
+The current relay rejects any segment starting `git~` (all methods) and `gitatt~` / `gitmod~`
+(writes). Linux hosts were not affected by the alias, but deploy the current commit anyway.
+
 ### Known issue in letta-code (upstream)
 
 `write_memory_file` in `@letta-ai/letta-code` does not block `.git` paths itself, so the App Server

@@ -91,7 +91,11 @@ object WorkspaceRelay {
     // First character not `-`: a ref becomes a `git show <sha>` argument, and `--output=…` is an option.
     private val REF = Regex("^[A-Za-z0-9._/~^@{}][A-Za-z0-9._/~^@{}-]*$")
     private val GIT_CONFIG_FILES = setOf(".gitattributes", ".gitmodules")
-    private val AGENT_ID =Regex("^[A-Za-z0-9_-]{1,128}$")
+
+    // NTFS 8.3 short names: `GIT~1` is `.git`, `GITATT~1` is `.gitattributes`, `GITMOD~1` is `.gitmodules`.
+    private const val GIT_DIR_ALIAS = "git~"
+    private val GIT_CONFIG_ALIASES = listOf("gitatt~", "gitmod~")
+    private val AGENT_ID = Regex("^[A-Za-z0-9_-]{1,128}$")
     private val SECRET_KEY = Regex("^[A-Z_][A-Z0-9_]*$")
     private val WINDOWS_DRIVE = Regex("^[A-Za-z]:[\\\\/]")
 
@@ -267,7 +271,7 @@ object WorkspaceRelay {
         if (!isRelativePlainPath()) return false
         val segments = replace('\\', '/').split('/')
         if (!segments.all { it.isSafeSegment() }) return false
-        return !write || segments.none { it.segmentName() in GIT_CONFIG_FILES }
+        return !write || segments.none { it.isGitConfigFile() }
     }
 
     private fun String.isRelativePlainPath(): Boolean =
@@ -280,7 +284,12 @@ object WorkspaceRelay {
     private fun String.isSafeSegment(): Boolean {
         val name = segmentName()
         if (name.isEmpty()) return isEmpty()
-        return name != ".git"
+        return name != ".git" && !name.startsWith(GIT_DIR_ALIAS)
+    }
+
+    private fun String.isGitConfigFile(): Boolean {
+        val name = segmentName()
+        return name in GIT_CONFIG_FILES || GIT_CONFIG_ALIASES.any { name.startsWith(it) }
     }
 
     /** A POSIX, UNC or drive-letter absolute path. */
