@@ -1,392 +1,302 @@
 # Context usage, compaction and model switch: research and plan
 
-Date: 2026-10-09. Status: plan (no code in this PR). Tracked by the beads epic filed alongside
-this document (see section 9).
+Date: 2026-10-09 (second pass the same day). Status: plan (no code in this PR). Tracked by the
+beads epic `letta-mobile-pt1ze` (section 12).
+
+**Premise (corrected by the user in the second pass): there is no Letta server.** The legacy
+Python server is deprecated; the only backend is the letta-code process in **local-backend mode**
+(desktop-bundled runtime, the Meridian host behind the Iroh wrapper, and the embedded Android
+runtime). Everything below is about what that process emits and what we can compute ourselves.
+The first revision designed around Letta server REST (`GET /v1/agents/{id}/context`); that design
+is removed.
 
 Goal: an agent side-drawer card with (a) a model chip (current model plus reasoning effort; tap
 opens a searchable list that changes the model) and (b) a slim context meter that opens a sheet
-with a per-category breakdown, used/limit, and a **Compact** button.
+with a per-category breakdown, used/limit and a **Compact** button.
 
 ## 1. Method
 
-- Static reading only. `resources/app.asar` of the official Letta Desktop (`Programs\letta-code`,
-  v0.33.6) was extracted with `@electron/asar` to a scratch dir on `E:` (deleted afterwards).
-  The REA CLI was not needed; `rea setup` was not run. Bounded grep windows over the renderer
-  chunk `dist/assets/index-*.js` and over the bundled
-  `app.asar.unpacked/node_modules/@letta-ai/letta-code/letta.js` (0.33.6, Apache-2.0, same
-  version as our desktop pin, so no diff against our pin was needed).
-- The app was not launched, no network traffic captured, no credentials touched.
-- Clean-room: renderer behaviour is described in our words. Only letta-code protocol facts are
-  quoted. Evidence below names functions and frame names; `letta.js:NNNN` are line numbers in the
-  0.33.6 bundle (stable for that version only).
-- Our repo was read at `origin/main` (`592e0d4ff`, after #1827). Paths are relative to
-  `android-compose/` unless stated.
+- Static reading only; app not launched, no network capture, no credentials. `rea setup` not run.
+- Official Letta Desktop `resources/app.asar` extracted with `@electron/asar` to a scratch dir on
+  `E:` (deleted). Renderer read with bounded grep windows; its behaviour is described in our own
+  words. letta-code (Apache-2.0) protocol facts are quoted freely.
+- letta-code sources compared: **0.26.1** (embedded Android pin, via `npm pack`), **0.29.12**
+  (our desktop runtime, `Programs\letta-desktop\...\letta-code-runtime`), **0.33.6** (our wire
+  baseline), **0.34.8** (what the official Desktop auto-updated to during this work) and **0.34.9**
+  (latest on npm). `letta.js:NNNN` are line numbers in the 0.34.8 bundle unless a version is given.
+- GitHub: release notes 0.28.14-0.34.9 and issue/PR search in `letta-ai/letta-code` show **no**
+  local-backend context endpoint, frame or open work item. The only related PR is #814 (the TUI
+  `/context` command).
+- Our repo read at `origin/main` (`592e0d4ff`). Paths are relative to `android-compose/`.
 
-## 2. Answer to the open question: breakdown or total only?
+## 2. Answer: does letta-code (local mode) give a per-category breakdown?
 
-| Source | Per-category breakdown? | Evidence |
+**No, in every version through 0.34.9.** Only the total is exact, and only the total is exposed.
+
+| Source | Breakdown? | Evidence |
 |---|---|---|
-| App Server WebSocket (letta-code 0.33.6), direct | **No. Total only.** | `usage_statistics` stream delta carries `context_tokens`; `device_status`, `update_loop_status` carry no context data; none of the inbound command parsers (`letta.js:196937-197800`) is a context query. |
-| Letta server REST `GET /v1/agents/{id}/context` | **Yes**, plus window size | `ContextWindowOverview` schema (renderer SDK bundle) and `getAgentContextOverview` (`letta.js:216110`). |
-| Iroh `admin_rpc agent.context` (our wrapper host) | **Shape yes, numbers are an estimate** | `LocalBackendContextReader.kt`: `system = ceil(len/4)`, `messages = count*50`, `window = 200000` constant, core memory/tools/summary all 0. Without `--local-backend-dir` the method returns `capability_unavailable` (`AgentAdminHandlers.registerAgentContext`). |
-| Bundled local backend (Android embedded / desktop local) | Same estimate | `AppServerLocalRepositoryTransport.getContext` calls the same `agent.context`. |
+| App Server frames (`usage_statistics`, `device_status`, `update_loop_status`) | **Total only** | `createUsageStatisticsChunk` (`letta.js:116903`) emits `prompt/completion/total/cached_input/cache_write/reasoning_tokens` and `context_tokens`; no section fields. No inbound command parser is a context query. |
+| `LocalBackend` (`letta.js:118208`) | **No context overview method** | Only `effectiveContextWindow` (`:118414`, limit) and compaction. |
+| TUI `/context` (`letta.js:520532`) | Breakdown only via `getAgentContextOverview` = `GET /v1/agents/{id}/context`, fetched best effort with a 5 s abort; on failure it **silently** draws the total-only bar. In local mode there is no server to answer, so the TUI itself is total-only. | `letta.js:520532-520550` |
+| Official Desktop GUI | Total only (section 4) | renderer `ContextWindowUsageRow` |
+| Our Iroh/local `agent.context` | A breakdown *shape* with a **crude estimate** (section 5) | `LocalBackendContextReader.kt` |
 
-Consequences:
+letta-code never counts sections exactly: there is **no tokenizer** in the runtime (only the
+Anthropic SDK's unused `count_tokens` client call). All its own accounting is `ceil(chars / 4)`:
 
-1. The official desktop GUI itself shows **total only** (section 4). The breakdown exists only in
-   letta-code's TUI `/context` (REST based) and in leftover, unreferenced "ADE Context Window"
-   strings in the renderer (system instructions, tool descriptions, core memory, external summary,
-   messages, recursive memory, recall, archival, plus a "Summarize" button). No renderer code
-   uses those strings in 0.33.6. We are therefore **ahead of the reference** wherever a breakdown
-   is available, and must label provenance honestly where it is not.
-2. Our existing code already has both a total-only path and a breakdown path (section 6). The
-   work is mostly provenance, relay of compaction, the card/sheet, and fixing the Iroh estimate.
-3. Do not present the Iroh estimate as real. Real per-category counts over Iroh need the host to
-   obtain them from a Letta server REST (not available for the pure local backend, where no
-   tokenizer exists; letta-code itself estimates with chars/4: `estimateStoredMessageTokens`,
-   `letta.js:479640`).
+- `estimateProviderContextTokens` (`letta.js:116861`): system prompt + messages + tool schemas,
+  each `ceil(JSON.length / 4)`. It computes the three sections, **adds them and throws the parts
+  away** (used only for the compaction trigger when the provider reports no usage).
+- `estimateLocalMessageTokens` (`local-context-estimate.ts`, `letta.js:115911`): text/thinking/tool
+  call chars / 4, 1200 tokens per image.
+- `estimateSystemPromptSize` (`letta memory tokens`): per memory file chars / 4.
+- Exact figures come only from the provider: `contextTokensFromLocalUsage` takes the provider
+  `totalTokens` (else input+output+cacheRead+cacheWrite). So `context_tokens` is the whole
+  conversation after that call, **completion included**.
 
-## 3. Wire level (letta-code 0.33.6, protocol facts)
+## 3. Where the prompt is assembled (local turn path) and the choke point
 
-### 3.1 Context usage
+`HeadlessBackend.executeConversationTurn` (`letta.js:114167`):
 
-- **`usage_statistics` delta** (`createUsageStatisticsChunk`, `letta.js:108975`; also the cloud
-  server stream). Fields: `prompt_tokens`, `completion_tokens`, `total_tokens`,
-  `cached_input_tokens`, `cache_write_tokens`, `reasoning_tokens`, `context_tokens`, `step_count`.
-  `context_tokens` is the whole prompt the call held (cached prefix included); the official
-  renderer takes the **latest positive** one per `agent:conversation` runtime
-  (`getLatestContextTokens`) and caches it across reloads. `prompt_tokens` is not a substitute
-  (cached calls report only the uncached tail). When the provider reports no usage the local
-  backend falls back to a chars/4 estimate of the request (`estimateProviderContextTokens`).
-  Emitted once per model call, i.e. at turn/step boundaries, not continuously.
-- **Window size** is not on the wire. The official renderer resolves it by precedence:
-  conversation `context_window_limit` > conversation `model_settings.context_window` /
-  `max_context_window` > agent `llm_config.context_window` > model catalog entry
-  `max_context_window`. Our `contextWindowTokensOf` already mirrors this
-  (`sharedLogic/.../data/context/ContextWindowLimit.kt`).
-- **REST `/v1/agents/{id}/context`** (`context_window_overview`), optional `conversation_id`.
-  Fields (tokens unless noted): `context_window_size_max`, `context_window_size_current`,
-  `num_messages`, `num_archival_memory`, `num_recall_memory` (counts), `num_tokens_system`
-  (+ `system_prompt`), `num_tokens_core_memory` (+ `core_memory`),
-  `num_tokens_functions_definitions` (+ `functions_definitions`), `num_tokens_messages`
-  (+ `messages`), `num_tokens_summary_memory` (+ `summary_memory`),
-  `num_tokens_external_memory_summary`, and optional `num_tokens_memory_filesystem`,
-  `num_tokens_tool_usage_rules`, `num_tokens_directories`. Our `ContextWindowOverview` model
-  already matches (`data/model/Agent.kt:20`).
-- The TUI `/context` (`renderContextUsage`, `letta.js:501640`) draws six categories (System, Core
-  Memory, Tools, Messages, Summary, Other = external memory) and **rescales** the category
-  weights to the streamed used total, labelling it "Estimated usage by category". That rescale is
-  `scaleBreakdownToUsedTokens` in the web memory viewer (`letta.js:479578`). Lesson: the REST
-  breakdown and the streamed total can disagree; reconcile, do not mix raw (our
-  `ContextWindowUsage.from` already does this with an "Other/Unitemised" segment).
-- `device_status` (`buildDeviceStatus`, `letta.js:189396`) has `supported_commands`, `is_processing`,
-  current model data via `agent_retrieve`; **no** token fields.
+1. `store.listLocalMessages(conversation, agent)` -> `uiMessages`: the whole transcript; a
+   compaction **summary** is an ordinary message carrying `metadata.compaction`.
+2. `getOrCompileSystemPrompt` (`:118579`) -> `compileLocalSystemPrompt` (`:118128`):
+   `content = injectCoreMemory(agent.system, coreMemory)`, `coreMemory` = rendered MemFS projection
+   (system memory files, tree) + memory metadata. Persisted per conversation as
+   `conversations/<key>/system-prompt.json` `{content, coreMemory, compiledAt, rawSystemHash,
+   memfsRevision}` (0.29.12 and later; **0.26.1 stores `content` only**). If MemFS changes
+   mid-conversation the update is appended as a `<memory_update>` system message
+   (`midConversationSystemPrompt`), not recompiled.
+3. `executor.execute({systemPrompt, midConversationSystemPrompt, body, history, uiMessages, agent})`
+   -> pi stream adapter `streamOnce(input)` (`:117524`). `body.client_tools` (tool schemas, built per
+   turn by the listener from the toolset registry, **not stored on disk**) become `toPiTools`; the
+   request is `{systemPrompt, messages: toPiMessages(uiMessages) (+ mid-conversation message), tools}`.
+4. `createUsageStatisticsChunk(part.message.usage, contextTokensEstimate)` (`:117029`) yields the
+   `usage_statistics` frame.
 
-### 3.2 Compaction
+System, memory, summary and history are therefore derivable from **disk**; tool schemas are known
+only inside the process.
 
-Two entry points, both reach the same server call (`conversations.messages.compact`).
+**Single choke point:** `streamOnce` / the call at `:117029` holds `input.systemPrompt`,
+`input.uiMessages`, `input.clientTools` and the provider usage together. A patch or an upstream
+change could attach a `context_breakdown` there. Even then each section is a chars/4 estimate; only
+the total is exact.
 
-1. `execute_command {command_id:"compact", request_id, runtime:{agent_id,conversation_id}, args?}`
-   (`handleExecuteCommand`, `letta.js:420758`; `handleCompactCommand`, `letta.js:421035`).
-   - `args` optional mode: `all | sliding_window | self_compact_all | self_compact_sliding_window`
-     (`VALID_COMPACT_MODES`; `help` prints usage). Unknown mode throws.
-   - Runs PreCompact hooks first (may block), calls the API, marks post-compaction reminders,
-     optionally launches a reflection subagent (if reflection trigger is `compaction-event` and
-     MemFS is on), regenerates the conversation description.
-   - Lifecycle: `slash_command_start {command_id,input}` delta, then `slash_command_end
-     {command_id,input,output,success}` delta, then `execute_command_response
-     {request_id,success,output}` (response frame is 0.33-only; the embedded 0.26.1 runtime does
-     not emit it, see `transport/appserver/README.md`).
-   - `output` is a **human string**: "Compaction completed (mode: X). Message buffer length
-     reduced from N to M. Summary: ...". Not structured. Special case: HTTP 400 "Summarization
-     failed to reduce the number of messages" becomes the success text "Compaction run, but the
-     number of messages is the same".
-2. `conversation_compact {request_id, conversation_id, body?}` ->
-   `conversation_compact_response {request_id, success, compaction:{summary,
-   num_messages_before, num_messages_after}, error?}` (`letta.js:198335`). Structured, no hooks,
-   no reflection. For `conversation_id == "default"` the body must carry `agent_id`
-   (that is what `handleCompactCommand` does). `body.compaction_settings` may override
-   `{mode, model, ...}` for this call.
+Per-section tracking in 0.33-0.34: none. `contextTracker` (`context-tracker.ts`) holds
+`lastContextTokens` and a history of totals; `context-budget.ts` only caps reflection-subagent
+startup prompts; the system-prompt doctor keeps a per-agent memory `estimated_tokens` (clients get
+only `should_doctor`).
 
-Compaction in the **message stream** (both manual and automatic):
+## 4. Official Desktop behaviour (own words) and protocol facts
 
-- `event_message {event_type:"compaction", event_data:{trigger}}` marks start
-  (renderer shows a muted "compacting" line).
-- `summary_message {summary, compaction_stats}` marks completion. `compaction_stats`:
-  `trigger` (`context_window_exceeded` | `post_step_context_check`, or a manual trigger string),
-  `context_tokens_before`, `context_tokens_after`, `context_window`, `messages_count_before`,
-  `messages_count_after`. The renderer shows a collapsible warning-coloured card "Summary" with
-  "before -> after messages" and the summary text. This is the only place that gives
-  before/after **tokens**; the two compact entry points give message counts only.
+- **Meter**: composer donut button opening a 360 px popover "Context window": percent, thin bar,
+  "used / limit" in k/M. One neutral colour, no thresholds, no categories, behind a "Token usage"
+  display option (default off). Input: latest positive `usage_statistics.context_tokens` per
+  `agent:conversation`, cached; window = conversation `context_window_limit` > conversation
+  `model_settings` window > agent `llm_config.context_window` > catalog `max_context_window`
+  (our `contextWindowTokensOf` mirrors this). Unreferenced "ADE Context Window" strings (system,
+  tools, core memory, summary, messages, recall, archival, "Summarize") show a breakdown was once
+  planned; no renderer code uses them.
+- **Compact** is not a button: palette item "Compact conversation", shown only when
+  `supported_commands` has `compact`; sends `execute_command compact` (optional mode argument).
+- **Model picker**: tabs Recent/Hosted/All/BYOK, search over label/description/handle, grouped per
+  handle, badges, details, refresh; a separate Reasoning row whose tiers are the catalog entries of
+  the selected handle (each tier is its own entry with `updateArgs.reasoning_effort`; the window
+  travels with it). Selecting sends `update_model` (15 s timeout), optimistic with rollback.
 
-Auto-compaction: server side. The Letta server compacts on overflow
-(`context_window_exceeded`) and after a step when over its threshold (`post_step_context_check`).
-The local backend compacts before a call when `context_tokens > window - min(16384, 0.2*window)`
-(`contextCompactionThreshold`, `letta.js:109144`), up to 3 times per turn. There is no client-side
-auto-compact threshold setting in Desktop.
+Protocol facts (local mode):
 
-Compaction settings are **agent state** (`agent.compaction_settings`): `mode`
-(the four above), `model` (summarizer model), `prompt`, `clip_chars`,
-`sliding_window_percentage` (0..1, kept share after sliding-window summarization),
-`prompt_acknowledgement`. Written through the normal agent update (renderer settings panel
-"Compaction Settings"; TUI `/compaction`).
+- `execute_command {command_id:"compact", args?, runtime}` -> `slash_command_start`/`slash_command_end`
+  deltas -> `execute_command_response {success, output}`. **0.26.1 has `execute_command` and
+  `compact` in `SUPPORTED_REMOTE_COMMANDS` but emits no response frame**, only the deltas.
+  `output` is text ("Compaction completed ... reduced from N to M messages. Summary: ...").
+- `conversation_compact {conversation_id, body?}` -> `conversation_compact_response {success,
+  compaction{summary, num_messages_before, num_messages_after}}` exists from 0.29.x; **absent in 0.26.1**.
+- **The local backend supports only compaction modes `all` and `sliding_window`**
+  (`validateLocalCompactionSettingsRecord`, `:118170`); `self_compact_*` is rejected.
+- Stream markers exist only for **automatic** compaction: `event_message{event_type:"compaction"}`
+  then `summary_message{summary, compaction_stats{trigger, context_tokens_before/after,
+  context_window, messages_count_before/after}}` (`emitCompactionChunks`, `:117483`). A **manual**
+  compact streams no `summary_message`, and no `usage_statistics` follows until the next turn: the
+  **streamed total goes stale after a manual compact**. Local `compaction_stats.context_tokens_*`
+  are messages-only chars/4 estimates, not provider figures.
+- Local auto-compaction: before a call and after a turn when `context_tokens > window -
+  min(16384, 0.2 * window)` (`contextCompactionThreshold`), up to 3 times per turn.
+- `context-limit` / `set-max-context` (`execute_command`) write `context_window_limit` on the agent
+  (default conversation) or conversation; above the model default needs `--override`.
+- `list_models` -> one entry per (handle, effort tier, window). `update_model` applies to the agent
+  on the default conversation, else a per-conversation override (`applied_to`), and preserves the
+  window on same-model effort changes.
 
-### 3.3 Context limit and model
-
-- `execute_command {command_id:"context-limit"|"set-max-context", args:"[tokens|200k] [--override]"}`
-  (`applySetMaxContext`, `letta.js:420055`). No args resets to the model default. On the default
-  conversation it writes `agent.context_window_limit`; otherwise the conversation's. Values above
-  the model default need `--override`.
-- `list_models {request_id, force?}` -> `list_models_response {entries[], available_handles,
-  byok_provider_aliases}`. Entry: `id, handle, label, description, isDefault?, isFeatured?, free?,
-  supportsStructuredOutputs?, updateArgs{reasoning_effort?, context_window?, max_output_tokens?,
-  provider_type?...}`. **One entry per (handle, effort tier, window)**: effort tiers are separate
-  catalog entries sharing a handle.
-- `update_model {request_id, runtime:{agent_id,conversation_id}, payload:{model_id?|model_handle?,
-  reasoning_effort?}}` -> `update_model_response {success, applied_to:"agent"|"conversation",
-  model_id, model_handle, model_settings, error?}` (`applyModelUpdateForRuntime`, `letta.js:402240`).
-  Scope rule: **default conversation updates the agent; any other conversation gets a
-  per-conversation override** (conversation `model` + `model_settings`). It also **preserves the
-  current context window** when the same registry model is re-selected with a different effort
-  (`shouldPreserveContextWindowForModelSelection`), switches the toolset for the new model, emits a
-  status delta "Model updated to X (Effort)", and re-emits runtime state.
-  `reasoning_effort` values: `none|minimal|low|medium|high|xhigh|max|null`.
-
-## 4. Official Desktop renderer behaviour (own words)
-
-- **Meter**: a small donut icon button ("Usage") in the composer area; opens a 360 px popover with
-  a "Context window" row: percent, a thin bar, and "used / capacity tokens" in compact units
-  (`k`, `M`). One neutral colour: **no warn/auto-compact thresholds, no categories**. Shown only
-  when the display option "Token usage" is on (default off; options menu also has "Reasoning" and
-  "Compactions"). Hidden until a positive `context_tokens` has been seen for the runtime; the
-  last value is cached per `agent:conversation` so it survives navigation.
-- **Compact**: not a button. It is the palette/slash item "Compact conversation", enabled only
-  when the connected device advertises `compact` in `supported_commands`; typed args pass through
-  (`/compact all`). Result is rendered by the generic slash-command rows and the compaction
-  event/summary rows above. A separate "Compaction Settings" panel edits mode, summarizer model,
-  prompt, clip chars, sliding-window percentage, prompt acknowledgement.
-- **Model picker**: tabs Recent / Hosted / All / BYOK; search by label, description and handle;
-  entries grouped per handle (a "split by context window" variant groups per handle+window); a
-  featured badge, tier badges, BYOK badge, per-model details (input/output cost), copy-handle
-  action, refresh of the list (force reload), an "add more models" shortcut. **Reasoning effort**
-  is a separate row above the list for the selected model: the tiers come from the catalog entries
-  of that handle, ordered off < none < minimal < low < medium < high < xhigh/max; a tier is
-  selected by choosing the entry with that effort (so effort and window travel together).
-  Selecting sends `update_model` with `model_id` (or `model_handle`, plus the BYOK override
-  handle) and a 15 s timeout; the UI applies the result optimistically and rolls back on
-  failure. The composer chip shows label plus effort. Scope: per-conversation override unless on
-  the agent's default conversation (server decides, see `applied_to`).
-
-## 5. Letta server REST (for HTTP-connected sessions)
-
-- Context: `GET /v1/agents/{id}/context[?conversation_id=]` (letta-code `getAgentContextOverview`).
-  Our `AgentApi.getContextWindow` already calls it with `mobile_safe=true&include_raw=false`.
-- Model change: `PATCH /v1/agents/{id}` with `model` (handle) and/or `model_settings`
-  (reasoning effort lives in `model_settings.reasoning_effort` or the legacy
-  `llm_config.reasoning_effort`) and `context_window_limit`; conversations take `model`,
-  `model_settings`, `context_window_limit` on `PATCH /v1/conversations/{id}`
-  (letta-code `updateAgentLLMConfig`/`updateConversationLLMConfig`). Compact:
-  `POST /v1/conversations/{id}/compact` (SDK `conversations.messages.compact`).
-- Agent summary fields for the chip: `agent.model`, `llm_config.{model,context_window,
-  reasoning_effort}`, `context_window_limit`, `compaction_settings`.
-
-## 6. What our repo already has
+## 5. What our repo already has
 
 | Capability | Where | State |
 |---|---|---|
-| Streamed total | `data/context/ContextTokenReadings.kt` folds `ServerFrame.UsageStatistics.contextTokens`; persisted via `ContextReadingSnapshots` | Done (r2zo8, wdm6i) |
-| Window resolution | `ContextWindowLimit.kt` (`contextWindowTokensOf`: conversation switch, agent limit, model) | Done |
-| Usage policy fold | `ContextWindowUsage.kt` (`from`, `total`, reconcile, free space), `ContextWindowUsageStore.kt` (`contextUsageStates`, settle rule, keep-last-good) | Done, shared |
-| Chip UI | Desktop `ComposerContextChip` popover (`DesktopComposerContextUsage.kt`); Android chip fed by `AdminChatContextUsage.kt` | Total-only, because the loader only feeds readings |
-| Breakdown fetch | `IAgentRepository.getContextWindow` -> HTTP `AgentApi`, Iroh `agent.context` (`IrohAdminRpcAgentSource`), bundled `transport.getContext`; used by `ProjectChatCoordinator.refreshContextWindow` and the Android `ContextWindowCard` (`AgentScaffoldPickers.kt:581`) | Done, but not wired to the chip/popover, and Iroh numbers are an estimate |
-| Model list/update | `ModelControlWire` (`model.list`, `model.update`), `ModelPickerCatalog/Controller/State` (groups, recents, search, collapse), `ReasoningTier`, `ConversationModelSelections` (per-conversation switch + rollback), `ComposerEffort` | Done, relayed over Iroh (`ModelAdminHandlers`) |
-| Compact commands | `AppServerCommand.ConversationCompact`, `ExecuteCommand`; `AppServerClient.conversationCompact/executeCommand`; `AppServerSlashCommandApi` (`DEFAULT_SUPPORTED_COMMANDS` includes `compact`, `context-limit`); `AppServerContextWindowPreflight` uses `conversation_compact` as an automatic repair | Client types done; no user-facing Compact action |
-| Compaction rendering | `slash_command_*` deltas -> `RuntimeEventPayload.CommandStarted/Finished` (F08). **No** handling of `event_message`/`summary_message`/`compaction_stats` | Gap |
-| Iroh relay | `admin_rpc` router (`AdminRpcRegistry`), per-method capability map (`IrohPeerCapabilities.forAdminMethod`), typed control frames only for `runtime_start/input/sync/abort_message/remove_queue_item/resume_queue` (`IrohNodeConnection.kt:~480-520`). Slash commands over Iroh: `slash_command.list*` is `CapabilityUnavailable("admin_rest")`; **no** `execute_command` or `conversation_compact` relay | Gap |
+| Streamed total | `data/context/ContextTokenReadings.kt` (+ `ContextReadingSnapshots`) | Done |
+| Window resolution, usage fold, reconcile | `ContextWindowLimit.kt`, `ContextWindowUsage.kt` (`from`, `total`), `ContextWindowUsageStore.kt` | Done, shared |
+| Chips | Desktop `ComposerContextChip`; Android chip via `AdminChatContextUsage.kt`; Android `ContextWindowCard` (`AgentScaffoldPickers.kt:581`) via `ProjectChatCoordinator.refreshContextWindow` | Chips total-only; card calls `getContextWindow` |
+| Breakdown fetch | `IAgentRepository.getContextWindow` -> `agent.context` admin_rpc (Iroh `IrohAdminRpcAgentSource`; bundled `AppServerLocalRepositoryTransport.getContext`), served by `LocalBackendContextReader`. The REST `AgentApi.getContextWindow` is dead for us (no server). | Estimate, below |
+| Model list/update | `ModelControlWire`, `ModelPicker*`, `ConversationModelSelections`, `ComposerEffort`; Iroh relay `ModelAdminHandlers` | Done |
+| Compact | `AppServerCommand.ConversationCompact/ExecuteCommand`, `AppServerSlashCommandApi`, `AppServerContextWindowPreflight` | Types only; no user action; no Iroh relay |
+| Compaction rendering | `slash_command_*` only; nothing for `event_message`/`summary_message`/`compaction_stats` | Gap |
 
-HTTP-only / failing-over-Iroh paths relevant here (same class as the Tool Detail fix, #1827):
-`execute_command`, `conversation_compact`, `agent.update` for `compaction_settings` /
-`context_window_limit` (the latter is relayed, verify the wrapper's `agent.update` allowlists the
-fields), and slash-command listing. `agent.context` and `model.list/update` do relay.
+**`LocalBackendContextReader` today** (`sharedLogic/src/jvmAndAndroid/.../node/iroh/`): reads the
+sidecar `content` (fallback `agent.system`), `system = ceil(len/4)`, `messages = count * 50`,
+`window = 200000` constant, and zeroes core memory/summary/tools/memfs. Three defects: the
+50-token constant, the constant window, memory counted as system. Without `--local-backend-dir`
+the wrapper answers `capability_unavailable`. The class is in `jvmAndAndroid`, so the same code
+runs on desktop, the wrapper host and Android.
 
-## 7. Proposed design
+**Host patch mechanism (verified):** exists only on the Meridian Linux host, outside this repo. The
+App Server runs with `NODE_OPTIONS=--import=file:///opt/stacks/letta-code-parallel/admin-shim/scripts/letta-code-patch-register.mjs`
+(`scripts/deploy/appserver.env.example`), applying anchor-based patches to the pinned `letta.js`
+(`LETTA_CLI_PATH_REAL`, currently 0.32.3 in the template) and logging `lcp-patches applied=18
+skipped=0`; a drifted anchor silently makes that patch inert (`install-meridian.sh`). It does
+**not** exist for the desktop-bundled runtime or the nodejs-mobile Android runtime.
 
-### 7.1 Shared logic (commonMain)
+## 6. Options and recommendation
 
-New package `data/context/` additions, no platform code:
+| | A. Host-side estimator, calibrated to the provider total | B. Runtime patch (lcp) | C. Upstream PR to letta-code | D. Client-only total |
+|---|---|---|---|---|
+| Accuracy | Total exact; sections estimated (chars/4, same basis as letta-code); tools = derived residual | Total exact; sections chars/4; tools measured | as B | Total exact; no sections |
+| Desktop-bundled | Yes (in-process reader) | No (no loader) | After upgrade | Yes |
+| Embedded Android 0.26.1 | Yes, degraded (no `coreMemory`: memory counted in system) | No | No (ceiling) | Yes |
+| Meridian host over Iroh | Yes (wrapper redeploy) | Yes; anchor upkeep, tied to one version | Eventually | Yes (already) |
+| Cost / risk | Moderate, ours, testable | Fragile, one host | Slow, uncertain | Free |
+
+**Recommendation: A, with D as the always-available floor, plus a low-priority upstream
+issue/PR (C).** Nothing in letta-code can give exact sections (no tokenizer), so B and C buy only a
+measured tool-schema size, and B covers one host. A works on every runtime we ship; once calibrated
+to the provider total the remaining error is each section's chars/4 error, bounded and labelled
+"Estimated".
+
+### Design of A
+
+`ContextBreakdownEstimator` (pure Kotlin in `jvmAndAndroid` beside `LocalBackendContextReader`;
+no new dependency; chars/4 to match letta-code's own accounting, a real tokenizer can swap in
+behind the same interface later):
+
+- Inputs, all read-only from disk: sidecar `{content, coreMemory?}`; transcript via
+  `LocalBackendMessageReader` (rows after the last `metadata.compaction`, plus that summary row);
+  conversation/agent `context_window_limit` and model window; optional `reported_total`.
+- Sections: **System prompt** = `content` minus `coreMemory` (0.26.1: all of `content`);
+  **Memory** = `coreMemory` (optional per-file expansion from the memory dir); **Summary** = the
+  compaction row; **Messages** = letta-code's per-message formula; **Tools & other** = residual.
+- Calibration: the client holds the latest streamed `context_tokens` and passes it as the
+  `agent.context` param `reported_total`. With `S = system + memory + summary + messages`: if
+  `reported_total >= S`, `tools = reported_total - S`; if `reported_total < S`, scale the four
+  sections down proportionally and `tools = 0`. The rows always sum to the reported total, so a bar
+  cannot contradict the meter. Without a reported total the tools row is omitted and the sum is
+  marked "partial".
+- After a **manual compact** the streamed total is stale: the host recomputes `S` from the new
+  transcript and returns `calibrated:false`; the client shows "Estimated after compaction" until
+  the next `usage_statistics`.
+- Response gains `source:"estimate"`, `calibrated`, `tools_derived`, and uses the real
+  model/conversation window instead of 200000. The residual row absorbs reasoning tokens and cache
+  rounding, hence the label "Tools & other".
+
+## 7. Shared design (commonMain) and wiring
 
 ```kotlin
-enum class ContextProvenance { Exact /*server tokenizer*/, Estimated /*host/letta-code chars/4*/, TotalOnly }
-
-data class ContextMeter(            // what the card renders
-    val usage: ContextWindowUsage,  // existing type
-    val provenance: ContextProvenance,
-    val windowSource: WindowSource, // Conversation | Agent | Model | Unknown
-    val asOfMs: Long?,              // age of the streamed total
-    val autoCompactAt: Float?,      // known only for local backend: 1 - min(16384, 0.2*w)/w
-)
-
-interface ContextMeterSource {      // one per surface, built from existing pieces
-    val meter: Flow<ContextMeter?>  // streamed total (ContextTokenReadings) + window (contextWindowTokensOf)
-    suspend fun loadBreakdown(): ContextBreakdownResult // calls IAgentRepository.getContextWindow
-}
+enum class ContextProvenance { TotalOnly, Estimated, EstimatedCalibrated }
+data class ContextMeter(val usage: ContextWindowUsage, val provenance: ContextProvenance,
+    val windowSource: WindowSource, val autoCompactAt: Float?)  // 1 - min(16384, 0.2*w)/w
 ```
 
-- **Merge rule** (extends `ContextWindowUsagePolicy`): the streamed `context_tokens` is the
-  authority for *used*; a fetched overview supplies *categories* only and is rescaled to the
-  streamed total when both exist and are within the same turn (same as TUI), with the leftover
-  as "Other". If only the overview exists (no stream yet, e.g. fresh app), use its totals.
-  Provenance is `Exact` only on HTTP; Iroh/local overviews are `Estimated`; none -> `TotalOnly`.
-- **Fetch policy**: breakdown is loaded **lazily when the sheet opens** and after a settled turn
-  or compaction (never mid-turn, existing `settled` rule). Never polled. Streamed total keeps the
-  meter live for free.
-- `CompactionRepository` (interface in commonMain, `AppServerClient`-backed implementation):
-  `suspend fun compact(agentId, conversationId, mode: CompactionMode? = null): CompactionResult`
-  with `CompactionResult{ summary?, messagesBefore?, messagesAfter?, tokensBefore?,
-  tokensAfter?, noChange: Boolean }`.
-  - Strategy A (preferred when the device advertises `compact`): `execute_command compact`
-    (gets hooks and reflection parity with Desktop). Result text is unstructured, so *success* is
-    `execute_command_response.success`, and numbers come from the `summary_message.compaction_stats`
-    that follows on the stream (or a post-compaction `loadBreakdown`).
-  - Strategy B (fallback, and the Iroh path): `conversation_compact` (structured counts). For the
-    default conversation include `agent_id` in `body`.
-  - Strategy chosen by capability: `device_status.supported_commands` contains `compact` and the
-    host is >= 0.33; else B; else the button is hidden. Never guess on a timeout.
-- **Compaction lifecycle events**: map `event_message{event_type:compaction}` ->
-  `RuntimeEventPayload.CompactionStarted(trigger)` and `summary_message` ->
-  `CompactionFinished(summary, stats)` in `AppServerRuntimeEventMapper`; a timeline row (collapsed
-  summary card, "N -> M messages", optional "X -> Y tokens") and a presence phase
-  ("Compacting") in `RunPhaseReducer`. This also covers *automatic* compactions, which today
-  are invisible. After `CompactionFinished`, write `tokensAfter` into `ContextTokenReadings`
-  (a reading with provenance "compaction") so the meter drops immediately instead of waiting for
-  the next turn.
-- **Model chip**: reuse `ModelPickerController`, `ModelPickerCatalog.filter/groups`,
-  `ReasoningTier`, `ConversationModelSelections`. New small `ModelChipState(label, effort,
-  scope: Agent|Conversation, window)` derived from agent + selections. Scope is decided by
-  the server (`applied_to`); we show a "this conversation only" hint when it is `conversation`.
+- Used = streamed `context_tokens` (authority). The breakdown is fetched **lazily when the sheet
+  opens** and after a settled turn or compaction; never polled, never mid-turn (existing rule).
+- `CompactionRepository.compact(agentId, conversationId, mode?)` -> `CompactionResult{summary?,
+  messagesBefore?, messagesAfter?, noChange}`. Strategy by capability:
+  1. `compact` in `supported_commands` -> `execute_command compact` (hooks and reflection parity).
+     **This is the only path on embedded 0.26.1**, which lacks `conversation_compact` and the
+     response frame: success = `slash_command_end.success`;
+  2. else `conversation_compact` (0.29+; default conversation needs `agent_id` in `body`);
+  3. else hide the button. Offer only `all` / `sliding_window`.
+- Map `event_message`/`summary_message` to `CompactionStarted/Finished` (automatic compactions are
+  invisible today); on finish write `tokensAfter` into `ContextTokenReadings` flagged estimated; after
+  a manual compact trigger the host re-estimate.
+- Model chip reuses `ModelPickerController`, `ReasoningTier`, `ConversationModelSelections`.
 
-### 7.2 Command and RPC wiring
-
-| Need | Direct WS (App Server) | Iroh | HTTP (Letta server) |
+| Need | Desktop-local / embedded (in-process) | Direct WS to a remote letta-code | Iroh (Meridian wrapper) |
 |---|---|---|---|
-| Streamed total | `usage_statistics` (done) | relayed stream (done) | n/a (use REST) |
-| Breakdown | none; show total + free | `agent.context` (exists; estimate) | `GET /v1/agents/{id}/context` (done) |
-| Compact | `execute_command` / `conversation_compact` (client done) | **new** `conversation.compact` admin_rpc | `POST /v1/conversations/{id}/compact` |
-| Model list/change | `list_models` / `update_model` (done) | `model.list` / `model.update` (done) | `PATCH` agent/conversation (done by `AgentApi`) |
-| Context limit | `execute_command context-limit` | **new** admin_rpc or `agent.update`/`conversation.update` with `context_window_limit` | same PATCH |
+| Streamed total | `usage_statistics` | same | relayed (done) |
+| Breakdown | `agent.context` via reader + estimator | **total only** (a stock App Server has no admin_rpc) | `agent.context` + estimator (**wrapper redeploy**) |
+| Compact | `execute_command` (0.26.1+) / `conversation_compact` | same | **new** `conversation.compact` admin_rpc |
+| Model | `list_models` / `update_model` | same | `model.list` / `model.update` (done) |
+| Context limit | `execute_command context-limit` | same | `agent.update`/`conversation.update` `context_window_limit`; verify allowlist |
 
-**Iroh relay (needs wrapper host redeploy).** Follow the `WorkspaceAdminHandlers` /
-`ToolAdminHandlers` pattern, not a new control frame (control frames need
-`IrohPeerCapabilities.forProtocolCommand` and a branch in `IrohNodeConnection`, as the queue relay
-did; admin_rpc is cheaper and already capability-mapped):
+**Iroh relay** (`WorkspaceAdminHandlers` / `ToolAdminHandlers` pattern; admin_rpc rather than a new
+control frame, which would also need `forProtocolCommand` and an `IrohNodeConnection` branch):
+register `conversation.compact` in `ConversationAdminHandlers` calling the host `nativeClient`
+(`execute_command compact` preferred, `conversation_compact` fallback); map it to
+`CONVERSATION_MANAGE` in `IrohPeerCapabilities.forAdminMethod`; add to
+`AdminRpcRegistry.canonicalMethods`. An unknown-method or `capability_unavailable` answer from an
+old host maps to `CompactionResult.Unsupported` and hides the button (the #1827 pattern). Paths
+failing over Iroh today: `execute_command`, `conversation_compact`, slash-command listing
+(`CapabilityUnavailable "admin_rest"`).
 
-1. `ConversationAdminHandlers`: register `conversation.compact`
-   (`params: conversation_id, agent_id?, mode?`) -> `nativeClient.conversationCompact(...)`
-   (the host's `AppServerClient` already supports it); result
-   `{summary, num_messages_before, num_messages_after}`. Use `NativeAdmin.require(nativeClient,
-   NativeAdminOp.ConversationCompact)` like `ModelAdminHandlers`; add the op to
-   `NativeAdminOperationPolicy` (compaction is a mutation: not auto-retried, matches
-   `AppServerCommandRetryClass.AmbiguousMutation`).
-2. `IrohPeerCapabilities.forAdminMethod`: map `conversation.compact` to `CONVERSATION_MANAGE`
-   (not `admin.full`), add to `AdminRpcRegistry.canonicalMethods`. Already-paired desktops hold
-   `CONVERSATION_MANAGE` by default, so no capability migration.
-3. Optional: `agent.context` improvement on the host so Iroh numbers stop being fiction: tag the
-   result `"source":"estimate"`, use the agent's real `context_window_limit`/model window instead
-   of the 200000 constant, count core-memory/tools from the memfs and toolset the host already
-   knows. Client reads `source` to set `ContextProvenance`.
-4. Client: `IrohAdminRpcAgentDirectory.compactConversation(...)` + `IrohAgentRepository`; a
-   `capability_unavailable` / unknown-method answer from an older host maps to
-   `CompactionResult.Unsupported` and **hides** the Compact button (the #1827 pattern: typed
-   fallback, specific error text, no silent HTTP dial).
+## 8. UI plan
 
-**Version / capability gating**: Compact visible iff (device advertises `compact`) or (Iroh host
-answers a cheap probe: `admin_rpc` method list / first-call capability error cached per host) or
-(HTTP session). Embedded Android runtime 0.26.1 never emits `execute_command_response`; use
-strategy B there and treat a missing `conversation_compact_response` as unsupported (verify on
-device before claiming support). Model chip is gated by `list_models` success (existing).
-
-## 8. UI plan (drawer card and sheet)
-
-Card (Android side drawer, Desktop agent pane; one shared composable in `:sharedUI` once the
-phase 3 move lands, otherwise thin per-platform wrappers over the shared state):
-
-- Row 1: **model chip** = `label` + effort suffix ("Sonnet 4.5 - High"). Tap -> searchable list
-  (bottom sheet on phone, popover on desktop) built from `ModelPickerState` (recents first, group
-  per provider/handle, search over label/handle/description, refresh action, BYOK badge). Effort
-  row above the list, enabled tiers from the selected handle's entries. Optimistic update with
-  rollback via `ConversationModelSelections`.
-- Row 2: **slim meter** = thin bar + "42k / 200k" + percent. Colour from our theme only:
-  neutral < 70 %, warning 70-90 %, error >= 90 % (our design choice; the reference has none).
-  If `autoCompactAt` is known draw a tick mark there. Tap opens the sheet.
-- **Sheet**: header "Context window" + used/limit + provenance caption ("Exact", "Estimated by
-  host", "Total only"); stacked bar with legend rows from `ContextWindowUsage.segments`
-  (System prompt, Tool definitions, Core memory, Memory files, Summary, Messages, Other,
-  Free), existing label/kind keys; for `TotalOnly` a single "In context" bar plus a hint
-  line ("Breakdown needs a Letta server connection"). **Compact** button (+ overflow for mode:
-  Default / All / Sliding window), disabled while a turn is running or compaction is in progress,
-  hidden when unsupported. Optional later: "Set context limit" field.
-- Progress: pressing Compact sets a local "Compacting..." state, shows the muted compaction row in
-  the timeline from `CompactionStarted`, and on `CompactionFinished` the sheet shows "N -> M
-  messages, X -> Y tokens" for a few seconds and the meter drops.
+- Row 1 **model chip** (label + effort) -> searchable list (sheet on phone, popover on desktop) from
+  `ModelPickerState`; effort row for the selected handle; optimistic with rollback.
+- Row 2 **slim meter**: bar + "42k / 200k" + percent; neutral < 70 %, warning 70-90 %, error >= 90 %
+  (our choice; the reference has none); tick at `autoCompactAt`.
+- **Sheet**: used/limit; provenance caption ("Total only" / "Estimated" / "Estimated, matched to
+  provider total"); stacked bar and legend from `ContextWindowUsage.segments` (System prompt,
+  Memory, Summary, Messages, Tools & other, Free). `TotalOnly`: one "In context" bar and a hint
+  ("Breakdown not available from this host"). **Compact** button (+ Default / All / Sliding window
+  menu), disabled while running or compacting, hidden if unsupported; afterwards "N -> M messages"
+  and the meter drops to the estimate.
 
 ## 9. Edge cases
 
-- **Model with a smaller window than current usage**: after `update_model` the meter can exceed
-  100 %; `ContextWindowUsage.from/total` already widens `maxTokens` to hold usage. Show a warning
-  strip "Context exceeds this model's window; compact before sending". Preserve-window rule: the
-  server keeps the existing window on same-model effort changes, so refresh the window from
-  `update_model_response.model_settings` rather than the catalog.
-- **Compaction in progress / running turn**: disable Compact and model change while
-  `isProcessing` (the wire protocol does not document how a busy agent treats `update_model`).
-  A second Compact tap while one is in flight is ignored (idempotency key = conversation id).
-- **Compaction that changes nothing**: map the 400 "failed to reduce" case to `noChange=true` and
-  show "Already compact" (success tone).
-- **Unsupported host** (old wrapper, embedded 0.26.1, no `compact` in `supported_commands`): hide
-  Compact, keep meter; breakdown falls back to total-only.
-- **Iroh without `--local-backend-dir`**: `agent.context` returns `capability_unavailable`; show
-  total-only with the specific reason in the sheet, not "failed".
-- **Default vs other conversation**: `conversation_compact` for `default` needs `agent_id`; model
-  scope label depends on `applied_to`.
-- **Stale readings**: the streamed total can predate a compaction; clear/replace on
-  `CompactionFinished`; keep existing "settled" rule so mid-turn fetches are not shown.
-- **Concurrent viewers**: a compaction by another client arrives as `summary_message`; the meter
-  updates through the same path.
-- **Frame size**: breakdown responses can be large (`messages`, `system_prompt`); keep
-  `mobile_safe`/`include_raw=false` on HTTP and the host's `boundObjectStringFields` guard.
+- Model with a smaller window than usage: meter > 100 % (existing widening in `ContextWindowUsage`);
+  warning strip "Context exceeds this model's window; compact before sending". Refresh the window from
+  `update_model_response.model_settings`, not the catalog.
+- Compaction in progress / running turn: disable Compact and model change; ignore a second tap
+  (key = conversation). "Ran but nothing changed" -> "Already compact".
+- Unsupported host (no `compact`, old wrapper): hide Compact, keep meter, total-only.
+- Wrapper without `--local-backend-dir`: `agent.context` is `capability_unavailable`; show total-only
+  with the reason, not "failed".
+- Stale total after manual compact: estimated caption until the next turn.
+- 0.26.1: no `coreMemory` (memory merged into System), no `conversation_compact`, no
+  `execute_command_response`.
+- Default vs other conversation: `conversation_compact` for `default` needs `agent_id`; scope label
+  from `applied_to`.
+- Frame cap: `agent.context` keeps dropping `messages` and bounding strings (existing guard).
 
 ## 10. Test plan
 
-- commonTest: `ContextMeter` merge/provenance matrix (stream only, overview only, both disagree,
-  window smaller than usage, window unknown); `CompactionRepository` strategy selection by
-  capability; `execute_command_response` / `conversation_compact_response` decoding fixtures taken
-  from letta-code 0.33.6 (add to `LettaCode0336Frames.kt`); `event_message` + `summary_message` ->
-  `Compaction*` mapping incl. missing stats; reducer test: compaction phase and meter drop.
-- Iroh: host handler test for `conversation.compact` (success, no-change 400, no nativeClient ->
-  `capability_unavailable`, wrong capability -> `authz.denied`) in the style of
-  `ToolAdminHandlers` tests; client test that an older host's unknown-method answer yields
-  `Unsupported` and hides the button (like `IrohHttpOnlyRoutesTest`).
-- UI: Compose tests for the card states (loading, total-only, estimated, exact, over-window,
-  compacting, unsupported); model chip search/effort/rollback; desktop popover parity.
-- Manual: live host on 0.33.6 (compact via execute_command, auto-compaction visible), embedded
-  0.26.1 (fallback), Iroh against a redeployed wrapper and against the old wrapper.
+- Estimator unit tests on fixture stores (0.26.1 sidecar without `coreMemory`, 0.29+ with it):
+  section split, compaction row as summary, calibration (reported > S, < S, absent), window from
+  conversation/agent/model, per-message formula parity with letta-code.
+- commonTest: `ContextMeter` merge/provenance; `CompactionRepository` strategy by capability
+  incl. the 0.26.1 path (`slash_command_end` only); frame fixtures from 0.33.6/0.34.8 in
+  `LettaCode0336Frames.kt`; `summary_message` -> `Compaction*`; stale-total handling after manual compact.
+- Host: `conversation.compact` handler tests (success, no-change, no nativeClient, wrong capability);
+  `agent.context` returns `source`/`calibrated`; client test that an old host yields `Unsupported`
+  (like `IrohHttpOnlyRoutesTest`).
+- UI: card states (total-only, estimated, calibrated, over-window, compacting, unsupported); model
+  chip search/effort/rollback.
+- Manual: desktop-bundled 0.29.12, Meridian wrapper before/after redeploy, Android embedded 0.26.1.
 
 ## 11. PR slicing and dependencies
 
-| # | Slice | Depends on | Notes |
-|---|---|---|---|
-| S1 | `Compaction*` event mapping + timeline row + meter-drop on finish (client only) | none | Makes automatic compactions visible; no host change |
-| S2 | `ContextMeter`/provenance model + lazy breakdown loader wired to the existing chips; Iroh `source` tolerance | none | Pure shared logic + tests |
-| S3 | Host: `conversation.compact` admin_rpc + capability map + `agent.context` `source:"estimate"` and real window (**wrapper redeploy**) | none | Ship host first; old clients unaffected |
-| S4 | Client `CompactionRepository` (A/B strategies, gating, Iroh method, HTTP route) | S1, S3 | Feature flag until host deployed |
-| S5 | Drawer card + sheet UI (Android + Desktop), model chip surfaced in the card | S2, S4 | Reuses `ModelPicker*`; no new model plumbing |
-| S6 | Compaction mode menu + context-limit field (agent.update / `context-limit`) | S5 | Optional |
+| # | Slice | Depends on |
+|---|---|---|
+| S1 | `Compaction*` mapping (event_message/summary_message), timeline row, meter update on finish | none |
+| S2 | `ContextBreakdownEstimator` + reader rewrite (real window, sidecar split, `reported_total`, `source`/`calibrated`); client `ContextMeter`/provenance + lazy loader on existing chips (**wrapper redeploy** for Iroh) | none |
+| S3 | Host `conversation.compact` admin_rpc + capability map (**wrapper redeploy**) | none |
+| S4 | `CompactionRepository` (execute_command / conversation_compact / Iroh, 0.26.1 path, gating) | S1, S3 |
+| S5 | Drawer card + sheet UI (Android + Desktop) with model chip and Compact | S2, S4 |
+| S6 | Compaction mode menu + context-limit field | S5 |
+| S7 | Optional upstream issue/PR: attach the section estimates letta-code already computes (`estimateProviderContextTokens`) to `usage_statistics` as `context_breakdown` | none |
 
-S1, S2, S3 can proceed in parallel. S5 can start with S2 only (meter + model chip) and gain
-Compact when S4 lands.
+S1-S3 are parallel. S5 can start with S2 (meter + model chip) and gain Compact when S4 lands.
 
 ## 12. Beads
 
-Epic `letta-mobile-pt1ze`. Children: S1 `letta-mobile-kr39h`, S2 `letta-mobile-cyh28`,
-S3 `letta-mobile-57cta`, S4 `letta-mobile-3kble` (blocked by S1, S3), S5 `letta-mobile-3io8k`
-(blocked by S2, S4), S6 `letta-mobile-joigh` (blocked by S5). Not pushed (`bd dolt push` is left
-to the session-close protocol).
+Epic `letta-mobile-pt1ze`. S1 `letta-mobile-kr39h`, S2 `letta-mobile-cyh28`, S3 `letta-mobile-57cta`,
+S4 `letta-mobile-3kble` (blocked by S1, S3), S5 `letta-mobile-3io8k` (blocked by S2, S4), S6
+`letta-mobile-joigh` (blocked by S5), S7 `letta-mobile-pt1ze.1` (upstream). Not pushed (`bd dolt push`
+is left to the session-close protocol).
