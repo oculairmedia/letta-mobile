@@ -13,6 +13,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.ApprovalDiffPreview
 import com.letta.mobile.runtime.PermissionSuggestion
@@ -50,8 +51,7 @@ class ChatRowApprovalDetailsUiTest {
             assertTrue(decision.approve)
             assertEquals(listOf("allow-edit-repo"), decision.selectedSuggestionIds)
             // Bound to the details the card drew, so the gateway can refuse it if they changed.
-            assertEquals("call-edit", decision.suggestionToolCallId)
-            assertEquals("perm-call-edit", decision.suggestionApprovalId)
+            assertEquals(ApprovalBinding("call-edit", "perm-call-edit"), decision.suggestionBinding)
         }
     }
 

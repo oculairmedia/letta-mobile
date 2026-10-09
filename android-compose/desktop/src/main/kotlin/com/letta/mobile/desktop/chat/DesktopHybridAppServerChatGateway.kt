@@ -178,13 +178,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         // letta-mobile-bzvro.11: a parked control request that is not a user-input tool is answered
         // against the control request's own id too (the card's id is the streamed message's).
         val capturedRequestId = capturedApprovalId(appServerEngine, submission)
-        // An always-allow is bound to the exact request its card offered the rule for; the streamed
-        // message id is never a stand-in for it, so a rule can't be persisted against another call.
-        val effectiveRequestId = if (submission.selectedSuggestionIds.isNotEmpty()) {
-            capturedRequestId ?: throw ApprovalRejectedException("the permission rule is no longer offered for this request")
-        } else {
-            capturedRequestId ?: requestId.value
-        }
+        val effectiveRequestId = effectiveApprovalId(capturedRequestId, submission, requestId.value)
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
             updatedInput = answerUpdatedInput,
@@ -207,17 +201,31 @@ class DesktopHybridAppServerChatGateway internal constructor(
             // a server replay is re-answered. A rejection reaches the approval
             // coordinator's error path instead of vanishing.
             val result = appServerEngine.submitApprovalResponse(ApprovalSubmission(scope, effectiveRequestId, decision))
-            if (result is ApprovalSubmitResult.Rejected) {
-                // The server no longer holds this request: drop its parked details so the card stops being live.
-                if (result.error.contains("no longer pending", ignoreCase = true)) {
-                    submission.toolCallId?.let { appServerEngine.clearUserInputApprovalId(it, effectiveRequestId) }
-                }
-                throw ApprovalRejectedException(result.error)
-            }
+            if (result is ApprovalSubmitResult.Rejected) failRejected(appServerEngine, submission, effectiveRequestId, result.error)
         }
         submission.toolCallId?.let { toolCallId ->
             capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(toolCallId, it) }
         }
+    }
+
+    /**
+     * An always-allow is bound to the exact request its card offered the rule for; the streamed
+     * message id ([fallback]) is never a stand-in for it, so a rule can't be persisted against another call.
+     */
+    private fun effectiveApprovalId(captured: String?, submission: DesktopApprovalSubmission, fallback: String): String {
+        if (submission.selectedSuggestionIds.isEmpty()) return captured ?: fallback
+        return captured ?: throw ApprovalRejectedException("the permission rule is no longer offered for this request")
+    }
+
+    /**
+     * The server refused the answer. When it no longer holds the request at all, its parked details are
+     * dropped too, so the card stops being live.
+     */
+    private fun failRejected(engine: AppServerTurnEngine, submission: DesktopApprovalSubmission, approvalId: String, error: String): Nothing {
+        if (error.contains("no longer pending", ignoreCase = true)) {
+            submission.toolCallId?.let { engine.clearUserInputApprovalId(it, approvalId) }
+        }
+        throw ApprovalRejectedException(error)
     }
 
     /**
@@ -229,9 +237,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val callId = submission.toolCallId ?: return null
         val parked = engine?.pendingApprovalDetails?.value?.get(callId)
         if (submission.selectedSuggestionIds.isNotEmpty()) {
-            return parked.approvalIdForSuggestions(
-                submission.suggestionToolCallId, submission.suggestionApprovalId, submission.selectedSuggestionIds,
-            )
+            return parked.approvalIdForSuggestions(submission.suggestionBinding, submission.selectedSuggestionIds)
         }
         return engine?.userInputApprovalId(callId) ?: parked?.approvalId
     }

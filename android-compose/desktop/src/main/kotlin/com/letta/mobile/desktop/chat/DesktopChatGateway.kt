@@ -112,8 +112,7 @@ data class DesktopApprovalSubmission(
     val reason: String?,
     val selectedSuggestionIds: List<String> = emptyList(),
     /** The parked request [selectedSuggestionIds] were offered by; see [com.letta.mobile.data.runtime.approvalIdForSuggestions]. */
-    val suggestionToolCallId: String? = null,
-    val suggestionApprovalId: String? = null,
+    val suggestionBinding: com.letta.mobile.data.runtime.ApprovalBinding? = null,
 )
 
 /**

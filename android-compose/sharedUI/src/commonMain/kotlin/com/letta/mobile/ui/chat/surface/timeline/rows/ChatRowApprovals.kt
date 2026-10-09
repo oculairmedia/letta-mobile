@@ -66,6 +66,7 @@ import com.letta.mobile.sharedui.resources.rows_tool_decisions
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
+import com.letta.mobile.data.runtime.binding
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -129,8 +130,7 @@ internal fun rememberApprovalDecider(
                             approve = true,
                             reason = null,
                             selectedSuggestionIds = listOf(suggestionId),
-                            suggestionToolCallId = details.toolCallId,
-                            suggestionApprovalId = details.approvalId,
+                            suggestionBinding = details.binding,
                         ),
                     )
                 }

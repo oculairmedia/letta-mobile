@@ -137,7 +137,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     fun clearIfMatches(gate: Gate) {
         // The parked details follow the same guard: only the request this gate answered is dropped,
         // never a newer one that replaced it under a new approval id.
-        parked.resolveIfApproval(gate.toolCallId, gate.approvalId)
+        parked.resolveIfApproval(ApprovalBinding(gate.toolCallId, gate.approvalId))
         synchronized(lock) {
             val victims = gates.entries
                 .filter { it.value[gate.toolCallId] == gate.approvalId }

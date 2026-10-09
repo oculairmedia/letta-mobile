@@ -205,14 +205,14 @@ class ApprovalRequestDetailsTest {
         val a = details("call-a")
         val b = details("call-b")
         // Parallel calls [A, B]: A's card was drawn, A resolved, the card redraws for B.
-        assertEquals("perm-call-b", b.approvalIdForSuggestions("call-b", "perm-call-b", listOf("s1")))
+        assertEquals("perm-call-b", b.approvalIdForSuggestions(b.binding, listOf("s1")))
         // A rule offered on A's card must never be attached to B (nor to a missing request).
-        assertNull(b.approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
-        assertNull(null.approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
+        assertNull(b.approvalIdForSuggestions(a.binding, listOf("s1")))
+        assertNull(null.approvalIdForSuggestions(a.binding, listOf("s1")))
         // A re-surfaced request (new approval id) or a suggestion no longer offered is refused.
-        assertNull(a.copy(approvalId = "perm-new").approvalIdForSuggestions("call-a", "perm-call-a", listOf("s1")))
-        assertNull(a.approvalIdForSuggestions("call-a", "perm-call-a", listOf("gone")))
-        assertNull(a.approvalIdForSuggestions(null, null, listOf("s1")))
+        assertNull(a.copy(approvalId = "perm-new").approvalIdForSuggestions(a.binding, listOf("s1")))
+        assertNull(a.approvalIdForSuggestions(a.binding, listOf("gone")))
+        assertNull(a.approvalIdForSuggestions(null, listOf("s1")))
     }
 
     @Test
@@ -221,9 +221,9 @@ class ApprovalRequestDetailsTest {
         val key = TurnRuntimeKey("agent", "conv-a")
         store.record(key, details("call-a").copy(approvalId = "perm-new"))
 
-        store.resolveIfApproval("call-a", "perm-old")
+        store.resolveIfApproval(ApprovalBinding("call-a", "perm-old"))
         assertEquals(setOf("call-a"), store.pending.value.keys)
-        store.resolveIfApproval("call-a", "perm-new")
+        store.resolveIfApproval(ApprovalBinding("call-a", "perm-new"))
         assertTrue(store.pending.value.isEmpty())
     }
 

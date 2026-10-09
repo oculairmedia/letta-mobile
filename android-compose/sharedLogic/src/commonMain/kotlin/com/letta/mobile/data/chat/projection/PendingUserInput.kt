@@ -36,8 +36,11 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
 fun UiApprovalRequest.requiresUserInput(): Boolean =
     details != null || toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
 
+private fun PendingApprovalDetails.isCurrentIn(request: UiApprovalRequest): Boolean =
+    this === request.details || sameRequestAs(request.details)
+
 private fun PendingApprovalDetails.sameRequestAs(other: PendingApprovalDetails?): Boolean =
-    other != null && approvalId == other.approvalId && toolCallId == other.toolCallId
+    approvalId == other?.approvalId && toolCallId == other?.toolCallId
 
 /**
  * [messages] with each approval request joined to the parked control request that [details]
@@ -55,7 +58,7 @@ fun withPendingApprovalDetails(
         val match = request.toolCalls.firstNotNullOfOrNull { details[it.toolCallId] }
         // Parked details are immutable per control request, so the approval id is their identity:
         // comparing it (not the whole data class) keeps this per-frame join from walking diff text.
-        if (match == null || match === request.details || match.sameRequestAs(request.details)) {
+        if (match == null || match.isCurrentIn(request)) {
             message
         } else {
             changed = true
