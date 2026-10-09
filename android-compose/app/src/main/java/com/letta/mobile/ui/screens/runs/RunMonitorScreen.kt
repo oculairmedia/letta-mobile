@@ -1160,8 +1160,7 @@ private fun messageSummary(message: LettaMessage): String {
         is ApprovalResponseMessage -> message.approvals?.joinToString { it.status.orEmpty() }.orEmpty()
         is HiddenReasoningMessage -> message.hiddenReasoning.orEmpty()
         is EventMessage -> message.eventType
-        is PingMessage -> message.messageType
-        is UnknownMessage -> message.messageType
+        is PingMessage, is UnknownMessage, is com.letta.mobile.data.model.SummaryMessage -> message.messageType
         is ErrorMessage -> "Error: ${message.text.take(80)}"
         is StopReason -> "Stop: ${message.reason}"
         is UsageStatistics -> "Usage: ${message.totalTokens ?: 0} tokens"
