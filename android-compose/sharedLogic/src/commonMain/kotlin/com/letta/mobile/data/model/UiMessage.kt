@@ -89,6 +89,11 @@ data class UiMessage(
      * the assistant text that follows the call, else on the tool call itself.
      */
     val artifacts: List<com.letta.mobile.data.chat.projection.CanvasArtifactReceipt> = emptyList(),
+    /**
+     * letta-mobile-kr39h: this row is a conversation compaction's summary ([content] is the summary
+     * text). Renderers draw a divider with the summary behind a disclosure, never a bubble.
+     */
+    val isCompaction: Boolean = false,
 )
 
 @Immutable

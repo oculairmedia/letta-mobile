@@ -116,12 +116,13 @@ fun timelineEventToUiMessage(
             if (ev.messageType == TimelineMessageType.TOOL_RETURN) return null
             if (ev.messageType == TimelineMessageType.OTHER) return null
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
+            if (ev.messageType == TimelineMessageType.COMPACTION) return null
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
                 TimelineMessageType.ASSISTANT -> "assistant"
                 TimelineMessageType.REASONING -> "assistant"
                 TimelineMessageType.TOOL_CALL -> "assistant"
-                TimelineMessageType.SYSTEM -> return null
+                TimelineMessageType.SYSTEM, TimelineMessageType.COMPACTION -> return null
                 // Locals never originate as ERROR (server-only frame), but
                 // make the `when` exhaustive so adding the type elsewhere
                 // doesn't compile-warn here. letta-mobile-5s1n.
@@ -229,6 +230,7 @@ fun timelineEventToUiMessage(
         }
         is TimelineEvent.Confirmed -> {
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
+            if (ev.messageType == TimelineMessageType.COMPACTION) return compactionUiMessage(ev)
 
             val projectedSubagentNotification = when (ev.messageType) {
                 TimelineMessageType.USER, TimelineMessageType.ASSISTANT -> extractSubagentNotification(ev.content)
@@ -258,7 +260,7 @@ fun timelineEventToUiMessage(
                 TimelineMessageType.ERROR -> "system"
                 TimelineMessageType.TOOL_CALL -> "assistant"
                 TimelineMessageType.TOOL_RETURN -> return null
-                TimelineMessageType.OTHER -> return null
+                TimelineMessageType.OTHER, TimelineMessageType.COMPACTION -> return null
             }
             // letta-mobile-23h5 (regression fix 2026-04-19): when an approval
             // has been decided we MUST NOT synthesize a `UiApprovalResponse`
@@ -365,6 +367,17 @@ fun timelineEventToUiMessage(
         }
     }
 }
+
+/** letta-mobile-kr39h: a compaction summary row; a blank summary still marks where it happened. */
+private fun compactionUiMessage(ev: TimelineEvent.Confirmed): UiMessage = UiMessage(
+    id = ev.serverId,
+    role = "system",
+    content = ev.content,
+    timestamp = ev.date.toString(),
+    agentId = ev.agentId,
+    clientMessageId = ev.otid.takeIf { it.isNotBlank() },
+    isCompaction = true,
+)
 
 /** The approval buttons for [toolCalls] while request [requestId] is undecided; null once decided or with no request. */
 private fun pendingApprovalRequest(

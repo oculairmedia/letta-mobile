@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.runtime.CompactionStats
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -15,7 +16,9 @@ import kotlinx.serialization.json.longOrNull
  * and 0.33's `approval_classification_end`.
  *
  * Shapes follow letta-code `loop-status-protocol.ts`, `protocol_v2.ts` and
- * `approval-classification-protocol.ts` (0.29.12 through 0.33.6). Every read is fail-soft: a
+ * `approval-classification-protocol.ts` (0.29.12 through 0.33.6). The compaction pair
+ * (`event_message` with `event_type: "compaction"`, then `summary_message`) follows the local
+ * backend's `emitCompactionChunks` (letta-mobile-kr39h). Every read is fail-soft: a
  * missing or mistyped field degrades to its default and never throws, because this runs inside the
  * turn collect loop (see the mapper's FAIL-SOFT note, letta-mobile-fkpd4).
  */
@@ -33,8 +36,31 @@ internal object AppServerLiveStatusDeltas {
             autoDeniedToolCallIds = delta.strings("auto_denied_tool_call_ids"),
             userInputToolCallIds = delta.strings("user_input_tool_call_ids"),
         )
+        "event_message" -> compactionStarted(delta)
+        "summary_message" -> RuntimeEventPayload.CompactionFinished(
+            summary = delta.str("summary").orEmpty(),
+            stats = (delta["compaction_stats"] as? JsonObject)?.let(::compactionStats),
+        )
         else -> null
     }
+
+    /** Only the compaction event is typed; other `event_message` kinds stay raw frames. */
+    private fun compactionStarted(delta: JsonObject): RuntimeEventPayload? {
+        if (delta.str("event_type") != COMPACTION_EVENT_TYPE) return null
+        val data = delta["event_data"] as? JsonObject
+        return RuntimeEventPayload.CompactionStarted(trigger = data?.str("trigger"))
+    }
+
+    private fun compactionStats(stats: JsonObject) = CompactionStats(
+        trigger = stats.str("trigger"),
+        contextTokensBefore = stats.long("context_tokens_before"),
+        contextTokensAfter = stats.long("context_tokens_after"),
+        contextWindow = stats.long("context_window"),
+        messagesCountBefore = stats.long("messages_count_before")?.toInt(),
+        messagesCountAfter = stats.long("messages_count_after")?.toInt(),
+    )
+
+    private const val COMPACTION_EVENT_TYPE = "compaction"
 
     private fun retry(delta: JsonObject) = RuntimeEventPayload.RetryNotice(
         message = delta.str("message"),
