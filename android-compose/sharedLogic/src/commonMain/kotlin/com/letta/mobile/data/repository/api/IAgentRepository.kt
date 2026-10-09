@@ -61,6 +61,17 @@ interface IAgentRepository {
     suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview
     suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
         getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
+    /**
+     * letta-mobile-cyh28: the context breakdown for the drawer meter. [reportedTotal] is the
+     * client's latest streamed `context_tokens` (null when it has none or knows it is stale after a
+     * compaction); a local-backend host matches its estimated sections to it. Defaults to
+     * [getContextWindow] for backends with nothing to match.
+     */
+    suspend fun getContextBreakdown(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        reportedTotal: Int?,
+    ): ContextWindowOverview = getContextWindow(agentId, conversationId)
     suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit)
     suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) =
         checkpointAndRestoreConfig(AgentId(agentId), operation)
