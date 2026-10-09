@@ -122,7 +122,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.attachTool(agentId.value, toolId.value)
+            irohSource.attachTool(agentId, toolId)
         } else {
             toolApi.attachTool(agentId.value, toolId.value)
         }
@@ -138,7 +138,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.detachTool(agentId.value, toolId.value)
+            irohSource.detachTool(agentId, toolId)
         } else {
             toolApi.detachTool(agentId.value, toolId.value)
         }
@@ -165,7 +165,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
         val irohSource = irohToolSource
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.updateTool(toolId.value, params)
+            irohSource.updateTool(toolId, params)
         } else {
             toolApi.updateTool(toolId.value, params)
         }
@@ -183,7 +183,7 @@ open class ToolRepository @Inject constructor(
     override suspend fun deleteTool(toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteTool(toolId.value)
+            irohSource.deleteTool(toolId)
         } else {
             toolApi.deleteTool(toolId.value)
         }
