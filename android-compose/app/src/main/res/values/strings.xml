@@ -891,6 +891,7 @@
     <string name="screen_runs_request_config_include_return_types_label">Return message types: %1$s</string>
     <string name="screen_runs_request_config_use_assistant_message_label">Use assistant message: %1$s</string>
     <string name="screen_runs_steps_title">Recent Steps</string>
+    <string name="screen_runs_detail_unavailable_iroh">Run messages, usage, metrics, step detail and cancel/delete are not available over Iroh yet. Run status and steps are shown below.</string>
     <string name="screen_runs_step_provider_label">Provider: %1$s</string>
     <string name="screen_runs_step_provider_category_label">Provider category: %1$s</string>
     <string name="screen_runs_step_provider_id_label">Provider ID: %1$s</string>

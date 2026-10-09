@@ -10,6 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface IRunRepository {
     val runs: StateFlow<List<Run>>
+
+    /**
+     * False when the active backend cannot serve run messages/usage/metrics or cancel/delete
+     * (iroh:// has admin_rpc `run.list`/`run.get`/`step.list` only). Callers hide those
+     * affordances instead of calling a route that would fail.
+     */
+    val supportsRunDetail: Boolean get() = true
+
     suspend fun refreshRuns(params: RunListParams = RunListParams())
     suspend fun getRecentRuns(limit: Int = 100): List<Run>
     suspend fun getRun(runId: String): Run

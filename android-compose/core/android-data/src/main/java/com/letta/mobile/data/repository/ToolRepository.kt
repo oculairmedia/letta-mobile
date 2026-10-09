@@ -72,6 +72,10 @@ open class ToolRepository @Inject constructor(
     }
 
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.listTools(limit = limit, offset = offset)
+        }
         return toolApi.listTools(limit = limit, offset = offset)
     }
 

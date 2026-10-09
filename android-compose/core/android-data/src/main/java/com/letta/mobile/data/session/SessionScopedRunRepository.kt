@@ -41,6 +41,9 @@ class SessionScopedRunRepository internal constructor(
     private val _runs = MutableStateFlow(sessionManager.current.runRepository.runs.value)
     override val runs: StateFlow<List<Run>> = _runs
 
+    override val supportsRunDetail: Boolean
+        get() = sessionManager.current.runRepository.supportsRunDetail
+
     init {
         sessionManager.currentGraph
             .flatMapLatest { it.runRepository.runs }

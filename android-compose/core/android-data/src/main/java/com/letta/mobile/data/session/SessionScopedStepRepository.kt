@@ -41,6 +41,9 @@ class SessionScopedStepRepository internal constructor(
     private val _steps = MutableStateFlow(sessionManager.current.stepRepository.steps.value)
     override val steps: StateFlow<List<Step>> = _steps
 
+    override val supportsStepQueries: Boolean
+        get() = sessionManager.current.stepRepository.supportsStepQueries
+
     init {
         sessionManager.currentGraph
             .flatMapLatest { it.stepRepository.steps }

@@ -10,6 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface IStepRepository {
     val steps: StateFlow<List<Step>>
+
+    /**
+     * False when the active backend has no step query route (iroh:// only exposes `step.list` by
+     * run, via [IRunRepository.getRunSteps]). Listing then yields empty and single-step reads are
+     * unavailable rather than failing.
+     */
+    val supportsStepQueries: Boolean get() = true
+
     suspend fun refreshSteps(params: StepListParams = StepListParams())
     suspend fun listSteps(params: StepListParams = StepListParams()): List<Step>
     suspend fun getStep(stepId: String): Step
