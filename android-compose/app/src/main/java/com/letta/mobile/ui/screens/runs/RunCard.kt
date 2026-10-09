@@ -47,25 +47,11 @@ internal fun RunCard(
     run: Run,
     onInspect: () -> Unit,
 ) {
-    val clipboard = LocalClipboardManager.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     val active = isActiveRunStatus(run.status)
     val containerColor = runCardContainerColor(run.status)
 
     val startEpochMs = remember(run.createdAt) { parseInstantMillis(run.createdAt) }
-    val frozenDuration = remember(run.totalDurationNs, run.completedAt, startEpochMs) {
-        val totalNs = run.totalDurationNs
-        val completedAt = run.completedAt
-        when {
-            totalNs != null -> formatElapsedDuration(totalNs / 1_000_000L)
-            startEpochMs != null && completedAt != null -> {
-                val end = parseInstantMillis(completedAt)
-                if (end != null) formatElapsedDuration(end - startEpochMs) else "--:--"
-            }
-            else -> "--:--"
-        }
-    }
+    val frozenDuration = remember(run.totalDurationNs, run.completedAt, startEpochMs) { frozenRunDuration(run, startEpochMs) }
     var liveDuration by remember(run.id, run.status) { mutableStateOf(frozenDuration) }
     if (active && startEpochMs != null) {
         LaunchedEffect(run.id, startEpochMs) {
@@ -118,64 +104,77 @@ internal fun RunCard(
                 )
             }
 
-            // Row 2 — supporting: agent id, optional conversation id
-            Text(
-                text = stringResource(R.string.screen_runs_agent_label, run.agentId),
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            run.conversationId?.let { conversationId ->
-                Text(
-                    text = stringResource(R.string.screen_runs_conversation_label, conversationId),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            RunCardAgentLines(run)
 
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline),
             )
 
-            // Row 3 — metadata: timestamp + low-contrast truncated UUID pill (click-to-copy)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = run.createdAt
-                        ?.let { stringResource(R.string.screen_runs_created_label, formatRelativeTime(it)) }
-                        .orEmpty(),
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = truncateRunId(run.id),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = LettaCodeFont,
-                        fontSize = LettaDimens.Type.caption,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-                        .clickable {
-                            clipboard.setText(AnnotatedString(run.id))
-                            HapticEffects.longPress(haptic, view)
-                        }
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
-                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-                )
-            }
+            RunCardMetadataRow(run)
         }
+    }
+}
+
+@Composable
+private fun RunCardAgentLines(run: Run) {
+    // Row 2 — supporting: agent id, optional conversation id
+    Text(
+        text = stringResource(R.string.screen_runs_agent_label, run.agentId),
+        style = MaterialTheme.typography.listItemSupporting,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    run.conversationId?.let { conversationId ->
+        Text(
+            text = stringResource(R.string.screen_runs_conversation_label, conversationId),
+            style = MaterialTheme.typography.listItemSupporting,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun RunCardMetadataRow(run: Run) {
+    val clipboard = LocalClipboardManager.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    // Row 3 — metadata: timestamp + low-contrast truncated UUID pill (click-to-copy)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = run.createdAt
+                ?.let { stringResource(R.string.screen_runs_created_label, formatRelativeTime(it)) }
+                .orEmpty(),
+            style = MaterialTheme.typography.listItemMetadata,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Text(
+            text = truncateRunId(run.id),
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = LettaCodeFont,
+                fontSize = LettaDimens.Type.caption,
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = LettaDimens.Alpha.disabled),
+            maxLines = 1,
+            modifier = Modifier
+                .clip(RoundedCornerShape(LettaDimens.Radius.sm))
+                .clickable {
+                    clipboard.setText(AnnotatedString(run.id))
+                    HapticEffects.longPress(haptic, view)
+                }
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
+                .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        )
     }
 }

@@ -73,3 +73,11 @@ internal fun LazyListScope.runDetailLimitedNote(show: Boolean) {
         )
     }
 }
+
+/** Elapsed time for a finished (or not yet started) run, as `mm:ss`; `--:--` when unknown. */
+internal fun frozenRunDuration(run: Run, startEpochMs: Long?): String {
+    val totalNs = run.totalDurationNs
+    if (totalNs != null) return formatElapsedDuration(totalNs / 1_000_000L)
+    val end = parseInstantMillis(run.completedAt)
+    return if (startEpochMs != null && end != null) formatElapsedDuration(end - startEpochMs) else "--:--"
+}

@@ -2,7 +2,7 @@ package com.letta.mobile.util
 
 import com.letta.mobile.data.api.ApiException
 
-fun mapErrorToUserMessage(e: Exception, fallback: String = "Something went wrong"): String {
+fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong"): String {
     return when (e) {
         is ApiException -> when (e.code) {
             401 -> "Authentication failed. Check your Letta API key in Settings."

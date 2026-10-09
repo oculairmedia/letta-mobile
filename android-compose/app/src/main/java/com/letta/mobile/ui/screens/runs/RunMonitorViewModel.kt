@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
+import com.letta.mobile.util.runCatchingCancellable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -74,7 +75,7 @@ class RunMonitorViewModel @Inject constructor(
             val searchQuery = current?.searchQuery.orEmpty()
             val selectedRun = current?.selectedRun
             _uiState.value = UiState.Loading
-            try {
+            runCatchingCancellable {
                 runRepository.refreshRuns(RunListParams(active = activeOnly.takeIf { it }))
                 _uiState.value = UiState.Success(
                     RunMonitorUiState(
@@ -91,10 +92,10 @@ class RunMonitorViewModel @Inject constructor(
                         selectedStepMetrics = current?.selectedStepMetrics,
                         selectedStepTrace = current?.selectedStepTrace,
                         operationError = current?.operationError,
-                        runDetailLimited = current?.runDetailLimited ?: false,
+                        runDetailLimited = current?.runDetailLimited == true,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load runs"))
             }
         }
@@ -127,7 +128,7 @@ class RunMonitorViewModel @Inject constructor(
     fun inspectRun(runId: String) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            try {
+            runCatchingCancellable {
                 val run = runRepository.getRun(runId)
                 val detail = fetchRunDetail(runId)
                 val messages = detail.messages
@@ -150,7 +151,7 @@ class RunMonitorViewModel @Inject constructor(
                         runDetailLimited = !detailAvailable,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 setOperationError(mapErrorToUserMessage(e, "Failed to load run details"))
             }
         }
@@ -171,7 +172,7 @@ class RunMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             if (current.runDetailLimited) return@launch
-            try {
+            runCatchingCancellable {
                 val step = stepRepository.getStep(stepId)
                 val stepMessages = stepRepository.getStepMessages(stepId)
                 val stepMetrics = stepRepository.getStepMetrics(stepId)
@@ -187,7 +188,7 @@ class RunMonitorViewModel @Inject constructor(
                         operationError = null,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 setOperationError(mapErrorToUserMessage(e, "Failed to load step details"))
             }
         }
@@ -199,7 +200,7 @@ class RunMonitorViewModel @Inject constructor(
             val targetStep = current.selectedStep?.takeIf { it.id == stepId }
                 ?: current.selectedRunSteps.firstOrNull { it.id == stepId }
                 ?: return@launch
-            try {
+            runCatchingCancellable {
                 val updatedStep = stepRepository.updateStepFeedback(
                     stepId = stepId,
                     params = StepFeedbackUpdateParams(
@@ -215,7 +216,7 @@ class RunMonitorViewModel @Inject constructor(
                         operationError = null,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 setOperationError(mapErrorToUserMessage(e, "Failed to update step feedback"))
             }
         }
@@ -225,7 +226,7 @@ class RunMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             val selectedRun = current.selectedRun ?: current.runs.firstOrNull { it.id == runId } ?: return@launch
-            try {
+            runCatchingCancellable {
                 val refreshedRun = runRepository.cancelRun(selectedRun)
                 val refreshedRuns = current.runs.map { if (it.id == refreshedRun.id) refreshedRun else it }
                     .filterNot { current.activeOnly && it.status !in setOf("created", "running") }
@@ -240,7 +241,7 @@ class RunMonitorViewModel @Inject constructor(
                         operationError = null,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 setOperationError(mapErrorToUserMessage(e, "Failed to cancel run"))
             }
         }
@@ -249,7 +250,7 @@ class RunMonitorViewModel @Inject constructor(
     fun deleteRun(runId: String) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            try {
+            runCatchingCancellable {
                 runRepository.deleteRun(runId)
                 _uiState.value = UiState.Success(
                     current.copy(
@@ -266,7 +267,7 @@ class RunMonitorViewModel @Inject constructor(
                         operationError = null,
                     )
                 )
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 setOperationError(mapErrorToUserMessage(e, "Failed to delete run"))
             }
         }
