@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Agent
@@ -67,10 +68,18 @@ internal class DesktopLocalBackendAdminGateway(
 
     /**
      * letta-mobile-bzvro.17: the bundled App Server has no `conversation_delete`, so a delete
-     * archives and hides the conversation; it leaves every list and stays recoverable on disk.
+     * archives and hides the conversation; it leaves every list (Archived too) and stays on disk, but
+     * the app's only way back is the undo offered right after.
      */
     override suspend fun deleteConversation(conversationId: String) {
         shared.setConversationRemoved(com.letta.mobile.data.model.ConversationId(conversationId), removed = true)
+    }
+
+    override val deleteBehavior: ConversationDeleteBehavior get() = ConversationDeleteBehavior.RemovesFromLists
+
+    /** The undo of [deleteConversation]: un-hide, and archived again only if it was archived before. */
+    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
+        shared.restoreRemovedConversation(com.letta.mobile.data.model.ConversationId(conversationId), archived = wasArchived)
     }
 
     /** letta-mobile-bzvro.17: rename (and the generated title) is the conversation's `summary`. */

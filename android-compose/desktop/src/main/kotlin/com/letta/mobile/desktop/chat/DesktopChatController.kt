@@ -10,6 +10,7 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
@@ -154,6 +155,21 @@ class DesktopChatController(
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
+
+    /**
+     * letta-mobile-bzvro.31: the delete the shell offers to take back (an undo snackbar). Empty when
+     * nothing is pending, where delete is permanent, or once the backend changed. Only the latest
+     * delete can be undone.
+     */
+    val deletionUndo = DesktopDeletionUndo()
+
+    private val _deleteBehavior = MutableStateFlow(ConversationDeleteBehavior.Permanent)
+
+    /**
+     * What the active backend's delete really does (the bundled App Server has no delete command,
+     * Iroh only archives), observable so the confirm dialog's wording follows a reconnect.
+     */
+    val deleteBehavior: StateFlow<ConversationDeleteBehavior> = _deleteBehavior.asStateFlow()
 
     /**
      * Conversation awaiting the agent's reply. Set the moment a prompt is sent
@@ -426,8 +442,10 @@ class DesktopChatController(
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
             modelCatalogHelper.reset()
+            deletionUndo.backendChanged()
         }
         gateway = next
+        _deleteBehavior.value = next?.deleteBehavior ?: ConversationDeleteBehavior.Permanent
         runPhases.bind(next)
         approvalCoordinator.bindGateway(next)
         connectionWatcher.start(next)
@@ -552,9 +570,12 @@ class DesktopChatController(
         scope.launch {
             val nextGateway = gateway ?: return@launch
             _deletingConversationIds.update { it + conversationId }
+            val listed = _state.value.conversations.firstOrNull { it.id == conversationId }
+            val startedOn = deletionUndo.backendGeneration
             try {
                 nextGateway.deleteConversation(conversationId)
                 if (closed) return@launch
+                deletionUndo.offer(conversationId, listed, nextGateway.deleteBehavior, startedOn)
                 val wasSelected = _state.value.selectedConversationId == conversationId
                 _state.update {
                     it.withRuntimeState(
@@ -583,6 +604,48 @@ class DesktopChatController(
                 _deletingConversationIds.update { it - conversationId }
             }
         }
+    }
+
+    /**
+     * letta-mobile-bzvro.31: brings back the conversation a delete removed, in the state it had
+     * before (a chat that was archived comes back archived), then re-reads the roster so it
+     * rejoins the list; if the roster cannot be read right now the row is put back as it was
+     * listed. The current selection is left alone. An offer from another backend is refused with
+     * a message rather than sent to the wrong one.
+     */
+    fun undoDeleteConversation(offer: DesktopDeletionUndo.Offer) {
+        if (closed) return
+        deletionUndo.clear(offer.conversationId)
+        val target = gateway?.takeIf { deletionUndo.isCurrent(offer) }
+        if (target == null) {
+            showError("Can't undo: the chat backend changed since it was deleted.")
+            return
+        }
+        scope.launch { restoreAndRelist(target, offer) }
+    }
+
+    private suspend fun restoreAndRelist(target: DesktopChatGateway, offer: DesktopDeletionUndo.Offer) {
+        try {
+            target.restoreDeletedConversation(offer.conversationId, offer.wasArchived)
+            if (!refreshConversationRoster()) putBackListedRow(offer)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            showError(t.message ?: t::class.simpleName ?: "Restore failed")
+        }
+    }
+
+    /** Re-adds the row an undone delete removed, for when the roster cannot be re-read yet. */
+    private fun putBackListedRow(offer: DesktopDeletionUndo.Offer) {
+        _state.update { current ->
+            val runtime = current.runtimeState
+            val roster = DesktopDeletionUndo.rosterWithRowPutBack(runtime.conversations, offer) ?: return@update current
+            current.withRuntimeState(runtime.copy(conversations = roster))
+        }
+    }
+
+    private fun showError(message: String) {
+        _state.update { it.copy(errorMessage = message) }
     }
 
     /** Create a new conversation for the active agent and select it. */
@@ -1231,21 +1294,22 @@ class DesktopChatController(
      * composer draft are untouched. Only an empty session (nothing selected yet) takes the full load
      * path, because then there is no selection to preserve and the first conversation should open.
      */
-    private suspend fun refreshConversationRoster() {
-        if (closed) return
-        val nextGateway = gateway ?: return
+    private suspend fun refreshConversationRoster(): Boolean {
+        if (closed) return false
+        val nextGateway = gateway ?: return false
         val runtime = _state.value.runtimeState
-        if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return
+        if (!runtime.isRemoteBacked || runtime.connectionState !in ROSTER_REFRESHABLE_STATES) return false
         if (runtime.selectedConversationId == null) {
             reloadConversationsAndSelect(preferConversationId = null)
-            return
+            return true
         }
         val deleting = _deletingConversationIds.value
         val summaries = loadConversationSummaries(nextGateway).filterNot { it.id in deleting }
-        if (closed || gateway !== nextGateway) return
+        if (closed || gateway !== nextGateway) return false
         _state.update { current ->
             current.withRuntimeState(ChatSessionReducer.conversationRosterRefreshed(current.runtimeState, summaries))
         }
+        return true
     }
 
     /**

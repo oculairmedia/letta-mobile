@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -35,6 +36,8 @@ internal data class DesktopAgentSidebarActions(
     val onDestinationSelected: (DesktopDestination) -> Unit,
     val onConversationSelected: (String) -> Unit,
     val onDeleteConversation: (String) -> Unit,
+    /** What the backend's delete really does; the confirm dialog and the row menu word and offer it accordingly. */
+    val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
     /** letta-mobile-bzvro.17: rename (persists the conversation's summary) and pin. */
     val onRenameConversation: (id: String, title: String) -> Unit = { _, _ -> },
     val onPinConversation: (id: String, pinned: Boolean) -> Unit = { _, _ -> },

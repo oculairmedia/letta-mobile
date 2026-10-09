@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
@@ -217,6 +218,13 @@ class IrohAdminRpcChatGateway(
             ),
         )
         agentIdByConversation.remove(ConversationId(conversationId))
+    }
+
+    /** `conversation_delete` is not exposed over admin_rpc, so a delete archives; it stays under Archived. */
+    override val deleteBehavior: ConversationDeleteBehavior get() = ConversationDeleteBehavior.MovesToArchived
+
+    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
+        setConversationArchived(conversationId, archived = wasArchived)
     }
 
     override suspend fun listConversationMessages(

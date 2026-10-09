@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasLibrary
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -51,6 +52,14 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     DesktopShellLayoutBody(context, frame)
                 }
                 DesktopShellOverlays(context, frame)
+                val chatController = context.core.chatController
+                val undoable by chatController.deletionUndo.pending.collectAsState()
+                DesktopUndoDeleteSnackbar(
+                    offer = undoable,
+                    onUndo = chatController::undoDeleteConversation,
+                    onExpire = { chatController.deletionUndo.clear(it.conversationId) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }
@@ -159,6 +168,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
     val canvasDocuments by canvasShell.library.documents.collectAsState()
     val archivedCanvasIds by canvasShell.library.archived.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val deleteBehavior by chatController.deleteBehavior.collectAsState()
     val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
     val archiveFilter = frame.lists.archiveFilter
     DesktopAgentSidebar(
@@ -187,6 +197,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onDestinationSelected = navigator::navigate,
             onConversationSelected = { context.router.openConversation(ConversationId(it)) },
             onDeleteConversation = chatController::deleteConversation,
+            deleteBehavior = deleteBehavior,
             onRenameConversation = { id, title ->
                 chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
             },

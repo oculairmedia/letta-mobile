@@ -9,13 +9,21 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -38,7 +46,6 @@ internal val LocalSharedNavDrawer = staticCompositionLocalOf<SharedNavDrawerView
 internal class SharedNavDrawerViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
-    private val conversationRepository: IConversationRepository,
     private val allConversations: IAllConversationsRepository,
 ) : ViewModel() {
 
@@ -47,6 +54,10 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 
     /** Agents pinned to Home; the rail orbs' menu pins and unpins them. */
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
+
+    /** Conversations the user pinned; the drawer lists them first and its row menus pin and unpin them. */
+    val pinnedConversationIds: StateFlow<Set<String>> = settingsRepository.getPinnedConversationIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptySet())
 
     /**
@@ -81,22 +92,66 @@ internal class SharedNavDrawerViewModel @Inject constructor(
         _archiveFilter.value = filter
     }
 
-    fun setConversationArchived(conversationId: String, agentId: String, archived: Boolean) {
+    /**
+     * The conversation actions take the repository the drawer LISTS from (the scaffold's own, which
+     * can differ from any injected one): a write through another repository would miss this one's
+     * cache, and a rename would silently do nothing.
+     */
+    fun setConversationArchived(repository: IConversationRepository, conversationId: String, agentId: String, archived: Boolean) {
         viewModelScope.launch {
-            runCatchingNonCancel { conversationRepository.setConversationArchived(conversationId, agentId, archived) }
+            reportFailure("Couldn't ${if (archived) "archive" else "restore"} the chat") {
+                repository.setConversationArchived(conversationId, agentId, archived)
+            }
         }
     }
 
     fun setAgentPinned(agentId: String, pinned: Boolean) {
         viewModelScope.launch {
-            runCatchingNonCancel { settingsRepository.setAgentPinned(agentId, pinned) }
+            reportFailure("Couldn't ${if (pinned) "pin" else "unpin"} the agent") { settingsRepository.setAgentPinned(agentId, pinned) }
         }
     }
 
-    fun deleteConversation(conversationId: String, agentId: String) {
-        viewModelScope.launch {
-            runCatchingNonCancel { conversationRepository.deleteConversation(conversationId, agentId) }
+    /** The Iroh backend has no delete command, so a delete there only archives (it stays under Archived); the confirm dialog says so. */
+    val deleteBehavior: ConversationDeleteBehavior
+        get() = if (settingsRepository.activeBackendIsIroh()) {
+            ConversationDeleteBehavior.MovesToArchived
+        } else {
+            ConversationDeleteBehavior.Permanent
         }
+
+    fun setConversationPinned(conversationId: ConversationId, pinned: Boolean) {
+        viewModelScope.launch {
+            reportFailure("Couldn't ${if (pinned) "pin" else "unpin"} the chat") { settingsRepository.setConversationPinned(conversationId.value, pinned) }
+        }
+    }
+
+    /** A blank title is ignored; the row keeps its name. */
+    fun renameConversation(
+        repository: IConversationRepository,
+        conversationId: ConversationId,
+        agentId: AgentId,
+        title: ConversationSummary,
+    ) {
+        val trimmed = title.value.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            reportFailure("Couldn't rename the chat") { repository.updateConversation(conversationId, agentId, trimmed) }
+        }
+    }
+
+    fun deleteConversation(repository: IConversationRepository, conversationId: String, agentId: String) {
+        viewModelScope.launch {
+            reportFailure("Couldn't delete the chat") { repository.deleteConversation(conversationId, agentId) }
+        }
+    }
+
+    private val _failures = MutableSharedFlow<String>(extraBufferCapacity = FAILURE_BUFFER)
+
+    /** A conversation action that failed, as a message for the drawer to show. */
+    val failures: SharedFlow<String> = _failures.asSharedFlow()
+
+    private suspend fun reportFailure(message: String, block: suspend () -> Unit) {
+        if (runCatchingNonCancel { block() } == null) _failures.tryEmit(message)
     }
 
     /** A failed store call leaves the drawer as it was; cancellation still propagates. */
@@ -113,6 +168,7 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private companion object {
         const val TAG = "SharedNavDrawer"
         const val STOP_TIMEOUT_MS = 5_000L
+        const val FAILURE_BUFFER = 4
         const val ACTIVITY_MAX_AGE_MS = 60_000L
     }
 }

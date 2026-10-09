@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -127,6 +128,35 @@ class DesktopLocalBackendAdminGatewayTest {
         assertEquals("conversation-1", client.updateCommand?.conversationId)
         assertEquals(true, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
         assertEquals(true, client.updateCommand?.body?.get("hidden")?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun `restoring a deleted conversation un-hides it and un-archives one that was active`() = runTest {
+        // letta-mobile-bzvro.31: the undo of the archiving delete.
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            retrieveConversation = conversation("conversation-1", archived = true)
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        assertEquals(ConversationDeleteBehavior.RemovesFromLists, gateway.deleteBehavior)
+        gateway.restoreDeletedConversation("conversation-1", wasArchived = false)
+
+        assertEquals("conversation-1", client.updateCommand?.conversationId)
+        assertEquals(false, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
+        assertEquals(false, client.updateCommand?.body?.get("hidden")?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun `restoring a conversation that was already archived keeps it archived`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            retrieveConversation = conversation("conversation-1", archived = true)
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        gateway.restoreDeletedConversation("conversation-1", wasArchived = true)
+
+        assertEquals(true, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
+        assertEquals(false, client.updateCommand?.body?.get("hidden")?.jsonPrimitive?.boolean)
     }
 
     @Test

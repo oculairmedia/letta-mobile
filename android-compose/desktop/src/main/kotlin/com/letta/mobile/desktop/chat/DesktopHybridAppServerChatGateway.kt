@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
@@ -384,6 +385,12 @@ class DesktopHybridAppServerChatGateway internal constructor(
     override suspend fun deleteConversation(conversationId: String) {
         adminGateway.deleteConversation(conversationId)
         agentIdByConversation.remove(ConversationId(conversationId))
+    }
+
+    override val deleteBehavior: ConversationDeleteBehavior get() = adminGateway.deleteBehavior
+
+    override suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
+        adminGateway.restoreDeletedConversation(conversationId, wasArchived)
     }
 
     /** letta-mobile-bzvro.17: titles (rename, generated) are the admin gateway's to write. */

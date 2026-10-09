@@ -171,8 +171,9 @@ class DesktopPhoneShellTest {
         onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).assertExists()
         onNodeWithTag(ComposerTestTags.CARD, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ComposerTestTags.HINT, useUnmergedTree = true).assertDoesNotExist()
-        // The canvas mode keeps the top of the board clear: no header.
+        // The canvas mode keeps the top of the board clear: no header, only the agent pill (vgouv).
         onNodeWithTag(PhoneShellTags.CHAT_HEADER).assertDoesNotExist()
+        onNodeWithTag(PhoneShellTags.CANVAS_IDENTITY_PILL).assertExists()
 
         // The Touch bar stands on the simulated keyboard (TouchComposerBar reads WindowInsets.ime).
         val barBottom = onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom

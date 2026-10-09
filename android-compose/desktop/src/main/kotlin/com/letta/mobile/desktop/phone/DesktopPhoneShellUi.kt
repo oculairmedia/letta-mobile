@@ -39,25 +39,28 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.AgentIdentity
+import com.letta.mobile.ui.chat.AgentIdentityPill
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags for the phone shell's own chrome. */
 internal object PhoneShellTags {
     const val CHAT_HEADER = "phone-chat-header"
+    const val CANVAS_IDENTITY_PILL = "phone-canvas-identity-pill"
     const val TOP_BAR = "phone-top-bar"
     const val DRAWER = "phone-drawer"
 }
 
 /**
  * The chat screen's floating header on a phone (Android's ChatScreen header pills): the menu that
- * opens the agents panel, the agent's name, and the way back to the canvas. It floats over the
- * full-screen page, which draws edge to edge under it; its measured height (plus the status bar) is
- * the page's `topChromeInset`.
+ * opens the agents panel, the shared [AgentIdentityPill] (letta-mobile-vgouv: the one pill Android
+ * draws), and the way back to the canvas. It floats over the full-screen page, which draws edge to
+ * edge under it; its measured height (plus the status bar) is the page's `topChromeInset`.
  */
 @Composable
 internal fun PhoneChatHeader(
-    title: String,
+    identity: AgentIdentity,
     onMenu: () -> Unit,
     onCanvas: (() -> Unit)?,
     onHeightChange: (Dp) -> Unit,
@@ -75,21 +78,44 @@ internal fun PhoneChatHeader(
     ) {
         HeaderPill { IconButton(onClick = onMenu) { Icon(LettaIcons.Menu, contentDescription = "Agents and conversations") } }
         Spacer(Modifier.size(LettaDimens.Space.sm))
-        HeaderPill(Modifier.weight(1f, fill = false)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
-            )
-        }
+        AgentIdentityPill(identity, Modifier.weight(1f, fill = false))
         Spacer(Modifier.weight(1f))
         if (onCanvas != null) {
             HeaderPill { IconButton(onClick = onCanvas) { Icon(LettaIcons.Dashboard, contentDescription = "Canvas") } }
         }
     }
 }
+
+/**
+ * The agent pill alone, where the header draws it, while the phone's canvas mode keeps the top of
+ * the board clear (Android's canvas identity pill): under the status bar, at the header's start
+ * inset. Only the pill takes touches, and it stops short of the screen's trailing side
+ * ([CANVAS_PILL_MAX_WIDTH_FRACTION], the name ellipsizes) and reports its height through
+ * [onHeightChange], which the frame adds to the board's top inset: the board starts below the pill
+ * and its actions at the trailing end stay clear.
+ */
+@Composable
+internal fun PhoneCanvasIdentityPill(
+    identity: AgentIdentity,
+    modifier: Modifier = Modifier,
+    onHeightChange: (Dp) -> Unit = {},
+) {
+    val density = LocalDensity.current
+    Row(
+        modifier
+            .fillMaxWidth(CANVAS_PILL_MAX_WIDTH_FRACTION)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm)
+            // Reported so the board's top inset reserves the pill's room instead of lying under it.
+            .onSizeChanged { onHeightChange(with(density) { it.height.toDp() }) }
+            .testTag(PhoneShellTags.CANVAS_IDENTITY_PILL),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AgentIdentityPill(identity)
+    }
+}
+
+internal const val CANVAS_PILL_MAX_WIDTH_FRACTION = 0.55f
 
 @Composable
 private fun HeaderPill(modifier: Modifier = Modifier, content: @Composable () -> Unit) {

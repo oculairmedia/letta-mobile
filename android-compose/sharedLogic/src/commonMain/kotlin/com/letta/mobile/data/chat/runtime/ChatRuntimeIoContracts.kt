@@ -26,6 +26,18 @@ interface ChatGateway : TimelineTransport {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")
     }
 
+    /** What [deleteConversation] actually does on this backend; UIs word the confirm dialog and the undo from it. */
+    val deleteBehavior: ConversationDeleteBehavior get() = ConversationDeleteBehavior.Permanent
+
+    /**
+     * Undoes a [deleteConversation] that did not destroy the conversation, putting it back in the
+     * state it had before: [wasArchived] true keeps it archived (it only rejoins the Archived
+     * list), false makes it active again. Unsupported where delete is permanent.
+     */
+    suspend fun restoreDeletedConversation(conversationId: String, wasArchived: Boolean) {
+        throw UnsupportedOperationException("restoreDeletedConversation is not supported by this gateway")
+    }
+
     companion object {
         const val DEFAULT_CONVERSATION_LIMIT = 40
         const val DEFAULT_AGENT_CONVERSATION_LIMIT = 500

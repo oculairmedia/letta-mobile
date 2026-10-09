@@ -3,6 +3,7 @@ package com.letta.mobile.ui.shell.sidebar
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 
@@ -92,6 +93,12 @@ data class ShellAgentPanelActions(
     val onConversationSelected: (String) -> Unit = {},
     val onArchiveConversation: (id: String, archived: Boolean) -> Unit = { _, _ -> },
     val onDeleteConversation: (String) -> Unit = {},
+    /**
+     * What [onDeleteConversation] really does on this backend: the confirm dialog says so instead
+     * of promising a permanent removal, and a chat already under Archived is not offered Delete
+     * where delete would only move it there.
+     */
+    val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
     /** letta-mobile-bzvro.17: rename a conversation; null means the host cannot, so rows offer no rename. */
     val onRenameConversation: ((id: String, title: String) -> Unit)? = null,
     /** letta-mobile-bzvro.17: pin or unpin a conversation; null means the host keeps no pins. */

@@ -15,12 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -56,9 +58,10 @@ private val PhoneChatAppearance = ChatSurfaceAppearance(
 
 /**
  * Hosts the shared chat [page] as this window draws it. Without a phone it is exactly
- * `page(modifier, ChatPageFrame())`. On the phone the page fills the screen edge to edge and the
- * floating header ([PhoneChatHeader]) shows over the full-screen chat only: the canvas mode keeps
- * the top of the board clear, as on Android.
+ * `page(modifier, ChatPageFrame())`. On the phone the page fills the screen edge to edge. Over the
+ * full-screen chat the floating header ([PhoneChatHeader]) shows; in canvas mode only the shared
+ * agent pill does ([PhoneCanvasIdentityPill], Android's canvas identity pill), narrow enough to
+ * leave the board's own actions clear.
  */
 @Composable
 internal fun DesktopPhoneChatFrame(
@@ -76,26 +79,54 @@ internal fun DesktopPhoneChatFrame(
     val frame = ChatPageFrame(topChromeInset = phoneTopChromeInset(fullScreen, headerHeight), showKeyboardHints = false)
     Box(modifier.fillMaxSize()) {
         page(Modifier, frame)
-        if (fullScreen) PhoneChatPageHeader(phone, inputs) { headerHeight = it }
+        PhoneChatPageHeader(phone, inputs, fullScreen) { headerHeight = it }
     }
 }
 
 /** Its own composable, so the agent's name is the only thing it collects and the page does not recompose with it. */
 @Composable
-private fun PhoneChatPageHeader(phone: DesktopPhoneChrome, inputs: PhoneChatPageInputs, onHeightChange: (Dp) -> Unit) {
+private fun PhoneChatPageHeader(
+    phone: DesktopPhoneChrome,
+    inputs: PhoneChatPageInputs,
+    fullScreen: Boolean,
+    onHeightChange: (Dp) -> Unit,
+) {
     val state by inputs.uiState.collectAsState()
-    PhoneChatHeader(
-        title = state.agentName?.takeIf(String::isNotBlank) ?: "Chat",
-        onMenu = { phone.drawerOpen = true },
-        onCanvas = inputs.onBackToCanvas,
-        onHeightChange = onHeightChange,
-    )
+    val identity = remember(state.agentId, state.agentName, phone) {
+        phoneAgentIdentity(state.agentId, state.agentName) { phone.drawerOpen = true }
+    }
+    if (fullScreen) {
+        PhoneChatHeader(
+            identity = identity,
+            onMenu = { phone.drawerOpen = true },
+            onCanvas = inputs.onBackToCanvas,
+            onHeightChange = onHeightChange,
+        )
+    } else {
+        PhoneCanvasIdentityPill(identity, onHeightChange = onHeightChange)
+    }
 }
 
-/** The status bar, plus the floating header while the full-screen page shows it. */
+/**
+ * letta-mobile-vgouv: the shared pill's identity on the phone preview. The agents panel (the
+ * drawer, which holds the rail) is its switcher; the desktop keeps no agent favourite or pin, so
+ * neither mark shows and a long press does nothing.
+ */
+internal fun phoneAgentIdentity(agentId: String?, agentName: String?, onSwitch: () -> Unit): AgentIdentity =
+    AgentIdentity(
+        agentId = agentId.orEmpty(),
+        name = agentName?.takeIf(String::isNotBlank) ?: "Chat",
+        isFavorite = false,
+        isPinned = false,
+        onClick = onSwitch,
+        onLongClick = {},
+    )
+
+/** The status bar, plus the floating header (full-screen page) or the canvas mode's agent pill. */
 @Composable
 private fun phoneTopChromeInset(fullScreen: Boolean, headerHeight: Dp): Dp {
     val density = LocalDensity.current
     val statusBar = with(density) { WindowInsets.statusBars.getTop(density).toDp() }
-    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar
+    // The canvas mode reserves the room its pill takes (status bar, the pill and its gaps), so the board starts below it.
+    return if (fullScreen) maxOf(statusBar, headerHeight) else statusBar + headerHeight + LettaDimens.Space.sm * 2
 }

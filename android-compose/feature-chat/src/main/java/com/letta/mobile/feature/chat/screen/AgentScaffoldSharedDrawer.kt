@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import android.widget.Toast
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.Composable
@@ -7,13 +8,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.shell.ShellNavDrawer
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
@@ -44,7 +48,12 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val archiveFilter by drawer.archiveFilter.collectAsStateWithLifecycle()
     val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
+    val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
+    val context = LocalContext.current
+    LaunchedEffect(drawer) {
+        drawer.failures.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
     val open = state.drawerState.isOpen
     LaunchedEffect(open) {
         if (open) {
@@ -66,6 +75,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         conversations = state.drawerConversations,
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
+        pinnedConversationIds = pinnedConversationIds,
         canvases = canvases,
         hiddenSections = androidHiddenDrawerSections(state.params.navigation),
     ).withRoster(roster)
@@ -150,8 +160,14 @@ internal fun sharedDrawerPanelActions(
         onConversationSelected = { id ->
             closeDrawerAndRun(state) { navigation.onSwitchConversation?.invoke(agentId, id, agentName) }
         },
-        onArchiveConversation = { id, archived -> drawer.setConversationArchived(id, agentId, archived) },
-        onDeleteConversation = { id -> drawer.deleteConversation(id, agentId) },
+        // The drawer lists from drawerConversationRepo, so the actions write through the same one.
+        onArchiveConversation = { id, archived -> drawer.setConversationArchived(state.drawerConversationRepo, id, agentId, archived) },
+        onDeleteConversation = { id -> drawer.deleteConversation(state.drawerConversationRepo, id, agentId) },
+        deleteBehavior = drawer.deleteBehavior,
+        onRenameConversation = { id, title ->
+            drawer.renameConversation(state.drawerConversationRepo, ConversationId(id), AgentId(agentId), ConversationSummary(title))
+        },
+        onPinConversation = { id, pinned -> drawer.setConversationPinned(ConversationId(id), pinned) },
         onOpenCanvas = { canvasId -> closeDrawerAndRun(state) { navigation.onOpenCanvas?.invoke(canvasId.value) } },
         // onArchiveCanvas stays null: Android keeps no canvas archive yet (letta-mobile-c3np7.5.7),
         // so canvas rows offer no archive, by hover or by long-press.
