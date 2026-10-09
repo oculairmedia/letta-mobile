@@ -87,6 +87,8 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
             state = drawerState,
             actions = rememberSharedDrawerActions(state, drawer),
             modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
+            // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
+            agentCard = { AndroidAgentContextCard(state) },
         )
     }
 }

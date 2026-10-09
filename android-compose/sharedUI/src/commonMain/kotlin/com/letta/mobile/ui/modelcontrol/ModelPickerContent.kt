@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.modelcontrol
 
+import com.letta.mobile.data.context.formatContextTokens
+import com.letta.mobile.data.context.AgentContextCardModel
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -80,6 +83,7 @@ object ModelPickerTags {
     const val EDIT = "model_picker_edit"
     const val ERROR = "model_picker_error"
     const val EMPTY = "model_picker_empty"
+    const val WINDOW_PREFIX = "model_picker_window_"
 }
 
 /** Tier tags sit after the name, quieter than it. */
@@ -225,6 +229,7 @@ private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
                 )
             }
         }
+        PickerRowWindow(entry)
         val onEffort = actions.onEffortSelected
         if (onEffort != null && entry.efforts.isNotEmpty()) {
             ReasoningEffortChips(
@@ -234,6 +239,28 @@ private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
             )
         }
     }
+}
+
+/**
+ * letta-mobile-3io8k: what the conversation already holds, in tokens, when the picker is opened from
+ * the context sheet; rows then show their window and warn when it is smaller than that.
+ */
+val LocalModelPickerContextTokens = staticCompositionLocalOf<Int?> { null }
+
+/** "200k context", and a warning when the conversation would not fit in it. */
+@Composable
+private fun PickerRowWindow(entry: ModelPickerEntry) {
+    val window = entry.contextWindow ?: return
+    val used = LocalModelPickerContextTokens.current
+    val overflows = AgentContextCardModel.overflowsWindow(used, window)
+    Text(
+        text = if (overflows) ModelControlStrings.windowTooSmall(formatContextTokens(window)) else ModelControlStrings.windowLabel(formatContextTokens(window)),
+        style = MaterialTheme.typography.bodySmall,
+        color = if (overflows) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.testTag("${ModelPickerTags.WINDOW_PREFIX}${entry.value}"),
+    )
 }
 
 @Composable

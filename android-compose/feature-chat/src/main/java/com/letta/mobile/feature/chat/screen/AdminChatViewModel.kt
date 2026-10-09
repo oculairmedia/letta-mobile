@@ -630,6 +630,9 @@ internal class AdminChatViewModel @Inject constructor(
         sessionManager.currentGraph.flatMapLatest { it.contextTokenReadings.readings }
     }
 
+    /** letta-mobile-3io8k: what the drawer's context card reads, per session graph. */
+    internal val contextCardSession: StateFlow<ContextCardSession> by lazy { contextCardSessions(sessionManager.currentGraph, viewModelScope) }
+
     fun refreshModels() = modelCoordinator.refreshModels()
 
     fun updateActiveAgentModel(

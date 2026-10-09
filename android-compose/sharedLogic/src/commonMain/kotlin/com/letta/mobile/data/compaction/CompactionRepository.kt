@@ -60,6 +60,17 @@ interface CompactionRepository {
     suspend fun compact(request: CompactionRequest): CompactionOutcome
 }
 
+/**
+ * letta-mobile-3io8k: tries this repository, then [fallback] when this one cannot compact at all
+ * (e.g. the Iroh relay first, then a desktop's bundled App Server). Any other outcome stands.
+ */
+fun CompactionRepository.orElse(fallback: CompactionRepository): CompactionRepository = object : CompactionRepository {
+    override suspend fun compact(request: CompactionRequest): CompactionOutcome {
+        val first = this@orElse.compact(request)
+        return if (first == CompactionOutcome.Unsupported) fallback.compact(request) else first
+    }
+}
+
 /** Maps a successful result onto [CompactionOutcome.Compacted] or [CompactionOutcome.AlreadyCompact]. */
 internal fun ConversationCompactResult.toOutcome(): CompactionOutcome =
     if (noChange) CompactionOutcome.AlreadyCompact(this) else CompactionOutcome.Compacted(this)
