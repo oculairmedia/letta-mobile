@@ -71,11 +71,18 @@ class LettaCode033CompatibilityTest {
     }
 
     @Test
-    fun aFrameTypeNewIn033IsUnknownNotAFailure() {
-        val frame = decode(LettaCode0336Frames.EXECUTE_COMMAND_RESPONSE).frame
+    fun aFrameTypeThisClientDoesNotKnowIsUnknownNotAFailure() {
+        // execute_command_response used to be the example here; it is a typed frame now (F20), so
+        // the example is a type no letta-code version defines: any future frame must stay tolerated.
+        val frame = decode("""{"type":"a_frame_type_from_a_future_letta_code","request_id":"req-9","success":true}""").frame
         val unknown = assertIs<AppServerInboundFrame.Unknown>(frame)
-        assertEquals("execute_command_response", unknown.type)
+        assertEquals("a_frame_type_from_a_future_letta_code", unknown.type)
         assertEquals("req-9", unknown.requestId)
+    }
+
+    @Test
+    fun executeCommandResponseIsTyped() {
+        assertIs<AppServerInboundFrame.ExecuteCommandResponse>(decode(LettaCode0336Frames.EXECUTE_COMMAND_RESPONSE).frame)
     }
 
     @Test
