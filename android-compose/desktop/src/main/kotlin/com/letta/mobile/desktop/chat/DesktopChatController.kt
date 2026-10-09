@@ -159,8 +159,7 @@ class DesktopChatController(
      * letta-mobile-bzvro.31: the conversation a delete just archived, which the shell offers to
      * bring back (an undo snackbar). Null when nothing is pending, or where delete is permanent.
      */
-    private val _undoableDeletion = MutableStateFlow<String?>(null)
-    val undoableDeletion: StateFlow<String?> = _undoableDeletion.asStateFlow()
+    val deletionUndo = DesktopDeletionUndo()
 
     /**
      * Whether the active backend's delete only archives (the bundled App Server has no delete
@@ -568,7 +567,7 @@ class DesktopChatController(
             try {
                 nextGateway.deleteConversation(conversationId)
                 if (closed) return@launch
-                _undoableDeletion.value = conversationId.takeIf { nextGateway.deleteArchivesConversation }
+                if (nextGateway.deleteArchivesConversation) deletionUndo.offer(conversationId)
                 val wasSelected = _state.value.selectedConversationId == conversationId
                 _state.update {
                     it.withRuntimeState(
@@ -599,18 +598,13 @@ class DesktopChatController(
         }
     }
 
-    /** The snackbar timed out or was dismissed: the deletion can no longer be undone from the shell. */
-    fun clearUndoableDeletion(conversationId: String) {
-        _undoableDeletion.update { if (it == conversationId) null else it }
-    }
-
     /**
      * letta-mobile-bzvro.31: brings back the conversation a delete archived, then re-reads the
      * roster so it rejoins the list. The current selection is left alone.
      */
     fun undoDeleteConversation(conversationId: String) {
         if (closed) return
-        clearUndoableDeletion(conversationId)
+        deletionUndo.clear(conversationId)
         scope.launch {
             val nextGateway = gateway ?: return@launch
             try {

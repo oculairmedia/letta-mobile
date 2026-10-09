@@ -53,11 +53,11 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 }
                 DesktopShellOverlays(context, frame)
                 val chatController = context.core.chatController
-                val undoable by chatController.undoableDeletion.collectAsState()
+                val undoable by chatController.deletionUndo.pending.collectAsState()
                 DesktopUndoDeleteSnackbar(
                     pendingConversationId = undoable,
                     onUndo = chatController::undoDeleteConversation,
-                    onExpire = chatController::clearUndoableDeletion,
+                    onExpire = chatController.deletionUndo::clear,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }

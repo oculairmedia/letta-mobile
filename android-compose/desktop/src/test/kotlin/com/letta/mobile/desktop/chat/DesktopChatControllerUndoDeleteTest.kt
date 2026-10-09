@@ -50,14 +50,14 @@ class DesktopChatControllerUndoDeleteTest {
 
         controller.deleteConversation("conv-2")
         runCurrent()
-        assertEquals("conv-2", controller.undoableDeletion.value)
+        assertEquals("conv-2", controller.deletionUndo.pending.value)
         assertEquals(listOf("conv-1"), controller.state.value.conversations.map { it.id })
 
         controller.undoDeleteConversation("conv-2")
         runCurrent()
 
         assertEquals(listOf("conv-2"), gateway.restored)
-        assertNull(controller.undoableDeletion.value)
+        assertNull(controller.deletionUndo.pending.value)
         assertEquals(listOf("conv-1", "conv-2"), controller.state.value.conversations.map { it.id }.sorted())
         controller.close()
     }
@@ -71,9 +71,9 @@ class DesktopChatControllerUndoDeleteTest {
 
         controller.deleteConversation("conv-2")
         runCurrent()
-        controller.clearUndoableDeletion("conv-2")
+        controller.deletionUndo.clear("conv-2")
 
-        assertNull(controller.undoableDeletion.value)
+        assertNull(controller.deletionUndo.pending.value)
         assertTrue(gateway.restored.isEmpty())
         controller.close()
     }
@@ -89,7 +89,7 @@ class DesktopChatControllerUndoDeleteTest {
         controller.deleteConversation("conv-2")
         runCurrent()
 
-        assertNull(controller.undoableDeletion.value)
+        assertNull(controller.deletionUndo.pending.value)
         controller.close()
     }
 
