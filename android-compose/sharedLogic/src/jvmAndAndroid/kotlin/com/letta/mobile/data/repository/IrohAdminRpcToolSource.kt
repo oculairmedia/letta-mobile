@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.iroh.AdminRpcMethod
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.serialization.builtins.ListSerializer
@@ -55,7 +56,7 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools/$toolId",
             body = buildJsonObject { put("tool_id", toolId) }.toString(),
         )
-        return decodeTool(response, "tool.get")
+        return decodeTool(response, AdminRpcMethod("tool.get"))
     }
 
     suspend fun createTool(params: ToolCreateParams): Tool {
@@ -64,7 +65,7 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools",
             body = json.encodeToString(ToolCreateParams.serializer(), params),
         )
-        return decodeTool(response, "tool.create")
+        return decodeTool(response, AdminRpcMethod("tool.create"))
     }
 
     suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
@@ -81,12 +82,12 @@ class IrohAdminRpcToolSource(
             path = "/v1/tools/$toolId",
             body = requestBody.toString(),
         )
-        return decodeTool(response, "tool.update")
+        return decodeTool(response, AdminRpcMethod("tool.update"))
     }
 
-    private fun decodeTool(response: AppServerInboundFrame.AdminRpcResponse, method: String): Tool {
-        if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
-        val result = response.result ?: error("Iroh admin_rpc $method returned no result")
+    private fun decodeTool(response: AppServerInboundFrame.AdminRpcResponse, method: AdminRpcMethod): Tool {
+        if (!response.success) error(response.error ?: "Iroh admin_rpc ${method.value} failed")
+        val result = response.result ?: error("Iroh admin_rpc ${method.value} returned no result")
         return json.decodeFromJsonElement(Tool.serializer(), result)
     }
 
