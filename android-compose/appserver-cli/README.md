@@ -19,15 +19,15 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.12 --listen ws://127.0.0.1:4500
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.33.6 --listen ws://127.0.0.1:4500
 .\bin\meridian-app-server.bat app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.12 --dry-run
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.33.6 --dry-run
 ```
 
 Loopback development uses no WebSocket auth. Non-loopback listeners require
 `--ws-auth`; the client then sends `Authorization: Bearer <token>`.
 
-Each 0.29.12 client opens one bidirectional `/ws` connection. Never add the
+Each 0.29+ client opens one bidirectional `/ws` connection. Never add the
 removed `?channel=control|stream` query. Upstream supports concurrent clients;
 Iroh deployments still use the Kotlin wrapper as their authorization, runtime
 ownership, and fanout boundary.

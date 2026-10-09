@@ -547,8 +547,11 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
   `~/.nvm/versions/node/v24.18.0/bin/node`). The contract verifier pins the wire baseline
-  **`@letta-ai/letta-code@0.32.10`** (`app-server-v2-contract-matrix.json`); runtime probes and the
-  restart-replay evidence use the desktop's bundled **`0.29.12`**. One table lists every pin:
+  **`@letta-ai/letta-code@0.33.6`** (`app-server-v2-contract-matrix.json`), which is also the
+  desktop's bundled runtime. The restart-replay evidence is still the older **`0.29.12`** capture
+  (it needs a live server + model provider to re-capture), and the Android embedded runtime is
+  held at **`0.26.1`** (nodejs-mobile Node 18; letta-code 0.26.2+ needs Node >= 22.19), so
+  anything "verified against a 0.33 server" is desktop/remote-only. One table lists every pin:
   `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`
   ("letta-code version pins"). Install the package under test at
   `~/letta-code-install/node_modules/@letta-ai/letta-code` (older VM snapshots carry 0.29.9 there;

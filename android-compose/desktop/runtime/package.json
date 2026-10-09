@@ -4,6 +4,6 @@
   "private": true,
   "description": "Pinned Letta Code runtime bundled with the Windows desktop client.",
   "dependencies": {
-    "@letta-ai/letta-code": "0.29.12"
+    "@letta-ai/letta-code": "0.33.6"
   }
 }

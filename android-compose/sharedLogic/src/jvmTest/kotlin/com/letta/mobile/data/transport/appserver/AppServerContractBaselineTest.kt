@@ -40,8 +40,8 @@ class AppServerContractBaselineTest {
         val classifiedCommands = capabilities.flatMap { it.stringSet("commands") }
         val classifiedMessages = capabilities.flatMap { it.stringSet("messages") }
 
-        assertEquals(100, commands.size, "Update the pinned count after reviewing an upstream union change")
-        assertEquals(111, messages.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(101, commands.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(112, messages.size, "Update the pinned count after reviewing an upstream union change")
         assertEquals(commands, classifiedCommands.toSet())
         assertEquals(messages, classifiedMessages.toSet())
         assertEquals(classifiedCommands.size, classifiedCommands.toSet().size, "A command has multiple capability owners")
@@ -121,10 +121,10 @@ class AppServerContractBaselineTest {
         val probes = matrix["cli_probes"]!!.jsonArray.map { it.jsonObject }
             .associateBy { it.requiredString("classification") }
 
-        assertEquals("0.32.10", baseline.requiredString("version"))
+        assertEquals("0.33.6", baseline.requiredString("version"))
         assertEquals("v24.18.0", baseline.requiredString("node"))
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
-        assertEquals("0.32.10 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
+        assertEquals("0.33.6 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
         val serverListener = probes.getValue("server_listener")
         val appServer = probes.getValue("app_server_v2")

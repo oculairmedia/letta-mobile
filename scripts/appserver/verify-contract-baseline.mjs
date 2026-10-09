@@ -159,7 +159,8 @@ function normalizePath(path) {
 
 function extractDiscriminants(source, unionName) {
   return unionMembers(source, unionName).map((member) => {
-    const declarationMatch = source.match(new RegExp(`export (?:interface|type) ${member}(?:<[^>]*>)?(?: extends [^{]+)? \\{([\\s\\S]*?)\\n\\}`));
+    // 0.33 also declares members as intersections: `export type X = SomeResult & { type: "x" };`.
+    const declarationMatch = source.match(new RegExp(`export (?:interface|type) ${member}(?:<[^>]*>)?(?: extends [^{]+| = [^{;]+&)? \\{([\\s\\S]*?)\\n\\}`));
     if (!declarationMatch) throw new Error(`Missing declaration for ${member}`);
     const typeMatch = declarationMatch[1].match(/\btype:\s*"([^"]+)"/);
     if (!typeMatch) throw new Error(`Missing type discriminant for ${member}`);
