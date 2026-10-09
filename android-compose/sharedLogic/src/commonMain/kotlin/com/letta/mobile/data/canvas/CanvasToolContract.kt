@@ -57,8 +57,7 @@ object CanvasToolContract {
             "Use canvas_get_scene to read the canvas."
 
     /** How every canvas-reading tool is told which canvas: optional, defaulting to the conversation's. */
-    const val CANVAS_ID_DESCRIPTION = "The canvas to use. Omit it to use the canvas of the conversation you are in " +
-        "(created on first use); only name one to reach a different canvas from canvas_list."
+    const val CANVAS_ID_DESCRIPTION = "Omit to use this conversation's canvas (made on first use); name one from canvas_list only to reach another."
 
     private val canvasIdParam = ToolParam("canvas_id", description = CANVAS_ID_DESCRIPTION)
 
@@ -66,59 +65,56 @@ object CanvasToolContract {
     private val dryRunParam = ToolParam(
         CanvasDryRun.PARAM,
         type = "boolean",
-        description = "true to check the write without publishing it: the result says valid true/false and lists " +
-            "each problem (op_index, invariant, detail). Nothing is published either way.",
+        description = "true to check without publishing: the result is valid true/false plus each problem (op_index, invariant, detail).",
     )
 
     private const val DRY_RUN_HINT =
-        "Pass dry_run: true to check a batch against the current board first without publishing it. "
+        "dry_run: true checks it first, publishing nothing. "
 
     val create = CanvasToolDefinition(
         CREATE,
-        "Create a new canvas document. Returns the created canvas_id. The conversation you are in already " +
-            "has a canvas, which every other canvas tool uses when given no canvas_id.",
+        "Create a canvas; returns its canvas_id. This conversation already has one, which the other canvas tools " +
+            "use when given no canvas_id.",
         objectSchema(ToolParam("title"), ToolParam("conversation_id")),
     )
 
     val getScene = CanvasToolDefinition(
         GET_SCENE,
-        "Get a canvas's current scene (DrawBox JSON) and revision. With no canvas_id, reads the canvas of the " +
-            "conversation you are in. The result's schema_hint summarises the element format; plugin_elements " +
-            "lists the plugin elements on it (change them with $APPLY_OPS set_plugin_element).",
+        "Get a canvas's current scene (DrawBox JSON) and revision (no canvas_id: this conversation's canvas). " +
+            "schema_hint summarises the element format; plugin_elements lists its plugin elements " +
+            "(change them with $APPLY_OPS set_plugin_element).",
         objectSchema(canvasIdParam),
     )
 
     val getLayout = CanvasToolDefinition(
         GET_LAYOUT,
-        "Read a canvas's geometry without its full payloads (with no canvas_id, the conversation's canvas). " +
-            "Each row is {id, kind, frame:[x,y,w,h]}. frame is the point box before rotation. kind is shape " +
-            "(plus shape, such as RECTANGLE or ARROW), text, path, image, note or plugin (plus pluginKind). " +
-            "label and pluginKind are at most 60 UTF-16 units. A note with no stored frame is reported where " +
-            "the board places it. An ARROW's bindings are {from, to}, each a note id, an element id, or null. " +
-            "Rows are ordered by id. limit defaults to 200 and is at most 500; a page also ends at 16 KiB and " +
-            "returns nextCursor as r<revision>:<index>. A cursor from another revision is refused as " +
-            "{\"error\":\"stale_cursor\",\"revision\":<current>}; any other cursor that was not a nextCursor is refused." +
-            "Call again with no cursor.",
+        "Read a canvas's geometry without its full payloads (no canvas_id: this conversation's canvas). " +
+            "Rows {id, kind, frame:[x,y,w,h]} are ordered by id; frame is the point box before rotation. kind is " +
+            "shape (plus shape, e.g. RECTANGLE or ARROW), text, path, image, note or plugin (plus pluginKind); " +
+            "label and pluginKind are cut at 60 UTF-16 units. A note with no stored frame is reported where the board " +
+            "places it. An ARROW's bindings are {from, to}: a note id, an element id, or null. limit defaults to 200, " +
+            "at most 500; a page also ends at 16 KiB and returns nextCursor (r<revision>:<index>). A cursor from " +
+            "another revision is refused as {\"error\":\"stale_cursor\",\"revision\":<current>}, as is any cursor " +
+            "that was not a nextCursor; call again with no cursor.",
         objectSchema(
             canvasIdParam,
-            ToolParam("cursor", description = "The nextCursor from the previous page. Omit it to start from the first row."),
-            ToolParam("limit", type = "integer", description = "How many rows to return, from 1 to 500. Defaults to 200."),
+            ToolParam("cursor", description = "The previous page's nextCursor; omit for the first page."),
+            ToolParam("limit", type = "integer", description = "Rows to return, 1 to 500 (default 200)."),
         ),
     )
 
     val replaceScene = CanvasToolDefinition(
         REPLACE_SCENE,
-        "Replace the whole drawing of a canvas (block-document notes are kept). With no canvas_id, draws on the " +
-            "canvas of the conversation you are in. A scene the apps cannot draw is refused with the reason and " +
-            "nothing is published; so is one that leaves the board inconsistent (a note label whose shape the new " +
-            "scene drops, an arrow bound to a shape it drops). " + DRY_RUN_HINT + CanvasSceneSchema.description,
+        "Replace the whole drawing of a canvas (block-document notes are kept; no canvas_id: this conversation's " +
+            "canvas). A scene the apps cannot draw, or one that leaves the board inconsistent (a note label whose " +
+            "shape it drops, an arrow bound to a shape it drops), is refused with the reason and nothing is " +
+            "published. " + DRY_RUN_HINT + CanvasSceneSchema.description,
         objectSchema(
             canvasIdParam,
             ToolParam(
                 "scene_json",
                 required = true,
-                description = "The scene as a JSON string: {\"bgColor\":\"#rrggbbaa\",\"elements\":[...]}, " +
-                    "elements of type Shape, Text, Path or Image as this tool's description sets out.",
+                description = "The scene as a JSON string, in the format this tool's description sets out.",
             ),
             dryRunParam,
         ),
@@ -126,10 +122,9 @@ object CanvasToolContract {
 
     val applyOps = CanvasToolDefinition(
         APPLY_OPS,
-        "Apply a sequence of Canvas operations to a canvas (with no canvas_id, the canvas of the conversation you " +
-            "are in). Each op is an object with a \"type\": " +
+        "Apply a sequence of canvas operations (no canvas_id: this conversation's canvas). Each op is an object with a \"type\": " +
             "add_element {elementId, elementJson} adds one element and update_element {elementId, elementJson} " +
-            "replaces it whole (elementJson is one element as a JSON string, in the scene format below); " +
+            "replaces it whole (elementJson is one element as a JSON string, in the scene format of $REPLACE_SCENE's description); " +
             "remove_element {elementId}; set_background {colorHex \"#rrggbbaa\"}; " +
             "set_document {documentId, documentJson, frame?, color?, style?, owner?} places a block-document note on the board " +
             "(frame = {x, y, width, height} in world units, color = #rrggbb or #00000000 for plain text, " +
@@ -143,22 +138,19 @@ object CanvasToolContract {
             "(side is left, top, right or bottom; a null end stays free). " +
             CanvasSceneSchemaText.PLUGIN_OPS +
             " opId, actorId and lamport are filled in by the host. " +
-            "To create notes, checklists, cards or text, use $COMPOSE instead: it places and sizes them for you. " +
-            "The batch is all or nothing: it is applied to a copy of the board first, and if any op's element cannot be " +
-            "drawn or the board it leaves is inconsistent (update_element/remove_element/remove_document of an id " +
-            "that is not there, add_element of an id that is, a note label whose shape is gone, an arrow bound to a " +
-            "missing shape or note, a documentJson without a \"blocks\" array, a scene over the size limits) the " +
-            "whole batch is refused, naming each op by index and the rule it breaks, and nothing is published. " +
-            DRY_RUN_HINT +
-            CanvasSceneSchema.description,
+            "For notes, checklists, cards or text use $COMPOSE: it places and sizes them. " +
+            "All or nothing: the batch is applied to a copy of the board first, and if an element cannot be drawn or " +
+            "the result is inconsistent (update/remove of a missing id, add of an existing id, a note label whose " +
+            "shape is gone, an arrow bound to a missing shape or note, a documentJson without a \"blocks\" array, a " +
+            "scene over the size limits) the whole batch is refused, naming each op by index and the rule it breaks. " +
+            DRY_RUN_HINT.trimEnd(),
         objectSchema(
             canvasIdParam,
             ToolParam(
                 "ops",
                 type = "array",
                 required = true,
-                description = "The ops, in order, e.g. [{\"type\":\"add_element\",\"elementId\":\"box-1\"," +
-                    "\"elementJson\":\"{\\\"type\\\":\\\"Shape\\\",...}\"}].",
+                description = "The ops, in order, e.g. [{\"type\":\"add_element\",\"elementId\":\"box-1\",\"elementJson\":\"{...}\"}].",
                 items = buildJsonObject { put("type", "object") },
             ),
             dryRunParam,
@@ -195,9 +187,8 @@ object CanvasToolContract {
 
     val list = CanvasToolDefinition(
         LIST,
-        "List the canvases for a conversation, or every canvas you may read. Each entry says whether it is " +
-            "current (the canvas of the conversation you are in, listed first). You rarely need this: the other " +
-            "tools use the current canvas when given no canvas_id.",
+        "List the canvases for a conversation, or every canvas you may read; the current one (this conversation's) " +
+            "is flagged and first. You rarely need this: the other tools default to the current canvas.",
         objectSchema(ToolParam("conversation_id")),
     )
 
@@ -208,7 +199,7 @@ object CanvasToolContract {
      */
     val compose = CanvasToolDefinition(
         COMPOSE,
-        "Put notes, checklists, cards, text and labelled groups on the conversation canvas in one call (or pass canvas_id). " +
+        "Put notes, checklists, cards, text and labelled groups on the conversation canvas (or pass canvas_id) in one call. " +
             "Read $COMPOSE_GUIDE once: format, caps, markdown, errors. kind is NOTE {markdown}, CHECKLIST " +
             "{items: [{text, checked?}]}, CARD {title, fields?: [{label, value}], markdown?}, TEXT " +
             "{text, size: heading|body}, GROUP {label?, children}. No coordinates: the board places and sizes everything. " +
