@@ -35,6 +35,8 @@ object AdminRpcRegistry {
         // but was missing here, so the canonical/registered assertion passed only
         // by accident (it compares against the full router set).
         "conversation.get",
+        // letta-mobile-57cta: manual compaction relay (ConversationCompactHandlers).
+        "conversation.compact",
         "message.list",
         "message.get",
         "tool_return.get",
@@ -163,6 +165,8 @@ object AdminRpcRegistry {
         ReflectionAdminHandlers.register(router, nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.
         WorkspaceAdminHandlers.register(router, nativeClient)
+        // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
+        ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

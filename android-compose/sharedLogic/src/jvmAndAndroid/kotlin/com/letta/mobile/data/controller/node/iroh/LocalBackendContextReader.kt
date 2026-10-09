@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.context.estimate.ContextBreakdownEstimator
 import com.letta.mobile.data.context.estimate.LocalContextInputs
+import com.letta.mobile.data.context.estimate.LocalMessageTokens
 import com.letta.mobile.data.context.estimate.LocalTranscriptContext
 import com.letta.mobile.data.context.estimate.toAgentContextJson
 import kotlinx.serialization.json.JsonObject
@@ -54,6 +55,18 @@ internal class LocalBackendContextReader(
             )
             ContextBreakdownEstimator.estimate(inputs).toAgentContextJson()
         }.getOrNull()
+
+    /**
+     * letta-mobile-57cta: the in-context transcript (compaction summary plus messages) in estimated
+     * tokens, unscaled — what letta-code's `compaction_stats.context_tokens_*` measure. Null when
+     * the store cannot be read.
+     */
+    fun transcriptTokens(query: AgentContextQuery): Long? = runCatching {
+        val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
+        val transcript = readTranscript(File(dir, "messages.jsonl")) ?: return@runCatching null
+        val summary = transcript.summary?.let { LocalMessageTokens.of(it) } ?: 0
+        summary.toLong() + LocalMessageTokens.ofAll(transcript.messages)
+    }.getOrNull()
 
     /** An absent transcript is an empty conversation; one past the byte cap is not estimated at all. */
     private fun readTranscript(file: File): LocalTranscriptContext? {
