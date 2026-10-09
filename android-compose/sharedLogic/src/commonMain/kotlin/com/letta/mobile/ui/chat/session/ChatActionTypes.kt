@@ -41,4 +41,11 @@ data class ChatApprovalAnswer(
     val reason: String?,
     /** letta-mobile-bzvro.11: the `permission_suggestions` ids chosen with an approval ("always allow"). */
     val selectedSuggestionIds: List<String> = emptyList(),
+    /**
+     * The parked control request the [selectedSuggestionIds] were offered by (its tool call id and
+     * real approval id). An "always allow" is bound to exactly the details object the card drew,
+     * so it can never persist a rule for a different request.
+     */
+    val suggestionToolCallId: String? = null,
+    val suggestionApprovalId: String? = null,
 )

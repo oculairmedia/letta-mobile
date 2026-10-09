@@ -64,6 +64,7 @@ import com.letta.mobile.sharedui.resources.rows_send_answer
 import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
 import com.letta.mobile.ui.chat.session.ChatActions
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -92,7 +93,7 @@ internal class ApprovalDecider(
     val isSubmitting: Boolean,
     val submit: ((toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit)?,
     /** Approves and persists the server-offered rule [suggestionId] (letta-mobile-bzvro.11). */
-    val submitAlwaysAllow: ((toolCallIds: List<String>, suggestionId: String) -> Unit)? = null,
+    val submitAlwaysAllow: ((details: PendingApprovalDetails, suggestionId: String) -> Unit)? = null,
 ) {
     val enabled: Boolean get() = !isSubmitting && submit != null
 }
@@ -119,9 +120,17 @@ internal fun rememberApprovalDecider(
                 null
             },
             submitAlwaysAllow = if (approvalsEnabled) {
-                { ids, suggestionId ->
+                { details, suggestionId ->
                     actions.submitApproval(
-                        ChatApprovalAnswer(approval.requestId, ids, approve = true, reason = null, selectedSuggestionIds = listOf(suggestionId)),
+                        ChatApprovalAnswer(
+                            requestId = approval.requestId,
+                            toolCallIds = listOf(details.toolCallId),
+                            approve = true,
+                            reason = null,
+                            selectedSuggestionIds = listOf(suggestionId),
+                            suggestionToolCallId = details.toolCallId,
+                            suggestionApprovalId = details.approvalId,
+                        ),
                     )
                 }
             } else {
@@ -300,7 +309,7 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
             onDismiss = { rejecting = false },
         )
     }
-    approval.details?.let { AlwaysAllowButtons(it.suggestions, decider, toolCallIds) }
+    approval.details?.let { AlwaysAllowButtons(it, decider) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(
             onClick = {

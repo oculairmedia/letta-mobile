@@ -36,6 +36,9 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
 fun UiApprovalRequest.requiresUserInput(): Boolean =
     details != null || toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
 
+private fun PendingApprovalDetails.sameRequestAs(other: PendingApprovalDetails?): Boolean =
+    other != null && approvalId == other.approvalId && toolCallId == other.toolCallId
+
 /**
  * [messages] with each approval request joined to the parked control request that [details]
  * (by tool call id) holds for it. Returns the same list when nothing joins, so an idle
@@ -50,7 +53,9 @@ fun withPendingApprovalDetails(
     val joined = messages.map { message ->
         val request = message.approvalRequest ?: return@map message
         val match = request.toolCalls.firstNotNullOfOrNull { details[it.toolCallId] }
-        if (match == null || match == request.details) {
+        // Parked details are immutable per control request, so the approval id is their identity:
+        // comparing it (not the whole data class) keeps this per-frame join from walking diff text.
+        if (match == null || match === request.details || match.sameRequestAs(request.details)) {
             message
         } else {
             changed = true
