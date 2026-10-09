@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.chat.AgentIdentity
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
@@ -76,21 +77,46 @@ internal fun DesktopPhoneChatFrame(
     val frame = ChatPageFrame(topChromeInset = phoneTopChromeInset(fullScreen, headerHeight), showKeyboardHints = false)
     Box(modifier.fillMaxSize()) {
         page(Modifier, frame)
-        if (fullScreen) PhoneChatPageHeader(phone, inputs) { headerHeight = it }
+        PhoneChatPageHeader(phone, inputs, fullScreen) { headerHeight = it }
     }
 }
 
 /** Its own composable, so the agent's name is the only thing it collects and the page does not recompose with it. */
 @Composable
-private fun PhoneChatPageHeader(phone: DesktopPhoneChrome, inputs: PhoneChatPageInputs, onHeightChange: (Dp) -> Unit) {
+private fun PhoneChatPageHeader(
+    phone: DesktopPhoneChrome,
+    inputs: PhoneChatPageInputs,
+    fullScreen: Boolean,
+    onHeightChange: (Dp) -> Unit,
+) {
     val state by inputs.uiState.collectAsState()
-    PhoneChatHeader(
-        title = state.agentName?.takeIf(String::isNotBlank) ?: "Chat",
-        onMenu = { phone.drawerOpen = true },
-        onCanvas = inputs.onBackToCanvas,
-        onHeightChange = onHeightChange,
-    )
+    val identity = phoneAgentIdentity(state.agentId, state.agentName) { phone.drawerOpen = true }
+    if (fullScreen) {
+        PhoneChatHeader(
+            identity = identity,
+            onMenu = { phone.drawerOpen = true },
+            onCanvas = inputs.onBackToCanvas,
+            onHeightChange = onHeightChange,
+        )
+    } else {
+        PhoneCanvasIdentityPill(identity)
+    }
 }
+
+/**
+ * letta-mobile-vgouv: the shared pill's identity on the phone preview. The agents panel (the
+ * drawer, which holds the rail) is its switcher; the desktop keeps no agent favourite or pin, so
+ * neither mark shows and a long press does nothing.
+ */
+internal fun phoneAgentIdentity(agentId: String?, agentName: String?, onSwitch: () -> Unit): AgentIdentity =
+    AgentIdentity(
+        agentId = agentId.orEmpty(),
+        name = agentName?.takeIf(String::isNotBlank) ?: "Chat",
+        isFavorite = false,
+        isPinned = false,
+        onClick = onSwitch,
+        onLongClick = {},
+    )
 
 /** The status bar, plus the floating header while the full-screen page shows it. */
 @Composable
