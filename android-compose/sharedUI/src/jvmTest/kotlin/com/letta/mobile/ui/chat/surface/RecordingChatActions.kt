@@ -55,8 +55,7 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
         val approve: Boolean,
         val reason: String?,
         val selectedSuggestionIds: List<String> = emptyList(),
-        val suggestionToolCallId: String? = null,
-        val suggestionApprovalId: String? = null,
+        val suggestionBinding: com.letta.mobile.data.runtime.ApprovalBinding? = null,
     )
 
     fun count(name: String): Int = calls.count { it == name }
@@ -125,7 +124,7 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         record("submitApproval")
-        approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds, answer.suggestionToolCallId, answer.suggestionApprovalId)
+        approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds, answer.suggestionBinding)
     }
 
     override fun submitA2uiAction(action: A2uiAction) = record("submitA2uiAction")

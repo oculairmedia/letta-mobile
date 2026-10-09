@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.coroutines.CancellationException
+import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -21,8 +22,7 @@ internal data class ApprovalSubmissionRequest(
     val approve: Boolean,
     val reason: String?,
     val selectedSuggestionIds: List<String> = emptyList(),
-    val suggestionToolCallId: String? = null,
-    val suggestionApprovalId: String? = null,
+    val suggestionBinding: ApprovalBinding? = null,
 )
 
 /**
@@ -94,7 +94,7 @@ internal class DesktopChatApprovalCoordinator(
         request: ApprovalSubmissionRequest,
     ) {
         // An always-allow targets exactly the call whose card offered the rule, not the first of the row.
-        val toolCallId = request.suggestionToolCallId ?: request.toolCallIds.firstOrNull()
+        val toolCallId = request.suggestionBinding?.toolCallId ?: request.toolCallIds.firstOrNull()
         when (gw) {
             is ApprovalSubmittingGateway -> gw.submitApproval(
                 agentId = agentId,
@@ -113,8 +113,7 @@ internal class DesktopChatApprovalCoordinator(
                     approve = request.approve,
                     reason = request.reason,
                     selectedSuggestionIds = request.selectedSuggestionIds,
-                    suggestionToolCallId = request.suggestionToolCallId,
-                    suggestionApprovalId = request.suggestionApprovalId,
+                    suggestionBinding = request.suggestionBinding,
                 ),
             )
         }

@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.runtime.ApprovalBinding
 import kotlin.jvm.JvmInline
 
 /*
@@ -42,10 +43,8 @@ data class ChatApprovalAnswer(
     /** letta-mobile-bzvro.11: the `permission_suggestions` ids chosen with an approval ("always allow"). */
     val selectedSuggestionIds: List<String> = emptyList(),
     /**
-     * The parked control request the [selectedSuggestionIds] were offered by (its tool call id and
-     * real approval id). An "always allow" is bound to exactly the details object the card drew,
-     * so it can never persist a rule for a different request.
+     * The parked control request the [selectedSuggestionIds] were offered by. An "always allow" is
+     * bound to exactly the details the card drew, so it can never persist a rule for a different request.
      */
-    val suggestionToolCallId: String? = null,
-    val suggestionApprovalId: String? = null,
+    val suggestionBinding: ApprovalBinding? = null,
 )

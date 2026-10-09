@@ -41,6 +41,12 @@ data class PendingApprovalDetails(
     }
 }
 
+/** One parked control request, as a card named it: its tool call and the control request's real id. */
+data class ApprovalBinding(val toolCallId: String, val approvalId: String)
+
+/** The request [this] describes. */
+val PendingApprovalDetails.binding: ApprovalBinding get() = ApprovalBinding(toolCallId, approvalId)
+
 /** Observable registry of [PendingApprovalDetails]; entries are scoped to a runtime so a turn end clears only its own. */
 internal class PendingApprovalDetailsStore {
     private data class Entry(val key: TurnRuntimeKey, val details: PendingApprovalDetails)
@@ -60,9 +66,9 @@ internal class PendingApprovalDetailsStore {
         publish { it - toolCallId }
     }
 
-    /** Drops [toolCallId]'s details only while they are still those of control request [approvalId]. */
-    fun resolveIfApproval(toolCallId: String, approvalId: String) {
-        publish { current -> if (current[toolCallId]?.details?.approvalId == approvalId) current - toolCallId else current }
+    /** Drops the details of [request]'s tool call only while they are still those of that control request. */
+    fun resolveIfApproval(request: ApprovalBinding) {
+        publish { current -> if (current[request.toolCallId]?.details?.binding == request) current - request.toolCallId else current }
     }
 
     /**
@@ -85,20 +91,18 @@ internal class PendingApprovalDetailsStore {
 /**
  * letta-mobile-bzvro.11: the approval id an "always allow" for [suggestionIds] may be answered
  * with, or null when it must be refused. The suggestion ids were offered by one specific parked
- * request (the one the card drew: [boundToolCallId] / [boundApprovalId]); they are honoured only
+ * request (the one the card drew: [bound]); they are honoured only
  * while this, the CURRENT parked details for that call, is still that request and still offers
  * every id. Otherwise (a redrawn card, a re-surfaced request, a resolved call) a rule would be
  * persisted against a request the person never saw.
  */
-fun PendingApprovalDetails?.approvalIdForSuggestions(
-    boundToolCallId: String?,
-    boundApprovalId: String?,
-    suggestionIds: List<String>,
-): String? {
-    if (this == null || boundToolCallId == null || boundApprovalId == null) return null
-    val sameRequest = toolCallId == boundToolCallId && approvalId == boundApprovalId
-    return boundApprovalId.takeIf { sameRequest && suggestionIds.all { id -> suggestions.any { it.id == id } } }
+fun PendingApprovalDetails?.approvalIdForSuggestions(bound: ApprovalBinding?, suggestionIds: List<String>): String? {
+    val parked = this ?: return null
+    if (bound == null || parked.binding != bound) return null
+    return bound.approvalId.takeIf { parked.offersAll(suggestionIds) }
 }
+
+private fun PendingApprovalDetails.offersAll(ids: List<String>) = ids.all { id -> suggestions.any { it.id == id } }
 
 /** letta-mobile-bzvro.11/.12: what each parked control request of [this] engine offered, by tool call id. */
 val AppServerTurnEngine.pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>>
