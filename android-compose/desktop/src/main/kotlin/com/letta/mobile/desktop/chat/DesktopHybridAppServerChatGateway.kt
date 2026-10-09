@@ -27,9 +27,8 @@ import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
-import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
-import com.letta.mobile.data.runtime.RuntimePermissionDefaults
+import com.letta.mobile.data.runtime.ModeChangeResult
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -106,8 +105,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val adminGateway: DesktopAdminChatGateway,
     private val transportResources: DesktopTransportResources? = null,
     private val onClose: (() -> Unit)? = null,
-    override val permissionModes: PermissionModeRegistry = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)),
-    override val permissionModeUnavailableReason: String? = null,
+    override val permissionModes: PermissionModeRegistry? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         adminGateway.getConversation(conversationId).agentId.value
@@ -151,9 +149,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
     override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
-        permissionModes.change(runtime, mode) { requested ->
-            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(runtime, requested) ?: false
-        }
+        permissionModes?.change(runtime, mode) { requested ->
+            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(runtime, requested) ?: ModeChangeResult.Unconfirmed
+        } ?: false
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         abortConversationTurn(ConversationId(conversationId))
@@ -518,11 +516,9 @@ internal class DesktopRuntimeOwnedChatGateway(
             ?: error("The local App Server gateway cannot submit approvals")
     }
 
-    override val permissionModes get() = (delegate as? DesktopPermissionModeController)?.permissionModes
-        ?: PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))
-
-    override val permissionModeUnavailableReason: String?
-        get() = (delegate as? DesktopPermissionModeController)?.permissionModeUnavailableReason
+    // null (no chip) unless the delegate itself has mode support: never a registry nothing reads.
+    override val permissionModes: PermissionModeRegistry?
+        get() = (delegate as? DesktopPermissionModeController)?.permissionModes
 
     override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
         (delegate as? DesktopPermissionModeController)?.setPermissionMode(runtime, mode) ?: false

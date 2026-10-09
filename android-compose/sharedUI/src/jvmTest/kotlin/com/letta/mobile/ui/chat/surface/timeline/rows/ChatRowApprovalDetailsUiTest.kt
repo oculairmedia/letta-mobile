@@ -56,6 +56,27 @@ class ChatRowApprovalDetailsUiTest {
     }
 
     @Test
+    fun aBundledQuestionDoesNotHideTheParkedToolGate() = runComposeUiTest {
+        val bundled = editApproval(parked = true).let { message ->
+            val request = message.approvalRequest!!
+            message.copy(
+                approvalRequest = request.copy(
+                    toolCalls = request.toolCalls + UiApprovalToolCall(
+                        toolCallId = "call-ask",
+                        name = "AskUserQuestion",
+                        arguments = """{"questions":[{"question":"Which?","header":"Pick","options":[{"label":"A","description":"a"}]}]}""",
+                    ),
+                ),
+            )
+        }
+        setContent { MaterialTheme { RenderRow(single(bundled)) } }
+
+        // The Edit gate parked first: its card (rule, path, diff) is what the person sees and can answer.
+        onNodeWithText("Approval requested").assertExists()
+        onNodeWithText("Always allow Edit(/repo/**)").assertExists()
+    }
+
+    @Test
     fun plainApproveStillCarriesNoRuleIds() = runComposeUiTest {
         val actions = RecordingChatActions()
         setContent { MaterialTheme { RenderRow(single(editApproval(parked = true)), rowContext(), rowCallbacks(actions)) } }

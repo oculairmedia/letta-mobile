@@ -76,9 +76,19 @@ class ComposerPermissionModeUiTest {
 
     @Test
     fun anUnconfirmedChangeSaysSo() = runComposeUiTest {
-        showPanel(unrestricted.copy(failed = true))
+        showPanel(unrestricted.copy(selected = AppServerPermissionMode.Strict, unconfirmed = AppServerPermissionMode.Unrestricted))
 
+        // The chip names the requested mode as unconfirmed; it does not claim the old one.
+        onNodeWithText("Approve all (unconfirmed)").assertExists()
         onNodeWithText("The server did not confirm the change").assertExists()
+        onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
+    }
+
+    @Test
+    fun aChoiceForAnUnstartedConversationSaysWhenItApplies() = runComposeUiTest {
+        showPanel(unrestricted.copy(selected = AppServerPermissionMode.Strict, appliesOnStart = true))
+
+        onNodeWithText("Applies when the conversation starts").assertExists()
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertIsEnabled()
     }
 

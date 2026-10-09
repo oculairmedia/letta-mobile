@@ -65,6 +65,7 @@ import com.letta.mobile.sharedui.resources.rows_sending
 import com.letta.mobile.sharedui.resources.rows_tool_decisions
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.data.runtime.PendingApprovalDetails
+import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
@@ -174,8 +175,11 @@ internal fun ApprovalRequestCard(
  */
 @Composable
 internal fun ApprovalRequestCard(approval: UiApprovalRequest, decider: ApprovalDecider) {
-    // A structured AskUserQuestion takes precedence over the generic disclosure.
-    if (AskUserQuestionCard(approval, decider)) return
+    // A structured AskUserQuestion takes precedence over the generic disclosure, unless the request
+    // parked now is another tool's (a bundled [Bash, AskUserQuestion]): that gate is answered first,
+    // and the question's card takes over once it resolves.
+    val parkedOtherTool = approval.details?.let { !RuntimeUserInputTools.requiresUserInput(it.toolName) } == true
+    if (!parkedOtherTool && AskUserQuestionCard(approval, decider)) return
     val actionable = decider.submit != null
     ApprovalChrome(icon = LettaIcons.CheckCircle, title = stringResource(Res.string.rows_approval_requested)) {
         ApprovalCardContent(approval, decider, actionable)

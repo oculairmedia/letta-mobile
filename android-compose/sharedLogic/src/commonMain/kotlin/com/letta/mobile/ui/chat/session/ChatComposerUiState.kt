@@ -111,15 +111,17 @@ data class ChatWorkingDirectoryUiState(
 
 /**
  * letta-mobile-bzvro.13: the permission-mode chip. [selected] is the mode the server confirmed;
- * [pending] a request still waiting for the server's `update_device_status` echo. The chip is
- * shown disabled, with [unavailableReason], where this owner cannot change the mode.
+ * [pending] a request still waiting for the server's `update_device_status` echo; [unconfirmed] a
+ * request whose outcome is unknown (the server may run [selected] or it), shown as such rather than
+ * as the old mode; [appliesOnStart] a choice for a conversation whose runtime has not started.
+ * The chip is shown disabled, with [unavailableReason], where this owner cannot change the mode.
  */
 @Immutable
 data class ChatPermissionModeUiState(
     val selected: AppServerPermissionMode,
     val pending: AppServerPermissionMode? = null,
-    /** The last requested change was not confirmed. */
-    val failed: Boolean = false,
+    val unconfirmed: AppServerPermissionMode? = null,
+    val appliesOnStart: Boolean = false,
     val unavailableReason: String? = null,
     val options: ImmutableList<AppServerPermissionMode> = AppServerPermissionMode.entries.toImmutableList(),
 ) {
@@ -128,4 +130,10 @@ data class ChatPermissionModeUiState(
 
 /** The chip's state for a runtime's [PermissionModeState]; [unavailableReason] locks it. */
 fun PermissionModeState.toUiState(unavailableReason: String? = null): ChatPermissionModeUiState =
-    ChatPermissionModeUiState(selected = mode, pending = pending, failed = failed, unavailableReason = unavailableReason)
+    ChatPermissionModeUiState(
+        selected = mode,
+        pending = pending,
+        unconfirmed = unconfirmed,
+        appliesOnStart = appliesOnStart,
+        unavailableReason = unavailableReason,
+    )

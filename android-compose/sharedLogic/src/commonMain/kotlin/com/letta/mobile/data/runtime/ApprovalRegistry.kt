@@ -57,6 +57,9 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
 
     fun park(key: TurnRuntimeKey, request: ToolApprovalRequest) = parked.record(key, PendingApprovalDetails.of(request))
 
+    /** Parks a request that arrived only as a streamed `approval_request_message` (no suggestions or diffs). */
+    fun park(key: TurnRuntimeKey, details: PendingApprovalDetails) = parked.record(key, details)
+
     /**
      * One parked interactive tool call. [approvalId] is the REAL can_use_tool
      * control-request id; pairing the two in a type keeps callers from

@@ -74,6 +74,18 @@ class TurnBoundaryGateTest {
     }
 
     @Test
+    fun anAbortedTurnEndsEvenWhileAnApprovalIsStillParked() {
+        // Nobody can answer a parked approval once the turn is aborted, and a server that sends no
+        // turn_finished must still be able to end it.
+        gate.decideFrame(run1.assistantDelta())
+        gate.noteAbortRequested()
+        val idle = assertIs<TurnBoundaryDecision.LoopIdle>(
+            gate.decideFrame(TestLoopState.WaitingOnInput.frame(), leaseRun = run1, approvalOutstanding = true),
+        )
+        assertEquals(RuntimeRunStatus.Cancelled, idle.status)
+    }
+
+    @Test
     fun idleBetweenApprovalContinuationRoundsDoesNotComplete() {
         // letta-mobile-qygvv.29: round 1 paused on requires_approval, its tool ran, the loop idled.
         gate.decideFrame(run1.assistantDelta())

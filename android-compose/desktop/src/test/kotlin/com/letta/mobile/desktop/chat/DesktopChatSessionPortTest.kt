@@ -9,6 +9,7 @@ import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.ModeChangeResult
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -350,7 +351,6 @@ class DesktopChatSessionPortTest {
 
         val chip = port.composer.value.permissionMode
         assertEquals(AppServerPermissionMode.Unrestricted, chip?.selected, "the default is Unrestricted")
-        assertNull(chip?.unavailableReason)
 
         port.actions.setPermissionMode(AppServerPermissionMode.Standard)
         runCurrent()
@@ -361,11 +361,11 @@ class DesktopChatSessionPortTest {
     }
 
     @Test
-    fun aLockedGatewayShowsTheReasonAndIgnoresRequests() = runTest {
-        val gateway = ModeGateway(permissionModeUnavailableReason = "Not supported over Iroh yet")
+    fun aGatewayThatReportsNoRegistryShowsNoChipAndIgnoresRequests() = runTest {
+        val gateway = ModeGateway(registry = null)
         val (controller, port) = startedPort(gateway)
 
-        assertEquals("Not supported over Iroh yet", port.composer.value.permissionMode?.unavailableReason)
+        assertNull(port.composer.value.permissionMode)
         port.actions.setPermissionMode(AppServerPermissionMode.Strict)
         runCurrent()
         assertEquals(emptyList(), gateway.requested)
@@ -374,14 +374,14 @@ class DesktopChatSessionPortTest {
     }
 
     private class ModeGateway(
-        override val permissionModeUnavailableReason: String? = null,
+        registry: PermissionModeRegistry? = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)),
     ) : FakeDesktopChatGateway(), DesktopPermissionModeController {
-        override val permissionModes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))
+        override val permissionModes = registry
         val requested = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
 
         override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
             requested += runtime to mode
-            return permissionModes.change(runtime, mode) { true }
+            return permissionModes?.change(runtime, mode) { ModeChangeResult.Confirmed } ?: false
         }
     }
 

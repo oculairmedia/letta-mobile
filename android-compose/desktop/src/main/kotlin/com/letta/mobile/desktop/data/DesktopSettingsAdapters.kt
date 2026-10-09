@@ -333,14 +333,18 @@ fun createDefaultDesktopDataBindings(
         irohAgentDirectoryProvider = irohAgentDirectoryProvider,
         contextReadingSnapshots = com.letta.mobile.data.context.ContextReadingSnapshots(secureSettingsStore),
     )
+    // One per app: every gateway built later (a reconnect, a rebuild) shares its registry.
+    val permissionModeSettings = com.letta.mobile.data.runtime.PermissionModeSettings(secureSettingsStore)
     return DesktopDataBindings(
         secureSettingsStore = secureSettingsStore,
+        permissionModeSettings = permissionModeSettings,
         healthRepository = DesktopServerHealthRepository(),
         sessionGraphFactory = graphFactory,
         sessionGraphProvider = DesktopSessionGraphProvider(graphFactory),
         chatSessionGraphFactory = defaultDesktopChatSessionGraphFactory(
             configProvider = configProvider,
             repositoryGraphFactory = graphFactory,
+            permissionModeSettings = permissionModeSettings,
         ),
         modelControlRpc = com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker.overTransport(channelTransportProvider),
     )

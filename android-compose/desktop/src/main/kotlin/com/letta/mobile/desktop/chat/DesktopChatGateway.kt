@@ -84,14 +84,12 @@ interface DesktopPendingApprovalSource {
 
 /**
  * letta-mobile-bzvro.13: a gateway that runs the App Server turn engine itself can read and change a
- * conversation's permission mode. A gateway that cannot (HTTP-only, relayed over an admin RPC) does not
- * implement this, and the composer shows no mode chip for it.
+ * conversation's permission mode. A gateway that cannot (HTTP-only, relayed over an admin RPC, an Iroh
+ * node that sets its own) reports no [permissionModes], and the composer shows no mode chip for it.
  */
 interface DesktopPermissionModeController {
-    val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry
-
-    /** Why this connection cannot change the mode (the chip then shows it, locked), or null when it can. */
-    val permissionModeUnavailableReason: String?
+    /** The registry this gateway's turns are governed by, or null when it has no mode support. */
+    val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
 
     /** Asks for [mode] on the conversation's runtime; true once the server echoed it. */
     suspend fun setPermissionMode(

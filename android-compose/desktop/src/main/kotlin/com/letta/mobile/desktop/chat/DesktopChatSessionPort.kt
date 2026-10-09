@@ -213,12 +213,11 @@ internal class DesktopChatSessionPort(
             .distinctUntilChanged()
             .flatMapLatest { (target, gateway) ->
                 val agentId = target?.first
-                val modes = gateway as? DesktopPermissionModeController
+                val modes = (gateway as? DesktopPermissionModeController)?.permissionModes
                 if (agentId == null || modes == null) {
                     flowOf(null)
                 } else {
-                    modes.permissionModes.observe(AppServerRuntimeScope(agentId, target.second))
-                        .map { it.toUiState(modes.permissionModeUnavailableReason) }
+                    modes.observe(AppServerRuntimeScope(agentId, target.second)).map { it.toUiState() }
                 }
             }
 
@@ -227,7 +226,7 @@ internal class DesktopChatSessionPort(
         val conversation = controller.state.value.selectedConversation ?: return
         val agentId = conversation.agentId?.takeIf(String::isNotBlank) ?: return
         val modes = controller.activeGateway as? DesktopPermissionModeController ?: return
-        if (modes.permissionModeUnavailableReason != null) return
+        if (modes.permissionModes == null) return
         scope.launch { modes.setPermissionMode(AppServerRuntimeScope(agentId, conversation.id), mode) }
     }
 

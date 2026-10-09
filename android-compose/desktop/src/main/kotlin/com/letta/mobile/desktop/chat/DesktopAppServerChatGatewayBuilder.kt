@@ -12,7 +12,6 @@ import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
-import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -39,7 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 
 /**
@@ -69,11 +67,10 @@ class DesktopAppServerChatGatewayBuilder(
     private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
     /** HTTP `/app-server-info` probe run before every remote WebSocket dial (letta-mobile-bzvro.2). */
     private val preflightProbe: DesktopAppServerProbe = defaultDesktopAppServerProbe,
-    /** letta-mobile-bzvro.13: the persisted default permission mode; null runs every runtime Unrestricted. */
+    /** letta-mobile-bzvro.13: the app's one permission-mode settings; null runs every runtime Unrestricted, with no chip. */
     permissionModeSettings: PermissionModeSettings? = null,
 ) : DesktopAppServerChatGatewayFactory {
-    private val permissionModes = permissionModeRegistryFor(permissionModeSettings)
-
+    private val permissionModes = permissionModeSettings?.modes
 
     override suspend fun create(
         lettaConfig: LettaConfig,
@@ -130,7 +127,9 @@ class DesktopAppServerChatGatewayBuilder(
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,
                     turnContextPreflight = turnContextPreflightFor(isIroh, client),
-                    permissionModes = permissionModes,
+                    // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
+                    // Unrestricted, as it always did, and the persisted default does not reach it.
+                    permissionModes = permissionModes.takeUnless { isIroh },
                 ),
             )
             val adminGateway = adminGatewayFor(lettaConfig, client)
@@ -139,8 +138,7 @@ class DesktopAppServerChatGatewayBuilder(
                 client = client,
                 adminGateway = adminGateway,
                 transportResources = transportResources,
-                permissionModes = permissionModes,
-                permissionModeUnavailableReason = IROH_PERMISSION_MODE_UNAVAILABLE.takeIf { isIroh },
+                permissionModes = permissionModes.takeUnless { isIroh },
                 onClose = {
                     eventRouter.detach()
                     localClientLease?.close()
@@ -294,6 +292,7 @@ internal fun buildDesktopAppServerTurnEngine(
             config.permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
                 ?: AppServerPermissionMode.Unrestricted
         },
+        onPermissionModeInForce = { runtime, mode -> config.permissionModes?.observed(runtime, mode) },
         turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
         eventRouter = router,
         externalToolRegistry = externalToolRegistry,
@@ -328,10 +327,3 @@ internal suspend fun authenticateDesktopIrohAppServer(
         error("Desktop iroh App Server auth failed: ${auth.error ?: "unknown error"}")
     }
 }
-
-/** Shown on the composer's mode chip: `change_device_state` is not confirmed to be relayed by an Iroh node. */
-private const val IROH_PERMISSION_MODE_UNAVAILABLE = "The mode is set by the connected node; changing it over Iroh is not supported yet."
-
-/** The registry over the settings' default; with no settings every runtime follows the product default (Unrestricted). */
-private fun permissionModeRegistryFor(settings: PermissionModeSettings?): PermissionModeRegistry =
-    PermissionModeRegistry(settings?.defaultMode ?: MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE))
