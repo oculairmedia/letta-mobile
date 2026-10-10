@@ -404,14 +404,16 @@ class TouchCanvasDockUiTest {
         // The bubble's card carries the page's own bar, with the same draft.
         onNodeWithTag(TOUCH_HEAD_TAG).performClick()
         waitForIdle()
-        val cardBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        onNodeWithTag(ComposerTestTags.TOUCH_BAR).assertExists()
         onNodeWithText("Make the island longer").assertExists()
 
         presentation = ChatSurfacePresentation.ChatFirst
         waitForIdle()
         onAllNodesWithTag(ComposerTestTags.TOUCH_BAR).assertCountEquals(1)
+        // The same draft on the page's bar, flush with the screen's foot. (The card is narrower than
+        // the page, so the two bars need not wrap the draft alike.)
+        onNodeWithText("Make the island longer").assertExists()
         val pageBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
-        assertEquals((cardBar.bottom - cardBar.top).value, (pageBar.bottom - pageBar.top).value, DP_TOLERANCE)
         assertEquals(root.bottom, pageBar.bottom)
     }
 
