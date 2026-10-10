@@ -72,8 +72,8 @@ private class Scanner(private val s: String) {
             c == '\n' -> newline()
             c == ' ' || c == '\t' || c == '\r' -> advance { endWord() }
             c == '#' && word == null -> comment()
-            c in OPERATOR_CHARS -> operator(c)
-            c == '<' || c == '>' -> redirection(c)
+            c in OPERATOR_CHARS -> operator()
+            c in REDIRECT_CHARS -> redirection()
             else -> advance { wordBuilder().append(c) }
         }
     }
@@ -141,35 +141,22 @@ private class Scanner(private val s: String) {
         return true
     }
 
-    private fun operator(c: Char): Boolean {
+    private fun operator(): Boolean {
         endWord()
-        val doubled = peek(1) == c
-        val pipe = c == '|' && !doubled
-        val width = if (doubled || (c == '|' && peek(1) == '&')) 2 else 1
-        endCommand(piped = pipe)
-        i += width
+        val op = TWO_CHAR_OPERATORS.firstOrNull { s.startsWith(it, i) } ?: s[i].toString()
+        endCommand(piped = op in PIPES)
+        i += op.length
         return true
     }
 
-    private fun redirection(c: Char): Boolean {
+    private fun redirection(): Boolean {
         // `2>`, `1<`: a file-descriptor number is part of the redirection, not a word.
         if (word?.all { it.isDigit() } == true) word = null
         endWord()
-        val (kind, width) = if (c == '>') outRedirect() else inRedirect()
+        val (token, kind) = REDIRECTS.first { (token, _) -> s.startsWith(token, i) }
         redirect = kind
-        i += width
+        i += token.length
         return true
-    }
-
-    private fun outRedirect(): Pair<Redirect, Int> =
-        Redirect.FILE_OUT to if (peek(1) == '>' || peek(1) == '&' || peek(1) == '|') 2 else 1
-
-    private fun inRedirect(): Pair<Redirect, Int> = when {
-        peek(1) == '<' && peek(2) == '<' -> Redirect.HERE_STRING to 3
-        peek(1) == '<' && peek(2) == '-' -> Redirect.HEREDOC_STRIP_TABS to 3
-        peek(1) == '<' -> Redirect.HEREDOC to 2
-        peek(1) == '&' || peek(1) == '>' -> Redirect.FILE_IN to 2
-        else -> Redirect.FILE_IN to 1
     }
 
     private fun endWord() {
@@ -219,6 +206,23 @@ private class Scanner(private val s: String) {
 
     private companion object {
         val OPERATOR_CHARS = setOf(';', '&', '|', '(', ')')
+        val REDIRECT_CHARS = setOf('<', '>')
+        val TWO_CHAR_OPERATORS = listOf("&&", "||", "|&", ";;")
+        val PIPES = setOf("|", "|&")
+
+        /** Redirection tokens, longest first. */
+        val REDIRECTS = listOf(
+            "<<<" to Redirect.HERE_STRING,
+            "<<-" to Redirect.HEREDOC_STRIP_TABS,
+            "<<" to Redirect.HEREDOC,
+            "<&" to Redirect.FILE_IN,
+            "<>" to Redirect.FILE_IN,
+            "<" to Redirect.FILE_IN,
+            ">>" to Redirect.FILE_OUT,
+            ">&" to Redirect.FILE_OUT,
+            ">|" to Redirect.FILE_OUT,
+            ">" to Redirect.FILE_OUT,
+        )
         val DOUBLE_QUOTE_ESCAPABLE = setOf('"', '\\', '$', '`', '\n')
         val ANSI_ESCAPES = mapOf('n' to '\n', 't' to '\t', 'r' to '\r', '\'' to '\'', '\\' to '\\', '"' to '"')
     }

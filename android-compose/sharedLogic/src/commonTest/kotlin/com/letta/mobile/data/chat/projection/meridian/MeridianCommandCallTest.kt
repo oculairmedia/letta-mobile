@@ -181,6 +181,9 @@ class MeridianCommandCallTest {
         assertEquals(receipt, MeridianCommandCall.stdoutJson(receipt))
         assertEquals("  $receipt\n", MeridianCommandCall.stdoutJson("  $receipt\n"))
         assertEquals(receipt, MeridianCommandCall.stdoutJson("Exit code: 0\n$receipt\nhint: done"))
+        assertEquals(receipt, MeridianCommandCall.stdoutJson("$receipt\nhint: retry with {\"dry_run\": true}"))
+        val nested = """{"ok":true,"note":"a } in a string","items":[{"k":1}]}"""
+        assertEquals(nested, MeridianCommandCall.stdoutJson("Exit code: 0\n$nested\n}"))
         assertEquals("plain text", MeridianCommandCall.stdoutJson("plain text"))
         assertNull(MeridianCommandCall.stdoutJson(null))
     }

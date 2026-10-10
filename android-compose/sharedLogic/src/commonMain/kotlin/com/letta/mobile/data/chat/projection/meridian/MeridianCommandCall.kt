@@ -1,8 +1,6 @@
 package com.letta.mobile.data.chat.projection.meridian
 
 import com.letta.mobile.data.model.ToolCall
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -46,11 +44,11 @@ data class MeridianCommandCall(
         fun parse(name: String?, arguments: String?): MeridianCommandCall? {
             if (name == null || arguments.isNullOrBlank()) return null
             return when {
-                name == META_TOOL -> parseJsonObject(arguments)?.let(::fromMetaTool)
+                name == META_TOOL -> arguments.toJsonObjectOrNull()?.let(::fromMetaTool)
                 // Cheap reject first: most shell calls never mention meridian.
-                name.lowercase() in SHELL_TOOLS && META_TOOL in arguments ->
-                    parseJsonObject(arguments)?.let(::shellScript)?.let(::fromScript)
-                else -> null
+                name.lowercase() !in SHELL_TOOLS -> null
+                META_TOOL !in arguments -> null
+                else -> arguments.toJsonObjectOrNull()?.let(::shellScript)?.let { MeridianInvocation.find(it) }?.toCall(inputOverride = null)
             }
         }
 
@@ -62,23 +60,23 @@ data class MeridianCommandCall(
          * but a shell tool may frame it (an exit-code line, stderr hints). Returns the JSON object
          * text when one is found, else [raw] unchanged.
          */
-        fun stdoutJson(raw: String?): String? {
-            if (raw == null) return null
-            val trimmed = raw.trim()
-            if (parseJsonObject(trimmed, strict = true) != null) return raw
-            val end = trimmed.lastIndexOf('}')
-            if (end < 0) return raw
-            return objectStarts(trimmed).take(MAX_STDOUT_PROBES)
-                .map { start -> trimmed.substring(start, end + 1) }
-                .firstOrNull { parseJsonObject(it, strict = true) != null } ?: raw
+        fun stdoutJson(raw: String?): String? = when {
+            raw == null -> null
+            raw.toStrictJsonObjectOrNull() != null -> raw
+            else -> raw.trim().firstJsonObject() ?: raw
         }
 
         /** Whether a CLI result says it failed: `{"error": …}` or `{"ok": false}`. */
         fun isErrorResult(json: String?): Boolean {
-            val body = json?.let { parseJsonObject(it, strict = true) } ?: return false
-            val ok = (body["ok"] as? JsonPrimitive)?.booleanOrNull
-            return ok == false || (ok == null && body["error"].let { it != null && it !is JsonNull })
+            val body = json?.toStrictJsonObjectOrNull() ?: return false
+            return when ((body["ok"] as? JsonPrimitive)?.booleanOrNull) {
+                false -> true
+                true -> false
+                null -> body["error"].isPresent()
+            }
         }
+
+        private fun JsonElement?.isPresent(): Boolean = this != null && this !is JsonNull
 
         /** The meta-tool's `{command, input}`: the command with or without `meridian`, a string or an argv. */
         private fun fromMetaTool(args: JsonObject): MeridianCommandCall? {
@@ -88,7 +86,7 @@ data class MeridianCommandCall(
         }
 
         private fun metaCommand(command: JsonElement?): String? = when (command) {
-            is JsonArray -> command.mapNotNull { (it as? JsonPrimitive)?.content }.joinToString(" ") { quote(it) }
+            is JsonArray -> command.argvWords().asShellScript()
             is JsonPrimitive -> command.content.takeIf { command.isString }
             else -> null
         }
@@ -100,30 +98,20 @@ data class MeridianCommandCall(
             else -> null
         }
 
-        private fun fromScript(script: String): MeridianCommandCall? =
-            MeridianInvocation.find(script)?.toCall(inputOverride = null)
-
         /** The script a shell tool runs: `command` / `cmd`, a string or an argv (`["bash","-lc",…]`). */
-        private fun shellScript(args: JsonObject): String? {
-            val command = args["command"] ?: args["cmd"] ?: return null
-            return when (command) {
-                is JsonPrimitive -> command.content.takeIf { command.isString }
-                is JsonArray -> argvScript(command.mapNotNull { (it as? JsonPrimitive)?.content })
-                else -> null
-            }
+        private fun shellScript(args: JsonObject): String? = when (val command = args["command"] ?: args["cmd"]) {
+            is JsonPrimitive -> command.content.takeIf { command.isString }
+            is JsonArray -> argvScript(command.argvWords())
+            else -> null
         }
 
+        /** An argv's script: the `<script>` of `["bash", "-lc", "<script>"]`, else the words joined. */
         private fun argvScript(argv: List<String>): String? {
             if (argv.isEmpty()) return null
-            val shellWrapped = argv.size >= SHELL_ARGV_SIZE && isShell(argv[0]) && argv[1].startsWith("-") && 'c' in argv[1]
-            return if (shellWrapped) argv[2] else argv.joinToString(" ") { quote(it) }
+            val shell = argv[0].isShellProgram()
+            val scriptFlag = argv.getOrNull(1)?.isShellScriptFlag() == true
+            return argv.getOrNull(2)?.takeIf { shell && scriptFlag } ?: argv.asShellScript()
         }
-
-        private fun objectStarts(text: String): Sequence<Int> =
-            text.indices.asSequence().filter { text[it] == '{' && (it == 0 || text[it - 1] == '\n') }
-
-        private const val MAX_STDOUT_PROBES = 4
-        private const val SHELL_ARGV_SIZE = 3
 
         /** Shell-tool names across runtimes (letta-code `Bash`, Codex-style `exec_command`, …). */
         private val SHELL_TOOLS = setOf(
@@ -132,24 +120,3 @@ data class MeridianCommandCall(
         )
     }
 }
-
-internal fun isShell(word: String): Boolean = word.substringAfterLast('/') in SHELLS
-
-private val SHELLS = setOf("bash", "sh", "zsh", "dash")
-
-/** [word] single-quoted when it needs it, so an argv re-reads as the same words. */
-private fun quote(word: String): String =
-    if (word.isNotEmpty() && word.all { it.isLetterOrDigit() || it in SAFE_CHARS }) word else "'" + word.replace("'", "'\\''") + "'"
-
-private const val SAFE_CHARS = "-_./=:,@%+"
-
-internal fun parseJsonObject(text: String, strict: Boolean = false): JsonObject? = try {
-    (if (strict) StrictJson else LenientJson).parseToJsonElement(text.trim()) as? JsonObject
-} catch (e: SerializationException) {
-    null
-} catch (e: IllegalArgumentException) {
-    null
-}
-
-private val LenientJson = Json { isLenient = true }
-private val StrictJson = Json
