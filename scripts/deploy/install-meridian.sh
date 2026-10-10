@@ -78,7 +78,14 @@ for script in "${SCRIPTS[@]}"; do
   [[ -f "$HERE/$script" ]] && sync_file "$HERE/$script" "$LIB_DIR/$script" 755
 done
 
-[[ -f "$HERE/meridian-shim.cjs" ]] && sync_file "$HERE/meridian-shim.cjs" "$SHIM_DST" 755
+# Never replace a different `meridian` (e.g. the developer JVM CLI that --meridian-binary may point
+# at for agent_message_send): only a missing file or an earlier copy of this shim is overwritten.
+if [[ -e "$SHIM_DST" ]] && ! grep -q 'meridian/tools/1' "$SHIM_DST" 2>/dev/null; then
+  drift=1
+  say "$SHIM_DST" "IS ANOTHER PROGRAM — move it (and repoint --meridian-binary) first"
+elif [[ -f "$HERE/meridian-shim.cjs" ]]; then
+  sync_file "$HERE/meridian-shim.cjs" "$SHIM_DST" 755
+fi
 for skill in "$HERE"/skills/*/SKILL.md; do
   [[ -f "$skill" ]] || continue
   name="$(basename "$(dirname "$skill")")"
