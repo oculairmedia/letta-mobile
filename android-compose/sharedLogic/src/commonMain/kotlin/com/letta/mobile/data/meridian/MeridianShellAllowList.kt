@@ -81,43 +81,61 @@ object MeridianShellAllowList {
     }
 
     /** The shell words of [text], or null when it holds anything but plain and safely quoted words. */
-    private fun words(text: String): List<String>? {
-        val words = mutableListOf<String>()
-        val current = StringBuilder()
-        var inWord = false
-        var i = 0
-        while (i < text.length) {
-            val c = text[i]
-            when {
-                c == ' ' || c == '\t' -> {
-                    if (inWord) words += current.toString().also { current.clear() }
-                    inWord = false
-                    i += 1
-                }
-                c == '\'' || c == '"' -> {
-                    val close = text.indexOf(c, i + 1).takeIf { it > i } ?: return null
-                    val quoted = text.substring(i + 1, close)
-                    if (c == '"' && quoted.any { it in DOUBLE_QUOTE_UNSAFE }) return null
-                    current.append(quoted)
-                    inWord = true
-                    i = close + 1
-                }
-                SAFE_CHAR.matches(c.toString()) -> {
-                    current.append(c)
-                    inWord = true
-                    i += 1
-                }
-                else -> return null
-            }
-        }
-        if (inWord) words += current.toString()
-        return words
-    }
+    private fun words(text: String): List<String>? = ShellWords(text).read()
 
     private fun parse(text: String): JsonElement? = try {
         json.parseToJsonElement(text)
     } catch (_: SerializationException) {
         null
+    }
+
+    /** A tokenizer that accepts only plain words, single quotes, and inert double quotes. */
+    private class ShellWords(private val text: String) {
+        private val words = mutableListOf<String>()
+        private val current = StringBuilder()
+        private var inWord = false
+        private var at = 0
+
+        fun read(): List<String>? {
+            while (at < text.length) {
+                if (!step(text[at])) return null
+            }
+            endWord()
+            return words
+        }
+
+        private fun step(c: Char): Boolean = when {
+            c == ' ' || c == '\t' -> {
+                endWord()
+                at += 1
+                true
+            }
+            c == '\'' || c == '"' -> quoted(c)
+            SAFE_CHAR.matches(c.toString()) -> {
+                current.append(c)
+                inWord = true
+                at += 1
+                true
+            }
+            else -> false
+        }
+
+        private fun quoted(quote: Char): Boolean {
+            val close = text.indexOf(quote, at + 1)
+            if (close < 0) return false
+            val body = text.substring(at + 1, close)
+            if (quote == '"' && body.any { it in DOUBLE_QUOTE_UNSAFE }) return false
+            current.append(body)
+            inWord = true
+            at = close + 1
+            return true
+        }
+
+        private fun endWord() {
+            if (inWord) words += current.toString()
+            current.clear()
+            inWord = false
+        }
     }
 
     private const val DOUBLE_QUOTE_UNSAFE = "$`\\\n"
