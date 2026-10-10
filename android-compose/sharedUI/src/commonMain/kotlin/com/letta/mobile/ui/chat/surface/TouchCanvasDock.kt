@@ -84,10 +84,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.X
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.chat_surface_bubble_stop
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply
 import com.letta.mobile.sharedui.resources.chat_surface_collapsed_reply_unnamed
 import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
@@ -583,20 +581,9 @@ private fun PopupReply(reply: PopupTurn, content: TouchHeadContent, placement: P
 /** The working line; in the canvas bubble, with Stop at its end (the bar's Stop is not on screen). */
 @Composable
 private fun PopupWorkingRow(working: String, stop: (() -> Unit)?) {
-    if (stop == null) {
-        WorkingLine(working)
-        return
-    }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Box(Modifier.weight(1f, fill = false)) { WorkingLine(working) }
-        IconButton(onClick = stop, modifier = Modifier.size(ChatHeadDimens.plus).testTag(BUBBLE_STOP_TAG)) {
-            Icon(
-                Lucide.Square,
-                contentDescription = stringResource(Res.string.chat_surface_bubble_stop),
-                modifier = Modifier.size(LettaDimens.Control.icon),
-                tint = MaterialTheme.colorScheme.error,
-            )
-        }
+        stop?.let { BubbleStopButton(it) }
     }
 }
 

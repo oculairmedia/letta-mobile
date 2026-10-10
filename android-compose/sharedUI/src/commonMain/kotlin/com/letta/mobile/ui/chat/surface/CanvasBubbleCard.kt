@@ -49,7 +49,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Square
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.chat_surface_bubble_stop
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_card
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_card_unnamed
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_collapse
@@ -280,6 +283,19 @@ private fun BubblePlus(state: CanvasBubbleState, anchor: BubbleAnchor, motion: C
                 }
             }
         }
+    }
+}
+
+/** Stops the turn from the collapsed bubble, beside its working line: a full touch target. */
+@Composable
+internal fun BubbleStopButton(onStop: () -> Unit) {
+    IconButton(onClick = onStop, modifier = Modifier.size(ChatHeadDimens.plus).testTag(BUBBLE_STOP_TAG)) {
+        Icon(
+            Lucide.Square,
+            contentDescription = stringResource(Res.string.chat_surface_bubble_stop),
+            modifier = Modifier.size(LettaDimens.Control.icon),
+            tint = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
