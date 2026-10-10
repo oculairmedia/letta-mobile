@@ -107,6 +107,13 @@ class ExternalToolRegistry(
     }
 
     /**
+     * The tools a call can reach through [invoke]: the fixed tools whose capability is enabled, then
+     * the live sources' tools. The Meridian command surface (letta-mobile-jna0o.3) lists and
+     * dispatches through this, so its commands reach exactly what a native tool call reaches.
+     */
+    fun invocableTools(): List<ExternalTool> = listAdvertisedTools()
+
+    /**
      * lgns8.17(a): the wire form of [listAdvertisedTools] for the `external_tools`
      * field of `runtime_start`.
      *
