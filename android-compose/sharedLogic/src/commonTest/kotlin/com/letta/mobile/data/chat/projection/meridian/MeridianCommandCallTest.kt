@@ -206,6 +206,8 @@ class MeridianCommandCallTest {
         assertEquals(MeridianCliFixtures.HOST_UNAVAILABLE_JSON, MeridianCommandCall.toolResult(MeridianCliFixtures.HOST_UNAVAILABLE))
         assertEquals(MeridianCliFixtures.USAGE_JSON, MeridianCommandCall.toolResult(MeridianCliFixtures.USAGE))
         assertEquals("""{"rows":[]}""", MeridianCommandCall.toolResult("""{"rows":[]}"""))
+        val usageWithDetail = """{"error":"usage","message":"m","detail":{"x":1}}"""
+        assertEquals(usageWithDetail, MeridianCommandCall.toolResult(usageWithDetail))
     }
 
     @Test

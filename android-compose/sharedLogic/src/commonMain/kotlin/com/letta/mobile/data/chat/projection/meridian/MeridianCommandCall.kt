@@ -88,9 +88,9 @@ data class MeridianCommandCall(
             val body = stdout.toStrictJsonObjectOrNull() ?: return stdout
             val code = (body["error"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return stdout
             return when {
+                code !in TOOL_REFUSALS -> stdout
                 body["detail"] is JsonObject -> body["detail"].toString()
-                code in TOOL_REFUSALS -> (body["message"] as? JsonPrimitive)?.content ?: stdout
-                else -> stdout
+                else -> (body["message"] as? JsonPrimitive)?.content ?: stdout
             }
         }
 
