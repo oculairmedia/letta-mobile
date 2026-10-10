@@ -106,7 +106,8 @@ class MeridianCommandRouter(
         }
         val result = registry.invoke(command.toolName, input, request.caller)
         if (registry.invocableTools().none { it.name == command.toolName }) {
-            return MeridianError(MeridianErrorCode.HOST_UNAVAILABLE, "${command.toolName} is no longer served here", command = command.display).toResponse()
+            val gone = "${command.toolName} is no longer served here"
+            return MeridianError(MeridianErrorCode.HOST_UNAVAILABLE, gone, command = command.display).toResponse()
         }
         return MeridianToolOutcome.response(command, result, limits)
     }
