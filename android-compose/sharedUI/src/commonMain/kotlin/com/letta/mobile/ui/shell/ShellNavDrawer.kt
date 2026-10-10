@@ -34,13 +34,15 @@ object ShellNavDrawerTags {
 
 /**
  * The phone's navigation drawer: the desktop's agent rail and agent panel side by side (rail, panel, separated by tone rather than a line), so the hamburger opens the same navigation the desktop shows. [modifier] sizes
- * it; the host's drawer sheet supplies the scrim, the slide and the insets.
+ * it; the host's drawer sheet supplies the scrim, the slide and the insets. [agentCard] is the
+ * model-and-context card under the agent's name (letta-mobile-3io8k).
  */
 @Composable
 fun ShellNavDrawer(
     state: ShellNavDrawerState,
     actions: ShellNavDrawerActions,
     modifier: Modifier = Modifier,
+    agentCard: (@Composable () -> Unit)? = null,
 ) {
     Row(modifier.fillMaxHeight().testTag(ShellNavDrawerTags.DRAWER)) {
         ShellAgentRail(
@@ -48,9 +50,10 @@ fun ShellNavDrawer(
             actions = actions.rail,
             modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer),
         )
-ShellAgentPanel(
+        ShellAgentPanel(
             state = state.panel,
             actions = actions.panel,
+            agentCard = agentCard,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()

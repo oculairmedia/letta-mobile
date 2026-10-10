@@ -51,6 +51,8 @@ data class ModelPickerEntry(
     /** Reasoning variants the host advertises for the handle; empty when none. */
     val efforts: List<String>,
     val selected: Boolean,
+    /** letta-mobile-3io8k: the model's context window in tokens, when the catalog says. */
+    val contextWindow: Int? = null,
 )
 
 /** Models of one provider route, under that provider's name. */
@@ -118,6 +120,7 @@ object ModelPickerCatalog {
         tier = ReasoningTier.of(model.reasoningEffort ?: model.model.reasoningEffort),
         efforts = ComposerEffort.sorted(model.reasoningEfforts),
         selected = selected != null && selected == model.model,
+        contextWindow = model.model.contextWindow?.takeIf { it > 0 },
     )
 
     private fun ModelPickerEntry.matches(needle: String): Boolean =

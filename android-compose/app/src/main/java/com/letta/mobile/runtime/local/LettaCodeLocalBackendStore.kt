@@ -1,6 +1,10 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import com.letta.mobile.data.context.estimate.ContextBreakdownEstimator
+import com.letta.mobile.data.context.estimate.LocalContextInputs
+import com.letta.mobile.data.context.estimate.LocalTranscriptContext
+import com.letta.mobile.data.context.estimate.toAgentContextJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -113,36 +117,40 @@ class LettaCodeLocalBackendStore @Inject constructor(
         recordFile.writeText(json.encodeToString(JsonObject.serializer(), merged))
     }
 
+    /**
+     * letta-mobile-cyh28: the shared local-backend estimator over this store's default
+     * conversation (the embedded runtime, letta-code 0.26.1, keeps no `coreMemory` in its
+     * sidecar, so memory is counted inside the system prompt). The client re-matches the sections
+     * to its streamed total; the window falls back to letta.js's 128k custom-model default.
+     */
     override suspend fun contextWindowOverview(agentId: AgentId): ContextWindowOverview? =
         withContext(Dispatchers.IO) {
             val recordFile =
                 File(File(storageDirectory, "agents"), "${base64Url(agentId.value)}.json")
-            val record = recordFile.takeIf { it.isFile }
-                ?.let { runCatching { json.parseToJsonElement(it.readText()).jsonObject }.getOrNull() }
-                ?: return@withContext null
-            val system = record.stringField("system").orEmpty()
-            val transcript = File(
-                File(File(storageDirectory, "conversations"), base64Url("default:${agentId.value}")),
-                "messages.jsonl",
+            val record = readJsonObject(recordFile) ?: return@withContext null
+            val conversationDir =
+                File(File(storageDirectory, "conversations"), base64Url("default:${agentId.value}"))
+            val transcript = File(conversationDir, "messages.jsonl")
+            val inputs = LocalContextInputs(
+                systemPromptSidecar = readJsonObject(File(conversationDir, "system-prompt.json")),
+                agent = record,
+                conversation = readJsonObject(File(conversationDir, "conversation.json")),
+                transcript = if (transcript.isFile) {
+                    transcript.bufferedReader().use { LocalTranscriptContext.read(it.lineSequence()) }
+                } else {
+                    LocalTranscriptContext.read(emptySequence())
+                },
+                reportedTotal = null,
             )
-            val transcriptBytes = transcript.takeIf { it.isFile }?.length() ?: 0L
-            val messageCount = transcript.takeIf { it.isFile }
-                ?.useLines { lines -> lines.count { it.isNotBlank() } } ?: 0
-            // Same heuristic letta.js applies for local providers
-            // (estimateSerializedTokens): ~4 chars per token.
-            val systemTokens = system.length / 4
-            val messageTokens = (transcriptBytes / 4L).toInt()
-            ContextWindowOverview(
-                // letta.js's customOpenAICompatibleModel defaults the context
-                // window to 128k unless model_settings overrides it.
-                contextWindowSizeMax = record.intField("context_window_limit")
-                    ?: DEFAULT_LOCAL_CONTEXT_WINDOW,
-                contextWindowSizeCurrent = systemTokens + messageTokens,
-                numMessages = messageCount,
-                numTokensSystem = systemTokens,
-                numTokensMessages = messageTokens,
+            val overview = json.decodeFromJsonElement(
+                ContextWindowOverview.serializer(),
+                ContextBreakdownEstimator.estimate(inputs).toAgentContextJson(),
             )
+            if (overview.contextWindowSizeMax > 0) overview else overview.copy(contextWindowSizeMax = DEFAULT_LOCAL_CONTEXT_WINDOW)
         }
+
+    private fun readJsonObject(file: File): JsonObject? =
+        file.takeIf { it.isFile }?.let { runCatching { json.parseToJsonElement(it.readText()).jsonObject }.getOrNull() }
 
     /**
      * Seeds the minimal agent + default-conversation records letta.js needs
@@ -453,9 +461,6 @@ class LettaCodeLocalBackendStore @Inject constructor(
 
     private fun JsonObject.stringField(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString }?.content
-
-    private fun JsonObject.intField(key: String): Int? =
-        this[key]?.jsonPrimitive?.content?.toIntOrNull()
 
     /**
      * Resolve an image_ref part back to a normal image part by loading bytes
