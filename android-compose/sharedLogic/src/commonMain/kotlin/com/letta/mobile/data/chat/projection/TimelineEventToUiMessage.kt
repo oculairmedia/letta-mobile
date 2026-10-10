@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.chat.projection.meridian.MeridianCommandCall
 import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
@@ -436,7 +437,21 @@ private data class ToolCallRenderData(
     val sourceAgentId: String? = null,
 )
 
+/**
+ * letta-mobile-jna0o.6: a `meridian canvas …` call (Bash or the meta-tool) renders as the native
+ * canvas tool it runs, its result read off stdout, so its row matches the native call's row.
+ */
+private fun ToolCallRenderData.forMeridianStdout(): ToolCallRenderData {
+    val stdout = MeridianCommandCall.stdoutJson(result)
+    return copy(result = stdout, isError = isError || MeridianCommandCall.isErrorResult(stdout))
+}
+
 private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRenderData): UiToolCall {
+    MeridianCommandCall.parse(this)?.let { meridian -> return meridian.applyTo(this).toNativeUiToolCall(data.forMeridianStdout()) }
+    return toNativeUiToolCall(data)
+}
+
+private fun com.letta.mobile.data.model.ToolCall.toNativeUiToolCall(data: ToolCallRenderData): UiToolCall {
     val normalized = normalizeSkillToolCall(name ?: "tool", arguments ?: "")
     return UiToolCall(
         name = normalized.name,

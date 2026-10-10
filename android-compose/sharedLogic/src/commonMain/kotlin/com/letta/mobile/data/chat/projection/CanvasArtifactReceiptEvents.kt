@@ -44,7 +44,7 @@ internal class ReceiptNarration(private val events: List<TimelineEvent>, private
 }
 
 internal fun TimelineEvent.hasComposeCall(): Boolean =
-    messageTypeOf() == TimelineMessageType.TOOL_CALL && toolCallList().any { CanvasArtifactReceipts.isComposeTool(it.name) }
+    messageTypeOf() == TimelineMessageType.TOOL_CALL && toolCallList().any(CanvasArtifactReceipts::isComposeCall)
 
 internal fun TimelineEvent.toolCallList(): List<ToolCall> = when (this) {
     is TimelineEvent.Confirmed -> toolCalls
