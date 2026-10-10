@@ -392,7 +392,14 @@ open class CachedAgentRepository(
         }
     }
 
-    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
+        getContextBreakdown(agentId, conversationId, reportedTotal = null)
+
+    override suspend fun getContextBreakdown(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        reportedTotal: Int?,
+    ): ContextWindowOverview {
         val localSource = localAgentSource
         if (localSource != null && isLocalRuntimeActive()) {
             // No remote API for local agents; estimate from the on-disk
@@ -401,7 +408,7 @@ open class CachedAgentRepository(
         }
         val irohSource = irohAgentSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.getContextWindow(agentId, conversationId)
+            return irohSource.getContextBreakdown(agentId, conversationId, reportedTotal)
         }
         return remote.getContextWindow(agentId, conversationId)
     }

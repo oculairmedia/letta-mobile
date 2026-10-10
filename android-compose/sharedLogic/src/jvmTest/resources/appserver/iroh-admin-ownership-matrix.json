@@ -354,6 +354,27 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "conversation.compact",
+      "handler": "ConversationCompactHandlers.kt",
+      "current_backend": "native App Server v2 execute_command compact, conversation_compact when the command is absent (letta-mobile-57cta)",
+      "owner": "app_server_v2",
+      "public_contract": "execute_command",
+      "native_contract": [
+        "execute_command",
+        "execute_command_response",
+        "conversation_compact",
+        "conversation_compact_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-57cta: manual compaction relay for Iroh clients. Reads the local-backend transcript (read-only) before and after for the estimated token drop.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

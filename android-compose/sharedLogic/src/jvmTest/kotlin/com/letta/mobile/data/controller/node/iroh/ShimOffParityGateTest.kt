@@ -129,6 +129,14 @@ class ShimOffParityGateTest {
         override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
             AppServerInboundFrame.ConversationUpdateResponse(command.requestId, true, convObj())
 
+        // letta-mobile-57cta: conversation.compact runs /compact.
+        override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand) =
+            AppServerInboundFrame.ExecuteCommandResponse(
+                command.requestId,
+                true,
+                output = "Compaction completed. Message buffer length reduced from 4 to 2.",
+            )
+
         override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
             com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse(command.requestId, true, "conv-1", null)
 
