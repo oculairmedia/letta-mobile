@@ -43,7 +43,6 @@ fun ReasoningEffortSlider(
     current: String?,
     onApply: (effort: String?) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
 ) {
     val currentIndex = stops.indexOf(current)
     var position by remember(stops, currentIndex) { mutableFloatStateOf(currentIndex.toFloat()) }
@@ -70,7 +69,6 @@ fun ReasoningEffortSlider(
             onValueChangeFinished = ::apply,
             valueRange = 0f..(stops.count - 1).toFloat(),
             steps = (stops.count - 2).coerceAtLeast(0),
-            enabled = enabled,
             modifier = Modifier
                 .weight(1f)
                 .testTag(ReasoningEffortSliderTags.SLIDER)

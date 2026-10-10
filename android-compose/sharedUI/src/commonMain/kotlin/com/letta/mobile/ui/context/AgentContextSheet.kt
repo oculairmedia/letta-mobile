@@ -91,22 +91,32 @@ fun ColumnScope.AgentContextSheetContent(
  */
 @Composable
 private fun SelectedModelEffort(picker: AgentContextPicker) {
-    val selected = picker.state.selected
-    val stops = selected?.let { ReasoningEffortStops.of(it.efforts) }
-    val apply = picker.onEffortApplied
+    val choice = EffortChoice.of(picker)
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
-        visible = selected != null && stops != null && apply != null,
+        visible = choice != null,
         enter = if (reducedMotion) EnterTransition.None else expandVertically() + fadeIn(),
         exit = if (reducedMotion) ExitTransition.None else shrinkVertically() + fadeOut(),
     ) {
-        if (selected == null || stops == null || apply == null) return@AnimatedVisibility
+        choice ?: return@AnimatedVisibility
         ReasoningEffortSlider(
-            stops = stops,
-            current = selected.tier?.effort,
-            onApply = { effort -> apply(selected, effort) },
+            stops = choice.stops,
+            current = choice.entry.tier?.effort,
+            onApply = { effort -> choice.apply(choice.entry, effort) },
             modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
+    }
+}
+
+/** The selected model, its effort stops and the host's switch: all three, or no slider. */
+private class EffortChoice(val entry: ModelPickerEntry, val stops: ReasoningEffortStops, val apply: (ModelPickerEntry, String?) -> Unit) {
+    companion object {
+        fun of(picker: AgentContextPicker): EffortChoice? {
+            val apply = picker.onEffortApplied ?: return null
+            val entry = picker.state.selected ?: return null
+            val stops = ReasoningEffortStops.of(entry.efforts) ?: return null
+            return EffortChoice(entry, stops, apply)
+        }
     }
 }
 
