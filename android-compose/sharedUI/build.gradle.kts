@@ -149,6 +149,8 @@ kotlin {
                 implementation(libs.androidx.exifinterface)
                 // letta-mobile-bglj6.1: the shared chat page collects its port with the Android lifecycle.
                 implementation(libs.androidx.lifecycle.runtime.compose)
+                // letta-mobile-y5q9z: Back folds the canvas bubble's open card.
+                implementation(libs.androidx.activity.compose)
             }
         }
 

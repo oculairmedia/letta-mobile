@@ -109,11 +109,13 @@ class TouchReplyPopupUiTest {
     }
 
     @Test
-    fun aTapOpensTheChat() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
+    fun aTapOpensTheBubblesCard() = runDesktopComposeUiTest(WIDTH, HEIGHT) {
         val shown = show(longScene)
         onNodeWithTag(TOUCH_POPUP_TEXT_TAG, useUnmergedTree = true).performClick()
         settle()
-        assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), shown.intents)
+        // letta-mobile-y5q9z: on the canvas the reply opens the bubble's card, not the full chat.
+        onNodeWithTag(BUBBLE_CARD_TAG).assertExists()
+        assertTrue(shown.intents.isEmpty(), "the reply opened the full chat: ${shown.intents}")
     }
 
     @Test

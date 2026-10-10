@@ -34,4 +34,17 @@
     <!-- The board's menu on the Touch canvas, standing in for the header it keeps off the board. -->
     <string name="chat_surface_canvas_switch_agent">Switch agent</string>
     <string name="chat_surface_canvas_agent_menu">Agent menu</string>
+    <!-- letta-mobile-y5q9z: the canvas's agent bubble, its expanded card and its recent interactions. -->
+    <string name="chat_surface_bubble_card">Conversation with %1$s</string>
+    <string name="chat_surface_bubble_card_unnamed">Conversation with the agent</string>
+    <string name="chat_surface_bubble_collapse">Collapse to the bubble</string>
+    <string name="chat_surface_bubble_stop">Stop the agent</string>
+    <string name="chat_surface_recents_open">Show recent interactions</string>
+    <string name="chat_surface_recents_close">Hide recent interactions</string>
+    <string name="chat_surface_recents_title">Recent interactions</string>
+    <string name="chat_surface_recents_new_thread">New thread</string>
+    <string name="chat_surface_recents_empty">No other conversations with this agent yet.</string>
+    <string name="chat_surface_recents_row">%1$s, %2$s</string>
+    <string name="chat_surface_recents_row_current">%1$s, %2$s, current conversation</string>
+    <string name="chat_surface_recents_row_archived">%1$s, %2$s, archived</string>
 </resources>
