@@ -115,7 +115,7 @@ class MeridianCommandRouter(
         val builder = MeridianInputBuilder(command)
         val args = builder.parseArgs(rest).getOrElse { return Result.failure(it) }
         val source = inputSource(command, args.inputFile, stdin).getOrElse { return Result.failure(it) }
-        return builder.build(source, args)
+        return builder.build(args.copy(stdin = source))
     }
 
     /** stdin, or the `--input-file` the front door can read; never both. */
