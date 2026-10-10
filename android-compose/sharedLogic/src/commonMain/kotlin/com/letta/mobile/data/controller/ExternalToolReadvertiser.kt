@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAdvertisementState
+import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -64,7 +65,7 @@ internal class ExternalToolReadvertiser(
             clientInfo = clientInfo,
             recoverApprovals = false,
             forceDeviceStatus = false,
-            externalTools = registry.advertisedToolsCommandGroups(),
+            externalTools = registry.advertisedToolsCommandGroups(audience = ToolAudience(runtime.agentId)),
         )
         val failure = sendForFailure(command) ?: return
         // The runtime keeps its previous tools; the next runtime_start (a reconnect, or the next

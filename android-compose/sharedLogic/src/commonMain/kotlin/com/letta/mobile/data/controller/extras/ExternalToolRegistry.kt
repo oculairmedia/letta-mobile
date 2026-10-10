@@ -47,7 +47,15 @@ class ExternalToolRegistry(
      * The advertised capabilities that gate which tools are registered.
      */
     private val capabilities: RemoteCapabilities,
+
+    /**
+     * Which tools the model is offered (letta-mobile-jna0o.8), built once from this registry so a
+     * meta-tool can route back into it. [ToolOffer.Native] (every tool) unless a host opts in.
+     */
+    offer: (ExternalToolRegistry) -> ToolOffer = { ToolOffer.Native },
 ) : ExternalToolRegistrar {
+    private val toolOffer: ToolOffer by lazy { offer(this) }
+
     /**
      * Fixed tools that are advertised (i.e., their capability is enabled).
      */
@@ -107,6 +115,27 @@ class ExternalToolRegistry(
     }
 
     /**
+     * The tools a call can reach through [invoke]: the fixed tools whose capability is enabled, then
+     * the live sources' tools. The Meridian command surface (letta-mobile-jna0o.3) lists and
+     * dispatches through this, so its commands reach exactly what a native tool call reaches.
+     */
+    fun invocableTools(): List<ExternalTool> = listAdvertisedTools()
+
+    /**
+     * The tools [audience] is offered: every invocable tool under [ToolOffer.Native], the
+     * `meridian` meta-tool alone under the Meridian offer in meta mode.
+     */
+    fun offeredTools(audience: ToolAudience = ToolAudience.HostDefault): List<ExternalTool> =
+        toolOffer.offered(listAdvertisedTools(), audience)
+
+    /**
+     * This registry's fixed tools under [offer] instead (letta-mobile-jna0o.8). Call it while
+     * building the host, before adding any [ToolSource]: live sources are not carried over.
+     */
+    fun offering(offer: (ExternalToolRegistry) -> ToolOffer): ExternalToolRegistry =
+        ExternalToolRegistry(tools, capabilities, offer)
+
+    /**
      * lgns8.17(a): the wire form of [listAdvertisedTools] for the `external_tools`
      * field of `runtime_start`.
      *
@@ -127,8 +156,11 @@ class ExternalToolRegistry(
      * entirely rather than sending an empty group (the server treats an omitted
      * field and an empty group list alike: "unregister everything").
      */
-    fun advertisedToolsCommandGroups(scopeId: String? = null): List<AppServerExternalToolsGroup>? {
-        val advertised = listAdvertisedTools()
+    fun advertisedToolsCommandGroups(
+        scopeId: String? = null,
+        audience: ToolAudience = ToolAudience.HostDefault,
+    ): List<AppServerExternalToolsGroup>? {
+        val advertised = offeredTools(audience)
         dynamicTools.markAdvertised(advertised)
         val definitions = advertised.map { tool ->
             AppServerExternalToolDefinition(
@@ -170,6 +202,7 @@ class ExternalToolRegistry(
      */
     suspend fun invoke(toolName: String, input: JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val tool = toolsByName[toolName] ?: dynamicTools.find(toolName)
+            ?: toolOffer.extraTools.firstOrNull { it.name == toolName }
             ?: return ExternalToolResult.Error(unavailableMessage(toolName))
 
         return try {
