@@ -38,6 +38,8 @@ internal fun ChatScreen(
     onOpenConversation: ((String, String) -> Unit)? = null,
     /** The shared page's canvas mode wants the board's top clear: true while the host's header should hide. */
     onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
+    /** letta-mobile-y5q9z: the agent's conversations for the shared page's canvas bubble "+". */
+    recentInteractions: com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
     selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
@@ -143,6 +145,7 @@ internal fun ChatScreen(
                     // floating header, and only rests its content (and the canvas's chrome) below them.
                     topChromeInset = contentPadding.calculateTopPadding(),
                     onHostHeaderHiddenChange = onHostHeaderHiddenChange,
+                    recentInteractions = recentInteractions,
                 ),
                 modifier = modifier.fillMaxSize(),
             )

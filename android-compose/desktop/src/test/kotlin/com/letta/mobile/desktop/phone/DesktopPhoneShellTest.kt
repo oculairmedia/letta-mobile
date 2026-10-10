@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -166,21 +167,26 @@ class DesktopPhoneShellTest {
             }
         }
         settle()
-        // Canvas first, as on Android: the canvas's chat head and bar, not the desktop's floating panel.
+        // Canvas first, as on Android: the canvas's chat head (the agent bubble, no bar since
+        // letta-mobile-y5q9z), not the desktop's floating panel.
         onNodeWithTag(TOUCH_DOCK_TAG).assertExists()
-        onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).assertExists()
+        onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
+        onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ComposerTestTags.CARD, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ComposerTestTags.HINT, useUnmergedTree = true).assertDoesNotExist()
         // The canvas mode keeps the top of the board clear: no header, only the agent pill (vgouv).
         onNodeWithTag(PhoneShellTags.CHAT_HEADER).assertDoesNotExist()
         onNodeWithTag(PhoneShellTags.CANVAS_IDENTITY_PILL).assertExists()
 
-        // The Touch bar stands on the simulated keyboard (TouchComposerBar reads WindowInsets.ime).
+        // The bubble's card carries the Touch bar; it rides up on the simulated keyboard (the card is
+        // laid out above WindowInsets.ime) without re-anchoring.
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        settle()
         val barBottom = onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
         state.keyboardVisible = true
         settle()
         val raisedBottom = onNodeWithTag(ComposerTestTags.TOUCH_BAR, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.bottom
-        assertTrue(raisedBottom < barBottom - KEYBOARD_LIFT_FLOOR_PX, "the bar rose with the keyboard: $barBottom -> $raisedBottom")
+        assertTrue(raisedBottom < barBottom - KEYBOARD_LIFT_FLOOR_PX, "the card rose with the keyboard: $barBottom -> $raisedBottom")
         controller.close()
     }
 
@@ -236,5 +242,6 @@ class DesktopPhoneShellTest {
 
         /** TouchCanvasDock's root tag (internal to sharedUI). */
         const val TOUCH_DOCK_TAG = "chat-touch-dock"
+        const val TOUCH_HEAD_TAG = "chat-touch-head"
     }
 }

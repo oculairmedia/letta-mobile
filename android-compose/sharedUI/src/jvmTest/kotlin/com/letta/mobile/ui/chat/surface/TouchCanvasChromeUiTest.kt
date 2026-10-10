@@ -203,7 +203,7 @@ class TouchCanvasChromeUiTest {
             Offset((head.left - ChatHeadDimens.head / 4).toPx(), ((head.top + head.bottom) / 2).toPx())
         }
         assertEquals(Color.White, pixels[probe.x.toInt(), probe.y.toInt()], "the head glows at $probe")
-        // The thinking is still announced to a screen reader.
-        onNodeWithTag(DOCK_COLLAPSED_THINKING_TAG).assertExists()
+        // letta-mobile-y5q9z: with no bar on the canvas, the bubble says the agent is working (and offers Stop).
+        onNodeWithTag(BUBBLE_STOP_TAG).assertExists()
     }
 }

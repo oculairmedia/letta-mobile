@@ -137,4 +137,27 @@ object ChatHeadDimens {
 
     /** The snap to an edge after a drag. */
     const val snapMillis: Int = 240
+
+    /** letta-mobile-y5q9z: the expanded bubble's card, at most this wide (a note over the board). */
+    val cardMaxWidth: Dp = 400.dp
+
+    /** The card keeps to this share of the area above the keyboard, so the board stays in view. */
+    const val cardMaxHeightFraction: Float = 0.8f
+
+    /** The recent exchange inside the card scrolls past this height. */
+    val cardExchangeMaxHeight: Dp = 280.dp
+
+    /** The recent interactions inside the card scroll past this height. */
+    val cardRecentsMaxHeight: Dp = 320.dp
+
+    /** The card's header row: the agent's name between its controls, each a full touch target. */
+    val cardHeader: Dp = 48.dp
+
+    /** The "+" beside the head, a full touch target, and its gap to the head. */
+    val plus: Dp = 48.dp
+    val plusGap: Dp = LettaDimens.Space.sm
+
+    /** One recent interaction: a full-height touch row with the agent's avatar. */
+    val recentsRowMinHeight: Dp = 56.dp
+    val recentsAvatar: Dp = 32.dp
 }
