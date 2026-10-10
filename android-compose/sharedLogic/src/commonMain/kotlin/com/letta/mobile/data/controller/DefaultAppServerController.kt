@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAdvertisementState
+import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.ApprovalDecisionCache
 import com.letta.mobile.data.controller.registry.RuntimeRecord
@@ -431,7 +432,7 @@ class DefaultAppServerController(
                     // from it. Re-sent on every runtime_start, which is also how
                     // reconnect re-advertises (see ExternalToolRegistry.reRegisterAll)
                     // and how a live tool change does (ExternalToolReadvertiser).
-                    externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
+                    externalTools = externalToolRegistry?.advertisedToolsCommandGroups(audience = ToolAudience(agentId.value)),
                 ),
             )
         } catch (e: CancellationException) {

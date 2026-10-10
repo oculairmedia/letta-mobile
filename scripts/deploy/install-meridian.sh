@@ -152,12 +152,12 @@ grep -a "lcp-patches applied" /var/log/meridian-appserver.log 2>/dev/null | tail
 timeout 30 node "$LIB_DIR/appserver-probe.cjs" 2>&1 | tail -1 || true
 # The shim's shebang is `#!/usr/bin/env node`: node must be on the App Server's PATH.
 say "node for the meridian shim" "$(command -v node || echo "NOT ON PATH — the shim cannot start")"
-# jna0o.5: the endpoint exists only with LETTA_AGENT_TOOLS_MODE=cli. Outside an agent's shell
+# jna0o.5: the endpoint exists only when agent-tools-mode puts some agent on cli. Outside an agent's shell
 # call the live-call binding answers "denied" (exit 3), which still proves it is serving; exit 4
 # means nothing answered.
 if [[ -S /run/meridian/tools.sock ]]; then
   rc=0; timeout 10 "$SHIM_DST" --help >/dev/null 2>&1 </dev/null || rc=$?
   say "meridian tools endpoint" "$( (( rc == 0 || rc == 3 )) && echo serving || echo "socket present, no answer (exit $rc)")"
 else
-  say "meridian tools endpoint" "off (set LETTA_AGENT_TOOLS_MODE=cli to serve)"
+  say "meridian tools endpoint" "off (served only when LETTA_AGENT_TOOLS_MODE or an override is cli)"
 fi

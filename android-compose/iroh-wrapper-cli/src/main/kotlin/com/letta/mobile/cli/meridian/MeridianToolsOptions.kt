@@ -5,24 +5,17 @@ import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import com.letta.mobile.data.meridian.AgentToolsMode
+import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.meridian.endpoint.MeridianCallerBindingMode
 
 /**
- * `--agent-tools-mode`: how the agents this host serves reach its tools (letta-mobile-jna0o.9).
- * Only [CLI] serves the `meridian/tools/1` endpoint; [NATIVE] (the default) leaves the host exactly
- * as it was. Named identically to the jna0o.9 flag so the two collapse into one when that lands.
+ * True when any agent on this host is offered its tools through the `meridian` CLI
+ * (`agent-tools-mode` cli, as the host default or a per-agent override): only then is the local
+ * `meridian/tools/1` endpoint served, so native and meta hosts are unchanged.
  */
-enum class AgentToolsMode(val wire: String) {
-    NATIVE("native"),
-    CLI("cli"),
-    META("meta"),
-    ;
-
-    companion object {
-        fun parse(value: String): AgentToolsMode = entries.firstOrNull { it.wire == value.trim().lowercase() }
-            ?: throw IllegalArgumentException("--agent-tools-mode must be one of ${entries.joinToString("|") { it.wire }}, not '$value'")
-    }
-}
+fun AgentToolsModePolicy.servesCli(): Boolean =
+    hostDefault == AgentToolsMode.CLI || AgentToolsMode.CLI in perAgent.values
 
 /** Which listener(s) the endpoint opens: the Unix socket, loopback TCP, or the socket with TCP as fallback. */
 enum class MeridianToolsTransport(val wire: String) {
@@ -39,7 +32,8 @@ enum class MeridianToolsTransport(val wire: String) {
 
 /** The resolved endpoint settings, independent of clikt so tests can build them directly. */
 data class MeridianToolsConfig(
-    val mode: AgentToolsMode = AgentToolsMode.NATIVE,
+    /** Whether `agent-tools-mode` puts any agent on the CLI ([servesCli]); off, nothing is served. */
+    val enabled: Boolean = false,
     val transport: MeridianToolsTransport = MeridianToolsTransport.AUTO,
     val socketPath: String = DEFAULT_SOCKET,
     val tcpPort: Int = 0,
@@ -47,8 +41,6 @@ data class MeridianToolsConfig(
     val binding: MeridianCallerBindingMode = MeridianCallerBindingMode.LIVE_CALL,
     val callsPerMinute: Int = DEFAULT_CALLS_PER_MINUTE,
 ) {
-    val enabled: Boolean get() = mode == AgentToolsMode.CLI
-
     companion object {
         /** systemd `RuntimeDirectory=meridian`; not /tmp, which the unit's `PrivateTmp=true` hides. */
         const val DEFAULT_SOCKET = "/run/meridian/tools.sock"
@@ -59,14 +51,11 @@ data class MeridianToolsConfig(
     }
 }
 
-/** The `app-server-serve-iroh` options for the local `meridian/tools/1` endpoint (letta-mobile-jna0o.4). */
+/**
+ * The `app-server-serve-iroh` options for the local `meridian/tools/1` endpoint (letta-mobile-jna0o.4).
+ * Whether it is served at all follows `--agent-tools-mode` (jna0o.9): see [servesCli].
+ */
 class MeridianToolsOptions : OptionGroup(name = "Meridian CLI endpoint (jna0o.4)") {
-    private val mode by option(
-        "--agent-tools-mode",
-        envvar = "LETTA_AGENT_TOOLS_MODE",
-        help = "native|cli|meta. 'cli' serves the local meridian/tools/1 endpoint the `meridian` shim calls. Default native (no endpoint).",
-    ).convert { AgentToolsMode.parse(it) }.default(AgentToolsMode.NATIVE)
-
     private val transport by option(
         "--meridian-tools-transport",
         envvar = "MERIDIAN_TOOLS_TRANSPORT",
@@ -104,8 +93,8 @@ class MeridianToolsOptions : OptionGroup(name = "Meridian CLI endpoint (jna0o.4)
         help = "Tool-running meridian calls allowed per conversation per minute.",
     ).int().default(MeridianToolsConfig.DEFAULT_CALLS_PER_MINUTE)
 
-    fun config(): MeridianToolsConfig = MeridianToolsConfig(
-        mode = mode,
+    fun config(cliServed: Boolean): MeridianToolsConfig = MeridianToolsConfig(
+        enabled = cliServed,
         transport = transport,
         socketPath = socketPath,
         tcpPort = tcpPort,

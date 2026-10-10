@@ -174,6 +174,45 @@ class MeridianErrorsTest {
     }
 
     @Test
+    fun aFlagNeverTakesTheNextFlagAsItsValue() = runTest {
+        assertEquals(
+            """{"error":"usage","command":"canvas layout","message":"--cursor needs a value"}""",
+            run(listOf("canvas", "layout", "--cursor", "--limit", "5")).stdout,
+        )
+        assertEquals(MeridianExit.OK, run(listOf("canvas", "create", "--title=--draft")).exitCode, "--name=value may start with --")
+        assertEquals("--draft", (host.calls.last().input["title"] as JsonPrimitive).content)
+    }
+
+    @Test
+    fun aFailingInputFileReaderIsAStructuredRefusal() = runTest {
+        val router = host.router(inputFiles = MeridianInputFiles { error("disk on fire") })
+        assertEquals(
+            """{"error":"invalid_input","command":"canvas create","message":"cannot read --input-file in.json"}""",
+            run(listOf("canvas", "create", "--input-file", "in.json"), router = router).stdout,
+        )
+    }
+
+    @Test
+    fun aResultIsPassedThroughEvenWhenItsToolGoesAwayMeanwhile() = runTest {
+        val registry = com.letta.mobile.data.controller.extras.ExternalToolRegistry.hostTools(emptyList())
+        val source = com.letta.mobile.data.controller.extras.MutableToolSource("plugins")
+        registry.addSource(source)
+        val ran = mutableListOf<String>()
+        val tool = com.letta.mobile.data.plugin.PluginActionTool(
+            MeridianTestHost.PLUGIN_DEFINITION,
+            com.letta.mobile.data.plugin.PluginActionInvoker { definition, _, _ ->
+                ran += definition.name
+                source.publish(emptyList())
+                com.letta.mobile.data.controller.extras.ExternalToolResult.Success("""{"ok":true}""")
+            },
+        )
+        source.publish(listOf(tool))
+        val response = MeridianCommandRouter(registry).execute(MeridianRequest(listOf("plugin", "letta.example", "start"), caller = MeridianTestHost.CALLER))
+        assertEquals(MeridianResponse(MeridianExit.OK, """{"ok":true}"""), response)
+        assertEquals(listOf("example_start"), ran)
+    }
+
+    @Test
     fun theArgvSplitterKeepsQuotedWordsAndRefusesAnOpenQuote() {
         assertEquals(listOf("meridian", "canvas", "create", "--title", "My plan's draft"), MeridianArgv.split("""meridian canvas create --title "My plan's draft" """))
         assertEquals(listOf("a b", "c\"d", "e f", ""), MeridianArgv.split("""'a b' "c\"d" e\ f ''"""))

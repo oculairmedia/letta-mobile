@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
 import com.letta.mobile.cli.meridian.MeridianToolsOptions
+import com.letta.mobile.cli.meridian.servesCli
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
@@ -163,6 +164,19 @@ class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_MODEL_EXPOSURE_FILE",
         help = "JSON file holding which App Server models are exposed to app model pickers " +
             "(model.exposure.*; default: model-exposure.json next to host-canvases.json).",
+    )
+
+    private val agentToolsMode by option(
+        "--agent-tools-mode",
+        envvar = "LETTA_AGENT_TOOLS_MODE",
+        help = "How agents are offered this host's tools (letta-mobile-jna0o.9): native (each tool, the default), " +
+            "cli (none; agents run the meridian CLI from their shell) or meta (the one 'meridian' tool).",
+    )
+
+    private val agentToolsModeOverrides by option(
+        "--agent-tools-mode-overrides",
+        envvar = "LETTA_AGENT_TOOLS_MODE_OVERRIDES",
+        help = "Per-agent agent-tools-mode, as agentId=mode pairs separated by commas; overrides --agent-tools-mode.",
     )
 
     private val pairingStoreFile by option(
@@ -416,7 +430,7 @@ class AppServerServeIrohCommand : CliktCommand(
      * Server (Iroh-only stub mode has no runtimes, so nothing to bind to).
      */
     private suspend fun startMeridianTools(scope: CoroutineScope, client: AppServerClient?) {
-        val config = meridianTools.config()
+        val config = meridianTools.config(cliServed = agentToolsPolicy.servesCli())
         if (!config.enabled) return
         if (client == null) {
             println("[iroh-app-server] meridian tools endpoint: DISABLED (no App Server to relay)")
@@ -743,14 +757,25 @@ class AppServerServeIrohCommand : CliktCommand(
      */
     private val productionToolRegistry: ExternalToolRegistry by lazy { buildProductionExternalToolRegistry() }
 
-    private fun buildProductionExternalToolRegistry(): ExternalToolRegistry =
-        buildProductionExternalToolRegistryForTesting(
-            binary = meridianBinary,
-            identityDir = a2aIdentityDir,
-            addressStore = a2aAddressBook,
-            localBackendDir = localBackendDir,
-            hostTools = hostCanvasTools,
+    /** The `agent-tools-mode` flag (jna0o.9), read once: the registry's offer and the CLI endpoint follow it. */
+    private val agentToolsPolicy: com.letta.mobile.data.meridian.AgentToolsModePolicy by lazy {
+        com.letta.mobile.data.meridian.AgentToolsModePolicy.parse(agentToolsMode, agentToolsModeOverrides)
+            .getOrElse { throw com.github.ajalt.clikt.core.UsageError(it.message.orEmpty()) }
+    }
+
+    private fun buildProductionExternalToolRegistry(): ExternalToolRegistry {
+        val policy = agentToolsPolicy
+        println("[iroh-app-server] Agent tools mode: ${policy.describe()}")
+        return policy.apply(
+            buildProductionExternalToolRegistryForTesting(
+                binary = meridianBinary,
+                identityDir = a2aIdentityDir,
+                addressStore = a2aAddressBook,
+                localBackendDir = localBackendDir,
+                hostTools = hostCanvasTools,
+            ),
         )
+    }
 
     /**
      * The canvas relay every app connected here shares boards through, and the canvas_* tools the

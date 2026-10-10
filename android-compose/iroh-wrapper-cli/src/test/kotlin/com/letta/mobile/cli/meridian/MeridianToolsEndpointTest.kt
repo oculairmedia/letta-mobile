@@ -30,7 +30,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
+import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -62,10 +64,10 @@ class MeridianToolsEndpointTest {
 
     private fun config(
         transport: MeridianToolsTransport = MeridianToolsTransport.UNIX,
-        mode: AgentToolsMode = AgentToolsMode.CLI,
+        enabled: Boolean = true,
         socket: Path = dir.resolve("t.sock"),
     ) = MeridianToolsConfig(
-        mode = mode,
+        enabled = enabled,
         transport = transport,
         socketPath = socket.toString(),
         tcpPort = 0,
@@ -122,8 +124,8 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `native mode serves nothing`() = runBlocking {
-        val job = endpoint(config(mode = AgentToolsMode.NATIVE)).start(scope)
+    fun `a host with no cli agent serves nothing`() = runBlocking {
+        val job = endpoint(config(enabled = false)).start(scope)
 
         assertNull(job)
         assertTrue(Files.notExists(dir.resolve("t.sock")))
@@ -138,10 +140,13 @@ class MeridianToolsEndpointTest {
     }
 
     @Test
-    fun `agent tools mode parses the three arms and rejects others`() {
-        assertEquals(AgentToolsMode.CLI, AgentToolsMode.parse(" CLI "))
-        assertEquals(AgentToolsMode.META, AgentToolsMode.parse("meta"))
-        assertTrue(runCatching { AgentToolsMode.parse("shell") }.isFailure)
+    fun `the endpoint follows agent-tools-mode cli, as host default or per-agent override`() {
+        fun policy(default: String, overrides: String? = null) = AgentToolsModePolicy.parse(default, overrides).getOrThrow()
+
+        assertTrue(policy("cli").servesCli())
+        assertTrue(policy("native", "agent-a=cli").servesCli())
+        assertFalse(policy("native").servesCli())
+        assertFalse(policy("meta", "agent-a=native").servesCli())
     }
 
     /** The frame collector runs concurrently with the first request; retry until it has caught up. */
