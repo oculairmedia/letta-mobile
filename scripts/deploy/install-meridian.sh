@@ -42,6 +42,15 @@ declare -A DROPINS=(
 )
 SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh)
 
+# letta-mobile-jna0o.5: the agent-side `meridian` shim (on the App Server's PATH) and the
+# `meridian-canvas` letta-code skill (in the App Server user's global skills root, which letta-code
+# reads from $HOME/.letta/skills). Both are inert until the wrapper runs with
+# LETTA_AGENT_TOOLS_MODE=cli; the shim then reaches /run/meridian/tools.sock.
+SHIM_DST=/usr/local/bin/meridian
+appserver_user="$(systemctl show -p User --value meridian-appserver.service 2>/dev/null || true)"
+appserver_home="$(getent passwd "${appserver_user:-root}" | cut -d: -f6)"
+SKILLS_ROOT="${MERIDIAN_SKILLS_ROOT:-${appserver_home:-/root}/.letta/skills}"
+
 say() { printf '%-58s %s\n' "$1" "$2"; }
 
 sync_file() {  # src dst mode
@@ -67,6 +76,13 @@ for template in "${!DROPINS[@]}"; do
 done
 for script in "${SCRIPTS[@]}"; do
   [[ -f "$HERE/$script" ]] && sync_file "$HERE/$script" "$LIB_DIR/$script" 755
+done
+
+[[ -f "$HERE/meridian-shim.cjs" ]] && sync_file "$HERE/meridian-shim.cjs" "$SHIM_DST" 755
+for skill in "$HERE"/skills/*/SKILL.md; do
+  [[ -f "$skill" ]] || continue
+  name="$(basename "$(dirname "$skill")")"
+  sync_file "$skill" "$SKILLS_ROOT/$name/SKILL.md" 644
 done
 
 # Env files: seed when absent, otherwise compare key names only. A value never
@@ -112,3 +128,14 @@ done
 # applied count means an anchor drifted and that patch is silently inert.
 grep -a "lcp-patches applied" /var/log/meridian-appserver.log 2>/dev/null | tail -1 || true
 timeout 30 node "$LIB_DIR/appserver-probe.cjs" 2>&1 | tail -1 || true
+# The shim's shebang is `#!/usr/bin/env node`: node must be on the App Server's PATH.
+say "node for the meridian shim" "$(command -v node || echo "NOT ON PATH — the shim cannot start")"
+# jna0o.5: the endpoint exists only with LETTA_AGENT_TOOLS_MODE=cli. Outside an agent's shell
+# call the live-call binding answers "denied" (exit 3), which still proves it is serving; exit 4
+# means nothing answered.
+if [[ -S /run/meridian/tools.sock ]]; then
+  rc=0; timeout 10 "$SHIM_DST" --help >/dev/null 2>&1 </dev/null || rc=$?
+  say "meridian tools endpoint" "$( (( rc == 0 || rc == 3 )) && echo serving || echo "socket present, no answer (exit $rc)")"
+else
+  say "meridian tools endpoint" "off (set LETTA_AGENT_TOOLS_MODE=cli to serve)"
+fi
