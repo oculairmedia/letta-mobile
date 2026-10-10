@@ -218,4 +218,4 @@ async function main() {
   finish(Number.isInteger(response.exit_code) ? response.exit_code : EXIT_HOST_UNAVAILABLE, response.stdout || '', response.stderr || '');
 }
 
-main();
+main().catch((error) => hostUnavailable(`meridian shim failed: ${error && error.message ? error.message : error}`));
