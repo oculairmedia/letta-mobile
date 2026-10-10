@@ -42,7 +42,7 @@ class MeridianToolsServiceTest {
     private suspend fun MeridianToolsService.call(line: String) = MeridianToolsWire.decodeResponse(handle(line))
 
     @Test
-    fun `a call inside a live meridian shell call runs with the App Server's scope and call id`() = runTest {
+    fun aCallInsideALiveMeridianShellCallRunsWithTheAppServersScopeAndCallId() = runTest {
         liveCalls.observe(started(listCall))
 
         val first = service().call(request("meridian", "canvas", "list"))
@@ -58,7 +58,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `live-call binding refuses a call with no live meridian shell call`() = runTest {
+    fun liveCallBindingRefusesACallWithNoLiveMeridianShellCall() = runTest {
         val otherCall = ShellCall("call-b", "meridian canvas list", scope = OTHER_CONVERSATION)
         val noCall = service().call(request("canvas", "list"))
         liveCalls.observe(started(otherCall))
@@ -75,7 +75,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `env-scoped fallback attributes to the claimed scope without a call id`() = runTest {
+    fun envScopedFallbackAttributesToTheClaimedScopeWithoutACallId() = runTest {
         val envScoped = service(MeridianCallerBindingMode.ENV_SCOPED)
 
         val response = envScoped.call(request("canvas", "list"))
@@ -88,7 +88,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `help is served after binding and needs no tool`() = runTest {
+    fun helpIsServedAfterBindingAndNeedsNoTool() = runTest {
         liveCalls.observe(started(ShellCall("call-1", "meridian --help")))
 
         val help = service().call(request("meridian", "--help"))
@@ -98,7 +98,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `the TCP token is required when set`() = runTest {
+    fun theTCPTokenIsRequiredWhenSet() = runTest {
         liveCalls.observe(started(listCall))
         val guarded = service(token = "s3cret")
 
@@ -112,7 +112,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `malformed lines and unknown protocols are refused`() = runTest {
+    fun malformedLinesAndUnknownProtocolsAreRefused() = runTest {
         val garbage = service().call("not json")
         val emptyArgv = service().call("""{"argv":[]}""")
         val future = service().call("""{"argv":["canvas","list"],"protocol":"meridian/tools/9"}""")
@@ -121,7 +121,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `the router's per-conversation rate limit applies`() = runTest {
+    fun theRoutersPerConversationRateLimitApplies() = runTest {
         liveCalls.observe(started(listCall))
         val limited = service(rateLimiter = { _, _ -> MeridianAdmission.Limited(retryAfterMs = 500) })
 
@@ -132,7 +132,7 @@ class MeridianToolsServiceTest {
     }
 
     @Test
-    fun `only router commands are reachable`() = runTest {
+    fun onlyRouterCommandsAreReachable() = runTest {
         liveCalls.observe(started(ShellCall("call-1", "meridian rest get /v1/agents")))
 
         val rest = service().call(request("meridian", "rest", "get", "/v1/agents"))
