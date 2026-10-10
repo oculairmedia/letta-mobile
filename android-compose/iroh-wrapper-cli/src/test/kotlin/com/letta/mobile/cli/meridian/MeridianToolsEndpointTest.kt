@@ -76,9 +76,8 @@ class MeridianToolsEndpointTest {
     private fun endpoint(config: MeridianToolsConfig) =
         MeridianToolsEndpoint(config, ExternalToolRegistry.hostTools(listOf(tool)), frames, { synchronized(logs) { logs += it } })
 
-    private fun request(vararg argv: String, token: String? = null) = MeridianToolsWire.encodeRequest(
-        MeridianToolsWireRequest(argv.toList(), agentId = "agent-a", conversationId = "conv-a", token = token),
-    )
+    private fun request(vararg argv: String, token: String? = null) =
+        MeridianToolsWireRequest(argv.toList(), agentId = "agent-a", conversationId = "conv-a", token = token)
 
     @Test
     fun `serves the router on the Unix socket and binds to the live shell call`() = runBlocking {
@@ -162,8 +161,8 @@ class MeridianToolsEndpointTest {
 
     private fun tcp(port: Int): SocketChannel = SocketChannel.open(InetSocketAddress(InetAddress.getLoopbackAddress(), port))
 
-    private fun exchange(channel: SocketChannel, line: String): MeridianToolsWireResponse = channel.use {
-        val bytes = ByteBuffer.wrap((line + "\n").toByteArray())
+    private fun exchange(channel: SocketChannel, request: MeridianToolsWireRequest): MeridianToolsWireResponse = channel.use {
+        val bytes = ByteBuffer.wrap((MeridianToolsWire.encodeRequest(request) + "\n").toByteArray())
         while (bytes.hasRemaining()) it.write(bytes)
         val reply = MeridianToolsSocketServer.readLine(Channels.newInputStream(it))
         MeridianToolsWire.decodeResponse(requireNotNull(reply))
