@@ -116,53 +116,72 @@ internal class MeridianInvocation private constructor(
     }
 }
 
-/** The flags after the verb: native argument fields, an inline input, and the rest. */
+/** The flags after the verb: native argument fields, an inline input, and the positional words. */
 private class Flags private constructor(
     val fields: Map<String, JsonElement>,
     val input: String?,
     val positionals: List<String>,
 ) {
-    companion object {
-        fun read(words: List<String>): Flags {
-            val fields = LinkedHashMap<String, JsonElement>()
-            val positionals = mutableListOf<String>()
-            var input: String? = null
-            var index = 0
-            while (index < words.size) {
-                val (name, inline) = split(words[index])
-                index++
-                if (name == null) {
-                    positionals += words[index - 1]
-                    continue
-                }
-                val takesValue = name in VALUE_FLAGS || name in INPUT_FLAGS || name in FILE_FLAGS
-                val value = inline ?: if (takesValue) words.getOrNull(index)?.also { index++ } else null
-                when {
-                    name in BOOLEAN_FLAGS -> fields[BOOLEAN_FLAGS.getValue(name)] = JsonPrimitive(inline?.toBooleanStrictOrNull() ?: true)
-                    name in INPUT_FLAGS -> input = value
-                    name in VALUE_FLAGS && value != null -> fields[VALUE_FLAGS.getValue(name)] = fieldValue(name, value)
-                }
-            }
+    /** One left-to-right pass over the words; a value flag takes `--name=value` or the next word. */
+    private class Reader(private val words: List<String>) {
+        private val fields = LinkedHashMap<String, JsonElement>()
+        private val positionals = mutableListOf<String>()
+        private var input: String? = null
+        private var index = 0
+
+        fun read(): Flags {
+            while (index < words.size) next()
             return Flags(fields, input, positionals)
         }
 
-        /** `--name=value` / `--name` into (name, inline value); (null, null) for a positional. */
-        private fun split(word: String): Pair<String?, String?> {
-            if (!word.startsWith("-") || word == "-") return null to null
-            val name = word.trimStart('-')
-            val eq = name.indexOf('=')
-            return if (eq < 0) name to null else name.substring(0, eq) to name.substring(eq + 1)
+        private fun next() {
+            val word = words[index++]
+            val flag = Flag.of(word)
+            if (flag == null) {
+                positionals += word
+                return
+            }
+            val value = flag.inline ?: valueAfter(flag.name)
+            when (flag.name) {
+                in BOOLEAN_FLAGS -> fields[BOOLEAN_FLAGS.getValue(flag.name)] = JsonPrimitive(flag.inline?.toBooleanStrictOrNull() ?: true)
+                in INPUT_FLAGS -> input = value
+                in VALUE_FLAGS -> value?.let { fields[VALUE_FLAGS.getValue(flag.name)] = fieldValue(flag.name, it) }
+            }
         }
 
-        private fun fieldValue(flag: String, value: String): JsonElement =
-            if (flag == "limit") value.toIntOrNull()?.let(::JsonPrimitive) ?: JsonPrimitive(value) else JsonPrimitive(value)
+        private fun valueAfter(name: String): String? =
+            if (name in TAKES_VALUE) words.getOrNull(index)?.also { index++ } else null
+    }
 
-        private val BOOLEAN_FLAGS = mapOf("dry-run" to "dry_run", "dry_run" to "dry_run")
-        private val VALUE_FLAGS = mapOf(
-            "canvas" to "canvas_id", "canvas-id" to "canvas_id", "canvas_id" to "canvas_id",
-            "cursor" to "cursor", "limit" to "limit", "title" to "title",
-        )
-        private val INPUT_FLAGS = setOf("input", "json")
-        private val FILE_FLAGS = setOf("input-file", "file", "f")
+    companion object {
+        fun read(words: List<String>): Flags = Reader(words).read()
     }
 }
+
+/** `--name=value` / `--name`. */
+private class Flag(val name: String, val inline: String?) {
+    companion object {
+        /** The flag [word] spells; null for a positional word. */
+        fun of(word: String): Flag? {
+            if (!word.startsWith("-") || word == "-") return null
+            val body = word.trimStart('-')
+            val eq = body.indexOf('=')
+            return if (eq < 0) Flag(body, null) else Flag(body.substring(0, eq), body.substring(eq + 1))
+        }
+    }
+}
+
+private fun fieldValue(flag: String, value: String): JsonElement =
+    if (flag == "limit") value.toIntOrNull()?.let(::JsonPrimitive) ?: JsonPrimitive(value) else JsonPrimitive(value)
+
+private val BOOLEAN_FLAGS = mapOf("dry-run" to "dry_run", "dry_run" to "dry_run")
+private val VALUE_FLAGS = mapOf(
+    "canvas" to "canvas_id", "canvas-id" to "canvas_id", "canvas_id" to "canvas_id",
+    "cursor" to "cursor", "limit" to "limit", "title" to "title",
+)
+private val INPUT_FLAGS = setOf("input", "json")
+
+/** Input files (`--input-file`): the input is not in the script, but the flag takes the next word. */
+private val FILE_FLAGS = setOf("input-file", "file", "f")
+private val TAKES_VALUE = VALUE_FLAGS.keys + INPUT_FLAGS + FILE_FLAGS
+

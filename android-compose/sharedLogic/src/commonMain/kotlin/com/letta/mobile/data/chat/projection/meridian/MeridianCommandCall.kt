@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ToolCall
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -79,21 +80,24 @@ data class MeridianCommandCall(
             return ok == false || (ok == null && body["error"].let { it != null && it !is JsonNull })
         }
 
+        /** The meta-tool's `{command, input}`: the command with or without `meridian`, a string or an argv. */
         private fun fromMetaTool(args: JsonObject): MeridianCommandCall? {
-            val command = args["command"] ?: args["argv"] ?: return null
-            val script = when (command) {
-                is JsonArray -> command.mapNotNull { (it as? JsonPrimitive)?.content }.joinToString(" ") { quote(it) }
-                is JsonPrimitive -> command.content
-                else -> return null
-            }
+            val script = metaCommand(args["command"] ?: args["argv"]) ?: return null
             val prefixed = if (script.trimStart().startsWith(META_TOOL)) script else "$META_TOOL $script"
-            val invocation = MeridianInvocation.find(prefixed) ?: return null
-            val input = when (val value = args["input"] ?: args["stdin"]) {
-                is JsonObject -> value.toString()
-                is JsonPrimitive -> value.content.takeIf { value.isString }
-                else -> null
-            }
-            return invocation.toCall(inputOverride = input)
+            return MeridianInvocation.find(prefixed)?.toCall(inputOverride = metaInput(args["input"] ?: args["stdin"]))
+        }
+
+        private fun metaCommand(command: JsonElement?): String? = when (command) {
+            is JsonArray -> command.mapNotNull { (it as? JsonPrimitive)?.content }.joinToString(" ") { quote(it) }
+            is JsonPrimitive -> command.content.takeIf { command.isString }
+            else -> null
+        }
+
+        /** The input as an object (sent as JSON) or as the text the agent wrote. */
+        private fun metaInput(input: JsonElement?): String? = when (input) {
+            is JsonObject -> input.toString()
+            is JsonPrimitive -> input.content.takeIf { input.isString }
+            else -> null
         }
 
         private fun fromScript(script: String): MeridianCommandCall? =

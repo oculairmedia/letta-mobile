@@ -55,13 +55,20 @@ private class Scanner(private val s: String) {
     }
 
     /** Reads one token's worth of [s]; false on an unterminated quote. */
-    private fun step(): Boolean {
+    private fun step(): Boolean = quoting() ?: structural()
+
+    /** A quote or escape at [i], read into the word; null when [i] is not one. */
+    private fun quoting(): Boolean? = when (s[i]) {
+        '\'' -> singleQuoted()
+        '"' -> doubleQuoted()
+        '\\' -> escaped()
+        '$' -> if (peek(1) == '\'') ansiQuoted() else null
+        else -> null
+    }
+
+    private fun structural(): Boolean {
         val c = s[i]
         return when {
-            c == '\'' -> singleQuoted()
-            c == '"' -> doubleQuoted()
-            c == '$' && peek(1) == '\'' -> ansiQuoted()
-            c == '\\' -> escaped()
             c == '\n' -> newline()
             c == ' ' || c == '\t' || c == '\r' -> advance { endWord() }
             c == '#' && word == null -> comment()
@@ -89,35 +96,24 @@ private class Scanner(private val s: String) {
         return true
     }
 
-    private fun doubleQuoted(): Boolean {
-        val out = wordBuilder()
-        var j = i + 1
-        while (j < s.length && s[j] != '"') {
-            val c = s[j]
-            if (c == '\\' && j + 1 < s.length && s[j + 1] in DOUBLE_QUOTE_ESCAPABLE) {
-                if (s[j + 1] != '\n') out.append(s[j + 1])
-                j += 2
-            } else {
-                out.append(c)
-                j++
-            }
+    private fun doubleQuoted(): Boolean = quoted(from = i + 1, close = '"') { next ->
+        when {
+            next !in DOUBLE_QUOTE_ESCAPABLE -> null
+            next == '\n' -> ""
+            else -> next.toString()
         }
-        if (j >= s.length) return false
-        i = j + 1
-        return true
     }
 
-    private fun ansiQuoted(): Boolean {
+    private fun ansiQuoted(): Boolean = quoted(from = i + 2, close = '\'') { next -> (ANSI_ESCAPES[next] ?: next).toString() }
+
+    /** A quoted span from [from] up to [close], each `\x` read through [unescape] (null keeps it as written). */
+    private inline fun quoted(from: Int, close: Char, unescape: (Char) -> String?): Boolean {
         val out = wordBuilder()
-        var j = i + 2
-        while (j < s.length && s[j] != '\'') {
-            if (s[j] == '\\' && j + 1 < s.length) {
-                out.append(ANSI_ESCAPES[s[j + 1]] ?: s[j + 1])
-                j += 2
-            } else {
-                out.append(s[j])
-                j++
-            }
+        var j = from
+        while (j < s.length && s[j] != close) {
+            val escape = if (s[j] == '\\') s.getOrNull(j + 1)?.let(unescape) else null
+            if (escape != null) out.append(escape) else out.append(s[j])
+            j += if (escape != null) 2 else 1
         }
         if (j >= s.length) return false
         i = j + 1
