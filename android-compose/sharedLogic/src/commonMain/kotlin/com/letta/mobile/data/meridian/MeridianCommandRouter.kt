@@ -6,6 +6,8 @@ import com.letta.mobile.data.meridian.MeridianCommandCatalog.CANVAS
 import com.letta.mobile.data.meridian.MeridianCommandCatalog.GUIDE
 import com.letta.mobile.data.meridian.MeridianCommandCatalog.HELP
 import com.letta.mobile.data.meridian.MeridianCommandCatalog.SCHEMA
+import com.letta.mobile.data.controller.extras.ExternalToolResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -105,8 +107,11 @@ class MeridianCommandRouter(
             ).toResponse()
         }
         val result = registry.invoke(command.toolName, input, request.caller)
-        if (registry.invocableTools().none { it.name == command.toolName }) {
-            return MeridianError(MeridianErrorCode.HOST_UNAVAILABLE, "${command.toolName} is no longer served here", command = command.display).toResponse()
+        // A tool removed while the call was in flight answers "no longer available"; a result it
+        // already produced (side effects done) is always passed through.
+        if (result is ExternalToolResult.Error && registry.invocableTools().none { it.name == command.toolName }) {
+            val gone = "${command.toolName} is no longer served here"
+            return MeridianError(MeridianErrorCode.HOST_UNAVAILABLE, gone, command = command.display).toResponse()
         }
         return MeridianToolOutcome.response(command, result, limits)
     }
@@ -126,7 +131,7 @@ class MeridianCommandRouter(
             else -> {
                 val reader = inputFiles
                     ?: return refuse(command, MeridianErrorCode.USAGE, "--input-file is not available here; pipe the file on stdin")
-                reader.read(inputFile)
+                readOrNull(reader, inputFile)
                     ?: return refuse(command, MeridianErrorCode.INVALID_INPUT, "cannot read --input-file $inputFile")
             }
         }
@@ -135,6 +140,15 @@ class MeridianCommandRouter(
             return refuse(command, MeridianErrorCode.INPUT_TOO_LARGE, "the input is $size bytes; at most ${limits.maxInputBytes}")
         }
         return Result.success(text)
+    }
+
+    /** The file's text, or null when the front door's reader cannot read it (an error there included). */
+    private suspend fun readOrNull(reader: MeridianInputFiles, path: String): String? = try {
+        reader.read(path)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
     }
 
     private fun <T> refuse(command: MeridianCommand, code: MeridianErrorCode, message: String): Result<T> =
