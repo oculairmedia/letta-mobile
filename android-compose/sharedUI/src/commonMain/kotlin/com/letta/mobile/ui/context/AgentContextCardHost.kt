@@ -52,8 +52,6 @@ import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /** letta-mobile-3io8k: what a host supplies once per session; any part may be absent. */
@@ -154,9 +152,10 @@ private fun rememberCardModel(
     requests: CardRequests,
     lastOutcome: CompactionOutcome?,
 ): AgentContextCardModel {
-    val breakdown by (deps.breakdown?.state ?: IDLE).collectAsState()
-    val compacting by (deps.compaction?.compacting ?: NONE_COMPACTING).collectAsState()
-    val supported by (deps.compaction?.supported ?: UNKNOWN_SUPPORT).collectAsState()
+    // deps is fixed per session, so which of these flows exist never changes between compositions.
+    val breakdown = deps.breakdown?.state?.collectAsState()?.value ?: ContextBreakdownState.Idle
+    val compacting = deps.compaction?.compacting?.collectAsState()?.value.orEmpty()
+    val supported = deps.compaction?.supported?.collectAsState()?.value
     val reading = requests.reading
     return AgentContextCardModel.present(
         AgentContextCardInputs(
@@ -188,8 +187,8 @@ private data class Reading(val total: Int?, val estimated: Boolean)
 
 @Composable
 private fun rememberReading(readings: ContextTokenReadings?, focus: AgentContextFocus): Reading {
-    val totals by (readings?.readings ?: NO_READINGS).collectAsState()
-    val estimated by (readings?.estimated ?: NO_ESTIMATES).collectAsState()
+    val totals = readings?.readings?.collectAsState()?.value.orEmpty()
+    val estimated = readings?.estimated?.collectAsState()?.value.orEmpty()
     val key = contextReadingKeyOf(focus.agentId, focus.conversationId ?: DEFAULT_CONVERSATION)
     return Reading(total = key?.let(totals::get), estimated = key != null && key in estimated)
 }
@@ -271,8 +270,3 @@ internal class BelowAnchorPositionProvider(private val gapPx: Int) : PopupPositi
 }
 
 private const val DEFAULT_CONVERSATION = "default"
-private val IDLE: StateFlow<ContextBreakdownState> = MutableStateFlow(ContextBreakdownState.Idle)
-private val NONE_COMPACTING: StateFlow<Set<com.letta.mobile.data.compaction.CompactionKey>> = MutableStateFlow(emptySet())
-private val UNKNOWN_SUPPORT: StateFlow<Boolean?> = MutableStateFlow(null)
-private val NO_READINGS: StateFlow<Map<com.letta.mobile.data.context.ContextReadingKey, Int>> = MutableStateFlow(emptyMap())
-private val NO_ESTIMATES: StateFlow<Set<com.letta.mobile.data.context.ContextReadingKey>> = MutableStateFlow(emptySet())

@@ -47,7 +47,9 @@ internal fun SessionGraph.toContextCardSession(): ContextCardSession = ContextCa
 
 internal fun contextCardSessions(graphs: StateFlow<SessionGraph>, scope: CoroutineScope): StateFlow<ContextCardSession> =
     graphs.map { it.toContextCardSession() }
-        .stateIn(scope, SharingStarted.Eagerly, graphs.value.toContextCardSession())
+        .stateIn(scope, SharingStarted.WhileSubscribed(SESSION_STOP_TIMEOUT_MS), graphs.value.toContextCardSession())
+
+private const val SESSION_STOP_TIMEOUT_MS = 5_000L
 
 /** The card under the agent's name in the hamburger drawer; its sheet is a bottom sheet. */
 @Composable
