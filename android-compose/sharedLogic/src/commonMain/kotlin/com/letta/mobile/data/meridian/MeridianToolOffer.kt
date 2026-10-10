@@ -2,6 +2,7 @@ package com.letta.mobile.data.meridian
 
 import com.letta.mobile.data.controller.extras.ExternalTool
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.extras.ToolOffer
 
 /**
@@ -44,8 +45,8 @@ class MeridianToolOffer(
 
     override val extraTools: List<ExternalTool> = listOf(metaTool)
 
-    override fun offered(invocable: List<ExternalTool>, agentId: String?): List<ExternalTool> =
-        when (modes.modeFor(agentId)) {
+    override fun offered(invocable: List<ExternalTool>, audience: ToolAudience): List<ExternalTool> =
+        when (modes.modeFor(audience.agentId)) {
             AgentToolsMode.NATIVE -> invocable
             AgentToolsMode.META -> if (invocable.isEmpty()) emptyList() else listOf(metaTool)
         }

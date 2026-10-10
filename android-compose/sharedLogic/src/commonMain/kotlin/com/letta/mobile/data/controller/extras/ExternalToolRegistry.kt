@@ -122,10 +122,11 @@ class ExternalToolRegistry(
     fun invocableTools(): List<ExternalTool> = listAdvertisedTools()
 
     /**
-     * The tools [agentId]'s runtime is offered (null: the host default): every invocable tool under
-     * [ToolOffer.Native], the `meridian` meta-tool alone under the Meridian offer.
+     * The tools [audience] is offered: every invocable tool under [ToolOffer.Native], the
+     * `meridian` meta-tool alone under the Meridian offer in meta mode.
      */
-    fun offeredTools(agentId: String? = null): List<ExternalTool> = toolOffer.offered(listAdvertisedTools(), agentId)
+    fun offeredTools(audience: ToolAudience = ToolAudience.HostDefault): List<ExternalTool> =
+        toolOffer.offered(listAdvertisedTools(), audience)
 
     /**
      * This registry's fixed tools under [offer] instead (letta-mobile-jna0o.8). Call it while
@@ -155,8 +156,11 @@ class ExternalToolRegistry(
      * entirely rather than sending an empty group (the server treats an omitted
      * field and an empty group list alike: "unregister everything").
      */
-    fun advertisedToolsCommandGroups(scopeId: String? = null, agentId: String? = null): List<AppServerExternalToolsGroup>? {
-        val advertised = offeredTools(agentId)
+    fun advertisedToolsCommandGroups(
+        scopeId: String? = null,
+        audience: ToolAudience = ToolAudience.HostDefault,
+    ): List<AppServerExternalToolsGroup>? {
+        val advertised = offeredTools(audience)
         dynamicTools.markAdvertised(advertised)
         val definitions = advertised.map { tool ->
             AppServerExternalToolDefinition(
