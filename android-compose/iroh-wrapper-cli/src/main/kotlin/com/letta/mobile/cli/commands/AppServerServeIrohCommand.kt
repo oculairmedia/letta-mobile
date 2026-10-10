@@ -32,7 +32,6 @@ import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
 import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
-import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
@@ -683,7 +682,6 @@ class AppServerServeIrohCommand : CliktCommand(
         val controller = DefaultAppServerController(
             client = routedClient,
             runtimeRegistry = runtimeRegistry,
-            turnContextPreflight = AppServerContextWindowPreflight(routedClient),
             // letta-mobile-bn008-phase2-custom-tool (1vuec): wire the Iroh
             // agent-message CLI as an external tool, gated by --meridian-binary.
             // When unset the registry advertises no extras, preserving the

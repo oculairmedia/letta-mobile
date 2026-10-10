@@ -7,7 +7,6 @@ import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.runtime.AppServerTurnEngine
-import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -308,7 +307,6 @@ internal class IrohDialer(
                 version = clientVersion,
             ),
             permissionMode = AppServerPermissionMode.Unrestricted,
-            turnContextPreflight = TurnContextPreflight.None,
             eventRouter = eventRouter,
             externalToolRegistry = externalToolRegistry,
         )
