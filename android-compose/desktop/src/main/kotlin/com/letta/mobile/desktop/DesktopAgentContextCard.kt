@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.ui.context.AgentContextCardActions
+import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
@@ -52,8 +53,15 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
     val conversationId = frame.chatState.selectedConversationId
     val agent = frame.focus.rosterAgents.firstOrNull { it.id.value == agentId }
     val override = conversationId?.let(selections::get)
+    val binding = remember(deps, chatController) {
+        AgentContextCardBinding(
+            deps = deps,
+            actions = AgentContextCardActions(onModelSelected = { entry -> chatController.setConversationModel(entry.value) }),
+            presentation = AgentContextPresentation.Popover,
+        )
+    }
     AgentContextCardHost(
-        deps = deps,
+        binding = binding,
         focus = AgentContextFocus(
             agentId = agentId,
             conversationId = conversationId,
@@ -63,10 +71,6 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
             windowTokens = contextWindowTokensOf(agent, models, override),
             turnRunning = frame.activity.isThinkingSelected || frame.activity.isStreamingReplySelected,
         ),
-        actions = remember(chatController) {
-            AgentContextCardActions(onModelSelected = { entry -> chatController.setConversationModel(entry.value) })
-        },
-        presentation = AgentContextPresentation.Popover,
     )
 }
 

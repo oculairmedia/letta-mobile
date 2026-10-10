@@ -13,6 +13,7 @@ import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.feature.chat.coordination.EffortSelection
 import com.letta.mobile.ui.context.AgentContextCardActions
+import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
@@ -62,9 +63,19 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
     val deps = remember(session, pickerSource) {
         AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource)
     }
+    val binding = remember(deps, viewModel) {
+        AgentContextCardBinding(
+            deps = deps,
+            actions = AgentContextCardActions(
+                onModelSelected = { entry -> viewModel.updateActiveAgentModel(entry.handle.value) },
+                onEffortSelected = { entry, effort -> viewModel.updateActiveAgentModel(entry.handle.value, EffortSelection.Set(effort)) },
+            ),
+            presentation = AgentContextPresentation.Sheet,
+        )
+    }
     val current = state.availableModels.firstOrNull { it.handle == state.activeAgentModel || it.id == state.activeAgentModel }
     AgentContextCardHost(
-        deps = deps,
+        binding = binding,
         focus = AgentContextFocus(
             agentId = state.agentIdValue,
             conversationId = state.conversationId,
@@ -74,12 +85,5 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
             windowTokens = contextWindowTokensOf(agent, state.availableModels, state.conversationId?.let(selections::get)),
             turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
         ),
-        actions = remember(viewModel) {
-            AgentContextCardActions(
-                onModelSelected = { entry -> viewModel.updateActiveAgentModel(entry.handle.value) },
-                onEffortSelected = { entry, effort -> viewModel.updateActiveAgentModel(entry.handle.value, EffortSelection.Set(effort)) },
-            )
-        },
-        presentation = AgentContextPresentation.Sheet,
     )
 }

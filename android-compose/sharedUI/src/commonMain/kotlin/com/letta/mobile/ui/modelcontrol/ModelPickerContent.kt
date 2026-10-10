@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.modelcontrol
 
-import com.letta.mobile.data.context.formatContextTokens
+import com.letta.mobile.ui.context.AgentContextStrings
 import com.letta.mobile.data.context.AgentContextCardModel
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.background
@@ -254,7 +254,7 @@ private fun PickerRowWindow(entry: ModelPickerEntry) {
     val used = LocalModelPickerContextTokens.current
     val overflows = AgentContextCardModel.overflowsWindow(used, window)
     Text(
-        text = if (overflows) ModelControlStrings.windowTooSmall(formatContextTokens(window)) else ModelControlStrings.windowLabel(formatContextTokens(window)),
+        text = AgentContextStrings.windowLine(window, overflows),
         style = MaterialTheme.typography.bodySmall,
         color = if (overflows) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 2,

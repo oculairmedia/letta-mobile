@@ -3,6 +3,7 @@ package com.letta.mobile.ui.context
 import com.letta.mobile.data.context.CompactionNotice
 import com.letta.mobile.data.context.ContextProvenance
 import com.letta.mobile.data.context.ModelChangeScope
+import com.letta.mobile.data.context.formatContextTokens
 
 /**
  * letta-mobile-3io8k: the drawer context card's and sheet's text, in Kotlin like
@@ -18,6 +19,12 @@ object AgentContextStrings {
     const val TOTAL_ONLY_HINT = "Breakdown not available from this host."
     const val NEAR_FULL_HINT = "Nearly full. Compacting now keeps the next turn from being cut short."
     const val OPEN_SHEET = "Model and context"
+
+    /** A model's context window under its name in the picker ("200k context"), or the overflow warning. */
+    fun windowLine(windowTokens: Int, overflows: Boolean): String {
+        val window = formatContextTokens(windowTokens)
+        return if (overflows) "$window context: smaller than this conversation; compact before sending" else "$window context"
+    }
 
     fun usedLine(percent: Int?, window: String?, used: String?): String = when {
         percent != null && window != null -> "$percent% of $window used"

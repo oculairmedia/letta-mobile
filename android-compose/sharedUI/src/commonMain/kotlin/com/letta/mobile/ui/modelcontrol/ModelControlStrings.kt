@@ -95,10 +95,4 @@ object ModelControlStrings {
     fun removeLabel(name: String) = "Remove $name"
 
     fun showSecret(label: String, shown: Boolean) = if (shown) "Hide $label" else "Show $label"
-
-    /** letta-mobile-3io8k: a model's context window under its name ("200k context"). */
-    fun windowLabel(window: String): String = "$window context"
-
-    /** The window is smaller than what the conversation already holds. */
-    fun windowTooSmall(window: String): String = "$window context: smaller than this conversation; compact before sending"
 }

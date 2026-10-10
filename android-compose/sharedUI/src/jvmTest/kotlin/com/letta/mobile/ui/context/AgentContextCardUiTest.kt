@@ -51,7 +51,7 @@ class AgentContextCardUiTest {
     @Test
     fun theCardShowsTheModelEffortAndHowFullTheWindowIs() = runComposeUiTest {
         val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
-        setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
+        setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD_MODEL, useUnmergedTree = true).assertTextEquals("Claude Opus · High")
         onNodeWithTag(AgentContextTags.CARD_USAGE, useUnmergedTree = true).assertTextEquals("42% of 200k used")
     }
@@ -59,7 +59,7 @@ class AgentContextCardUiTest {
     @Test
     fun theSheetIsTotalOnlyWithoutABreakdownAndHidesCompactWithoutARoute() = runComposeUiTest {
         val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
-        setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
+        setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.SCOPE).assertTextEquals("Applies to this agent")
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Total only")
@@ -78,7 +78,7 @@ class AgentContextCardUiTest {
             calibrated = false,
         )
         val deps = AgentContextCardDeps(readings(84_000), ContextBreakdownLoader { overview }, compaction = null, pickerSource = null)
-        setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
+        setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Estimated, matched to provider total")
@@ -92,7 +92,7 @@ class AgentContextCardUiTest {
         val repository = repository(CompactionOutcome.Compacted(result))
         val readings = readings(84_000)
         val deps = AgentContextCardDeps(readings, breakdown = null, compaction = CompactionController(repository, readings), pickerSource = null)
-        setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
+        setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.COMPACT).assertIsEnabled().performClick()
         waitForIdle()
@@ -106,7 +106,7 @@ class AgentContextCardUiTest {
     fun anUnsupportedBackendHidesCompactAfterTheFirstTry() = runComposeUiTest {
         val readings = readings(84_000)
         val deps = AgentContextCardDeps(readings, null, CompactionController(repository(CompactionOutcome.Unsupported), readings), null)
-        setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
+        setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         onNodeWithTag(AgentContextTags.COMPACT).performClick()
         waitForIdle()

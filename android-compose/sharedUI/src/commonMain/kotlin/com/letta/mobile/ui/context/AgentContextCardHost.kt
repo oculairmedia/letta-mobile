@@ -95,62 +95,92 @@ data class AgentContextCardActions(
 /** A bottom sheet on a phone; a popover anchored under the card beside the desktop sidebar. */
 enum class AgentContextPresentation { Sheet, Popover }
 
+/** How a host binds the card: the session pieces, the model picks, and how the sheet opens. */
+data class AgentContextCardBinding(
+    val deps: AgentContextCardDeps,
+    val actions: AgentContextCardActions,
+    val presentation: AgentContextPresentation,
+)
+
 /**
  * letta-mobile-3io8k: the drawer card with its sheet, wired to the session. The meter is the
  * streamed total; the breakdown loads only while the sheet is open and no turn runs, and again
  * after a compaction; nothing polls.
  */
 @Composable
-fun AgentContextCardHost(
-    deps: AgentContextCardDeps,
-    focus: AgentContextFocus,
-    actions: AgentContextCardActions,
-    presentation: AgentContextPresentation,
-    modifier: Modifier = Modifier,
-) {
+fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFocus, modifier: Modifier = Modifier) {
+    val deps = binding.deps
     var open by remember { mutableStateOf(false) }
     var lastOutcome by remember(focus.agentId, focus.conversationId) { mutableStateOf<CompactionOutcome?>(null) }
-    val reading = rememberReading(deps.readings, focus)
-    val request = ContextBreakdownRequest(
-        agentId = AgentId(focus.agentId),
-        conversationId = focus.conversationId?.let(::ConversationId),
-        reportedTotal = reading.total.takeUnless { reading.estimated },
-    )
-    val breakdown by (deps.breakdown?.state ?: IDLE).collectAsState()
-    val compacting by (deps.compaction?.compacting ?: NONE_COMPACTING).collectAsState()
-    val supported by (deps.compaction?.supported ?: UNKNOWN_SUPPORT).collectAsState()
-    val compactionRequest = CompactionRequest(AgentId(focus.agentId), focus.conversationId?.let(::ConversationId))
-    val model = AgentContextCardModel.present(
-        AgentContextCardInputs(
-            modelLabel = focus.modelLabel,
-            effort = focus.effort,
-            meter = ContextMeter.of(reading.total, focus.windowTokens, breakdown.overviewFor(request), reading.estimated),
-            conversationIsDefault = focus.isDefaultConversation,
-            compactSupported = if (deps.compaction == null) false else supported,
-            compacting = compactionRequest.key in compacting,
-            turnRunning = focus.turnRunning,
-            lastOutcome = lastOutcome,
-        ),
-    )
-    LaunchedEffect(open, request, focus.turnRunning) {
-        if (open && !focus.turnRunning) deps.breakdown?.load(request)
+    val requests = CardRequests.of(focus, rememberReading(deps.readings, focus))
+    val model = rememberCardModel(deps, focus, requests, lastOutcome)
+    LaunchedEffect(open, requests.breakdown, focus.turnRunning) {
+        if (open && !focus.turnRunning) deps.breakdown?.load(requests.breakdown)
     }
     val scope = rememberCoroutineScope()
     val onCompact: () -> Unit = {
-        scope.launch {
-            val controller = deps.compaction ?: return@launch
-            lastOutcome = controller.compact(compactionRequest)
-            deps.breakdown?.load(request.copy(reportedTotal = null), force = true)
-        }
+        scope.launch { deps.compaction?.let { lastOutcome = compactAndReload(it, deps.breakdown, requests) } }
     }
     Box(modifier) {
         AgentContextCard(model = model, onClick = { open = true })
         if (open) {
-            AgentContextSurface(presentation, onDismiss = { open = false }) {
-                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, actions) { open = false }, onCompact)
+            AgentContextSurface(binding.presentation, onDismiss = { open = false }) {
+                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions) { open = false }, onCompact)
             }
         }
     }
+}
+
+/** The two requests one conversation's card makes, and the reading they were built from. */
+private data class CardRequests(val reading: Reading, val breakdown: ContextBreakdownRequest, val compaction: CompactionRequest) {
+    companion object {
+        fun of(focus: AgentContextFocus, reading: Reading): CardRequests {
+            val agentId = AgentId(focus.agentId)
+            val conversationId = focus.conversationId?.let(::ConversationId)
+            return CardRequests(
+                reading = reading,
+                // A post-compaction estimate is not a total to match the sections to.
+                breakdown = ContextBreakdownRequest(agentId, conversationId, reading.total.takeUnless { reading.estimated }),
+                compaction = CompactionRequest(agentId, conversationId),
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberCardModel(
+    deps: AgentContextCardDeps,
+    focus: AgentContextFocus,
+    requests: CardRequests,
+    lastOutcome: CompactionOutcome?,
+): AgentContextCardModel {
+    val breakdown by (deps.breakdown?.state ?: IDLE).collectAsState()
+    val compacting by (deps.compaction?.compacting ?: NONE_COMPACTING).collectAsState()
+    val supported by (deps.compaction?.supported ?: UNKNOWN_SUPPORT).collectAsState()
+    val reading = requests.reading
+    return AgentContextCardModel.present(
+        AgentContextCardInputs(
+            modelLabel = focus.modelLabel,
+            effort = focus.effort,
+            meter = ContextMeter.of(reading.total, focus.windowTokens, breakdown.overviewFor(requests.breakdown), reading.estimated),
+            conversationIsDefault = focus.isDefaultConversation,
+            compactSupported = if (deps.compaction == null) false else supported,
+            compacting = requests.compaction.key in compacting,
+            turnRunning = focus.turnRunning,
+            lastOutcome = lastOutcome,
+        ),
+    )
+}
+
+/** Compacts, then re-reads the breakdown from disk: the old total no longer describes it. */
+private suspend fun compactAndReload(
+    controller: CompactionController,
+    breakdown: ContextBreakdownLoader?,
+    requests: CardRequests,
+): CompactionOutcome {
+    val outcome = controller.compact(requests.compaction)
+    breakdown?.load(requests.breakdown.copy(reportedTotal = null), force = true)
+    return outcome
 }
 
 /** The conversation's streamed total and whether it is a post-compaction estimate. */
