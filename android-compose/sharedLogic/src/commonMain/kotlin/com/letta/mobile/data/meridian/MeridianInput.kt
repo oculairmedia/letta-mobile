@@ -6,20 +6,93 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/**
- * Reads `--input-file PATH` for a front door that has a filesystem (the wrapper's endpoint binds
- * one); null means the file could not be read. The router never reads files itself.
- */
-fun interface MeridianInputFiles {
-    suspend fun read(path: String): String?
-}
+/** One `--flag` as written: its name, and its value (null for a bare boolean flag). */
+internal data class MeridianFlag(val name: String, val value: String?)
 
-/** The words after a command: positionals, `--flag value` / `--flag=value` scalars, and `--input-file`. */
+/**
+ * The words after a command: positionals, `--flag value` / `--flag=value` scalars and
+ * `--input-file`, plus the [stdin] JSON text once the front door has resolved it.
+ */
 internal data class MeridianArgs(
     val positionals: List<String>,
-    val flags: List<Pair<String, String?>>,
+    val flags: List<MeridianFlag>,
     val inputFile: String?,
+    val stdin: String? = null,
 )
+
+/** One input property of a command's tool, as the tool's input schema describes it. */
+internal class MeridianInputProperty(val name: String, schema: JsonObject?) {
+    val type: String? = (schema?.get("type") as? JsonPrimitive)?.takeIf { it.isString }?.content
+    val pointer: String get() = "/$name"
+    val flag: String get() = "--${name.replace('_', '-')}"
+    val isBoolean: Boolean get() = type == "boolean"
+
+    fun expected(): String = when (type) {
+        "array", "object" -> "given in the stdin JSON (an $type cannot be a flag)"
+        "integer" -> "an integer"
+        else -> "a $type"
+    }
+}
+
+/** A scalar written in argv for [property]: a positional, or a flag's value. */
+internal data class MeridianRawValue(val property: MeridianInputProperty, val raw: String) {
+    /** [raw] typed as the schema says, or null when it is not that type (or cannot be a flag). */
+    fun json(): JsonElement? = when (property.type) {
+        "integer" -> raw.toLongOrNull()?.let(::JsonPrimitive)
+        "number" -> raw.toDoubleOrNull()?.let(::JsonPrimitive)
+        "boolean" -> raw.toBooleanStrictOrNull()?.let(::JsonPrimitive)
+        "array", "object" -> null
+        else -> JsonPrimitive(raw)
+    }
+}
+
+/** A command's input properties, found by property name or by flag (dashes, aliases). */
+internal class MeridianCommandSchema(private val command: MeridianCommand) {
+    private val properties: JsonObject? = command.tool.inputSchema?.get("properties") as? JsonObject
+
+    fun property(name: String) = MeridianInputProperty(name, properties?.get(name) as? JsonObject)
+
+    fun forFlag(flag: MeridianFlag) = property(command.flagAliases[flag.name] ?: flag.name.replace('-', '_'))
+
+    /** False only when the schema lists its properties and [property] is not one of them. */
+    fun accepts(property: MeridianInputProperty): Boolean = properties == null || property.name in properties
+}
+
+/**
+ * Reads a command's argv words left to right: a word starting `--` is a flag (`--name=value`,
+ * `--name value`, or a bare boolean `--name`); anything else is a positional.
+ */
+private class MeridianArgvReader(private val words: List<String>, private val schema: MeridianCommandSchema) {
+    private var index = 0
+    private val positionals = mutableListOf<String>()
+    private val flags = mutableListOf<MeridianFlag>()
+
+    fun read(): MeridianArgs {
+        while (index < words.size) {
+            val word = words[index++]
+            if (word.startsWith("--") && word != "--") flags += nextFlag() else positionals += word
+        }
+        val inputFile = flags.lastOrNull { it.name == INPUT_FILE }?.value
+        return MeridianArgs(positionals.toList(), flags.filterNot { it.name == INPUT_FILE }, inputFile)
+    }
+
+    /** The flag just read, taking the next word as its value when it needs one. */
+    private fun nextFlag(): MeridianFlag {
+        val word = words[index - 1]
+        val body = word.removePrefix("--")
+        val bare = MeridianFlag(body.substringBefore('='), null)
+        return when {
+            '=' in body -> bare.copy(value = body.substringAfter('='))
+            schema.forFlag(bare).isBoolean -> bare
+            index < words.size -> bare.copy(value = words[index++])
+            else -> throw MeridianProblemException(MeridianInputProblem.MissingValue(word))
+        }
+    }
+
+    private companion object {
+        const val INPUT_FILE = "input-file"
+    }
+}
 
 /**
  * Turns a command's argv words and stdin into the tool's input object (letta-mobile-jna0o.3).
@@ -31,115 +104,60 @@ internal data class MeridianArgs(
  * parsed itself, so a call reaches the tool exactly as the native call would.
  */
 internal class MeridianInputBuilder(private val command: MeridianCommand) {
-    private val properties: JsonObject? =
-        (command.tool.inputSchema?.get("properties") as? JsonObject)
+    private val schema = MeridianCommandSchema(command)
 
-    fun parseArgs(words: List<String>): Result<MeridianArgs> {
-        val positionals = mutableListOf<String>()
-        val flags = mutableListOf<Pair<String, String?>>()
-        var index = 0
-        while (index < words.size) {
-            val word = words[index]
-            if (!word.startsWith("--") || word == "--") {
-                positionals += word
-                index += 1
-                continue
-            }
-            val flag = word.removePrefix("--")
-            val name = flag.substringBefore('=')
-            val inline = if ('=' in flag) flag.substringAfter('=') else null
-            val takesValue = inline == null && !isBooleanFlag(name)
-            if (takesValue && index + 1 >= words.size) return usage("--$name needs a value")
-            flags += name to (inline ?: if (takesValue) words[index + 1] else null)
-            index += if (takesValue) 2 else 1
+    fun parseArgs(words: List<String>): Result<MeridianArgs> = catchingProblems { MeridianArgvReader(words, schema).read() }
+
+    /** The tool input: [MeridianArgs.stdin] parsed, then the argv scalars added. */
+    fun build(args: MeridianArgs): Result<JsonObject> = catchingProblems {
+        val merged = LinkedHashMap<String, JsonElement>(stdinObject(args))
+        for ((property, value) in scalars(args)) {
+            val existing = merged[property.name]
+            if (existing != null && existing != value) throw MeridianProblemException(MeridianInputProblem.GivenTwice(property))
+            merged[property.name] = value
         }
-        val inputFile = flags.lastOrNull { it.first == INPUT_FILE }?.second
-        return Result.success(MeridianArgs(positionals, flags.filterNot { it.first == INPUT_FILE }, inputFile))
+        JsonObject(merged)
     }
 
-    /** The tool input: [stdin] parsed, then [args]' scalars added. */
-    fun build(stdin: String?, args: MeridianArgs): Result<JsonObject> {
-        val base = parseStdin(stdin).getOrElse { return Result.failure(it) }
-        val extra = scalars(args).getOrElse { return Result.failure(it) }
-        val merged = LinkedHashMap<String, JsonElement>(base)
-        for ((key, value) in extra) {
-            val existing = merged[key]
-            if (existing != null && existing != value) {
-                return failure(MeridianErrorCode.INVALID_INPUT, "$key is given both in the stdin JSON and as an argument", "/$key")
-            }
-            merged[key] = value
-        }
-        return Result.success(JsonObject(merged))
-    }
-
-    private fun parseStdin(stdin: String?): Result<JsonObject> {
-        if (stdin.isNullOrBlank()) return Result.success(JsonObject(emptyMap()))
+    private fun stdinObject(args: MeridianArgs): JsonObject {
+        val text = args.stdin
+        if (text.isNullOrBlank()) return JsonObject(emptyMap())
         val element = try {
-            Json.parseToJsonElement(stdin)
+            Json.parseToJsonElement(text)
         } catch (e: SerializationException) {
-            return failure(MeridianErrorCode.INVALID_JSON, "stdin is not valid JSON: ${e.message?.lineSequence()?.firstOrNull().orEmpty()}", "")
+            throw MeridianProblemException(MeridianInputProblem.InvalidJson(e.message.orEmpty()))
         }
-        val obj = element as? JsonObject
-            ?: return failure(MeridianErrorCode.INVALID_JSON, "stdin must be one JSON object", "")
-        return Result.success(obj)
+        return element as? JsonObject ?: throw MeridianProblemException(MeridianInputProblem.InvalidJson(null))
     }
 
-    private fun scalars(args: MeridianArgs): Result<List<Pair<String, JsonElement>>> {
-        if (args.positionals.size > command.positional.size) {
-            return usage("unexpected argument '${args.positionals[command.positional.size]}'")
+    private fun scalars(args: MeridianArgs): List<Pair<MeridianInputProperty, JsonElement>> {
+        args.positionals.getOrNull(command.positional.size)?.let {
+            throw MeridianProblemException(MeridianInputProblem.UnexpectedArgument(it))
         }
-        val named = command.positional.zip(args.positionals) + args.flags.map { (flag, value) -> property(flag) to (value ?: TRUE) }
-        return Result.success(named.map { (key, raw) -> key to (typed(key, raw).getOrElse { return Result.failure(it) }) })
+        val positional = command.positional.zip(args.positionals).map { (name, raw) -> MeridianRawValue(schema.property(name), raw) }
+        val flagged = args.flags.map { flag -> MeridianRawValue(schema.forFlag(flag), flag.value ?: TRUE) }
+        return (positional + flagged).map { it.property to typed(it) }
     }
 
-    /** The input property a flag names: an alias, or the flag with dashes as underscores. */
-    private fun property(flag: String): String = command.flagAliases[flag] ?: flag.replace('-', '_')
-
-    private fun isBooleanFlag(flag: String): Boolean = typeOf(property(flag)) == "boolean"
-
-    private fun typeOf(key: String): String? =
-        (properties?.get(key) as? JsonObject)?.get("type")?.let { (it as? JsonPrimitive)?.contentOrNullSafe() }
-
-    private fun typed(key: String, raw: String): Result<JsonElement> {
-        if (properties != null && key !in properties) {
-            return failure(MeridianErrorCode.INVALID_INPUT, "${command.display} takes no --${key.replace('_', '-')}", "/$key")
-        }
-        val value: JsonElement? = when (typeOf(key)) {
-            "integer" -> raw.toLongOrNull()?.let(::JsonPrimitive)
-            "number" -> raw.toDoubleOrNull()?.let(::JsonPrimitive)
-            "boolean" -> raw.toBooleanStrictOrNull()?.let(::JsonPrimitive)
-            "array", "object" -> null
-            else -> JsonPrimitive(raw)
-        }
-        return value?.let { Result.success(it) }
-            ?: failure(MeridianErrorCode.INVALID_INPUT, "--${key.replace('_', '-')} must be ${expected(key)}", "/$key")
+    private fun typed(value: MeridianRawValue): JsonElement {
+        if (!schema.accepts(value.property)) throw MeridianProblemException(MeridianInputProblem.UnknownFlag(command, value.property))
+        return value.json() ?: throw MeridianProblemException(MeridianInputProblem.WrongType(value.property))
     }
 
-    private fun expected(key: String): String = when (val type = typeOf(key)) {
-        "array", "object" -> "given in the stdin JSON (an $type cannot be a flag)"
-        "integer" -> "an integer"
-        else -> "a $type"
+    /** [block], with a problem it raises answered as this command's structured error. */
+    private inline fun <T> catchingProblems(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (problem: MeridianProblemException) {
+        Result.failure(MeridianFailure(problem.problem.toError(command)))
     }
 
-    private fun JsonPrimitive.contentOrNullSafe(): String? = if (isString) content else null
-
-    private fun <T> usage(message: String): Result<T> = failure(MeridianErrorCode.USAGE, message, null)
-
-    private fun <T> failure(code: MeridianErrorCode, message: String, pointer: String?): Result<T> =
-        Result.failure(MeridianFailure(MeridianError(code, message, command = command.display, pointer = pointer, hint = hintFor(code))))
-
-    private fun hintFor(code: MeridianErrorCode): String? = when (code) {
-        MeridianErrorCode.INVALID_JSON ->
-            "Pass the input as one JSON object on stdin with a quoted heredoc: meridian ${command.display} <<'JSON' ... JSON"
-        MeridianErrorCode.USAGE, MeridianErrorCode.INVALID_INPUT -> "See: meridian ${command.display} --help"
-        else -> null
-    }
-
-    companion object {
-        const val INPUT_FILE = "input-file"
-        private const val TRUE = "true"
+    private companion object {
+        const val TRUE = "true"
     }
 }
+
+/** A problem raised while reading input, before it is tied to a command. */
+internal class MeridianProblemException(val problem: MeridianInputProblem) : Exception(problem.message)
 
 /** A refusal raised while parsing, carried out of a [Result]. */
 internal class MeridianFailure(val error: MeridianError) : Exception(error.message)
