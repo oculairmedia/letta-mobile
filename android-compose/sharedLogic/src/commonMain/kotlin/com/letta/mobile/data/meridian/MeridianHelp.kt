@@ -132,7 +132,7 @@ internal object MeridianHelp {
 
     private const val COMPOSE_TOPIC = "compose"
 
-    private val GUIDE_TEXTS: Map<String, () -> String> = linkedMapOf(
+    private val GUIDE_TEXTS: Map<String, () -> String> = mapOf(
         "scene" to { CanvasSceneSchema.description },
         "ops" to { CanvasToolContract.applyOps.description },
     )
