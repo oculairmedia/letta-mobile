@@ -84,7 +84,8 @@ private class MeridianArgvReader(private val words: List<String>, private val sc
         return when {
             '=' in body -> bare.copy(value = body.substringAfter('='))
             schema.forFlag(bare).isBoolean -> bare
-            index < words.size -> bare.copy(value = words[index++])
+            // A flag never takes the next flag as its value; a value starting `--` needs `--name=value`.
+            index < words.size && !words[index].startsWith("--") -> bare.copy(value = words[index++])
             else -> throw MeridianProblemException(MeridianInputProblem.MissingValue(word))
         }
     }
