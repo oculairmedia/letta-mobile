@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.projection
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.canvas.CanvasToolContract
+import com.letta.mobile.data.chat.projection.meridian.MeridianCommandCall
 import com.letta.mobile.data.canvas.compose.ComposeBounds
 import com.letta.mobile.data.canvas.compose.ComposeKind
 import com.letta.mobile.data.model.ToolCall
@@ -112,9 +113,18 @@ object CanvasArtifactReceipts {
         return if (message.artifacts == receipts) message else message.copy(artifacts = receipts)
     }
 
+    /**
+     * Whether [call] is a compose call: the native tool, or (letta-mobile-jna0o.6) a
+     * `meridian canvas compose` run through Bash or the `meridian` meta-tool.
+     */
+    fun isComposeCall(call: ToolCall): Boolean =
+        isComposeTool(call.name) || isComposeTool(MeridianCommandCall.parse(call)?.toolName)
+
     /** The receipt one call's return says, or its pending / degraded form. Exposed for tests. */
-    fun receiptFor(event: TimelineEvent, call: ToolCall, ordinal: Int = 0): CanvasArtifactReceipt =
-        ComposeCallReading.of(event, call, ordinal).receipt()
+    fun receiptFor(event: TimelineEvent, call: ToolCall, ordinal: Int = 0): CanvasArtifactReceipt {
+        val meridian = MeridianCommandCall.parse(call)
+        return ComposeCallReading.of(event, meridian?.applyTo(call) ?: call, ordinal, fromCli = meridian != null).receipt()
+    }
 
     private val PROVIDER_SAFE_COMPOSE = CanvasToolContract.COMPOSE.replace('.', '_')
 }
@@ -132,7 +142,7 @@ private class ReceiptCollector(private val events: List<TimelineEvent>) {
         val event = events[index]
         val target = ReceiptNarration(events, index).target()
         event.toolCallList().forEachIndexed { ordinal, call ->
-            if (CanvasArtifactReceipts.isComposeTool(call.name)) {
+            if (CanvasArtifactReceipts.isComposeCall(call)) {
                 val receipt = CanvasArtifactReceipts.receiptFor(event, call, ordinal)
                 val callKey = call.effectiveId.ifBlank { "${CanvasArtifactReceipts.eventKey(event)}#$ordinal" }
                 keepMostAdvanced(callKey, Found(order = index * MAX_CALLS_PER_EVENT + ordinal, target = target, receipt = receipt))

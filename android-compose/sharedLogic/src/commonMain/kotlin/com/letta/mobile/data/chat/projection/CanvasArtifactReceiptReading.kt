@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.canvas.compose.ComposeKind
+import com.letta.mobile.data.chat.projection.meridian.MeridianCommandCall
 import com.letta.mobile.data.canvas.compose.ComposeReceipt
 import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.canvas.compose.ComposeStatus
@@ -119,15 +120,21 @@ internal class ComposeCallReading private constructor(
     }
 
     companion object {
-        fun of(event: TimelineEvent, call: ToolCall, ordinal: Int): ComposeCallReading {
+        /**
+         * [fromCli]: the call ran through the `meridian` CLI (letta-mobile-jna0o.6), so its return
+         * is the shell's output and the receipt JSON is read off its stdout.
+         */
+        fun of(event: TimelineEvent, call: ToolCall, ordinal: Int, fromCli: Boolean = false): ComposeCallReading {
             val callId = call.effectiveId.takeIf { it.isNotBlank() }
             val request = RequestSummary.of(call.arguments)
+            val returned = event.returnText(callId, ordinal)
+            val result = if (fromCli) MeridianCommandCall.toolResult(returned) else returned
             return ComposeCallReading(
                 callId = callId,
                 request = request,
                 fallbackId = request.artifactId ?: callId?.let { "call:$it" } ?: "call:${CanvasArtifactReceipts.eventKey(event)}#$ordinal",
-                result = event.returnText(callId, ordinal),
-                isError = event.returnIsError(callId),
+                result = result,
+                isError = event.returnIsError(callId) || (fromCli && MeridianCommandCall.isErrorResult(returned)),
                 truncated = event.returnTruncated(callId),
             )
         }
