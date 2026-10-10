@@ -18,6 +18,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.controller.extras.ToolOffer
 import com.letta.mobile.data.controller.extras.ToolSource
 import com.letta.mobile.data.plugin.PluginActionInvoker
 import com.letta.mobile.data.plugin.PluginActionTool
@@ -33,7 +34,10 @@ import kotlinx.serialization.json.jsonObject
  * Every call any tool receives is recorded, so a test can prove which registry entry ran and for
  * whom.
  */
-internal class MeridianTestHost(withCanvas: Boolean = true) {
+internal class MeridianTestHost(
+    withCanvas: Boolean = true,
+    offer: ((ExternalToolRegistry) -> ToolOffer)? = null,
+) {
     data class Call(val tool: String, val input: JsonObject, val caller: ExternalToolCaller)
 
     val calls = mutableListOf<Call>()
@@ -57,7 +61,7 @@ internal class MeridianTestHost(withCanvas: Boolean = true) {
             Recording(FakeMessageTool(), calls),
             Recording(FakeDeviceAction(), calls),
         ),
-    ).also { registry ->
+    ).let { registry -> offer?.let(registry::offering) ?: registry }.also { registry ->
         val plugin = PluginActionTool(PLUGIN_DEFINITION, PluginActionInvoker { definition, input, caller ->
             calls += Call(definition.name, input, caller)
             ExternalToolResult.Success("""{"ok":true,"action":"${definition.action}"}""")
