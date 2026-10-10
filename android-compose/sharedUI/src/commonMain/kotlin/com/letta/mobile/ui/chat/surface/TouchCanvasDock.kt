@@ -27,9 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -510,24 +508,6 @@ private fun popupShape(style: PopupCardStyle): Shape {
     return headAnchoredShape(style.placement.headOnRight, style.below)
 }
 
-/**
- * A card spoken from the head (the popup, the bubble's card): rounded all round but for the corner
- * nearest the head, which stays tight.
- */
-internal fun headAnchoredShape(headOnRight: Boolean, below: Boolean): Shape {
-    // Clockwise from the top left, as the shape takes them.
-    val corners = Array(CORNERS) { CornerSize(LettaDimens.Radius.lg) }
-    corners[anchorCorner(headOnRight, below)] = CornerSize(ChatHeadDimens.popupAnchorCorner)
-    return AbsoluteRoundedCornerShape(corners[0], corners[1], corners[2], corners[3])
-}
-
-/** Which corner (clockwise from the top left) faces the head. */
-private fun anchorCorner(headOnRight: Boolean, below: Boolean): Int {
-    return when {
-        below -> if (headOnRight) TOP_RIGHT else TOP_LEFT
-        else -> if (headOnRight) BOTTOM_RIGHT else BOTTOM_LEFT
-    }
-}
 
 /**
  * Swiping the card sideways drags it with the finger, fading as it goes; let go past
@@ -723,12 +703,6 @@ private const val INPUT_TRAY_MAX_HEIGHT_FRACTION = 0.6f
 
 private const val HALF = 0.5f
 
-/** The popup's four corners, clockwise from the top left. */
-private const val CORNERS = 4
-private const val TOP_LEFT = 0
-private const val TOP_RIGHT = 1
-private const val BOTTOM_RIGHT = 2
-private const val BOTTOM_LEFT = 3
 
 /** How much a fully swiped popup fades. */
 private const val SWIPE_FADE = 0.6f
