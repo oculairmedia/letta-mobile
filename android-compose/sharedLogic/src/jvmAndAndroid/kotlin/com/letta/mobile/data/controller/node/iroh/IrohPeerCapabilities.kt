@@ -198,6 +198,8 @@ object IrohPeerCapabilities {
     private val CONVERSATION_MANAGE_METHODS = setOf(
         "conversation.create", "conversation.update", "conversation.archive",
         "conversation.restore", "conversation.delete", "conversation.fork",
+        // letta-mobile-57cta: rewrites the conversation's transcript, like fork/update.
+        "conversation.compact",
     )
 
     // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.

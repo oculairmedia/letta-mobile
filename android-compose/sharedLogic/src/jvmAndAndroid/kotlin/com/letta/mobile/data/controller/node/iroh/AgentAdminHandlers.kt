@@ -213,8 +213,11 @@ object AgentAdminHandlers {
      * the HTTP hop. The pinned App Server v2 inventory has no context command, so
      * with no store configured the method fails closed — never a shim dial.
      *
-     * The page guard still runs on the result: context carries a full transcript,
+     * The page guard still runs on the result: context carries the prompt text,
      * and bounding it is controller-owned regardless of source.
+     *
+     * letta-mobile-cyh28: an optional `reported_total` (the client's latest streamed
+     * `context_tokens`) is what the estimated sections are matched to.
      */
     private fun registerAgentContext(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
         if (store == null) {
@@ -223,7 +226,10 @@ object AgentAdminHandlers {
         }
         router.register("agent.context") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
-            val context = store.agentContextProjected(id, param(params, AdminParamKey("conversation_id")))
+            val reportedTotal = param(params, AdminParamKey("reported_total"))?.toIntOrNull()?.takeIf { it > 0 }
+            val context = store.agentContextProjected(
+                AgentContextQuery(id, param(params, AdminParamKey("conversation_id")), reportedTotal),
+            )
                 ?: adminError("agent $id not found")
             MessageListPageGuard.boundObjectStringFields(
                 MessageListPageGuard.dropField(context, "messages"),

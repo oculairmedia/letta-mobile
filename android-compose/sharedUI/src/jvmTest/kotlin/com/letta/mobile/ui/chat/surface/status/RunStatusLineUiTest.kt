@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.runtime.CommandActivity
 import com.letta.mobile.data.runtime.CommandState
+import com.letta.mobile.data.runtime.LiveCompaction
 import com.letta.mobile.data.runtime.LiveNotice
 import com.letta.mobile.data.runtime.LiveRetry
 import com.letta.mobile.data.runtime.LoopPhase
@@ -29,6 +30,21 @@ class RunStatusLineUiTest {
     fun nothingToSayDrawsNothing() = runComposeUiTest {
         setContent { MaterialTheme { RunStatusLine(RuntimeLiveStatus.Idle) } }
         onNodeWithTag(RunStatusTestTags.LINE).assertDoesNotExist()
+    }
+
+    @Test
+    fun aRunningCompactionSaysSo() = runComposeUiTest {
+        setContent { MaterialTheme { RunStatusLine(RuntimeLiveStatus(compaction = LiveCompaction(running = true))) } }
+        onNodeWithText("Compacting the conversation…").assertExists()
+    }
+
+    @Test
+    fun aFinishedCompactionGivesItsMessageCounts() = runComposeUiTest {
+        val stats = com.letta.mobile.runtime.CompactionStats(messagesCountBefore = 48, messagesCountAfter = 12)
+        setContent {
+            MaterialTheme { RunStatusLine(RuntimeLiveStatus(compaction = LiveCompaction(running = false, stats = stats))) }
+        }
+        onNodeWithText("Conversation compacted · 48 → 12 messages").assertExists()
     }
 
     @Test
