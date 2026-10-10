@@ -19,11 +19,11 @@ internal object MeridianHelp {
         appendLine("meridian: commands for this conversation's host. Input is one JSON object on stdin; output is JSON.")
         appendLine()
         appendLine("Commands:")
-        presentGroups(commands).forEach { group ->
-            val count = commands.count { it.path.first() == group.name && !it.hidden }
-            appendLine("  ${group.name.padEnd(NAME_COLUMN)}${group.summary} ($count)")
+        presentGroups(commands).forEach { group -> appendLine("  ${group.name.padEnd(NAME_COLUMN)}${group.summary}") }
+        val topics = guideTopics(commands)
+        if (topics.isNotEmpty()) {
+            appendLine("  ${MeridianCommandCatalog.GUIDE.padEnd(NAME_COLUMN)}Reference text on demand: ${topics.joinToString(", ")}.")
         }
-        if (guideTopics(commands).isNotEmpty()) appendLine("  ${MeridianCommandCatalog.GUIDE.padEnd(NAME_COLUMN)}Reference text on demand: ${guideTopics(commands).joinToString(", ")}.")
         appendLine()
         appendLine("Run `meridian <command> --help` for its verbs, `meridian schema <command...>` for an input schema.")
         appendLine(EXIT_CODES)
