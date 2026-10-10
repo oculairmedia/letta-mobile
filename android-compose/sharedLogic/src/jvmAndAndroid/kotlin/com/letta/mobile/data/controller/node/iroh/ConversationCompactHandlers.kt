@@ -5,6 +5,7 @@ import com.letta.mobile.data.compaction.CompactionMode
 import com.letta.mobile.data.compaction.CompactionPath
 import com.letta.mobile.data.compaction.ConversationCompactResult
 import com.letta.mobile.data.compaction.ConversationCompactRpc
+import com.letta.mobile.data.compaction.executeCommandAnswer
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -81,8 +82,9 @@ internal object ConversationCompactHandlers {
 
     /** `/compact`; null when the App Server has no such command. */
     private suspend fun viaCommand(client: AppServerClient, request: CompactRequest): ConversationCompactResult? {
-        val response = try {
-            client.executeCommand(
+        val answer = try {
+            // letta-code 0.26.1 answers only with slash_command_end, never execute_command_response.
+            client.executeCommandAnswer(
                 AppServerCommand.ExecuteCommand(
                     requestId = NativeAdmin.requestId(),
                     commandId = COMPACT_COMMAND,
@@ -93,9 +95,9 @@ internal object ConversationCompactHandlers {
         } catch (unsupported: UnsupportedOperationException) {
             return null
         }
-        val output = response.output ?: response.error
-        if (!response.success && output.orEmpty().startsWith(UNKNOWN_COMMAND)) return null
-        if (!response.success) adminError("compaction_failed: ${output ?: "the App Server could not compact"}")
+        val output = answer.output
+        if (!answer.success && output.orEmpty().startsWith(UNKNOWN_COMMAND)) return null
+        if (!answer.success) adminError("compaction_failed: ${output ?: "the App Server could not compact"}")
         return CompactCommandOutput.parse(output)
     }
 

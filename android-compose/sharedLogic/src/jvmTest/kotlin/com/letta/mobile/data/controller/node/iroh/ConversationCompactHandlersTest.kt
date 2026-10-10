@@ -7,8 +7,12 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRequestTimeoutException
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
+import com.letta.mobile.data.transport.appserver.AppServerChannel
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -52,6 +56,34 @@ class ConversationCompactHandlersTest {
         assertEquals("agent-1", sent.runtime?.agentId)
         assertEquals("conv-7", sent.runtime?.conversationId)
         assertTrue(client.compacts.isEmpty(), "never compacts twice")
+    }
+
+    @Test
+    fun embedded0261CompletesOnSlashCommandEndWithoutAResponseFrame() = runTest {
+        val client = CompactingClient(commandHangs = true)
+        val router = AdminRpcRouter().also { ConversationCompactHandlers.register(it, client, store = null) }
+        val running = async { router.dispatch(AdminRpcInvocation("t-1", ConversationCompactRpc.METHOD, params)) }
+        client.started.await()
+        client.events.emit(
+            AppServerReceivedFrame(
+                channel = AppServerChannel.Stream,
+                frame = AppServerInboundFrame.StreamDelta(
+                    runtime = AppServerRuntimeScope("agent-1", "default"),
+                    eventSeq = 1,
+                    emittedAt = "",
+                    idempotencyKey = "k",
+                    delta = buildJsonObject {
+                        put("message_type", "slash_command_end")
+                        put("command_id", "compact")
+                        put("output", COMPLETED)
+                        put("success", true)
+                    },
+                ),
+                raw = JsonObject(emptyMap()),
+            ),
+        )
+        val result = Json.parseToJsonElement(running.await()).jsonObject.getValue("result").jsonObject
+        assertEquals(12, result.getValue("num_messages_after").jsonPrimitive.int)
     }
 
     @Test
@@ -174,14 +206,18 @@ class ConversationCompactHandlersTest {
         private val commandSuccess: Boolean = true,
         private val commandUnsupported: Boolean = false,
         private val commandTimesOut: Boolean = false,
+        private val commandHangs: Boolean = false,
         private val onCompact: () -> Unit = {},
     ) : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = emptyFlow()
+        override val events = MutableSharedFlow<AppServerReceivedFrame>()
+        val started = CompletableDeferred<Unit>()
         val commands = mutableListOf<AppServerCommand.ExecuteCommand>()
         val compacts = mutableListOf<AppServerCommand.ConversationCompact>()
 
         override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand): AppServerInboundFrame.ExecuteCommandResponse {
             commands += command
+            started.complete(Unit)
+            if (commandHangs) awaitCancellation()
             if (commandUnsupported) throw UnsupportedOperationException("execute_command is not supported by this client")
             if (commandTimesOut) throw AppServerRequestTimeoutException(command.requestId, 30_000L, RuntimeException("slow"))
             onCompact()
