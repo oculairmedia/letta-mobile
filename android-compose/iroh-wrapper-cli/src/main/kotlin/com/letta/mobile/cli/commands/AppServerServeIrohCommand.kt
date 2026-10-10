@@ -4,7 +4,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.types.int
+import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
+import com.letta.mobile.cli.meridian.MeridianToolsOptions
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
@@ -317,6 +320,9 @@ class AppServerServeIrohCommand : CliktCommand(
     private val channelAccountCache =
         com.letta.mobile.data.controller.channels.InMemoryChannelAccountCache()
 
+    /** letta-mobile-jna0o.4: the local `meridian/tools/1` endpoint; off unless --agent-tools-mode cli. */
+    private val meridianTools by MeridianToolsOptions()
+
     private val lettaCommand by option(
         "--letta-command",
         envvar = "LETTA_COMMAND",
@@ -392,6 +398,7 @@ class AppServerServeIrohCommand : CliktCommand(
             )
 
             printChannelsHostBanner()
+            startMeridianTools(scope, nativeAdminClient)
 
             // Start accepting connections
             endpoint.start(controller)
@@ -401,6 +408,21 @@ class AppServerServeIrohCommand : CliktCommand(
 
             awaitServerLoop()
         }
+    }
+
+    /**
+     * letta-mobile-jna0o.4: serve the router over the registry the controller advertises, binding
+     * callers to the shell calls seen on the App Server frames this host relays. Needs a live App
+     * Server (Iroh-only stub mode has no runtimes, so nothing to bind to).
+     */
+    private suspend fun startMeridianTools(scope: CoroutineScope, client: AppServerClient?) {
+        val config = meridianTools.config()
+        if (!config.enabled) return
+        if (client == null) {
+            println("[iroh-app-server] meridian tools endpoint: DISABLED (no App Server to relay)")
+            return
+        }
+        MeridianToolsEndpoint(config, productionToolRegistry, client.events, ::println).start(scope)
     }
 
     private suspend fun setupA2aReceiver(
@@ -692,7 +714,7 @@ class AppServerServeIrohCommand : CliktCommand(
             // external_tools so the model sees it without operator
             // intervention. The CLI binary is the same `meridian agent-message
             // send` the operator flow already uses; this is purely additive.
-            externalToolRegistry = buildProductionExternalToolRegistry(),
+            externalToolRegistry = productionToolRegistry,
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
@@ -719,6 +741,8 @@ class AppServerServeIrohCommand : CliktCommand(
      * Test seam: `buildProductionExternalToolRegistryForTesting` exposes the
      * same logic without the class-private option fields.
      */
+    private val productionToolRegistry: ExternalToolRegistry by lazy { buildProductionExternalToolRegistry() }
+
     private fun buildProductionExternalToolRegistry(): ExternalToolRegistry =
         buildProductionExternalToolRegistryForTesting(
             binary = meridianBinary,
