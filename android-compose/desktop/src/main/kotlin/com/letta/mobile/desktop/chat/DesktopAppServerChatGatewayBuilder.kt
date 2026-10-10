@@ -8,11 +8,9 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
-import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
-import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -126,7 +124,6 @@ class DesktopAppServerChatGatewayBuilder(
                 externalToolRegistry = desktopCanvasToolRegistry(isIroh, canvasSessions),
                 config = DesktopAppServerEngineConfig(
                     eventRouter = router,
-                    turnContextPreflight = turnContextPreflightFor(isIroh, client),
                     // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
                     // Unrestricted, as it always did, and the persisted default does not reach it.
                     permissionModes = permissionModes.takeUnless { isIroh },
@@ -177,10 +174,6 @@ class DesktopAppServerChatGatewayBuilder(
 
     private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
         if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
-
-    /** Iroh turns run on the wrapper; client-local preflight would be a duplicate typed-command path. */
-    private fun turnContextPreflightFor(isIroh: Boolean, client: DefaultAppServerClient): TurnContextPreflight =
-        if (isIroh) TurnContextPreflight.None else AppServerContextWindowPreflight(client)
 
     private fun adminGatewayFor(lettaConfig: LettaConfig, client: DefaultAppServerClient): DesktopAdminChatGateway =
         if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
@@ -249,14 +242,12 @@ class DesktopAppServerChatGatewayBuilder(
  * ensureRuntime's single runtime_start carry it — no eager
  * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
  *
- * Context-window preflight matches the Iroh wrapper path so direct Desktop
- * App Server WebSocket connections also persist a default limit and compact
- * poisoned empty-assistant transcripts before the turn starts. Desktop Iroh
- * dials inject [TurnContextPreflight.None] — the wrapper owns preflight.
+ * Context management is letta-code's (letta-mobile-4rxis): the engine never stamps a context
+ * window or compacts before a turn. letta-code compacts from the agent's own compaction settings
+ * against the model's real window.
  */
 internal data class DesktopAppServerEngineConfig(
     val eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
-    val turnContextPreflight: TurnContextPreflight? = null,
     val permissionModes: PermissionModeRegistry? = null,
 )
 
@@ -293,7 +284,6 @@ internal fun buildDesktopAppServerTurnEngine(
                 ?: AppServerPermissionMode.Unrestricted
         },
         onPermissionModeInForce = { runtime, mode -> config.permissionModes?.observed(runtime, mode) },
-        turnContextPreflight = config.turnContextPreflight ?: AppServerContextWindowPreflight(client),
         eventRouter = router,
         externalToolRegistry = externalToolRegistry,
     ).also { engine -> engine.answerApprovalReplaysFrom(router, scope) }

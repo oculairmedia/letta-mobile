@@ -232,7 +232,9 @@ class DesktopAppServerChatGatewayBuilderTest {
             val start = client.runtimeStarts.single()
             assertEquals(AppServerPermissionMode.Unrestricted, start.mode)
             assertEquals("conv-1", start.conversationId)
-            assertEquals(2, client.agentRetrieveCount, "context-window preflight must run on each user turn")
+            // letta-mobile-4rxis: letta-code owns context management; the desktop engine must not
+            // read the agent, stamp a window, list messages or compact before a turn.
+            assertEquals(emptyList(), client.contextManagementCalls)
         } finally {
             eventRouter.detach()
         }
@@ -285,8 +287,7 @@ class DesktopAppServerChatGatewayBuilderTest {
      */
     private class RecordingAppServerClient : AppServerClient {
         val runtimeStarts = mutableListOf<AppServerCommand.RuntimeStart>()
-        var agentRetrieveCount = 0
-            private set
+        val contextManagementCalls = mutableListOf<String>()
         val eventsFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
         override val events: Flow<AppServerReceivedFrame> = eventsFlow
 
@@ -315,36 +316,30 @@ class DesktopAppServerChatGatewayBuilderTest {
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
-        // Healthy context so AppServerContextWindowPreflight does not mutate or
-        // invalidate the cached runtime between the two turns under test.
         override suspend fun agentRetrieve(
             command: AppServerCommand.AgentRetrieve,
-        ): AppServerInboundFrame.AgentRetrieveResponse {
-            agentRetrieveCount += 1
-            return AppServerInboundFrame.AgentRetrieveResponse(
-                requestId = command.requestId,
-                success = true,
-                agent = buildJsonObject { put("context_window_limit", 200_000) },
-            )
-        }
+        ): AppServerInboundFrame.AgentRetrieveResponse = recordContextCall("agent_retrieve")
+
+        override suspend fun agentUpdate(
+            command: AppServerCommand.AgentUpdate,
+        ): AppServerInboundFrame.AgentUpdateResponse = recordContextCall("agent_update")
 
         override suspend fun conversationRetrieve(
             command: AppServerCommand.ConversationRetrieve,
-        ): AppServerInboundFrame.ConversationRetrieveResponse =
-            AppServerInboundFrame.ConversationRetrieveResponse(
-                requestId = command.requestId,
-                success = true,
-                conversation = buildJsonObject {},
-            )
+        ): AppServerInboundFrame.ConversationRetrieveResponse = recordContextCall("conversation_retrieve")
 
         override suspend fun conversationMessagesList(
             command: AppServerCommand.ConversationMessagesList,
-        ): AppServerInboundFrame.ConversationMessagesListResponse =
-            AppServerInboundFrame.ConversationMessagesListResponse(
-                requestId = command.requestId,
-                success = true,
-                messages = kotlinx.serialization.json.JsonArray(emptyList()),
-            )
+        ): AppServerInboundFrame.ConversationMessagesListResponse = recordContextCall("conversation_messages_list")
+
+        override suspend fun conversationCompact(
+            command: AppServerCommand.ConversationCompact,
+        ): AppServerInboundFrame.ConversationCompactResponse = recordContextCall("conversation_compact")
+
+        private fun recordContextCall(name: String): Nothing {
+            contextManagementCalls += name
+            error("$name must not be sent around a user turn")
+        }
     }
 
     private class FakeAppServerClient(
