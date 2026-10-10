@@ -2,6 +2,7 @@ package com.letta.mobile.data.context.limit
 
 import com.letta.mobile.data.context.ContextMeter
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * letta-mobile-joigh: the stops of the context-limit slider for one model.
@@ -70,7 +71,8 @@ enum class ContextLimitWarning {
 data class ContextLimitAdvice(val tokens: Int, val autoCompactAtTokens: Int?, val warning: ContextLimitWarning) {
     companion object {
         fun of(tokens: Int, usedTokens: Int?, modelMax: Int?): ContextLimitAdvice {
-            val threshold = ContextMeter.autoCompactAt(tokens)?.let { (it * tokens).toInt() }
+            // The float share times the window, rounded back: 111,616 for 128k, not 111,615.
+            val threshold = ContextMeter.autoCompactAt(tokens)?.let { (it * tokens).roundToInt() }
             val warning = when {
                 modelMax != null && tokens > modelMax -> ContextLimitWarning.ExceedsModel
                 usedTokens != null && usedTokens >= tokens -> ContextLimitWarning.BelowUsage

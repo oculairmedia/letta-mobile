@@ -43,6 +43,7 @@ import com.letta.mobile.data.context.ContextMeter
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.FocusedContextWindows
 import com.letta.mobile.data.context.contextReadingKeyOf
+import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.context.limit.ContextLimitController
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.context.overviewFor
@@ -132,7 +133,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     val windows = rememberWindows(deps, focus, requests)
     val breakdownState = deps.breakdown?.state?.collectAsState()?.value ?: ContextBreakdownState.Idle
     val overview = breakdownState.overviewFor(requests.breakdown)
-    val model = rememberCardModel(deps, focus, requests, lastOutcome, CardWindow(windows, overview))
+    val model = rememberCardModel(deps, focus, requests, CardSnapshot(windows, overview, lastOutcome))
     LaunchedEffect(open, requests.breakdown, focus.turnRunning) {
         if (open && !focus.turnRunning) deps.breakdown?.load(requests.breakdown)
     }
@@ -146,7 +147,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
             AgentContextSurface(binding.presentation, onDismiss = { open = false }) {
                 val limit = rememberLimitControl(
                     deps.contextLimit,
-                    LimitTarget.of(focus, windows, ContextMeter.windowOf(windows.pinned, overview, windows.window), model.meter?.usage?.usedTokens),
+                    LimitTarget.of(focus, windows, windows.current(overview), model.meter?.usage?.usedTokens),
                     onApplied = { deps.breakdown?.load(requests.breakdown, force = true) },
                 )
                 AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact, limit)
@@ -171,8 +172,11 @@ private data class CardRequests(val reading: Reading, val breakdown: ContextBrea
     }
 }
 
-/** The windows the meter draws against, and the host record that may override them. */
-private class CardWindow(val windows: FocusedContextWindows, val overview: ContextWindowOverview?)
+/** The windows the meter draws against, the host record that may override them, and the last compaction. */
+private class CardSnapshot(val windows: FocusedContextWindows, val overview: ContextWindowOverview?, val lastOutcome: CompactionOutcome?) {
+    fun meter(reading: Reading): ContextMeter? =
+        ContextMeter.of(reading.total, windows.meterWindow, windows.recordWith(overview), reading.estimated)
+}
 
 /**
  * letta-mobile-joigh: the conversation's windows: a limit just applied here, else the host's
@@ -184,7 +188,8 @@ private fun rememberWindows(deps: AgentContextCardDeps, focus: AgentContextFocus
     val catalogFlow = remember(deps.pickerSource) { deps.pickerSource?.models?.map { rows -> rows.map { it.model } } }
     val catalog = catalogFlow?.collectAsState(initial = emptyList())?.value.orEmpty()
     val applied = deps.contextLimit?.applied?.collectAsState()?.value.orEmpty()
-    return FocusedContextWindows.of(applied[requests.compaction.key], focus.modelValue, focus.windowTokens, focus.modelWindowTokens, catalog)
+    val modelMax = focus.modelWindowTokens ?: modelCatalogWindowOf(catalog, focus.modelValue)
+    return FocusedContextWindows.of(applied[requests.compaction.key], focus.modelValue, focus.windowTokens, modelMax)
 }
 
 @Composable
@@ -192,23 +197,21 @@ private fun rememberCardModel(
     deps: AgentContextCardDeps,
     focus: AgentContextFocus,
     requests: CardRequests,
-    lastOutcome: CompactionOutcome?,
-    window: CardWindow,
+    snapshot: CardSnapshot,
 ): AgentContextCardModel {
     // deps is fixed per session, so which of these flows exist never changes between compositions.
     val compacting = deps.compaction?.compacting?.collectAsState()?.value.orEmpty()
     val supported = deps.compaction?.supported?.collectAsState()?.value
-    val reading = requests.reading
     return AgentContextCardModel.present(
         AgentContextCardInputs(
             modelLabel = focus.modelLabel,
             effort = focus.effort,
-            meter = ContextMeter.of(reading.total, window.windows.window, window.overview, reading.estimated, window.windows.pinned),
+            meter = snapshot.meter(requests.reading),
             conversationIsDefault = focus.modelScope == ModelChangeScope.Agent,
             compactSupported = if (deps.compaction == null) false else supported,
             compacting = requests.compaction.key in compacting,
             turnRunning = focus.turnRunning,
-            lastOutcome = lastOutcome,
+            lastOutcome = snapshot.lastOutcome,
         ),
     )
 }
