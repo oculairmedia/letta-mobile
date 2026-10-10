@@ -52,8 +52,8 @@ class AgentContextCardUiTest {
     fun theCardShowsTheModelEffortAndHowFullTheWindowIs() = runComposeUiTest {
         val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
         setContent { MaterialTheme { AgentContextCardHost(deps, focus, actions, AgentContextPresentation.Popover) } }
-        onNodeWithTag(AgentContextTags.CARD_MODEL).assertTextEquals("Claude Opus · High")
-        onNodeWithTag(AgentContextTags.CARD_USAGE).assertTextEquals("42% of 200k used")
+        onNodeWithTag(AgentContextTags.CARD_MODEL, useUnmergedTree = true).assertTextEquals("Claude Opus · High")
+        onNodeWithTag(AgentContextTags.CARD_USAGE, useUnmergedTree = true).assertTextEquals("42% of 200k used")
     }
 
     @Test
