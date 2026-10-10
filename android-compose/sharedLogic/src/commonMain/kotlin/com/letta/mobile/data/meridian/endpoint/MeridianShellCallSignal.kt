@@ -68,8 +68,8 @@ sealed interface MeridianShellCallSignal {
             return if (runsMeridian(command)) Started(scope, id) else null
         }
 
-        /** `command` / `cmd` from the tool args (an object, or the JSON text of one). */
-        private fun shellCommand(args: JsonElement?): String? {
+        /** `command` / `cmd` from a shell tool's args (an object, or the JSON text of one). */
+        fun shellCommand(args: JsonElement?): String? {
             val obj = when (args) {
                 is JsonObject -> args
                 is JsonPrimitive -> if (args.isString) parseObject(args.content) else null

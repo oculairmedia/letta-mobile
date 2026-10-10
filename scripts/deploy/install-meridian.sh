@@ -40,7 +40,7 @@ declare -A DROPINS=(
   [meridian-appserver.memory-protection.conf]="meridian-appserver.service.d/memory-protection.conf"
   [meridian-iroh-wrapper.memory-protection.conf]="meridian-iroh-wrapper.service.d/memory-protection.conf"
 )
-SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh)
+SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh meridian-permission-hook.cjs)
 
 # letta-mobile-jna0o.5: the agent-side `meridian` shim (on the App Server's PATH) and the
 # `meridian-canvas` letta-code skill (in the App Server user's global skills root, which letta-code
@@ -91,6 +91,21 @@ for skill in "$HERE"/skills/*/SKILL.md; do
   name="$(basename "$(dirname "$skill")")"
   sync_file "$skill" "$SKILLS_ROOT/$name/SKILL.md" 644
 done
+
+# jna0o.7: the letta-code PermissionRequest hook that approves allow-listed `meridian` calls in
+# every permission mode (deliberately NOT a `Bash(meridian:*)` allow rule, which is a raw prefix
+# match and would also approve `meridian ...; anything`). Registered in the App Server user's
+# global settings, everything else in that file kept as it is.
+LETTA_SETTINGS="${appserver_home:-/root}/.letta/settings.json"
+if [[ -f "$HERE/meridian-permission-hook.cjs" ]]; then
+  if (( CHECK_ONLY )); then
+    hook_state="$(node "$HERE/meridian-permission-hook.cjs" --install "$LETTA_SETTINGS" --check 2>&1 || true)"
+  else
+    hook_state="$(node "$HERE/meridian-permission-hook.cjs" --install "$LETTA_SETTINGS" 2>&1 || true)"
+  fi
+  [[ "$hook_state" == "in sync" ]] || drift=1
+  say "$LETTA_SETTINGS (meridian PermissionRequest hook)" "$hook_state"
+fi
 
 # Env files: seed when absent, otherwise compare key names only. A value never
 # reaches stdout, so this is safe to run and paste anywhere.
