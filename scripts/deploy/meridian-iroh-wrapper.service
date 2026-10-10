@@ -56,6 +56,15 @@ ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
 # owns /var/lib/meridian via StateDirectory.
 StateDirectory=meridian
 
+# letta-mobile-jna0o.4/.5: /run/meridian holds the local meridian/tools/1 socket
+# (tools.sock, 0660) the agent's `meridian` shim connects to. It must be /run,
+# not /tmp: PrivateTmp=true below gives this unit its own /tmp. The socket is
+# only created with LETTA_AGENT_TOOLS_MODE=cli in /etc/meridian/iroh-wrapper.env.
+# If the App Server ever runs as a user other than this unit's, give both a
+# shared group (Group= here, SupplementaryGroups= there) and use mode 0750.
+RuntimeDirectory=meridian
+RuntimeDirectoryMode=0750
+
 Restart=always
 RestartSec=10
 LimitNOFILE=65536
