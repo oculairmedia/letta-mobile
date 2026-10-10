@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.context.ContextWindowSegment
@@ -24,6 +26,7 @@ import com.letta.mobile.data.context.ContextWindowSegmentKind
 import com.letta.mobile.data.context.ContextWindowUsage
 import com.letta.mobile.data.context.formatContextShare
 import com.letta.mobile.data.context.formatContextTokens
+import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.ChatComposerColors
 import com.letta.mobile.ui.theme.ChatComposerDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -34,11 +37,36 @@ import com.letta.mobile.ui.theme.LettaDimens
  * ComposerContextUsage unchanged).
  */
 
+/**
+ * The stacked bar. [autoCompactAt] (a share of the window, letta-mobile-joigh) draws a tick where
+ * letta-code auto-compacts, so the threshold reads against the sections that will reach it.
+ */
 @Composable
-internal fun ContextUsageBar(usage: ContextWindowUsage, modifier: Modifier = Modifier) {
+internal fun ContextUsageBar(usage: ContextWindowUsage, modifier: Modifier = Modifier, autoCompactAt: Float? = null) {
+    Box(modifier.fillMaxWidth()) {
+        ContextUsageStripes(usage)
+        autoCompactAt?.takeIf { it in 0f..1f }?.let { share -> AutoCompactTick(share) }
+    }
+}
+
+@Composable
+private fun AutoCompactTick(share: Float) {
+    Box(Modifier.fillMaxWidth(share).height(LettaDimens.Space.sm).testTag(AgentContextTags.AUTO_COMPACT_MARK)) {
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .width(AgentContextDimens.autoCompactMarkerWidth)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.onSurface),
+        )
+    }
+}
+
+@Composable
+private fun ContextUsageStripes(usage: ContextWindowUsage) {
     // Weighted stripes: a segment under ~1% still gets a sliver so the bar accounts for every row.
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .height(LettaDimens.Space.sm)
             .clip(RoundedCornerShape(LettaDimens.Radius.sm))

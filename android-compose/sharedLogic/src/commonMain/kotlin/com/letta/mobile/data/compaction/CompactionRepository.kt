@@ -16,14 +16,21 @@ data class CompactionRequest(
      * app named it that way or by its addressable `conv-default-<agentId>` alias.
      */
     val wireConversationId: String
-        get() {
-            val id = conversationId?.value?.takeIf { it.isNotBlank() } ?: return ConversationCompactRpc.DEFAULT_CONVERSATION
-            return if (id == SharedChatSessionResolver.DEFAULT_SHIM_CONVERSATION_PREFIX + agentId.value) {
-                ConversationCompactRpc.DEFAULT_CONVERSATION
-            } else {
-                id
-            }
-        }
+        get() = wireConversationIdOf(agentId, conversationId)
+}
+
+/**
+ * letta-mobile-joigh: the conversation id letta-code uses — the bare `default` for the agent's
+ * default conversation (null, blank, or its addressable `conv-default-<agentId>` alias), else the
+ * id itself. Slash commands scope by it: on `default` they act on the agent.
+ */
+fun wireConversationIdOf(agentId: AgentId, conversationId: ConversationId?): String {
+    val id = conversationId?.value?.takeIf { it.isNotBlank() } ?: return ConversationCompactRpc.DEFAULT_CONVERSATION
+    return if (id == SharedChatSessionResolver.DEFAULT_SHIM_CONVERSATION_PREFIX + agentId.value) {
+        ConversationCompactRpc.DEFAULT_CONVERSATION
+    } else {
+        id
+    }
 }
 
 /** What a compaction attempt came to. */

@@ -8,6 +8,9 @@ import com.letta.mobile.data.compaction.AdminRpcCompactionRepository
 import com.letta.mobile.data.compaction.CompactionController
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.contextWindowTokensOf
+import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
+import com.letta.mobile.data.context.limit.ContextLimitController
+import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.session.SessionGraph
@@ -26,24 +29,27 @@ import kotlinx.coroutines.flow.stateIn
 
 /**
  * letta-mobile-3io8k: the session pieces the drawer's context card reads — the streamed readings,
- * the breakdown loader and compaction — rebuilt with each session graph so a backend switch never
- * shows the previous backend's numbers. Compaction goes through the host's `conversation.compact`;
- * a session with no admin_rpc answers Unsupported and the button hides.
+ * the breakdown loader, compaction and the context limit — rebuilt with each session graph so a
+ * backend switch never shows the previous backend's numbers. Compaction and the limit go through
+ * the host's `conversation.compact` / `conversation.context_limit`; a session with no admin_rpc
+ * (the embedded runtime) answers Unsupported, so the button hides and the slider gives its reason.
  */
 internal data class ContextCardSession(
     val readings: com.letta.mobile.data.context.ContextTokenReadings,
     val breakdown: ContextBreakdownLoader,
     val compaction: CompactionController,
+    val contextLimit: ContextLimitController,
 )
 
-internal fun SessionGraph.toContextCardSession(): ContextCardSession = ContextCardSession(
-    readings = contextTokenReadings,
-    breakdown = ContextBreakdownLoader(agentRepository),
-    compaction = CompactionController(
-        AdminRpcCompactionRepository(AdminRpcInvoker.overTransport { channelTransport }),
-        contextTokenReadings,
-    ),
-)
+internal fun SessionGraph.toContextCardSession(): ContextCardSession {
+    val rpc = AdminRpcInvoker.overTransport { channelTransport }
+    return ContextCardSession(
+        readings = contextTokenReadings,
+        breakdown = ContextBreakdownLoader(agentRepository),
+        compaction = CompactionController(AdminRpcCompactionRepository(rpc), contextTokenReadings),
+        contextLimit = ContextLimitController(AdminRpcContextLimitRepository(rpc)),
+    )
+}
 
 internal fun contextCardSessions(graphs: StateFlow<SessionGraph>, scope: CoroutineScope): StateFlow<ContextCardSession> =
     graphs.map { it.toContextCardSession() }
@@ -63,7 +69,7 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
         viewModel.modelPickerSource()?.let { ModelPickerSource.withFallback(it, fallback) } ?: fallback
     }
     val deps = remember(session, pickerSource) {
-        AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource)
+        AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource, session.contextLimit)
     }
     val binding = remember(deps, viewModel) {
         AgentContextCardBinding(
@@ -85,6 +91,7 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
             modelValue = state.activeAgentModel,
             effort = current?.reasoningEffort,
             windowTokens = contextWindowTokensOf(agent, state.availableModels, state.conversationId?.let(selections::get)),
+            modelWindowTokens = modelCatalogWindowOf(state.availableModels, state.activeAgentModel),
             turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
             picksTargetConversation = viewModel.modelPicksTargetConversation(),
         ),

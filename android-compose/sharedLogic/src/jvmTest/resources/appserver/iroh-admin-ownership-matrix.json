@@ -375,6 +375,25 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "conversation.context_limit",
+      "handler": "ConversationContextLimitHandlers.kt",
+      "current_backend": "native App Server v2 execute_command context-limit (letta-code /context-limit; letta-mobile-joigh)",
+      "owner": "app_server_v2",
+      "public_contract": "execute_command",
+      "native_contract": [
+        "execute_command",
+        "execute_command_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-joigh: context-limit relay for Iroh clients. letta-code validates the value and picks the scope (agent on default, else the conversation's own limit). No --override is sent.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

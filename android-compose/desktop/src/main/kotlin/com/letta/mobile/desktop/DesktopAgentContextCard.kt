@@ -11,6 +11,12 @@ import com.letta.mobile.data.compaction.CompactionRepository
 import com.letta.mobile.data.compaction.orElse
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.contextWindowTokensOf
+import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
+import com.letta.mobile.data.context.limit.AppServerContextLimitRepository
+import com.letta.mobile.data.context.limit.ContextLimitController
+import com.letta.mobile.data.context.limit.ContextLimitRepository
+import com.letta.mobile.data.context.limit.orElse
+import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
@@ -24,8 +30,8 @@ import com.letta.mobile.ui.context.AgentContextPresentation
 /**
  * letta-mobile-3io8k: the sidebar's model-and-context card for the focused agent, opening as a
  * popover under it. Desktop only binds: the session's streamed readings and agent repository, the
- * host's model control (falling back to the chat's model list), and compaction over the Iroh relay
- * or, without one, the bundled App Server.
+ * host's model control (falling back to the chat's model list), and compaction and the context
+ * limit over the Iroh relay or, without one, the bundled App Server.
  */
 @Composable
 internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: DesktopShellFrame) {
@@ -46,6 +52,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
                 onModelSelected = chatController::setConversationModel,
                 recentModels = chatController.conversationManagement.recentModels,
             ).pickerSource(),
+            contextLimit = ContextLimitController(desktopContextLimitRepository(dataBindings.modelControlRpc)),
         )
     }
     val models by graph.modelRepository.llmModels.collectAsState()
@@ -69,6 +76,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
             modelValue = override ?: agent?.model,
             effort = null,
             windowTokens = contextWindowTokensOf(agent, models, override),
+            modelWindowTokens = modelCatalogWindowOf(models, override ?: agent?.model),
             turnRunning = frame.activity.isThinkingSelected || frame.activity.isStreamingReplySelected,
         ),
     )
@@ -78,4 +86,10 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
 private fun desktopCompactionRepository(rpc: AdminRpcInvoker?): CompactionRepository {
     val direct = AppServerCompactionRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
     return rpc?.let { AdminRpcCompactionRepository(it).orElse(direct) } ?: direct
+}
+
+/** letta-mobile-joigh: letta-code's `/context-limit` through the Iroh relay, else the bundled App Server directly. */
+private fun desktopContextLimitRepository(rpc: AdminRpcInvoker?): ContextLimitRepository {
+    val direct = AppServerContextLimitRepository(client = { DesktopLocalAppServerClientRegistry.shared.currentOrNull() })
+    return rpc?.let { AdminRpcContextLimitRepository(it).orElse(direct) } ?: direct
 }

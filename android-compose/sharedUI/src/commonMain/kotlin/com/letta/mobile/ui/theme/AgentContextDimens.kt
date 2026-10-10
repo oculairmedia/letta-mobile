@@ -17,4 +17,13 @@ object AgentContextDimens {
 
     /** How far below the card the desktop popover opens. */
     val popoverGap: Dp = 6.dp
+
+    /** letta-mobile-joigh: room for the limit slider's widest label ("200k of 400k"), so the track never shifts. */
+    val limitValueWidth: Dp = 84.dp
+
+    /** letta-mobile-joigh: the limit status row's fixed height: a text button's, so its Compact action never moves the sheet. */
+    val limitStatusHeight: Dp = 40.dp
+
+    /** letta-mobile-joigh: the auto-compact tick on the sheet's context bar. */
+    val autoCompactMarkerWidth: Dp = 2.dp
 }

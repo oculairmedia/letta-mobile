@@ -37,6 +37,8 @@ object AdminRpcRegistry {
         "conversation.get",
         // letta-mobile-57cta: manual compaction relay (ConversationCompactHandlers).
         "conversation.compact",
+        // letta-mobile-joigh: context-limit relay (ConversationContextLimitHandlers).
+        "conversation.context_limit",
         "message.list",
         "message.get",
         "tool_return.get",
@@ -167,6 +169,8 @@ object AdminRpcRegistry {
         WorkspaceAdminHandlers.register(router, nativeClient)
         // letta-mobile-57cta: manual compaction for Iroh clients (execute_command / conversation_compact).
         ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
+        // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
+        ConversationContextLimitHandlers.register(router, nativeClient)
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

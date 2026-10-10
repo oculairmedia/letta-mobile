@@ -67,6 +67,7 @@ fun ColumnScope.AgentContextSheetContent(
     model: AgentContextCardModel,
     picker: AgentContextPicker?,
     onCompact: () -> Unit,
+    limit: ContextLimitControl? = null,
 ) {
     SheetHeading(AgentContextStrings.MODEL_TITLE, AgentContextStrings.scope(model.scope), Modifier.testTag(AgentContextTags.SCOPE))
     if (picker != null) {
@@ -82,7 +83,7 @@ fun ColumnScope.AgentContextSheetContent(
         )
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    ContextSection(model, onCompact)
+    ContextSection(model, onCompact, limit)
 }
 
 /**
@@ -134,7 +135,7 @@ private fun SheetHeading(title: String, caption: String, captionModifier: Modifi
 }
 
 @Composable
-private fun ContextSection(model: AgentContextCardModel, onCompact: () -> Unit) {
+private fun ContextSection(model: AgentContextCardModel, onCompact: () -> Unit, limit: ContextLimitControl?) {
     val reducedMotion = LocalReducedMotion.current
     Column(
         modifier = Modifier
@@ -150,6 +151,7 @@ private fun ContextSection(model: AgentContextCardModel, onCompact: () -> Unit) 
         } else {
             MeterDetail(meter)
         }
+        LimitControl(limit, onCompact.takeIf { model.compact == CompactAffordance.Available })
         CompactControls(model, onCompact)
     }
 }
@@ -179,7 +181,7 @@ private fun ContextHeader(model: AgentContextCardModel) {
 
 @Composable
 private fun MeterDetail(meter: ContextMeter) {
-    if (meter.usage.maxTokens > 0) ContextUsageBar(meter.usage)
+    if (meter.usage.maxTokens > 0) ContextUsageBar(meter.usage, autoCompactAt = meter.autoCompactAt)
     ContextUsageRows(meter.usage)
     Caption(
         AgentContextStrings.provenance(meter.provenance, meter.totalIsEstimate),
@@ -187,6 +189,16 @@ private fun MeterDetail(meter: ContextMeter) {
     )
     if (meter.provenance == ContextProvenance.TotalOnly) {
         Caption(AgentContextStrings.TOTAL_ONLY_HINT, Modifier.testTag(AgentContextTags.HINT))
+    }
+}
+
+/** letta-mobile-joigh: the context-limit slider, or why this host has none; nothing when the sheet has no limit to offer. */
+@Composable
+private fun LimitControl(limit: ContextLimitControl?, onCompact: (() -> Unit)?) {
+    when (limit) {
+        null -> Unit
+        ContextLimitControl.Unsupported -> Caption(ContextLimitStrings.UNSUPPORTED, Modifier.testTag(ContextLimitTags.UNSUPPORTED))
+        is ContextLimitControl.Adjustable -> ContextLimitSlider(limit.setting, limit.onApply, onCompact)
     }
 }
 

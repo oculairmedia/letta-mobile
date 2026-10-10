@@ -40,16 +40,18 @@ data class ContextMeter(
          * one is still shown, labelled [ContextProvenance.Estimated]. A breakdown from a host that
          * predates the estimator (no `source`) is ignored: its numbers were placeholders. The
          * host's window (the conversation/agent record) wins over [windowTokens] (the model
-         * catalog) because it carries per-conversation limits.
+         * catalog) because it carries per-conversation limits; [pinnedWindow] (a limit this
+         * session just applied, letta-mobile-joigh) wins over both until the record is re-read.
          */
         fun of(
             streamedTotal: Int?,
             windowTokens: Int?,
             breakdown: ContextWindowOverview? = null,
             totalIsEstimate: Boolean = false,
+            pinnedWindow: Int? = null,
         ): ContextMeter? {
             val estimate = breakdown?.takeIf { it.source == ESTIMATE_SOURCE }
-            val window = estimate?.contextWindowSizeMax?.takeIf { it > 0 } ?: windowTokens?.takeIf { it > 0 }
+            val window = windowOf(pinnedWindow, estimate, windowTokens)
             if (estimate == null) {
                 val total = streamedTotal ?: return null
                 return ContextMeter(ContextWindowUsage.total(total, window), ContextProvenance.TotalOnly, autoCompactAt(window), totalIsEstimate)
@@ -67,6 +69,15 @@ data class ContextMeter(
                 totalIsEstimate = totalIsEstimate,
             )
         }
+
+        /**
+         * letta-mobile-joigh: the window in force — [pinnedWindow], else the host record in
+         * [breakdown] (estimator answers only), else [windowTokens]. Null when none is known.
+         */
+        fun windowOf(pinnedWindow: Int?, breakdown: ContextWindowOverview?, windowTokens: Int?): Int? =
+            pinnedWindow?.takeIf { it > 0 }
+                ?: breakdown?.takeIf { it.source == ESTIMATE_SOURCE }?.contextWindowSizeMax?.takeIf { it > 0 }
+                ?: windowTokens?.takeIf { it > 0 }
 
         /**
          * letta-code's `contextCompactionThreshold`: the window less `min(16384, max(1, 20%))`,

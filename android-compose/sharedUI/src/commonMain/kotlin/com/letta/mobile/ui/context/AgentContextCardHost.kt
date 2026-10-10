@@ -41,7 +41,10 @@ import com.letta.mobile.data.context.ContextBreakdownRequest
 import com.letta.mobile.data.context.ContextBreakdownState
 import com.letta.mobile.data.context.ContextMeter
 import com.letta.mobile.data.context.ContextTokenReadings
+import com.letta.mobile.data.context.FocusedContextWindows
 import com.letta.mobile.data.context.contextReadingKeyOf
+import com.letta.mobile.data.context.limit.ContextLimitController
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.context.overviewFor
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -53,6 +56,7 @@ import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.theme.AgentContextDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** letta-mobile-3io8k: what a host supplies once per session; any part may be absent. */
@@ -61,6 +65,8 @@ class AgentContextCardDeps(
     val breakdown: ContextBreakdownLoader?,
     val compaction: CompactionController?,
     val pickerSource: ModelPickerSource?,
+    /** letta-mobile-joigh: the context-limit change; null when the host has no route to letta-code's `/context-limit`. */
+    val contextLimit: ContextLimitController? = null,
 )
 
 /** The conversation the card describes, and its model as the host resolves it. */
@@ -74,6 +80,8 @@ data class AgentContextFocus(
     val effort: String?,
     /** The model's window from the host's catalog; the breakdown's record window wins when known. */
     val windowTokens: Int?,
+    /** letta-mobile-joigh: the focused model's catalog window (the limit slider's ceiling); the sheet's catalog fills in when null. */
+    val modelWindowTokens: Int? = null,
     /** A turn is running: no breakdown fetch, no compaction. */
     val turnRunning: Boolean,
     /**
@@ -121,7 +129,10 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     var open by remember { mutableStateOf(false) }
     var lastOutcome by remember(focus.agentId, focus.conversationId) { mutableStateOf<CompactionOutcome?>(null) }
     val requests = CardRequests.of(focus, rememberReading(deps.readings, focus))
-    val model = rememberCardModel(deps, focus, requests, lastOutcome)
+    val windows = rememberWindows(deps, focus, requests)
+    val breakdownState = deps.breakdown?.state?.collectAsState()?.value ?: ContextBreakdownState.Idle
+    val overview = breakdownState.overviewFor(requests.breakdown)
+    val model = rememberCardModel(deps, focus, requests, lastOutcome, CardWindow(windows, overview))
     LaunchedEffect(open, requests.breakdown, focus.turnRunning) {
         if (open && !focus.turnRunning) deps.breakdown?.load(requests.breakdown)
     }
@@ -133,7 +144,12 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
         AgentContextCard(model = model, onClick = { open = true })
         if (open) {
             AgentContextSurface(binding.presentation, onDismiss = { open = false }) {
-                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact)
+                val limit = rememberLimitControl(
+                    deps.contextLimit,
+                    LimitTarget.of(focus, windows, ContextMeter.windowOf(windows.pinned, overview, windows.window), model.meter?.usage?.usedTokens),
+                    onApplied = { deps.breakdown?.load(requests.breakdown, force = true) },
+                )
+                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact, limit)
             }
         }
     }
@@ -155,15 +171,31 @@ private data class CardRequests(val reading: Reading, val breakdown: ContextBrea
     }
 }
 
+/** The windows the meter draws against, and the host record that may override them. */
+private class CardWindow(val windows: FocusedContextWindows, val overview: ContextWindowOverview?)
+
+/**
+ * letta-mobile-joigh: the conversation's windows: a limit just applied here, else the host's
+ * figure, else the sheet catalog's window for the focused model (see [FocusedContextWindows]).
+ */
+@Composable
+private fun rememberWindows(deps: AgentContextCardDeps, focus: AgentContextFocus, requests: CardRequests): FocusedContextWindows {
+    // deps is fixed per session, so which of these flows exist never changes between compositions.
+    val catalogFlow = remember(deps.pickerSource) { deps.pickerSource?.models?.map { rows -> rows.map { it.model } } }
+    val catalog = catalogFlow?.collectAsState(initial = emptyList())?.value.orEmpty()
+    val applied = deps.contextLimit?.applied?.collectAsState()?.value.orEmpty()
+    return FocusedContextWindows.of(applied[requests.compaction.key], focus.modelValue, focus.windowTokens, focus.modelWindowTokens, catalog)
+}
+
 @Composable
 private fun rememberCardModel(
     deps: AgentContextCardDeps,
     focus: AgentContextFocus,
     requests: CardRequests,
     lastOutcome: CompactionOutcome?,
+    window: CardWindow,
 ): AgentContextCardModel {
     // deps is fixed per session, so which of these flows exist never changes between compositions.
-    val breakdown = deps.breakdown?.state?.collectAsState()?.value ?: ContextBreakdownState.Idle
     val compacting = deps.compaction?.compacting?.collectAsState()?.value.orEmpty()
     val supported = deps.compaction?.supported?.collectAsState()?.value
     val reading = requests.reading
@@ -171,7 +203,7 @@ private fun rememberCardModel(
         AgentContextCardInputs(
             modelLabel = focus.modelLabel,
             effort = focus.effort,
-            meter = ContextMeter.of(reading.total, focus.windowTokens, breakdown.overviewFor(requests.breakdown), reading.estimated),
+            meter = ContextMeter.of(reading.total, window.windows.window, window.overview, reading.estimated, window.windows.pinned),
             conversationIsDefault = focus.modelScope == ModelChangeScope.Agent,
             compactSupported = if (deps.compaction == null) false else supported,
             compacting = requests.compaction.key in compacting,

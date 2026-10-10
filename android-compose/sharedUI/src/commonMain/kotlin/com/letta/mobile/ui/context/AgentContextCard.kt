@@ -44,6 +44,7 @@ object AgentContextTags {
     const val COMPACT = "agent-context-compact"
     const val NOTICE = "agent-context-notice"
     const val HINT = "agent-context-hint"
+    const val AUTO_COMPACT_MARK = "agent-context-auto-compact-mark"
 }
 
 /**
