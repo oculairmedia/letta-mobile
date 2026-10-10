@@ -66,9 +66,9 @@ data class MeridianCommandCall(
             else -> raw.trim().firstJsonObject() ?: raw
         }
 
-        /** Whether a CLI result says it failed: `{"error": …}` or `{"ok": false}`. */
-        fun isErrorResult(json: String?): Boolean {
-            val body = json?.toStrictJsonObjectOrNull() ?: return false
+        /** Whether a CLI return says it failed: `{"error": …}` or `{"ok": false}` on stdout. */
+        fun isErrorResult(raw: String?): Boolean {
+            val body = stdoutJson(raw)?.toStrictJsonObjectOrNull() ?: return false
             return when ((body["ok"] as? JsonPrimitive)?.booleanOrNull) {
                 false -> true
                 true -> false
@@ -76,27 +76,35 @@ data class MeridianCommandCall(
             }
         }
 
+        /**
+         * The result the native tool would have returned, from a CLI return (Bash stdout, or the
+         * meta-tool's answer): stdout as is on success. A router refusal
+         * `{"error":"refused"|"denied","message":…,"detail":…}` (hint after it) reads as the tool's
+         * own refusal: its JSON `detail` (canvas_compose's `{ok:false,code,problems,hint}`), else its
+         * message. Any other router error (usage, unknown command, host unavailable) stays its JSON.
+         */
+        fun toolResult(raw: String?): String? {
+            val stdout = stdoutJson(raw) ?: return null
+            val body = stdout.toStrictJsonObjectOrNull() ?: return stdout
+            val code = (body["error"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return stdout
+            return when {
+                body["detail"] is JsonObject -> body["detail"].toString()
+                code in TOOL_REFUSALS -> (body["message"] as? JsonPrimitive)?.content ?: stdout
+                else -> stdout
+            }
+        }
+
         private fun JsonElement?.isPresent(): Boolean = this != null && this !is JsonNull
 
-        /** The meta-tool's `{command, input}`: the command with or without `meridian`, a string or an argv. */
+        /** The meta-tool's `{command: string, input: object}`; the command may start with `meridian`. */
         private fun fromMetaTool(args: JsonObject): MeridianCommandCall? {
-            val script = metaCommand(args["command"] ?: args["argv"]) ?: return null
-            val prefixed = if (script.trimStart().startsWith(META_TOOL)) script else "$META_TOOL $script"
-            return MeridianInvocation.find(prefixed)?.toCall(inputOverride = metaInput(args["input"] ?: args["stdin"]))
+            val script = (args["command"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+            val prefixed = if (script.trim().substringBefore(' ') == META_TOOL) script else "$META_TOOL $script"
+            return MeridianInvocation.find(prefixed)?.toCall(inputOverride = (args["input"] as? JsonObject)?.toString())
         }
 
-        private fun metaCommand(command: JsonElement?): String? = when (command) {
-            is JsonArray -> command.argvWords().asShellScript()
-            is JsonPrimitive -> command.content.takeIf { command.isString }
-            else -> null
-        }
-
-        /** The input as an object (sent as JSON) or as the text the agent wrote. */
-        private fun metaInput(input: JsonElement?): String? = when (input) {
-            is JsonObject -> input.toString()
-            is JsonPrimitive -> input.content.takeIf { input.isString }
-            else -> null
-        }
+        /** The router's error codes for a tool that answered with a refusal. */
+        private val TOOL_REFUSALS = setOf("refused", "denied")
 
         /** The script a shell tool runs: `command` / `cmd`, a string or an argv (`["bash","-lc",…]`). */
         private fun shellScript(args: JsonObject): String? = when (val command = args["command"] ?: args["cmd"]) {

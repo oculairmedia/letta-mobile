@@ -441,10 +441,8 @@ private data class ToolCallRenderData(
  * letta-mobile-jna0o.6: a `meridian canvas …` call (Bash or the meta-tool) renders as the native
  * canvas tool it runs, its result read off stdout, so its row matches the native call's row.
  */
-private fun ToolCallRenderData.forMeridianStdout(): ToolCallRenderData {
-    val stdout = MeridianCommandCall.stdoutJson(result)
-    return copy(result = stdout, isError = isError || MeridianCommandCall.isErrorResult(stdout))
-}
+private fun ToolCallRenderData.forMeridianStdout(): ToolCallRenderData =
+    copy(result = MeridianCommandCall.toolResult(result), isError = isError || MeridianCommandCall.isErrorResult(result))
 
 private fun com.letta.mobile.data.model.ToolCall.toUiToolCall(data: ToolCallRenderData): UiToolCall {
     MeridianCommandCall.parse(this)?.let { meridian -> return meridian.applyTo(this).toNativeUiToolCall(data.forMeridianStdout()) }

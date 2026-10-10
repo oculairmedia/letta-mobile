@@ -128,13 +128,13 @@ internal class ComposeCallReading private constructor(
             val callId = call.effectiveId.takeIf { it.isNotBlank() }
             val request = RequestSummary.of(call.arguments)
             val returned = event.returnText(callId, ordinal)
-            val result = if (fromCli) MeridianCommandCall.stdoutJson(returned) else returned
+            val result = if (fromCli) MeridianCommandCall.toolResult(returned) else returned
             return ComposeCallReading(
                 callId = callId,
                 request = request,
                 fallbackId = request.artifactId ?: callId?.let { "call:$it" } ?: "call:${CanvasArtifactReceipts.eventKey(event)}#$ordinal",
                 result = result,
-                isError = event.returnIsError(callId) || (fromCli && MeridianCommandCall.isErrorResult(result)),
+                isError = event.returnIsError(callId) || (fromCli && MeridianCommandCall.isErrorResult(returned)),
                 truncated = event.returnTruncated(callId),
             )
         }

@@ -13,14 +13,16 @@ internal class MeridianInvocation private constructor(
     /** The JSON input from a heredoc, here-string or `echo … |`, or null when it is not in the script. */
     private val stdin: String?,
 ) {
+    /** The native tool call this runs; null for help, guides and schemas, which run no tool. */
     fun toCall(inputOverride: String?): MeridianCommandCall? {
-        if (args.any { it in HELP_WORDS } || args.firstOrNull() != CANVAS) return null
-        val verb = args.getOrNull(1)?.lowercase()?.replace('_', '-') ?: return null
-        val flags = MeridianFlags(args.drop(2))
-        val tool = flags.nativeToolFor(verb) ?: return null
-        val input = inputOverride ?: flags.input ?: stdin
-        return MeridianCommandCall(toolName = tool, arguments = arguments(input, flags.fields))
+        if (args.isHelp()) return null
+        val (spec, rest) = MeridianCommandTable.resolve(args) ?: return null
+        val flags = MeridianFlags(spec, rest)
+        return MeridianCommandCall(toolName = spec.toolName, arguments = arguments(inputOverride ?: stdin, flags.fields))
     }
+
+    /** As the router reads it: `help …`, or `--help` / `-h` anywhere. */
+    private fun List<String>.isHelp(): Boolean = firstOrNull() == HELP || any { it in HELP_FLAGS }
 
     /** The input object with the flags merged in; the raw input when it is not a JSON object. */
     private fun arguments(input: String?, fields: Map<String, JsonElement>): String {
@@ -94,9 +96,9 @@ private fun ShellCommand.producedText(): String? {
     }
 }
 
-private const val CANVAS = "canvas"
 private const val MAX_WRAP_DEPTH = 2
-private val HELP_WORDS = setOf("--help", "-h", "help")
+private const val HELP = "help"
+private val HELP_FLAGS = setOf("--help", "-h")
 private val ECHO_FLAGS = setOf("-n", "-e", "-E", "-ne", "-en")
 private val PREFIX_PROGRAMS = setOf("env", "exec", "command", "time", "nohup")
 private val ENV_ASSIGNMENT = Regex("[A-Za-z_][A-Za-z0-9_]*=.*", RegexOption.DOT_MATCHES_ALL)

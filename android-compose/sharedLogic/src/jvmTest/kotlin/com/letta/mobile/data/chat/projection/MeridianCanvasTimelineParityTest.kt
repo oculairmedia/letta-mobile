@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.canvas.CanvasToolContract
+import com.letta.mobile.data.chat.projection.meridian.MeridianCliFixtures
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -46,10 +47,18 @@ class MeridianCanvasTimelineParityTest {
 
     @Test
     fun theRowModelIsTheNativeRowModel() {
-        listOf(null, Returned(receiptJson), Returned(refusalJson, isError = true)).forEach { returned ->
-            val expected = row(native, returned)
+        // Native return vs the CLI's: pending, a receipt (stdout byte for byte), a refusal (the
+        // router wraps the tool's JSON under `detail`, its hint after it).
+        val compactRefusal = Json.parseToJsonElement(refusalJson).toString()
+        val cases = listOf(
+            null to null,
+            Returned(receiptJson) to Returned(receiptJson),
+            Returned(compactRefusal, isError = true) to Returned(routerRefusal(), isError = true),
+        )
+        cases.forEach { (nativeReturn, cliReturn) ->
+            val expected = row(native, nativeReturn)
             assertEquals(CanvasToolContract.COMPOSE, expected.name)
-            listOf(viaBash, viaWrappedBash, viaMetaTool).forEach { cli -> assertEquals(expected, row(cli, returned), "${cli.name} $returned") }
+            listOf(viaBash, viaWrappedBash, viaMetaTool).forEach { cli -> assertEquals(expected, row(cli, cliReturn), "${cli.name} $cliReturn") }
         }
     }
 
@@ -61,24 +70,52 @@ class MeridianCanvasTimelineParityTest {
     }
 
     @Test
-    fun aRefusalOnStdoutIsAFailedReceiptEvenWithoutTheErrorFlag() {
-        // The CLI exits 2 with `{"ok":false,…}` on stdout; a shell tool may not flag the return.
+    fun aRouterRefusalIsTheNativeFailedReceiptEvenWithoutTheErrorFlag() {
+        // The CLI exits 2 with the router's error JSON on stdout; a shell tool may not flag the return.
         val expected = receipt(native, Returned(refusalJson, isError = true))
-        val actual = receipt(viaBash, Returned("Exit code: 2\n$refusalJson", isError = false))
+        val actual = receipt(viaBash, Returned("Exit code: 2\n${routerRefusal()}", isError = false))
         assertEquals(expected, actual)
+        assertEquals(expected, receipt(viaMetaTool, Returned(routerRefusal(), isError = true)))
         assertEquals(CanvasArtifactStatus.Failed, actual.status)
         assertEquals("VALIDATION_FAILED", actual.error?.code)
         assertEquals(3, actual.error?.problemCount)
-        assertEquals("error", row(viaBash, Returned("Exit code: 2\n$refusalJson")).status)
+        assertEquals("error", row(viaBash, Returned("Exit code: 2\n${routerRefusal()}")).status)
+    }
+
+    @Test
+    fun aDeniedCallerReadsAsTheNativeMessageRefusal() {
+        val message = "Unauthorized: actor agent-x may not write canvas c1"
+        val expected = receipt(native, Returned(message, isError = true))
+        assertEquals(expected, receipt(viaBash, Returned(MeridianCliFixtures.deniedMessage(message))))
+        val cliRow = row(viaMetaTool, Returned(MeridianCliFixtures.deniedMessage(message), isError = true))
+        assertEquals(row(native, Returned(message, isError = true)), cliRow)
     }
 
     @Test
     fun anUnreachableHostIsAFailedReceiptAndAnErrorRow() {
-        val actual = receipt(viaBash, Returned("""{"error":"host_unavailable"}"""))
+        val actual = receipt(viaBash, Returned(MeridianCliFixtures.HOST_UNAVAILABLE))
         assertEquals(CanvasArtifactStatus.Failed, actual.status)
-        assertEquals("host_unavailable", actual.error?.message)
+        assertEquals("connect /run/meridian/tools.sock: no such file", actual.error?.message)
         assertEquals("Weekend plan", actual.title)
-        assertEquals("error", row(viaBash, Returned("""{"error":"host_unavailable"}""")).status)
+        val row = row(viaBash, Returned(MeridianCliFixtures.HOST_UNAVAILABLE))
+        assertEquals("error", row.status)
+        assertEquals(MeridianCliFixtures.HOST_UNAVAILABLE_JSON, row.result)
+    }
+
+    @Test
+    fun agentAndPluginCommandsRenderAsTheirNativeRows() {
+        val found = """{"agents":[{"agentId":"agent-42"}]}"""
+        val nativeFind = ToolCall(id = "t4", name = "agent_discover", arguments = """{"query":"planner","limit":5}""")
+        val cliFind = ToolCall(id = "t4", name = "Bash", arguments = bashArgs("meridian agents find planner --limit 5"))
+        val metaFind = ToolCall(id = "t4", name = "meridian", arguments = """{"command":"agents find planner --limit 5"}""")
+        assertEquals(row(nativeFind, Returned(found)), row(cliFind, Returned(found)))
+        assertEquals(row(nativeFind, Returned(found)), row(metaFind, Returned(found)))
+        val nativeSend = ToolCall(id = "t5", name = "agent_message_send", arguments = """{"body":"hi","to":"agent-42"}""")
+        val cliSend = ToolCall(id = "t5", name = "Bash", arguments = bashArgs("meridian agent-message send agent-42 <<'JSON'\n{\"body\":\"hi\"}\nJSON"))
+        assertEquals(row(nativeSend, Returned("sent")), row(cliSend, Returned("sent")))
+        val nativePlugin = ToolCall(id = "t6", name = "weather_forecast", arguments = """{"city":"Paris"}""")
+        val metaPlugin = ToolCall(id = "t6", name = "meridian", arguments = """{"command":"plugin com.example.weather forecast --city Paris"}""")
+        assertEquals(row(nativePlugin, Returned("sunny")), row(metaPlugin, Returned("sunny")))
     }
 
     @Test
@@ -129,6 +166,10 @@ class MeridianCanvasTimelineParityTest {
         toolReturnContentByCallId = returned?.let { persistentMapOf(call.effectiveId to it.text) } ?: persistentMapOf(),
         toolReturnIsErrorByCallId = returned?.let { persistentMapOf(call.effectiveId to it.isError) } ?: persistentMapOf(),
     )
+
+    /** The router's refusal of canvas_compose, as the CLI prints it (JSON, then the hint). */
+    private fun routerRefusal(): String =
+        MeridianCliFixtures.refused(Json.parseToJsonElement(refusalJson).toString()) + "\nFix every problem and send the whole request again."
 
     private fun receipt(call: ToolCall, returned: Returned?): CanvasArtifactReceipt =
         CanvasArtifactReceipts.attach(listOf(event(call, returned))).values.single().single()
