@@ -283,8 +283,10 @@ private fun TouchChatHead(content: TouchHeadContent) {
  * while the agent thinks (there is no bar to show it): its working line, with the elapsed clock
  * and Stop, shows for as long as the turn is busy.
  */
-private fun bubbleTurn(turn: CollapsedTurn, bubble: TouchBubble?): CollapsedTurn =
-    if (bubble != null && turn.busy && !turn.working) turn.copy(working = true) else turn
+private fun bubbleTurn(turn: CollapsedTurn, bubble: TouchBubble?): CollapsedTurn {
+    if (bubble == null) return turn
+    return if (turn.busy) turn.copy(working = true) else turn
+}
 
 /**
  * A tap on the head: the canvas bubble opens or folds its card; otherwise it shows or hides the
@@ -504,7 +506,9 @@ private fun PopupCard(reply: PopupTurn, content: TouchHeadContent, style: PopupC
 }
 
 /** Rounded all round but for the corner nearest the head, which stays tight: the card's anchor. */
-private fun popupShape(style: PopupCardStyle): Shape = headAnchoredShape(style.placement.headOnRight, style.below)
+private fun popupShape(style: PopupCardStyle): Shape {
+    return headAnchoredShape(style.placement.headOnRight, style.below)
+}
 
 /**
  * A card spoken from the head (the popup, the bubble's card): rounded all round but for the corner
@@ -518,9 +522,11 @@ internal fun headAnchoredShape(headOnRight: Boolean, below: Boolean): Shape {
 }
 
 /** Which corner (clockwise from the top left) faces the head. */
-private fun anchorCorner(headOnRight: Boolean, below: Boolean): Int = when {
-    below -> if (headOnRight) TOP_RIGHT else TOP_LEFT
-    else -> if (headOnRight) BOTTOM_RIGHT else BOTTOM_LEFT
+private fun anchorCorner(headOnRight: Boolean, below: Boolean): Int {
+    return when {
+        below -> if (headOnRight) TOP_RIGHT else TOP_LEFT
+        else -> if (headOnRight) BOTTOM_RIGHT else BOTTOM_LEFT
+    }
 }
 
 /**

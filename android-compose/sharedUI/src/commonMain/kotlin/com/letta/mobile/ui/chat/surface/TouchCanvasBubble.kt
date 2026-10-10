@@ -33,9 +33,8 @@ internal fun rememberTouchBubble(frame: ChatSurfaceFrame, state: CanvasBubbleSta
         state = state,
         exchange = { modifier -> DockedReplyCard(dockedReplyParams(frame), modifier) },
         composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
-        recents = recents,
+        recents = recents?.let { BubbleRecents(state, it, recentsHop(frame, it, state::closeRecents)) },
         onStop = if (busy) frame.port.actions::stopRun else null,
-        hop = recents?.let { recentsHop(frame, it, state::closeRecents) },
     )
 }
 
@@ -55,16 +54,19 @@ internal fun ObserveBubbleConversation(frame: ChatSurfaceFrame, state: CanvasBub
  * opened by the "+" in the panel's header. Null when the host offers no conversations.
  */
 @Composable
-internal fun rememberDockedRecents(frame: ChatSurfaceFrame): DockedRecents? {
+internal fun rememberDockedRecents(frame: ChatSurfaceFrame): BubbleRecents? {
     val state = rememberCanvasBubbleState(expanded = true)
     ObserveBubbleConversation(frame, state)
     val recents = frame.recents ?: return null
-    return DockedRecents(state, recents, recentsHop(frame, recents, state::closeRecents))
+    return BubbleRecents(state, recents, recentsHop(frame, recents, state::closeRecents))
 }
 
-/** The docked panel's "+": its state (only [CanvasBubbleState.recentsOpen] matters there), rows and hop. */
+/**
+ * The "+"'s recent interactions: the state that opens them (on the docked panel only
+ * [CanvasBubbleState.recentsOpen] matters), the rows and what a pick does.
+ */
 @Immutable
-internal class DockedRecents(
+internal class BubbleRecents(
     val state: CanvasBubbleState,
     val recents: ChatRecentInteractions,
     val hop: RecentInteractionsActions,

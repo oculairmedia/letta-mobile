@@ -55,9 +55,8 @@ import com.letta.mobile.sharedui.resources.chat_surface_bubble_card_unnamed
 import com.letta.mobile.sharedui.resources.chat_surface_bubble_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_recents_close
 import com.letta.mobile.sharedui.resources.chat_surface_recents_open
-import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
-import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsActions
 import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsList
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
@@ -85,12 +84,10 @@ internal class TouchBubble(
     val exchange: @Composable (Modifier) -> Unit,
     /** The prompt bar: the page's own composer, so the draft and the send are the page's. */
     val composer: @Composable () -> Unit,
-    /** Null: the host has no conversations to offer, and there is no "+". */
-    val recents: ChatRecentInteractions?,
+    /** The "+"'s recent interactions and their hop; null: the host has none to offer, and there is no "+". */
+    val recents: BubbleRecents?,
     /** Stops the turn from the collapsed bubble; null while nothing runs. */
     val onStop: (() -> Unit)?,
-    /** Hops to another conversation: what the host does, and what the page does around it. */
-    val hop: RecentInteractionsActions?,
 )
 
 /** Where the head is, which the card and the "+" are anchored to. */
@@ -206,10 +203,11 @@ private fun BubbleCardHeader(agentName: String, onCollapse: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
         )
         IconButton(onClick = onCollapse, modifier = Modifier.size(ChatHeadDimens.cardHeader).testTag(BUBBLE_COLLAPSE_TAG)) {
-            Icon(
-                LettaIcons.ChevronDown,
+            // Open, the chevron points down: folding the card back down into the head.
+            DisclosureChevron(
+                expanded = true,
                 contentDescription = stringResource(Res.string.chat_surface_bubble_collapse),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                opensUpward = true,
             )
         }
     }
@@ -219,17 +217,17 @@ private fun BubbleCardHeader(agentName: String, onCollapse: () -> Unit) {
 @Composable
 private fun BubbleCardBody(bubble: TouchBubble, look: CardLook, modifier: Modifier) {
     val recents = bubble.recents
-    val hop = bubble.hop
     AnimatedContent(
-        targetState = bubble.state.recentsOpen && recents != null && hop != null,
+        targetState = recents?.state?.recentsOpen == true,
         modifier = modifier,
         transitionSpec = { bodySwap(look.reduced) },
         label = "bubbleCardBody",
     ) { showRecents ->
-        if (showRecents && recents != null && hop != null) {
+        val shown = if (showRecents) recents else null
+        if (shown != null) {
             RecentInteractionsList(
-                rows = recents.conversations,
-                actions = hop,
+                rows = shown.recents.conversations,
+                actions = shown.hop,
                 maxHeight = ChatHeadDimens.cardRecentsMaxHeight,
                 modifier = Modifier.padding(bottom = LettaDimens.Space.sm),
             )

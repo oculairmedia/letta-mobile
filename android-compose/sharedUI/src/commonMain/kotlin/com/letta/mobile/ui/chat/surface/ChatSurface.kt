@@ -565,7 +565,7 @@ private fun dockedPanelContent(
     frame: ChatSurfaceFrame,
     composerMode: ChatSurfaceMode,
     ambient: ChatAmbient,
-    recents: DockedRecents?,
+    recents: BubbleRecents?,
 ): DockedPanelContent {
     return DockedPanelContent(
         ambient = ambient,

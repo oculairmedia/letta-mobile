@@ -285,7 +285,7 @@ internal class DockedPanelContent(
     /** What the dock shows above the bar minimised: the agent's mascot, see [CollapsedDock]. */
     val collapsed: CollapsedDockContent,
     /** letta-mobile-y5q9z: the header's "+" and the recent interactions it opens; null hides the "+". */
-    val recents: DockedRecents? = null,
+    val recents: BubbleRecents? = null,
 )
 
 private val DockLimits = ChatDockLimits(
@@ -729,7 +729,7 @@ internal fun Modifier.dockDrag(state: ChatDockState): Modifier = pointerInput(st
  * [CollapsedDock] has its own restore control.
  */
 @Composable
-private fun PanelHeader(state: ChatDockState, badged: Boolean, recents: DockedRecents?) {
+private fun PanelHeader(state: ChatDockState, badged: Boolean, recents: BubbleRecents?) {
     val moveLabel = stringResource(Res.string.chat_surface_dock_move)
     Box(
         Modifier
