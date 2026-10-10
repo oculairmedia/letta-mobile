@@ -31,6 +31,7 @@ import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerState
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortStops
+import com.letta.mobile.ui.modelcontrol.EffortSetting
 import com.letta.mobile.ui.modelcontrol.ReasoningEffortSlider
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -100,8 +101,7 @@ private fun SelectedModelEffort(picker: AgentContextPicker) {
     ) {
         choice ?: return@AnimatedVisibility
         ReasoningEffortSlider(
-            stops = choice.stops,
-            current = choice.entry.tier?.effort,
+            setting = EffortSetting(choice.stops, choice.entry.tier?.effort),
             onApply = { effort -> choice.apply(choice.entry, effort) },
             modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )

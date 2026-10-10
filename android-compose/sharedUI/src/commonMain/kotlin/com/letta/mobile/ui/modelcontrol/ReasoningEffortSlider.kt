@@ -35,16 +35,12 @@ object ReasoningEffortSliderTags {
  * haptics), names the value beside it and to accessibility, moves one stop per arrow key (Material's own
  * slider keys), and
  * applies only when the drag is released (or a key or accessibility action sets it) — never per
- * drag tick. [current] is the effort the model runs at now; null is Default.
+ * drag tick.
  */
 @Composable
-fun ReasoningEffortSlider(
-    stops: ReasoningEffortStops,
-    current: String?,
-    onApply: (effort: String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val currentIndex = stops.indexOf(current)
+fun ReasoningEffortSlider(setting: EffortSetting, onApply: (effort: String?) -> Unit, modifier: Modifier = Modifier) {
+    val stops = setting.stops
+    val currentIndex = stops.indexOf(setting.current)
     var position by remember(stops, currentIndex) { mutableFloatStateOf(currentIndex.toFloat()) }
     val haptics = LocalHaptics.current
     val label = effortLabel(stops.valueAt(position.roundToInt()))
@@ -85,6 +81,9 @@ fun ReasoningEffortSlider(
         )
     }
 }
+
+/** A model's effort stops and the effort it runs at now (null = Default). */
+data class EffortSetting(val stops: ReasoningEffortStops, val current: String?)
 
 /** "Default", or the tier as the picker rows name it ("High"). */
 fun effortLabel(effort: String?): String =

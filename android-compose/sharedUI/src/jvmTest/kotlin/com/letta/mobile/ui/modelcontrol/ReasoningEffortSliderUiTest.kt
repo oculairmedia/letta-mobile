@@ -40,7 +40,7 @@ class ReasoningEffortSliderUiTest {
     @Test
     fun itNamesTheCurrentStopAndAppliesOnlyWhenSet() = runComposeUiTest {
         val applied = mutableListOf<String?>()
-        setContent { MaterialTheme { ReasoningEffortSlider(stops, current = "medium", onApply = { applied += it }) } }
+        setContent { MaterialTheme { ReasoningEffortSlider(EffortSetting(stops, "medium"), onApply = { applied += it }) } }
         onNodeWithTag(ReasoningEffortSliderTags.VALUE).assertTextEquals("Med")
         onNodeWithTag(ReasoningEffortSliderTags.SLIDER)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Med"))
@@ -55,7 +55,7 @@ class ReasoningEffortSliderUiTest {
     @Test
     fun anArrowKeyMovesOneStopAndApplies() = runComposeUiTest {
         val applied = mutableListOf<String?>()
-        setContent { MaterialTheme { ReasoningEffortSlider(stops, current = "low", onApply = { applied += it }) } }
+        setContent { MaterialTheme { ReasoningEffortSlider(EffortSetting(stops, "low"), onApply = { applied += it }) } }
         onNodeWithTag(ReasoningEffortSliderTags.SLIDER).requestFocus().performKeyInput { pressKey(Key.DirectionLeft) }
         waitForIdle()
         assertEquals(listOf<String?>(null), applied)
