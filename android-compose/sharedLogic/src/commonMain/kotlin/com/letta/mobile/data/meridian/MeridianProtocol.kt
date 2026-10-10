@@ -96,6 +96,14 @@ data class MeridianError(
 }
 
 /**
+ * Reads `--input-file PATH` for a front door that has a filesystem (the wrapper's endpoint binds
+ * one); null means the file could not be read. The router never reads files itself.
+ */
+fun interface MeridianInputFiles {
+    suspend fun read(path: String): String?
+}
+
+/**
  * The size caps (design: "Inputs and results are size-capped"). Defaults sit above every cap the
  * tools themselves enforce (canvas_compose's 64 KiB request, the 8M-char scene), so the router only
  * stops input no tool would accept and output no tool return could carry.
