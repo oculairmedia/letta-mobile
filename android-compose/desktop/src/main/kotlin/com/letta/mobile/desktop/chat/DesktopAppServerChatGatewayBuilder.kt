@@ -4,6 +4,7 @@ import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
 import com.letta.mobile.data.model.LettaConfig
@@ -267,9 +268,29 @@ internal data class DesktopAppServerEngineConfig(
 internal fun desktopCanvasToolRegistry(
     isIroh: Boolean,
     canvasSessions: com.letta.mobile.data.canvas.CanvasSessionRegistry,
-): ExternalToolRegistry = ExternalToolRegistry.hostTools(
-    if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions),
+    agentToolsModes: AgentToolsModePolicy = desktopAgentToolsModePolicy(),
+): ExternalToolRegistry = agentToolsModes.withoutCli().apply(
+    ExternalToolRegistry.hostTools(
+        if (isIroh) emptyList() else CanvasExternalTools.all(DesktopNotebookCanvasStore.documents, canvasSessions),
+    ),
 )
+
+/**
+ * The desktop's `agent-tools-mode` (letta-mobile-jna0o.9): `-Dletta.agentToolsMode` or
+ * `LETTA_AGENT_TOOLS_MODE` (native|cli|meta), with per-agent `agentId=mode` pairs in
+ * `-Dletta.agentToolsModeOverrides` / `LETTA_AGENT_TOOLS_MODE_OVERRIDES`. Native unless set. A
+ * direct App Server has no `meridian` CLI front door, so cli means native here
+ * ([AgentToolsModePolicy.withoutCli]); a value that names no mode is reported and ignored.
+ */
+internal fun desktopAgentToolsModePolicy(
+    setting: (property: String, env: String) -> String? = { property, env -> System.getProperty(property) ?: System.getenv(env) },
+): AgentToolsModePolicy = AgentToolsModePolicy.parse(
+    setting("letta.agentToolsMode", "LETTA_AGENT_TOOLS_MODE"),
+    setting("letta.agentToolsModeOverrides", "LETTA_AGENT_TOOLS_MODE_OVERRIDES"),
+).getOrElse { invalid ->
+    System.err.println("[letta-desktop] ${invalid.message}; agent tools stay native")
+    AgentToolsModePolicy()
+}
 
 internal fun buildDesktopAppServerTurnEngine(
     client: AppServerClient,

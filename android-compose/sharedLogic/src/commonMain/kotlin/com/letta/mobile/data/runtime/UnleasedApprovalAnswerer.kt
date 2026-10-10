@@ -11,7 +11,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
@@ -91,7 +90,7 @@ internal class UnleasedApprovalAnswerer(
         if (request.request.string("subtype") != CAN_USE_TOOL) return UnleasedApprovalOutcome.NotApproval
         val toolName = request.request.string("tool_name")
         if (sender.cachedDecisionFor(request) != null) return UnleasedApprovalOutcome.AlreadyDecided
-        val details = ApprovalDetails(request, key, toolName, permissionModeFor(key))
+        val details = ApprovalDetails(request, key, toolName, permissionModeFor(key), request.request["input"]?.toString())
         return withheldOutcome(details) ?: autoAllow(details, runtime, connectionGeneration)
     }
 
@@ -104,7 +103,7 @@ internal class UnleasedApprovalAnswerer(
             record("approval.unleasedNotOwned", details)
             return UnleasedApprovalOutcome.NotOwned
         }
-        if (shouldStayPending(details.mode, details.toolName)) {
+        if (!autoAllowPermitted(details.mode, details.toolName, details.argumentsJson)) {
             record("approval.unleasedPending", details)
             return UnleasedApprovalOutcome.LeftPending
         }
@@ -127,11 +126,6 @@ internal class UnleasedApprovalAnswerer(
         }
         record("approval.unleasedAutoAllow", details)
         return UnleasedApprovalOutcome.AutoAllowed
-    }
-
-    private fun shouldStayPending(mode: AppServerPermissionMode, toolName: String?): Boolean {
-        if (mode != AppServerPermissionMode.Unrestricted) return true
-        return RuntimeUserInputTools.requiresUserInput(toolName)
     }
 
     /**
@@ -204,6 +198,7 @@ internal class UnleasedApprovalAnswerer(
         val key: TurnRuntimeKey,
         val toolName: String?,
         val mode: AppServerPermissionMode,
+        val argumentsJson: String?,
     )
 
     private fun kotlinx.serialization.json.JsonObject.string(key: String): String? =

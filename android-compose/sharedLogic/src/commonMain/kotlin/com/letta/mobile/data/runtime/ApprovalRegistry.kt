@@ -184,8 +184,10 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
  * approve-all is auto-answered before here. (Whether Standard also streams messages for calls its own rules
  * allow is not verified; the gate is lifted by the tool's return, and a replay after the return is ignored.)
  */
-internal fun gatesStreamedApproval(toolName: String?, mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode): Boolean = when {
-    com.letta.mobile.runtime.RuntimeUserInputTools.requiresUserInput(toolName) -> true
+internal fun gatesStreamedApproval(approval: ApprovalAutoAllowRequest, mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode): Boolean = when {
+    com.letta.mobile.runtime.RuntimeUserInputTools.requiresUserInput(approval.toolName) -> true
+    // jna0o.7: an allow-listed `meridian` CLI call never waits on the person.
+    com.letta.mobile.data.meridian.MeridianShellAllowList.allows(approval.toolName, approval.argumentsJson) -> false
     else -> mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Standard ||
         mode == com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Strict
 }

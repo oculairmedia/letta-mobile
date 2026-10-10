@@ -3,6 +3,7 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ToolAudience
 import com.letta.mobile.data.controller.ApprovalSubmission
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
@@ -19,7 +20,6 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
-import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
@@ -939,7 +939,7 @@ class AppServerTurnEngine(
         val key = wiring.lease.slot.key
         // Never park a finished call again (replay), nor replace a control request's real id with this one.
         if (callId in ledger.returned || approvals.approvalIdFor(callId) != null) return
-        if (!gatesStreamedApproval(approval.toolName, permissionModeProvider(wiring.command))) return
+        if (!gatesStreamedApproval(approval, permissionModeProvider(wiring.command))) return
         approvals.park(key, PendingApprovalDetails(approval.requestId, callId, approval.toolName ?: "tool"))
         approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
@@ -1439,15 +1439,12 @@ class AppServerTurnEngine(
         command: TurnCommand,
         draft: RuntimeEventDraft,
     ): Boolean {
-        // Read now, not at turn start: a mode tightened mid-turn must govern this approval.
-        if (permissionModeProvider(command) != AppServerPermissionMode.Unrestricted) return false
         val approval = draft.toApprovalAutoAllowRequest() ?: return false
-        // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion,
-        // ExitPlanMode) must NEVER be auto-approved — auto-approving closes them
-        // with no answer (the tool returns a "Waiting for user response..."
-        // placeholder and the agent stalls). Surface them to the client as a
-        // real approval request so the user can see the query and answer it.
-        if (RuntimeUserInputTools.requiresUserInput(approval.toolName)) return false
+        // Read now, not at turn start: a mode tightened mid-turn must govern this approval.
+        // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion, ExitPlanMode) are NEVER
+        // auto-approved (that closes them with no answer and the agent stalls); jna0o.7: an
+        // allow-listed `meridian` CLI call is approved in every mode, like the tool it replaces.
+        if (!approval.autoAllowPermitted(permissionModeProvider(command))) return false
         Telemetry.event(
             "IrohTurn", "approval.auto_allow",
             "approvalId" to approval.requestId,
@@ -1508,7 +1505,7 @@ class AppServerTurnEngine(
                 // the App Server registers depends on which code path opened the
                 // runtime. Absent/empty => the field is omitted and the server can
                 // never emit an external_tool_call_request.
-                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
+                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(audience = ToolAudience(command.agentId.value)),
             ),
         )
         Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
