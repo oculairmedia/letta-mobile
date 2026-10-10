@@ -35,6 +35,7 @@ import com.letta.mobile.data.compaction.CompactionRequest
 import com.letta.mobile.data.compaction.key
 import com.letta.mobile.data.context.AgentContextCardInputs
 import com.letta.mobile.data.context.AgentContextCardModel
+import com.letta.mobile.data.context.ModelChangeScope
 import com.letta.mobile.data.context.ContextBreakdownLoader
 import com.letta.mobile.data.context.ContextBreakdownRequest
 import com.letta.mobile.data.context.ContextBreakdownState
@@ -75,7 +76,16 @@ data class AgentContextFocus(
     val windowTokens: Int?,
     /** A turn is running: no breakdown fetch, no compaction. */
     val turnRunning: Boolean,
+    /**
+     * Whether this host's model pick is a per-conversation override at all. False when it always
+     * changes the agent (e.g. an agent update rather than `update_model` on the conversation).
+     */
+    val picksTargetConversation: Boolean = true,
 ) {
+    /** Where a pick lands: the agent, unless it is a conversation override on a non-default conversation. */
+    val modelScope: ModelChangeScope
+        get() = if (picksTargetConversation && !isDefaultConversation) ModelChangeScope.Conversation else ModelChangeScope.Agent
+
     val isDefaultConversation: Boolean
         get() = conversationId.isNullOrBlank() || conversationId == DEFAULT || conversationId == "conv-default-$agentId"
 
@@ -123,7 +133,7 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
         AgentContextCard(model = model, onClick = { open = true })
         if (open) {
             AgentContextSurface(binding.presentation, onDismiss = { open = false }) {
-                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions) { open = false }, onCompact)
+                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact)
             }
         }
     }
@@ -162,7 +172,7 @@ private fun rememberCardModel(
             modelLabel = focus.modelLabel,
             effort = focus.effort,
             meter = ContextMeter.of(reading.total, focus.windowTokens, breakdown.overviewFor(requests.breakdown), reading.estimated),
-            conversationIsDefault = focus.isDefaultConversation,
+            conversationIsDefault = focus.modelScope == ModelChangeScope.Agent,
             compactSupported = if (deps.compaction == null) false else supported,
             compacting = requests.compaction.key in compacting,
             turnRunning = focus.turnRunning,
@@ -193,12 +203,15 @@ private fun rememberReading(readings: ContextTokenReadings?, focus: AgentContext
     return Reading(total = key?.let(totals::get), estimated = key != null && key in estimated)
 }
 
+/**
+ * The sheet's model list: compact rows (no effort chips) and one effort slider for the selected
+ * model. A pick applies at once and the sheet stays open, so the slider can follow it.
+ */
 @Composable
 private fun rememberPicker(
     source: ModelPickerSource?,
     focus: AgentContextFocus,
     actions: AgentContextCardActions,
-    onPicked: () -> Unit,
 ): AgentContextPicker? {
     source ?: return null
     val scope = rememberCoroutineScope()
@@ -210,14 +223,15 @@ private fun rememberPicker(
         ModelPickerActions.bind(
             controller = controller,
             onSelect = { entry ->
-                if (!entry.selected) actions.onModelSelected(entry)
-                onPicked()
+                if (!entry.selected) {
+                    controller.setSelected(entry.value)
+                    actions.onModelSelected(entry)
+                }
             },
             onEditModels = null,
-            onEffortSelected = actions.onEffortSelected?.let { pick -> { entry, effort -> pick(entry, effort); onPicked() } },
         )
     }
-    return AgentContextPicker(state, bound)
+    return AgentContextPicker(state, bound, actions.onEffortSelected)
 }
 
 @Composable

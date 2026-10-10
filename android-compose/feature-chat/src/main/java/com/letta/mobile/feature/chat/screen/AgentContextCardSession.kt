@@ -86,6 +86,7 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
             effort = current?.reasoningEffort,
             windowTokens = contextWindowTokensOf(agent, state.availableModels, state.conversationId?.let(selections::get)),
             turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
+            picksTargetConversation = viewModel.modelPicksTargetConversation(),
         ),
     )
 }

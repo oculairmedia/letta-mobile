@@ -28,7 +28,17 @@ import com.letta.mobile.data.context.CompactAffordance
 import com.letta.mobile.data.context.ContextMeter
 import com.letta.mobile.data.context.ContextProvenance
 import com.letta.mobile.data.context.formatContextTokens
+import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerState
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortStops
+import com.letta.mobile.ui.modelcontrol.ReasoningEffortSlider
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import com.letta.mobile.ui.modelcontrol.LocalModelPickerContextTokens
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
@@ -36,8 +46,15 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
-/** The model list the sheet shows, when the host can switch models. */
-data class AgentContextPicker(val state: ModelPickerState, val actions: ModelPickerActions)
+/**
+ * The model list the sheet shows, when the host can switch models. [onEffortApplied] sets the
+ * selected model's reasoning effort (null = Default); null when the host has no effort switch.
+ */
+data class AgentContextPicker(
+    val state: ModelPickerState,
+    val actions: ModelPickerActions,
+    val onEffortApplied: ((ModelPickerEntry, String?) -> Unit)? = null,
+)
 
 /**
  * letta-mobile-3io8k: the card's sheet — the searchable model list (grouped by provider, with
@@ -55,6 +72,7 @@ fun ColumnScope.AgentContextSheetContent(
         CompositionLocalProvider(LocalModelPickerContextTokens provides model.meter?.usage?.usedTokens) {
             ModelPickerContent(state = picker.state, actions = picker.actions)
         }
+        SelectedModelEffort(picker)
     } else {
         Text(
             text = modelLine(model),
@@ -64,6 +82,32 @@ fun ColumnScope.AgentContextSheetContent(
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     ContextSection(model, onCompact)
+}
+
+/**
+ * letta-mobile-3io8k: one effort slider, for the selected model only (tap a model first to tune
+ * another; the pick applies at once and the slider follows it). Hidden for a model with no tiers
+ * or a single one; it unfolds rather than jumping in.
+ */
+@Composable
+private fun SelectedModelEffort(picker: AgentContextPicker) {
+    val selected = picker.state.selected
+    val stops = selected?.let { ReasoningEffortStops.of(it.efforts) }
+    val apply = picker.onEffortApplied
+    val reducedMotion = LocalReducedMotion.current
+    AnimatedVisibility(
+        visible = selected != null && stops != null && apply != null,
+        enter = if (reducedMotion) EnterTransition.None else expandVertically() + fadeIn(),
+        exit = if (reducedMotion) ExitTransition.None else shrinkVertically() + fadeOut(),
+    ) {
+        if (selected == null || stops == null || apply == null) return@AnimatedVisibility
+        ReasoningEffortSlider(
+            stops = stops,
+            current = selected.tier?.effort,
+            onApply = { effort -> apply(selected, effort) },
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+        )
+    }
 }
 
 @Composable

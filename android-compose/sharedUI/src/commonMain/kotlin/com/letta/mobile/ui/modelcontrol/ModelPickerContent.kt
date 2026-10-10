@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.modelcontrol
 
+import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.ui.context.AgentContextStrings
 import com.letta.mobile.data.context.AgentContextCardModel
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -219,6 +220,7 @@ private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
                         maxLines = 1,
                     )
                 }
+                PickerRowWindow(entry)
             }
             if (entry.selected) {
                 Icon(
@@ -229,7 +231,7 @@ private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
                 )
             }
         }
-        PickerRowWindow(entry)
+        PickerRowOverflow(entry)
         val onEffort = actions.onEffortSelected
         if (onEffort != null && entry.efforts.isNotEmpty()) {
             ReasoningEffortChips(
@@ -247,21 +249,36 @@ private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
  */
 val LocalModelPickerContextTokens = staticCompositionLocalOf<Int?> { null }
 
-/** "200k context", and a warning when the conversation would not fit in it. */
+/** The window beside the name ("200k"), in the error colour when the conversation would not fit. */
 @Composable
 private fun PickerRowWindow(entry: ModelPickerEntry) {
     val window = entry.contextWindow ?: return
-    val used = LocalModelPickerContextTokens.current
-    val overflows = AgentContextCardModel.overflowsWindow(used, window)
     Text(
-        text = AgentContextStrings.windowLine(window, overflows),
+        text = formatContextTokens(window),
         style = MaterialTheme.typography.bodySmall,
-        color = if (overflows) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
+        color = if (entry.overflows()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
         modifier = Modifier.testTag("${ModelPickerTags.WINDOW_PREFIX}${entry.value}"),
     )
 }
+
+/** Under the row only when the conversation would not fit in the model's window. */
+@Composable
+private fun PickerRowOverflow(entry: ModelPickerEntry) {
+    val window = entry.contextWindow ?: return
+    if (!entry.overflows()) return
+    Text(
+        text = AgentContextStrings.windowLine(window, overflows = true),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun ModelPickerEntry.overflows(): Boolean =
+    AgentContextCardModel.overflowsWindow(LocalModelPickerContextTokens.current, contextWindow)
 
 @Composable
 private fun PickerFooter(state: ModelPickerState, actions: ModelPickerActions) {

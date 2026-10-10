@@ -648,6 +648,8 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun modelPickerSource(): com.letta.mobile.data.repository.modelcontrol.ModelPickerSource? = modelCoordinator.pickerSource()
 
+    fun modelPicksTargetConversation(): Boolean = modelCoordinator.picksTargetConversation()
+
     fun modelsEditController(
         scope: kotlinx.coroutines.CoroutineScope,
     ): com.letta.mobile.data.repository.modelcontrol.ProviderManagementController? = modelCoordinator.modelsEditController(scope)

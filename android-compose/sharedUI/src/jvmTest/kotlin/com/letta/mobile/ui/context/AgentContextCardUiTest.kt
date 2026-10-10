@@ -61,7 +61,7 @@ class AgentContextCardUiTest {
         val deps = AgentContextCardDeps(readings(84_000), breakdown = null, compaction = null, pickerSource = null)
         setContent { MaterialTheme { AgentContextCardHost(AgentContextCardBinding(deps, actions, AgentContextPresentation.Popover), focus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
-        onNodeWithTag(AgentContextTags.SCOPE).assertTextEquals("Applies to this agent")
+        onNodeWithTag(AgentContextTags.SCOPE).assertTextEquals("Changes the agent's model")
         onNodeWithTag(AgentContextTags.PROVENANCE).assertTextEquals("Total only")
         onNodeWithTag(AgentContextTags.HINT).assertExists()
         onNodeWithTag(AgentContextTags.COMPACT).assertDoesNotExist()

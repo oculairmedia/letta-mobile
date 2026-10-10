@@ -35,9 +35,14 @@ object AgentContextStrings {
     fun totalLine(used: String, window: String?, percent: Int?): String =
         if (window != null && percent != null) "$used / $window ($percent%)" else used
 
+    /**
+     * The true reach of a pick: letta-code's `update_model` on the agent's default conversation
+     * changes the agent's model (other conversations without their own pick follow it); on any
+     * other conversation it is an override for that conversation alone.
+     */
     fun scope(scope: ModelChangeScope): String = when (scope) {
-        ModelChangeScope.Agent -> "Applies to this agent"
-        ModelChangeScope.Conversation -> "Applies to this conversation"
+        ModelChangeScope.Agent -> "Changes the agent's model"
+        ModelChangeScope.Conversation -> "This conversation only; the agent's model is unchanged"
     }
 
     fun provenance(provenance: ContextProvenance, totalIsEstimate: Boolean): String = when {
