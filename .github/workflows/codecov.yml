@@ -81,6 +81,26 @@ jobs:
         if: steps.coverage-scope.outputs.run == 'true'
         run: ./gradlew --no-configuration-cache :koverXmlReportCi
 
+      - name: Upload JVM test diagnostics
+        # `always()` because the failure worth preserving is the kover task's own: a red
+        # `:sharedLogic:jvmTest` skips every later step, and since per-PR runs were removed
+        # this job is the only place on `main` where the full unbounded suite executes.
+        # The JUnit XML carries each failure's assertion message -- the console log does
+        # not, so without this a red reads only as `AssertionError at <file>:<line>` and
+        # the named frame/step/invariant is unrecoverable (letta-mobile-k02zi).
+        # Paths are workspace-root relative: `defaults.run.working-directory` applies to
+        # `run:` steps only, never to an action's `with:` inputs.
+        # `run_attempt` is part of the name because upload-artifact@v4 rejects a duplicate
+        # artifact name within one run, and a re-run is how this evidence gets gathered.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codecov-test-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            android-compose/**/build/test-results/**/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Verify coverage report
         if: steps.coverage-scope.outputs.run == 'true'
         run: test -s build/reports/kover/report.xml
