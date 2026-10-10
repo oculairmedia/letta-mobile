@@ -61,6 +61,7 @@ internal fun ChatMessageRow(
     position: GroupPosition = GroupPosition.None,
 ) {
     when {
+        message.isCompaction -> CompactionDividerRow(message.content)
         isUserRole(message.role) && message.subagentNotification == null ->
             UserPromptRow(message, context, callbacks, PromptGrouping.of(position))
         message.isReasoning && message.subagentNotification == null -> ReasoningRow(message, context, callbacks)

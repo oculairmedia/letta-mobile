@@ -101,4 +101,23 @@ internal object LettaCode0336Frames {
     const val EXECUTE_COMMAND_RESPONSE = """
         {"type":"execute_command_response","request_id":"req-9","command_id":"compact","success":true}
     """
+
+    /**
+     * letta-mobile-kr39h: local-backend automatic compaction, `emitCompactionChunks`: a
+     * `compaction` event, then the `summary_message` with `compaction_stats`. Neither carries an id.
+     */
+    const val COMPACTION_EVENT = """
+        {"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},
+         "event_seq":20,"emitted_at":"2026-10-08T10:01:00.000Z","idempotency_key":"stream_delta:20:a",
+         "delta":{"message_type":"event_message","event_type":"compaction","event_data":{"trigger":"context_window_overflow"}}}
+    """
+
+    const val COMPACTION_SUMMARY = """
+        {"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},
+         "event_seq":21,"emitted_at":"2026-10-08T10:01:04.000Z","idempotency_key":"stream_delta:21:a",
+         "delta":{"message_type":"summary_message","summary":"The user and agent set up the repo.",
+                  "compaction_stats":{"trigger":"context_window_overflow","context_tokens_before":150000,
+                  "context_tokens_after":20000,"context_window":200000,"messages_count_before":48,
+                  "messages_count_after":12}}}
+    """
 }

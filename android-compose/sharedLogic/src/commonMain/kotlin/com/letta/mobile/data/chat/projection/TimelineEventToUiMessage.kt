@@ -121,7 +121,7 @@ fun timelineEventToUiMessage(
                 TimelineMessageType.ASSISTANT -> "assistant"
                 TimelineMessageType.REASONING -> "assistant"
                 TimelineMessageType.TOOL_CALL -> "assistant"
-                TimelineMessageType.SYSTEM -> return null
+                TimelineMessageType.SYSTEM, TimelineMessageType.COMPACTION -> return null
                 // Locals never originate as ERROR (server-only frame), but
                 // make the `when` exhaustive so adding the type elsewhere
                 // doesn't compile-warn here. letta-mobile-5s1n.
@@ -229,24 +229,7 @@ fun timelineEventToUiMessage(
         }
         is TimelineEvent.Confirmed -> {
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
-
-            val projectedSubagentNotification = when (ev.messageType) {
-                TimelineMessageType.USER, TimelineMessageType.ASSISTANT -> extractSubagentNotification(ev.content)
-                else -> null
-            }
-            if (projectedSubagentNotification != null) {
-                return UiMessage(
-                    id = ev.serverId,
-                    role = "assistant",
-                    content = "",
-                    timestamp = ev.date.toString(),
-                    runId = ev.runId,
-                    agentId = ev.agentId,
-                    stepId = ev.stepId,
-                    clientMessageId = ev.otid.takeIf { it.isNotBlank() },
-                    subagentNotification = projectedSubagentNotification,
-                )
-            }
+            confirmedStructuredRow(ev)?.let { return it }
 
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
@@ -258,7 +241,7 @@ fun timelineEventToUiMessage(
                 TimelineMessageType.ERROR -> "system"
                 TimelineMessageType.TOOL_CALL -> "assistant"
                 TimelineMessageType.TOOL_RETURN -> return null
-                TimelineMessageType.OTHER -> return null
+                TimelineMessageType.OTHER, TimelineMessageType.COMPACTION -> return null
             }
             // letta-mobile-23h5 (regression fix 2026-04-19): when an approval
             // has been decided we MUST NOT synthesize a `UiApprovalResponse`

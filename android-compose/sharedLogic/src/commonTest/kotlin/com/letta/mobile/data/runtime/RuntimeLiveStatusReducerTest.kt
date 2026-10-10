@@ -64,6 +64,29 @@ class RuntimeLiveStatusReducerTest {
     }
 
     @Test
+    fun aCompactionRunsThenFinishesWithItsCounts() {
+        val running = fold(RuntimeEventPayload.CompactionStarted(trigger = "context_window_overflow"))
+        assertEquals(LiveCompaction(running = true, trigger = "context_window_overflow"), running.compaction)
+        assertTrue(!running.isEmpty)
+        val stats = com.letta.mobile.runtime.CompactionStats(messagesCountBefore = 48, messagesCountAfter = 12)
+        val done = RuntimeLiveStatusReducer.reduce(running, RuntimeEventPayload.CompactionFinished("s", stats), 2_000L)
+        val compaction = done.compaction!!
+        assertEquals(false, compaction.running)
+        assertEquals("context_window_overflow", compaction.trigger)
+        assertEquals(48 to 12, compaction.messageCounts)
+    }
+
+    @Test
+    fun aFinishedCompactionIsHistoryOnceTheUserSendsAgain() {
+        val done = fold(RuntimeEventPayload.CompactionStarted(), RuntimeEventPayload.CompactionFinished())
+        assertNull(done.compaction!!.messageCounts)
+        val next = RuntimeLiveStatusReducer.reduce(done, RuntimeEventPayload.LocalUserAppend("l", "hi"), 3_000L)
+        assertNull(next.compaction)
+        val stillRunning = fold(RuntimeEventPayload.CompactionStarted(), RuntimeEventPayload.LocalUserAppend("l", "hi"))
+        assertTrue(stillRunning.compaction!!.running)
+    }
+
+    @Test
     fun aCommandEndReplacesItsStart() {
         val status = fold(
             RuntimeEventPayload.CommandStarted("cmd-1", "/compact", slash = true),

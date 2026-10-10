@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.runtime.CompactionStats
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 
@@ -20,9 +21,12 @@ data class RuntimeLiveStatus(
     val notice: LiveNotice? = null,
     /** Server-side commands, newest last, at most [RuntimeLiveStatusReducer.MAX_COMMANDS]. */
     val commands: List<CommandActivity> = emptyList(),
+    /** letta-mobile-kr39h: a compaction in progress, or the one that just finished. */
+    val compaction: LiveCompaction? = null,
 ) {
     /** Nothing to show. */
-    val isEmpty: Boolean get() = phase == null && retry == null && notice == null && commands.isEmpty()
+    val isEmpty: Boolean
+        get() = phase == null && retry == null && notice == null && commands.isEmpty() && compaction == null
 
     companion object {
         val Idle = RuntimeLiveStatus()
@@ -77,6 +81,24 @@ data class CommandActivity(
 
 enum class CommandState { Running, Succeeded, Failed }
 
+/**
+ * letta-mobile-kr39h: a conversation compaction as the stream described it. [stats] is null while
+ * it runs and on servers that do not report `compaction_stats`.
+ */
+data class LiveCompaction(
+    val running: Boolean,
+    val trigger: String? = null,
+    val stats: CompactionStats? = null,
+) {
+    /** "48 → 12 messages" material: both counts, when the server sent them. */
+    val messageCounts: Pair<Int, Int>?
+        get() {
+            val before = stats?.messagesCountBefore ?: return null
+            val after = stats.messagesCountAfter ?: return null
+            return before to after
+        }
+}
+
 /** The one place runtime events become a [RuntimeLiveStatus]. Pure: the caller passes the clock. */
 object RuntimeLiveStatusReducer {
     const val MAX_COMMANDS: Int = 3
@@ -89,12 +111,21 @@ object RuntimeLiveStatusReducer {
             ?: state
         is RuntimeEventPayload.CommandStarted -> state.withCommand(event.toActivity())
         is RuntimeEventPayload.CommandFinished -> state.withCommand(event.toActivity())
+        is RuntimeEventPayload.CompactionStarted -> state.copy(compaction = LiveCompaction(running = true, trigger = event.trigger))
+        is RuntimeEventPayload.CompactionFinished -> state.copy(
+            compaction = LiveCompaction(
+                running = false,
+                trigger = event.stats?.trigger ?: state.compaction?.trigger,
+                stats = event.stats,
+            ),
+        )
         is RuntimeEventPayload.RunLifecycleChanged -> state.onLifecycle(event.status)
         // A new message moves the conversation on: the last turn's finished commands are history.
         is RuntimeEventPayload.LocalUserAppend -> state.copy(
             retry = null,
             notice = null,
             commands = state.commands.filter { it.running },
+            compaction = state.compaction?.takeIf { it.running },
         )
         else -> state
     }
