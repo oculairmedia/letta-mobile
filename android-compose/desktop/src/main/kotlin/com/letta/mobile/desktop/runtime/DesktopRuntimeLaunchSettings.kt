@@ -23,6 +23,9 @@ internal data class DesktopRuntimeLaunchInputs(
     val workingDirectory: File,
     /** The NODE_OPTIONS the desktop process itself inherited, kept and extended. */
     val inheritedNodeOptions: String? = null,
+    /** A tool directory (git, G07) found after launch, prepended to the child's [inheritedPath]. */
+    val extraPathDirectory: File? = null,
+    val inheritedPath: String? = null,
 )
 
 internal const val DESKTOP_RUNTIME_HEAP_FLOOR_MB = 4_096
@@ -49,9 +52,15 @@ internal fun desktopRuntimeLaunchContext(inputs: DesktopRuntimeLaunchInputs): De
             "LETTA_LISTENER_INSTANCE_ID" to "$INSTANCE_ID_PREFIX${inputs.instanceId}",
             "USER_CWD" to cwd,
             "PERSIST_CWD" to "1",
-        ),
+        ) + pathEnvironment(inputs),
         workingDirectory = inputs.workingDirectory,
     )
+}
+
+private fun pathEnvironment(inputs: DesktopRuntimeLaunchInputs): Map<String, String> {
+    val extra = inputs.extraPathDirectory?.absolutePath ?: return emptyMap()
+    val inherited = inputs.inheritedPath?.takeIf { it.isNotBlank() } ?: return mapOf("PATH" to extra)
+    return mapOf("PATH" to extra + File.pathSeparator + inherited)
 }
 
 /**
@@ -77,6 +86,10 @@ internal object DesktopRuntimeLaunchPreference {
     @Volatile
     var workingDirectory: File? = null
 
+    /** Set by the git environment check when git lives off the inherited PATH (G07). */
+    @Volatile
+    var extraPathDirectory: File? = null
+
     /** The context for the next spawn, from the live preference and this machine. */
     fun currentContext(): DesktopRuntimeLaunchContext {
         val home = System.getProperty("user.home")?.takeIf { it.isNotBlank() }?.let(::File)
@@ -90,6 +103,8 @@ internal object DesktopRuntimeLaunchPreference {
                     temp = File(System.getProperty("java.io.tmpdir")),
                 ),
                 inheritedNodeOptions = System.getenv("NODE_OPTIONS"),
+                extraPathDirectory = extraPathDirectory,
+                inheritedPath = System.getenv("PATH"),
             ),
         )
     }

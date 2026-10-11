@@ -17,9 +17,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
+import com.letta.mobile.desktop.runtime.DesktopGitStatus
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.ui.theme.LettaDimens
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -34,6 +36,7 @@ internal fun DesktopLocalRuntimeSettingsCard(controller: DesktopLocalRuntimeCont
     LaunchedEffect(controller) { controller.load() }
     val health by controller.health.collectAsState()
     val launch by controller.launch.collectAsState()
+    val git by controller.git.collectAsState()
     val pickerLauncher = rememberDirectoryPickerLauncher(
         dialogSettings = FileKitDialogSettings(title = "Choose the runtime's default working directory"),
     ) { directory ->
@@ -48,7 +51,12 @@ internal fun DesktopLocalRuntimeSettingsCard(controller: DesktopLocalRuntimeCont
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
             Text("Local runtime", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            RuntimeHealthSection(health = health, onForceRestart = controller::forceRestart)
+            RuntimeHealthSection(
+                health = health,
+                onForceRestart = controller::forceRestart,
+                onSetRunning = controller::setRunning,
+            )
+            RuntimeGitSection(git = git, onRecheck = controller::recheckGit)
             RuntimeLaunchSection(
                 launch = launch,
                 onChangeDirectory = { pickerLauncher.launch() },
@@ -59,7 +67,7 @@ internal fun DesktopLocalRuntimeSettingsCard(controller: DesktopLocalRuntimeCont
 }
 
 @Composable
-private fun RuntimeHealthSection(health: RuntimeHealth, onForceRestart: () -> Unit) {
+private fun RuntimeHealthSection(health: RuntimeHealth, onForceRestart: () -> Unit, onSetRunning: (Boolean) -> Unit) {
     DesktopSettingsFieldLabel("Health")
     Text(
         text = health.describe(),
@@ -67,7 +75,34 @@ private fun RuntimeHealthSection(health: RuntimeHealth, onForceRestart: () -> Un
         color = if (health.gaveUp || health.restartPending) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
     )
     if (health.recentStderr.isNotEmpty()) RuntimeStderrTail(health.recentStderr)
-    DesktopOutlinedButton(onClick = onForceRestart) { DesktopButtonContent("Force restart") }
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
+        if (health.stoppedByUser) {
+            DesktopDefaultButton(onClick = { onSetRunning(true) }) { DesktopButtonContent("Start runtime") }
+        } else {
+            DesktopOutlinedButton(onClick = { onSetRunning(false) }) { DesktopButtonContent("Stop runtime") }
+            DesktopOutlinedButton(onClick = onForceRestart) { DesktopButtonContent("Force restart") }
+        }
+    }
+}
+
+/** Git availability for the runtime (G07): an actionable state with where to get it when missing. */
+@Composable
+private fun RuntimeGitSection(git: DesktopGitStatus, onRecheck: () -> Unit) {
+    DesktopSettingsFieldLabel("Git")
+    val missing = git as? DesktopGitStatus.Missing
+    Text(
+        text = git.describe(),
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (missing != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+    )
+    if (missing == null) return
+    val uriHandler = LocalUriHandler.current
+    Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
+        DesktopDefaultButton(onClick = { uriHandler.openUri(missing.platform.installUrl) }) {
+            DesktopButtonContent("Get Git")
+        }
+        DesktopOutlinedButton(onClick = onRecheck) { DesktopButtonContent("Check again") }
+    }
 }
 
 @Composable
@@ -120,7 +155,7 @@ private fun RuntimeLaunchSection(
 @Composable
 internal fun DesktopLocalRuntimeBanner(modifier: Modifier = Modifier) {
     val health by DesktopLocalRuntimeHost.health.collectAsState()
-    if (!health.restartPending && !health.needsForceRestart) return
+    if (!health.needsChatBanner) return
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -135,7 +170,9 @@ internal fun DesktopLocalRuntimeBanner(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onErrorContainer,
             modifier = Modifier.weight(1f),
         )
-        if (health.needsForceRestart) {
+        if (health.stoppedByUser) {
+            DesktopDefaultButton(onClick = DesktopLocalRuntimeHost::startByUser) { DesktopButtonContent("Start") }
+        } else if (health.needsForceRestart) {
             DesktopDefaultButton(onClick = DesktopLocalRuntimeHost::forceRestart) { DesktopButtonContent("Restart") }
         }
     }
