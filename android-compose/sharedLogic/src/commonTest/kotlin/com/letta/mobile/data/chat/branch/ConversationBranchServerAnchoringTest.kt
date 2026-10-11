@@ -150,12 +150,12 @@ class ConversationBranchServerAnchoringTest {
         BranchSource("conv-1", "agent-1", timeline, historyComplete)
 
     private class Backend(private val history: List<BranchMessage>?) {
-        val forkedThrough = mutableListOf<String?>()
+        val forkedThrough = mutableListOf<String>()
         val created = mutableListOf<String>()
         val renames = mutableListOf<Pair<String, String>>()
 
         fun asBackend() = BranchBackend(
-            fork = { request -> forkedThrough += request.throughMessageId; conversation("fork-${forkedThrough.size}") },
+            fork = { request -> forkedThrough += request.throughMessageId.orEmpty(); conversation("fork-${forkedThrough.size}") },
             createEmpty = { agentId -> created += agentId; conversation("empty") },
             history = history?.let { messages -> { _ -> BranchHistory(messages, complete = true) } },
             rename = { fork, name -> renames += fork.id.value to name; fork.copy(summary = name) },
