@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -20,7 +22,7 @@ import kotlinx.coroutines.flow.flowOf
 
 internal class DesktopLocalBackendAdminGateway(
     appServerClient: AppServerClient,
-) : DesktopAdminChatGateway, ConversationSummaryGateway, ConversationForkGateway {
+) : DesktopAdminChatGateway, ConversationSummaryGateway, ConversationForkGateway, ConversationRecompileGateway {
     private val shared = AppServerLocalAdminGateway(appServerClient) { operation ->
         "desktop-local-$operation-${UUID.randomUUID()}"
     }
@@ -89,6 +91,10 @@ internal class DesktopLocalBackendAdminGateway(
     /** letta-mobile-bzvro.15: `conversation_fork` through the bundled App Server. */
     override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
         shared.forkConversation(request)
+
+    /** letta-mobile-zxk2n.5: `/recompile` as `conversation_recompile` through the bundled App Server. */
+    override suspend fun recompileConversation(request: ConversationRecompileRequest) =
+        shared.recompileConversation(request)
 
     override suspend fun createAgent(params: AgentCreateParams): Agent =
         shared.createAgent(params)

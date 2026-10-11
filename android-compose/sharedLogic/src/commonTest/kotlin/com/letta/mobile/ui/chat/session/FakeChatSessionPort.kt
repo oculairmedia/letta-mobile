@@ -17,6 +17,10 @@ internal class FakeChatSessionPort : ChatSessionPort {
     private val ui = MutableStateFlow(ChatUiState())
     private val composerState = MutableStateFlow(ChatComposerUiState(canSend = true))
     val sent = mutableListOf<String>()
+    val commandsRun = mutableListOf<ChatComposerCommand>()
+
+    /** The owner's own `/` commands, as a server list would set them. */
+    fun setCommands(commands: List<ChatComposerCommand>) = composerState.update { it.copy(commands = commands.toPersistentList()) }
 
     override val uiState: StateFlow<ChatUiState> = ui
     override val composer: StateFlow<ChatComposerUiState> = composerState
@@ -49,7 +53,9 @@ internal class FakeChatSessionPort : ChatSessionPort {
 
         override fun clearComposerError() = composerState.update { it.copy(error = null) }
 
-        override fun runComposerCommand(command: ChatComposerCommand) = Unit
+        override fun runComposerCommand(command: ChatComposerCommand) {
+            commandsRun += command
+        }
 
         override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
 

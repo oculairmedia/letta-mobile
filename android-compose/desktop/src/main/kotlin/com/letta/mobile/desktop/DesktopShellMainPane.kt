@@ -7,6 +7,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.model.AgentId
@@ -29,6 +32,7 @@ import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
+import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
 
 /** What the chat surfaces in the main pane share: the composer's commands and context reading, and the canvas. */
 private data class DesktopShellChatHost(
@@ -53,6 +57,28 @@ internal fun RowScope.DesktopShellMainPane(context: DesktopShellContext, frame: 
         inputs = desktopMainContentInputs(context, frame, host),
         actions = desktopMainContentActions(context, frame, host),
         modifier = Modifier.weight(1f).fillMaxHeight(),
+    )
+    DesktopRenameChatOverlay(context, frame)
+}
+
+/** letta-mobile-zxk2n.5: `/rename` for the open chat, written through the shared rename path. */
+@Composable
+private fun DesktopRenameChatOverlay(context: DesktopShellContext, frame: DesktopShellFrame) {
+    if (!context.overlays.renameChat) return
+    val selectedId = frame.chatState.selectedConversationId
+    val conversation = frame.chatState.conversations.firstOrNull { it.id == selectedId }
+    if (conversation == null) {
+        context.overlays.renameChat = false
+        return
+    }
+    ShellRenameChatDialog(
+        title = conversation.displayTitle(),
+        onRename = { title ->
+            context.core.chatController.conversationManagement.rename(
+                ConversationSummaryUpdate(ConversationId(conversation.id), ConversationSummary(title)),
+            )
+        },
+        onDismiss = { context.overlays.renameChat = false },
     )
 }
 
@@ -80,6 +106,12 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             onEditAgent = { navigator.editAgentId = it },
             onCanvasSessionChange = { core.canvasShell.activeSession = it },
             showDockedCanvas = showDockedCanvas,
+            client = DesktopClientCommandRoutes(
+                onSearch = { context.overlays.commandPalette = true },
+                onOpenModelPicker = { context.overlays.modelPicker = true },
+                onRenameChat = { context.overlays.renameChat = true },
+                onNewChat = { context.openNewChatForFocusedAgent(focus) },
+            ),
         ),
     )
     val rosterAgents = focus.rosterAgents
