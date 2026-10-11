@@ -371,17 +371,13 @@ private fun DesktopWorkingDirectoryRow(
     loading: Boolean,
     onChangeDirectory: ((String) -> Unit)?,
 ) {
-    val pickerLauncher = io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher(
-        dialogSettings = io.github.vinceglb.filekit.dialogs.FileKitDialogSettings(
-            title = "Choose working directory",
-        ),
-    ) { directory ->
-        directory?.let { onChangeDirectory?.invoke(it.file.absolutePath) }
-    }
+    // letta-mobile-zxk2n.6: the shared working-directory picker (browse, type, create, recents, worktrees).
+    val picker = rememberDesktopWorkingDirectoryPicker { chosen -> onChangeDirectory?.invoke(chosen) }
+    DesktopWorkingDirectoryPickerHost(picker)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = onChangeDirectory != null && !loading) { pickerLauncher.launch() }
+            .clickable(enabled = onChangeDirectory != null && !loading) { picker.open(path) }
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
