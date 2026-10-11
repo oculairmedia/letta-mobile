@@ -55,7 +55,7 @@ internal class AdminChatSessionPort(
 
     /** Android's support does not change while the page is open. */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(
-        Capabilities.copy(fork = onOpenConversation != null, editAndResend = onOpenConversation != null),
+        branchCapabilities(Capabilities, branches = onOpenConversation != null && viewModel.canBranchConversations),
     )
 
     private fun initialComposer(): ChatComposerUiState = composerSnapshot(
@@ -118,6 +118,13 @@ internal class AdminChatSessionPort(
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /**
+         * letta-mobile-7mys7: fork, edit-and-resend and rerun need a page that can open the fork and
+         * a backend that can make it (the embedded runtime cannot).
+         */
+        internal fun branchCapabilities(base: ChatSurfaceCapabilities, branches: Boolean): ChatSurfaceCapabilities =
+            base.copy(fork = branches, editAndResend = branches, rerunInFork = branches)
 
         val Capabilities = ChatSurfaceCapabilities(
             attachImages = true,
