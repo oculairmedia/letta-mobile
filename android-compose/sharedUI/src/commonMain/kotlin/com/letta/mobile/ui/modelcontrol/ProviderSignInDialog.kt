@@ -76,11 +76,19 @@ object ProviderSignInTags {
  * desktop. Device-code providers show the code to enter and wait for the
  * approval; the others open the sign-in page and take back the code. The
  * browser and the clipboard come from Compose's platform locals, so neither
- * host binds anything.
+ * host binds anything; they are read here, in the host's composition, since
+ * a dialog window may provide its own.
  */
 @Composable
 fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActions) {
     val provider = state.provider ?: return
+    val uriHandler = LocalUriHandler.current
+    val clipboard = LocalClipboardManager.current
+    val platform = SignInPlatform(
+        // A host without a browser throws; the link stays visible to copy instead.
+        openUrl = { url -> runCatching { uriHandler.openUri(url) } },
+        copy = { text -> clipboard.setText(AnnotatedString(text)) },
+    )
     val finished = state is ProviderSignInState.Connected || state is ProviderSignInState.Failed
     AlertDialog(
         onDismissRequest = actions.onClose,
@@ -90,7 +98,7 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
             Column(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
                 modifier = Modifier.fillMaxWidth().testTag(ProviderSignInTags.SHEET),
-            ) { SignInBody(state, actions) }
+            ) { SignInBody(state, actions, platform) }
         },
         confirmButton = { ConfirmButton(state, actions) },
         dismissButton = {
@@ -101,13 +109,16 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
     )
 }
 
+/** The browser and clipboard of the host the sheet is shown on. */
+private class SignInPlatform(val openUrl: (String) -> Unit, val copy: (String) -> Unit)
+
 @Composable
-private fun SignInBody(state: ProviderSignInState, actions: ProviderSignInActions) {
+private fun SignInBody(state: ProviderSignInState, actions: ProviderSignInActions, platform: SignInPlatform) {
     when (state) {
         ProviderSignInState.Idle -> Unit
         is ProviderSignInState.Starting -> Progress(ModelControlStrings.SIGN_IN_STARTING)
-        is ProviderSignInState.AwaitingApproval -> DeviceCodeBody(state)
-        is ProviderSignInState.AwaitingCode -> PastedCodeBody(state, actions)
+        is ProviderSignInState.AwaitingApproval -> DeviceCodeBody(state, platform)
+        is ProviderSignInState.AwaitingCode -> PastedCodeBody(state, actions, platform)
         is ProviderSignInState.Connecting -> Progress(ModelControlStrings.SIGN_IN_CONNECTING)
         is ProviderSignInState.Connected -> Outcome(LettaIcons.CheckCircle, state.provider.signInConnected, error = false)
         is ProviderSignInState.Failed -> Outcome(LettaIcons.Error, state.message, error = true)
@@ -132,8 +143,7 @@ private fun ConfirmButton(state: ProviderSignInState, actions: ProviderSignInAct
 }
 
 @Composable
-private fun DeviceCodeBody(state: ProviderSignInState.AwaitingApproval) {
-    val clipboard = LocalClipboardManager.current
+private fun DeviceCodeBody(state: ProviderSignInState.AwaitingApproval, platform: SignInPlatform) {
     Text(ModelControlStrings.SIGN_IN_ENTER_CODE, style = MaterialTheme.typography.bodyMedium)
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -152,10 +162,10 @@ private fun DeviceCodeBody(state: ProviderSignInState.AwaitingApproval) {
     }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(
-            onClick = { clipboard.setText(AnnotatedString(state.userCode)) },
+            onClick = { platform.copy(state.userCode) },
             modifier = Modifier.testTag(ProviderSignInTags.COPY_CODE),
         ) { Text(ModelControlStrings.SIGN_IN_COPY_CODE) }
-        OpenPageButton(state.verificationUrl)
+        OpenPageButton(state.verificationUrl, platform)
     }
     LinkText(state.verificationUrl)
     Progress(ModelControlStrings.SIGN_IN_WAITING)
@@ -163,14 +173,13 @@ private fun DeviceCodeBody(state: ProviderSignInState.AwaitingApproval) {
 }
 
 @Composable
-private fun PastedCodeBody(state: ProviderSignInState.AwaitingCode, actions: ProviderSignInActions) {
-    val clipboard = LocalClipboardManager.current
+private fun PastedCodeBody(state: ProviderSignInState.AwaitingCode, actions: ProviderSignInActions, platform: SignInPlatform) {
     val error = state.error
     Text(ModelControlStrings.SIGN_IN_CODE_STEP_1, style = MaterialTheme.typography.bodyMedium)
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.fillMaxWidth()) {
-        OpenPageButton(state.authorizeUrl)
+        OpenPageButton(state.authorizeUrl, platform)
         OutlinedButton(
-            onClick = { clipboard.setText(AnnotatedString(state.authorizeUrl)) },
+            onClick = { platform.copy(state.authorizeUrl) },
             modifier = Modifier.testTag(ProviderSignInTags.COPY_LINK),
         ) { Text(ModelControlStrings.SIGN_IN_COPY_LINK) }
     }
@@ -191,11 +200,9 @@ private fun PastedCodeBody(state: ProviderSignInState.AwaitingCode, actions: Pro
 }
 
 @Composable
-private fun OpenPageButton(url: String) {
-    val uriHandler = LocalUriHandler.current
+private fun OpenPageButton(url: String, platform: SignInPlatform) {
     Button(
-        // A host without a browser throws; the link stays visible to copy instead.
-        onClick = { runCatching { uriHandler.openUri(url) } },
+        onClick = { platform.openUrl(url) },
         modifier = Modifier.testTag(ProviderSignInTags.OPEN_PAGE),
     ) {
         Icon(LettaIcons.ExternalLink, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm))
