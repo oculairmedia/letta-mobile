@@ -65,6 +65,8 @@ internal fun ChatMessageRow(
     callbacks: ChatRowCallbacks,
     position: GroupPosition = GroupPosition.None,
 ) {
+    // letta-mobile-zxk2n.5: a row the chat options hide (a paged row the list cannot drop) draws nothing.
+    if (context.displayOptions.hides(message)) return
     when {
         message.isCompaction -> CompactionDividerRow(message.content)
         isUserRole(message.role) && message.subagentNotification == null ->

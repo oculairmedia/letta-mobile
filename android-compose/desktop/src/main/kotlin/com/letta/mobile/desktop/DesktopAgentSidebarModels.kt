@@ -5,6 +5,9 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsActions
+import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
+import com.letta.mobile.ui.shell.sidebar.ShellConversationMarkActions
 
 @Immutable
 internal data class DesktopAgentSidebarState(
@@ -21,6 +24,8 @@ internal data class DesktopAgentSidebarState(
     val pinnedConversationIds: Set<String> = emptySet(),
     /** letta-mobile-7mys7: each fork's source conversation (ConversationLineage). */
     val conversationParents: Map<String, String> = emptyMap(),
+    /** letta-mobile-zxk2n.5: the list's client marks (settled last, markers before titles). */
+    val listMarks: DesktopSidebarListMarks = DesktopSidebarListMarks(),
     val archiveFilter: ConversationArchiveFilter,
     val selectedDestination: DesktopDestination,
     val mode: WorkPlayMode,
@@ -50,6 +55,22 @@ internal data class DesktopAgentSidebarActions(
     val onOpenCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit = {},
     val onNewCanvas: () -> Unit = {},
     val onArchiveCanvas: (id: com.letta.mobile.data.canvas.CanvasId, archived: Boolean) -> Unit = { _, _ -> },
+    /** letta-mobile-zxk2n.5: settle and marker; null leaves both out of the row menu. */
+    val conversationMarks: ShellConversationMarkActions? = null,
+    /** letta-mobile-zxk2n.5: what the Chat options dialog changes. */
+    val chatOptions: ShellChatOptionsActions = ShellChatOptionsActions(),
+)
+
+/**
+ * letta-mobile-zxk2n.5: the sidebar's client marks, the stack's archived chats for the Archived
+ * chats dialog, and the Chat options dialog's state (null hides it).
+ */
+@Immutable
+internal data class DesktopSidebarListMarks(
+    val settledIds: Set<String> = emptySet(),
+    val markers: Map<String, String> = emptyMap(),
+    val archivedConversations: List<DesktopConversationSummary> = emptyList(),
+    val chatOptions: ShellChatOptionsState? = null,
 )
 
 @Immutable
