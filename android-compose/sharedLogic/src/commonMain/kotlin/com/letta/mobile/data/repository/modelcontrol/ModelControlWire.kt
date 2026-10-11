@@ -54,6 +54,8 @@ internal object ModelControlWire {
         put("provider_id", request.providerId)
         request.authMethodId?.let { put("auth_method_id", it) }
         put("fields", JsonObject(request.fields.mapValues { JsonPrimitive(it.value) }))
+        request.providerName?.let { put("provider_name", it) }
+        request.oauthConfig?.let { put("oauth_config", it) }
     }
 
     fun updateParams(target: ConversationModelTarget, handle: ModelHandle?, effort: ReasoningEffortChoice): JsonObject =
@@ -82,6 +84,7 @@ internal object ModelControlWire {
             providerType = row.string("provider_type").orEmpty(),
             providerName = row.string("provider_name") ?: id,
             isOauth = row.bool("is_oauth") ?: false,
+            oauthProviderId = row.string("oauth_provider_id"),
             requiresApiKey = row.bool("requires_api_key") ?: false,
             authMethods = authMethods(row),
             connections = (row["connected_providers"] as? JsonArray).orEmpty()
@@ -132,14 +135,21 @@ internal object ModelControlWire {
         (this[key] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
 }
 
-/** `provider.connect` input: field values keyed by [ProviderField.key]. */
+/**
+ * `provider.connect` input: field values keyed by [ProviderField.key], or the
+ * finished token bundle of a subscription sign-in ([oauthConfig], opaque here).
+ * [toString] names keys only, so a request cannot leak a credential into a log.
+ */
 data class ProviderConnectRequest(
     val providerId: String,
     val authMethodId: String?,
     val fields: Map<String, String>,
+    val providerName: String? = null,
+    val oauthConfig: JsonObject? = null,
 ) {
     override fun toString(): String =
-        "ProviderConnectRequest(providerId=$providerId, authMethodId=$authMethodId, fieldKeys=${fields.keys.sorted()})"
+        "ProviderConnectRequest(providerId=$providerId, authMethodId=$authMethodId, fieldKeys=${fields.keys.sorted()}, " +
+            "providerName=$providerName, oauthConfig=${if (oauthConfig == null) "null" else "<redacted>"})"
 }
 
 /** The agent + conversation a model switch applies to. */

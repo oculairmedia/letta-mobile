@@ -13,14 +13,18 @@ package com.letta.mobile.data.repository.modelcontrol
  *    connection per provider row. Saving again replaces it; a named second
  *    endpoint is refused (`provider_name` is only accepted with OAuth tokens).
  *  - Subscription (OAuth) providers: the host only accepts finished tokens; it
- *    does not run a browser or device-code login. The working path is the
- *    host's own terminal (`letta`, then `/connect`), which writes the same
- *    local provider store, so the app offers that and a "Check again".
+ *    does not run a browser or device-code login. The app runs the login for
+ *    the providers it knows ([ProviderOAuthKind], letta-mobile-zxk2n.3) and
+ *    hands the tokens over; for any other the working path is the host's own
+ *    terminal (`letta`, then `/connect`), with a "Check again".
  */
 
 /** How a provider row gets connected. */
 enum class ProviderConnectMethod {
-    /** Subscription/OAuth: sign in from the host's terminal, then come back. */
+    /** Subscription/OAuth the app signs in itself (device code or pasted code). */
+    SIGN_IN,
+
+    /** Subscription/OAuth the app has no login for: sign in from the host's terminal, then come back. */
     TERMINAL_SIGN_IN,
 
     /** One or more credential fields (API key, AWS keys or profile). */
@@ -41,11 +45,16 @@ val ConnectableProvider.takesBaseUrl: Boolean
 
 val ConnectableProvider.connectMethod: ProviderConnectMethod
     get() = when {
+        isOauth && ProviderOAuthKind.of(this) != null -> ProviderConnectMethod.SIGN_IN
         isOauth -> ProviderConnectMethod.TERMINAL_SIGN_IN
         authMethods.isEmpty() -> ProviderConnectMethod.NONE
         takesBaseUrl -> ProviderConnectMethod.ENDPOINT
         else -> ProviderConnectMethod.API_KEY
     }
+
+/** A subscription account, whichever way it signs in. */
+val ConnectableProvider.isSubscription: Boolean
+    get() = connectMethod == ProviderConnectMethod.SIGN_IN || connectMethod == ProviderConnectMethod.TERMINAL_SIGN_IN
 
 /** The base URL a connected endpoint uses, when the host reports one. */
 val ConnectableProvider.connectedBaseUrl: String?
@@ -68,7 +77,7 @@ data class ProviderSettingsLists(
         fun of(providers: List<ConnectableProvider>): ProviderSettingsLists {
             val sorted = providers.distinctBy { it.id }.sortedBy { it.displayName.lowercase() }
             return ProviderSettingsLists(
-                accounts = sorted.filter { it.connectMethod == ProviderConnectMethod.TERMINAL_SIGN_IN && !it.isConnected },
+                accounts = sorted.filter { it.isSubscription && !it.isConnected },
                 connected = sorted.filter { it.isConnected },
                 other = sorted.filter { !it.isConnected && it.canConnectFromApp },
                 apiKeys = sorted.filter { it.connectMethod == ProviderConnectMethod.API_KEY },

@@ -25,7 +25,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.repository.modelcontrol.CatalogRow
 import com.letta.mobile.data.repository.modelcontrol.ExposureChange
+import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
 import com.letta.mobile.data.repository.modelcontrol.ProviderSection
+import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -120,6 +122,7 @@ private fun providerSubtitle(section: ProviderSection): String {
     val connection = provider.connections.firstOrNull()
     return when {
         connection != null -> listOfNotNull("Connected", connection.baseUrl ?: connection.providerName).joinToString(" · ")
+        provider.connectMethod == ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN
         provider.isOauth -> ModelControlStrings.METHOD_TERMINAL
         !provider.canConnectFromApp -> "Nothing to connect from the app"
         provider.description.isNotBlank() -> provider.description
@@ -143,6 +146,11 @@ internal fun ProviderActionsRow(section: ProviderSection, busy: Boolean, actions
                 enabled = !busy,
                 modifier = Modifier.testTag("${ProviderManagementTags.DISCONNECT_PREFIX}${section.key}"),
             ) { Text("Disconnect") }
+            actions.canSignIn && provider.connectMethod == ProviderConnectMethod.SIGN_IN -> Button(
+                onClick = { actions.onSignIn(provider) },
+                enabled = !busy,
+                modifier = Modifier.testTag("${ProviderManagementTags.SIGN_IN_PREFIX}${section.key}"),
+            ) { Text(ModelControlStrings.SIGN_IN) }
             provider.canConnectFromApp -> Button(
                 onClick = { actions.onConnect(provider) },
                 enabled = !busy,

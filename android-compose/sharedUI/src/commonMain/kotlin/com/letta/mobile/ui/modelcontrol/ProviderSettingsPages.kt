@@ -55,13 +55,13 @@ private fun LazyListScope.accountsSection(accounts: List<ConnectableProvider>, c
     items(accounts, key = { "account-${it.id}" }) { provider ->
         ProviderCard(
             provider = provider,
-            description = ModelControlStrings.METHOD_TERMINAL,
-            leading = LettaIcons.Terminal,
+            description = methodLabel(provider),
+            leading = methodIcon(provider),
             busy = context.state.busy,
             onClick = { context.actions.onOpenSignIn(provider) },
         )
     }
-    item("browser-note") { Hint(ModelControlStrings.METHOD_BROWSER_UNSUPPORTED) }
+    item("sign-in-note") { Hint(ModelControlStrings.SIGN_IN_NOTE) }
     item("have-key") {
         TextButton(
             onClick = { context.onPageChange(ProviderSettingsPage.API_KEYS) },
@@ -89,7 +89,7 @@ private fun LazyListScope.connectedSection(connected: List<ConnectableProvider>,
 /** A connected card leads to where its connection is managed. */
 private fun openConnected(provider: ConnectableProvider, context: ProviderPageContext) {
     when (provider.connectMethod) {
-        ProviderConnectMethod.TERMINAL_SIGN_IN -> context.actions.onOpenSignIn(provider)
+        ProviderConnectMethod.SIGN_IN, ProviderConnectMethod.TERMINAL_SIGN_IN -> context.actions.onOpenSignIn(provider)
         ProviderConnectMethod.API_KEY -> context.onPageChange(ProviderSettingsPage.API_KEYS)
         ProviderConnectMethod.ENDPOINT -> context.onPageChange(ProviderSettingsPage.ENDPOINTS)
         ProviderConnectMethod.NONE -> Unit
@@ -301,18 +301,21 @@ private fun Hint(text: String) {
 }
 
 private fun methodIcon(provider: ConnectableProvider): ImageVector = when (provider.connectMethod) {
+    ProviderConnectMethod.SIGN_IN -> LettaIcons.AccountCircle
     ProviderConnectMethod.TERMINAL_SIGN_IN -> LettaIcons.Terminal
     ProviderConnectMethod.ENDPOINT -> LettaIcons.Server
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> LettaIcons.Key
 }
 
 private fun methodLabel(provider: ConnectableProvider): String = when (provider.connectMethod) {
+    ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN
     ProviderConnectMethod.TERMINAL_SIGN_IN -> ModelControlStrings.METHOD_TERMINAL
     ProviderConnectMethod.ENDPOINT -> ModelControlStrings.PAGE_ENDPOINTS
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> ModelControlStrings.METHOD_API_KEY
 }
 
 private fun connectedDescription(provider: ConnectableProvider): String = when (provider.connectMethod) {
+    ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN_CONNECTED
     ProviderConnectMethod.TERMINAL_SIGN_IN -> ModelControlStrings.METHOD_TERMINAL_CONNECTED
     ProviderConnectMethod.ENDPOINT -> provider.connectedBaseUrl ?: ModelControlStrings.PAGE_ENDPOINTS
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> ModelControlStrings.METHOD_API_KEY
