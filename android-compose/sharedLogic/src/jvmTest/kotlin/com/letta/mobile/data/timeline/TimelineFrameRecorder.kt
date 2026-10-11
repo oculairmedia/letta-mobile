@@ -131,7 +131,7 @@ internal class TimelineFrameRecorder private constructor(
     suspend fun settle(durable: List<LettaMessage>) {
         step = "settle"
         transport.durable = durable
-        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        reconcileUntilApplied()
         awaitCondition({ "overlay never drained: ${frames.lastOrNull()}" }) {
             owner.session.live.value == null && presentation.live.value.isEmpty()
         }
@@ -144,7 +144,7 @@ internal class TimelineFrameRecorder private constructor(
     suspend fun openOn(durable: List<LettaMessage>) {
         step = "history"
         transport.durable = durable
-        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        reconcileUntilApplied()
         presenter.awaitRows(durable.count { it.renders() }) { "history never paged in: ${frames.lastOrNull()}" }
         presenter.awaitIdle()
     }
@@ -153,9 +153,25 @@ internal class TimelineFrameRecorder private constructor(
     suspend fun openOnHistory(durable: List<LettaMessage>) {
         step = "history"
         transport.durable = durable
-        assertEquals(TimelineEnginePageOutcome.Applied, coordinator.reconcileRecent(owner))
+        reconcileUntilApplied()
         awaitCondition({ "history never paged in: ${frames.lastOrNull()}" }) { presenter.size > 0 }
         presenter.awaitIdle()
+    }
+
+    /**
+     * The Paging mediator's own recent-page refresh also begins a reconcile when the presenter first
+     * collects, and a newer begin supersedes the older request, so under load (Kover instrumentation
+     * in the Codecov run) this explicit reconcile can lose that race and answer Stale. Stale carries
+     * no data and is safe to retry; any outcome other than Applied still fails the test.
+     */
+    private suspend fun reconcileUntilApplied() {
+        var outcome = coordinator.reconcileRecent(owner)
+        var retries = 0
+        while (outcome == TimelineEnginePageOutcome.Stale && retries++ < STALE_RETRIES) {
+            yield()
+            outcome = coordinator.reconcileRecent(owner)
+        }
+        assertEquals(TimelineEnginePageOutcome.Applied, outcome)
     }
 
     private suspend fun settleUi() {
@@ -183,6 +199,7 @@ internal class TimelineFrameRecorder private constructor(
 
     companion object {
         private const val SETTLE_YIELDS = 20
+        private const val STALE_RETRIES = 5
 
         suspend fun open(scope: TimelineScope): TimelineFrameRecorder {
             val transport = MutableDurableTransport()
