@@ -190,7 +190,7 @@ internal fun DesktopNucleusEffects(
 ) {
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
-    val attention = rememberDesktopAttention(bindings.attention, window)
+    val attention = rememberDesktopAttention(bindings.attention, window, bindings.controller)
 
     // Route toast clicks that no longer match an in-memory reply handler
     // (toasts posted by a previous process instance, still in the Action
@@ -219,7 +219,7 @@ internal fun DesktopNucleusEffects(
         actions = actions,
     )
     AgentWorkEffect(window, state)
-    ApprovalAttentionEffect(attention, bindings.controller, window) { conversationId ->
+    ApprovalAttentionEffect(attention) { conversationId ->
         activate()
         bindings.onOpenConversation(conversationId)
     }
