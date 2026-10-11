@@ -197,7 +197,6 @@ class NotificationDeliveryCoordinatorTest {
 
     private fun createFixture(
         currentConversationId: String? = null,
-        @Suppress("UNUSED_PARAMETER") activeReplyStreams: Set<String> = emptySet(),
         notified: MutableMap<String, String> = mutableMapOf(),
         publisherAccepted: Boolean = true,
         mutedAgentIds: Set<String> = emptySet(),

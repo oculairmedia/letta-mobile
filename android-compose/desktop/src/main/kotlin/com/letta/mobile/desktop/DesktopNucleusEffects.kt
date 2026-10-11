@@ -190,7 +190,7 @@ internal fun DesktopNucleusEffects(
 ) {
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
-    val attention = rememberDesktopAttention(bindings.attention, window, bindings.controller)
+    val attention = rememberDesktopAttention(bindings.attention, window)
 
     // Route toast clicks that no longer match an in-memory reply handler
     // (toasts posted by a previous process instance, still in the Action

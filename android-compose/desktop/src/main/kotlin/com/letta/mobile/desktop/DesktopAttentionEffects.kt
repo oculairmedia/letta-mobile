@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.notify.AttentionCopy
 import com.letta.mobile.data.notify.AttentionDecision
 import com.letta.mobile.data.notify.AttentionEvent
 import com.letta.mobile.data.notify.AttentionGate
@@ -13,10 +14,13 @@ import com.letta.mobile.data.notify.ApprovalAttentionMonitor
 import com.letta.mobile.data.presence.ConversationRunState
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.launcher.windows.WindowsBadgeManager
+import dev.nucleusframework.notification.common.notification
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import java.awt.Window
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 
 /**
  * letta-mobile-bzvro.27 (F27): what the desktop's attention notifications read. [runs] is the
@@ -37,11 +41,7 @@ internal data class DesktopApprovalNotice(val event: AttentionEvent.ApprovalNeed
  * person looking. Approval toasts and the finished-reply toast both ask it, so a muted agent is
  * silent on both.
  */
-internal class DesktopAttention(
-    val bindings: DesktopAttentionBindings,
-    val window: Window,
-    val controller: DesktopNucleusController,
-) {
+internal class DesktopAttention(val bindings: DesktopAttentionBindings, val window: Window) {
     val gate = AttentionGate(prefs = { bindings.prefs.prefs.value }, focus = { window.isFocused })
     private val finishedTurns = AtomicLong()
 
@@ -54,11 +54,8 @@ internal class DesktopAttention(
 }
 
 @Composable
-internal fun rememberDesktopAttention(
-    bindings: DesktopAttentionBindings,
-    window: Window,
-    controller: DesktopNucleusController,
-): DesktopAttention = remember(bindings, window, controller) { DesktopAttention(bindings, window, controller) }
+internal fun rememberDesktopAttention(bindings: DesktopAttentionBindings, window: Window): DesktopAttention =
+    remember(bindings, window) { DesktopAttention(bindings, window) }
 
 /**
  * Posts a toast for each approval the gate lets through; clicking it (or Open) raises the window
@@ -69,11 +66,28 @@ internal fun ApprovalAttentionEffect(attention: DesktopAttention, onOpen: (conve
     val open by rememberUpdatedState(onOpen)
     LaunchedEffect(attention) {
         ApprovalAttentionMonitor(attention.gate).watch(attention.bindings.runs) { event ->
-            attention.controller.notifyApprovalNeeded(DesktopApprovalNotice(event, attention.bindings.agentNameFor(event.agentId))) {
+            postApprovalToast(DesktopApprovalNotice(event, attention.bindings.agentNameFor(event.agentId))) {
                 open(event.conversationId)
             }
             TaskbarProgress.requestAttention(attention.window)
             if (Platform.Current == Platform.Windows && WindowsBadgeManager.isAvailable) WindowsBadgeManager.setCount(1)
         }
+    }
+}
+
+/**
+ * The native toast for [notice]: its body and an Open button both bring the conversation forward;
+ * the decision itself is made in the app. Native sends go through OS IPC, so they stay off the UI
+ * thread like the controller's other notifications (which also initialize the backend).
+ */
+private suspend fun postApprovalToast(notice: DesktopApprovalNotice, onOpen: () -> Unit) {
+    withContext(Dispatchers.IO) {
+        notification(
+            title = AttentionCopy.approvalTitle(notice.agentName),
+            message = AttentionCopy.approvalBody(notice.event),
+            onActivated = onOpen,
+        ) {
+            button(AttentionCopy.OPEN_ACTION) { onOpen() }
+        }.send()
     }
 }

@@ -48,14 +48,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
         }
 
-        // letta-mobile-bzvro.27: a muted agent posts nothing.
-        if (attentionPrefs.prefs.value.isMuted(candidate.agentId)) {
-            return candidate.suppressed(NotificationSuppressionReason.MutedAgent, notificationId)
-        }
-
-        if (currentConversationTracker.current == candidate.conversationId) {
-            return candidate.suppressed(NotificationSuppressionReason.ForegroundConversation, notificationId)
-        }
+        audienceSuppression(candidate)?.let { return candidate.suppressed(it, notificationId) }
 
         if (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
@@ -71,6 +64,16 @@ class NotificationDeliveryCoordinator @Inject constructor(
         }
         syncStateStore.setLastNotifiedMessageId(candidate.conversationId, notificationId)
         return candidate.published(notificationId)
+    }
+
+    /**
+     * Who would see this: nobody wants it from an agent they muted (letta-mobile-bzvro.27), and the
+     * person already sees a conversation that is on screen.
+     */
+    private fun audienceSuppression(candidate: NotificationDeliveryCandidate): NotificationSuppressionReason? = when {
+        attentionPrefs.prefs.value.isMuted(candidate.agentId) -> NotificationSuppressionReason.MutedAgent
+        currentConversationTracker.current == candidate.conversationId -> NotificationSuppressionReason.ForegroundConversation
+        else -> null
     }
 
     private fun NotificationDeliveryCandidate.published(notificationId: String): NotificationDeliveryDecision.Published {
