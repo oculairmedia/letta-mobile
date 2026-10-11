@@ -49,6 +49,24 @@ object IrohPeerCapabilities {
     )
 
     /**
+     * Default grant of a scanned pairing invite (letta-mobile-dpv7m.1): read
+     * and send chat, and manage the conversations of the agents in scope —
+     * nothing else (no memory writes, tools, skills, schedules, projects, and
+     * never admin). Wider roles are requested explicitly by the inviter.
+     */
+    val CHAT_ROLE: Set<String> = setOf(CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE)
+
+    /** Named roles an inviter may request instead of an explicit capability list. */
+    val ROLES: Map<String, Set<String>> by lazy {
+        mapOf(
+            "chat" to CHAT_ROLE,
+            "desktop" to DEFAULT_DESKTOP_ROLE,
+            "vibesync" to VIBESYNC_ROLE,
+            "admin" to setOf(ADMIN_FULL),
+        )
+    }
+
+    /**
      * Vibesync consumer role (letta-mobile-qjncd): a paired desktop that may
      * additionally spawn subagents (agent.create + conversation.create,
      * without the rest of admin.full) and read/write the workactivity stream.
@@ -151,6 +169,14 @@ object IrohPeerCapabilities {
 
     fun isAllowed(capabilities: Set<String>, required: String): Boolean =
         ADMIN_FULL in capabilities || required in capabilities
+
+    /**
+     * Agent scope check (letta-mobile-dpv7m.1): null scope = every agent; a
+     * request that names no agent is not agent-addressed and passes here
+     * (its conversation/capability gates still apply).
+     */
+    fun isAgentInScope(agentScope: Set<String>?, agentId: String?): Boolean =
+        agentScope == null || agentId == null || agentId in agentScope
 
     /**
      * Conversation-content scope for admin_rpc reads (lgns8.12): peers that

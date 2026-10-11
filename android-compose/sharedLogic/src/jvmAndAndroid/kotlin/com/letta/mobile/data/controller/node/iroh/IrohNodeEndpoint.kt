@@ -79,6 +79,13 @@ class IrohNodeEndpoint(
     init {
         val alpns = listOf(alpn) + canvasRelay?.alpns.orEmpty() + protocolHandlers.map { it.alpn }
         require(alpns.map { it.toList() }.distinct().size == alpns.size) { "Duplicate Iroh protocol ALPN" }
+        // letta-mobile-dpv7m.1: revoking a paired device ends its live sessions
+        // now, instead of leaving them authenticated until the peer redials.
+        pairingService?.addRevocationListener(::closeRevokedPeer)
+    }
+
+    private fun closeRevokedPeer(remoteId: String) {
+        appServerConnections[remoteId].orEmpty().forEach { it.revokeSession() }
     }
 
     private var endpoint: Endpoint? = null
@@ -428,8 +435,15 @@ class IrohNodeEndpoint(
         relay.accept(alpn, connection, origin = remoteId, hostNodeId = nodeIdHex())
     }
 
+    /**
+     * Connection admission (not authentication). With a static allowlist, only
+     * listed NodeIds connect — unless pairing is configured, in which case paired
+     * NodeIds and unknown peers that come to redeem an invite are admitted too.
+     * Admission never authenticates: unlisted peers still have to prove a
+     * paired NodeId or a valid invite in the auth frame (dpv7m.1).
+     */
     private fun isPeerAllowed(remoteId: String): Boolean =
-        authPolicy.allowedPeerIds.isEmpty() || remoteId in authPolicy.allowedPeerIds
+        authPolicy.allowedPeerIds.isEmpty() || remoteId in authPolicy.allowedPeerIds || pairingService != null
 
     suspend fun shutdown() {
         acceptJob?.cancel()

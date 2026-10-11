@@ -30,6 +30,12 @@ fun adminError(message: String): Nothing = throw IllegalArgumentException(messag
 data class AdminRpcRequestContext(
     val authenticated: Boolean,
     val authorizedConversationIds: Set<String>? = null,
+    /**
+     * letta-mobile-dpv7m.1: agents a paired peer may address; null = every
+     * agent. Enforced by [AdminRpcRouter.dispatch] for every method via
+     * [AgentScopeGuard], so no handler can forget it.
+     */
+    val authorizedAgentIds: Set<String>? = null,
 ) {
     fun canAccessConversation(conversationId: String): Boolean =
         authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)
@@ -108,8 +114,17 @@ class AdminRpcRouter(
             Telemetry.event("AdminRpc", "method.not_found", "method" to invocation.method)
             return encodeFailure(invocation.requestId, AdminRpcErrors.unknownMethod(invocation.method))
         }
+        val agentScope = invocation.context.authorizedAgentIds
+        if (!AgentScopeGuard.allowsParams(agentScope, invocation.params)) {
+            Telemetry.event("AdminRpc", "authz.agent_scope_denied", "method" to invocation.method)
+            return encodeFailure(invocation.requestId, AgentScopeGuard.DENIED)
+        }
         return try {
-            val result = handler(invocation.params, invocation.context)
+            val result = AgentScopeGuard.filterResult(
+                agentScope,
+                invocation.method,
+                handler(invocation.params, invocation.context),
+            )
             json.encodeToString(
                 kotlinx.serialization.serializer(),
                 buildJsonObject {

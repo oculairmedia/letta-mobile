@@ -144,6 +144,41 @@ class PairCommandTest {
     }
 
     /**
+     * letta-mobile-dpv7m.1: the host `pair` command's invite is redeemable by
+     * the SERVING wrapper (a separate pairing-service instance over the same
+     * files), names the host's real NodeId, and grants chat only by default.
+     */
+    @Test
+    fun cliMintedInviteIsRedeemedByTheServerAndNamesTheRealNodeId() = runBlocking {
+        val dir = Files.createTempDirectory("pair-cli")
+        val peers = dir.resolve("paired-peers.json")
+        val invites = PairingStorePaths.inviteStore(peers, null)
+        val keyStore = FixedIrohSecretKeyStore(ByteArray(32) { (it + 7).toByte() })
+        val router = buildPairRouter(keyStore, peers, invites, dial = "203.0.113.7:4501")
+
+        val minted = mintInvite(router, buildJsonObject { put("qr", true); put("agent_ids", "agent-1") })
+        val link = assertNotNull(com.letta.mobile.data.pairing.PairLink.parse(minted.pairLink))
+        val envelope = assertNotNull(PairQrEnvelope.decode(link.qrInvite))
+        assertEquals(
+            com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity.nodeIdHexFromSecretBytes(keyStore.loadOrCreate()),
+            envelope.nodeIdHex,
+            "the QR must name the Ed25519 NodeId the server endpoint answers to",
+        )
+        assertEquals("203.0.113.7:4501", link.dial)
+        assertTrue(link.qrInvite !in minted.toString(), "MintedInvite.toString must not leak the secret")
+
+        val server = IrohPairingService(
+            com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore(peers),
+            com.letta.mobile.data.controller.node.iroh.FilePairingInviteStore(invites),
+        )
+        val phone = "c".repeat(64)
+        val redeemed = server.redeem(envelope.signedSecret.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX), phone)
+        assertTrue(redeemed is IrohPairingService.RedeemResult.Paired, "server must redeem the CLI's invite: $redeemed")
+        assertEquals(com.letta.mobile.data.controller.node.iroh.IrohPeerCapabilities.CHAT_ROLE, server.peer(phone)!!.capabilities)
+        assertEquals(setOf("agent-1"), server.peer(phone)!!.agentIds)
+    }
+
+    /**
      * Build the same in-process admin router [PairCommand.run] builds,
      * with a deterministic HMAC signer keyed by a 32-byte fixed value so
      * the resulting `node_id` and `signature` are stable across runs.

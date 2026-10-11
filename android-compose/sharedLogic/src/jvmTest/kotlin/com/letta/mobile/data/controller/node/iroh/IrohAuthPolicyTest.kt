@@ -96,4 +96,37 @@ class IrohAuthPolicyTest {
         assertEquals(IrohAuthPolicy.InsecureAnonymousForTestOnly, accepted.policy)
         assertTrue(accepted.warning.contains("UNAUTHENTICATED"))
     }
+
+    // letta-mobile-dpv7m.1: a pairing store alone is a secure, fail-closed configuration.
+    @Test
+    fun pairingStoreAloneResolvesToPairedPeersOnly() {
+        val resolution = IrohAuthPolicy.resolve(
+            authToken = null,
+            allowedPeerIds = emptySet(),
+            allowInsecureAnonymous = false,
+            pairingEnabled = true,
+        )
+        assertEquals(IrohAuthPolicy.PairedPeersOnly, assertIs<IrohAuthPolicyResolution.Secure>(resolution).policy)
+        // A configured bootstrap token still wins (explicit allowance), pairing works alongside.
+        val withToken = IrohAuthPolicy.resolve(strongToken, emptySet(), allowInsecureAnonymous = false, pairingEnabled = true)
+        assertIs<IrohAuthPolicy.BearerToken>(assertIs<IrohAuthPolicyResolution.Secure>(withToken).policy)
+    }
+
+    @Test
+    fun onlyAnonymousTestModeAndListedPeersPreAuthenticate() {
+        val peer = "a".repeat(64)
+        val other = "b".repeat(64)
+        assertFalse(IrohAuthPolicy.PairedPeersOnly.preAuthenticates(peer))
+        assertFalse(IrohAuthPolicy.BearerToken(strongToken, setOf(peer)).preAuthenticates(peer))
+        assertTrue(IrohAuthPolicy.PeerAllowlist(setOf(peer)).preAuthenticates(peer))
+        assertFalse(IrohAuthPolicy.PeerAllowlist(setOf(peer)).preAuthenticates(other))
+        assertTrue(IrohAuthPolicy.InsecureAnonymousForTestOnly.preAuthenticates(other))
+    }
+
+    @Test
+    fun verifierDeniesABlankTokenWhenNoBootstrapCredentialExists() {
+        val verifier = IrohBearerAuthVerifier(IrohAuthPolicy.PairedPeersOnly)
+        val outcome = verifier.verify("a".repeat(64), "")
+        assertEquals("pairing_required", assertIs<IrohBearerAuthVerifier.Outcome.Denied>(outcome).reason)
+    }
 }

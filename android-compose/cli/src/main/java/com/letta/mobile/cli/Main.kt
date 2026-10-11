@@ -32,6 +32,9 @@ import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.PeerCommand
 import com.letta.mobile.cli.commands.PeerGetCommand
 import com.letta.mobile.cli.commands.PeerInviteCommand
+import com.letta.mobile.cli.commands.PeerInviteListCommand
+import com.letta.mobile.cli.commands.PeerInviteRevokeCommand
+import com.letta.mobile.cli.commands.PeerSetAgentsCommand
 import com.letta.mobile.cli.commands.PeerListCommand
 import com.letta.mobile.cli.commands.PeerRenameCommand
 import com.letta.mobile.cli.commands.PeerRevokeCommand
@@ -89,6 +92,9 @@ object Main {
                     PeerRenameCommand(),
                     PeerSetCapabilitiesCommand(),
                     PeerRevokeCommand(),
+                    PeerInviteListCommand(),
+                    PeerInviteRevokeCommand(),
+                    PeerSetAgentsCommand(),
                 ),
                 AppServerServeIrohStubCommand(),
                 AppServerIrohProbeCommand(),

@@ -126,6 +126,11 @@ object AdminRpcRegistry {
         modelExposureFile: String? = null,
         /** See [NativeReadTiers.turnIdentity]. */
         turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
+        /**
+         * letta-mobile-dpv7m.1: how `pair.invite.create {qr:true}` signs the QR
+         * and which NodeId/dial address it names. Null = no QR minting.
+         */
+        pairingQr: PairingQrConfig? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -162,7 +167,13 @@ object AdminRpcRegistry {
             skillsListing = skillsListing,
         )
         ApprovalAdminHandlers.register(router, controller)
-        PairingAdminHandlers.register(router, pairingService)
+        PairingAdminHandlers.register(
+            router,
+            pairingService,
+            qrSigner = pairingQr?.signer ?: NoOpPairQrSigner,
+            qrNodeIdHex = pairingQr?.nodeIdHex,
+            dialHint = pairingQr?.dialHint ?: { null },
+        )
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.

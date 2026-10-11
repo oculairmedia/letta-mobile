@@ -29,6 +29,9 @@ import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
+import com.letta.mobile.data.controller.node.iroh.FilePairingInviteStore
+import com.letta.mobile.data.controller.node.iroh.HmacPairQrSigner
+import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
@@ -114,7 +117,9 @@ class AppServerServeIrohCommand : CliktCommand(
     private val authToken by option(
         "--auth-token",
         envvar = "LETTA_IROH_AUTH_TOKEN",
-        help = "Optional bearer/invite token clients must present before runtime, input, sync, or admin_rpc.",
+        help = "Optional BOOTSTRAP bearer token: a peer presenting it gets the full admin role. " +
+            "With --pairing-store-file it is not required (paired NodeIds and one-time invites " +
+            "authenticate); omit it to run fail-closed pairing-only.",
     )
 
     private val allowedPeerIds by option(
@@ -183,7 +188,22 @@ class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_IROH_PAIRING_STORE",
         help = "Path to the paired-peer JSON store (d6e8g.5). When set, paired NodeIds " +
             "authenticate without a token and one-time invites can be minted via " +
-            "pair.invite.create; redeem with an 'invite:<secret>' auth token.",
+            "pair.invite.create or the 'pair' command; redeem with an 'invite:<secret>' auth " +
+            "token. On its own this is a secure (pairing-only) configuration.",
+    )
+
+    private val pairingInviteStoreFile by option(
+        "--pairing-invite-store-file",
+        envvar = "LETTA_IROH_PAIRING_INVITE_STORE",
+        help = "Pending-invite store shared with the 'pair' command (hashed secrets only). " +
+            "Default: <pairing-store>.invites.json next to --pairing-store-file.",
+    )
+
+    private val publicDialAddress by option(
+        "--public-dial-address",
+        envvar = "LETTA_IROH_PUBLIC_DIAL",
+        help = "Dial address embedded in scannable pairing links (an Iroh ticket or " +
+            "<node-id>@host:port reachable from phones). Default: this endpoint's current ticket.",
     )
 
     private val subagentRegistryFile by option(
@@ -367,8 +387,10 @@ class AppServerServeIrohCommand : CliktCommand(
             val turnIdentity = newTurnIdentityLedger(identityRows)
 
             val pairingService = pairingStoreFile?.let { storePath ->
-                println("[iroh-app-server] Pairing enabled (store: $storePath)")
-                IrohPairingService(FilePairedPeerStore(java.nio.file.Path.of(storePath)))
+                val peers = java.nio.file.Path.of(storePath)
+                val invites = PairingStorePaths.inviteStore(peers, pairingInviteStoreFile)
+                println("[iroh-app-server] Pairing enabled (store: $storePath, invites: $invites)")
+                IrohPairingService(FilePairedPeerStore(peers), FilePairingInviteStore(invites))
             }
 
             println("[iroh-app-server] Starting Iroh endpoint...")
@@ -408,6 +430,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 endpoint = endpoint,
                 admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
                 scope = scope,
+                pairingQr = pairingQrConfig(endpoint),
             )
 
             printChannelsHostBanner()
@@ -539,10 +562,27 @@ class AppServerServeIrohCommand : CliktCommand(
         clock = System::currentTimeMillis,
     )
 
+    /**
+     * letta-mobile-dpv7m.1: QR invites name this endpoint's REAL NodeId and are
+     * HMAC-signed with its identity key; the scannable link carries
+     * --public-dial-address or the live ticket.
+     */
+    private fun pairingQrConfig(endpoint: IrohNodeEndpoint): PairingQrConfig? {
+        if (pairingStoreFile == null) return null
+        val keyStore = irohSecretKeyPath?.let(::FileIrohSecretKeyStore)
+            ?: com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore()
+        return PairingQrConfig(
+            signer = HmacPairQrSigner(keyStore),
+            nodeIdHex = endpoint.nodeIdHex(),
+            dialHint = { publicDialAddress?.takeIf { it.isNotBlank() } ?: runCatching { endpoint.ticketString() }.getOrNull() },
+        )
+    }
+
     private fun setupAdminRpc(
         endpoint: IrohNodeEndpoint,
         admin: AdminContext,
         scope: CoroutineScope,
+        pairingQr: PairingQrConfig?,
     ) {
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
@@ -562,6 +602,7 @@ class AppServerServeIrohCommand : CliktCommand(
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
             turnIdentity = admin.turnIdentity,
+            pairingQr = pairingQr,
             subagentPublisher = { source ->
                 com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher(scope, source)
                     .also { subagentPublisher = it }
@@ -633,6 +674,7 @@ class AppServerServeIrohCommand : CliktCommand(
             authToken = authToken,
             allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
             allowInsecureAnonymous = allowInsecureAnonymousIroh,
+            pairingEnabled = !pairingStoreFile.isNullOrBlank(),
         )
     ) {
         is IrohAuthPolicyResolution.Secure -> resolution.policy
