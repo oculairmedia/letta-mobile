@@ -29,6 +29,9 @@ internal data class DesktopAttentionBindings(
     val agentIdForConversation: (conversationId: String) -> String?,
 )
 
+/** An approval to announce, with the agent's display name when the window knows it. */
+internal data class DesktopApprovalNotice(val event: AttentionEvent.ApprovalNeeded, val agentName: String?)
+
 /**
  * One window's attention policy: the shared [AttentionGate] with "the window has focus" as the
  * person looking. Approval toasts and the finished-reply toast both ask it, so a muted agent is
@@ -66,7 +69,7 @@ internal fun ApprovalAttentionEffect(attention: DesktopAttention, onOpen: (conve
     val open by rememberUpdatedState(onOpen)
     LaunchedEffect(attention) {
         ApprovalAttentionMonitor(attention.gate).watch(attention.bindings.runs) { event ->
-            attention.controller.notifyApprovalNeeded(event, attention.bindings.agentNameFor(event.agentId)) {
+            attention.controller.notifyApprovalNeeded(DesktopApprovalNotice(event, attention.bindings.agentNameFor(event.agentId))) {
                 open(event.conversationId)
             }
             TaskbarProgress.requestAttention(attention.window)
