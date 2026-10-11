@@ -172,7 +172,7 @@ class CanvasBubbleUiTest {
         onNodeWithTag(recentRowTag("conv-2")).performClick()
         waitForIdle()
         assertEquals(listOf("conv-2"), hops.opened)
-        assertEquals("half a thought", PendingComposerDrafts.shared.take("conv-1"), "the draft waits for the way back")
+        assertEquals("half a thought", PendingComposerDrafts.shared.take("conv-1")?.draft?.text, "the draft waits for the way back")
         assertTrue(CanvasBubbleArrival.take(), "the next conversation's card opens on arrival")
         onAllNodesWithTag(RECENTS_LIST_TAG).assertCountEquals(0)
         onNodeWithTag(BUBBLE_CARD_TAG).assertExists()

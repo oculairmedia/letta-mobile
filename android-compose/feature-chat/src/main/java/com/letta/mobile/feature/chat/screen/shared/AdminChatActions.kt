@@ -68,7 +68,7 @@ internal class AdminChatActions(
 
     override fun rerun(message: UiMessage) = viewModel.rerunMessage(message)
 
-    override fun forkFromMessage(message: UiMessage) {
+    override fun forkFromMessage(message: UiMessage, name: String?) {
         onOpenConversation?.let { open -> viewModel.forkFromMessage(message, open) }
     }
 

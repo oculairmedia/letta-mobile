@@ -322,7 +322,8 @@ internal class DesktopChatActions(
 
     override fun rerun(message: UiMessage) = Unit
 
-    override fun forkFromMessage(message: UiMessage) = controller.conversationManagement.forkFrom(message, branchView())
+    override fun forkFromMessage(message: UiMessage, name: String?) =
+        controller.conversationManagement.forkFrom(message, branchView(), name)
 
     override fun editAndResend(message: UiMessage) = controller.conversationManagement.editAndResend(message, branchView())
 

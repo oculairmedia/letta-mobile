@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.branch.BranchState
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
@@ -117,11 +118,27 @@ internal class DesktopConversationManagement(
         withContext(Dispatchers.IO) { recents.record(model) }
     }
 
-    fun forkFrom(message: UiMessage, view: DesktopBranchView) {
-        if (!host.isClosed) brancher.forkFrom(message, view)
+    fun forkFrom(message: UiMessage, view: DesktopBranchView, name: String? = null) {
+        if (!host.isClosed) brancher.forkFrom(message, view, name)
     }
 
     fun editAndResend(message: UiMessage, view: DesktopBranchView) {
         if (!host.isClosed) brancher.editAndResend(message, view)
     }
+
+    /** letta-mobile-7mys7: forks before the prompt and sends it again there; the original keeps its answer. */
+    fun rerun(message: UiMessage, view: DesktopBranchView) {
+        if (!host.isClosed) brancher.rerun(message, view)
+    }
+
+    /** letta-mobile-7mys7 (G37): forks the whole selected conversation, named [name] when given. */
+    fun forkConversation(name: String? = null) {
+        if (!host.isClosed) brancher.forkConversation(name)
+    }
+
+    /** Whether a fork can be named on this backend. */
+    val canNameForks: Boolean get() = brancher.canName
+
+    /** The fork, edit or rerun in flight, or the last failure. */
+    val branchState: StateFlow<BranchState> get() = brancher.state
 }
