@@ -25,6 +25,7 @@ import com.letta.mobile.ui.shell.ShellNavDrawerInput
 import com.letta.mobile.ui.shell.ShellNavDrawerMapping
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
+import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsActions
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -50,6 +51,10 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
     val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
     val conversationParents by drawer.conversationParents.collectAsStateWithLifecycle()
+    val settledConversationIds by drawer.settledConversationIds.collectAsStateWithLifecycle()
+    val conversationMarkers by drawer.conversationMarkers.collectAsStateWithLifecycle()
+    val chatOptions = rememberAndroidChatOptionsState(state, drawer)
+    val chatOptionsActions = rememberAndroidChatOptionsActions(state, drawer)
     val identities = LocalMascotRegistry.current.identities
     val context = LocalContext.current
     LaunchedEffect(drawer) {
@@ -78,6 +83,9 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         archiveFilter = archiveFilter,
         pinnedConversationIds = pinnedConversationIds,
         conversationParents = conversationParents,
+        settledConversationIds = settledConversationIds,
+        conversationMarkers = conversationMarkers,
+        chatOptions = chatOptions,
         canvases = canvases,
         hiddenSections = androidHiddenDrawerSections(state.params.navigation),
     ).withRoster(roster)
@@ -87,7 +95,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
         ShellNavDrawer(
             state = drawerState,
-            actions = rememberSharedDrawerActions(state, drawer),
+            actions = rememberSharedDrawerActions(state, drawer, chatOptionsActions),
             modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
             // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
             agentCard = { AndroidAgentContextCard(state) },
@@ -120,8 +128,15 @@ internal fun ShellNavDrawerInput.withRoster(roster: SharedDrawerRoster): ShellNa
 private fun rememberSharedDrawerActions(
     state: AgentScaffoldRuntimeState,
     drawer: SharedNavDrawerViewModel,
-): ShellNavDrawerActions = remember(state, drawer) {
-    ShellNavDrawerActions(rail = sharedDrawerRailActions(state, drawer), panel = sharedDrawerPanelActions(state, drawer))
+    chatOptions: ShellChatOptionsActions,
+): ShellNavDrawerActions = remember(state, drawer, chatOptions) {
+    ShellNavDrawerActions(
+        rail = sharedDrawerRailActions(state, drawer),
+        panel = sharedDrawerPanelActions(state, drawer).copy(
+            conversationMarks = drawer.conversationMarkActions,
+            chatOptions = chatOptions,
+        ),
+    )
 }
 
 internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel): ShellAgentRailActions {

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.appserver
 
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.controller.node.iroh.withDefaultContextWindow
 import com.letta.mobile.data.model.Agent
@@ -14,6 +15,8 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConversationFork
 import com.letta.mobile.data.transport.appserver.AppServerConversationForkBody
+import com.letta.mobile.data.transport.appserver.AppServerConversationRecompile
+import com.letta.mobile.data.transport.appserver.AppServerConversationRecompileBody
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -218,6 +221,18 @@ class AppServerLocalAdminGateway(
         return getConversation(forkedId)
     }
 
+    /** letta-mobile-zxk2n.5: `conversation_recompile`; throws with the server's reason when it refuses. */
+    suspend fun recompileConversation(request: ConversationRecompileRequest) {
+        val response = client.conversationRecompile(
+            AppServerConversationRecompile(
+                requestId = requestId(Operation.ConversationRecompile.requestName),
+                conversationId = request.conversationId,
+                body = AppServerConversationRecompileBody(agentId = request.agentId.takeIf(String::isNotBlank)),
+            ),
+        )
+        check(response.success) { response.error ?: Operation.ConversationRecompile.failureMessage }
+    }
+
     private suspend fun updateConversation(conversationId: String, body: JsonObject): Conversation {
         val response = client.conversationUpdate(
             AppServerCommand.ConversationUpdate(
@@ -254,6 +269,7 @@ class AppServerLocalAdminGateway(
         ConversationCreate("conversation-create", "conversation creation", "conversation"),
         ConversationUpdate("conversation-update", "conversation update", "conversation"),
         ConversationFork("conversation-fork", "conversation fork", "conversation"),
+        ConversationRecompile("conversation-recompile", "system prompt recompile", "result"),
         AgentCreate("agent-create", "agent creation", "agent"),
         ListModels("list-models", "model listing", "models"),
         ;

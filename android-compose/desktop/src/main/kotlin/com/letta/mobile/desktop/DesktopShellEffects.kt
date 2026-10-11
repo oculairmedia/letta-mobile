@@ -41,6 +41,8 @@ private fun DesktopShellChatEffects(
         chatController.refreshSelectedConversationWorkingDirectory()
     }
     CommandPaletteKeyDispatcherEffect(onOpenPalette = { context.overlays.commandPalette = true })
+    // letta-mobile-zxk2n.5: mod+Alt+Up / Down for the previous / next conversation.
+    ConversationStepKeyDispatcherEffect(context, frame)
     DesktopControllerLifecycles(
         DesktopControllerLifecycleParams(
             chatController = chatController,
