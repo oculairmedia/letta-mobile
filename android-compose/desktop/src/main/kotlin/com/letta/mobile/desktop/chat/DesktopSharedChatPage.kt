@@ -54,15 +54,12 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 
 /*
  * letta-mobile-bglj6.1 (stage 3, desktop): the Conversations destination rendered with the shared
@@ -150,7 +147,8 @@ internal fun DesktopSharedChatPage(
         mutableStateOf(ChatSurfacePresentation.initial(phone.opensOnCanvas(openOnCanvas.enabled.value), hasCanvas = true))
     }
     val hasConversation = state.canvasOwner.conversationId != null
-    val host = rememberDesktopChatSurfaceHost(port, navigation, phone)
+    val directoryPicker = rememberDesktopWorkingDirectoryPicker(port)
+    val host = rememberDesktopChatSurfaceHost(port, navigation, directoryPicker, phone)
     // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
@@ -198,6 +196,7 @@ internal fun DesktopSharedChatPage(
             recents = navigation.recentInteractions,
         )
     }
+    DesktopWorkingDirectoryPickerHost(directoryPicker, forceSheet = phone != null)
 }
 
 /** The desktop's appearance: its own font scale, already applied to the window's text through density. */
@@ -283,18 +282,14 @@ private fun DockedConversationCanvas(
     )
 }
 
-/** The page's host navigation, with the same folder picker the old working-directory row used. */
+/** The page's host navigation; the working-directory row opens the shared picker (letta-mobile-zxk2n.6). */
 @Composable
 private fun rememberDesktopChatSurfaceHost(
     port: DesktopChatSessionPort,
     navigation: DesktopSharedChatPageNavigation,
+    directoryPicker: DesktopWorkingDirectoryPicker,
     phone: DesktopPhoneChrome? = null,
 ): ChatSurfaceHost {
-    val directoryPicker = rememberDirectoryPickerLauncher(
-        dialogSettings = FileKitDialogSettings(title = "Choose working directory"),
-    ) { directory ->
-        directory?.let { port.actions.changeWorkingDirectory(ChatWorkingDirectory(it.file.absolutePath)) }
-    }
     val supportsWorkingDirectory = port.capabilities.collectAsState().value.workingDirectory
     // The shell rebuilds [navigation] with fresh lambdas on every recomposition (a stream token);
     // the host keeps one instance that forwards to the latest, so timeline rows stay skippable.
@@ -311,7 +306,11 @@ private fun rememberDesktopChatSurfaceHost(
             openAgent = { agentId -> latest.openAgent(agentId) },
             openModelPicker = { latest.openModelPicker() },
             resolveAgentName = agentNames::get,
-            pickWorkingDirectory = if (supportsWorkingDirectory) ({ directoryPicker.launch() }) else null,
+            pickWorkingDirectory = if (supportsWorkingDirectory) {
+                { directoryPicker.open(port.composer.value.workingDirectory?.path) }
+            } else {
+                null
+            },
             openAgentPane = openDrawer ?: if (hasAgentPane) ({ latest.openAgentPane?.invoke() }) else null,
             editAgent = if (hasEditAgent) ({ latest.editAgent?.invoke() }) else null,
             openAgentSwitcher = openDrawer,

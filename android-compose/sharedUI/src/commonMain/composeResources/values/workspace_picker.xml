@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- letta-mobile-zxk2n.6: the working-directory picker and @agent mention chips. -->
+    <string name="cwd_picker_title">Working directory</string>
+    <string name="cwd_picker_close">Close</string>
+    <string name="cwd_picker_path">Folder path</string>
+    <string name="cwd_picker_go">Go to folder</string>
+    <string name="cwd_picker_up">Up one folder</string>
+    <string name="cwd_picker_new_folder">New folder</string>
+    <string name="cwd_picker_new_folder_name">Folder name</string>
+    <string name="cwd_picker_create">Create</string>
+    <string name="cwd_picker_cancel">Cancel</string>
+    <string name="cwd_picker_open_file_manager">Show in file manager</string>
+    <string name="cwd_picker_system_dialog">Choose with system dialog…</string>
+    <string name="cwd_picker_recent">Recent</string>
+    <string name="cwd_picker_worktrees">Worktrees</string>
+    <string name="cwd_picker_worktree_search">Search worktrees</string>
+    <string name="cwd_picker_folders">Folders</string>
+    <string name="cwd_picker_empty">No sub-folders here.</string>
+    <string name="cwd_picker_more">More folders are not shown. Type a path to go further.</string>
+    <string name="cwd_picker_use">Use this folder</string>
+    <string name="cwd_picker_next_turn">Applies from the next turn.</string>
+    <string name="cwd_picker_in_worktree">In worktree %1$s</string>
+    <string name="cwd_picker_back_to_repository">Back to repository</string>
+    <string name="composer_worktree_badge">worktree %1$s</string>
+    <string name="composer_agent_mentions">Mentioned agents</string>
+    <string name="composer_remove_agent_mention">Remove mention of %1$s</string>
+</resources>

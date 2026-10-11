@@ -254,7 +254,7 @@ private fun rememberAdminChatSessionPort(
     val canOpenConversation = navigation.onOpenConversation != null
     return remember(viewModel, canOpenConversation, workspaceFiles) {
         AdminChatSessionPort(
-            fileMentions = workspaceFiles?.mentionables ?: flowOf(emptyList()),
+            fileMentions = workspaceFiles?.mentionablesFor(viewModel.agentId.value) ?: flowOf(emptyList()),
             viewModel = viewModel,
             scope = viewModel.viewModelScope,
             onOpenBugReport = { currentOnBugCommand?.invoke() },
