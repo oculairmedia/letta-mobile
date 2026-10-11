@@ -248,29 +248,30 @@ internal class ImageBitmapCache(
      * again.
      */
     fun trimToBudget() {
-        var held = byId.values.sumOf { it.bitmap?.let { b -> b.width.toLong() * b.height * 4 } ?: 0L }
+        var held = byId.values.sumOf { it.heldBytes() }
         if (held <= budgetBytes) return
-        val idle = byId.keys.filter { (lastUse[it] ?: -1L) < frame }.sortedBy { lastUse[it] ?: -1L }
-        for (id in idle) {
-            if (held <= budgetBytes) break
-            val bitmap = byId[id]?.bitmap ?: continue
-            held -= bitmap.width.toLong() * bitmap.height * 4
-            byId.remove(id)
-            aliases.remove(id)
-            lastUse.remove(id)
-        }
+        val idle = byId.keys.filter { lastUseOf(it) < frame }.sortedBy(::lastUseOf).iterator()
+        while (held > budgetBytes && idle.hasNext()) held -= drop(idle.next())
     }
+
+    private fun lastUseOf(id: String): Long = lastUse[id] ?: -1L
+
+    /** Forgets [id]'s bitmap; answers the bytes that frees. */
+    private fun drop(id: String): Long {
+        val freed = byId.remove(id)?.heldBytes() ?: 0L
+        aliases.remove(id)
+        lastUse.remove(id)
+        return freed
+    }
+
+    private fun Entry.heldBytes(): Long = bitmap?.let { it.width.toLong() * it.height * BYTES_PER_PIXEL } ?: 0L
 
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return
         // SnapshotStateMap.keys.retainAll exists but does an iteration-time
         // check. Build the drop list first to avoid mutation while iterating.
-        val drop = byId.keys.filter { it !in liveIds }
-        for (id in drop) {
-            byId.remove(id)
-            aliases.remove(id)
-            lastUse.remove(id)
-        }
+        val gone = byId.keys.filter { it !in liveIds }
+        gone.forEach(::drop)
     }
 
     fun size(): Int = byId.size
@@ -300,6 +301,9 @@ private const val MAX_MIP_PX: Int = 2048
 
 /** Decoded image memory a board keeps by default: 64 MB, about four 2048 px bitmaps. */
 internal const val DEFAULT_IMAGE_BUDGET_BYTES: Long = 64L * 1024 * 1024
+
+/** A decoded bitmap is ARGB, four bytes a pixel. */
+private const val BYTES_PER_PIXEL = 4L
 
 /**
  * Per-canvas cache of [TextLayoutResult] entries for [Element.Text]
