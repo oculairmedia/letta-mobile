@@ -56,10 +56,13 @@ import com.letta.mobile.ui.theme.customColors
  * navigate to a subagent's conversation). It is offered only once the child's
  * conversation exists - while running it usually does not yet.
  */
+/** Opens a subagent's own conversation from the roster. */
+typealias OpenSubagentConversation = (SubagentRosterItem) -> Unit
+
 @Composable
 fun SubagentRosterList(
     roster: SubagentRoster,
-    onOpenConversation: ((SubagentRosterItem) -> Unit)?,
+    onOpenConversation: OpenSubagentConversation?,
     onClearFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -99,7 +102,7 @@ private fun RosterSection(
 }
 
 @Composable
-private fun BackgroundSection(items: List<SubagentRosterItem>, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
+private fun BackgroundSection(items: List<SubagentRosterItem>, onOpenConversation: OpenSubagentConversation?) {
     if (items.isEmpty()) return
     var shown by rememberSaveable { mutableStateOf(false) }
     val toggleLabel = if (shown) "Hide" else "Show"
@@ -138,7 +141,7 @@ private fun SectionAction(action: Pair<String, () -> Unit>?) {
 }
 
 @Composable
-private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
+private fun RunningCard(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
     var expanded by remember(item.key) { mutableStateOf(false) }
     val canExpand = item.activity.size > 1
     val expandToggle = if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier
@@ -173,7 +176,7 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((Subagent
 }
 
 @Composable
-private fun EndedRow(item: SubagentRosterItem, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
+private fun EndedRow(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -267,7 +270,7 @@ private fun ActivityLine(text: String) {
 }
 
 @Composable
-private fun ConversationAction(item: SubagentRosterItem, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
+private fun ConversationAction(item: SubagentRosterItem, onOpenConversation: OpenSubagentConversation?) {
     if (onOpenConversation == null || !item.canOpenConversation) return
     TextButton(
         onClick = { onOpenConversation(item) },
