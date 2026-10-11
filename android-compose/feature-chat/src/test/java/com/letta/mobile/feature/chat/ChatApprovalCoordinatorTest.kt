@@ -89,6 +89,34 @@ class ChatApprovalCoordinatorTest {
         assertEquals(ChatApprovalResult.Failed("boom"), result)
     }
 
+    /** letta-mobile-bzvro.40: an always-allow from an Iroh-relayed card carries its rule ids to the repository. */
+    @Test
+    fun `always allow carries the chosen rule ids`() = runTest {
+        val result = coordinator.submitApproval(
+            agentId = "agent-1",
+            activeConversationId = "conv-1",
+            requestId = "perm-tool-1",
+            toolCallIds = listOf("tool-1"),
+            approve = true,
+            reason = null,
+            selectedSuggestionIds = listOf("rule-1"),
+        )
+
+        assertEquals(ChatApprovalResult.Submitted, result)
+        coVerify(exactly = 1) {
+            messageRepository.submitApproval(
+                com.letta.mobile.data.repository.api.MessageApprovalAnswer(
+                    agentId = AgentId("agent-1"),
+                    approvalRequestId = "perm-tool-1",
+                    toolCallIds = listOf("tool-1"),
+                    approve = true,
+                    conversationId = "conv-1",
+                    selectedSuggestionIds = listOf("rule-1"),
+                ),
+            )
+        }
+    }
+
     @Test
     fun `submitApproval propagates cancellation instead of reporting a failure`() = runTest {
         coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any(), any()) } throws CancellationException("left the screen")

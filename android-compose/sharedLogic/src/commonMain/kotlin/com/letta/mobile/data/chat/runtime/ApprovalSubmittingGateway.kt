@@ -23,4 +23,44 @@ interface ApprovalSubmittingGateway {
         approve: Boolean,
         reason: String?,
     )
+
+    /**
+     * letta-mobile-bzvro.40: approves [toolCallId] and persists the server-offered rules
+     * [suggestionIds] ("always allow"). A gateway that cannot carry them refuses, rather than approve
+     * without the rule the person chose.
+     */
+    suspend fun submitAlwaysAllow(
+        agentId: String,
+        conversationId: String,
+        approvalRequestId: String,
+        toolCallId: String,
+        suggestionIds: List<String>,
+    ): Unit = throw UnsupportedOperationException("always-allow rules are not supported by this connection")
+}
+
+/**
+ * letta-mobile-bzvro.11/.12/.40: a gateway that can say what each parked `can_use_tool` request
+ * offered (always-allow rules, blocked path, diffs), by tool call id: one that runs the App Server
+ * turn engine itself, or an Iroh gateway fed by its host's `pending_approvals` relay.
+ */
+interface PendingApprovalSource {
+    val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
+}
+
+/**
+ * letta-mobile-bzvro.13/.40: a gateway that can read and change a conversation's permission mode. One
+ * that cannot reports no [permissionModes], and the composer shows no mode chip for it.
+ */
+interface PermissionModeGateway {
+    /** The registry this gateway's conversations are governed by, or null when it has no mode support. */
+    val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
+
+    /** Asks for [mode] on the conversation's runtime; true once the server confirmed it. */
+    suspend fun setPermissionMode(
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode,
+    ): Boolean
+
+    /** Brings the chip and the server into agreement when a conversation is opened (a relaying host). */
+    suspend fun syncPermissionMode(runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) = Unit
 }

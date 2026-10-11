@@ -138,6 +138,21 @@ class IrohNodeEndpoint(
     }
 
     /**
+     * letta-mobile-bzvro.40: wires [publisher] to this endpoint. Its `pending_approvals` frames go to
+     * the connections viewing the frame's conversation (the audience of that conversation's turn
+     * stream), and each connection that starts viewing a conversation gets its parked requests
+     * replayed to it alone.
+     */
+    fun attachPendingApprovalsPublisher(publisher: PendingApprovalsPublisher) {
+        publisher.attach { conversationId, frame ->
+            connectionRegistry.viewersFor(conversationId).count { it.writeFrame(frame) }
+        }
+        connectionRegistry.addViewerJoinedListener { conversationId, viewer ->
+            publisher.replayTo(conversationId, viewer)
+        }
+    }
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */

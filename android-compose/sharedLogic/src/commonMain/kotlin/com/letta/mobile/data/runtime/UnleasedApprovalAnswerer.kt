@@ -79,6 +79,12 @@ internal class UnleasedApprovalAnswerer(
     private val runtimeOwned: (TurnRuntimeKey) -> Boolean,
     private val permissionModeFor: (TurnRuntimeKey) -> AppServerPermissionMode,
     private val runtimeScopeFor: (TurnRuntimeKey) -> AppServerRuntimeScope?,
+    /**
+     * letta-mobile-bzvro.40: a request left pending for the person is parked like a leased one, so
+     * its card (with rules and diffs) reaches a viewer now (a relaying node pushes it) rather than
+     * only when the next turn subscribes.
+     */
+    private val parkLeftPending: (TurnRuntimeKey, PendingApprovalDetails) -> Unit = { _, _ -> },
 ) {
     suspend fun answer(
         request: AppServerInboundFrame.ControlRequest,
@@ -105,6 +111,7 @@ internal class UnleasedApprovalAnswerer(
         }
         if (!autoAllowPermitted(details.mode, details.toolName, details.argumentsJson)) {
             record("approval.unleasedPending", details)
+            parkLeftPending(details.key, details.parked())
             return UnleasedApprovalOutcome.LeftPending
         }
         return null
@@ -199,7 +206,20 @@ internal class UnleasedApprovalAnswerer(
         val toolName: String?,
         val mode: AppServerPermissionMode,
         val argumentsJson: String?,
-    )
+    ) {
+        /** What the request offered, as the card shows it. */
+        fun parked(): PendingApprovalDetails {
+            val body = request.request
+            return PendingApprovalDetails(
+                approvalId = request.requestId,
+                toolCallId = (body["tool_call_id"] as? JsonPrimitive)?.contentOrNull ?: request.requestId,
+                toolName = (toolName ?: "tool").take(ApprovalRequestPayloadParser.MAX_TOOL_NAME_CHARS),
+                suggestions = ApprovalRequestPayloadParser.suggestions(body),
+                blockedPath = ApprovalRequestPayloadParser.blockedPath(body),
+                diffs = ApprovalRequestPayloadParser.diffs(body),
+            )
+        }
+    }
 
     private fun kotlinx.serialization.json.JsonObject.string(key: String): String? =
         (this[key] as? JsonPrimitive)?.contentOrNull

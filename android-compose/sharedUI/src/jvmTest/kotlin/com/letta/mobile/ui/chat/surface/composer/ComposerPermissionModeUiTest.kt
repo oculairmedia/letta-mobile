@@ -10,6 +10,11 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.withKeyDown
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
@@ -111,5 +116,41 @@ class ComposerPermissionModeUiTest {
         showPanel(unrestricted, mode = ChatSurfaceMode.Docked)
 
         onNodeWithTag(ComposerTestTags.PERMISSION_MODE_CHIP).assertDoesNotExist()
+    }
+
+    /** letta-mobile-bzvro.40 (G48): Shift+Tab at the prompt moves to the next mode, as Letta Desktop does. */
+    @Test
+    fun shiftTabCyclesToTheNextMode() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        showPanel(ChatPermissionModeUiState(selected = AppServerPermissionMode.Standard), actions)
+
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput {
+            withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) }
+        }
+
+        runOnIdle { assertEquals(listOf(AppServerPermissionMode.AcceptEdits), actions.permissionModes) }
+    }
+
+    @Test
+    fun shiftTabDoesNothingWhileAChangeIsPending() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val pending = ChatPermissionModeUiState(selected = AppServerPermissionMode.Standard, pending = AppServerPermissionMode.Strict)
+        showPanel(pending, actions)
+
+        onNodeWithTag(ComposerTestTags.INPUT).requestFocus().performKeyInput {
+            withKeyDown(Key.ShiftLeft) { pressKey(Key.Tab) }
+        }
+
+        runOnIdle { assertEquals(emptyList(), actions.permissionModes) }
+    }
+
+    @Test
+    fun theCycleWrapsAndFollowsTheOptions() {
+        val options = AppServerPermissionMode.entries
+        val last = ChatPermissionModeUiState(selected = options.last())
+
+        assertEquals(options.first(), nextPermissionMode(last))
+        assertEquals(null, nextPermissionMode(last.copy(unavailableReason = "locked")))
+        assertEquals(null, nextPermissionMode(null))
     }
 }

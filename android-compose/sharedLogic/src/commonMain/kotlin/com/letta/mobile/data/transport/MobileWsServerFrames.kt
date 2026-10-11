@@ -662,6 +662,25 @@ sealed interface ServerFrame {
     ) : ServerFrame
 
     /**
+     * letta-mobile-bzvro.40: an Iroh host's snapshot of the approvals parked for one conversation
+     * (see [com.letta.mobile.data.runtime.ApprovalRelay]). Routing-only: it feeds the client's
+     * pending-approval store, never the timeline.
+     */
+    @Serializable
+    data class PendingApprovalsUpdated(
+        override val v: Int = 1,
+        val type: String = com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
+        override val id: String = "",
+        override val ts: String = "",
+        @SerialName("agent_id") val agentId: String = "",
+        @SerialName("conversation_id") val conversationId: String,
+        val approvals: kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(emptyList()),
+    ) : ServerFrame {
+        fun decode(): com.letta.mobile.data.runtime.RelayedPendingApprovals =
+            com.letta.mobile.data.runtime.ApprovalRelay.decode(agentId, conversationId, approvals)
+    }
+
+    /**
      * Forward-compat sink for unknown `type` values. Spec §2 mandates
      * silent-ignore; surfacing as a typed value (rather than throwing)
      * lets callers tell apart "deserialization failed" from "frame the

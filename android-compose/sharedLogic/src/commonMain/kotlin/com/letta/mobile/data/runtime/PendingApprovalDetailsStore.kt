@@ -54,9 +54,16 @@ internal class PendingApprovalDetailsStore {
     private val lock = SynchronizedObject()
     private var entries = emptyMap<String, Entry>()
     private val view = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
+    private val scopedView = MutableStateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>(emptyMap())
 
     /** Pending details by tool call id. */
     val pending: StateFlow<Map<String, PendingApprovalDetails>> = view.asStateFlow()
+
+    /**
+     * letta-mobile-bzvro.40: the same entries grouped by the runtime that parked them, oldest first.
+     * A relaying node pushes each conversation's list to that conversation's viewers.
+     */
+    val byRuntime: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>> = scopedView.asStateFlow()
 
     fun record(key: TurnRuntimeKey, details: PendingApprovalDetails) {
         // Re-recording a call moves it to the newest slot; past the cap the oldest request is dropped.
@@ -93,6 +100,7 @@ internal class PendingApprovalDetailsStore {
         synchronized(lock) {
             entries = change(entries)
             view.value = entries.mapValues { it.value.details }
+            scopedView.value = entries.values.groupBy({ it.key }, { it.details })
         }
     }
 }
@@ -116,3 +124,7 @@ private fun PendingApprovalDetails.offersAll(ids: List<String>) = ids.all { id -
 /** letta-mobile-bzvro.11/.12: what each parked control request of [this] engine offered, by tool call id. */
 val AppServerTurnEngine.pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>>
     get() = approvals.parkedDetails
+
+/** letta-mobile-bzvro.40: [pendingApprovalDetails] grouped by the runtime each request belongs to. */
+val AppServerTurnEngine.pendingApprovalsByRuntime: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>
+    get() = approvals.parkedByRuntime

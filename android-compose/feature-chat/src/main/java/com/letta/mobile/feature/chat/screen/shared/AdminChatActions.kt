@@ -5,6 +5,7 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.ui.chat.session.A2uiSnackbarId
@@ -77,7 +78,10 @@ internal class AdminChatActions(
     }
 
     override fun submitApproval(answer: ChatApprovalAnswer) =
-        viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
+        viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds)
+
+    // letta-mobile-bzvro.40: the permission-mode chip, over the Iroh host.
+    override fun setPermissionMode(mode: AppServerPermissionMode) = viewModel.setPermissionMode(mode)
 
     override fun submitA2uiAction(action: A2uiAction) = viewModel.submitA2uiAction(action)
 

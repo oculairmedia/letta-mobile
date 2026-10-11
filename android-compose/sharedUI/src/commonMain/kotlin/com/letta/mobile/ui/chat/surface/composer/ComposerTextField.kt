@@ -142,7 +142,13 @@ internal fun ComposerTextField(
             // Only the primary field speaks for the page: the outgoing one losing focus to it is not "unfocused".
             .onFocusChanged { focus.report(it) }
             .onPreviewKeyEvent { event ->
-                composerEnterKeyHandled(
+                composerModeCycleKeyHandled(
+                    eventKey = event.key,
+                    eventType = event.type,
+                    shiftPressed = event.isShiftPressed,
+                    state = model.composer.permissionMode,
+                    onSelect = model.actions::setPermissionMode,
+                ) || composerEnterKeyHandled(
                     ComposerEnterKeyParams(
                         eventKey = event.key,
                         eventType = event.type,

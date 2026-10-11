@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.ApprovalSubmitResult
+import com.letta.mobile.data.controller.ControllerApprovalAnswer
+import com.letta.mobile.data.runtime.ApprovalRelay
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.serialization.json.JsonElement
@@ -27,6 +29,8 @@ object ApprovalAdminHandlers {
         controller: AppServerController? = null,
     ) {
         router.register("approval.submit") { params -> submit(params, controller) }
+        // letta-mobile-bzvro.40: this host pushes parked approvals and honours always-allow rule ids.
+        if (controller != null) router.featureCapabilities += ApprovalRelay.CAPABILITY
     }
 
     private suspend fun submit(
@@ -48,6 +52,7 @@ object ApprovalAdminHandlers {
             ?: approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject?.get("reason")?.jsonPrimitive?.contentOrNull
         val updatedInput = approval["updated_input"]?.jsonObject
             ?: com.letta.mobile.data.model.AskUserQuestion.decodeAnswerReason(reason)
+        val selectedSuggestionIds = selectedSuggestionIds(approval)
         val toolCallIds = approval["approvals"]?.jsonArray
             ?.mapNotNull { it.jsonObject["tool_call_id"]?.jsonPrimitive?.contentOrNull }
             ?.takeIf { it.isNotEmpty() }
@@ -77,13 +82,16 @@ object ApprovalAdminHandlers {
                 recoverApprovals = true,
             )
             controller.submitApproval(
-                agentId = AgentId(agentId),
-                conversationId = convId,
-                approvalRequestId = approvalRequestId,
-                approve = approve,
-                reason = reason,
-                toolCallId = toolCallIds.firstOrNull(),
-                updatedInput = updatedInput,
+                ControllerApprovalAnswer(
+                    agentId = AgentId(agentId),
+                    conversationId = convId,
+                    approvalRequestId = approvalRequestId,
+                    approve = approve,
+                    reason = reason,
+                    toolCallId = toolCallIds.firstOrNull(),
+                    updatedInput = updatedInput,
+                    selectedSuggestionIds = selectedSuggestionIds,
+                ),
             )
         }.onSuccess { result ->
             return handleApprovalSubmitResult(result, approve)
@@ -102,6 +110,20 @@ object ApprovalAdminHandlers {
         }
         error("unreachable")
     }
+
+    /**
+     * letta-mobile-bzvro.40: the always-allow rule ids, on the message or on its first decision. Only
+     * an approval carries them; the controller checks them against the request it parked.
+     */
+    private fun selectedSuggestionIds(approval: JsonObject): List<String> {
+        val ids = approval[SELECTED_SUGGESTIONS] ?: approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject?.get(SELECTED_SUGGESTIONS)
+        return (ids as? kotlinx.serialization.json.JsonArray).orEmpty()
+            .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            .take(MAX_SELECTED_SUGGESTIONS)
+    }
+
+    private const val SELECTED_SUGGESTIONS = "selected_permission_suggestion_ids"
+    private const val MAX_SELECTED_SUGGESTIONS = 10
 
     private fun handleApprovalSubmitResult(
         result: ApprovalSubmitResult,

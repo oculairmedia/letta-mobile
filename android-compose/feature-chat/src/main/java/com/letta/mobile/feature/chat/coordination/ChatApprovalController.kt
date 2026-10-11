@@ -6,7 +6,9 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -18,6 +20,8 @@ internal class ChatApprovalController(
     private val bannerController: ChatBannerController,
     private val agentId: String,
     private val activeConversationId: () -> String?,
+    /** letta-mobile-bzvro.40: the Iroh host's parked requests, whose cards are not in [uiState] itself. */
+    private val relay: ChatApprovalRelay? = null,
 ) {
     /**
      * The shared in-flight tracker (letta-mobile-2dsi5.4), the same one desktop uses. An answer stays
@@ -28,8 +32,10 @@ internal class ChatApprovalController(
 
     init {
         scope.launch {
-            uiState
-                .map { state -> state.messages.mapNotNull { it.approvalRequest?.requestId }.toSet() }
+            combine(
+                uiState.map { state -> state.messages.mapNotNull { it.approvalRequest?.requestId }.toSet() },
+                relay?.pendingDetails?.map { parked -> parked.values.map { it.approvalId }.toSet() } ?: flowOf(emptySet()),
+            ) { timeline, parked -> timeline + parked }
                 .distinctUntilChanged()
                 .collect { pending ->
                     if (tracker.submitting.value.isEmpty()) return@collect
@@ -45,6 +51,7 @@ internal class ChatApprovalController(
         approve: Boolean,
         reason: String?,
         activeConversationIdOverride: String? = null,
+        selectedSuggestionIds: List<String> = emptyList(),
     ) {
         val conversationId = activeConversationIdOverride ?: activeConversationId()
         scope.launch {
@@ -57,8 +64,9 @@ internal class ChatApprovalController(
                     toolCallIds = toolCallIds,
                     approve = approve,
                     reason = reason,
+                    selectedSuggestionIds = selectedSuggestionIds,
                 )) {
-                    ChatApprovalResult.Submitted -> true
+                    ChatApprovalResult.Submitted -> true.also { toolCallIds.forEach { relay?.resolve(it) } }
                     ChatApprovalResult.MissingActiveAgent -> {
                         bannerController.showError("No active agent available for approval")
                         false

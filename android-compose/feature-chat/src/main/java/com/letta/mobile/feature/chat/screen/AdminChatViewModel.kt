@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -56,6 +57,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -174,6 +176,8 @@ internal class AdminChatViewModel @Inject constructor(
         com.letta.mobile.data.presence.ConversationRunRegistry(),
     /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
     private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the permission-mode chip; null leaves both off. */
+    private val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -195,6 +199,8 @@ internal class AdminChatViewModel @Inject constructor(
     companion object {
         private const val LIVE_STATUS_STOP_TIMEOUT_MS = 5_000L
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
+        private val NO_PARKED_APPROVALS: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
+            MutableStateFlow(emptyMap())
     }
 
     private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
@@ -319,7 +325,9 @@ internal class AdminChatViewModel @Inject constructor(
     @Composable
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
-        return state
+        // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
+        val parked by (approvalRelay?.pendingDetails ?: NO_PARKED_APPROVALS).collectAsState()
+        return androidx.compose.runtime.remember(state, parked) { state.withPendingApprovalDetails(parked) }
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
@@ -539,6 +547,7 @@ internal class AdminChatViewModel @Inject constructor(
         bannerController = chatBannerController,
         agentId = agentId.value,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
+        relay = approvalRelay,
     )
 
     private val adminChatA2uiCoordinator: AdminChatA2uiCoordinator by lazy {
@@ -1071,7 +1080,27 @@ internal class AdminChatViewModel @Inject constructor(
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String? = null,
-    ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason)
+        selectedSuggestionIds: List<String> = emptyList(),
+    ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason, selectedSuggestionIds = selectedSuggestionIds)
+
+    /** letta-mobile-bzvro.40: the conversation's permission-mode chip; null while the host offers none. */
+    val permissionMode: Flow<com.letta.mobile.ui.chat.session.ChatPermissionModeUiState?> by lazy(LazyThreadSafetyMode.NONE) {
+        val relay = approvalRelay ?: return@lazy flowOf(null)
+        _uiState.map { currentRuntimeScope() }.distinctUntilChanged().flatMapLatest(relay::permissionMode)
+    }
+
+    /** letta-mobile-bzvro.40: asks the host for [mode]; the chip shows it pending until confirmed. */
+    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) {
+        val relay = approvalRelay ?: return
+        val runtime = currentRuntimeScope() ?: return
+        viewModelScope.launch { relay.setPermissionMode(runtime, mode) }
+    }
+
+    private fun currentRuntimeScope(): com.letta.mobile.data.transport.appserver.AppServerRuntimeScope? {
+        val conversation = conversationId?.value?.takeIf { it.isNotBlank() } ?: return null
+        return agentId.value.takeIf { it.isNotBlank() }
+            ?.let { com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(it, conversation) }
+    }
 
     fun resetMessages() {
         viewModelScope.launch {

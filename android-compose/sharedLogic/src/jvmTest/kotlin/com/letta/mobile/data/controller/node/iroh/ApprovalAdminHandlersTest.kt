@@ -5,6 +5,8 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.ApprovalSubmitResult
 import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.controller.ControllerApprovalAnswer
+import com.letta.mobile.data.runtime.ApprovalRelay
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -46,6 +48,29 @@ class ApprovalAdminHandlersTest {
         assertEquals("agent-1", controller.submittedAgentId)
         assertEquals("approval-1", controller.submittedApprovalRequestId)
         assertEquals(true, controller.submittedApprove)
+    }
+
+    @Test
+    fun alwaysAllowRuleIdsReachTheController() = runTest {
+        installRecordingTransport()
+        val controller = RecordingController()
+        val params = approvalParams(
+            """[{"type":"approval","approval_request_id":"perm-a","approve":true,"selected_permission_suggestion_ids":["rule-1"],"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+        )
+
+        val response = dispatchApproval(controller = controller, params = params)
+
+        assertTrue(response.getValue("success").jsonPrimitive.boolean)
+        assertEquals(listOf("rule-1"), controller.submittedSuggestionIds)
+        assertEquals("tool-a", controller.submittedToolCallId)
+    }
+
+    @Test
+    fun hostWithControllerAdvertisesTheApprovalRelay() {
+        val router = AdminRpcRouter().also { ApprovalAdminHandlers.register(it, RecordingController()) }
+        assertTrue(ApprovalRelay.CAPABILITY in IrohNodeConnection.advertisedCapabilities(router))
+        val bare = AdminRpcRouter().also { ApprovalAdminHandlers.register(it, null) }
+        assertFalse(ApprovalRelay.CAPABILITY in IrohNodeConnection.advertisedCapabilities(bare))
     }
 
     @Test
@@ -114,19 +139,16 @@ class ApprovalAdminHandlersTest {
         ).jsonObject
     }
 
-    private fun approvalParams() = buildJsonObject {
+    private fun approvalParams(
+        messages: String = """[{"type":"approval","approval_request_id":"approval-1","approve":true,"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+    ) = buildJsonObject {
         put("agent_id", "agent-1")
         put("conversation_id", "conv-1")
         put(
             "payload",
             buildJsonObject {
                 put("streaming", false)
-                put(
-                    "messages",
-                    Json.parseToJsonElement(
-                        """[{"type":"approval","approval_request_id":"approval-1","approve":true,"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
-                    ),
-                )
+                put("messages", Json.parseToJsonElement(messages))
             },
         )
     }
@@ -160,6 +182,15 @@ class ApprovalAdminHandlersTest {
         var submittedToolCallId: String? = null
         var submittedUpdatedInput: kotlinx.serialization.json.JsonObject? = null
         var submitResult: ApprovalSubmitResult = ApprovalSubmitResult.Accepted
+        var submittedSuggestionIds: List<String> = emptyList()
+
+        override suspend fun submitApproval(answer: ControllerApprovalAnswer): ApprovalSubmitResult {
+            submittedSuggestionIds = answer.selectedSuggestionIds
+            return submitApproval(
+                answer.agentId, answer.conversationId, answer.approvalRequestId, answer.approve,
+                answer.reason, answer.toolCallId, answer.updatedInput,
+            )
+        }
 
         override suspend fun startRuntime(
             agentId: AgentId,
