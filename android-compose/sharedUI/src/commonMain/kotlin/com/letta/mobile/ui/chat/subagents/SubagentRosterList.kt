@@ -63,22 +63,27 @@ fun SubagentRosterList(
     onClearFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (roster.isEmpty) {
+        EmptyRoster(modifier)
+        return
+    }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        if (roster.isEmpty) {
-            Text(
-                text = "No subagents",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = LettaDimens.Space.lg).testTag(SUBAGENT_ROSTER_EMPTY_TAG),
-            )
-            return@Column
-        }
         RosterSection("Running", roster.running) { item -> RunningCard(item, onOpenConversation) }
         RosterSection("Finished", roster.finished, action = "Clear" to onClearFinished) { item ->
             EndedRow(item, onOpenConversation)
         }
         BackgroundSection(roster.background, onOpenConversation)
     }
+}
+
+@Composable
+private fun EmptyRoster(modifier: Modifier) {
+    Text(
+        text = "No subagents",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(vertical = LettaDimens.Space.lg).testTag(SUBAGENT_ROSTER_EMPTY_TAG),
+    )
 }
 
 @Composable
@@ -97,11 +102,10 @@ private fun RosterSection(
 private fun BackgroundSection(items: List<SubagentRosterItem>, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
     if (items.isEmpty()) return
     var shown by rememberSaveable { mutableStateOf(false) }
-    SectionHeader(
-        title = "Background · ${items.size}",
-        action = (if (shown) "Hide" else "Show") to { shown = !shown },
-    )
-    if (shown) items.forEach { item -> key(item.key) { EndedRow(item, onOpenConversation) } }
+    val toggleLabel = if (shown) "Hide" else "Show"
+    val visible = if (shown) items else emptyList()
+    SectionHeader(title = "Background · ${items.size}", action = toggleLabel to { shown = !shown })
+    visible.forEach { item -> key(item.key) { EndedRow(item, onOpenConversation) } }
 }
 
 @Composable
@@ -117,22 +121,29 @@ private fun SectionHeader(title: String, action: Pair<String, () -> Unit>?) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
-        if (action != null) {
-            Text(
-                text = action.first,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(role = Role.Button, onClick = action.second),
-            )
-        }
+        SectionAction(action)
     }
+}
+
+@Composable
+private fun SectionAction(action: Pair<String, () -> Unit>?) {
+    if (action == null) return
+    Text(
+        text = action.first,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.clickable(role = Role.Button, onClick = action.second),
+    )
 }
 
 @Composable
 private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
     var expanded by remember(item.key) { mutableStateOf(false) }
     val canExpand = item.activity.size > 1
+    val expandToggle = if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier
+    val orbActivity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working
+    val visibleLines = if (expanded) item.activity else item.activity.takeLast(1)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -144,7 +155,7 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((Subagent
     ) {
         Column(
             modifier = Modifier
-                .then(if (canExpand) Modifier.clickable(role = Role.Button) { expanded = !expanded } else Modifier)
+                .then(expandToggle)
                 .padding(LettaDimens.Space.md),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
@@ -152,13 +163,10 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((Subagent
                 horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AgentActivityOrb(
-                    size = LettaDimens.Orb.sm,
-                    activity = if (item.status == SubagentRosterStatus.QUIET) AgentActivity.Idle else AgentActivity.Working,
-                )
+                AgentActivityOrb(size = LettaDimens.Orb.sm, activity = orbActivity)
                 TitleBlock(item, modifier = Modifier.weight(1f))
             }
-            (if (expanded) item.activity else item.activity.takeLast(1)).forEach { line -> ActivityLine(line) }
+            visibleLines.forEach { line -> ActivityLine(line) }
             ConversationAction(item, onOpenConversation)
         }
     }
@@ -166,7 +174,6 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((Subagent
 
 @Composable
 private fun EndedRow(item: SubagentRosterItem, onOpenConversation: ((SubagentRosterItem) -> Unit)?) {
-    val failed = item.status == SubagentRosterStatus.FAILED || item.status == SubagentRosterStatus.CANCELLED
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -178,20 +185,29 @@ private fun EndedRow(item: SubagentRosterItem, onOpenConversation: ((SubagentRos
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (item.status.isTerminal) {
-                Icon(
-                    imageVector = if (failed) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle,
-                    contentDescription = statusWord(item.status),
-                    tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor,
-                    modifier = Modifier.size(LettaDimens.Control.icon),
-                )
-            } else {
-                AgentActivityOrb(size = LettaDimens.Control.icon, activity = AgentActivity.Working)
-            }
+            StatusGlyph(item.status)
             TitleBlock(item, modifier = Modifier.weight(1f))
         }
         ConversationAction(item, onOpenConversation)
     }
+}
+
+/** A check or an error mark once ended; a background run still going keeps its orb. */
+@Composable
+private fun StatusGlyph(status: SubagentRosterStatus) {
+    if (!status.isTerminal) {
+        AgentActivityOrb(size = LettaDimens.Control.icon, activity = AgentActivity.Working)
+        return
+    }
+    val failed = status == SubagentRosterStatus.FAILED || status == SubagentRosterStatus.CANCELLED
+    val icon = if (failed) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle
+    val tint = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.customColors.successColor
+    Icon(
+        imageVector = icon,
+        contentDescription = statusWord(status),
+        tint = tint,
+        modifier = Modifier.size(LettaDimens.Control.icon),
+    )
 }
 
 @Composable
@@ -209,7 +225,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            if (item.identity.label != null) IdentityBadge(item)
+            IdentityBadge(item)
         }
         Text(
             text = item.subtitle(),
@@ -225,12 +241,13 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
 /** External coding agents (Claude Code, Codex) are named, so their work is never mistaken for Letta's. */
 @Composable
 private fun IdentityBadge(item: SubagentRosterItem) {
+    val label = item.identity.label ?: return
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {
         Text(
-            text = item.identity.label.orEmpty(),
+            text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(horizontal = LettaDimens.Space.xs).testTag(SubagentRosterTag.BADGE.of(item.key)),
