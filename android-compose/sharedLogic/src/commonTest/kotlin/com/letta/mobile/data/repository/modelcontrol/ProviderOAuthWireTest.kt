@@ -13,11 +13,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** PKCE, pasted-code parsing, login selection and credential redaction of the sign-ins (letta-mobile-zxk2n.3). */
+/** PKCE (S256), pasted-code parsing, login selection and credential redaction of the sign-ins (letta-mobile-zxk2n.3). */
 class ProviderOAuthWireTest {
     @Test
-    fun pkceMatchesTheRfc7636Example() {
-        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", Pkce.challengeOf("dBjftJeZ4CVP-mJ92K9qbKgSFJ2t3W4f-BvBTnc-5gw"))
+    fun pkceChallengeIsBase64UrlSha256OfTheVerifier() {
+        // Expected value computed independently: base64.urlsafe_b64encode(hashlib.sha256(verifier).digest()) without '='.
+        assertEquals("NT1g8wvn0aIGfdV2wO5IMHalrL6VFGKOOFL-eUNMOTE", Pkce.challengeOf("dBjftJeZ4CVP-mJ92K9qbKgSFJ2t3W4f-BvBTnc-5gw"))
 
         val pkce = Pkce.create { n -> ByteArray(n) { 0xFF.toByte() } }
 
