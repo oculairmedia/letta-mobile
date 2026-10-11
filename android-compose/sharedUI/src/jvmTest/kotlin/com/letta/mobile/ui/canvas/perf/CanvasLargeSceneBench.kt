@@ -72,7 +72,7 @@ class CanvasLargeSceneBench {
             if ("data" in parts) dataPath(payload)
             if ("hit" in parts) hitTesting(payload)
             if ("render" in parts) profiled { render(payload) }
-            if ("session" in parts && n <= 2000) sessionOps(payload)
+            if ("session" in parts && n <= 2000) profiled { sessionOps(payload) }
         }
         File("build/canvas-bench").apply { mkdirs() }.resolve("results.txt").writeText(out.toString())
     }

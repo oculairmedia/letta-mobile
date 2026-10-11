@@ -86,14 +86,30 @@ internal object NotebookBoardStorage {
         val raw = (read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value
         val stored = StoredBoard(read)
         if (stored.isInline) return raw
-        val root = Json.parseToJsonElement(raw).jsonObject
+        return assembled(stored, Json.parseToJsonElement(raw).jsonObject, stored::elements).toString()
+    }
+
+    /**
+     * The board without its element bodies: scene fields as [boardJson] has them, `elements` as
+     * ordering stubs (plus id-less legacy elements). All a canvas write needs of the board as it
+     * stands; reading every element's every field out of the document, and parsing it, made a
+     * write cost the size of the board (letta-mobile-24zur.3).
+     */
+    fun envelope(read: Read): JsonObject {
+        val root = Json.parseToJsonElement((read.get(ObjectId.ROOT, BOARD).orElseThrow() as AmValue.Str).value).jsonObject
+        val stored = StoredBoard(read)
+        return if (stored.isInline) root else assembled(stored, root, stored::elementStubs)
+    }
+
+    /** [root] with its object fields and arrays read in, and its elements from [elements]. */
+    private fun assembled(stored: StoredBoard, root: JsonObject, elements: (JsonObject) -> List<JsonElement>): JsonObject {
         val objectFields = stored.objectFields()
         val arrayFields = stored.arrayFields(root)
         val merged = LinkedHashMap<String, JsonElement>()
         root.forEach { (key, value) -> merged[key] = objectFields[key] ?: arrayFields[key] ?: value }
         for ((key, value) in objectFields.entries + arrayFields.entries) if (key !in merged) merged[key] = value
-        merged["elements"] = JsonArray(stored.elements(root))
-        return JsonObject(merged).toString()
+        merged["elements"] = JsonArray(elements(root))
+        return JsonObject(merged)
     }
 
     /** The parts of a board kept outside `ROOT.board`: element bodies, tombstones, object fields and arrays. */
@@ -110,12 +126,19 @@ internal object NotebookBoardStorage {
         val isInline: Boolean get() = listOf(keys, deleted, fieldKeys, arrayKeys).all { it.isEmpty() }
 
         /** Id-less legacy elements, then live elements in the board string's order, then the rest by id. */
-        fun elements(root: JsonObject): List<JsonElement> {
-            val rawElements = (root["elements"] as? JsonArray).orEmpty()
-            val rawIds = rawElements.mapNotNull(::idOf)
-            val orderedKeys = rawIds.filter { it in keys && it !in deleted }.distinct() +
-                (keys - deleted - rawIds.toSet()).sorted()
-            return rawElements.filter { idOf(it) == null } + readMaps(elementMap, orderedKeys).values
+        fun elements(root: JsonObject): List<JsonElement> =
+            idless(root) + readMaps(elementMap, orderedKeys(root)).values
+
+        /** [elements] with each id'd element as its ordering stub, its body not read. */
+        fun elementStubs(root: JsonObject): List<JsonElement> =
+            idless(root) + orderedKeys(root).map { JsonObject(mapOf("id" to JsonPrimitive(it))) }
+
+        private fun idless(root: JsonObject): List<JsonElement> =
+            (root["elements"] as? JsonArray).orEmpty().filter { idOf(it) == null }
+
+        private fun orderedKeys(root: JsonObject): List<String> {
+            val rawIds = (root["elements"] as? JsonArray).orEmpty().mapNotNull(::idOf)
+            return rawIds.filter { it in keys && it !in deleted }.distinct() + (keys - deleted - rawIds.toSet()).sorted()
         }
 
         fun objectFields(): Map<String, JsonObject> = readMaps(fieldMap, fieldKeys)
@@ -205,28 +228,32 @@ internal object NotebookBoardStorage {
         tx.set(tombstones, key, true)
     }
 
+    /** A canvas write's scene and its digests, computed once for the merge and the new base. */
+    class CanvasSave(val incoming: JsonObject, val digests: SceneBase)
+
     /**
      * Apply one canvas write: only elements and scene fields that differ between the canvas's
-     * previous write ([base]) and this one are written, so notebook-side edits survive and
-     * unchanged content records nothing.
+     * previous write ([base]) and this one ([save]) are written, so notebook-side edits survive
+     * and unchanged content records nothing. The board as it stands is read without its element
+     * bodies ([envelope]), and each element is digested once, when [save] is made.
      */
-    fun mergeCanvasBoard(tx: Transaction, base: SceneBase, incoming: JsonObject) {
-        val current = Json.parseToJsonElement(boardJson(tx)).jsonObject
-        mergeElements(tx, base, incoming, liveIdsOf(current))
-        writeEnvelope(tx, mergedEnvelope(current, base, incoming))
+    fun mergeCanvasBoard(tx: Transaction, base: SceneBase, save: CanvasSave) {
+        val current = envelope(tx)
+        mergeElements(tx, base, save, liveIdsOf(current))
+        writeEnvelope(tx, mergedEnvelope(current, base, save))
     }
 
     /**
      * Elements the canvas changed since [base]: removed ones are removed, and changed ones are
      * written unless the notebook side deleted them meanwhile (not in [liveIds]).
      */
-    private fun mergeElements(tx: Transaction, base: SceneBase, incoming: JsonObject, liveIds: Set<String>) {
-        val next = addressableElements(incoming)
+    private fun mergeElements(tx: Transaction, base: SceneBase, save: CanvasSave, liveIds: Set<String>) {
+        val next = addressableElements(save.incoming)
         for (key in base.elements.keys + next.keys) {
             val nextValue = next[key]
             val previousDigest = base.elements[key]
             when {
-                previousDigest == nextValue?.let(::digest) -> Unit
+                previousDigest == save.digests.elements[key] -> Unit
                 nextValue == null -> removeElement(tx, key)
                 previousDigest == null || key in liveIds -> putElement(tx, key, nextValue)
             }
@@ -234,12 +261,12 @@ internal object NotebookBoardStorage {
     }
 
     /** [current]'s scene fields with those the canvas changed since [base] taken from [incoming]. */
-    private fun mergedEnvelope(current: JsonObject, base: SceneBase, incoming: JsonObject): JsonObject {
+    private fun mergedEnvelope(current: JsonObject, base: SceneBase, save: CanvasSave): JsonObject {
         val envelope = LinkedHashMap<String, JsonElement>(current)
-        for (key in (base.fields.keys + incoming.keys).filter(::isSceneField)) {
-            val value = incoming[key]
+        for (key in (base.fields.keys + save.incoming.keys).filter(::isSceneField)) {
+            val value = save.incoming[key]
             when {
-                base.fields[key] == value?.let(::digest) -> Unit
+                base.fields[key] == save.digests.fields[key] -> Unit
                 value != null -> envelope[key] = value
                 else -> envelope.remove(key)
             }
@@ -320,14 +347,14 @@ internal object NotebookBoardStorage {
 
     // ---- canvas base ------------------------------------------------------------------------
 
-    fun sceneBaseOf(sceneJson: String): SceneBase {
-        val board = sceneBoard(sceneJson)
-        return SceneBase(
-            blank = sceneJson.isEmpty(),
-            elements = addressableElements(board).mapValues { digest(it.value) },
-            fields = board.filterKeys(::isSceneField).mapValues { digest(it.value) },
-        )
-    }
+    fun sceneBaseOf(sceneJson: String): SceneBase = sceneBaseOf(sceneBoard(sceneJson), blank = sceneJson.isEmpty())
+
+    /** The digests of [board], a scene as [sceneBoard] makes it. */
+    fun sceneBaseOf(board: JsonObject, blank: Boolean): SceneBase = SceneBase(
+        blank = blank,
+        elements = addressableElements(board).mapValues { digest(it.value) },
+        fields = board.filterKeys(::isSceneField).mapValues { digest(it.value) },
+    )
 
     /** Whether the canvas's last write was a blank scene; null if the canvas never wrote. */
     fun baseIsBlank(read: Read): Boolean? {
@@ -456,7 +483,7 @@ internal object NotebookBoardStorage {
     private fun isSceneField(key: String): Boolean = key != "elements" && key != "schema"
 
     /** The ids of the elements [read]'s board shows. */
-    private fun liveIdsOf(read: Read): Set<String> = liveIdsOf(Json.parseToJsonElement(boardJson(read)).jsonObject)
+    private fun liveIdsOf(read: Read): Set<String> = liveIdsOf(envelope(read))
 
     private fun liveIdsOf(board: JsonObject): Set<String> = (board["elements"] as? JsonArray).orEmpty().mapNotNull(::idOf).toSet()
 
