@@ -97,6 +97,11 @@ internal class CanvasBoardUi {
     var lastSavedElements by mutableStateOf<List<Element>?>(null)
     var lastExportedJson by mutableStateOf<String?>(null)
 
+    // The elements (as that very list) and background a change from elsewhere left on the board.
+    // While the board still holds them there is nothing of this app's to save: the session
+    // already has it. A plain field, not state: nothing is drawn from it.
+    var importedDrawing: Pair<List<Element>, androidx.compose.ui.graphics.Color>? = null
+
     // The drawing (scene minus our metadata and documents) DrawBox last agreed with the session
     // on. Only a change to *this* re-imports, so a moved note or a saved stroke never reloads
     // the board and throws the camera back.

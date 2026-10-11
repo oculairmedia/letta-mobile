@@ -68,12 +68,24 @@ class CanvasLargeSceneBench {
         for (n in sizes) {
             log("=== N=$n ===")
             val payload = CanvasLargeSceneFixtures.scene(n)
-            dataPath(payload)
-            hitTesting(payload)
-            render(payload)
-            if (n <= 2000) sessionOps(payload)
+            val parts = (System.getenv("CANVAS_BENCH_PARTS") ?: "data,hit,render,session").split(',').toSet()
+            if ("data" in parts) dataPath(payload)
+            if ("hit" in parts) hitTesting(payload)
+            if ("render" in parts) profiled { render(payload) }
+            if ("session" in parts && n <= 2000) sessionOps(payload)
         }
         File("build/canvas-bench").apply { mkdirs() }.resolve("results.txt").writeText(out.toString())
+    }
+
+    /** Runs [block] under a JFR recording written to `CANVAS_BENCH_JFR`, when that is set. */
+    private fun profiled(block: () -> Unit) {
+        val path = System.getenv("CANVAS_BENCH_JFR") ?: return block()
+        jdk.jfr.Recording(jdk.jfr.Configuration.getConfiguration("profile")).use { recording ->
+            recording.start()
+            block()
+            recording.stop()
+            recording.dump(java.nio.file.Path.of(path))
+        }
     }
 
     // ---------------------------------------------------------------- data path
@@ -98,9 +110,10 @@ class CanvasLargeSceneBench {
                 if (evaluated?.shouldImport == true) CanvasImageAssets.parse(CanvasSceneStateGuard(null).drawable(json), null)
             },
         )
-        // What autosave does on the main thread after every import or edit (CanvasBoardSync.onJsonExported).
+        // What autosave does after every import or edit: serialize + strip twice. On the main thread before
+        // letta-mobile-24zur.2, on Dispatchers.Default after (and skipped for a drawing just imported).
         log(
-            "autosave.mainThread.ms=" + median {
+            "autosave.serializeAndStrip.ms=" + median {
                 val exported = DrawingSerializer.serialize(payload)
                 CanvasOpProjector.stripMetadataForDrawBox(exported)
                 CanvasOpProjector.stripMetadataForDrawBox(exported)
@@ -156,9 +169,15 @@ class CanvasLargeSceneBench {
                 moved = moved.translate(Offset(2f, 1f))
                 controller.onIntent(Intent.UpdateElement(moved))
             }
-            // An external import: same content, every element a new instance (as parsing makes it).
+            // An external import as an agent's op makes it: one element moved, every element a new
+            // instance (as parsing makes it).
+            var nudge = 0f
             scenario("afterImport", frames = 10) {
-                controller.importExternal(payload.copy(elements = payload.elements.map { it.freshCopy() }))
+                nudge += 3f
+                val fresh = payload.elements.map { it.freshCopy() }.toMutableList()
+                val i = fresh.indexOfFirst { it is Element.Shape }
+                fresh[i] = fresh[i].translate(Offset(nudge, 0f))
+                controller.importExternal(payload.copy(elements = fresh))
             }
             log("render.importApply.mainThread.ms=${median(reps = 8) { controller.importExternal(payload.copy(elements = payload.elements.map { it.freshCopy() })) }}")
         } finally {
