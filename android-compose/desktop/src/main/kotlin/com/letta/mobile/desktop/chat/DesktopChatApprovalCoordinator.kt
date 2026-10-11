@@ -118,7 +118,7 @@ internal class DesktopChatApprovalCoordinator(
     ) {
         // An always-allow targets exactly the call whose card offered the rule, not the first of the row.
         val toolCallId = request.suggestionBinding?.toolCallId ?: request.toolCallIds.firstOrNull()
-        val alwaysAllow = request.alwaysAllow(agentId, conversationId)
+        val alwaysAllow = request.alwaysAllow(SubmissionTarget(gw, agentId, conversationId))
         when {
             // letta-mobile-bzvro.40: an Iroh gateway carries the rule to its host, bound to the request the card drew.
             gw is ApprovalSubmittingGateway && alwaysAllow != null -> gw.submitAlwaysAllow(alwaysAllow)
@@ -146,10 +146,10 @@ internal class DesktopChatApprovalCoordinator(
     }
 
     /** The always-allow [this] asks for, or null for a plain decision. */
-    private fun ApprovalSubmissionRequest.alwaysAllow(agentId: String, conversationId: String): AlwaysAllowAnswer? {
+    private fun ApprovalSubmissionRequest.alwaysAllow(target: SubmissionTarget): AlwaysAllowAnswer? {
         val binding = suggestionBinding ?: return null
         if (selectedSuggestionIds.isEmpty()) return null
-        return AlwaysAllowAnswer(agentId, conversationId, binding, selectedSuggestionIds)
+        return AlwaysAllowAnswer(target.agentId, target.conversationId, binding, selectedSuggestionIds)
     }
 
     fun clearSubmittedApproval(requestId: String) {

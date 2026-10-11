@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -52,12 +53,12 @@ internal class ChatApprovalController(
         approve: Boolean,
         reason: String?,
         activeConversationIdOverride: String? = null,
-    ) = submit(ChatApprovalAnswer(requestId, toolCallIds, approve, reason), activeConversationIdOverride)
+    ) = submit(ChatApprovalAnswer(requestId, toolCallIds, approve, reason), activeConversationIdOverride?.let(::ConversationId))
 
     /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
-    fun submit(answer: ChatApprovalAnswer, activeConversationIdOverride: String? = null) {
+    fun submit(answer: ChatApprovalAnswer, conversationOverride: ConversationId? = null) {
         val requestId = answer.requestId
-        val conversationId = activeConversationIdOverride ?: activeConversationId()
+        val conversationId = conversationOverride?.value ?: activeConversationId()
         scope.launch {
             markApprovalInFlight(requestId, conversationId)
             val submitted = try {

@@ -13,7 +13,6 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -101,7 +100,7 @@ class IrohAdminRpcChatGateway(
         approve: Boolean,
         reason: String?,
     ) {
-        postApproval(agentId, conversationId, IrohApprovalSubmitBody.decision(approvalRequestId, toolCallId, approve, reason))
+        postApproval(IrohApprovalSubmitBody.params(agentId, conversationId, IrohApprovalSubmitBody.decision(approvalRequestId, toolCallId, approve, reason)))
         toolCallId?.let { approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(it)) }
     }
 
@@ -110,15 +109,16 @@ class IrohAdminRpcChatGateway(
         if (com.letta.mobile.data.runtime.ApprovalRelay.CAPABILITY !in transport.hostCapabilities) {
             throw UnsupportedOperationException("this host cannot persist always-allow rules")
         }
-        postApproval(answer.agentId, answer.conversationId, IrohApprovalSubmitBody.alwaysAllow(answer.binding, answer.suggestionIds))
+        postApproval(IrohApprovalSubmitBody.params(answer.agentId, answer.conversationId, IrohApprovalSubmitBody.alwaysAllow(answer.binding, answer.suggestionIds)))
         approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(answer.binding.toolCallId))
     }
 
-    private suspend fun postApproval(agentId: String, conversationId: String, approval: ApprovalCreate) {
+    private suspend fun postApproval(params: JsonObject) {
+        val agentId = (params["agent_id"] as? JsonPrimitive)?.content.orEmpty()
         val response = transport.adminRpc(
             method = "approval.submit",
             path = "/v1/agents/$agentId/messages",
-            body = IrohApprovalSubmitBody.params(agentId, conversationId, approval).toString(),
+            body = params.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc approval.submit failed")
     }
