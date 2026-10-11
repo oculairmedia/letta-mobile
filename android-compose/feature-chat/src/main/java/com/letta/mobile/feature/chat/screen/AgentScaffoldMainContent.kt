@@ -149,6 +149,8 @@ private fun AgentScaffoldChatScreenPane(
         // The header's agent pill, for the phone canvas mode's board menu while the header is hidden.
         onOpenAgentSwitcher = { params.sheetVisibility.onShowAgentSwitcherChange(true) },
         onHostHeaderHiddenChange = onHeaderHiddenChange,
+        // letta-mobile-y5q9z: the canvas bubble's "+" lists and switches the drawer's conversations.
+        recentInteractions = rememberAgentRecentInteractions(state),
         onViewSubagentConversation = params.navigation.onViewSubagentConversation
             ?: params.navigation.onSwitchConversation?.let { switch ->
                 { subagentAgentId, subagentConversationId ->

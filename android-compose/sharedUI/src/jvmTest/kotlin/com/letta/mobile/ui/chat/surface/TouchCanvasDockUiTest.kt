@@ -42,7 +42,6 @@ import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.mascot.FakeMascotHost
 import com.letta.mobile.ui.mascot.FakeMascotShell
 import com.letta.mobile.ui.mascot.PointerObservingMascotHost
-import com.letta.mobile.ui.theme.TouchComposerDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -50,10 +49,11 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * letta-mobile-bglj6.1.9: the Touch idiom. On the canvas there is no panel: a flush bar at the
- * bottom and a chat head the reply pops out of; the head toggles the popup, the popup opens the
- * chat, a drag snaps the head to the nearer edge and reports its place. The full page draws the
- * phone bar: no card, no model chip, no keyboard hints.
+ * letta-mobile-bglj6.1.9: the Touch idiom. On the canvas there is no panel and (letta-mobile-y5q9z)
+ * no bar: a chat head the reply pops out of, which opens the canvas bubble's card (see
+ * CanvasBubbleUiTest). Without a canvas the docked head keeps its bar: the head toggles the popup and
+ * the popup opens the chat. A drag snaps the head to the nearer edge and reports its place. The full
+ * page draws the phone bar: no card, no model chip, no keyboard hints.
  */
 class TouchCanvasDockUiTest {
     private val prompt = UiMessage(id = "u1", role = "user", content = "Sketch a kitchen layout.", timestamp = "2026-09-30T18:02:00Z")
@@ -120,26 +120,26 @@ class TouchCanvasDockUiTest {
     }
 
     @Test
-    fun theCanvasHasABottomBarAndAHeadButNoPanel() = runComposeUiTest {
+    fun theCanvasHasAHeadButNoBarAndNoPanel() = runComposeUiTest {
         show(Port(), ChatSurfacePresentation.CanvasFirst)
-        onNodeWithTag(ComposerTestTags.TOUCH_BAR).assertExists()
+        onAllNodesWithTag(ComposerTestTags.TOUCH_BAR).assertCountEquals(0)
         onNodeWithTag(TOUCH_HEAD_TAG).assertExists()
         onAllNodesWithTag(DOCK_PANEL_TAG).assertCountEquals(0)
         onAllNodesWithTag(ComposerTestTags.EXPAND).assertCountEquals(0)
     }
 
     @Test
-    fun theBarsChevronOpensTheChat() = runComposeUiTest {
-        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst)
+    fun withoutACanvasTheBarsChevronOpensTheChat() = runComposeUiTest {
+        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst, withCanvas = false)
         onNodeWithTag(ComposerTestTags.TOUCH_RESTORE).performClick()
         assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), harness.intents)
     }
 
     @Test
-    fun theReplyPopsOutOfTheHeadWhichTogglesIt() = runComposeUiTest {
+    fun withoutACanvasTheReplyPopsOutOfTheHeadWhichTogglesIt() = runComposeUiTest {
         val port = Port()
         port.uiState.value = port.uiState.value.copy(messages = persistentListOf(prompt, reply))
-        val harness = show(port, ChatSurfacePresentation.CanvasFirst)
+        val harness = show(port, ChatSurfacePresentation.CanvasFirst, withCanvas = false)
         onNodeWithTag(TOUCH_POPUP_TAG).assertExists()
         onNodeWithTag(TOUCH_HEAD_TAG).performClick()
         waitForIdle()
@@ -206,16 +206,16 @@ class TouchCanvasDockUiTest {
         waitForIdle()
         onNodeWithTag(RINGS_TAG).assertExists()
         val rings = onNodeWithTag(ChatSurfaceTags.CANVAS_OVERLAY).getBoundsInRoot()
-        val bar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
-        assertTrue(rings.bottom <= bar.top, "the overlay runs under the bar: $rings vs $bar")
+        val board = onNodeWithTag(TOUCH_CANVAS_TAG).getBoundsInRoot()
+        assertTrue(rings.bottom <= board.bottom, "the overlay runs past the board: $rings vs $board")
         presentation = ChatSurfacePresentation.ChatFirst
         waitForIdle()
         onAllNodesWithTag(RINGS_TAG).assertCountEquals(0)
     }
 
     @Test
-    fun withNothingToShowTheHeadOpensTheChat() = runComposeUiTest {
-        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst)
+    fun withoutACanvasAndNothingToShowTheHeadOpensTheChat() = runComposeUiTest {
+        val harness = show(Port(), ChatSurfacePresentation.CanvasFirst, withCanvas = false)
         onNodeWithTag(TOUCH_HEAD_TAG).performClick()
         assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), harness.intents)
     }
@@ -339,7 +339,11 @@ class TouchCanvasDockUiTest {
         val harness = showWithoutALayer(FakeMascotShell("agent-1", layerMounted = false, host = PointerObservingMascotHost))
         onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { click() }
         settle()
-        assertEquals(listOf<ChatSurfaceIntent>(ChatSurfaceIntent.Expand), harness.intents)
+        // On the canvas a tap opens the bubble's card, not the full chat.
+        onNodeWithTag(BUBBLE_CARD_TAG).assertExists()
+        assertTrue(harness.intents.isEmpty(), "the head opened the full chat: ${harness.intents}")
+        onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { click() }
+        settle()
         onNodeWithTag(TOUCH_HEAD_TAG).performTouchInput { longClick() }
         settle()
         assertEquals(1, harness.agentPaneOpened)
@@ -374,7 +378,7 @@ class TouchCanvasDockUiTest {
     }
 
     @Test
-    fun theCanvasBarIsThePagesBarAndTheBoardRunsUnderItsCorners() = runComposeUiTest {
+    fun theBoardRunsToTheFootAndTheCardsBarIsThePagesBar() = runComposeUiTest {
         val port = Port()
         port.composer.value = port.composer.value.copy(text = "Make the island longer")
         var presentation by mutableStateOf(ChatSurfacePresentation.CanvasFirst)
@@ -394,19 +398,22 @@ class TouchCanvasDockUiTest {
         }
         waitForIdle()
         val root = onRoot().getBoundsInRoot()
-        val canvasBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
+        // No bar on the canvas: the board runs to the screen's foot.
         val board = onNodeWithTag(TOUCH_CANVAS_TAG).getBoundsInRoot()
-        // Flush with the screen's foot, and the board behind its rounded top rather than ending on it.
-        assertEquals(root.bottom, canvasBar.bottom)
-        assertEquals((canvasBar.top + TouchComposerDimens.cornerReach).value, board.bottom.value, DP_TOLERANCE)
+        assertEquals(root.bottom.value, board.bottom.value, DP_TOLERANCE)
+        // The bubble's card carries the page's own bar, with the same draft.
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        waitForIdle()
+        onNodeWithTag(ComposerTestTags.TOUCH_BAR).assertExists()
+        onNodeWithText("Make the island longer").assertExists()
 
         presentation = ChatSurfacePresentation.ChatFirst
         waitForIdle()
         onAllNodesWithTag(ComposerTestTags.TOUCH_BAR).assertCountEquals(1)
+        // The same draft on the page's bar, flush with the screen's foot. (The card is narrower than
+        // the page, so the two bars need not wrap the draft alike.)
+        onNodeWithText("Make the island longer").assertExists()
         val pageBar = onNodeWithTag(ComposerTestTags.TOUCH_BAR).getBoundsInRoot()
-        // One bar in both modes: the same container, the same size for the same draft.
-        assertEquals(canvasBar.left to canvasBar.right, pageBar.left to pageBar.right)
-        assertEquals((canvasBar.bottom - canvasBar.top).value, (pageBar.bottom - pageBar.top).value, DP_TOLERANCE)
         assertEquals(root.bottom, pageBar.bottom)
     }
 

@@ -47,6 +47,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
 import com.letta.mobile.ui.chat.surface.DefaultFontScaleRange
+import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.components.ChatLoadingIndicator
 import com.letta.mobile.ui.components.LocalChatLoadingIndicator
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
@@ -84,6 +85,8 @@ internal data class SharedChatPageParams(
      * menu carries the agent switcher and menu). The full-screen page keeps the header.
      */
     val onHostHeaderHiddenChange: ((Boolean) -> Unit)? = null,
+    /** letta-mobile-y5q9z: the agent's conversations, for the canvas bubble's "+" (recent interactions). */
+    val recentInteractions: ChatRecentInteractions? = null,
 )
 
 /**
@@ -162,6 +165,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
                 canvas = canvas,
                 dockGeometry = dockGeometry,
                 onDockGeometryChange = { dockGeometry = it },
+                recents = params.recentInteractions,
             )
             SharedChatSubagentSheet(
                 state = subagentSheet,

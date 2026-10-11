@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -26,9 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -38,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -136,6 +136,22 @@ internal class TouchHeadContent(
     val turn: @Composable () -> CollapsedTurn,
     /** The input tray is up (a question or a form waits on the person): the reply's popup steps aside. */
     val inputPending: Boolean = false,
+    /**
+     * letta-mobile-y5q9z: the canvas bubble (the phone's canvas mode, which has no bar). The head
+     * and its reply open the bubble's card instead of the full chat; null keeps the bar's head.
+     */
+    val bubble: TouchBubble? = null,
+)
+
+/** The slots of the Touch dock: what waits on the person over the canvas, and the bar (if any). */
+@Immutable
+internal class TouchDockSlots(
+    /** What waits on the person, over the canvas just above the bar ([TouchInputTray]). */
+    val inputTray: @Composable () -> Unit = {},
+    /** The bar pinned to the bottom; null for the canvas bubble, which has none. */
+    val composer: (@Composable () -> Unit)?,
+    /** Floats at the bottom without taking room from the canvas (the bubble's snackbars). */
+    val floating: @Composable () -> Unit = {},
 )
 
 /**
@@ -149,9 +165,7 @@ internal fun TouchDockLayer(
     head: TouchHeadContent?,
     /** Host chrome over the canvas's top edge (ChatSurfacePlatform.topChromeInset): the head stays below it. */
     topChromeInset: Dp = 0.dp,
-    /** What waits on the person, over the canvas just above the bar ([TouchInputTray]); null for none. */
-    inputTray: @Composable () -> Unit = {},
-    composer: @Composable () -> Unit,
+    slots: TouchDockSlots,
 ) {
     val density = LocalDensity.current
     val scheme = MaterialTheme.colorScheme
@@ -185,22 +199,30 @@ internal fun TouchDockLayer(
         }
         // Over the head: an answer waiting on the person outranks the reply's popup.
         DockInputTray(
-            tray = inputTray,
+            tray = slots.inputTray,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = topChromeInset, bottom = with(density) { bar.heightPx.toDp() })
                 .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
                 .then(fade),
         )
-        Box(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .onSizeChanged { bar.heightPx = it.height }
-                .graphicsLayer { alpha = morphDockedAlpha(fraction()) }
-                .then(fade),
-        ) { composer() }
+        TouchDockBar(bar, slots, Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = morphDockedAlpha(fraction()) }.then(fade))
     }
+}
+
+/**
+ * The bar pinned to the bottom, measured for the canvas to keep clear of; or, for the canvas bubble,
+ * no bar (the canvas runs to the bottom) and only what floats there.
+ */
+@Composable
+private fun TouchDockBar(bar: TouchBarMetrics, slots: TouchDockSlots, modifier: Modifier) {
+    val composer = slots.composer
+    if (composer == null) {
+        SideEffect { bar.heightPx = 0 }
+        Box(modifier.fillMaxWidth()) { slots.floating() }
+        return
+    }
+    Box(modifier.fillMaxWidth().onSizeChanged { bar.heightPx = it.height }) { composer() }
 }
 
 @Composable
@@ -215,15 +237,16 @@ private fun DockInputTray(tray: @Composable () -> Unit, modifier: Modifier) {
  */
 @Composable
 private fun TouchChatHead(content: TouchHeadContent) {
-    val turn = content.turn()
+    val bubble = content.bubble
+    val turn = bubbleTurn(content.turn(), bubble)
     // Per turn, as the minimised dock's bubble: a new prompt brings a new popup.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     var hidden by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(turn.turnKey) { hidden = false }
     val hasReply = turn.hasReply && turn.dismissKey != dismissedTurn
     // A question waiting in the input tray outranks the reply: the popup steps aside rather than
-    // sit under the tray, and comes back once it is answered.
-    val popupShown = hasReply && !hidden && !content.inputPending
+    // sit under the tray, and comes back once it is answered. The open card says it all itself.
+    val popupShown = hasReply && !hidden && !content.inputPending && bubble?.state?.expanded != true
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val lane = HeadLane(maxWidth.value, maxHeight.value)
         val geometry = content.dock.geometry
@@ -232,22 +255,51 @@ private fun TouchChatHead(content: TouchHeadContent) {
         val drag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
         val position: () -> Offset = { rest + drag.value }
         HeadPopup(
-            reply = PopupTurn(turn, visible = popupShown, dismiss = { dismissedTurn = turn.dismissKey }),
+            reply = PopupTurn(
+                turn,
+                visible = popupShown,
+                dismiss = { dismissedTurn = turn.dismissKey },
+                stop = bubble?.onStop.takeIf { turn.busy },
+            ),
             content = content,
             placement = PopupPlacement(lane, right, position),
         )
+        if (bubble != null) BubbleCardLayer(bubble, content.agentName, BubbleAnchor(lane, right, position))
         ChatHead(
             content = content,
             place = HeadPlace(lane, drag, position),
-            onTap = { if (hasReply) hidden = !hidden else content.openChat() },
+            onTap = headTap(content, hasReply) { hidden = !hidden },
         )
         if (turn.busy && !turn.hasReply) ThinkingAnnouncement(content.agentName)
     }
 }
 
+/**
+ * The turn as the head's popup tells it. In the canvas bubble the popup also stands for the run
+ * while the agent thinks (there is no bar to show it): its working line, with the elapsed clock
+ * and Stop, shows for as long as the turn is busy.
+ */
+private fun bubbleTurn(turn: CollapsedTurn, bubble: TouchBubble?): CollapsedTurn {
+    if (bubble == null) return turn
+    return if (turn.busy) turn.copy(working = true) else turn
+}
+
+/**
+ * A tap on the head: the canvas bubble opens or folds its card; otherwise it shows or hides the
+ * popup ([togglePopup]) or, with nothing to show, opens the chat.
+ */
+private fun headTap(content: TouchHeadContent, hasReply: Boolean, togglePopup: () -> Unit): () -> Unit {
+    val bubble = content.bubble
+    return when {
+        bubble != null -> bubble.state::toggleExpanded
+        hasReply -> togglePopup
+        else -> content.openChat
+    }
+}
+
 /** The band the head moves in, in dp: the free area less its margins and clearances. */
 @Immutable
-private class HeadLane(val widthDp: Float, val heightDp: Float) {
+internal class HeadLane(val widthDp: Float, val heightDp: Float) {
     val size: Float = ChatHeadDimens.head.value
     private val margin = ChatHeadDimens.edgeMargin.value
     val top: Float = ChatHeadDimens.topClearance.value.coerceAtMost((heightDp - size) / 2f)
@@ -401,9 +453,12 @@ private fun HeadPopup(reply: PopupTurn, content: TouchHeadContent, placement: Po
     }
 }
 
-/** The turn the popup tells, whether it shows, and how it is dismissed until the next prompt. */
+/**
+ * The turn the popup tells, whether it shows, how it is dismissed until the next prompt and, while
+ * the turn runs in the canvas bubble, how it is stopped.
+ */
 @Immutable
-private class PopupTurn(val turn: CollapsedTurn, val visible: Boolean, val dismiss: () -> Unit)
+private class PopupTurn(val turn: CollapsedTurn, val visible: Boolean, val dismiss: () -> Unit, val stop: (() -> Unit)? = null)
 
 /**
  * Lays the popup out over the head: as wide as it needs up to [PopupPlacement.maxWidthDp], its
@@ -440,7 +495,7 @@ private fun PopupCard(reply: PopupTurn, content: TouchHeadContent, style: PopupC
     ) {
         // A streaming reply grows the card smoothly (up to its peek) instead of jumping a line at a time.
         Box(Modifier.animateContentSize(style.motion.contentSize())) {
-            PopupReply(reply.turn, content, style.placement)
+            PopupReply(reply, content, style.placement)
             PopupDismiss(reply.dismiss, Modifier.align(Alignment.TopEnd))
         }
     }
@@ -448,20 +503,9 @@ private fun PopupCard(reply: PopupTurn, content: TouchHeadContent, style: PopupC
 
 /** Rounded all round but for the corner nearest the head, which stays tight: the card's anchor. */
 private fun popupShape(style: PopupCardStyle): Shape {
-    // Clockwise from the top left, as the shape takes them.
-    val corners = Array(CORNERS) { CornerSize(LettaDimens.Radius.lg) }
-    corners[anchorCorner(style)] = CornerSize(ChatHeadDimens.popupAnchorCorner)
-    return AbsoluteRoundedCornerShape(corners[0], corners[1], corners[2], corners[3])
+    return headAnchoredShape(style.placement.headOnRight, style.below)
 }
 
-/** Which corner (clockwise from the top left) faces the head. */
-private fun anchorCorner(style: PopupCardStyle): Int {
-    val right = style.placement.headOnRight
-    return when {
-        style.below -> if (right) TOP_RIGHT else TOP_LEFT
-        else -> if (right) BOTTOM_RIGHT else BOTTOM_LEFT
-    }
-}
 
 /**
  * Swiping the card sideways drags it with the finger, fading as it goes; let go past
@@ -504,9 +548,10 @@ private fun popupAnnouncement(turn: CollapsedTurn, agentName: String, working: S
     return listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working).joinToString(" ")
 }
 
-/** The popup's reply, working line and input chip; a tap opens the chat. */
+/** The popup's reply, working line (with Stop in the canvas bubble) and input chip; a tap opens the chat. */
 @Composable
-private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement: PopupPlacement) {
+private fun PopupReply(reply: PopupTurn, content: TouchHeadContent, placement: PopupPlacement) {
+    val turn = reply.turn
     val openLabel = stringResource(Res.string.chat_surface_docked_reply_expand)
     val working = if (turn.working) collapsedWorkingLabel(turn) else null
     val announcement = popupAnnouncement(turn, content.agentName, working)
@@ -528,8 +573,17 @@ private fun PopupReply(turn: CollapsedTurn, content: TouchHeadContent, placement
     ) {
         // A short reply hugs its words; the working line and the chip want the full width.
         if (turn.text.isNotBlank()) PopupText(turn, placement, hug = working == null && !turn.needsInput)
-        if (working != null) WorkingLine(working)
+        if (working != null) PopupWorkingRow(working, reply.stop)
         if (turn.needsInput) NeedsInputChip(onOpen)
+    }
+}
+
+/** The working line; in the canvas bubble, with Stop at its end (the bar's Stop is not on screen). */
+@Composable
+private fun PopupWorkingRow(working: String, stop: (() -> Unit)?) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+        Box(Modifier.weight(1f, fill = false)) { WorkingLine(working) }
+        stop?.let { BubbleStopButton(it) }
     }
 }
 
@@ -636,12 +690,6 @@ private const val INPUT_TRAY_MAX_HEIGHT_FRACTION = 0.6f
 
 private const val HALF = 0.5f
 
-/** The popup's four corners, clockwise from the top left. */
-private const val CORNERS = 4
-private const val TOP_LEFT = 0
-private const val TOP_RIGHT = 1
-private const val BOTTOM_RIGHT = 2
-private const val BOTTOM_LEFT = 3
 
 /** How much a fully swiped popup fades. */
 private const val SWIPE_FADE = 0.6f

@@ -1,10 +1,12 @@
 package com.letta.mobile.ui.chat.surface
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.AnimationVector4D
 import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LocalContentColor
@@ -76,6 +79,10 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.chat_surface_dock_collapse
 import com.letta.mobile.sharedui.resources.chat_surface_dock_move
 import com.letta.mobile.sharedui.resources.chat_surface_dock_resize
+import com.letta.mobile.sharedui.resources.chat_surface_recents_close
+import com.letta.mobile.sharedui.resources.chat_surface_recents_open
+import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsList
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.chat.session.ChatDockDelta
 import com.letta.mobile.ui.chat.session.ChatDockEdge
 import com.letta.mobile.ui.chat.session.ChatDockFrame
@@ -277,6 +284,8 @@ internal class DockedPanelContent(
     val composer: @Composable (collapsed: Boolean) -> Unit,
     /** What the dock shows above the bar minimised: the agent's mascot, see [CollapsedDock]. */
     val collapsed: CollapsedDockContent,
+    /** letta-mobile-y5q9z: the header's "+" and the recent interactions it opens; null hides the "+". */
+    val recents: BubbleRecents? = null,
 )
 
 private val DockLimits = ChatDockLimits(
@@ -643,8 +652,39 @@ private fun PanelChrome(
 private fun PanelTop(state: ChatDockState, content: DockedPanelContent, modifier: Modifier) {
     Column(modifier.testTag(DOCK_SURFACE_TAG)) {
         // No progress bar: the panel's ambient glow says the agent is working.
-        PanelHeader(state, badged = dockBadgeShown(content.collapsed.agentId))
-        content.conversation(Modifier.weight(1f).fillMaxWidth())
+        PanelHeader(state, badged = dockBadgeShown(content.collapsed.agentId), recents = content.recents)
+        PanelBody(content, Modifier.weight(1f).fillMaxWidth())
+    }
+}
+
+/**
+ * The conversation, or (letta-mobile-y5q9z) the agent's recent interactions while the header's "+"
+ * has them open: a crossfade in the panel's own frame, so the panel keeps its size.
+ */
+@Composable
+private fun PanelBody(content: DockedPanelContent, modifier: Modifier) {
+    val recents = content.recents
+    if (recents == null) {
+        content.conversation(modifier)
+        return
+    }
+    val reduced = LocalReducedMotion.current
+    Crossfade(
+        targetState = recents.state.recentsOpen,
+        modifier = modifier,
+        animationSpec = if (reduced) snap() else tween(ChatMotionTokens.DockCollapse.MILLIS),
+        label = "dockedPanelBody",
+    ) { open ->
+        if (open) {
+            RecentInteractionsList(
+                rows = recents.recents.conversations,
+                actions = recents.hop,
+                maxHeight = ChatSurfaceDimens.dockMaxHeight,
+                modifier = Modifier.fillMaxSize().padding(top = LettaDimens.Space.sm),
+            )
+        } else {
+            content.conversation(Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -689,7 +729,7 @@ internal fun Modifier.dockDrag(state: ChatDockState): Modifier = pointerInput(st
  * [CollapsedDock] has its own restore control.
  */
 @Composable
-private fun PanelHeader(state: ChatDockState, badged: Boolean) {
+private fun PanelHeader(state: ChatDockState, badged: Boolean, recents: BubbleRecents?) {
     val moveLabel = stringResource(Res.string.chat_surface_dock_move)
     Box(
         Modifier
@@ -707,6 +747,7 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean) {
                     .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(LettaDimens.Radius.sm)),
             )
         }
+        if (recents != null) RecentsToggle(recents.state, Modifier.align(Alignment.CenterStart).padding(start = LettaDimens.Space.sm))
         Box(Modifier.align(Alignment.CenterEnd).padding(end = LettaDimens.Space.sm)) {
             IconButton(
                 onClick = state::toggleCollapsed,
@@ -719,6 +760,24 @@ private fun PanelHeader(state: ChatDockState, badged: Boolean) {
                 )
             }
         }
+    }
+}
+
+/** The header's "+": opens the recent interactions over the conversation, or closes them. */
+@Composable
+private fun RecentsToggle(state: CanvasBubbleState, modifier: Modifier) {
+    val open = state.recentsOpen
+    val label = stringResource(if (open) Res.string.chat_surface_recents_close else Res.string.chat_surface_recents_open)
+    IconButton(
+        onClick = state::toggleRecents,
+        modifier = modifier.size(LettaDimens.Control.iconButton).testTag(DOCK_RECENTS_TAG),
+    ) {
+        Icon(
+            if (open) LettaIcons.Close else LettaIcons.Add,
+            contentDescription = label,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -875,3 +934,4 @@ internal const val DOCK_COLLAPSE_TAG = "chat-dock-collapse"
 internal const val DOCK_RESTORE_TAG = "chat-dock-restore"
 internal const val DOCK_RESIZE_GRIP_TAG = "chat-dock-resize-grip"
 internal const val DOCK_BADGE_TAG = "chat-dock-badge"
+internal const val DOCK_RECENTS_TAG = "chat-dock-recents"

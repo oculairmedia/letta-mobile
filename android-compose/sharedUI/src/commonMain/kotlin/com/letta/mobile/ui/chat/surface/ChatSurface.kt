@@ -59,6 +59,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.surface.composer.ChatComposerPanel
 import com.letta.mobile.ui.chat.surface.status.RunStatusLine
+import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.surface.composer.ComposerInputs
 import com.letta.mobile.ui.chat.surface.composer.LocalComposerImageAttacher
 import com.letta.mobile.ui.chat.surface.composer.rememberComposerImageAttacher
@@ -105,6 +106,8 @@ import org.jetbrains.compose.resources.stringResource
  *   resets it. A host that does not hoist it gets a panel that still moves for the session.
  *   Null while the host is still reading the person's saved placement: the dock is not drawn
  *   at all until it is known, so it never appears at the default spot and then jumps.
+ * @param recents letta-mobile-y5q9z: this agent's conversations, for the canvas bubble's (phone)
+ *   and the docked panel's (desktop) "+" to hop between or start a new thread; null hides the "+".
  */
 @Composable
 fun ChatSurface(
@@ -119,6 +122,7 @@ fun ChatSurface(
     canvas: (@Composable (ChatCanvasActions) -> Unit)? = null,
     dockGeometry: ChatDockGeometry? = ChatDockGeometry.Default,
     onDockGeometryChange: (ChatDockGeometry) -> Unit = {},
+    recents: ChatRecentInteractions? = null,
 ) {
     // Lifecycle-aware on Android: a backgrounded app stops collecting, so the owner's
     // WhileSubscribed flows (the composer projection) can stop with it.
@@ -163,6 +167,7 @@ fun ChatSurface(
         pagedTimeline = pagedTimeline,
         companionAnchors = companionAnchors,
         dock = dock.takeIf { dockReady },
+        recents = recents,
     )
     val focusHandoff = remember { ComposerFocusHandoff() }
     // The thinking glow's shader, compiled once for the page rather than at every run's start.
@@ -230,7 +235,7 @@ internal object ChatSurfaceTags {
 
 /** One composition's worth of what every part of the page reads. */
 @Immutable
-private class ChatSurfaceFrame(
+internal class ChatSurfaceFrame(
     val port: ChatSessionPort,
     val snackbars: SnackbarHostState,
     val listState: LazyListState,
@@ -247,6 +252,8 @@ private class ChatSurfaceFrame(
     val companionAnchors: CompanionSeatAnchors,
     /** Null until the host knows where the person put the dock (or, on Touch, the head). */
     val dock: ChatDockState?,
+    /** The agent's conversations for the "+" (letta-mobile-y5q9z); null hides it. */
+    val recents: ChatRecentInteractions? = null,
 ) {
     val mode: ChatSurfaceMode get() = presentation.mode
 }
@@ -320,6 +327,9 @@ private fun coveredByPage(frame: ChatSurfaceFrame, modifier: Modifier): Modifier
 private fun TouchCanvasWithChat(frame: ChatSurfaceFrame, canvas: (@Composable () -> Unit)?) {
     val layers = rememberSurfaceMorphLayers(frame.mode)
     val bar = remember { TouchBarMetrics() }
+    // letta-mobile-y5q9z: over a canvas the phone has no bar, only the agent bubble. Its state lives
+    // as long as the page, so the card is as it was left on the way back from the full chat.
+    val bubble = if (canvas != null) rememberCanvasBubbleState() else null
     val density = LocalDensity.current
     Box(Modifier.fillMaxSize()) {
         if (canvas != null) {
@@ -351,13 +361,14 @@ private fun TouchCanvasWithChat(frame: ChatSurfaceFrame, canvas: (@Composable ()
                 ) { overlay() }
             }
         }
-        TouchChatLayers(frame, layers, bar)
+        TouchChatLayers(frame, layers, TouchDockParts(bar, bubble))
     }
 }
 
-/** Over the Touch canvas: the page background, the bar and its head, the page and the companion. */
+/** Over the Touch canvas: the page background, the bar (or the bubble) and its head, the page and the companion. */
 @Composable
-private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers, bar: TouchBarMetrics) {
+private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers, parts: TouchDockParts) {
+    val bar = parts.bar
     val morph = layers.morph
     val density = LocalDensity.current
     MorphBackdrop(morph.fraction)
@@ -367,7 +378,7 @@ private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers,
             LocalComposerPrimary provides layers.dockedPrimary,
             LocalChatWorkingCueAnimated provides false,
         ) {
-            TouchDock(frame, morph, bar)
+            TouchDock(frame, morph, parts)
         }
     }
     if (layers.showPage) {
@@ -395,15 +406,29 @@ private fun TouchChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers,
  * behind it is collected once.
  */
 @Composable
-private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, bar: TouchBarMetrics) {
+private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, parts: TouchDockParts) {
     val turn = rememberCollapsedTurn(dockedReplyParams(frame))
+    val bubble = parts.bubble?.let { rememberTouchBubble(frame, it, turn.busy) }
     TouchDockLayer(
-        bar = bar,
+        bar = parts.bar,
         morph = morph,
         topChromeInset = frame.platform.topChromeInset,
-        head = frame.dock?.let { touchHeadContent(frame, it, inputPending = touchInputPending(frame, turn.pendingApproval)) { turn } },
-        inputTray = { TouchCanvasInput(frame, turn.pendingApproval) },
-        composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
+        head = frame.dock?.let { touchHeadContent(frame, it, TouchHeadInputs(touchInputPending(frame, turn.pendingApproval), bubble)) { turn } },
+        slots = touchDockSlots(frame, turn.pendingApproval, bubble),
+    )
+}
+
+/** The bar, or (the canvas bubble) no bar and only its snackbars while its card is folded. */
+private fun touchDockSlots(frame: ChatSurfaceFrame, approval: UiApprovalRequest?, bubble: TouchBubble?): TouchDockSlots {
+    val inputTray: @Composable () -> Unit = { TouchCanvasInput(frame, approval) }
+    if (bubble == null) {
+        return TouchDockSlots(inputTray = inputTray, composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) })
+    }
+    // The open card's composer has the snackbars; folded, they float at the foot of the board.
+    return TouchDockSlots(
+        inputTray = inputTray,
+        composer = null,
+        floating = { if (!bubble.state.expanded) SnackbarHost(frame.snackbars, Modifier.fillMaxWidth()) },
     )
 }
 
@@ -456,21 +481,29 @@ private fun rememberTouchCanvasChrome(host: ChatSurfaceHost): CanvasHostChrome {
 private fun touchInputPending(frame: ChatSurfaceFrame, approval: UiApprovalRequest?): Boolean =
     approval != null || frame.uiState.a2uiSurfaces.isNotEmpty()
 
-/** What the chat head shows and does, from the page's frame. */
+/** What the chat head needs besides the frame: whether an answer waits on the person, and the bubble. */
+private class TouchHeadInputs(val inputPending: Boolean, val bubble: TouchBubble?)
+
+/**
+ * What the chat head shows and does, from the page's frame. In the canvas bubble its reply opens
+ * the bubble's card rather than the full chat (the card's own chevron goes on to the full chat).
+ */
 private fun touchHeadContent(
     frame: ChatSurfaceFrame,
     dock: ChatDockState,
-    inputPending: Boolean,
+    inputs: TouchHeadInputs,
     turn: @Composable () -> CollapsedTurn,
 ): TouchHeadContent {
+    val bubble = inputs.bubble
     return TouchHeadContent(
         dock = dock,
         agentId = frame.uiState.agentId,
         agentName = frame.uiState.agentName,
-        openChat = { frame.onIntent(ChatSurfaceIntent.Expand) },
+        openChat = bubble?.state?.let { it::expand } ?: { frame.onIntent(ChatSurfaceIntent.Expand) },
         openAgent = frame.host.openAgentPane,
         turn = turn,
-        inputPending = inputPending,
+        inputPending = inputs.inputPending,
+        bubble = bubble,
     )
 }
 
@@ -516,17 +549,24 @@ private fun DockedOverlay(frame: ChatSurfaceFrame, dock: ChatDockState, morph: S
     val composerMode = if (frame.mode == ChatSurfaceMode.FullScreen) ChatSurfaceMode.Docked else frame.mode
     // The canvas chat window's thinking cue is the ambient glow, so its rows keep still.
     val ambient = rememberChatAmbient(frame.uiState)
+    // letta-mobile-y5q9z: the header's "+" hops between the agent's conversations.
+    val recents = rememberDockedRecents(frame)
     CompositionLocalProvider(
         LocalCompanionLayer provides CompanionLayer.Docked,
         LocalComposerPrimary provides primary,
         LocalChatWorkingCueAnimated provides false,
     ) {
-        DockedChatPanel(dock, dockedPanelContent(frame, composerMode, ambient), Modifier.fillMaxSize(), morph)
+        DockedChatPanel(dock, dockedPanelContent(frame, composerMode, ambient, recents), Modifier.fillMaxSize(), morph)
     }
 }
 
 /** The panel's content, with its composer drawn for [composerMode]. */
-private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfaceMode, ambient: ChatAmbient): DockedPanelContent {
+private fun dockedPanelContent(
+    frame: ChatSurfaceFrame,
+    composerMode: ChatSurfaceMode,
+    ambient: ChatAmbient,
+    recents: BubbleRecents?,
+): DockedPanelContent {
     return DockedPanelContent(
         ambient = ambient,
         conversation = { conversationModifier -> DockedReplyCard(dockedReplyParams(frame), conversationModifier) },
@@ -539,10 +579,11 @@ private fun dockedPanelContent(frame: ChatSurfaceFrame, composerMode: ChatSurfac
             turn = { rememberCollapsedTurn(dockedReplyParams(frame)) },
             ambient = ambient,
         ),
+        recents = recents,
     )
 }
 
-private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
+internal fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
     return DockedReplyParams(
         state = frame.uiState,
         pagedTimeline = frame.pagedTimeline,
@@ -562,7 +603,7 @@ private fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
  * your input" chip opens the panel for it; on Touch the canvas's input tray carries it instead).
  */
 @Composable
-private fun DockComposer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, collapsed: Boolean) {
+internal fun DockComposer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, collapsed: Boolean) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
         if (!collapsed && mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)

@@ -393,6 +393,7 @@ private fun DesktopShellSharedChatPage(
             openAgentPane = { context.openAgentPane() },
             editAgent = { navigator.editAgentId = focus.selectedAgentId },
             agentNamesById = page.host.agentNamesById,
+            recentInteractions = rememberDesktopRecentInteractions(context, frame),
         ),
         modifier = modifier,
     )

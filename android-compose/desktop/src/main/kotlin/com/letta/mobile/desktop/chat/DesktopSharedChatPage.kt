@@ -60,6 +60,7 @@ import com.letta.mobile.ui.chat.surface.ChatCanvasPlaceholder
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 
@@ -105,6 +106,8 @@ internal data class DesktopSharedChatPageNavigation(
     val editAgent: (() -> Unit)? = null,
     /** Agent display names for provenance labels (the roster); desktop has no subagent opener. */
     val agentNamesById: Map<String, String> = emptyMap(),
+    /** letta-mobile-y5q9z: the agent's conversations for the docked chat's "+" (recent interactions). */
+    val recentInteractions: ChatRecentInteractions? = null,
 )
 
 internal data class DesktopSharedChatPageState(
@@ -192,6 +195,7 @@ internal fun DesktopSharedChatPage(
             },
             dockGeometry = dockGeometry,
             onDockGeometryChange = { dockGeometry = it },
+            recents = navigation.recentInteractions,
         )
     }
 }
