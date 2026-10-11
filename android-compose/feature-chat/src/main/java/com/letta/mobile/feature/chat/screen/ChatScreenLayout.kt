@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.subagents.projectSubagentRoster
+import com.letta.mobile.ui.chat.subagents.SubagentRosterList
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
@@ -632,8 +634,37 @@ internal fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetPara
                         }
                     }
                 },
+            roster = { ChatScreenSubagentRoster(params) },
         )
     }
+}
+
+/**
+ * letta-mobile-ulcg6 (PR4): the shared subagent roster inside the sheet, from
+ * the same projection the desktop Background tasks pane renders.
+ */
+@Composable
+private fun ChatScreenSubagentRoster(params: ChatScreenSubagentTodoSheetParams) {
+    val entries by params.resolvedSubagentSource.rosterEntries.collectAsStateWithLifecycle()
+    var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val roster = remember(entries, clearedKeys) {
+        projectSubagentRoster(entries, System.currentTimeMillis(), clearedKeys)
+    }
+    val openConversation = params.navigation.onViewSubagentConversation
+    SubagentRosterList(
+        roster = roster,
+        onOpenConversation = openConversation?.let { open ->
+            { item ->
+                val agentId = item.childAgentId
+                val conversationId = item.childConversationId
+                if (agentId != null && conversationId != null) {
+                    params.onTargetUpdate(null)
+                    open(agentId, conversationId)
+                }
+            }
+        },
+        onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
+    )
 }
 
 @Composable
