@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.branch.BranchOpener
 import com.letta.mobile.data.chat.branch.BranchSource
 import com.letta.mobile.data.chat.branch.ConversationBranchController
 import com.letta.mobile.data.chat.branch.ConversationBranching
+import com.letta.mobile.data.chat.branch.ConversationLineage
 import com.letta.mobile.data.chat.branch.PendingComposerDrafts
 import com.letta.mobile.data.chat.branch.PendingDraft
 import com.letta.mobile.data.model.AgentId
@@ -28,6 +29,8 @@ class ChatConversationBranching(
     onError: (String) -> Unit,
     history: (suspend (conversationId: String) -> BranchHistory)? = null,
     private val drafts: PendingComposerDrafts = PendingComposerDrafts.shared,
+    /** letta-mobile-7mys7 (G37): where a fork records its parent, for the drawer's "Forked from". */
+    lineage: ConversationLineage? = null,
 ) {
     private val branching = ConversationBranching(
         BranchBackend(
@@ -53,6 +56,7 @@ class ChatConversationBranching(
             outcome.draft?.let { drafts.put(outcome.conversation.id.value, PendingDraft(it, outcome.sendNow)) }
             open(outcome.conversation.agentId.value.ifBlank { outcome.source.agentId.orEmpty() }, outcome.conversation.id.value)
         },
+        lineage = lineage,
         onError = onError,
     )
 

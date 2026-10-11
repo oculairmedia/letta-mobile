@@ -180,6 +180,8 @@ internal class AdminChatViewModel @Inject constructor(
      * edit or rerun places its fork point on the server's stored messages; null in tests.
      */
     private val timelineTransport: com.letta.mobile.data.timeline.TimelineTransport? = null,
+    /** letta-mobile-7mys7 (G37): forks record their parent here; null in tests. */
+    private val conversationLineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -1153,6 +1155,7 @@ internal class AdminChatViewModel @Inject constructor(
             conversationRepository,
             onError = ::reportComposerError,
             history = timelineTransport?.let { transport -> transport::branchHistory },
+            lineage = conversationLineage,
         )
     }
 
