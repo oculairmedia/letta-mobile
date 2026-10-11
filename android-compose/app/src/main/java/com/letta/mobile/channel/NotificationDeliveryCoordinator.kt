@@ -88,26 +88,18 @@ class NotificationDeliveryCoordinator @Inject constructor(
         reason: NotificationDeferralReason,
         notificationId: String?,
     ): NotificationDeliveryDecision.Deferred =
-        NotificationDeliveryDecision.Deferred(reason).also { reportWithheld(it, reason, notificationId) }
+        NotificationDeliveryDecision.Deferred(reason).also { reportWithheld(it, telemetryAttrs(notificationId) + ("reason" to reason.name)) }
 
     private fun NotificationDeliveryCandidate.suppressed(
         reason: NotificationSuppressionReason,
         notificationId: String? = null,
     ): NotificationDeliveryDecision.Suppressed =
-        NotificationDeliveryDecision.Suppressed(reason).also { reportWithheld(it, reason, notificationId) }
+        NotificationDeliveryDecision.Suppressed(reason).also { reportWithheld(it, telemetryAttrs(notificationId) + ("reason" to reason.name)) }
 
-    /** Telemetry for a candidate that was not published: the outcome and its reason. */
-    private fun NotificationDeliveryCandidate.reportWithheld(
-        decision: NotificationDeliveryDecision,
-        reason: Enum<*>,
-        notificationId: String?,
-    ) {
+    /** Telemetry for a candidate that was not published: the outcome, with [attrs] naming the candidate and the reason. */
+    private fun reportWithheld(decision: NotificationDeliveryDecision, attrs: Array<Pair<String, Any?>>) {
         val outcome = if (decision is NotificationDeliveryDecision.Deferred) "deferred" else "suppressed"
-        Telemetry.event(
-            "NotificationDelivery", outcome,
-            *telemetryAttrs(notificationId),
-            "reason" to reason.name,
-        )
+        Telemetry.event("NotificationDelivery", outcome, *attrs)
     }
 
     private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, Any?>> {
