@@ -30,6 +30,9 @@ internal class DesktopOverlayVisibility : DesktopModelSurfaces {
     var newConversation by mutableStateOf(false)
     var newAgent by mutableStateOf(false)
     var irohResetConfirm by mutableStateOf(false)
+
+    /** letta-mobile-zxk2n.5: `/rename`'s dialog for the open chat. */
+    var renameChat by mutableStateOf(false)
 }
 
 @Immutable

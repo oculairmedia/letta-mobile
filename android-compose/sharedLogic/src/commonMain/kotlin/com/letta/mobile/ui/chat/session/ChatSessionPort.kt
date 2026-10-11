@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +41,17 @@ interface ChatSessionPort {
      */
     val liveStatus: StateFlow<RuntimeLiveStatus>
         get() = DefaultLiveStatus
+
+    /**
+     * letta-mobile-zxk2n.5 (G92): where the last `/recompile` stands; the page shows it as a
+     * snackbar (queued until the answer, then the answer). An owner without `/recompile` leaves it idle.
+     */
+    val recompileStatus: StateFlow<RecompileStatus>
+        get() = DefaultRecompileStatus
 }
+
+private val DefaultRecompileStatus: StateFlow<RecompileStatus> =
+    MutableStateFlow<RecompileStatus>(RecompileStatus.Idle).asStateFlow()
 
 private val DefaultCapabilities: StateFlow<ChatSurfaceCapabilities> =
     MutableStateFlow(ChatSurfaceCapabilities.Default).asStateFlow()

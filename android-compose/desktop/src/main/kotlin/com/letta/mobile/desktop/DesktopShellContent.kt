@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasLibrary
@@ -194,6 +195,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             canvases = CanvasLibrary.filter(canvasDocuments, archivedCanvasIds, archiveFilter.toCanvasArchiveFilter()),
             activeCanvasId = canvasShell.activeSession?.canvasId,
             archivedCanvasIds = archivedCanvasIds,
+            listMarks = rememberDesktopSidebarListMarks(context, frame),
         ),
         actions = DesktopAgentSidebarActions(
             onArchiveFilterChange = chatController::setArchiveFilter,
@@ -212,6 +214,8 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onOpenCanvas = { context.openCanvas(it) },
             onNewCanvas = { canvasShell.createNew(focus.selectedAgentId) },
             onArchiveCanvas = canvasShell.library::setArchived,
+            conversationMarks = remember(chatController) { chatController.conversationMarks.rowActions() },
+            chatOptions = rememberDesktopChatOptionsActions(chatController),
         ),
         // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
         agentCard = { DesktopAgentContextCard(context, frame) },

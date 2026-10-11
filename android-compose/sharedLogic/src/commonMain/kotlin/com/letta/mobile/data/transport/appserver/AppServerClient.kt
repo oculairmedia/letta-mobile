@@ -116,6 +116,10 @@ interface AppServerClient {
     suspend fun conversationFork(command: AppServerConversationFork): AppServerConversationForkResponse =
         throw UnsupportedOperationException("conversation_fork is not supported by this client")
 
+    /** letta-mobile-zxk2n.5: recompiles the agent's system prompt for a conversation (`/recompile`). */
+    suspend fun conversationRecompile(command: AppServerConversationRecompile): AppServerConversationRecompileResponse =
+        throw UnsupportedOperationException("conversation_recompile is not supported by this client")
+
     suspend fun conversationMessagesList(
         command: AppServerCommand.ConversationMessagesList,
     ): AppServerInboundFrame.ConversationMessagesListResponse =
@@ -413,6 +417,15 @@ class DefaultAppServerClient(
             },
             send = { transport.sendControl(command) },
         ).let { checkNotNull(AppServerConversationForkResponse.from(it)) }
+
+    override suspend fun conversationRecompile(command: AppServerConversationRecompile): AppServerConversationRecompileResponse =
+        registry.request(
+            requestId = command.requestId,
+            response = { frame ->
+                (frame as? AppServerInboundFrame.Unknown)?.takeIf { it.type == AppServerConversationRecompile.RESPONSE_TYPE }
+            },
+            send = { transport.sendControl(command) },
+        ).let { checkNotNull(AppServerConversationRecompileResponse.from(it)) }
 
     override suspend fun conversationMessagesList(
         command: AppServerCommand.ConversationMessagesList,

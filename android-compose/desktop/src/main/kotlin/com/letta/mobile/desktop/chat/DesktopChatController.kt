@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -20,6 +22,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.isIrohBackend
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -654,6 +657,11 @@ class DesktopChatController(
         _state.update { it.copy(errorMessage = message) }
     }
 
+    /** Shows [message] as the chat's error, for shell actions that fail outside the controller. */
+    internal fun reportError(message: String) {
+        if (!closed) showError(message)
+    }
+
     /** Create a new conversation for the active agent and select it. */
     fun createConversation() {
         if (closed) return
@@ -684,6 +692,8 @@ class DesktopChatController(
                 }
                 val created = gatewayExtras?.createConversation(agentId) ?: return@launch
                 unsentConversationId = created.id.value
+                // letta-mobile-zxk2n.5: "Pin new chats" pins it before the list shows it.
+                conversationMarks.onConversationCreated(created.id.value)
                 reloadConversationsAndSelect(preferConversationId = created.id.value)
                 onCreated(created.id.value)
             } catch (cancelled: CancellationException) {
@@ -704,6 +714,7 @@ class DesktopChatController(
         scope.launch {
             runCatching { gw.deleteConversation(pending) }
                 .onSuccess {
+                    conversationMarks.onConversationRemoved(pending)
                     if (!closed) {
                         _state.update {
                             it.withRuntimeState(
@@ -833,6 +844,25 @@ class DesktopChatController(
 
     /** letta-mobile-bzvro.15-.18: titles, pins, recent models, fork and edit-and-resend. */
     internal val conversationManagement = DesktopConversationManagement(scope, ListHost(), conversationPrefs)
+
+    /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
+    internal val conversationMarks = DesktopConversationMarks(conversationPrefs)
+
+    /** letta-mobile-zxk2n.5: `/recompile` for the selected conversation, and where it stands. */
+    internal val recompile = ConversationRecompileController(scope, { gateway }) {
+        if (bootstrapState.config.isIrohBackend()) {
+            ConversationRecompileController.UNAVAILABLE_OVER_IROH
+        } else {
+            ConversationRecompileController.UNAVAILABLE_DEFAULT
+        }
+    }
+
+    /** Recompiles the selected conversation's system prompt; with nothing selected, nothing happens. */
+    fun recompileSelectedConversation() {
+        if (closed) return
+        val selected = _state.value.selectedConversation ?: return
+        recompile.recompile(ConversationRecompileRequest(selected.id, selected.agentId.orEmpty()))
+    }
 
     private inner class ListHost : DesktopConversationListHost {
         override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway

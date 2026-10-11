@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
+import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
@@ -329,22 +330,52 @@ internal data class BuildComposerCommandsParams(
     val onEditAgent: () -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
     val onOpenCanvas: (() -> Unit)? = null,
+    /** letta-mobile-zxk2n.5: the surfaces the client-local commands open. */
+    val client: DesktopClientCommandRoutes = DesktopClientCommandRoutes(),
 )
 
+/** letta-mobile-zxk2n.5 (G92): where the desktop's client-local `/` commands lead that are not a page. */
+internal data class DesktopClientCommandRoutes(
+    /** `/search`: the command palette (mod+K), which searches chats and agents. */
+    val onSearch: () -> Unit = {},
+    val onOpenModelPicker: () -> Unit = {},
+    val onRenameChat: () -> Unit = {},
+)
+
+/** The desktop's route for each [ClientSlashCommand]. */
+internal fun desktopClientCommand(
+    command: ClientSlashCommand,
+    params: BuildComposerCommandsParams,
+): ComposerCommand {
+    val controller = params.chatController
+    val client = params.client
+    val run: () -> Unit = when (command) {
+        ClientSlashCommand.Search -> client.onSearch
+        ClientSlashCommand.Memory -> { { params.onNavigate(DesktopDestination.Memory) } }
+        // Skills & Tools is where the desktop lists and merges MCP servers.
+        ClientSlashCommand.Mcp -> { { params.onNavigate(DesktopDestination.Agents) } }
+        ClientSlashCommand.Models -> client.onOpenModelPicker
+        ClientSlashCommand.New -> controller::createConversation
+        ClientSlashCommand.Rename -> client.onRenameChat
+        ClientSlashCommand.Connect -> { { params.onNavigate(DesktopDestination.Providers) } }
+        ClientSlashCommand.Recompile -> controller::recompileSelectedConversation
+    }
+    return ComposerCommand(command.id, command.description, run = run)
+}
+
 internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
-    val chatController = params.chatController
     val onNavigate = params.onNavigate
-    add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
+    ClientSlashCommand.entries.forEach { add(desktopClientCommand(it, params)) }
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
     add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
-    add(ComposerCommand("memory", "Open memory") { onNavigate(DesktopDestination.Memory) })
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
     add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
     add(ComposerCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
     add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
-    params.agentSlashCommands.forEach { cmd ->
+    // A server command named like a client command would shadow it (commands are keyed by label).
+    params.agentSlashCommands.filter { ClientSlashCommand.fromId(it.command) == null }.forEach { cmd ->
         add(
             ComposerCommand(
                 label = cmd.command,
@@ -352,7 +383,7 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
                     cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
                 },
                 fillsComposer = true,
-            ) { chatController.updateComposerText("/${cmd.command} ") },
+            ) { params.chatController.updateComposerText("/${cmd.command} ") },
         )
     }
 }
@@ -413,6 +444,7 @@ internal data class DesktopComposerCommandsParams(
     val onCanvasSessionChange: (com.letta.mobile.data.canvas.CanvasSession?) -> Unit,
     /** Set while the shared chat page docks the conversation's board: the canvas command shows it. */
     val showDockedCanvas: (() -> Unit)? = null,
+    val client: DesktopClientCommandRoutes = DesktopClientCommandRoutes(),
 )
 
 @Composable
@@ -432,6 +464,7 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
                 onCreateAgent = params.onCreateAgent,
                 onEditAgent = { params.onEditAgent(params.selectedAgentId) },
                 onNavigate = params.onNavigate,
+                client = params.client,
                 onOpenCanvas = showDocked ?: {
                     openDesktopCanvasSession(
                         OpenDesktopCanvasParams(

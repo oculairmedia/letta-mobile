@@ -10,6 +10,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,6 +46,8 @@ import com.composables.icons.lucide.Palette
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
@@ -60,6 +64,8 @@ data class ShellConversationRowActions(
     val onPinToggle: (() -> Unit)? = null,
     /** What [onDelete] really does on this backend; the confirm dialog and the row menu follow it. */
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
+    /** letta-mobile-zxk2n.5: settle and marker; null leaves both out of the menu. */
+    val marks: ShellConversationMarkActions? = null,
 )
 
 /** The delete confirm dialog's wording: honest about what delete does on this backend. */
@@ -98,11 +104,13 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val hovered by interactionSource.collectIsHoveredAsState()
     var confirmDelete by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var pickingMarker by remember { mutableStateOf(false) }
     val onRename = actions.onRename
     if (renaming && onRename != null) {
         ShellConversationRenameField(title = model.title, onRename = onRename, onDone = { renaming = false })
         return
     }
+    val marks = actions.marks
     val menuItems = ShellRowMenus.conversation(
         archived = model.archived,
         deleting = model.deleting,
@@ -114,12 +122,26 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
                 pinned = model.pinned,
                 onRenameRequest = onRename?.let { { renaming = true } },
                 onPinToggle = actions.onPinToggle,
+                settled = model.settled,
+                onSettleToggle = marks?.let { { it.onSettle(model.id, !model.settled) } },
+                onMarkerRequest = marks?.let { { pickingMarker = true } },
             ),
         ),
     )
-    decorations.rowMenu(menuItems) {
-        decorations.tooltip(model.title) {
-            ShellConversationRowSurface(model, hovered, interactionSource, actions)
+    Box {
+        decorations.rowMenu(menuItems) {
+            decorations.tooltip(model.title) {
+                ShellConversationRowSurface(model, hovered, interactionSource, actions)
+            }
+        }
+        if (marks != null) {
+            ShellMarkerPicker(
+                expanded = pickingMarker,
+                current = model.marker,
+                choices = marks.markerChoices,
+                onPick = { marker -> marks.onSetMarker(model.id, marker) },
+                onDismiss = { pickingMarker = false },
+            )
         }
     }
     if (confirmDelete) {
@@ -132,6 +154,28 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
             { confirmDelete = false },
         )
     }
+}
+
+/** The marker choices as a menu under the row, then "Clear marker" when the chat wears one. */
+@Composable
+private fun ShellMarkerPicker(
+    expanded: Boolean,
+    current: String?,
+    choices: List<String>,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = choices.map { emoji ->
+        LettaMenuItem(label = if (emoji == current) "$emoji  (current)" else emoji) {
+            onPick(emoji)
+        }
+    } + listOfNotNull(current?.let { LettaMenuItem(label = "Clear marker") { onPick(null) } })
+    LettaPopupMenu(
+        expanded = expanded,
+        onDismiss = onDismiss,
+        items = items,
+        modifier = Modifier.testTag(ShellConversationTags.MARKER_PICKER),
+    )
 }
 
 @Composable
@@ -159,10 +203,14 @@ private fun ShellConversationRowSurface(
             ConversationLeadingIcon(model = model, hovered = hovered, onArchiveToggle = actions.onArchiveToggle)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = model.title,
+                    text = model.marker?.let { "$it ${model.title}" } ?: model.title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (model.deleting) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                    color = if (model.deleting || model.settled) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -175,6 +223,14 @@ private fun ShellConversationRowSurface(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            if (model.settled) {
+                Icon(
+                    imageVector = Icons.Outlined.TaskAlt,
+                    contentDescription = "Settled",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(PIN_ICON_SIZE).testTag(ShellConversationTags.SETTLED),
+                )
             }
             if (model.pinned) {
                 Icon(

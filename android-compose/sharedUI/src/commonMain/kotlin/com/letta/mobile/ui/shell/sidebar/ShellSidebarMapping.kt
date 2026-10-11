@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
-import com.letta.mobile.data.chat.runtime.PinnedConversations
+import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
 import kotlin.time.Instant
 
@@ -12,6 +12,10 @@ data class ShellConversationMarks(
     val deletingIds: Set<String> = emptySet(),
     /** letta-mobile-bzvro.17: pinned conversations, listed first. */
     val pinnedIds: Set<String> = emptySet(),
+    /** letta-mobile-zxk2n.5: settled conversations, listed after the active ones. */
+    val settledIds: Set<String> = emptySet(),
+    /** letta-mobile-zxk2n.5: each marked conversation's emoji. */
+    val markers: Map<String, String> = emptyMap(),
 )
 
 /** Pure mapping from the platform-neutral conversation summaries to the panel's rows. */
@@ -20,7 +24,8 @@ object ShellSidebarMapping {
     private const val LOADING_PREVIEW = "Loaded from backend"
 
     /**
-     * [conversations] as panel rows, the pinned ones first (each group keeps its order).
+     * [conversations] as panel rows, the pinned ones first and the settled ones last (each group
+     * keeps its order).
      * [timeLabel] turns a summary's `updatedAtLabel` into the row's trailing time (see
      * [ShellRelativeTime.compact]).
      */
@@ -29,7 +34,7 @@ object ShellSidebarMapping {
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
     ): List<ShellConversationRowModel> =
-        PinnedConversations.pinnedFirst(conversations, marks.pinnedIds) { it.id }.map { conversation ->
+        ConversationListOrder.arrange(conversations, marks.pinnedIds, marks.settledIds) { it.id }.map { conversation ->
             ShellConversationRowModel(
                 id = conversation.id,
                 title = conversation.displayTitle(),
@@ -40,6 +45,8 @@ object ShellSidebarMapping {
                 deleting = conversation.id in marks.deletingIds,
                 archived = conversation.archived,
                 pinned = conversation.id in marks.pinnedIds,
+                settled = conversation.id in marks.settledIds,
+                marker = marks.markers[conversation.id],
             )
         }
 
