@@ -65,7 +65,9 @@ class ProviderOAuthWireTest {
 
     @Test
     fun aConnectRequestCarriesTheTokensButNeverPrintsThem() {
-        val bundle = OAuthWire.tokenBundle("test-access", "test-refresh", 42L)
+        val tokens = SubscriptionTokens("test-access", "test-refresh", 42L)
+        assertFalse(tokens.toString().contains("test-access"))
+        val bundle = tokens.toOAuthConfig()
         val request = ProviderConnectRequest("xai", authMethodId = null, fields = emptyMap(), oauthConfig = bundle)
 
         val params = ModelControlWire.connectParams(request)

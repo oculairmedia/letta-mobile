@@ -1,9 +1,5 @@
 package com.letta.mobile.data.repository.modelcontrol
 
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.number
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.require
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.seconds
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.text
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -26,16 +22,16 @@ internal class XaiDeviceLogin(
 
     override suspend fun start(): DeviceCodeGrant {
         val response = http.post(DEVICE_CODE_URL, OAuthRequestBody.Form(mapOf("client_id" to CLIENT_ID, "scope" to SCOPE)))
-        if (!response.ok) throw OAuthWire.failure(NAME, "device authorization", response)
+        if (!response.ok) throw OAuthWire.failure(kind, "device authorization", response)
         val body = OAuthWire.body(response)
         val expiresIn = body.seconds("expires_in")?.takeIf { it > 0 }
-            ?: throw ProviderSignInException("$NAME sent an incomplete answer (no expires_in)")
+            ?: throw ProviderSignInException("${kind.label} sent an incomplete answer (no expires_in)")
         return DeviceCodeGrant(
-            userCode = body.require("user_code", NAME),
-            verificationUrl = OAuthWire.httpsUrl(body.text("verification_uri_complete") ?: body.text("verification_uri"), NAME),
+            userCode = body.require("user_code", kind),
+            verificationUrl = OAuthWire.httpsUrl(body.text("verification_uri_complete") ?: body.text("verification_uri"), kind),
             intervalSeconds = body.number("interval")?.takeIf { it > 0 },
             expiresInSeconds = expiresIn,
-            deviceSecret = body.require("device_code", NAME),
+            deviceSecret = body.require("device_code", kind),
         )
     }
 
@@ -49,19 +45,17 @@ internal class XaiDeviceLogin(
             "slow_down" -> DeviceCodePoll.SlowDown(body.number("interval"))
             "access_denied", "authorization_denied" -> DeviceCodePoll.Denied
             "expired_token" -> DeviceCodePoll.Expired
-            else -> DeviceCodePoll.Failed(OAuthWire.failure(NAME, "sign-in", response).message.orEmpty())
+            else -> DeviceCodePoll.Failed(OAuthWire.failure(kind, "sign-in", response).message.orEmpty())
         }
     }
 
     private fun request(tokens: JsonObject): ProviderConnectRequest {
         val lifetime = tokens.seconds("expires_in")?.takeIf { it > 0 } ?: DEFAULT_LIFETIME_SECONDS
-        val expiresAt = clock() + lifetime * OAuthWire.MS_PER_SECOND - OAuthWire.REFRESH_SKEW_MS
-        val bundle = OAuthWire.tokenBundle(tokens.require("access_token", NAME), tokens.require("refresh_token", NAME), expiresAt)
+        val bundle = SubscriptionTokens.from(tokens, kind, clock(), lifetime).toOAuthConfig()
         return ProviderConnectRequest(provider.id, authMethodId = null, fields = emptyMap(), oauthConfig = bundle)
     }
 
     private companion object {
-        const val NAME = "xAI"
         const val CLIENT_ID = "b1a00492-073a-47ea-816f-4c329264a828"
         const val SCOPE = "openid profile email offline_access grok-cli:access api:access"
         const val DEVICE_CODE_URL = "https://auth.x.ai/oauth2/device/code"
@@ -87,14 +81,14 @@ internal class ChatGptDeviceLogin(
     override suspend fun start(): DeviceCodeGrant {
         val response = http.post(USER_CODE_URL, OAuthRequestBody.Json(buildJsonObject { put("client_id", CLIENT_ID) }))
         if (response.status == HTTP_NOT_FOUND) throw ProviderSignInException("ChatGPT device-code sign-in isn't available right now")
-        if (!response.ok) throw OAuthWire.failure(NAME, "device authorization", response)
+        if (!response.ok) throw OAuthWire.failure(kind, "device authorization", response)
         val body = OAuthWire.body(response)
         return DeviceCodeGrant(
-            userCode = body.require("user_code", NAME),
+            userCode = body.require("user_code", kind),
             verificationUrl = VERIFICATION_URL,
             intervalSeconds = body.number("interval")?.takeIf { it >= 0 },
             expiresInSeconds = CODE_LIFETIME_SECONDS,
-            deviceSecret = body.require("device_auth_id", NAME),
+            deviceSecret = body.require("device_auth_id", kind),
         )
     }
 
@@ -106,13 +100,13 @@ internal class ChatGptDeviceLogin(
         val response = http.post(DEVICE_TOKEN_URL, OAuthRequestBody.Json(params))
         if (response.ok) return approved(OAuthWire.body(response))
         // Until the user approves, OpenAI answers 403/404.
-        if (response.status == HTTP_FORBIDDEN || response.status == HTTP_NOT_FOUND) return DeviceCodePoll.Pending
+        if (response.status in PENDING_STATUSES) return DeviceCodePoll.Pending
         return when (OAuthWire.errorCode(OAuthWire.body(response))) {
             "deviceauth_authorization_pending", "authorization_pending" -> DeviceCodePoll.Pending
             "slow_down" -> DeviceCodePoll.SlowDown(null)
             "access_denied", "authorization_denied" -> DeviceCodePoll.Denied
             "expired_token" -> DeviceCodePoll.Expired
-            else -> DeviceCodePoll.Failed(OAuthWire.failure(NAME, "sign-in", response).message.orEmpty())
+            else -> DeviceCodePoll.Failed(OAuthWire.failure(kind, "sign-in", response).message.orEmpty())
         }
     }
 
@@ -120,22 +114,22 @@ internal class ChatGptDeviceLogin(
         val form = mapOf(
             "grant_type" to "authorization_code",
             "client_id" to CLIENT_ID,
-            "code" to device.require("authorization_code", NAME),
-            "code_verifier" to device.require("code_verifier", NAME),
+            "code" to device.require("authorization_code", kind),
+            "code_verifier" to device.require("code_verifier", kind),
             "redirect_uri" to DEVICE_REDIRECT_URI,
         )
         val response = http.post(TOKEN_URL, OAuthRequestBody.Form(form))
-        if (!response.ok) return DeviceCodePoll.Failed(OAuthWire.failure(NAME, "token exchange", response).message.orEmpty())
+        if (!response.ok) return DeviceCodePoll.Failed(OAuthWire.failure(kind, "token exchange", response).message.orEmpty())
         return DeviceCodePoll.Approved(request(OAuthWire.body(response)))
     }
 
     private fun request(tokens: JsonObject): ProviderConnectRequest {
-        val access = tokens.require("access_token", NAME)
-        val lifetime = tokens.seconds("expires_in") ?: throw ProviderSignInException("$NAME sent an incomplete answer (no expires_in)")
-        val accountId = ChatGptAccount.idFrom(access) ?: throw ProviderSignInException("$NAME sign-in didn't name a ChatGPT account")
+        val access = tokens.require("access_token", kind)
+        val lifetime = tokens.seconds("expires_in") ?: throw ProviderSignInException("${kind.label} sent an incomplete answer (no expires_in)")
+        val accountId = ChatGptAccount.idFrom(access) ?: throw ProviderSignInException("${kind.label} sign-in didn't name a ChatGPT account")
         val bundle = buildJsonObject {
             put("access_token", access)
-            put("id_token", tokens.require("id_token", NAME))
+            put("id_token", tokens.require("id_token", kind))
             tokens.text("refresh_token")?.let { put("refresh_token", it) }
             put("account_id", accountId)
             put("expires_at", JsonPrimitive(clock() + lifetime * OAuthWire.MS_PER_SECOND))
@@ -144,7 +138,6 @@ internal class ChatGptDeviceLogin(
     }
 
     private companion object {
-        const val NAME = "ChatGPT"
         const val CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
         const val AUTH_BASE = "https://auth.openai.com"
         const val USER_CODE_URL = "$AUTH_BASE/api/accounts/deviceauth/usercode"
@@ -153,8 +146,8 @@ internal class ChatGptDeviceLogin(
         const val VERIFICATION_URL = "$AUTH_BASE/codex/device"
         const val DEVICE_REDIRECT_URI = "$AUTH_BASE/deviceauth/callback"
         const val CODE_LIFETIME_SECONDS = 900L
-        const val HTTP_FORBIDDEN = 403
         const val HTTP_NOT_FOUND = 404
+        val PENDING_STATUSES = setOf(403, HTTP_NOT_FOUND)
     }
 }
 

@@ -78,7 +78,7 @@ class ProviderSignInDialogUiTest {
         val state = ProviderSignInState.AwaitingApproval(xai, "ABCD-1234", "https://accounts.x.ai/device?code=ABCD-1234", 600_000)
         setContent { Frame(recorder) { ProviderSignInDialog(state, recorder.actions) } }
 
-        onNodeWithText(ModelControlStrings.signInTitle(xai.displayName)).assertIsDisplayed()
+        onNodeWithText(xai.signInTitle).assertIsDisplayed()
         onNodeWithTag(ProviderSignInTags.USER_CODE).assertTextContains("ABCD-1234")
         onNodeWithTag(ProviderSignInTags.COPY_CODE).assertIsDisplayed()
         onNodeWithText(ModelControlStrings.SIGN_IN_WAITING).assertIsDisplayed()
@@ -136,7 +136,7 @@ class ProviderSignInDialogUiTest {
         onNodeWithTag(ProviderSignInTags.CLOSE).assertTextContains(ModelControlStrings.CLOSE)
 
         state = ProviderSignInState.Connected(xai)
-        onNodeWithText(ModelControlStrings.signInConnected(xai.displayName)).assertIsDisplayed()
+        onNodeWithText(xai.signInConnected).assertIsDisplayed()
         onNodeWithText(ModelControlStrings.SIGN_IN_DONE).performClick()
         assertEquals(1, recorder.closes)
     }

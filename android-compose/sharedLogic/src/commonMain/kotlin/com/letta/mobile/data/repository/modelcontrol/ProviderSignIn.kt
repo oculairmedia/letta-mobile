@@ -150,21 +150,23 @@ class ProviderSignInController(
         val grant = login.start()
         val poller = DeviceCodePoller(grant, clock)
         _state.value = ProviderSignInState.AwaitingApproval(provider, grant.userCode, grant.verificationUrl, poller.deadline)
-        while (true) {
+        var approved: ProviderConnectRequest? = null
+        while (approved == null) {
             delay(poller.nextWaitMillis() ?: throw poller.timedOut())
             if (poller.expired()) throw poller.timedOut()
-            when (val result = login.poll(grant)) {
-                DeviceCodePoll.Pending -> Unit
-                is DeviceCodePoll.SlowDown -> {
-                    poller.slowDown(result.intervalSeconds)
-                    _state.update { (it as? ProviderSignInState.AwaitingApproval)?.copy(slowedDown = true) ?: it }
-                }
-                DeviceCodePoll.Denied -> throw ProviderSignInException("Sign-in was declined on the ${login.kind.label} page", SignInFailure.DENIED)
-                DeviceCodePoll.Expired -> throw ProviderSignInException("The code expired before it was approved", SignInFailure.EXPIRED)
-                is DeviceCodePoll.Failed -> throw ProviderSignInException(result.message)
-                is DeviceCodePoll.Approved -> return handOff(provider, result.request)
-            }
+            approved = settle(login.poll(grant), poller, login.kind)
         }
+        handOff(provider, approved)
+    }
+
+    /** One poll's outcome: the request once approved, null to keep polling; a refusal throws. */
+    private fun settle(result: DeviceCodePoll, poller: DeviceCodePoller, kind: ProviderOAuthKind): ProviderConnectRequest? {
+        if (result is DeviceCodePoll.SlowDown) {
+            poller.slowDown(result.intervalSeconds)
+            _state.update { (it as? ProviderSignInState.AwaitingApproval)?.copy(slowedDown = true) ?: it }
+        }
+        result.refusal(kind)?.let { throw it }
+        return (result as? DeviceCodePoll.Approved)?.request
     }
 
     private suspend fun handOff(provider: ConnectableProvider, request: ProviderConnectRequest) {
@@ -194,6 +196,14 @@ class ProviderSignInController(
             }
         }
     }
+}
+
+/** Why a poll ends the sign-in, or null when polling goes on (pending, slow down) or it was approved. */
+internal fun DeviceCodePoll.refusal(kind: ProviderOAuthKind): ProviderSignInException? = when (this) {
+    DeviceCodePoll.Denied -> ProviderSignInException("Sign-in was declined on the ${kind.label} page", SignInFailure.DENIED)
+    DeviceCodePoll.Expired -> ProviderSignInException("The code expired before it was approved", SignInFailure.EXPIRED)
+    is DeviceCodePoll.Failed -> ProviderSignInException(message)
+    DeviceCodePoll.Pending, is DeviceCodePoll.SlowDown, is DeviceCodePoll.Approved -> null
 }
 
 /**

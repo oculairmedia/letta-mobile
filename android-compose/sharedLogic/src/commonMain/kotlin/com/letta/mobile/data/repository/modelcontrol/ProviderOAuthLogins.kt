@@ -1,12 +1,5 @@
 package com.letta.mobile.data.repository.modelcontrol
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.longOrNull
-
 /**
  * Subscription sign-ins the app runs itself (letta-mobile-zxk2n.3, epic G54).
  *
@@ -162,60 +155,4 @@ sealed interface ProviderOAuthLogin {
         private fun ConnectableProvider.takesApiKey(): Boolean =
             authMethods.any { method -> method.fields.any { it.key == OAuthWire.API_KEY_FIELD } }
     }
-}
-
-/** Shared parsing for the provider token endpoints. Error text never includes a token or code. */
-internal object OAuthWire {
-    const val API_KEY_FIELD = "apiKey"
-    const val DEVICE_CODE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
-    const val SUBSCRIPTION_TOKENS_TYPE = "oauth"
-
-    /** Access tokens are refreshed this long before the provider's expiry (letta-code does the same). */
-    const val REFRESH_SKEW_MS = 5 * 60 * 1000L
-    const val MS_PER_SECOND = 1000L
-
-    private val json = Json { ignoreUnknownKeys = true }
-
-    fun body(response: OAuthHttpResponse): JsonObject =
-        runCatching { json.parseToJsonElement(response.body) as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
-
-    fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull?.takeIf { it.isNotBlank() }
-
-    /** A number, or a numeric string (OpenAI sends `interval` as either). */
-    fun JsonObject.number(key: String): Double? {
-        val primitive = this[key] as? JsonPrimitive ?: return null
-        return primitive.doubleOrNull ?: primitive.contentOrNull?.trim()?.toDoubleOrNull()
-    }
-
-    fun JsonObject.seconds(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull ?: number(key)?.toLong()
-
-    fun JsonObject.require(key: String, provider: String): String =
-        text(key) ?: throw ProviderSignInException("$provider sent an incomplete answer (no $key)")
-
-    /** `error` as a string, or `error.code` when it is an object. */
-    fun errorCode(body: JsonObject): String? = body.text("error") ?: ((body["error"] as? JsonObject)?.text("code"))
-
-    /** The provider's own error words for a message: `error` and `error_description`, never the raw body. */
-    fun failure(provider: String, action: String, response: OAuthHttpResponse): ProviderSignInException {
-        val body = body(response)
-        val detail = listOfNotNull(errorCode(body), body.text("error_description")).joinToString(": ")
-        val suffix = if (detail.isBlank()) "" else ": $detail"
-        return ProviderSignInException("$provider $action failed (HTTP ${response.status})$suffix")
-    }
-
-    /** Only an https verification page is opened in the browser. */
-    fun httpsUrl(raw: String?, provider: String): String {
-        val url = raw?.trim().orEmpty()
-        if (!url.startsWith("https://")) throw ProviderSignInException("$provider sent an untrusted sign-in address")
-        return url
-    }
-
-    fun tokenBundle(access: String, refresh: String, expiresAt: Long): JsonObject = JsonObject(
-        mapOf(
-            "type" to JsonPrimitive(SUBSCRIPTION_TOKENS_TYPE),
-            "access" to JsonPrimitive(access),
-            "refresh" to JsonPrimitive(refresh),
-            "expires" to JsonPrimitive(expiresAt),
-        ),
-    )
 }

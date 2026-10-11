@@ -87,10 +87,8 @@ object ModelControlStrings {
     const val SIGN_IN_CONNECTING = "Connecting to the host…"
     const val SIGN_IN_TRY_AGAIN = "Try again"
     const val SIGN_IN_DONE = "Done"
-
-    fun signInTitle(name: String) = "Sign in to $name"
-
-    fun signInConnected(name: String) = "$name is connected. Its models are in the picker now."
+    const val SIGN_IN_TITLE_PREFIX_TEXT = "Sign in to "
+    const val SIGN_IN_CONNECTED_SUFFIX = " is connected. Its models are in the picker now."
 
     const val SIGN_IN_TITLE_PREFIX = "Connect "
     const val SIGN_IN_STEP_1 = "On the computer running the App Server, open a terminal and run:"

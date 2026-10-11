@@ -1,8 +1,6 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 import com.letta.mobile.data.canvas.compose.Sha256
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.require
-import com.letta.mobile.data.repository.modelcontrol.OAuthWire.seconds
 import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.http.formUrlEncode
@@ -55,17 +53,14 @@ internal class ClaudeCodeLogin(
             put("code_verifier", grant.verifier)
         }
         val response = http.post(TOKEN_URL, OAuthRequestBody.Json(params))
-        if (!response.ok) throw OAuthWire.failure(NAME, "token exchange", response)
+        if (!response.ok) throw OAuthWire.failure(kind, "token exchange", response)
         val tokens = OAuthWire.body(response)
-        val lifetime = tokens.seconds("expires_in") ?: throw ProviderSignInException("$NAME sent an incomplete answer (no expires_in)")
-        val expiresAt = clock() + lifetime * OAuthWire.MS_PER_SECOND - OAuthWire.REFRESH_SKEW_MS
-        val bundle = OAuthWire.tokenBundle(tokens.require("access_token", NAME), tokens.require("refresh_token", NAME), expiresAt)
+        val lifetime = tokens.seconds("expires_in") ?: throw ProviderSignInException("${kind.label} sent an incomplete answer (no expires_in)")
+        val bundle = SubscriptionTokens.from(tokens, kind, clock(), lifetime).toOAuthConfig()
         return ProviderConnectRequest(provider.id, authMethodId = null, fields = emptyMap(), oauthConfig = bundle)
     }
 
     private companion object {
-        const val NAME = "Claude"
-
         // Claude Code's public OAuth client, the one letta-code signs in with.
         const val CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
         const val AUTHORIZE_URL = "https://claude.ai/oauth/authorize"
@@ -108,14 +103,13 @@ internal class OpenRouterCodeLogin(
             put("code_challenge_method", Pkce.METHOD)
         }
         val response = http.post(KEYS_URL, OAuthRequestBody.Json(params))
-        if (!response.ok) throw OAuthWire.failure(NAME, "key exchange", response)
-        val key = OAuthWire.body(response).require("key", NAME)
+        if (!response.ok) throw OAuthWire.failure(kind, "key exchange", response)
+        val key = OAuthWire.body(response).require("key", kind)
         val method = row.authMethods.firstOrNull { m -> m.fields.any { it.key == OAuthWire.API_KEY_FIELD } }
         return ProviderConnectRequest(row.id, authMethodId = method?.id, fields = mapOf(OAuthWire.API_KEY_FIELD to key))
     }
 
     private companion object {
-        const val NAME = "OpenRouter"
         const val AUTHORIZE_URL = "https://openrouter.ai/auth"
         const val KEYS_URL = "https://openrouter.ai/api/v1/auth/keys"
         const val CALLBACK_URL = "http://localhost:3000/letta/openrouter/callback"
@@ -152,10 +146,16 @@ internal data class PastedCode(val code: String, val state: String?) {
         fun parse(pasted: String, expectedState: String?): PastedCode {
             val parsed = split(pasted.trim())
             if (parsed.code.isBlank()) throw ProviderSignInException("Paste the code from the sign-in page", SignInFailure.BAD_CODE)
-            if (expectedState != null && parsed.state != null && parsed.state != expectedState) {
+            if (parsed.contradicts(expectedState)) {
                 throw ProviderSignInException("That code is from a different sign-in; start again", SignInFailure.BAD_CODE)
             }
             return parsed
+        }
+
+        /** A pasted state that differs from the one this sign-in sent; no state on either side is no contradiction. */
+        private fun PastedCode.contradicts(expectedState: String?): Boolean {
+            val pastedState = state ?: return false
+            return expectedState?.let { it != pastedState } ?: false
         }
 
         private fun split(value: String): PastedCode = when {

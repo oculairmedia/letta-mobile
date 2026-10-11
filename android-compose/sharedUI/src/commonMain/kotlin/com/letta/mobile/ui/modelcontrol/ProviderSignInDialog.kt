@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInController
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInState
 import com.letta.mobile.ui.icons.LettaIcons
@@ -84,7 +85,7 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
     AlertDialog(
         onDismissRequest = actions.onClose,
         icon = { Icon(LettaIcons.AccountCircle, contentDescription = null) },
-        title = { Text(ModelControlStrings.signInTitle(provider.displayName)) },
+        title = { Text(provider.signInTitle) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -108,7 +109,7 @@ private fun SignInBody(state: ProviderSignInState, actions: ProviderSignInAction
         is ProviderSignInState.AwaitingApproval -> DeviceCodeBody(state)
         is ProviderSignInState.AwaitingCode -> PastedCodeBody(state, actions)
         is ProviderSignInState.Connecting -> Progress(ModelControlStrings.SIGN_IN_CONNECTING)
-        is ProviderSignInState.Connected -> Outcome(LettaIcons.CheckCircle, ModelControlStrings.signInConnected(state.provider.displayName), error = false)
+        is ProviderSignInState.Connected -> Outcome(LettaIcons.CheckCircle, state.provider.signInConnected, error = false)
         is ProviderSignInState.Failed -> Outcome(LettaIcons.Error, state.message, error = true)
     }
 }
@@ -232,6 +233,12 @@ private fun Outcome(icon: ImageVector, text: String, error: Boolean) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = if (error) color else MaterialTheme.colorScheme.onSurface)
     }
 }
+
+/** "Sign in to xAI (Grok/X subscription)" */
+internal val ConnectableProvider.signInTitle: String get() = ModelControlStrings.SIGN_IN_TITLE_PREFIX_TEXT + displayName
+
+/** What the sheet says once the host accepted the sign-in. */
+internal val ConnectableProvider.signInConnected: String get() = displayName + ModelControlStrings.SIGN_IN_CONNECTED_SUFFIX
 
 @Composable
 private fun Hint(text: String) {
