@@ -124,7 +124,7 @@ class AppServerContractBaselineTest {
         assertEquals("0.34.8", baseline.requiredString("version"))
         assertEquals("v24.18.0", baseline.requiredString("node"))
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
-        assertEquals("0.33.6 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
+        assertEquals("0.34.8 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
         val serverListener = probes.getValue("server_listener")
         val appServer = probes.getValue("app_server_v2")
