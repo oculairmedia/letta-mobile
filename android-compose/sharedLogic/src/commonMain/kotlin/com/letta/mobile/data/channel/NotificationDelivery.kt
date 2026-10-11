@@ -56,4 +56,7 @@ enum class NotificationSuppressionReason {
     ActiveNotificationReplyStream,
     DuplicateNotification,
     PublishRejected,
+
+    /** letta-mobile-bzvro.27: the person muted this agent's notifications. */
+    MutedAgent,
 }

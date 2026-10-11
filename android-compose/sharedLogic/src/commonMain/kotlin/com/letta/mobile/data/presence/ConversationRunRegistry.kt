@@ -31,6 +31,12 @@ data class ConversationRunState(
      * commands), reduced from the same events by [com.letta.mobile.data.runtime.RuntimeLiveStatusReducer].
      */
     val live: RuntimeLiveStatus = RuntimeLiveStatus.Idle,
+    /**
+     * letta-mobile-bzvro.27: the request id of the approval the turn is parked on (the newest one
+     * while several wait), so attention notifications can tell a new request from a replay of one
+     * already announced. Null whenever [phase] is not [RunPhase.AWAITING_INPUT].
+     */
+    val awaitingApprovalId: String? = null,
 ) {
     /** How many tool calls are in flight; tools overlap, so this is a count, not a flag. */
     val openToolCalls: Int get() = openToolCallIds.size
