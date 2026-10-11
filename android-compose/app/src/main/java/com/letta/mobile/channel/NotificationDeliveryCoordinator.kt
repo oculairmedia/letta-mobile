@@ -48,7 +48,14 @@ class NotificationDeliveryCoordinator @Inject constructor(
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
         }
 
-        audienceSuppression(candidate)?.let { return candidate.suppressed(it, notificationId) }
+        // letta-mobile-bzvro.27: a muted agent posts nothing.
+        if (attentionPrefs.prefs.value.isMuted(candidate.agentId)) {
+            return candidate.suppressed(NotificationSuppressionReason.MutedAgent, notificationId)
+        }
+
+        if (currentConversationTracker.current == candidate.conversationId) {
+            return candidate.suppressed(NotificationSuppressionReason.ForegroundConversation, notificationId)
+        }
 
         if (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
@@ -66,16 +73,6 @@ class NotificationDeliveryCoordinator @Inject constructor(
         return candidate.published(notificationId)
     }
 
-    /**
-     * Who would see this: nobody wants it from an agent they muted (letta-mobile-bzvro.27), and the
-     * person already sees a conversation that is on screen.
-     */
-    private fun audienceSuppression(candidate: NotificationDeliveryCandidate): NotificationSuppressionReason? = when {
-        attentionPrefs.prefs.value.isMuted(candidate.agentId) -> NotificationSuppressionReason.MutedAgent
-        currentConversationTracker.current == candidate.conversationId -> NotificationSuppressionReason.ForegroundConversation
-        else -> null
-    }
-
     private fun NotificationDeliveryCandidate.published(notificationId: String): NotificationDeliveryDecision.Published {
         Telemetry.event(
             "NotificationDelivery", "published",
@@ -87,19 +84,25 @@ class NotificationDeliveryCoordinator @Inject constructor(
     private fun NotificationDeliveryCandidate.deferred(
         reason: NotificationDeferralReason,
         notificationId: String?,
-    ): NotificationDeliveryDecision.Deferred =
-        NotificationDeliveryDecision.Deferred(reason).also { reportWithheld(it, telemetryAttrs(notificationId) + ("reason" to reason.name)) }
+    ): NotificationDeliveryDecision.Deferred {
+        Telemetry.event(
+            "NotificationDelivery", "deferred",
+            *telemetryAttrs(notificationId),
+            "reason" to reason.name,
+        )
+        return NotificationDeliveryDecision.Deferred(reason)
+    }
 
     private fun NotificationDeliveryCandidate.suppressed(
         reason: NotificationSuppressionReason,
         notificationId: String? = null,
-    ): NotificationDeliveryDecision.Suppressed =
-        NotificationDeliveryDecision.Suppressed(reason).also { reportWithheld(it, telemetryAttrs(notificationId) + ("reason" to reason.name)) }
-
-    /** Telemetry for a candidate that was not published: the outcome, with [attrs] naming the candidate and the reason. */
-    private fun reportWithheld(decision: NotificationDeliveryDecision, attrs: Array<Pair<String, Any?>>) {
-        val outcome = if (decision is NotificationDeliveryDecision.Deferred) "deferred" else "suppressed"
-        Telemetry.event("NotificationDelivery", outcome, *attrs)
+    ): NotificationDeliveryDecision.Suppressed {
+        Telemetry.event(
+            "NotificationDelivery", "suppressed",
+            *telemetryAttrs(notificationId),
+            "reason" to reason.name,
+        )
+        return NotificationDeliveryDecision.Suppressed(reason)
     }
 
     private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, Any?>> {
