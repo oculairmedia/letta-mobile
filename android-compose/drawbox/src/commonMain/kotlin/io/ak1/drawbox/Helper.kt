@@ -160,12 +160,31 @@ internal class ImageBitmapCache(
         val bytesRef: ByteArray,
         val mipLevelPx: Int,
         val bitmap: ImageBitmap?,
-    )
+    ) {
+        /** Another array with the same content, seen since; checked by reference from then on. */
+        var alias: ByteArray? = null
+
+        /** The frame this image was last asked for in (see [trimToBudget]). */
+        var lastUse: Long = -1L
+
+        /**
+         * Whether [bytes] are this image. A drawing taken in from elsewhere (another app's change,
+         * parsed afresh) carries new arrays with the same content; comparing by reference alone
+         * re-decoded every image on the board for each such change. Content is compared once per
+         * new array and the array remembered, so the next frame is a reference check.
+         */
+        fun holds(bytes: ByteArray): Boolean {
+            if (bytesRef === bytes || alias === bytes) return true
+            if (bytesRef.size != bytes.size || !bytesRef.contentEquals(bytes)) return false
+            alias = bytes
+            return true
+        }
+
+        fun heldBytes(): Long = bitmap?.let { it.width.toLong() * it.height * BYTES_PER_PIXEL } ?: 0L
+    }
 
     private val byId = mutableStateMapOf<String, Entry>()
     private var nextGen: Long = 0L
-    private val aliases = HashMap<String, ByteArray>()
-    private val lastUse = HashMap<String, Long>()
     private var frame = 0L
 
     /**
@@ -187,11 +206,8 @@ internal class ImageBitmapCache(
     fun bitmapFor(id: String, bytes: ByteArray, targetDim: Int): ImageBitmap? {
         val mipLevelPx = mipLevelFor(targetDim)
         val existing = byId[id]
-        lastUse[id] = frame
-        if (existing != null &&
-            existing.mipLevelPx == mipLevelPx &&
-            sameBytes(id, existing.bytesRef, bytes)
-        ) {
+        existing?.lastUse = frame
+        if (existing != null && existing.mipLevelPx == mipLevelPx && existing.holds(bytes)) {
             return existing.bitmap
         }
 
@@ -202,13 +218,12 @@ internal class ImageBitmapCache(
         // id with an older generation will be discarded on completion.
         val myGen = ++nextGen
         val staleBitmap = existing?.bitmap
-        aliases.remove(id)
         byId[id] = Entry(
             gen = myGen,
             bytesRef = bytes,
             mipLevelPx = mipLevelPx,
             bitmap = staleBitmap,
-        )
+        ).also { it.lastUse = frame }
         scope.launch(Dispatchers.Default) {
             val decoded = decodeImageBitmapDownsampled(bytes, mipLevelPx, mipLevelPx)
             // Only land the result if our generation is still current. A
@@ -216,24 +231,11 @@ internal class ImageBitmapCache(
             // new bytes) supersedes us; we drop the result.
             val current = byId[id]
             if (current != null && current.gen == myGen) {
-                byId[id] = current.copy(bitmap = decoded)
+                byId[id] = current.copy(bitmap = decoded).also { it.lastUse = current.lastUse }
                 landed.longValue++
             }
         }
         return staleBitmap
-    }
-
-    /**
-     * Whether [bytes] are the image already cached for [id]. A drawing taken in from elsewhere
-     * (another app's change, parsed afresh) carries new arrays with the same content; comparing by
-     * reference alone re-decoded every image on the board for each such change. Content is
-     * compared once per new array and the array remembered, so the next frame is a reference check.
-     */
-    private fun sameBytes(id: String, cached: ByteArray, bytes: ByteArray): Boolean {
-        if (cached === bytes || aliases[id] === bytes) return true
-        if (cached.size != bytes.size || !cached.contentEquals(bytes)) return false
-        aliases[id] = bytes
-        return true
     }
 
     /** Starts a frame: images not asked for since are the first to go when over budget. */
@@ -248,29 +250,18 @@ internal class ImageBitmapCache(
      * again.
      */
     fun trimToBudget() {
-        var held = byId.values.sumOf { it.bitmap?.let { b -> b.width.toLong() * b.height * 4 } ?: 0L }
+        var held = byId.values.sumOf { it.heldBytes() }
         if (held <= budgetBytes) return
-        val idle = byId.keys.filter { (lastUse[it] ?: -1L) < frame }.sortedBy { lastUse[it] ?: -1L }
-        for (id in idle) {
-            if (held <= budgetBytes) break
-            val bitmap = byId[id]?.bitmap ?: continue
-            held -= bitmap.width.toLong() * bitmap.height * 4
-            byId.remove(id)
-            aliases.remove(id)
-            lastUse.remove(id)
-        }
+        val idle = byId.entries.filter { it.value.lastUse < frame }.sortedBy { it.value.lastUse }.map { it.key }.iterator()
+        while (held > budgetBytes && idle.hasNext()) held -= byId.remove(idle.next())?.heldBytes() ?: 0L
     }
 
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return
         // SnapshotStateMap.keys.retainAll exists but does an iteration-time
         // check. Build the drop list first to avoid mutation while iterating.
-        val drop = byId.keys.filter { it !in liveIds }
-        for (id in drop) {
-            byId.remove(id)
-            aliases.remove(id)
-            lastUse.remove(id)
-        }
+        val gone = byId.keys.filter { it !in liveIds }
+        gone.forEach { byId.remove(it) }
     }
 
     fun size(): Int = byId.size
@@ -300,6 +291,9 @@ private const val MAX_MIP_PX: Int = 2048
 
 /** Decoded image memory a board keeps by default: 64 MB, about four 2048 px bitmaps. */
 internal const val DEFAULT_IMAGE_BUDGET_BYTES: Long = 64L * 1024 * 1024
+
+/** A decoded bitmap is ARGB, four bytes a pixel. */
+private const val BYTES_PER_PIXEL = 4L
 
 /**
  * Per-canvas cache of [TextLayoutResult] entries for [Element.Text]

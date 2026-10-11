@@ -28,62 +28,52 @@ import kotlin.math.ceil
  * Not state: written from the draw pass, read by it; nothing composes from it.
  */
 internal class StaticLayer(private val layer: GraphicsLayer) {
-    private var recordedOffset: Offset? = null
-    private var recordedScale = 0f
-    private var recordedCanvas = IntSize.Zero
-    private var recordedExcluded: Set<String> = emptySet()
-    private var recordedWorld = Rect.Zero
-    private var margin = Offset.Zero
-    private var recordedImages = -1L
-
     /**
-     * Whether the recording still shows the board for [vp] at [canvas] with [excluded] drawn live,
-     * [images] being the image cache's count of landed decodes (a placeholder recorded before its
-     * image landed is stale).
+     * What a recording depends on besides where the view is: the zoom, the canvas size, the
+     * elements drawn live instead, and the image cache's count of landed decodes (a placeholder
+     * recorded before its image landed is stale).
      */
-    fun isFresh(vp: Viewport, canvas: IntSize, excluded: Set<String>, changes: List<RenderIndex.Change>, images: Long): Boolean {
-        val at = recordedOffset ?: return false
-        if (images != recordedImages) return false
-        if (vp.scale != recordedScale || canvas != recordedCanvas || excluded != recordedExcluded) return false
-        if (abs(vp.offset.x - at.x) > margin.x || abs(vp.offset.y - at.y) > margin.y) return false
-        return changes.none { it.id !in excluded && it.bounds.overlaps(recordedWorld) }
+    data class Key(val scale: Float, val canvas: IntSize, val excluded: Set<String>, val images: Long)
+
+    /** One recording: its [key], the view offset it was made at, the world it covers, its margin. */
+    private class Recording(val key: Key, val offset: Offset, val world: Rect, val margin: Offset) {
+        fun covers(vp: Viewport): Boolean =
+            abs(vp.offset.x - offset.x) <= margin.x && abs(vp.offset.y - offset.y) <= margin.y
+
+        fun touchedBy(change: RenderIndex.Change): Boolean =
+            change.id !in key.excluded && change.bounds.overlaps(world)
     }
 
-    /** Records the elements [index] has in the region around [vp], except [excluded]. */
-    fun DrawScope.record(
-        vp: Viewport,
-        index: RenderIndex,
-        excluded: Set<String>,
-        images: Long,
-        draw: DrawScope.(Element) -> Unit,
-    ) {
-        val canvas = IntSize(ceil(size.width).toInt(), ceil(size.height).toInt())
-        val mx = ceil(size.width * MARGIN).toInt().toFloat()
-        val my = ceil(size.height * MARGIN).toInt().toFloat()
-        val world = Rect(vp.screenToWorld(Offset(-mx, -my)), vp.screenToWorld(Offset(size.width + mx, size.height + my)))
+    private var recording: Recording? = null
+
+    /** Whether the recording still shows the board for [vp] under [key], given [changes] since. */
+    fun isFresh(vp: Viewport, key: Key, changes: List<RenderIndex.Change>): Boolean {
+        val r = recording ?: return false
+        return r.key == key && r.covers(vp) && changes.none(r::touchedBy)
+    }
+
+    /** Records the elements [index] has in the region around [vp], except those [key] excludes. */
+    fun DrawScope.record(vp: Viewport, key: Key, index: RenderIndex, draw: DrawScope.(Element) -> Unit) {
+        val margin = Offset(ceil(size.width * MARGIN), ceil(size.height * MARGIN))
+        val world = Rect(vp.screenToWorld(-margin), vp.screenToWorld(Offset(size.width, size.height) + margin))
         val elements = index.query(world)
-        layer.record(size = IntSize((canvas.width + 2 * mx).toInt(), (canvas.height + 2 * my).toInt())) {
+        val layerSize = IntSize((key.canvas.width + 2 * margin.x).toInt(), (key.canvas.height + 2 * margin.y).toInt())
+        layer.record(size = layerSize) {
             withTransform({
-                translate(mx + vp.offset.x, my + vp.offset.y)
+                translate(margin.x + vp.offset.x, margin.y + vp.offset.y)
                 scale(vp.scale, vp.scale, pivot = Offset.Zero)
             }) {
-                elements.forEach { if (it.id !in excluded) draw(it) }
+                elements.forEach { if (it.id !in key.excluded) draw(it) }
             }
         }
-        recordedOffset = vp.offset
-        recordedScale = vp.scale
-        recordedCanvas = canvas
-        recordedExcluded = excluded
-        recordedWorld = world
-        recordedImages = images
-        margin = Offset(mx, my)
+        recording = Recording(key, vp.offset, world, margin)
         DrawBoxRenderStats.layerRecords++
     }
 
     /** Replays the recording where [vp] puts it now. */
     fun DrawScope.replay(vp: Viewport) {
-        val at = recordedOffset ?: return
-        translate(vp.offset.x - at.x - margin.x, vp.offset.y - at.y - margin.y) { drawLayer(layer) }
+        val r = recording ?: return
+        translate(vp.offset.x - r.offset.x - r.margin.x, vp.offset.y - r.offset.y - r.margin.y) { drawLayer(layer) }
     }
 
     private companion object {

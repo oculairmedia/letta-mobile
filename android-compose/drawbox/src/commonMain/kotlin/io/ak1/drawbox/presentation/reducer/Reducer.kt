@@ -66,6 +66,7 @@ class Reducer(
             elements = useCase.updateText(state.elements, intent.id, intent.text),
         )
         is Intent.SyncTextMeasuredHeight -> syncMeasuredHeight(state, intent)
+        is Intent.SyncTextMeasuredHeights -> syncMeasuredHeights(state, intent.heights)
         is Intent.InsertImage -> state.adding(useCase.insertImage(intent.bytes, intent.position, intent.intrinsicSize))
         is Intent.InsertNewShape -> state.adding(
             useCase.insertNewShape(
@@ -142,6 +143,11 @@ class Reducer(
         val target = state.elements.firstOrNull { it.id == intent.id } as? Element.Text
         if (target == null || kotlin.math.abs(target.measuredHeight - intent.height) < 0.5f) return state
         return state.copy(elements = useCase.syncTextMeasuredHeight(state.elements, intent.id, intent.height))
+    }
+
+    private fun syncMeasuredHeights(state: State, heights: Map<String, Float>): State {
+        val synced = useCase.syncTextMeasuredHeights(state.elements, heights)
+        return if (synced === state.elements) state else state.copy(elements = synced)
     }
 
     /** The selected elements restyled or restacked, as one undo step. */

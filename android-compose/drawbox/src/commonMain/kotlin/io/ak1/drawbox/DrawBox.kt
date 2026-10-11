@@ -271,6 +271,9 @@ fun DrawBox(
     // frame has the correct geometry. The 0.5px drift gate in both the
     // dispatch and the reducer ensures fixed-point convergence in one step.
     LaunchedEffect(state.elements, textMeasurer) {
+        // Every drifted height goes in one intent: one per text was a pass over the whole drawing
+        // each, quadratic on a board with many text blocks.
+        val drifted = HashMap<String, Float>()
         state.elements.forEach { el ->
             if (el !is Element.Text) return@forEach
             val layout = textCache.layoutFor(
@@ -283,10 +286,9 @@ fun DrawBox(
                 measurer = textMeasurer,
             )
             val measured = layout.size.height.toFloat()
-            if (kotlin.math.abs(measured - el.measuredHeight) > 0.5f) {
-                onIntent(Intent.SyncTextMeasuredHeight(el.id, measured))
-            }
+            if (kotlin.math.abs(measured - el.measuredHeight) > 0.5f) drifted[el.id] = measured
         }
+        if (drifted.isNotEmpty()) onIntent(Intent.SyncTextMeasuredHeights(drifted))
     }
 
     // Drag-in-progress signal lifted out of the gesture coroutine so the render
@@ -924,14 +926,17 @@ fun DrawBox(
             // hidden text does not ghost from the recording under its editor.
             renderIndex.update(orderedElements)
             imageCache.beginFrame()
-            val excluded = if (hiddenElementIds.isEmpty()) activeIds else activeIds + hiddenElementIds
             val changes = renderIndex.takeDirty()
-            val canvasSize = IntSize(kotlin.math.ceil(size.width).toInt(), kotlin.math.ceil(size.height).toInt())
-            // Read here, in the draw pass, so a decode landing redraws and records the image in.
-            val imagesLanded = imageCache.landed.longValue
+            val layerKey = StaticLayer.Key(
+                scale = vp.scale,
+                canvas = IntSize(kotlin.math.ceil(size.width).toInt(), kotlin.math.ceil(size.height).toInt()),
+                excluded = if (hiddenElementIds.isEmpty()) activeIds else activeIds + hiddenElementIds,
+                // Read here, in the draw pass, so a decode landing redraws and records the image in.
+                images = imageCache.landed.longValue,
+            )
             with(staticLayer) {
-                if (!isFresh(vp, canvasSize, excluded, changes, imagesLanded)) {
-                    record(vp, renderIndex, excluded, imagesLanded) { el ->
+                if (!isFresh(vp, layerKey, changes)) {
+                    record(vp, layerKey, renderIndex) { el ->
                         renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                     }
                 }
