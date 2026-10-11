@@ -105,6 +105,7 @@ import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
+import com.letta.mobile.data.chat.branch.branchHistory
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -174,6 +175,11 @@ internal class AdminChatViewModel @Inject constructor(
         com.letta.mobile.data.presence.ConversationRunRegistry(),
     /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
     private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
+    /**
+     * letta-mobile-7mys7 (bzvro.32): the canonical transport the paged timeline reads, so a fork,
+     * edit or rerun places its fork point on the server's stored messages; null in tests.
+     */
+    private val timelineTransport: com.letta.mobile.data.timeline.TimelineTransport? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -1140,14 +1146,19 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
     }
 
-    // letta-mobile-bzvro.15 / .16: fork from a message, and edit-and-resend, opening the fork.
+    // letta-mobile-bzvro.15 / .16 / 7mys7: fork from a message, edit-and-resend and rerun, opening the fork.
     private val conversationBranching by lazy(LazyThreadSafetyMode.NONE) {
         com.letta.mobile.feature.chat.coordination.ChatConversationBranching(
             viewModelScope,
             conversationRepository,
             onError = ::reportComposerError,
+            history = timelineTransport?.let { transport -> transport::branchHistory },
         )
     }
+
+    /** Whether this backend can fork (the embedded runtime cannot), so the page offers the branch actions. */
+    val canBranchConversations: Boolean
+        get() = conversationRepository.canForkConversations()
 
     private fun branchOrigin(open: (agentId: String, conversationId: String) -> Unit) =
         conversationId?.let { id ->
@@ -1160,6 +1171,11 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun editAndResend(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
         branchOrigin(open)?.let { conversationBranching.editAndResend(it, message) }
+    }
+
+    /** letta-mobile-7mys7: forks before the prompt and sends it again in the fork; this conversation is unchanged. */
+    fun rerunInFork(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.rerun(it, message) }
     }
 
     /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */

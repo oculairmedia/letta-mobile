@@ -57,6 +57,8 @@ class SessionScopedConversationRepository @Inject constructor(
     override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String =
         sessionManager.withCurrentSession { it.conversationRepository.recompileConversation(id, dryRun, agentId) }
 
+    override fun canForkConversations(): Boolean = current.canForkConversations()
+
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         sessionManager.withCurrentSession { it.conversationRepository.forkConversation(id, agentId) }
 

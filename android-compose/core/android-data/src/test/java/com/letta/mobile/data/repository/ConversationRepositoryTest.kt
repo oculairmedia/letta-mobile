@@ -8,6 +8,7 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
@@ -31,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -359,6 +361,31 @@ class ConversationRepositoryTest {
         assertTrue(forked.id.value.startsWith("fork-"))
         assertTrue(fakeApi.calls.any { it.startsWith("forkConversation") })
         assertTrue(repository.getConversations("a1").first().any { it.id == forked.id })
+    }
+
+    @Test
+    fun `the embedded runtime cannot fork and never falls through to the REST fork`() = runTest {
+        repository = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
+            localConversationSource = FakeLocalRuntimeConversationSource(),
+            settingsRepository = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(id = "local", mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://runtime"),
+            ),
+        )
+
+        assertFalse(repository.canForkConversations())
+        val failure = runCatching { repository.forkConversation(ConversationId("local-conv-1"), AgentId("a1"), "message-1") }.exceptionOrNull()
+
+        assertTrue(failure is com.letta.mobile.data.chat.branch.BranchUnavailableException)
+        assertTrue(fakeApi.calls.none { it.startsWith("forkConversation") })
+    }
+
+    @Test
+    fun `a remote backend can fork`() {
+        assertTrue(repository.canForkConversations())
     }
 
     @Test

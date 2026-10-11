@@ -111,11 +111,14 @@ internal fun ChatMessageItem(
     // screen/list wiring outside this bead's ownership.
     val onSendAgainMessage = onRerunMessage
     var showMessageActions by remember { mutableStateOf(false) }
-    val actionAvailability = remember(message, copyText, onSendAgainMessage, rerunEnabled) {
+    // letta-mobile-7mys7: fork / edit / rerun, where the screen can open a fork.
+    val branchActions = com.letta.mobile.feature.chat.screen.messageactions.LocalMessageBranchActions.current
+    val actionAvailability = remember(message, copyText, onSendAgainMessage, rerunEnabled, branchActions) {
         messageActionAvailability(
             message = message,
             copyText = copyText,
             sendAgainAvailable = onSendAgainMessage != null && rerunEnabled,
+            branching = branchActions?.support ?: com.letta.mobile.data.chat.projection.BranchActionSupport.None,
         )
     }
     val onLongClick: (() -> Unit)? = if (actionAvailability.hasActions) {
@@ -138,6 +141,7 @@ internal fun ChatMessageItem(
             onDismiss = { showMessageActions = false },
             onCopy = { copyMessageText(context, copyText) },
             onSendAgain = { onSendAgainMessage?.invoke(message) },
+            branch = branchActions,
         ),
     )
 
