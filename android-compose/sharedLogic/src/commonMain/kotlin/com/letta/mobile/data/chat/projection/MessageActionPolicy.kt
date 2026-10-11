@@ -11,13 +11,15 @@ data class MessageActionAvailability(
     val canFork: Boolean = false,
     /** letta-mobile-bzvro.16: "Edit and resend". */
     val canEdit: Boolean = false,
+    /** letta-mobile-7mys7: "Rerun" (fork before the prompt and send it again there). */
+    val canRerun: Boolean = false,
 ) {
     val hasActions: Boolean
-        get() = canCopy || canSelectText || canSendAgain || canFork || canEdit
+        get() = canCopy || canSelectText || canSendAgain || canFork || canEdit || canRerun
 }
 
 /** Which branch actions the conversation's owner supports (its ChatSurfaceCapabilities). */
-data class BranchActionSupport(val fork: Boolean = false, val edit: Boolean = false) {
+data class BranchActionSupport(val fork: Boolean = false, val edit: Boolean = false, val rerun: Boolean = false) {
     companion object {
         val None = BranchActionSupport()
     }
@@ -44,7 +46,8 @@ fun messageActionAvailability(
         canSelectText = hasText,
         canSendAgain = sendAgainAvailable && isResendable(message),
         canFork = branching.fork && ConversationBranchPlanner.canFork(message),
-        canEdit = branching.edit && canEditText(message),
+        canEdit = branching.edit && ConversationBranchPlanner.canEdit(message) && imagesKept(message),
+        canRerun = branching.rerun && ConversationBranchPlanner.canRerun(message),
     )
 }
 
@@ -52,6 +55,8 @@ fun messageActionAvailability(
 private fun isResendable(message: UiMessage): Boolean =
     message.role == "user" && message.content.isNotBlank() && message.attachments.isEmpty()
 
-/** An edit refills the composer with text only, so a prompt with images would lose them. */
-private fun canEditText(message: UiMessage): Boolean =
-    ConversationBranchPlanner.canEdit(message) && message.attachments.isEmpty()
+/**
+ * letta-mobile-7mys7: an edit puts the prompt's images back in the composer with its text, so it
+ * needs their bytes; an image the timeline only keeps a pointer to would be lost.
+ */
+private fun imagesKept(message: UiMessage): Boolean = message.attachments.all { it.base64.isNotEmpty() }
