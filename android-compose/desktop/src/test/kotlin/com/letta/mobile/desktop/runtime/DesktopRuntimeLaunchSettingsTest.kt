@@ -33,6 +33,24 @@ class DesktopRuntimeLaunchSettingsTest {
         ).environment
 
     @Test
+    fun `git found off the inherited PATH is prepended to the child's PATH`() {
+        val git = File(root, "Git/cmd")
+        fun pathFor(extra: File?, inherited: String?) = desktopRuntimeLaunchContext(
+            DesktopRuntimeLaunchInputs(
+                totalMemoryBytes = null,
+                instanceId = "install-1",
+                workingDirectory = root,
+                extraPathDirectory = extra,
+                inheritedPath = inherited,
+            ),
+        ).environment["PATH"]
+
+        assertNull(pathFor(null, "/usr/bin"), "no extra directory leaves the inherited PATH alone")
+        assertEquals(git.absolutePath + File.pathSeparator + "/usr/bin", pathFor(git, "/usr/bin"))
+        assertEquals(git.absolutePath, pathFor(git, null))
+    }
+
+    @Test
     fun `heap is half of memory with a four gigabyte floor`() {
         assertEquals("--max-old-space-size=4096", environmentFor(8)["NODE_OPTIONS"])
         assertEquals("--max-old-space-size=8192", environmentFor(16)["NODE_OPTIONS"])

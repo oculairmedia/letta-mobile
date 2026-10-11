@@ -78,6 +78,15 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     private const val MAX_LOG_BYTES = 5L * 1024L * 1024L
     private const val RESTART_HANDOFF_MS = 15_000L
     private val logLock = Any()
+
+    /** Spawned children, so the next launch can reap a child this process left behind (G04). */
+    private val spawnRegistry = DesktopListenerSpawnRegistry(
+        file = File(System.getProperty("user.home"), ".letta-mobile/runtime/listener-spawn-registry.json"),
+        processTable = JvmDesktopProcessTable,
+        self = JvmDesktopProcessTable::self,
+        logLine = { line -> appendLog(localRuntimeLogFile(), line) },
+    )
+
     private val manager = DesktopLocalRuntimeManager(
         installationProvider = DesktopLettaCodeRuntimeLocator::locate,
         backendDirectory = ::backendDirectory,
@@ -90,6 +99,7 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
         },
         logLine = { line -> appendLog(localRuntimeLogFile(), line) },
         launchContext = DesktopRuntimeLaunchPreference::currentContext,
+        spawnLog = spawnRegistry,
     )
 
     // Concurrent so the supervisor can read it from process threads without this object's monitor.
@@ -119,6 +129,22 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
 
     fun forceRestart() = supervisor.forceRestart()
 
+    /** The runtime card's on/off switch (G05). */
+    fun stopByUser() = supervisor.stopByUser()
+
+    fun startByUser() = supervisor.startByUser()
+
+    /**
+     * Whether git is available to the runtime (G07). Watched from launch until found; an install
+     * puts git on the next spawn's PATH and restarts a running child once.
+     */
+    val gitEnvironment = DesktopGitEnvironmentMonitor(
+        probe = { DesktopGitProbe.forThisMachine().check() },
+        runtimeActive = { manager.isAlive },
+        restartRuntime = { supervisor.forceRestart() },
+        applyPathDirectory = { DesktopRuntimeLaunchPreference.extraPathDirectory = it },
+    )
+
     fun onSystemSuspended() = supervisor.onSuspended()
 
     fun onSystemResumed() = supervisor.onResumed()
@@ -144,6 +170,9 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread(::close, "letta-desktop-runtime-shutdown"))
+        // Before the first spawn: a child a crashed predecessor left behind still holds its port.
+        runCatching { spawnRegistry.reapOrphans() }
+        supervisorScope.launch { gitEnvironment.watchUntilAvailable() }
     }
 
     /** `~/.letta-mobile/local-backend` unless overridden — see [DesktopLocalBackendDirectorySettings]. */
@@ -212,6 +241,7 @@ private class JvmDesktopRuntimeProcess(
     override val descendants: List<DesktopRuntimeProcessHandle>
         get() = process.descendants().map(::JvmDesktopRuntimeProcessHandle).toList()
     override val exitCodeOrNull: Int? get() = runCatching { process.exitValue() }.getOrNull()
+    override val pid: Long? get() = runCatching { process.pid() }.getOrNull()
     override fun destroy() = process.destroy()
     override fun destroyForcibly() = process.destroyForcibly().let { Unit }
     override fun waitFor(timeoutMs: Long): Boolean =
