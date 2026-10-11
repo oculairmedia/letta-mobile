@@ -32,6 +32,7 @@ import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
+import com.letta.mobile.desktop.chat.sendOrBranch
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
@@ -337,7 +338,11 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
     // letta-mobile-7mys7: letta-code's /fork [name], run by the client (the App Server does not).
     if (chatController.conversationManagement.supportsBranching) {
-        add(ComposerCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) { chatController.updateComposerText("/fork ") })
+        add(
+            ComposerCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) {
+                chatController.updateComposerText("/fork ")
+            },
+        )
     }
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
