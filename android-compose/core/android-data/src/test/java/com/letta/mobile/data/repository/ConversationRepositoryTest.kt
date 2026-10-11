@@ -377,7 +377,9 @@ class ConversationRepositoryTest {
         )
 
         assertFalse(repository.canForkConversations())
-        val failure = runCatching { repository.forkConversation(ConversationId("local-conv-1"), AgentId("a1"), "message-1") }.exceptionOrNull()
+        val failure = runCatching {
+            repository.forkConversation(ConversationId("local-conv-1"), AgentId("a1"), "message-1")
+        }.exceptionOrNull()
 
         assertTrue(failure is com.letta.mobile.data.chat.branch.BranchUnavailableException)
         assertTrue(fakeApi.calls.none { it.startsWith("forkConversation") })
