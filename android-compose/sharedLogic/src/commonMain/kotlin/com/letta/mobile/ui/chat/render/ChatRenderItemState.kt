@@ -13,6 +13,8 @@ import kotlinx.collections.immutable.ImmutableSet
 data class ChatRenderItemState(
     val isStreaming: Boolean,
     val activeApprovalRequestId: String?,
+    /** letta-mobile-bzvro.14: approvals answered offline, waiting for the connection. */
+    val queuedApprovalRequestIds: ImmutableSet<String> = kotlinx.collections.immutable.persistentSetOf(),
     val collapsedRunIds: ImmutableSet<String>,
     val expandedReasoningMessageIds: ImmutableSet<String>,
 )
@@ -21,6 +23,7 @@ fun ChatUiState.toChatRenderItemState(): ChatRenderItemState =
     ChatRenderItemState(
         isStreaming = isStreaming,
         activeApprovalRequestId = activeApprovalRequestId,
+        queuedApprovalRequestIds = queuedApprovalRequestIds,
         collapsedRunIds = collapsedRunIds,
         expandedReasoningMessageIds = expandedReasoningMessageIds,
     )

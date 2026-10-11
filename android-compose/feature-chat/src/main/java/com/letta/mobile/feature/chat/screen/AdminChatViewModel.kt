@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
+import com.letta.mobile.data.chat.projection.withQueuedApprovals
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -288,7 +289,10 @@ internal class AdminChatViewModel @Inject constructor(
         conversationRepository = conversationRepository,
         backgroundRefreshScope = viewModelScope,
     )
-    private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
+    private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository) { entry ->
+        // letta-mobile-bzvro.14: over the Iroh channel an answer made offline waits in the outbox.
+        approvalBinding.deliver(entry, overChannel = usesChannelTransport.value)
+    }
     // The route's agent is this screen's for its whole life. The shared chat page reads it from
     // here to draw the agent's mascot (the Touch chat head, the composer companion) and to scope
     // foreign-agent rows out of the timeline (c4igq.4); without it every mascot site fell back
@@ -327,7 +331,10 @@ internal class AdminChatViewModel @Inject constructor(
         val state by _uiState.collectAsState()
         // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
         val parked by approvalBinding.pendingDetails.collectAsState()
-        return androidx.compose.runtime.remember(state, parked) { state.withPendingApprovalDetails(parked) }
+        val queued by approvalBinding.queuedRequestIds.collectAsState()
+        return androidx.compose.runtime.remember(state, parked, queued) {
+            state.withPendingApprovalDetails(parked).withQueuedApprovals(queued)
+        }
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)

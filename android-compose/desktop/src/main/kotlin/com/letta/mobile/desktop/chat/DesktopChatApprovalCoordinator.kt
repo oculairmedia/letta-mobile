@@ -2,11 +2,12 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
 import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
+import com.letta.mobile.data.chat.runtime.ApprovalQueueSource
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.model.UiMessage
-import kotlinx.coroutines.CancellationException
 import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PendingApprovalDetails
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,12 @@ internal class DesktopChatApprovalCoordinator(
     private val _canSubmitApprovals = MutableStateFlow(false)
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
 
+    private val _queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
+
+    /** letta-mobile-bzvro.14: requests answered offline and waiting in the bound gateway's outbox. */
+    val queuedApprovals: StateFlow<Set<String>> = _queuedApprovals.asStateFlow()
+    private var queueJob: Job? = null
+
     private val _pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
 
     /** What each parked control request of the bound gateway offered, by tool call id (empty when it reports none). */
@@ -64,6 +71,7 @@ internal class DesktopChatApprovalCoordinator(
 
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
+        bindQueue(gateway)
         detailsJob?.cancel()
         _pendingApprovalDetails.value = emptyMap()
         val source = gateway as? DesktopPendingApprovalSource ?: return
@@ -73,6 +81,13 @@ internal class DesktopChatApprovalCoordinator(
                 releaseAnsweredCalls(it)
             }
         }
+    }
+
+    private fun bindQueue(gateway: DesktopChatGateway?) {
+        queueJob?.cancel()
+        _queuedApprovals.value = emptySet()
+        val source = gateway as? ApprovalQueueSource ?: return
+        queueJob = scope.launch { source.queuedApprovalRequestIds.collect { _queuedApprovals.value = it } }
     }
 
     private data class SubmissionTarget(

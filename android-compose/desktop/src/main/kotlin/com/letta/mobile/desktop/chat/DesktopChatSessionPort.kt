@@ -136,6 +136,7 @@ internal class DesktopChatSessionPort(
         local = localTimeline.value,
         submittingApprovals = controller.submittingApprovals.value,
         approvalDetails = controller.pendingApprovalDetails.value,
+        queuedApprovals = controller.queuedApprovals.value,
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
@@ -143,15 +144,34 @@ internal class DesktopChatSessionPort(
         controller.replyPresence,
         controller.cancellingConversationId,
         selectedSendQueue(),
-        combine(localTimeline, controller.submittingApprovals, controller.pendingApprovalDetails, ::Triple),
-    ) { surface, presence, cancelling, queue, (local, submitting, details) ->
-        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting, details)
+        approvalInputs(),
+    ) { surface, presence, cancelling, queue, (local, approvals) ->
+        DesktopChatTimelineInputs(
+            surface, presence, cancelling, queue, local,
+            submittingApprovals = approvals.submitting,
+            approvalDetails = approvals.details,
+            queuedApprovals = approvals.queued,
+        )
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
         if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
             localTimeline.update { it.copy(acknowledgedError = null) }
         }
     }
+
+    /** What the cards draw about answers: in flight, parked details, queued offline. */
+    private class ApprovalInputs(
+        val submitting: Set<String>,
+        val details: Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>,
+        val queued: Set<String>,
+    )
+
+    private fun approvalInputs(): Flow<Pair<DesktopChatLocalTimelineState, ApprovalInputs>> = combine(
+        localTimeline,
+        controller.submittingApprovals,
+        controller.pendingApprovalDetails,
+        controller.queuedApprovals,
+    ) { local, submitting, details, queued -> local to ApprovalInputs(submitting, details, queued) }
 
     /**
      * The selected conversation's queue, re-resolved whenever the selection or the canonical route

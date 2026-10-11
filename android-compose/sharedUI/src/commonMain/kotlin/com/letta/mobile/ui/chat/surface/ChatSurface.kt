@@ -76,6 +76,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
 import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalRequestCard
+import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalOwner
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalDecider
 import org.jetbrains.compose.resources.stringResource
 
@@ -439,12 +440,10 @@ private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalReques
     if (!touchInputPending(frame, approval)) return
     TouchInputTray {
         if (approval != null) {
-            val decider = rememberApprovalDecider(
-                approval = approval,
-                activeApprovalRequestId = frame.uiState.activeApprovalRequestId,
-                approvalsEnabled = frame.capabilities.approvals,
-                actions = frame.port.actions,
-            )
+            val owner = remember(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions) {
+                ApprovalOwner.of(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions)
+            }
+            val decider = rememberApprovalDecider(approval, owner)
             ApprovalRequestCard(approval, decider)
         }
         A2uiSurfaceStack(

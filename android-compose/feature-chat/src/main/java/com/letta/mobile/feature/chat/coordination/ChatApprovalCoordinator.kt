@@ -1,5 +1,8 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.chat.approval.OutboxApproval
+import com.letta.mobile.data.chat.approval.OutboxSubmitResult
+import com.letta.mobile.data.chat.approval.OutboxTarget
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.MessageApprovalAnswer
@@ -8,6 +11,11 @@ import kotlinx.coroutines.CancellationException
 
 internal class ChatApprovalCoordinator(
     private val messageRepository: MessageRepository,
+    /**
+     * letta-mobile-bzvro.14: routes an answer through the offline outbox (sent now, or queued while the
+     * link is down); returns null when the answer goes straight to the repository.
+     */
+    private val outbox: suspend (OutboxApproval) -> OutboxSubmitResult? = { null },
 ) {
     suspend fun submitApproval(
         agentId: String,
@@ -24,8 +32,11 @@ internal class ChatApprovalCoordinator(
         if (agentId.isBlank()) return ChatApprovalResult.MissingActiveAgent
 
         return try {
-            messageRepository.submitApproval(answer.toMessageAnswer(AgentId(agentId), activeConversationId))
-            ChatApprovalResult.Submitted
+            val queued = outbox(OutboxApproval.of(OutboxTarget(agentId, activeConversationId), answer))
+            queued?.toChatResult() ?: run {
+                messageRepository.submitApproval(answer.toMessageAnswer(AgentId(agentId), activeConversationId))
+                ChatApprovalResult.Submitted
+            }
         } catch (cancelled: CancellationException) {
             // Not a failed submission: ChatApprovalController must see the cancellation to release
             // the in-flight card, instead of showing an error banner.
@@ -46,7 +57,16 @@ private fun ChatApprovalAnswer.toMessageAnswer(agentId: AgentId, conversationId:
     selectedSuggestionIds = selectedSuggestionIds,
 )
 
+/** letta-mobile-bzvro.14: what the outbox did with an answer, as the chat reports it. */
+private fun OutboxSubmitResult.toChatResult(): ChatApprovalResult = when (this) {
+    OutboxSubmitResult.Sent, OutboxSubmitResult.Duplicate -> ChatApprovalResult.Submitted
+    OutboxSubmitResult.Queued -> ChatApprovalResult.Queued
+    OutboxSubmitResult.NoLongerPending -> ChatApprovalResult.Failed("This approval is no longer pending.")
+}
+
 internal sealed interface ChatApprovalResult {
+    /** letta-mobile-bzvro.14: the link is down; the answer waits in the outbox and sends on reconnect. */
+    data object Queued : ChatApprovalResult
     data object MissingActiveAgent : ChatApprovalResult
     data object MissingActiveConversation : ChatApprovalResult
     data object Submitted : ChatApprovalResult
