@@ -39,34 +39,32 @@ object PairingAdminHandlers {
 
     /** Backward-compatible registration (no QR support). */
     fun register(router: AdminRpcRouter, pairing: IrohPairingService?) {
-        register(router, pairing, qrSigner = NoOpPairQrSigner, qrNodeIdHex = null)
+        register(router, pairing, qrConfig = null)
+    }
+
+    /** Legacy QR registration without a dial hint (desktop/Android in-process mint, tests). */
+    fun register(router: AdminRpcRouter, pairing: IrohPairingService?, qrSigner: PairQrSigner, qrNodeIdHex: String?) {
+        register(router, pairing, qrNodeIdHex?.let { PairingQrConfig(qrSigner, it) })
     }
 
     /**
-     * Register with QR minting enabled. `qrSigner` produces the protocol
-     * signature; `qrNodeIdHex` is the minting identity (the host's Iroh
-     * NodeId — the public key the scanner will dial and authenticate). When
-     * the caller sets `qr: true` AND both are wired, we emit `qr_invite` and
-     * `pair_link`; [dialHint] (the host's ticket or `<node>@host:port`) is
-     * added to the link when known.
+     * Register with optional QR minting. [qrConfig] names the minting identity
+     * (the host's Iroh NodeId — the public key the scanner dials and
+     * authenticates), its signer, and the dial hint (ticket or
+     * `<node>@host:port`). When the caller sets `qr: true` and it is wired, we
+     * emit `qr_invite` and `pair_link`.
      *
-     * Safety: a null or blank `qrNodeIdHex` collapses to the no-signer path
-     * so a misconfigured host never publishes an unsigned QR.
+     * Safety: a null config, a blank NodeId, or the no-op signer collapses to
+     * the no-QR path so a misconfigured host never publishes an unsigned QR.
      */
-    fun register(
-        router: AdminRpcRouter,
-        pairing: IrohPairingService?,
-        qrSigner: PairQrSigner,
-        qrNodeIdHex: String?,
-        dialHint: () -> String? = { null },
-    ) {
+    fun register(router: AdminRpcRouter, pairing: IrohPairingService?, qrConfig: PairingQrConfig?) {
         if (pairing == null) return
-        val qr = QrMinting(qrSigner, qrNodeIdHex, dialHint)
+        val qr = QrMinting(qrConfig)
         router.register("pair.invite.create") { params -> createInvite(pairing, qr, params) }
         router.register("pair.invite.list") { _ -> json.encodeToJsonElement(pairing.listInvites().map(::inviteSummary)) }
         router.register("pair.invite.revoke") { params ->
             val id = params.requireString("invite_id")
-            buildJsonObject { put("revoked", pairing.revokeInvite(id)) }
+            buildJsonObject { put("revoked", pairing.revokeInvite(InviteId(id))) }
         }
         registerPeerMethods(router, pairing)
     }
@@ -111,12 +109,9 @@ object PairingAdminHandlers {
         }
     }
 
-    private class QrMinting(
-        private val signer: PairQrSigner,
-        nodeIdHex: String?,
-        private val dialHint: () -> String?,
-    ) {
-        private val nodeId = nodeIdHex?.takeIf { it.isNotBlank() && signer !is NoOpPairQrSigner }
+    private class QrMinting(private val config: PairingQrConfig?) {
+        private val signer: PairQrSigner = config?.signer ?: NoOpPairQrSigner
+        private val nodeId = config?.nodeIdHex?.takeIf { it.isNotBlank() && signer !is NoOpPairQrSigner }
 
         /** The `qr_invite` envelope + `pair_link`, or null when QR minting is not configured. */
         fun mint(signedSecret: String, expiresAtMs: Long): Pair<String, String>? {
@@ -128,7 +123,7 @@ object PairingAdminHandlers {
                 expiresAtMs = expiresAtMs,
                 signature = signature,
             )
-            val dial = runCatching { dialHint() }.getOrNull()?.takeIf { it.isNotBlank() }
+            val dial = runCatching { config?.dialHint?.invoke() }.getOrNull()?.takeIf { it.isNotBlank() }
             return envelope to PairLink(qrInvite = envelope, dial = dial).encode()
         }
     }
@@ -144,7 +139,7 @@ object PairingAdminHandlers {
         val minted = if (wantQr) qr.mint(signedSecret, invite.expiresAtMs) else null
         return buildJsonObject {
             put("invite", signedSecret)
-            put("invite_id", invite.id)
+            put("invite_id", invite.id.value)
             put("deep_link", invite.deepLink())
             put("expires_at_ms", invite.expiresAtMs)
             put("suggested_name", invite.suggestedName)
@@ -191,7 +186,7 @@ object PairingAdminHandlers {
     }
 
     private fun inviteSummary(invite: PendingPairingInvite): JsonElement = buildJsonObject {
-        put("invite_id", invite.id)
+        put("invite_id", invite.id.value)
         put("suggested_name", invite.suggestedName)
         put("created_at_ms", invite.createdAtMs)
         put("expires_at_ms", invite.expiresAtMs)

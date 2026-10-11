@@ -167,13 +167,7 @@ object AdminRpcRegistry {
             skillsListing = skillsListing,
         )
         ApprovalAdminHandlers.register(router, controller)
-        PairingAdminHandlers.register(
-            router,
-            pairingService,
-            qrSigner = pairingQr?.signer ?: NoOpPairQrSigner,
-            qrNodeIdHex = pairingQr?.nodeIdHex,
-            dialHint = pairingQr?.dialHint ?: { null },
-        )
+        PairingAdminHandlers.register(router, pairingService, pairingQr)
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)
         // letta-mobile-bzvro.37: MemFS / secrets / workspace files for Iroh clients.

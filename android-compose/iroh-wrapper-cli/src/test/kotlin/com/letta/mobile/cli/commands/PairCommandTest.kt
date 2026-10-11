@@ -157,8 +157,8 @@ class PairCommandTest {
         val router = buildPairRouter(keyStore, peers, invites, dial = "203.0.113.7:4501")
 
         val minted = mintInvite(router, buildJsonObject { put("qr", true); put("agent_ids", "agent-1") })
-        val link = assertNotNull(com.letta.mobile.data.pairing.PairLink.parse(minted.pairLink))
-        val envelope = assertNotNull(PairQrEnvelope.decode(link.qrInvite))
+        val link = checkNotNull(com.letta.mobile.data.pairing.PairLink.parse(minted.pairLink)) { "pair_link must parse" }
+        val envelope = checkNotNull(PairQrEnvelope.decode(link.qrInvite)) { "envelope must decode" }
         assertEquals(
             com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity.nodeIdHexFromSecretBytes(keyStore.loadOrCreate()),
             envelope.nodeIdHex,

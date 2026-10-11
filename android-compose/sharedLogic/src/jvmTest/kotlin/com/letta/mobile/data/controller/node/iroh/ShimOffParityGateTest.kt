@@ -355,6 +355,9 @@ class ShimOffParityGateTest {
         // pairing rows address a peer by node id; reflection.set carries settings
         put("node_id", PEER_NODE_ID)
         put("capabilities", "chat.read")
+        // dpv7m.1: pair.invite.revoke addresses an invite by its non-secret id (an unknown id
+        // answers revoked=false, which is still a native success).
+        put("invite_id", "0123456789abcdef")
         put("trigger", "manual")
         put("step_count", "5")
         // lgns8.9 addressable rows: a schedule (cron task), a catalog tool, and

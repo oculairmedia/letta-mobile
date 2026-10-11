@@ -72,23 +72,27 @@ data class PairLink(val qrInvite: String, val dial: String?) {
             }
         }
 
+        /** Decode `%XX` escapes (and `+` as space); null on a malformed escape. */
         internal fun percentDecode(value: String): String? {
             val bytes = ArrayList<Byte>(value.length)
             var i = 0
             while (i < value.length) {
-                val c = value[i]
-                if (c == '%') {
-                    if (i + 2 >= value.length) return null
-                    val hi = value[i + 1].digitToIntOrNull(16) ?: return null
-                    val lo = value[i + 2].digitToIntOrNull(16) ?: return null
-                    bytes += ((hi shl 4) or lo).toByte()
-                    i += 3
-                } else {
-                    bytes += (if (c == '+') " " else c.toString()).encodeToByteArray().toList()
-                    i++
-                }
+                val token = decodeTokenAt(value, i) ?: return null
+                bytes += token.bytes
+                i += token.span
             }
             return bytes.toByteArray().decodeToString()
+        }
+
+        private class DecodedToken(val bytes: List<Byte>, val span: Int)
+
+        private fun decodeTokenAt(value: String, index: Int): DecodedToken? {
+            val c = value[index]
+            if (c != '%') return DecodedToken((if (c == '+') " " else c.toString()).encodeToByteArray().toList(), 1)
+            val hex = value.substring(index + 1).take(2)
+            val byte = hex.takeIf { it.length == 2 && it.all { d -> d.digitToIntOrNull(16) != null } }?.toInt(16)
+                ?: return null
+            return DecodedToken(listOf(byte.toByte()), 3)
         }
     }
 }

@@ -22,7 +22,7 @@ class PairingInviteStoreTest {
         val invite = cli.createInvite("phone")
         val onDisk = String(Files.readAllBytes(invites))
         assertFalse(invite.secret in onDisk, "the invite file must hold only a hash of the secret")
-        assertTrue(invite.id in onDisk)
+        assertTrue(invite.id.value in onDisk)
     }
 
     @Test

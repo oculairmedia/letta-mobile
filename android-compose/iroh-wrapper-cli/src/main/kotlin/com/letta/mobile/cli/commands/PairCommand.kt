@@ -17,6 +17,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.PairingAdminHandlers
+import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
 import com.letta.mobile.qr.QrCode
 import com.letta.mobile.qr.QrRenderer
 import kotlinx.coroutines.runBlocking
@@ -209,9 +210,8 @@ internal fun buildPairRouter(
     val nodeId = PairNodeIdFactory.fromSecretKeyStore(keyStore)
     val pairing = IrohPairingService(FilePairedPeerStore(peerStore), FilePairingInviteStore(inviteStore))
     return AdminRpcRouter().also { router ->
-        PairingAdminHandlers.register(router, pairing, HmacPairQrSigner(keyStore), nodeId) {
-            dial?.takeIf { it.isNotBlank() } ?: nodeId
-        }
+        val qr = PairingQrConfig(HmacPairQrSigner(keyStore), nodeId) { dial?.takeIf { it.isNotBlank() } ?: nodeId }
+        PairingAdminHandlers.register(router, pairing, qr)
     }
 }
 

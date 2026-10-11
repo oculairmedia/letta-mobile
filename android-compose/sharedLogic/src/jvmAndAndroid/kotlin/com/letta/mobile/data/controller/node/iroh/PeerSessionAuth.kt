@@ -51,9 +51,8 @@ internal class PeerSessionAuth(
     val authenticated = AtomicBoolean(policy.preAuthenticates(remoteId) || initiallyPaired)
 
     fun authenticate(token: String?, peerName: String?): Decision {
-        if (pairing != null && token != null && token.startsWith(IrohPairingService.INVITE_TOKEN_PREFIX)) {
-            return redeem(pairing, token.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX), peerName)
-        }
+        val inviteSecret = inviteSecretOf(token)
+        if (pairing != null && inviteSecret != null) return redeem(pairing, inviteSecret, peerName)
         if (pairing?.isPaired(remoteId) == true) return acceptPaired(alreadyPaired = false)
         return when (val outcome = verifier.verify(remoteId, token)) {
             IrohBearerAuthVerifier.Outcome.Authenticated -> {
@@ -63,6 +62,11 @@ internal class PeerSessionAuth(
             else -> reject(outcome)
         }
     }
+
+    /** The one-time secret when [token] is an `invite:<secret>` redemption, else null. */
+    private fun inviteSecretOf(token: String?): String? =
+        token?.takeIf { it.startsWith(IrohPairingService.INVITE_TOKEN_PREFIX) }
+            ?.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX)
 
     private fun redeem(pairing: IrohPairingService, secret: String, peerName: String?): Decision {
         // Invite guessing shares the NodeId's failure budget with bearer guessing.

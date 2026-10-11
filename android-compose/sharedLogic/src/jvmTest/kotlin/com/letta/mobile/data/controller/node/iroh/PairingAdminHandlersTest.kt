@@ -245,9 +245,11 @@ class PairingAdminHandlersTest {
     fun qrInviteCarriesAScannablePairLinkWithTheDialHint() = runTest {
         val fixedId = "abcd1234".repeat(8)
         val r = AdminRpcRouter().also {
-            PairingAdminHandlers.register(it, IrohPairingService(InMemoryPairedPeerStore()), FixedSigner("sig"), fixedId) {
-                "$fixedId@203.0.113.7:4501"
-            }
+            PairingAdminHandlers.register(
+                it,
+                IrohPairingService(InMemoryPairedPeerStore()),
+                PairingQrConfig(FixedSigner("sig"), fixedId) { "$fixedId@203.0.113.7:4501" },
+            )
         }
         val result = resultOf(dispatch(r, "pair.invite.create", mapOf("qr" to true)))
         val link = com.letta.mobile.data.pairing.PairLink.parse(result["pair_link"]!!.jsonPrimitive.content)

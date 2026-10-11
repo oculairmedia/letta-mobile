@@ -37,7 +37,7 @@ class IrohPairingService(
         val secret: String,
         val suggestedName: String,
         val expiresAtMs: Long,
-        val id: String = PendingPairingInvite.idFor(secret),
+        val id: InviteId = PendingPairingInvite.idFor(secret),
         val capabilities: Set<String> = IrohPeerCapabilities.CHAT_ROLE,
         val agentIds: Set<String>? = null,
     ) {
@@ -89,7 +89,7 @@ class IrohPairingService(
         invites.add(invite)
         Telemetry.event(
             "IrohPairing", "invite.created",
-            "inviteId" to invite.id,
+            "inviteId" to invite.id.value,
             "expiresAtMs" to invite.expiresAtMs,
             "capabilities" to invite.capabilities.sorted().joinToString(","),
             "agentScoped" to (invite.agentIds != null),
@@ -120,7 +120,7 @@ class IrohPairingService(
             return RedeemResult.Rejected("invalid")
         }
         if (nowMs() >= invite.expiresAtMs) {
-            Telemetry.event("IrohPairing", "redeem.rejected", "reason" to "expired", "inviteId" to invite.id)
+            Telemetry.event("IrohPairing", "redeem.rejected", "reason" to "expired", "inviteId" to invite.id.value)
             return RedeemResult.Rejected("expired")
         }
         val peer = PairedPeer(
@@ -136,7 +136,7 @@ class IrohPairingService(
             "IrohPairing", "peer.paired",
             "nodeId" to nodeId,
             "name" to peer.name,
-            "inviteId" to invite.id,
+            "inviteId" to invite.id.value,
             "capabilities" to peer.capabilities.sorted().joinToString(","),
         )
         return RedeemResult.Paired(peer)
@@ -151,9 +151,9 @@ class IrohPairingService(
     }
 
     /** Revoke an unredeemed invite by its non-secret id (protocol §11). */
-    fun revokeInvite(id: String): Boolean {
+    fun revokeInvite(id: InviteId): Boolean {
         val removed = invites.remove(id)
-        if (removed) Telemetry.event("IrohPairing", "invite.revoked", "inviteId" to id)
+        if (removed) Telemetry.event("IrohPairing", "invite.revoked", "inviteId" to id.value)
         return removed
     }
 
