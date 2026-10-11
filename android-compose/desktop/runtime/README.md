@@ -12,8 +12,14 @@ client (`@letta-ai/letta-code@0.34.8`). `desktop/scripts/npm-ci.ps1` installs it
 - **Nested older copies of letta-code.** `@letta-ai/letta-code@0.34.8` depends on
   `@letta-ai/letta-agent-sdk@0.8.24`, which pins `@letta-ai/letta-code@0.33.7`, and that SDK in
   turn nests `@letta-ai/letta-agent-sdk@0.8.21` with `@letta-ai/letta-code@0.33.3`. Both nested
-  copies declare a `postinstall` (`scripts/postinstall-patches.js`), and `npm-ci.ps1` does not
-  pass `--ignore-scripts`, so the scripts run at build time and the bundle is larger.
+  copies declare a `postinstall` (`scripts/postinstall-patches.js`), which runs at install time.
+  Their paths exceed the 260-character limit WiX enforces in the MSI, so
+  `desktop/scripts/stage-letta-code-runtime.ps1` removes the SDK's nested `node_modules` (and an
+  orphan `letta-code/node_modules/@letta-ai/letta-code` tree with no `package.json`) when it
+  stages the runtime. The SDK, which letta-code loads for Workflow runs, resolves
+  `@letta-ai/letta-code` with `require.resolve` and so uses the bundled 0.34.8 runtime; its own
+  dependencies (`@letta-ai/letta-client`, `ajv`) sit one level up. The longest staged path is
+  then about 250 characters under the CI packaging root.
 - An npm `overrides` entry was evaluated for 0.33.6 and does **not** dedupe these copies (the
   dependency is circular through the SDK, and the shrinkwrap wins); the lock is left as resolved.
 - `@janhapke/sharp-electron@0.35.3-electron.1` is a third-party sharp build by an individual
