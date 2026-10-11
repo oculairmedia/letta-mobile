@@ -847,11 +847,7 @@ class DesktopChatController(
         override suspend fun openBranch(branch: DesktopOpenedBranch) {
             if (closed) return
             reloadConversationsAndSelect(preferConversationId = branch.conversation.id.value)
-            val draft = branch.draft ?: return
-            updateComposerText(draft.text)
-            draft.images.forEach(::attachImage)
-            // letta-mobile-7mys7: a rerun sends the prompt into the fork at once.
-            if (branch.sendNow) send()
+            applyBranchDraft(branch)
         }
 
         override fun showError(message: String) {

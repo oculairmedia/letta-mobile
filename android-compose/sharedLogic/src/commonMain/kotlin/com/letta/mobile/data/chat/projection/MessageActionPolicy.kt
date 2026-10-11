@@ -32,7 +32,6 @@ fun messageActionAvailability(
     branching: BranchActionSupport = BranchActionSupport.None,
 ): MessageActionAvailability {
     val eligibleRole = message.role == "user" || message.role == "assistant"
-    val hasText = copyText.isNotBlank()
     if (!eligibleRole || message.isReasoning) {
         return MessageActionAvailability(
             canCopy = false,
@@ -40,16 +39,24 @@ fun messageActionAvailability(
             canSendAgain = false,
         )
     }
-
-    return MessageActionAvailability(
-        canCopy = hasText,
-        canSelectText = hasText,
-        canSendAgain = sendAgainAvailable && isResendable(message),
-        canFork = branching.fork && ConversationBranchPlanner.canFork(message),
-        canEdit = branching.edit && ConversationBranchPlanner.canEdit(message) && imagesKept(message),
-        canRerun = branching.rerun && ConversationBranchPlanner.canRerun(message),
+    val hasText = copyText.isNotBlank()
+    return branching.applyTo(
+        message,
+        MessageActionAvailability(
+            canCopy = hasText,
+            canSelectText = hasText,
+            canSendAgain = sendAgainAvailable && isResendable(message),
+        ),
     )
 }
+
+/** letta-mobile-7mys7: the branch actions [message] allows, given what the owner supports. */
+private fun BranchActionSupport.applyTo(message: UiMessage, base: MessageActionAvailability): MessageActionAvailability =
+    base.copy(
+        canFork = fork && ConversationBranchPlanner.canFork(message),
+        canEdit = edit && ConversationBranchPlanner.canEdit(message) && imagesKept(message),
+        canRerun = rerun && ConversationBranchPlanner.canRerun(message),
+    )
 
 /** The current coordinator drops attachments, so a resend of a prompt with images would be lossy. */
 private fun isResendable(message: UiMessage): Boolean =

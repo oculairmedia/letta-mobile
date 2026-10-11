@@ -29,6 +29,17 @@ internal data class DesktopOpenedBranch(
     val sendNow: Boolean = false,
 )
 
+/**
+ * letta-mobile-7mys7: puts an opened branch's prompt (text and images) in the composer and, for a
+ * rerun, sends it into the fork at once.
+ */
+internal fun DesktopChatController.applyBranchDraft(branch: DesktopOpenedBranch) {
+    val draft = branch.draft ?: return
+    updateComposerText(draft.text)
+    draft.images.forEach(::attachImage)
+    if (branch.sendNow) send()
+}
+
 /** What [DesktopConversationBrancher] needs from the controller. */
 internal interface DesktopBranchHost {
     val gateway: DesktopChatGateway?

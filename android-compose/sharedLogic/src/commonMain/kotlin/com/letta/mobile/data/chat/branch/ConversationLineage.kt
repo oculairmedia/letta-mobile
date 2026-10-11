@@ -25,7 +25,7 @@ class ConversationLineage(
     fun parentOf(conversationId: String): ConversationParent? = _parents.value[conversationId]
 
     fun record(forkId: String, parent: ConversationParent) {
-        if (forkId.isBlank() || parent.conversationId.isBlank() || forkId == parent.conversationId) return
+        if (!isLink(forkId, parent)) return
         _parents.update { current -> (current - forkId + (forkId to parent)).newest(MAX_ENTRIES) }
         persist()
     }
@@ -35,6 +35,10 @@ class ConversationLineage(
         _parents.update { it - conversationId }
         persist()
     }
+
+    /** Two real conversations, and not one conversation pointing at itself. */
+    private fun isLink(forkId: String, parent: ConversationParent): Boolean =
+        forkId.isNotBlank() && parent.conversationId.isNotBlank() && forkId != parent.conversationId
 
     private fun load(): Map<String, ConversationParent> =
         store.getString(key).orEmpty().lineSequence().mapNotNull(::decode).toMap(LinkedHashMap())
