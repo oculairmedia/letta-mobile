@@ -105,18 +105,19 @@ class NotificationDeliveryCoordinator @Inject constructor(
         return NotificationDeliveryDecision.Suppressed(reason)
     }
 
-    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, Any?>> {
+    /** Telemetry attributes, rendered as text so the list stays one concrete type. */
+    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, String>> {
         val sanitizedPreview = NotificationContentSanitizer.sanitizePreview(previewText)
         return arrayOf(
             "conversationId" to conversationId,
             "notificationId" to (notificationId ?: "<none>"),
-            "messageIdPresent" to (!messageId.isNullOrBlank()),
-            "runIdPresent" to (!runId.isNullOrBlank()),
+            "messageIdPresent" to (!messageId.isNullOrBlank()).toString(),
+            "runIdPresent" to (!runId.isNullOrBlank()).toString(),
             "source" to source.name,
             "phase" to phase.name,
-            "isFinal" to isFinal,
-            "rawPreviewLength" to previewText.length,
-            "normalizedPreviewLength" to sanitizedPreview.normalizedLength,
+            "isFinal" to isFinal.toString(),
+            "rawPreviewLength" to previewText.length.toString(),
+            "normalizedPreviewLength" to sanitizedPreview.normalizedLength.toString(),
             "previewFallbackReason" to sanitizedPreview.fallbackReason.name,
         )
     }
