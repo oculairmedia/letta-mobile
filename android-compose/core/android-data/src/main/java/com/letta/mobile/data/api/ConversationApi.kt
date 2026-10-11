@@ -127,7 +127,8 @@ class ConversationApi @Inject constructor(
         val body = response.body<kotlinx.serialization.json.JsonObject>()
         val forkedId = (body["id"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
             ?: throw ApiException(response.status.value, "fork returned no conversation id")
-        return if (body.containsKey("agent_id")) forkJson.decodeFromJsonElement(Conversation.serializer(), body) else getConversation(ConversationId(forkedId))
+        if (!body.containsKey("agent_id")) return getConversation(ConversationId(forkedId))
+        return forkJson.decodeFromJsonElement(Conversation.serializer(), body)
     }
 
     private val forkJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
