@@ -11,7 +11,7 @@ import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
@@ -409,7 +409,7 @@ private fun backgroundTasksHeaderToggle(context: DesktopShellContext, frame: Des
     val activeSubagents = frame.lists.activeSubagents
     return {
         DesktopBackgroundTasksToggle(
-            runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+            runningCount = activeSubagents.visibleRunningCount(),
             onClick = { navigator.showBackgroundTasks = true },
             inBar = true,
         )

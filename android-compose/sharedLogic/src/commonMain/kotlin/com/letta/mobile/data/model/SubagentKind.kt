@@ -13,6 +13,15 @@ package com.letta.mobile.data.model
  */
 enum class SubagentKind {
     Reflection,
+
+    /**
+     * letta-mobile-ulcg6: letta-code's memory upkeep worker (memory git-conflict
+     * and invalid-memory repair; wire label "Memory", always silent).
+     */
+    Memory,
+
+    /** Sleep-time runs marketed as "Dreaming". */
+    Dream,
     GeneralPurpose,
     Fork,
     Recall,
@@ -24,7 +33,7 @@ enum class SubagentKind {
      * its integration step). Hidden from the active-subagent chrome.
      */
     val isBackground: Boolean
-        get() = this == Reflection
+        get() = this == Reflection || this == Memory || this == Dream
 
     companion object {
         /** Trimmed, case-insensitive; any label starting with "reflection" is [Reflection]. */
@@ -32,6 +41,8 @@ enum class SubagentKind {
             val normalized = raw?.trim()?.lowercase().orEmpty()
             return when {
                 normalized.startsWith(REFLECTION_PREFIX) -> Reflection
+                normalized == "memory" -> Memory
+                normalized.startsWith("dream") -> Dream
                 normalized in GENERAL_PURPOSE_LABELS -> GeneralPurpose
                 normalized == "fork" -> Fork
                 normalized == "recall" -> Recall

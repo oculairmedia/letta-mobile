@@ -87,6 +87,21 @@ class WsActiveSubagentSource(
         }
     }
 
+    /** letta-mobile-ulcg6 (PR4): the parent conversation's entries, for the shared roster. */
+    override val rosterEntries: StateFlow<List<SubagentEntry>> =
+        parentConversationId
+            .filterNotNull()
+            .flatMapLatest { conversationId ->
+                repository.activeSubagentsFlow(SubagentParentScope(parentAgentId, conversationId))
+            }
+            .stateIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                initialValue = parentConversationId.value?.let { conversationId ->
+                    repository.currentActiveSubagents(SubagentParentScope(parentAgentId, conversationId))
+                }.orEmpty(),
+            )
+
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
         parentConversationId
             .filterNotNull()
