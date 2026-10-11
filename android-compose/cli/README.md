@@ -355,14 +355,14 @@ For the installable host distribution, build `:appserver-cli:distZip` and run
 command below remains useful when debugging the broader mobile CLI harness.
 
 ```powershell
-.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.33.6 --listen ws://127.0.0.1:4500"
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --listen ws://127.0.0.1:4500"
 .\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>"
-.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.33.6 --dry-run"
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --dry-run"
 ```
 
 Use `--dry-run` to print the generated process command without launching a
 server. Use repeated `--letta-arg` values when the host Letta command is a tool
-wrapper such as `pnpm dlx @letta-ai/letta-code@0.33.6`.
+wrapper such as `pnpm dlx @letta-ai/letta-code@0.34.8`.
 
 Loopback development uses no WebSocket auth. Any non-loopback listen host must
 be launched with `--ws-auth`; clients then pass the same token as
