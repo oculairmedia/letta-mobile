@@ -196,22 +196,63 @@ class LocalBackendAdminStoreEntityReaderTest {
         val context = assertNotNull(store.agentContextProjected(LocalBackendFixtureStore.AGENT_ID, null))
         assertEquals(LocalBackendFixtureStore.SYSTEM_PROMPT, context.getValue("system_prompt").jsonPrimitive.content)
         assertEquals(1, context.getValue("num_messages").jsonPrimitive.content.toInt())
-        assertEquals(1, context.getValue("messages").jsonArray.size)
+        // letta-mobile-cyh28: the transcript is no longer fanned out into the answer.
+        assertEquals(0, context.getValue("messages").jsonArray.size)
     }
 
     @Test
-    fun agentContextReportsAdminShimsTokenEstimates() {
+    fun agentContextEstimatesSectionsLikeLettaCodeAndSaysItIsPartial() {
         val (store, _) = store()
         val context = assertNotNull(store.agentContextProjected(LocalBackendFixtureStore.AGENT_ID, null))
-        // admin-shim: ceil(systemPrompt.length / 4) and messages * 50.
+        // letta-mobile-cyh28: ceil(chars / 4) per section; "hello" is one 5-char text part.
         val expectedSystem = (LocalBackendFixtureStore.SYSTEM_PROMPT.length + 3) / 4
         assertEquals(expectedSystem, context.getValue("num_tokens_system").jsonPrimitive.content.toInt())
-        assertEquals(50, context.getValue("num_tokens_messages").jsonPrimitive.content.toInt())
-        assertEquals(
-            expectedSystem + 50,
-            context.getValue("context_window_size_current").jsonPrimitive.content.toInt(),
+        assertEquals(2, context.getValue("num_tokens_messages").jsonPrimitive.content.toInt())
+        assertEquals(expectedSystem + 2, context.getValue("context_window_size_current").jsonPrimitive.content.toInt())
+        // No record names a window: 0 means unknown, never a made-up 200k.
+        assertEquals(0, context.getValue("context_window_size_max").jsonPrimitive.content.toInt())
+        assertEquals("estimate", context.getValue("source").jsonPrimitive.content)
+        assertEquals("false", context.getValue("calibrated").jsonPrimitive.content)
+    }
+
+    @Test
+    fun agentContextMatchesTheSectionsToTheReportedTotal() {
+        val (store, root) = store()
+        File(root, "agents/${LocalBackendFixtureStore.AGENT_ID}.json").writeText(
+            """{"id":"${LocalBackendFixtureStore.AGENT_ID}","name":"F","model_settings":{"context_window_limit":200000}}""",
         )
+        val context = assertNotNull(store.agentContextProjected(AgentContextQuery(LocalBackendFixtureStore.AGENT_ID, null, reportedTotal = 12_000)))
+        assertEquals(12_000, context.getValue("context_window_size_current").jsonPrimitive.content.toInt())
         assertEquals(200_000, context.getValue("context_window_size_max").jsonPrimitive.content.toInt())
+        val sections = listOf("num_tokens_system", "num_tokens_core_memory", "num_tokens_summary_memory", "num_tokens_messages", "num_tokens_functions_definitions")
+            .sumOf { context.getValue(it).jsonPrimitive.content.toInt() }
+        assertEquals(12_000, sections)
+        assertEquals("true", context.getValue("calibrated").jsonPrimitive.content)
+        assertEquals("client", context.getValue("total_source").jsonPrimitive.content)
+    }
+
+    @Test
+    fun agentContextReadsASessionCompactionAndTheRecordedUsage() {
+        val (store, root) = store()
+        val dir = LocalBackendFixtureStore.conversationDir(root, LocalBackendFixtureStore.AGENT_ID)
+        File(dir, "system-prompt.json").writeText("""{"content":"${"s".repeat(400)}${"m".repeat(400)}","coreMemory":"${"m".repeat(400)}"}""")
+        File(dir, "messages.jsonl").writeText(
+            listOf(
+                """{"type":"message","id":"e1","message":{"id":"m1","role":"user","content":"${"x".repeat(4000)}"}}""",
+                """{"type":"compaction","id":"e2","firstKeptEntryId":null,"summary":"s","tokensBefore":0,""" +
+                    """"message":{"id":"m2","role":"user","content":"${"y".repeat(40)}","timestamp":5,"metadata":{"compaction":{"summary":"s"}}}}""",
+                """{"type":"message","id":"e3","message":{"id":"m3","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"totalTokens":9000},"timestamp":9}}""",
+            ).joinToString("\n", postfix = "\n"),
+        )
+        val context = assertNotNull(store.agentContextProjected(LocalBackendFixtureStore.AGENT_ID, null))
+        assertEquals(100, context.getValue("num_tokens_system").jsonPrimitive.content.toInt())
+        assertEquals(100, context.getValue("num_tokens_core_memory").jsonPrimitive.content.toInt())
+        assertEquals(10, context.getValue("num_tokens_summary_memory").jsonPrimitive.content.toInt())
+        // The pre-compaction message is gone; only the reply after it is counted.
+        assertEquals(1, context.getValue("num_tokens_messages").jsonPrimitive.content.toInt())
+        assertEquals(9_000, context.getValue("context_window_size_current").jsonPrimitive.content.toInt())
+        assertEquals("recorded", context.getValue("total_source").jsonPrimitive.content)
+        assertEquals(2, context.getValue("num_messages").jsonPrimitive.content.toInt())
     }
 
     @Test

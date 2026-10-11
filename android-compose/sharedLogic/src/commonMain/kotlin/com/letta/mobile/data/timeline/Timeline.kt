@@ -178,6 +178,11 @@ enum class TimelineMessageType {
      * a silent dropped spinner. letta-mobile-5s1n.
      */
     ERROR,
+    /**
+     * letta-mobile-kr39h: a conversation compaction's summary row (`summary_message`), rendered
+     * as a divider with the summary behind a disclosure. Content is the summary text.
+     */
+    COMPACTION,
     OTHER,
 }
 

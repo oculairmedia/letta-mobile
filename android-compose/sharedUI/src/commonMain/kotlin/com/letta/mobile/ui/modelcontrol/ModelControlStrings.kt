@@ -20,6 +20,7 @@ object ModelControlStrings {
     const val LOADING_MODELS = "Loading models…"
     const val CURRENT_MODEL = "Current model"
     const val EFFORT_DEFAULT = "Default"
+    const val EFFORT = "Effort"
 
     fun noMatch(query: String) = "No models match \"$query\""
 

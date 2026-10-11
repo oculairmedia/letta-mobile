@@ -158,7 +158,13 @@ open class LocalBackendAdminStore(
 
     /** See [LocalBackendContextReader.agentContextProjected]. */
     fun agentContextProjected(agentId: String, conversationId: String?): JsonObject? =
-        contextReader.agentContextProjected(agentId, conversationId)
+        agentContextProjected(AgentContextQuery(agentId, conversationId))
+
+    /** letta-mobile-cyh28: as above, matched to the client's streamed total when it sends one. */
+    fun agentContextProjected(query: AgentContextQuery): JsonObject? = contextReader.agentContextProjected(query)
+
+    /** See [LocalBackendContextReader.transcriptTokens]. */
+    fun transcriptTokens(query: AgentContextQuery): Long? = contextReader.transcriptTokens(query)
 
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"

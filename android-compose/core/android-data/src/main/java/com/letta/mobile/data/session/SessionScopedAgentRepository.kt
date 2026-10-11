@@ -112,6 +112,13 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
         sessionManager.withCurrentSession { it.agentRepository.getContextWindow(agentId, conversationId) }
 
+    override suspend fun getContextBreakdown(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        reportedTotal: Int?,
+    ): ContextWindowOverview =
+        sessionManager.withCurrentSession { it.agentRepository.getContextBreakdown(agentId, conversationId, reportedTotal) }
+
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit): Unit =
         current.checkpointAndRestoreConfig(agentId, operation)
 

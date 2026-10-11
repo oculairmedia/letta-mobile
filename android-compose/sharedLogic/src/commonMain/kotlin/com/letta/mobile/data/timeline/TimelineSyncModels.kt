@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.EventMessage
+import com.letta.mobile.data.model.SummaryMessage
 import com.letta.mobile.data.model.HiddenReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.PingMessage
@@ -53,6 +54,8 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         // run aborts mid-flight (previously absorbed into UnknownMessage
         // and silently dropped).
         is com.letta.mobile.data.model.ErrorMessage -> TimelineMessageType.ERROR to text
+        // letta-mobile-kr39h: a compaction summary is a divider in the conversation.
+        is SummaryMessage -> if (hasServerId) TimelineMessageType.COMPACTION to summary.orEmpty() else return null
         else -> return null
     }
     val attachments = when (this) {
@@ -61,7 +64,7 @@ fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): Tim
         is SystemMessage -> this.attachments
         is ToolReturnMessage -> this.attachments
         is ReasoningMessage, is ToolCallMessage, is ApprovalRequestMessage,
-        is ApprovalResponseMessage, is HiddenReasoningMessage, is EventMessage,
+        is ApprovalResponseMessage, is HiddenReasoningMessage, is EventMessage, is SummaryMessage,
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }

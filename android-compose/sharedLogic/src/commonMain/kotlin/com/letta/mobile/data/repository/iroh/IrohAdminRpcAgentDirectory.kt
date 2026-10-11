@@ -186,10 +186,15 @@ class IrohAdminRpcAgentDirectory(
         )
     }
 
-    suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
+    suspend fun getContextWindow(
+        agentId: AgentId,
+        conversationId: ConversationId? = null,
+        reportedTotal: Int? = null,
+    ): ContextWindowOverview {
         val body = jsonBody {
             put("agent_id", agentId.value)
             conversationId?.let { put("conversation_id", it.value) }
+            reportedTotal?.let { put("reported_total", it) }
         }
         val query = conversationId?.let { "?conversation_id=${it.value}" } ?: ""
         return adminRpcDecoded(

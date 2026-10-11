@@ -96,6 +96,11 @@ internal fun ChatMessageItem(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    // letta-mobile-kr39h: a compaction summary is a divider, never a bubble.
+    if (message.isCompaction) {
+        com.letta.mobile.ui.chat.surface.timeline.rows.CompactionDividerRow(message.content, modifier)
+        return
+    }
     val isUser = message.role == "user"
     val showAvatar = false
     val context = LocalContext.current

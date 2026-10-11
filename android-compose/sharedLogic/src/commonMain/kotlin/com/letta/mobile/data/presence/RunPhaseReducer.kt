@@ -72,6 +72,9 @@ object RunPhaseReducer {
             is RuntimeEventPayload.CommandStarted,
             is RuntimeEventPayload.CommandFinished,
             is RuntimeEventPayload.ApprovalClassified,
+            // letta-mobile-kr39h: compaction feeds the status line and the context reading only.
+            is RuntimeEventPayload.CompactionStarted,
+            is RuntimeEventPayload.CompactionFinished,
             -> base
         }
         // letta-mobile-bzvro.7: the status line's detail, folded from the same event.

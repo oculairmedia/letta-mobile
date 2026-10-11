@@ -70,6 +70,8 @@ object ShellAgentPanelTags {
     const val AGENT_MENU = "shell-agent-panel-agent-menu"
     /** The focused agent's mascot (or its orb) at the head of the panel. */
     const val HERO = "shell-agent-panel-hero"
+    /** letta-mobile-3io8k: the host's model-and-context card under the agent's name. */
+    const val AGENT_CARD = "shell-agent-panel-agent-card"
 }
 
 /**
@@ -77,12 +79,16 @@ object ShellAgentPanelTags {
  * sections (Memory, Schedules, Channels, Skills) and New chat, the pinned conversations under an
  * Active / Archived / All filter, the canvases, and Settings. The desktop shows it as the sidebar
  * beside the agent rail; a phone shows it in the navigation drawer. [modifier] sizes and paints it.
+ *
+ * [agentCard] (letta-mobile-3io8k) is drawn under the agent's name: the host's model-and-context
+ * card. Null draws nothing there; it is never drawn on the Home page.
  */
 @Composable
 fun ShellAgentPanel(
     state: ShellAgentPanelState,
     actions: ShellAgentPanelActions,
     modifier: Modifier = Modifier,
+    agentCard: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -90,7 +96,7 @@ fun ShellAgentPanel(
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.lg),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
-        ShellPanelHeader(state = state, actions = actions)
+        ShellPanelHeader(state = state, actions = actions, agentCard = agentCard)
         ShellPanelSections(state = state, actions = actions)
         ShellPanelLibrary(state = state, actions = actions)
         if (state.showSettings) {
@@ -152,10 +158,15 @@ fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier
  * or "Home" while the fleet page is open; the agent menu has nothing to act on then, so it hides.
  */
 @Composable
-private fun ShellPanelHeader(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
-    Box(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
-        ShellPanelTitleSlot(state = state, onEditAgent = actions.onEditAgent, modifier = Modifier.fillMaxWidth())
-        if (!state.home) Box(Modifier.align(Alignment.TopEnd)) { ShellAgentOverflowMenu(actions = actions) }
+private fun ShellPanelHeader(state: ShellAgentPanelState, actions: ShellAgentPanelActions, agentCard: (@Composable () -> Unit)?) {
+    Column(Modifier.fillMaxWidth().padding(start = LettaDimens.Space.hair, bottom = LettaDimens.Space.lg)) {
+        Box(Modifier.fillMaxWidth()) {
+            ShellPanelTitleSlot(state = state, onEditAgent = actions.onEditAgent, modifier = Modifier.fillMaxWidth())
+            if (!state.home) Box(Modifier.align(Alignment.TopEnd)) { ShellAgentOverflowMenu(actions = actions) }
+        }
+        if (agentCard != null && !state.home) {
+            Box(Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm).testTag(ShellAgentPanelTags.AGENT_CARD)) { agentCard() }
+        }
     }
 }
 

@@ -116,6 +116,50 @@ class AppServerRuntimeEventMapperLiveStatusTest {
         assertFalse(RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Running).isPresentationOnly)
     }
 
+    @Test
+    fun aCompactionEventStartsACompactionNextToItsRawFrame() {
+        val payloads = map(LettaCode0336Frames.COMPACTION_EVENT)
+        assertEquals("event_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(payloads[0]).messageType)
+        assertEquals(RuntimeEventPayload.CompactionStarted(trigger = "context_window_overflow"), payloads[1])
+    }
+
+    @Test
+    fun theSummaryMessageFinishesItWithItsStats() {
+        val finished = assertIs<RuntimeEventPayload.CompactionFinished>(map(LettaCode0336Frames.COMPACTION_SUMMARY)[1])
+        assertEquals("The user and agent set up the repo.", finished.summary)
+        val stats = requireNotNull(finished.stats)
+        assertEquals(150_000L, stats.contextTokensBefore)
+        assertEquals(20_000L, stats.contextTokensAfter)
+        assertEquals(200_000L, stats.contextWindow)
+        assertEquals(48, stats.messagesCountBefore)
+        assertEquals(12, stats.messagesCountAfter)
+        assertEquals("context_window_overflow", stats.trigger)
+    }
+
+    @Test
+    fun aSummaryWithoutStatsStillFinishes() {
+        val payloads = map(
+            """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":1,
+               "emitted_at":"x","idempotency_key":"k","delta":{"message_type":"summary_message","compaction_stats":"x"}}""",
+        )
+        assertEquals(RuntimeEventPayload.CompactionFinished(summary = "", stats = null), payloads[1])
+    }
+
+    @Test
+    fun anotherEventKindIsOnlyTheRawFrame() {
+        val payloads = map(
+            """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":1,
+               "emitted_at":"x","idempotency_key":"k","delta":{"message_type":"event_message","event_type":"memory_update"}}""",
+        )
+        assertIs<RuntimeEventPayload.RemoteStreamFrame>(payloads.single())
+    }
+
+    @Test
+    fun compactionPayloadsAreAdvisory() {
+        assertTrue(RuntimeEventPayload.CompactionStarted().isAdvisory)
+        assertTrue(RuntimeEventPayload.CompactionFinished().isPresentationOnly)
+    }
+
     private fun map(json: String): List<RuntimeEventPayload> =
         mapper.map(command, AppServerProtocol.decodeFrame(json.trimIndent())).map { it.payload }
 

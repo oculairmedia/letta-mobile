@@ -89,6 +89,8 @@ object RuntimeEventServerFrameMapper {
         is RuntimeEventPayload.StatusNotice,
         is RuntimeEventPayload.CommandStarted,
         is RuntimeEventPayload.CommandFinished,
+        is RuntimeEventPayload.CompactionStarted,
+        is RuntimeEventPayload.CompactionFinished,
         -> listOf(runActivity(payload, context))
         else -> emptyList()
     }

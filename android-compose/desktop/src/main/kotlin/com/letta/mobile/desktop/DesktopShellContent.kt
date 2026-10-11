@@ -213,6 +213,8 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onNewCanvas = { canvasShell.createNew(focus.selectedAgentId) },
             onArchiveCanvas = canvasShell.library::setArchived,
         ),
+        // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
+        agentCard = { DesktopAgentContextCard(context, frame) },
     )
 }
 

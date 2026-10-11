@@ -76,6 +76,9 @@ internal class AdminChatModelCoordinator(
         }
     }
 
+    /** letta-mobile-3io8k: a pick goes to `model.update` on the conversation (else it updates the agent). */
+    fun picksTargetConversation(): Boolean = conversationModelTarget() != null
+
     private fun conversationModelTarget(): ConversationModelTarget? {
         if (modelControl == null || !settingsRepository.activeBackendIsIroh()) return null
         val conversation = conversationId()?.takeIf { it.isNotBlank() } ?: return null

@@ -3,7 +3,11 @@ package com.letta.mobile.data.context
 import com.letta.mobile.data.transport.ServerFrame
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import com.letta.mobile.runtime.CompactionStats
+import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -124,6 +128,66 @@ class ContextTokenReadingsTest {
 
         assertNull(readings.latest(AGENT, "local-conv-576"))
         assertNull(readings.latest(AGENT, "conv-default-$AGENT"))
+    }
+
+    private fun compacted(before: Long?, after: Long?, conversation: String = CONV_A) = ServerFrame.RunActivity(
+        id = "ra-1",
+        ts = "2026-10-09T10:00:00Z",
+        agentId = AGENT,
+        conversationId = conversation,
+        payload = RuntimeEventPayload.CompactionFinished(
+            summary = "s",
+            stats = CompactionStats(contextTokensBefore = before, contextTokensAfter = after),
+        ),
+    )
+
+    @Test
+    fun aCompactionTakesItsDropOffTheLastTotalAndFlagsItEstimated() = runTest {
+        val readings = ContextTokenReadings()
+        readings.record(usage(contextTokens = 160_000))
+
+        readings.record(compacted(before = 150_000, after = 20_000))
+
+        assertEquals(30_000, readings.latest(AGENT, CONV_A))
+        assertTrue(readings.isEstimated(AGENT, CONV_A))
+    }
+
+    @Test
+    fun theNextProviderTotalIsExactAgain() = runTest {
+        val readings = ContextTokenReadings()
+        readings.record(usage(contextTokens = 160_000))
+        readings.record(compacted(before = 150_000, after = 20_000))
+
+        readings.record(usage(contextTokens = 31_500))
+
+        assertEquals(31_500, readings.latest(AGENT, CONV_A))
+        assertFalse(readings.isEstimated(AGENT, CONV_A))
+    }
+
+    @Test
+    fun theEstimateNeverFallsBelowTheTranscriptNorRisesAboveTheLastTotal() = runTest {
+        val readings = ContextTokenReadings()
+        readings.record(usage(contextTokens = 40_000))
+        readings.record(compacted(before = 150_000, after = 20_000))
+        assertEquals(20_000, readings.latest(AGENT, CONV_A))
+
+        val grown = ContextTokenReadings()
+        grown.record(usage(contextTokens = 40_000))
+        grown.record(compacted(before = 10_000, after = 12_000))
+        assertEquals(40_000, grown.latest(AGENT, CONV_A))
+    }
+
+    @Test
+    fun aCompactionWithoutAPriorTotalOrStatsWritesNothing() = runTest {
+        val readings = ContextTokenReadings()
+        readings.record(compacted(before = 150_000, after = 20_000))
+        assertNull(readings.latest(AGENT, CONV_A))
+        assertFalse(readings.isEstimated(AGENT, CONV_A))
+
+        readings.record(usage(contextTokens = 160_000))
+        readings.record(compacted(before = null, after = 20_000))
+        assertEquals(160_000, readings.latest(AGENT, CONV_A))
+        assertFalse(readings.isEstimated(AGENT, CONV_A))
     }
 
     private companion object {

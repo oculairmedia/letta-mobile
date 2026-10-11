@@ -151,6 +151,12 @@ class IrohAgentRepository(
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
         directory().getContextWindow(agentId, conversationId)
 
+    override suspend fun getContextBreakdown(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        reportedTotal: Int?,
+    ): ContextWindowOverview = directory().getContextWindow(agentId, conversationId, reportedTotal)
+
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) {
         operation()
     }

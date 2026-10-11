@@ -19,6 +19,11 @@
     <string name="run_status_command_succeeded">%1$s finished</string>
     <string name="run_status_command_failed">%1$s failed</string>
     <string name="run_status_command_dismiss">Dismiss</string>
+    <!-- letta-mobile-kr39h: an automatic conversation compaction. -->
+    <string name="run_status_compacting">Compacting the conversation…</string>
+    <string name="run_status_compacted">Conversation compacted</string>
+    <!-- "Conversation compacted · 48 → 12 messages". -->
+    <string name="run_status_compacted_counts">Conversation compacted · %1$d → %2$d messages</string>
     <!-- letta-mobile-bzvro.9: the one action an error card offers. -->
     <string name="run_error_action_retry">Retry</string>
     <string name="run_error_action_switch_model">Switch model</string>

@@ -393,6 +393,7 @@ private fun TimelineEvent.uiSemanticIdentityOrNull(): String? = when (this) {
         TimelineMessageType.USER,
         TimelineMessageType.SYSTEM,
         TimelineMessageType.TOOL_RETURN,
+        TimelineMessageType.COMPACTION,
         TimelineMessageType.OTHER -> null
     }
 }

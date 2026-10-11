@@ -23,6 +23,10 @@
     <string name="rows_state_expanded">Expanded</string>
     <string name="rows_state_collapsed">Collapsed</string>
 
+    <!-- letta-mobile-kr39h: where the conversation was compacted. -->
+    <string name="rows_compaction_title">Conversation compacted</string>
+    <string name="rows_compaction_empty">No summary recorded</string>
+
     <!-- Reasoning and run activity -->
     <string name="rows_thought">Thought</string>
     <string name="rows_thinking">Thinking…</string>

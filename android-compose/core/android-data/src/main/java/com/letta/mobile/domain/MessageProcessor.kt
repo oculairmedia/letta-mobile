@@ -133,7 +133,7 @@ class MessageProcessor @Inject constructor(
                             onEmit(appMessage)
                         }
 
-                        is EventMessage -> Unit
+                        is EventMessage, is com.letta.mobile.data.model.SummaryMessage -> Unit
 
                         is HiddenReasoningMessage -> {
                         }

@@ -47,6 +47,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal fun DesktopAgentSidebar(
     state: DesktopAgentSidebarState,
     actions: DesktopAgentSidebarActions,
+    agentCard: (@Composable () -> Unit)? = null,
 ) {
     // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
     // Temporarily hidden — restore by rendering WorkPlaySwitcher above the panel. The lens itself
@@ -55,6 +56,7 @@ internal fun DesktopAgentSidebar(
         ShellAgentPanel(
             state = state.toShellPanelState(),
             actions = actions.toShellPanelActions(state.mode),
+            agentCard = agentCard,
             modifier = Modifier
                 .width(231.dp)
                 .fillMaxHeight()

@@ -430,6 +430,7 @@ private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
         TimelineMessageType.USER,
         TimelineMessageType.TOOL_RETURN,
         TimelineMessageType.SYSTEM,
+        TimelineMessageType.COMPACTION,
         TimelineMessageType.OTHER -> null
     }
 }

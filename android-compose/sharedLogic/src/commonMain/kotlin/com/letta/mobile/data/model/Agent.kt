@@ -32,6 +32,20 @@ data class ContextWindowOverview(
     @SerialName("num_tokens_summary_memory") val numTokensSummaryMemory: Int = 0,
     @SerialName("num_tokens_functions_definitions") val numTokensFunctionsDefinitions: Int = 0,
     @SerialName("num_tokens_messages") val numTokensMessages: Int = 0,
+    /**
+     * letta-mobile-cyh28: `"estimate"` when the local-backend estimator computed this answer;
+     * null from a host that predates it (whose section numbers were placeholders).
+     */
+    @SerialName("source") val source: String? = null,
+    /** The sections were matched to an exact total, so they sum to [contextWindowSizeCurrent]. */
+    @SerialName("calibrated") val calibrated: Boolean? = null,
+    /** [numTokensFunctionsDefinitions] is the residual of an exact total ("Tools & other"), not a count. */
+    @SerialName("tools_derived") val toolsDerived: Boolean? = null,
+    /** `client` or `recorded`: where the exact total came from. */
+    @SerialName("total_source") val totalSource: String? = null,
+    /** False when memory could not be told apart from the system prompt (letta-code 0.26.1). */
+    @SerialName("memory_split") val memorySplit: Boolean? = null,
+    @SerialName("window_source") val windowSource: String? = null,
 )
 
 @Serializable

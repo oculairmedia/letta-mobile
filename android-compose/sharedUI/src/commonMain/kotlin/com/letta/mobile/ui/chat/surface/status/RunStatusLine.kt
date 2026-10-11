@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.runtime.CommandActivity
 import com.letta.mobile.data.runtime.CommandState
+import com.letta.mobile.data.runtime.LiveCompaction
 import com.letta.mobile.data.runtime.LiveNotice
 import com.letta.mobile.data.runtime.LiveRetry
 import com.letta.mobile.data.runtime.LoopPhase
@@ -40,6 +41,9 @@ import com.letta.mobile.sharedui.resources.run_status_command_dismiss
 import com.letta.mobile.sharedui.resources.run_status_command_failed
 import com.letta.mobile.sharedui.resources.run_status_command_running
 import com.letta.mobile.sharedui.resources.run_status_command_succeeded
+import com.letta.mobile.sharedui.resources.run_status_compacted
+import com.letta.mobile.sharedui.resources.run_status_compacted_counts
+import com.letta.mobile.sharedui.resources.run_status_compacting
 import com.letta.mobile.sharedui.resources.run_status_processing
 import com.letta.mobile.sharedui.resources.run_status_retry_in
 import com.letta.mobile.sharedui.resources.run_status_retry_now
@@ -63,6 +67,7 @@ object RunStatusTestTags {
     const val COMMAND = "run-status-command"
     const val COMMAND_OUTPUT = "run-status-command-output"
     const val COMMAND_DISMISS = "run-status-command-dismiss"
+    const val COMPACTION = "run-status-compaction"
 }
 
 /**
@@ -86,7 +91,7 @@ fun RunStatusLine(
     var dismissed by remember { mutableStateOf(emptySet<String>()) }
     val commands = status.commands.filter { it.running || it.commandId !in dismissed }
     val phase = phaseLabel(status).takeUnless { companionShowing && it is PhaseLabel.Fixed }
-    if (nothingToShow(phase, status.notice, commands)) return
+    if (nothingToShow(phase, status, commands)) return
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -97,13 +102,22 @@ fun RunStatusLine(
         commands.forEach { command ->
             CommandCard(command, onDismiss = { dismissed = dismissed + command.commandId })
         }
-        if (phase != null) PhaseRow(phase, now)
-        status.notice?.let { NoticeText(it) }
+        StatusDetails(status, phase, now)
     }
 }
 
-private fun nothingToShow(phase: PhaseLabel?, notice: LiveNotice?, commands: List<CommandActivity>): Boolean =
-    phase == null && notice == null && commands.isEmpty()
+/** The compaction, phase and notice lines, in that order; each only when it has something to say. */
+@Composable
+private fun StatusDetails(status: RuntimeLiveStatus, phase: PhaseLabel?, now: () -> Long) {
+    status.compaction?.let { CompactionRow(it) }
+    if (phase != null) PhaseRow(phase, now)
+    status.notice?.let { NoticeText(it) }
+}
+
+private fun nothingToShow(phase: PhaseLabel?, status: RuntimeLiveStatus, commands: List<CommandActivity>): Boolean =
+    phase == null && commands.isEmpty() && status.hasNoDetail()
+
+private fun RuntimeLiveStatus.hasNoDetail(): Boolean = notice == null && compaction == null
 
 /** What the phase row says, before any retry countdown is filled in; null when nothing runs. */
 internal sealed interface PhaseLabel {
@@ -174,6 +188,32 @@ private fun retryText(retry: LiveRetry, now: () -> Long): String {
     }
     val provider = retry.provider?.takeIf { it.isNotBlank() } ?: return counted
     return counted + " " + stringResource(Res.string.run_status_retry_provider, provider)
+}
+
+/** letta-mobile-kr39h: "Compacting the conversation…", then what it came to. */
+@Composable
+private fun CompactionRow(compaction: LiveCompaction) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        modifier = Modifier.testTag(RunStatusTestTags.COMPACTION),
+    ) {
+        if (compaction.running) CircularProgressIndicator(Modifier.size(SPINNER_SIZE), strokeWidth = SPINNER_STROKE)
+        Text(
+            text = compactionText(compaction),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun compactionText(compaction: LiveCompaction): String {
+    if (compaction.running) return stringResource(Res.string.run_status_compacting)
+    val counts = compaction.messageCounts ?: return stringResource(Res.string.run_status_compacted)
+    return stringResource(Res.string.run_status_compacted_counts, counts.first, counts.second)
 }
 
 @Composable

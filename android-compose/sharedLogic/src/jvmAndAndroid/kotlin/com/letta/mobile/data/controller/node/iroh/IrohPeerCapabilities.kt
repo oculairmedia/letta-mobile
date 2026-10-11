@@ -105,6 +105,9 @@ object IrohPeerCapabilities {
         // disconnect and model.exposure.set change what EVERY client sees, so
         // they stay admin.full via the else branch.
         method == "model.update" -> CONVERSATION_MANAGE
+        // letta-mobile-joigh: the context limit is the same model-settings edit (agent or
+        // conversation `context_window_limit`, via letta-code's /context-limit).
+        method == "conversation.context_limit" -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
         // lgns8.16: reflection/sleeptime settings control WHEN the agent
@@ -198,6 +201,8 @@ object IrohPeerCapabilities {
     private val CONVERSATION_MANAGE_METHODS = setOf(
         "conversation.create", "conversation.update", "conversation.archive",
         "conversation.restore", "conversation.delete", "conversation.fork",
+        // letta-mobile-57cta: rewrites the conversation's transcript, like fork/update.
+        "conversation.compact",
     )
 
     // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.

@@ -129,6 +129,18 @@ class ShimOffParityGateTest {
         override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
             AppServerInboundFrame.ConversationUpdateResponse(command.requestId, true, convObj())
 
+        // letta-mobile-57cta: conversation.compact runs /compact; letta-mobile-joigh: conversation.context_limit runs /context-limit.
+        override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand) =
+            AppServerInboundFrame.ExecuteCommandResponse(
+                command.requestId,
+                true,
+                output = if (command.commandId == "context-limit") {
+                    "Current conversation max context set to ${command.args} tokens."
+                } else {
+                    "Compaction completed. Message buffer length reduced from 4 to 2."
+                },
+            )
+
         override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
             com.letta.mobile.data.transport.appserver.AppServerConversationForkResponse(command.requestId, true, "conv-1", null)
 
@@ -358,6 +370,8 @@ class ShimOffParityGateTest {
         put("model_handle", "openai/gpt-sol")
         put("handle", "openai/gpt-sol")
         put("exposed", false)
+        // letta-mobile-joigh: conversation.context_limit.
+        put("tokens", 200_000)
         if (method == "schedule.create") {
             put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
             put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))
