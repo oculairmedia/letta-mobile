@@ -191,16 +191,20 @@ class UseCase {
         if (heights.isEmpty()) return elements
         var changed = false
         val synced = elements.map { el ->
-            val height = heights[el.id]
-            if (el is Element.Text && height != null && kotlin.math.abs(el.measuredHeight - height) >= 0.5f) {
-                changed = true
-                el.copy(measuredHeight = height)
-            } else {
+            val height = (el as? Element.Text)?.driftedTo(heights[el.id])
+            if (height == null) {
                 el
+            } else {
+                changed = true
+                (el as Element.Text).copy(measuredHeight = height)
             }
         }
         return if (changed) synced else elements
     }
+
+    /** [height] when it is more than half a pixel from what this text has; null otherwise. */
+    private fun Element.Text.driftedTo(height: Float?): Float? =
+        height?.takeIf { kotlin.math.abs(measuredHeight - it) >= 0.5f }
 
     /** Replace the text of a single [Element.Text], or of a shape that [canHoldText]. */
     fun updateText(

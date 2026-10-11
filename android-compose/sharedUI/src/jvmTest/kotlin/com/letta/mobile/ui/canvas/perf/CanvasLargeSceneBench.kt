@@ -65,16 +65,23 @@ class CanvasLargeSceneBench {
     fun bench() {
         if (System.getenv("CANVAS_BENCH") != "1") return
         val sizes = (System.getenv("CANVAS_BENCH_SIZES") ?: "500,2000,10000").split(',').map { it.trim().toInt() }
-        for (n in sizes) {
-            log("=== N=$n ===")
-            val payload = CanvasLargeSceneFixtures.scene(n)
-            val parts = (System.getenv("CANVAS_BENCH_PARTS") ?: "data,hit,render,session").split(',').toSet()
-            if ("data" in parts) dataPath(payload)
-            if ("hit" in parts) hitTesting(payload)
-            if ("render" in parts) profiled { render(payload) }
-            if ("session" in parts && n <= 2000) sessionOps(payload)
-        }
+        val parts = (System.getenv("CANVAS_BENCH_PARTS") ?: "data,hit,render,session").split(',').toSet()
+        for (n in sizes) runSize(n, parts)
         File("build/canvas-bench").apply { mkdirs() }.resolve("results.txt").writeText(out.toString())
+    }
+
+    /** The stages named in [parts] on a board of [n] elements. */
+    private fun runSize(n: Int, parts: Set<String>) {
+        log("=== N=$n ===")
+        val payload = CanvasLargeSceneFixtures.scene(n)
+        val stages = linkedMapOf<String, () -> Unit>(
+            "data" to { dataPath(payload) },
+            "hit" to { hitTesting(payload) },
+            "render" to { profiled { render(payload) } },
+            // The notebook store is slow enough on big boards that 2,000 elements is the useful top.
+            "session" to { if (n <= 2000) profiled { sessionOps(payload) } },
+        )
+        stages.filterKeys { it in parts }.values.forEach { it() }
     }
 
     /** Runs [block] under a JFR recording written to `CANVAS_BENCH_JFR`, when that is set. */
