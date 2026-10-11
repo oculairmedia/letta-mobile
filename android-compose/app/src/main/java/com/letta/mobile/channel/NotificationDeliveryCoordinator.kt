@@ -44,7 +44,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
 
         val previewText = NotificationContentSanitizer.sanitizePreview(candidate.previewText)
 
-        if (previewText.fallbackApplied && (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal)) {
+        if (previewText.fallbackApplied && candidate.awaitsFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
         }
 
@@ -57,7 +57,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
             return candidate.suppressed(NotificationSuppressionReason.ForegroundConversation, notificationId)
         }
 
-        if (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal) {
+        if (candidate.awaitsFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
         }
 
@@ -134,3 +134,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
             messagePreview = previewText,
         )
 }
+
+/** A partial or not-yet-final candidate: its preview can still change, so it waits. */
+private val NotificationDeliveryCandidate.awaitsFinal: Boolean
+    get() = phase == NotificationCandidatePhase.Partial || !isFinal
