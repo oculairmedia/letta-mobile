@@ -290,6 +290,7 @@ class ChannelHeartbeatSyncTest {
             currentConversationTracker = CurrentConversationTracker(),
             syncStateStore = stateStore,
             publisher = publisher,
+            attentionPrefs = com.letta.mobile.testutil.FakeAttentionPrefs(),
         )
 
         val sync = ChannelHeartbeatSync(

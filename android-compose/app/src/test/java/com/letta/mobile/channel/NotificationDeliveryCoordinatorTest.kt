@@ -7,6 +7,8 @@ import com.letta.mobile.data.channel.NotificationDeferralReason
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.channel.NotificationDeliveryDecision
 import com.letta.mobile.data.channel.NotificationSuppressionReason
+import com.letta.mobile.data.notify.AttentionPrefs
+import com.letta.mobile.testutil.FakeAttentionPrefs
 import com.letta.mobile.testutil.FakeChannelNotificationPublisher
 import com.letta.mobile.testutil.FakeChannelSyncStateStore
 import com.letta.mobile.util.Telemetry
@@ -42,6 +44,19 @@ class NotificationDeliveryCoordinatorTest {
 
         assertEquals(
             NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.DuplicateNotification),
+            decision,
+        )
+        assertTrue(fixture.publisher.published.isEmpty())
+    }
+
+    @Test
+    fun `suppresses every candidate from a muted agent`() {
+        val fixture = createFixture(mutedAgentIds = setOf("agent-1"))
+
+        val decision = fixture.coordinator.submit(candidate())
+
+        assertEquals(
+            NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.MutedAgent),
             decision,
         )
         assertTrue(fixture.publisher.published.isEmpty())
@@ -185,6 +200,7 @@ class NotificationDeliveryCoordinatorTest {
         @Suppress("UNUSED_PARAMETER") activeReplyStreams: Set<String> = emptySet(),
         notified: MutableMap<String, String> = mutableMapOf(),
         publisherAccepted: Boolean = true,
+        mutedAgentIds: Set<String> = emptySet(),
     ): Fixture {
         val tracker = CurrentConversationTracker().apply { setCurrent(currentConversationId) }
         val stateStore = FakeChannelSyncStateStore(initialNotified = notified)
@@ -195,6 +211,7 @@ class NotificationDeliveryCoordinatorTest {
                 currentConversationTracker = tracker,
                 syncStateStore = stateStore,
                 publisher = publisher,
+                attentionPrefs = FakeAttentionPrefs(AttentionPrefs(mutedAgentIds = mutedAgentIds)),
             ),
             publisher = publisher,
             notified = stateStore.notified,

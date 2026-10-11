@@ -8,6 +8,7 @@ import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.channel.NotificationDeliveryDecision
 import com.letta.mobile.data.channel.NotificationSuppressionReason
+import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +36,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
     private val currentConversationTracker: CurrentConversationTracker,
     private val syncStateStore: IChannelSyncStateStore,
     private val publisher: IChannelNotificationPublisher,
+    private val attentionPrefs: AttentionPrefsRepository,
 ) : NotificationDelivery {
     override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision {
         val notificationId = candidate.notificationIdentity
@@ -44,6 +46,11 @@ class NotificationDeliveryCoordinator @Inject constructor(
 
         if (previewText.fallbackApplied && (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal)) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
+        }
+
+        // letta-mobile-bzvro.27: a muted agent posts nothing.
+        if (attentionPrefs.prefs.value.isMuted(candidate.agentId)) {
+            return candidate.suppressed(NotificationSuppressionReason.MutedAgent, notificationId)
         }
 
         if (currentConversationTracker.current == candidate.conversationId) {

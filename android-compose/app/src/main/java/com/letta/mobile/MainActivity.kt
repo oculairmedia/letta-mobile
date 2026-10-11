@@ -14,6 +14,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.mascot.ProvideMascotShell
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
+                    LocalAttentionPrefs provides deps.attentionPrefs,
                 ) {
                     ProvideMascotShell(
                         agents = deps.agentRepository.agents,

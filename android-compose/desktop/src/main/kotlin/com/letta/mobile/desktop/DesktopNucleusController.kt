@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.notify.AttentionCopy
 import dev.nucleusframework.autolaunch.AutoLaunch
 import dev.nucleusframework.autolaunch.AutoLaunchState
 import dev.nucleusframework.nativehttp.NativeHttpClient
@@ -384,6 +385,18 @@ internal class DesktopNucleusController(
 
         override fun onFailed(tag: String, group: String, errorCode: Int) {
             toastReplyHandlers.remove(tag)
+        }
+    }
+
+    /**
+     * letta-mobile-bzvro.27: an agent is parked on a tool approval. The toast body and its Open
+     * button both bring the conversation forward; the decision itself is made in the app.
+     */
+    fun notifyApprovalNeeded(title: String, message: String, onOpen: () -> Unit) {
+        scope.launch(Dispatchers.IO) {
+            notification(title = title, message = message, onActivated = onOpen) {
+                button(AttentionCopy.OPEN_ACTION) { onOpen() }
+            }.send()
         }
     }
 
