@@ -155,3 +155,16 @@ guardrail skips its files. Build, tests and compiler warnings still apply.
 Pressing or tapping picked an element within a fixed 12dp, which a fingertip on a thin line misses.
 `DrawBox(pickTolerance = ...)` is read at the moment of each press, so a host that knows the press
 came from a finger can widen it without changing mouse or pen precision. Null keeps 12dp.
+
+### 12. Large boards: culling, a pannable cached layer, caches that hit (letta-mobile-24zur.1)
+
+The cached layer of unchanging elements was recorded for exactly the screen, so every pan, zoom
+or change to any element re-recorded every element on the board. `RenderIndex` keeps each
+element's paint bounds (per instance) and a 512-unit grid. `StaticLayer` records only the
+elements painting into the screen plus half a screen on each side, replays that recording shifted
+while a pan stays within the margin, and re-records for a change only when it paints into the
+recorded region. `PathCache` was keyed on `positions`, a new list on every read, so it never hit;
+it is keyed on `samples` and caches the uniform-width check too. `ImageBitmapCache` treats new
+bytes with the same content as a hit (a drawing parsed afresh re-decoded every image) and drops
+the bitmaps of images not drawn lately once decoded images pass 64 MB. Hit testing skips a stroke
+whose box is out of reach and no longer sorts a drawing already in order. Tests: `RenderIndexTest`.
