@@ -437,6 +437,7 @@ internal fun ToolPolicy.toWireAllowlist(registry: ExternalToolRegistry?): List<S
     return allowedTools
         .map { it.value }
         .plus(registry?.listAdvertisedTools().orEmpty().map { it.name })
+        .plus(registry?.offeredTools().orEmpty().map { it.name })
         .distinct()
         .sorted()
 }

@@ -7,6 +7,8 @@ import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.controller.extras.MutableToolSource
 import com.letta.mobile.data.controller.extras.ToolAdvertisementState
 import com.letta.mobile.data.controller.extras.ToolSource
+import com.letta.mobile.data.meridian.AgentToolsMode
+import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -142,16 +144,39 @@ class ExternalToolReadvertisementTest {
         assertTrue(server.runtimeStarts.isEmpty())
     }
 
+    /** letta-mobile-jna0o.9: each runtime_start, first or re-issued, carries its own agent's agent-tools-mode. */
+    @Test
+    fun eachRuntimeIsAdvertisedItsAgentsToolsMode() = harness(
+        modes = AgentToolsModePolicy(perAgent = mapOf("agent-2" to AgentToolsMode.META, "agent-3" to AgentToolsMode.CLI)),
+    ) { server, registry, controller ->
+        val meta = AppServerRuntimeScope("agent-2", "conv-3")
+        val cli = AppServerRuntimeScope("agent-3", "conv-4")
+        controller.start(conv1)
+        controller.start(meta)
+        controller.start(cli)
+        assertEquals(listOf("canvas_open"), server.toolsOf(conv1))
+        assertEquals(listOf("meridian"), server.toolsOf(meta))
+        assertNull(server.runtimeStarts.last().externalTools, "cli advertises nothing")
+
+        registry.addSource(ToolSource.static("plugin.a", listOf(Tool("a_one"))))
+        advanceTimeBy(ExternalToolReadvertiser.DEBOUNCE_MS + 1)
+
+        assertEquals(listOf("canvas_open", "a_one"), server.toolsOf(conv1))
+        assertEquals(listOf("meridian"), server.toolsOf(meta))
+        assertEquals(emptyList<String>(), server.toolsOf(cli))
+    }
+
     private suspend fun DefaultAppServerController.start(scope: AppServerRuntimeScope) {
         startRuntime(AgentId(scope.agentId), ConversationId(scope.conversationId))
     }
 
     private fun harness(
         fixed: List<HostExternalTool> = listOf(Tool("canvas_open")),
+        modes: AgentToolsModePolicy? = null,
         body: suspend TestScope.(FakeToolAppServer, ExternalToolRegistry, DefaultAppServerController) -> Unit,
     ) = runTest {
         val server = FakeToolAppServer()
-        val registry = ExternalToolRegistry.hostTools(fixed)
+        val registry = ExternalToolRegistry.hostTools(fixed).let { modes?.apply(it) ?: it }
         var requests = 0
         val controller = DefaultAppServerController(
             client = server,
