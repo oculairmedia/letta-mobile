@@ -10,21 +10,26 @@ package com.letta.mobile.data.model
  * reflection run was ever hidden. Every surface that decides visibility (the
  * Android chip bar, rings and linger tick, the desktop Background tasks panel)
  * must ask this classifier instead of comparing strings.
+ *
+ * letta-mobile-iczm7: letta-code's memory upkeep workers (git-conflict repair, invalid-memory
+ * repair) run as subagentType `memory` (wire label "Memory"), always silent. Like reflection
+ * (dreaming) they are background work, shown only on the Dreaming surface.
  */
 enum class SubagentKind {
     Reflection,
     GeneralPurpose,
     Fork,
     Recall,
+    Memory,
     Other,
     ;
 
     /**
-     * Background work the user did not ask to see (sleeptime reflection and
-     * its integration step). Hidden from the active-subagent chrome.
+     * Background work the user did not ask to see (sleeptime reflection, its
+     * integration step, memory upkeep). Hidden from the active-subagent chrome.
      */
     val isBackground: Boolean
-        get() = this == Reflection
+        get() = this == Reflection || this == Memory
 
     companion object {
         /** Trimmed, case-insensitive; any label starting with "reflection" is [Reflection]. */
@@ -35,11 +40,13 @@ enum class SubagentKind {
                 normalized in GENERAL_PURPOSE_LABELS -> GeneralPurpose
                 normalized == "fork" -> Fork
                 normalized == "recall" -> Recall
+                normalized == MEMORY -> Memory
                 else -> Other
             }
         }
 
         private const val REFLECTION_PREFIX = "reflection"
+        private const val MEMORY = "memory"
         private val GENERAL_PURPOSE_LABELS = setOf("general-purpose", "general purpose", "general_purpose")
     }
 }
