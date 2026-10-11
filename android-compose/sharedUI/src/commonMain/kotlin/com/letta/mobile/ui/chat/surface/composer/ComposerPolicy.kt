@@ -168,23 +168,16 @@ internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: 
  * one shown; null while the chip cannot change (locked, or a change still pending).
  */
 internal fun nextPermissionMode(state: ChatPermissionModeUiState?): AppServerPermissionMode? {
-    if (state == null || !state.canChange || state.options.isEmpty()) return null
-    val current = state.options.indexOf(state.unconfirmed ?: state.selected)
-    return state.options[(current + 1).mod(state.options.size)]
+    val options = state?.takeIf { it.canChange }?.options ?: return null
+    if (options.isEmpty()) return null
+    val current = options.indexOf(state.unconfirmed ?: state.selected)
+    return options[(current + 1).mod(options.size)]
 }
 
-/** Shift+Tab at the prompt cycles the permission mode, as Letta Desktop's composer does. Returns whether it was consumed. */
-internal fun composerModeCycleKeyHandled(
-    eventKey: Key,
-    eventType: KeyEventType,
-    shiftPressed: Boolean,
-    state: ChatPermissionModeUiState?,
-    onSelect: (AppServerPermissionMode) -> Unit,
-): Boolean {
-    if (eventType != KeyEventType.KeyDown || eventKey != Key.Tab || !shiftPressed) return false
-    val next = nextPermissionMode(state) ?: return false
-    onSelect(next)
-    return true
+/** Shift+Tab, the key that cycles the permission mode at the prompt (as Letta Desktop's composer does). */
+internal fun isModeCycleKey(eventKey: Key, eventType: KeyEventType, shiftPressed: Boolean): Boolean {
+    if (eventType != KeyEventType.KeyDown) return false
+    return shiftPressed && eventKey == Key.Tab
 }
 
 /** One key event at the prompt, with what Enter would do. */

@@ -55,7 +55,9 @@ class ApprovalAdminHandlersTest {
         installRecordingTransport()
         val controller = RecordingController()
         val params = approvalParams(
-            """[{"type":"approval","approval_request_id":"perm-a","approve":true,"selected_permission_suggestion_ids":["rule-1"],"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+            Json.parseToJsonElement(
+                """[{"type":"approval","approval_request_id":"perm-a","approve":true,"selected_permission_suggestion_ids":["rule-1"],"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+            ),
         )
 
         val response = dispatchApproval(controller = controller, params = params)
@@ -140,7 +142,9 @@ class ApprovalAdminHandlersTest {
     }
 
     private fun approvalParams(
-        messages: String = """[{"type":"approval","approval_request_id":"approval-1","approve":true,"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+        messages: kotlinx.serialization.json.JsonElement = Json.parseToJsonElement(
+            """[{"type":"approval","approval_request_id":"approval-1","approve":true,"approvals":[{"tool_call_id":"tool-a","approve":true}]}]""",
+        ),
     ) = buildJsonObject {
         put("agent_id", "agent-1")
         put("conversation_id", "conv-1")
@@ -148,7 +152,7 @@ class ApprovalAdminHandlersTest {
             "payload",
             buildJsonObject {
                 put("streaming", false)
-                put("messages", Json.parseToJsonElement(messages))
+                put("messages", messages)
             },
         )
     }

@@ -2,6 +2,8 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.MessageApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -31,7 +33,7 @@ class ChatApprovalCoordinatorTest {
         )
 
         assertEquals(ChatApprovalResult.MissingActiveConversation, result)
-        coVerify(exactly = 0) { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.submitApproval(any<MessageApprovalAnswer>()) }
     }
 
     @Test
@@ -46,7 +48,7 @@ class ChatApprovalCoordinatorTest {
         )
 
         assertEquals(ChatApprovalResult.MissingActiveAgent, result)
-        coVerify(exactly = 0) { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.submitApproval(any<MessageApprovalAnswer>()) }
     }
 
     @Test
@@ -63,19 +65,21 @@ class ChatApprovalCoordinatorTest {
         assertEquals(ChatApprovalResult.Submitted, result)
         coVerify(exactly = 1) {
             messageRepository.submitApproval(
-                agentId = AgentId("agent-1"),
-                approvalRequestId = "approval-1",
-                toolCallIds = listOf("tool-1", "tool-2"),
-                approve = false,
-                reason = "not safe",
-                conversationId = "conv-1",
+                MessageApprovalAnswer(
+                    agentId = AgentId("agent-1"),
+                    approvalRequestId = "approval-1",
+                    toolCallIds = listOf("tool-1", "tool-2"),
+                    approve = false,
+                    reason = "not safe",
+                    conversationId = "conv-1",
+                ),
             )
         }
     }
 
     @Test
     fun `submitApproval maps repository failure`() = runTest {
-        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any(), any()) } throws IllegalStateException("boom")
+        coEvery { messageRepository.submitApproval(any<MessageApprovalAnswer>()) } throws IllegalStateException("boom")
 
         val result = coordinator.submitApproval(
             agentId = "agent-1",
@@ -95,17 +99,13 @@ class ChatApprovalCoordinatorTest {
         val result = coordinator.submitApproval(
             agentId = "agent-1",
             activeConversationId = "conv-1",
-            requestId = "perm-tool-1",
-            toolCallIds = listOf("tool-1"),
-            approve = true,
-            reason = null,
-            selectedSuggestionIds = listOf("rule-1"),
+            answer = ChatApprovalAnswer("perm-tool-1", listOf("tool-1"), approve = true, reason = null, selectedSuggestionIds = listOf("rule-1")),
         )
 
         assertEquals(ChatApprovalResult.Submitted, result)
         coVerify(exactly = 1) {
             messageRepository.submitApproval(
-                com.letta.mobile.data.repository.api.MessageApprovalAnswer(
+                MessageApprovalAnswer(
                     agentId = AgentId("agent-1"),
                     approvalRequestId = "perm-tool-1",
                     toolCallIds = listOf("tool-1"),
@@ -119,7 +119,7 @@ class ChatApprovalCoordinatorTest {
 
     @Test
     fun `submitApproval propagates cancellation instead of reporting a failure`() = runTest {
-        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any(), any()) } throws CancellationException("left the screen")
+        coEvery { messageRepository.submitApproval(any<MessageApprovalAnswer>()) } throws CancellationException("left the screen")
 
         assertThrows(CancellationException::class.java) {
             kotlinx.coroutines.runBlocking {

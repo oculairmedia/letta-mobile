@@ -11,7 +11,9 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -54,5 +56,35 @@ class ChatApprovalRelay @Inject constructor(
         modes.supported && modes.set(runtime, mode)
 
     /** The answer for [toolCallId] was accepted: its card goes now. */
-    fun resolve(toolCallId: String) = client.resolve(toolCallId)
+    fun resolve(toolCallId: String) = client.resolve(com.letta.mobile.runtime.ToolCallId(toolCallId))
+}
+
+/**
+ * letta-mobile-bzvro.40: one chat screen's view of a [ChatApprovalRelay] for [agentId]'s
+ * conversations; inert (no parked requests, no chip) when the screen has no relay.
+ */
+internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, private val agentId: String) {
+    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: NONE
+
+    /** The chip for whichever conversation [conversationIds] names now. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun permissionMode(conversationIds: Flow<String?>): Flow<ChatPermissionModeUiState?> {
+        val owner = relay ?: return flowOf(null)
+        return conversationIds.map(::runtimeOf).distinctUntilChanged().flatMapLatest(owner::permissionMode)
+    }
+
+    fun setPermissionMode(scope: CoroutineScope, conversationId: String?, mode: AppServerPermissionMode) {
+        val owner = relay ?: return
+        val runtime = runtimeOf(conversationId) ?: return
+        scope.launch { owner.setPermissionMode(runtime, mode) }
+    }
+
+    private fun runtimeOf(conversationId: String?): AppServerRuntimeScope? {
+        val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
+        return agentId.takeIf { it.isNotBlank() }?.let { AppServerRuntimeScope(it, conversation) }
+    }
+
+    private companion object {
+        val NONE: StateFlow<Map<String, PendingApprovalDetails>> = MutableStateFlow(emptyMap())
+    }
 }

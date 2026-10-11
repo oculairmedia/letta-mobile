@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.runtime.ApprovalRelay
 import com.letta.mobile.data.runtime.PendingApprovalDetails
+import com.letta.mobile.data.runtime.RelayedPendingApprovals
 import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
@@ -79,5 +80,5 @@ class PendingApprovalsPublisher(
     }
 
     internal fun frame(key: TurnRuntimeKey, details: List<PendingApprovalDetails>): String =
-        ApprovalRelay.encodeFrame(key.agentId, key.conversationId, details, clock().toString()).toString()
+        ApprovalRelay.encodeFrame(RelayedPendingApprovals(key.agentId, key.conversationId, details), clock().toString()).toString()
 }

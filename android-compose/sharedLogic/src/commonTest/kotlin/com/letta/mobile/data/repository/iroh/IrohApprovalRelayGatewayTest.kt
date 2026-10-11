@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
+import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.ApprovalRelay
 import com.letta.mobile.data.runtime.IrohApprovalControls
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -48,6 +50,8 @@ class IrohApprovalRelayGatewayTest {
         }
     }
 
+    private val alwaysAllow = AlwaysAllowAnswer("agent-1", "conv-1", ApprovalBinding("call-1", "perm-call-1"), listOf("rule-1"))
+
     private val parked = PendingApprovalDetails(
         approvalId = "perm-call-1",
         toolCallId = "call-1",
@@ -74,7 +78,7 @@ class IrohApprovalRelayGatewayTest {
         val gateway = gateway(transport)
         transport.frames.emit(push(listOf(parked)))
 
-        gateway.submitAlwaysAllow("agent-1", "conv-1", "perm-call-1", "call-1", listOf("rule-1"))
+        gateway.submitAlwaysAllow(alwaysAllow)
 
         val (method, body) = transport.bodies.single()
         assertEquals("approval.submit", method)
@@ -92,7 +96,7 @@ class IrohApprovalRelayGatewayTest {
         val gateway = gateway(transport)
 
         assertFailsWith<UnsupportedOperationException> {
-            gateway.submitAlwaysAllow("agent-1", "conv-1", "perm-call-1", "call-1", listOf("rule-1"))
+            gateway.submitAlwaysAllow(alwaysAllow)
         }
         assertTrue(transport.bodies.isEmpty())
         assertNull(gateway.permissionModes)

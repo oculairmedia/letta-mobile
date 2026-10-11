@@ -25,18 +25,24 @@ interface ApprovalSubmittingGateway {
     )
 
     /**
-     * letta-mobile-bzvro.40: approves [toolCallId] and persists the server-offered rules
-     * [suggestionIds] ("always allow"). A gateway that cannot carry them refuses, rather than approve
-     * without the rule the person chose.
+     * letta-mobile-bzvro.40: approves the bound call and persists the server-offered rules
+     * ("always allow"). A gateway that cannot carry them refuses, rather than approve without the
+     * rule the person chose.
      */
-    suspend fun submitAlwaysAllow(
-        agentId: String,
-        conversationId: String,
-        approvalRequestId: String,
-        toolCallId: String,
-        suggestionIds: List<String>,
-    ): Unit = throw UnsupportedOperationException("always-allow rules are not supported by this connection")
+    suspend fun submitAlwaysAllow(answer: AlwaysAllowAnswer): Unit =
+        throw UnsupportedOperationException("always-allow rules are not supported by this connection")
 }
+
+/**
+ * letta-mobile-bzvro.40: an approval that persists [suggestionIds], bound to the parked request
+ * ([binding]: its tool call and the control request's own id) whose card offered them.
+ */
+data class AlwaysAllowAnswer(
+    val agentId: String,
+    val conversationId: String,
+    val binding: com.letta.mobile.data.runtime.ApprovalBinding,
+    val suggestionIds: List<String>,
+)
 
 /**
  * letta-mobile-bzvro.11/.12/.40: a gateway that can say what each parked `can_use_tool` request

@@ -77,8 +77,7 @@ internal class AdminChatActions(
         onOpenConversation?.let { open -> viewModel.editAndResend(message, open) }
     }
 
-    override fun submitApproval(answer: ChatApprovalAnswer) =
-        viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds)
+    override fun submitApproval(answer: ChatApprovalAnswer) = viewModel.submitApproval(answer)
 
     // letta-mobile-bzvro.40: the permission-mode chip, over the Iroh host.
     override fun setPermissionMode(mode: AppServerPermissionMode) = viewModel.setPermissionMode(mode)

@@ -38,8 +38,8 @@ class ApprovalRelayClient(private val store: RelayedPendingApprovalStore = Relay
         frames.collect { raw -> ApprovalRelay.decode(raw)?.let(store::apply) }
     }
 
-    /** The answer for [toolCallId] was accepted: its card goes now, before the host's next snapshot. */
-    fun resolve(toolCallId: String) = store.resolve(toolCallId)
+    /** The answer for [call] was accepted: its card goes now, before the host's next snapshot. */
+    fun resolve(call: com.letta.mobile.runtime.ToolCallId) = store.resolve(call)
 }
 
 /**

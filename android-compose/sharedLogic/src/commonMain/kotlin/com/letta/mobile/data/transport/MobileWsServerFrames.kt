@@ -677,7 +677,11 @@ sealed interface ServerFrame {
         val approvals: kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(emptyList()),
     ) : ServerFrame {
         fun decode(): com.letta.mobile.data.runtime.RelayedPendingApprovals =
-            com.letta.mobile.data.runtime.ApprovalRelay.decode(agentId, conversationId, approvals)
+            com.letta.mobile.data.runtime.RelayedPendingApprovals(
+                agentId = agentId,
+                conversationId = conversationId,
+                approvals = com.letta.mobile.data.runtime.ApprovalRelay.decodeApprovals(approvals),
+            )
     }
 
     /**

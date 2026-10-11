@@ -2,6 +2,7 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.runtime.ApprovalDiffPreview
 import com.letta.mobile.runtime.PermissionSuggestion
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,16 +51,16 @@ object ApprovalRelay {
         details.take(MAX_ENTRIES).forEach { add(encodeEntry(it)) }
     }
 
-    /** One complete frame (stream channel, no envelope beyond `type`). */
-    fun encodeFrame(agentId: String, conversationId: String, details: List<PendingApprovalDetails>, ts: String): JsonObject =
+    /** One complete frame for [snapshot] (stream channel, no envelope beyond `type`). */
+    fun encodeFrame(snapshot: RelayedPendingApprovals, ts: String): JsonObject =
         buildJsonObject {
             put("v", 1)
             put("type", FRAME_TYPE)
-            put("id", "pending-approvals-$conversationId-$ts")
+            put("id", "pending-approvals-${snapshot.conversationId}-$ts")
             put("ts", ts)
-            put(AGENT_ID, agentId)
-            put(CONVERSATION_ID, conversationId)
-            put(APPROVALS, encodeApprovals(details))
+            put(AGENT_ID, snapshot.agentId)
+            put(CONVERSATION_ID, snapshot.conversationId)
+            put(APPROVALS, encodeApprovals(snapshot.approvals))
         }
 
     private fun encodeEntry(details: PendingApprovalDetails): JsonObject = buildJsonObject {
@@ -85,21 +86,17 @@ object ApprovalRelay {
     /** A received frame (or its fields), or null when it names no conversation. Malformed entries are skipped. */
     fun decode(frame: JsonObject): RelayedPendingApprovals? {
         // An emptied conversation may be replayed without an agent: the conversation alone keys the snapshot.
-        val agentId = frame.text(AGENT_ID).orEmpty()
         val conversationId = frame.text(CONVERSATION_ID) ?: return null
-        return decode(agentId, conversationId, frame[APPROVALS])
+        return RelayedPendingApprovals(frame.text(AGENT_ID).orEmpty(), conversationId, decodeApprovals(frame[APPROVALS]))
     }
 
-    fun decode(agentId: String, conversationId: String, approvals: JsonElement?): RelayedPendingApprovals =
-        RelayedPendingApprovals(
-            agentId = agentId,
-            conversationId = conversationId,
-            approvals = (approvals as? JsonArray).orEmpty().asSequence()
-                .mapNotNull { (it as? JsonObject)?.decodeEntry() }
-                .distinctBy { it.toolCallId }
-                .take(MAX_ENTRIES)
-                .toList(),
-        )
+    /** The `approvals` array, bounded; malformed entries are skipped. */
+    fun decodeApprovals(approvals: JsonElement?): List<PendingApprovalDetails> =
+        (approvals as? JsonArray).orEmpty().asSequence()
+            .mapNotNull { (it as? JsonObject)?.decodeEntry() }
+            .distinctBy { it.toolCallId }
+            .take(MAX_ENTRIES)
+            .toList()
 
     private fun JsonObject.decodeEntry(): PendingApprovalDetails? {
         val approvalId = text(APPROVAL_ID)?.take(ApprovalRequestPayloadParser.MAX_ID_CHARS) ?: return null
@@ -139,9 +136,6 @@ class RelayedPendingApprovalStore {
     /** Every reported request by tool call id (tool call ids are unique across conversations). */
     val pending: StateFlow<Map<String, PendingApprovalDetails>> = byToolCall.asStateFlow()
 
-    /** The reported requests of [conversationId], oldest first. */
-    fun pendingIn(conversationId: String): List<PendingApprovalDetails> = byConversation.value[conversationId].orEmpty()
-
     fun apply(update: RelayedPendingApprovals) {
         byConversation.update { current ->
             if (update.approvals.isEmpty()) current - update.conversationId else current + (update.conversationId to update.approvals)
@@ -150,9 +144,9 @@ class RelayedPendingApprovalStore {
     }
 
     /** Drops one request at once (its answer was accepted); the host's next snapshot confirms it. */
-    fun resolve(toolCallId: String) {
+    fun resolve(call: ToolCallId) {
         byConversation.update { current ->
-            current.mapValues { (_, list) -> list.filterNot { it.toolCallId == toolCallId } }.filterValues { it.isNotEmpty() }
+            current.mapValues { (_, list) -> list.filterNot { it.toolCallId == call.value } }.filterValues { it.isNotEmpty() }
         }
         publish()
     }

@@ -57,7 +57,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
@@ -190,6 +189,9 @@ internal class AdminChatViewModel @Inject constructor(
      */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
 
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the mode chip (inert without a relay). */
+    private val approvalBinding = com.letta.mobile.feature.chat.coordination.ChatApprovalBinding(approvalRelay, routeArgs.agentId)
+
     /**
      * letta-mobile-bzvro.7: the status line's detail for this screen's conversation, as the shared
      * reducer folded it into the registry. Read under the key this screen publishes with.
@@ -199,8 +201,6 @@ internal class AdminChatViewModel @Inject constructor(
     companion object {
         private const val LIVE_STATUS_STOP_TIMEOUT_MS = 5_000L
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
-        private val NO_PARKED_APPROVALS: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
-            MutableStateFlow(emptyMap())
     }
 
     private val _pagingPresentation = MutableStateFlow<ChatPagingPresentation?>(null)
@@ -326,7 +326,7 @@ internal class AdminChatViewModel @Inject constructor(
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
         // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
-        val parked by (approvalRelay?.pendingDetails ?: NO_PARKED_APPROVALS).collectAsState()
+        val parked by approvalBinding.pendingDetails.collectAsState()
         return androidx.compose.runtime.remember(state, parked) { state.withPendingApprovalDetails(parked) }
     }
 
@@ -1080,27 +1080,19 @@ internal class AdminChatViewModel @Inject constructor(
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String? = null,
-        selectedSuggestionIds: List<String> = emptyList(),
-    ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason, selectedSuggestionIds = selectedSuggestionIds)
+    ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason)
+
+    /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
+    fun submitApproval(answer: com.letta.mobile.ui.chat.session.ChatApprovalAnswer) = chatApprovalController.submit(answer)
 
     /** letta-mobile-bzvro.40: the conversation's permission-mode chip; null while the host offers none. */
     val permissionMode: Flow<com.letta.mobile.ui.chat.session.ChatPermissionModeUiState?> by lazy(LazyThreadSafetyMode.NONE) {
-        val relay = approvalRelay ?: return@lazy flowOf(null)
-        _uiState.map { currentRuntimeScope() }.distinctUntilChanged().flatMapLatest(relay::permissionMode)
+        approvalBinding.permissionMode(_uiState.map { conversationId?.value })
     }
 
     /** letta-mobile-bzvro.40: asks the host for [mode]; the chip shows it pending until confirmed. */
-    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) {
-        val relay = approvalRelay ?: return
-        val runtime = currentRuntimeScope() ?: return
-        viewModelScope.launch { relay.setPermissionMode(runtime, mode) }
-    }
-
-    private fun currentRuntimeScope(): com.letta.mobile.data.transport.appserver.AppServerRuntimeScope? {
-        val conversation = conversationId?.value?.takeIf { it.isNotBlank() } ?: return null
-        return agentId.value.takeIf { it.isNotBlank() }
-            ?.let { com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(it, conversation) }
-    }
+    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) =
+        approvalBinding.setPermissionMode(viewModelScope, conversationId?.value, mode)
 
     fun resetMessages() {
         viewModelScope.launch {

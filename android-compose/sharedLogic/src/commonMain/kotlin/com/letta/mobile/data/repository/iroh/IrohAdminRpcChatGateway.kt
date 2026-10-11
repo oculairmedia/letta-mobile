@@ -102,22 +102,16 @@ class IrohAdminRpcChatGateway(
         reason: String?,
     ) {
         postApproval(agentId, conversationId, IrohApprovalSubmitBody.decision(approvalRequestId, toolCallId, approve, reason))
-        toolCallId?.let { approvalControls?.relay?.resolve(it) }
+        toolCallId?.let { approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(it)) }
     }
 
     /** letta-mobile-bzvro.40: only a host that relays approvals applies the rule ids. */
-    override suspend fun submitAlwaysAllow(
-        agentId: String,
-        conversationId: String,
-        approvalRequestId: String,
-        toolCallId: String,
-        suggestionIds: List<String>,
-    ) {
+    override suspend fun submitAlwaysAllow(answer: com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer) {
         if (com.letta.mobile.data.runtime.ApprovalRelay.CAPABILITY !in transport.hostCapabilities) {
             throw UnsupportedOperationException("this host cannot persist always-allow rules")
         }
-        postApproval(agentId, conversationId, IrohApprovalSubmitBody.alwaysAllow(approvalRequestId, toolCallId, suggestionIds))
-        approvalControls?.relay?.resolve(toolCallId)
+        postApproval(answer.agentId, answer.conversationId, IrohApprovalSubmitBody.alwaysAllow(answer.binding, answer.suggestionIds))
+        approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(answer.binding.toolCallId))
     }
 
     private suspend fun postApproval(agentId: String, conversationId: String, approval: ApprovalCreate) {

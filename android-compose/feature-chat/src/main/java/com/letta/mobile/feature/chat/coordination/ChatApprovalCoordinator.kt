@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.MessageApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import kotlinx.coroutines.CancellationException
 
 internal class ChatApprovalCoordinator(
@@ -15,24 +16,15 @@ internal class ChatApprovalCoordinator(
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String?,
-        selectedSuggestionIds: List<String> = emptyList(),
-    ): ChatApprovalResult {
+    ): ChatApprovalResult = submitApproval(agentId, activeConversationId, ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
+
+    /** letta-mobile-bzvro.40: [answer] may carry always-allow rule ids, which only an Iroh host applies. */
+    suspend fun submitApproval(agentId: String, activeConversationId: String?, answer: ChatApprovalAnswer): ChatApprovalResult {
         if (activeConversationId.isNullOrBlank()) return ChatApprovalResult.MissingActiveConversation
         if (agentId.isBlank()) return ChatApprovalResult.MissingActiveAgent
 
         return try {
-            if (selectedSuggestionIds.isEmpty()) {
-                messageRepository.submitApproval(
-                    agentId = AgentId(agentId),
-                    approvalRequestId = requestId,
-                    toolCallIds = toolCallIds,
-                    approve = approve,
-                    reason = reason,
-                    conversationId = activeConversationId,
-                )
-            } else {
-                messageRepository.submitApproval(alwaysAllow(agentId, activeConversationId, requestId, toolCallIds, selectedSuggestionIds))
-            }
+            messageRepository.submitApproval(answer.toMessageAnswer(AgentId(agentId), activeConversationId))
             ChatApprovalResult.Submitted
         } catch (cancelled: CancellationException) {
             // Not a failed submission: ChatApprovalController must see the cancellation to release
@@ -42,23 +34,17 @@ internal class ChatApprovalCoordinator(
             ChatApprovalResult.Failed(e.message ?: "Failed to submit approval")
         }
     }
-
-    /** letta-mobile-bzvro.40: an approval that also persists the server-offered rules (an Iroh host only). */
-    private fun alwaysAllow(
-        agentId: String,
-        conversationId: String,
-        requestId: String,
-        toolCallIds: List<String>,
-        suggestionIds: List<String>,
-    ) = MessageApprovalAnswer(
-        agentId = AgentId(agentId),
-        approvalRequestId = requestId,
-        toolCallIds = toolCallIds,
-        approve = true,
-        conversationId = conversationId,
-        selectedSuggestionIds = suggestionIds,
-    )
 }
+
+private fun ChatApprovalAnswer.toMessageAnswer(agentId: AgentId, conversationId: String) = MessageApprovalAnswer(
+    agentId = agentId,
+    approvalRequestId = requestId,
+    toolCallIds = toolCallIds,
+    approve = approve,
+    reason = reason,
+    conversationId = conversationId,
+    selectedSuggestionIds = selectedSuggestionIds,
+)
 
 internal sealed interface ChatApprovalResult {
     data object MissingActiveAgent : ChatApprovalResult

@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,35 +52,16 @@ internal class ChatApprovalController(
         approve: Boolean,
         reason: String?,
         activeConversationIdOverride: String? = null,
-        selectedSuggestionIds: List<String> = emptyList(),
-    ) {
+    ) = submit(ChatApprovalAnswer(requestId, toolCallIds, approve, reason), activeConversationIdOverride)
+
+    /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
+    fun submit(answer: ChatApprovalAnswer, activeConversationIdOverride: String? = null) {
+        val requestId = answer.requestId
         val conversationId = activeConversationIdOverride ?: activeConversationId()
         scope.launch {
             markApprovalInFlight(requestId, conversationId)
             val submitted = try {
-                when (val result = coordinator.submitApproval(
-                    agentId = agentId,
-                    activeConversationId = conversationId,
-                    requestId = requestId,
-                    toolCallIds = toolCallIds,
-                    approve = approve,
-                    reason = reason,
-                    selectedSuggestionIds = selectedSuggestionIds,
-                )) {
-                    ChatApprovalResult.Submitted -> true.also { toolCallIds.forEach { relay?.resolve(it) } }
-                    ChatApprovalResult.MissingActiveAgent -> {
-                        bannerController.showError("No active agent available for approval")
-                        false
-                    }
-                    ChatApprovalResult.MissingActiveConversation -> {
-                        bannerController.showError("No active conversation available for approval")
-                        false
-                    }
-                    is ChatApprovalResult.Failed -> {
-                        bannerController.showError(result.message)
-                        false
-                    }
-                }
+                accepted(coordinator.submitApproval(agentId, conversationId, answer))
             } catch (cancelled: CancellationException) {
                 failApprovalInFlight(requestId)
                 throw cancelled
@@ -89,8 +71,26 @@ internal class ChatApprovalController(
             }
             // Presence flags reset as they always have; only a successful answer keeps its card
             // in flight, until the timeline reconciles it. Anything else is actionable again now.
-            if (submitted) settleApprovalPresence(requestId) else failApprovalInFlight(requestId)
+            if (submitted) {
+                // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot.
+                answer.toolCallIds.forEach { relay?.resolve(it) }
+                settleApprovalPresence(requestId)
+            } else {
+                failApprovalInFlight(requestId)
+            }
         }
+    }
+
+    /** Whether [result] means the answer went out; anything else is shown on the banner. */
+    private fun accepted(result: ChatApprovalResult): Boolean {
+        val error = when (result) {
+            ChatApprovalResult.Submitted -> return true
+            ChatApprovalResult.MissingActiveAgent -> "No active agent available for approval"
+            ChatApprovalResult.MissingActiveConversation -> "No active conversation available for approval"
+            is ChatApprovalResult.Failed -> result.message
+        }
+        bannerController.showError(error)
+        return false
     }
 
     private fun settleApprovalPresence(requestId: String) {

@@ -2,9 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.chat.runtime.MapSettingsStore
 import com.letta.mobile.data.controller.AppServerController
-import com.letta.mobile.data.controller.AppServerControllerState
-import com.letta.mobile.data.controller.CanonicalRuntime
-import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.controller.node.FakeAppServerController
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelControlException
 import com.letta.mobile.data.runtime.PermissionModeRpc
@@ -19,9 +17,6 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Standar
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
-import com.letta.mobile.runtime.ConversationId
-import com.letta.mobile.runtime.RuntimeEventDraft
-import com.letta.mobile.runtime.TurnCommand
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,10 +25,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -149,7 +141,7 @@ class PermissionModeRelayRoundTripTest {
     }
 
     /** The host's controller: confirms every change, as an App Server echoing `update_device_status` does. */
-    private class ModeController(initial: AppServerPermissionMode? = null) : AppServerController {
+    private class ModeController(initial: AppServerPermissionMode? = null) : AppServerController by FakeAppServerController() {
         private var mode: AppServerPermissionMode? = initial
         val changes = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
 
@@ -160,24 +152,6 @@ class PermissionModeRelayRoundTripTest {
             this.mode = mode
             return true
         }
-
-        override val state: Flow<AppServerControllerState> = flowOf(AppServerControllerState.Connected)
-
-        override suspend fun startRuntime(
-            agentId: AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = error("unused")
-
-        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = emptyFlow()
-
-        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean) =
-            error("unused")
-
-        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?) = error("unused")
     }
 
     private class FakeBiStream : AdminRpcBiStream {

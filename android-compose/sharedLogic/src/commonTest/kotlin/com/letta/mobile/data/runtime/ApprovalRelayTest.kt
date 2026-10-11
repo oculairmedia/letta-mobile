@@ -35,7 +35,7 @@ class ApprovalRelayTest {
 
     @Test
     fun `a frame round-trips every field the card shows`() {
-        val frame = ApprovalRelay.encodeFrame("agent-1", "conv-1", listOf(edit), ts = "t0")
+        val frame = ApprovalRelay.encodeFrame(RelayedPendingApprovals("agent-1", "conv-1", listOf(edit)), ts = "t0")
 
         val decoded = ApprovalRelay.decode(frame)
 
@@ -44,7 +44,7 @@ class ApprovalRelayTest {
 
     @Test
     fun `the frame decodes as the client's typed push`() {
-        val frame = ApprovalRelay.encodeFrame("agent-1", "conv-1", listOf(edit), ts = "t0").toString()
+        val frame = ApprovalRelay.encodeFrame(RelayedPendingApprovals("agent-1", "conv-1", listOf(edit)), ts = "t0").toString()
 
         val decoded = Json { ignoreUnknownKeys = true }.decodeFromString(ServerFrameSerializer, frame)
 
@@ -96,9 +96,7 @@ class ApprovalRelayTest {
 
         store.apply(RelayedPendingApprovals("", "conv-1", emptyList()))
         assertEquals(setOf("call-9"), store.pending.value.keys)
-        assertEquals(emptyList(), store.pendingIn("conv-1"))
-
-        store.resolve("call-9")
+        store.resolve(com.letta.mobile.runtime.ToolCallId("call-9"))
         assertEquals(emptyMap(), store.pending.value)
     }
 

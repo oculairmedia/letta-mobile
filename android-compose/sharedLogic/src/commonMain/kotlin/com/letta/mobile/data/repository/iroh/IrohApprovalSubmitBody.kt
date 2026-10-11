@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalSubmission
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.runtime.ApprovalBinding
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -30,8 +31,8 @@ internal object IrohApprovalSubmitBody {
     }
 
     /** letta-mobile-bzvro.40: an approval that also persists the server-offered rules [suggestionIds]. */
-    fun alwaysAllow(approvalRequestId: String, toolCallId: String, suggestionIds: List<String>): ApprovalCreate =
-        decision(approvalRequestId, toolCallId, approve = true, reason = null)
+    fun alwaysAllow(binding: ApprovalBinding, suggestionIds: List<String>): ApprovalCreate =
+        decision(binding.approvalId, binding.toolCallId, approve = true, reason = null)
             .copy(selectedPermissionSuggestionIds = suggestionIds)
 
     fun params(agentId: String, conversationId: String, approval: ApprovalCreate): JsonObject {
