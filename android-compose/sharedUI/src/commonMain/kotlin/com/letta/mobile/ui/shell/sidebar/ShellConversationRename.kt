@@ -31,6 +31,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 object ShellConversationTags {
     const val RENAME_FIELD = "shell_conversation_rename"
     const val PINNED = "shell_conversation_pinned"
+    const val SETTLED = "shell_conversation_settled"
+    const val MARKER_PICKER = "shell_conversation_marker_picker"
 }
 
 /**
