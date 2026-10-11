@@ -93,10 +93,10 @@ internal class DesktopChatSessionPort(
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RuntimeLiveStatus.Idle)
 
     /** letta-mobile-zxk2n.5: what the Chat options show and hide, for the page's appearance. */
-    val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationMarks.displayOptions
+    val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationManagement.marks.displayOptions
 
     /** letta-mobile-zxk2n.5: `/recompile`'s status, from the controller. */
-    override val recompileStatus: StateFlow<RecompileStatus> = controller.recompile.status
+    override val recompileStatus: StateFlow<RecompileStatus> = controller.conversationManagement.recompile.status
 
     override val actions: ChatActions = DesktopChatActions(
         controller = controller,
@@ -314,7 +314,7 @@ internal class DesktopChatActions(
 
     override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
 
-    override fun dismissRecompileStatus() = controller.recompile.dismiss()
+    override fun dismissRecompileStatus() = controller.conversationManagement.recompile.dismiss()
 
     override fun stopRun() {
         selectedConversationId?.let(controller::stopActiveRun)

@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +54,7 @@ import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
+import com.letta.mobile.ui.shell.ShellRowMenuItem
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -99,80 +102,85 @@ internal object ShellDeleteConversationCopy {
  */
 @Composable
 fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConversationRowActions) {
+    val row = remember { ShellConversationRowUi() }
+    val onRename = actions.onRename
+    if (row.renaming && onRename != null) {
+        ShellConversationRenameField(title = model.title, onRename = onRename, onDone = { row.renaming = false })
+        return
+    }
+    ShellConversationRowBody(model, actions, row)
+}
+
+/** What the row has open: the rename field, the delete confirmation, the marker menu. */
+@Stable
+private class ShellConversationRowUi {
+    var confirmDelete by mutableStateOf(false)
+    var renaming by mutableStateOf(false)
+    var pickingMarker by mutableStateOf(false)
+}
+
+@Composable
+private fun ShellConversationRowBody(model: ShellConversationRowModel, actions: ShellConversationRowActions, row: ShellConversationRowUi) {
     val decorations = LocalShellChromeDecorations.current
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    var confirmDelete by remember { mutableStateOf(false) }
-    var renaming by remember { mutableStateOf(false) }
-    var pickingMarker by remember { mutableStateOf(false) }
-    val onRename = actions.onRename
-    if (renaming && onRename != null) {
-        ShellConversationRenameField(title = model.title, onRename = onRename, onDone = { renaming = false })
-        return
+    Box {
+        decorations.rowMenu(conversationMenuItems(model, actions, row)) {
+            decorations.tooltip(model.title) {
+                ShellConversationRowSurface(model, hovered, interactionSource, actions)
+            }
+        }
+        actions.marks?.let { marks -> ShellMarkerPicker(model, marks, row) }
     }
+    if (row.confirmDelete) {
+        decorations.confirm(
+            ShellDeleteConversationCopy.request(model.title, actions.deleteBehavior),
+            {
+                row.confirmDelete = false
+                actions.onDelete()
+            },
+            { row.confirmDelete = false },
+        )
+    }
+}
+
+/** The row's menu: rename, pin, marker and settle when offered, then archive and delete. */
+private fun conversationMenuItems(
+    model: ShellConversationRowModel,
+    actions: ShellConversationRowActions,
+    row: ShellConversationRowUi,
+): List<ShellRowMenuItem> {
     val marks = actions.marks
-    val menuItems = ShellRowMenus.conversation(
+    return ShellRowMenus.conversation(
         archived = model.archived,
         deleting = model.deleting,
         deleteBehavior = actions.deleteBehavior,
         actions = ShellConversationMenuActions(
             onArchiveToggle = actions.onArchiveToggle,
-            onRequestDelete = { confirmDelete = true },
+            onRequestDelete = { row.confirmDelete = true },
             manage = ShellConversationManageMenu(
                 pinned = model.pinned,
-                onRenameRequest = onRename?.let { { renaming = true } },
+                onRenameRequest = actions.onRename?.let { { row.renaming = true } },
                 onPinToggle = actions.onPinToggle,
                 settled = model.settled,
                 onSettleToggle = marks?.let { { it.onSettle(model.id, !model.settled) } },
-                onMarkerRequest = marks?.let { { pickingMarker = true } },
+                onMarkerRequest = marks?.let { { row.pickingMarker = true } },
             ),
         ),
     )
-    Box {
-        decorations.rowMenu(menuItems) {
-            decorations.tooltip(model.title) {
-                ShellConversationRowSurface(model, hovered, interactionSource, actions)
-            }
-        }
-        if (marks != null) {
-            ShellMarkerPicker(
-                expanded = pickingMarker,
-                current = model.marker,
-                choices = marks.markerChoices,
-                onPick = { marker -> marks.onSetMarker(model.id, marker) },
-                onDismiss = { pickingMarker = false },
-            )
-        }
-    }
-    if (confirmDelete) {
-        decorations.confirm(
-            ShellDeleteConversationCopy.request(model.title, actions.deleteBehavior),
-            {
-                confirmDelete = false
-                actions.onDelete()
-            },
-            { confirmDelete = false },
-        )
-    }
 }
 
 /** The marker choices as a menu under the row, then "Clear marker" when the chat wears one. */
 @Composable
-private fun ShellMarkerPicker(
-    expanded: Boolean,
-    current: String?,
-    choices: List<String>,
-    onPick: (String?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val items = choices.map { emoji ->
-        LettaMenuItem(label = if (emoji == current) "$emoji  (current)" else emoji) {
-            onPick(emoji)
-        }
-    } + listOfNotNull(current?.let { LettaMenuItem(label = "Clear marker") { onPick(null) } })
+private fun ShellMarkerPicker(model: ShellConversationRowModel, marks: ShellConversationMarkActions, row: ShellConversationRowUi) {
+    val current = model.marker
+    val pick = { marker: String? -> marks.onSetMarker(model.id, marker) }
+    val items = marks.markerChoices.map { emoji ->
+        LettaMenuItem(label = if (emoji == current) "$emoji  (current)" else emoji) { pick(emoji) }
+    } + listOfNotNull(current?.let { LettaMenuItem(label = "Clear marker") { pick(null) } })
     LettaPopupMenu(
-        expanded = expanded,
-        onDismiss = onDismiss,
+        expanded = row.pickingMarker,
+        onDismiss = { row.pickingMarker = false },
         items = items,
         modifier = Modifier.testTag(ShellConversationTags.MARKER_PICKER),
     )
@@ -201,45 +209,9 @@ private fun ShellConversationRowSurface(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ConversationLeadingIcon(model = model, hovered = hovered, onArchiveToggle = actions.onArchiveToggle)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = model.marker?.let { "$it ${model.title}" } ?: model.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (model.deleting || model.settled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (model.preview.isNotBlank() && model.preview != model.title) {
-                    Text(
-                        text = model.preview,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = PREVIEW_ALPHA),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (model.settled) {
-                Icon(
-                    imageVector = Icons.Outlined.TaskAlt,
-                    contentDescription = "Settled",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(PIN_ICON_SIZE).testTag(ShellConversationTags.SETTLED),
-                )
-            }
-            if (model.pinned) {
-                Icon(
-                    imageVector = Icons.Outlined.PushPin,
-                    contentDescription = "Pinned",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(PIN_ICON_SIZE).testTag(ShellConversationTags.PINNED),
-                )
-            }
+            ConversationTitleAndPreview(model, Modifier.weight(1f))
+            if (model.settled) RowMarkIcon(Icons.Outlined.TaskAlt, "Settled", ShellConversationTags.SETTLED)
+            if (model.pinned) RowMarkIcon(Icons.Outlined.PushPin, "Pinned", ShellConversationTags.PINNED)
             Text(
                 text = if (model.deleting) "Deleting…" else model.timeLabel,
                 style = MaterialTheme.typography.labelSmall,
@@ -248,6 +220,42 @@ private fun ShellConversationRowSurface(
             )
         }
     }
+}
+
+/** The title (after its marker) over a one-line preview; a settled or deleting chat reads quieter. */
+@Composable
+private fun ConversationTitleAndPreview(model: ShellConversationRowModel, modifier: Modifier) {
+    val quiet = model.deleting || model.settled
+    Column(modifier = modifier) {
+        Text(
+            text = model.marker?.let { "$it ${model.title}" } ?: model.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (quiet) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (model.preview.isNotBlank() && model.preview != model.title) {
+            Text(
+                text = model.preview,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = PREVIEW_ALPHA),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** A small trailing mark (settled, pinned). */
+@Composable
+private fun RowMarkIcon(icon: ImageVector, description: String, tag: String) {
+    Icon(
+        imageVector = icon,
+        contentDescription = description,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(PIN_ICON_SIZE).testTag(tag),
+    )
 }
 
 @Composable

@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.runtime.ConversationListPrefs
+import com.letta.mobile.data.chat.runtime.ConversationMarker
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,11 +29,11 @@ internal class DesktopConversationMarks(private val prefs: DesktopConversationPr
     val markerChoices: List<String> get() = ConversationListPrefs.MARKER_CHOICES
 
     fun setSettled(conversationId: String, settled: Boolean) {
-        marks?.setSettled(conversationId, settled)
+        marks?.setSettled(ConversationId(conversationId), settled)
     }
 
     fun setMarker(conversationId: String, marker: String?) {
-        marks?.setMarker(conversationId, marker)
+        marks?.setMarker(ConversationId(conversationId), marker?.let(::ConversationMarker))
     }
 
     fun setAutoPinNewChats(enabled: Boolean) {
@@ -44,12 +46,6 @@ internal class DesktopConversationMarks(private val prefs: DesktopConversationPr
 
     /** A chat the user just started: pinned when auto-pin is on. */
     fun onConversationCreated(conversationId: String) {
-        marks?.onConversationCreated(conversationId) { prefs.pins?.setPinned(it, true) }
-    }
-
-    /** A chat that is gone for good (an unsent new chat cleaned up) drops its pin and marks. */
-    fun onConversationRemoved(conversationId: String) {
-        marks?.forget(conversationId)
-        prefs.pins?.setPinned(conversationId, false)
+        marks?.onConversationCreated(ConversationId(conversationId)) { prefs.pins?.setPinned(it.value, true) }
     }
 }

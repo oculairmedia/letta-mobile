@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.ConversationNavigation
 import com.letta.mobile.data.chat.runtime.ConversationStep
@@ -23,9 +24,9 @@ import java.awt.event.KeyEvent
 internal fun ConversationStepKeyDispatcherEffect(context: DesktopShellContext, frame: DesktopShellFrame) {
     val management = context.core.chatController.conversationManagement
     val pinned by management.pinnedConversationIds.collectAsState()
-    val settled by context.core.chatController.conversationMarks.settled.collectAsState()
+    val settled by management.marks.settled.collectAsState()
     val orderedIds by rememberUpdatedState(
-        ConversationListOrder.arrange(frame.lists.agentConversations, pinned, settled) { it.id }.map { it.id },
+        ConversationListOrder.arrange(frame.lists.agentConversations, ConversationListGroups(pinned, settled)) { it.id }.map { it.id },
     )
     val currentId by rememberUpdatedState(frame.chatState.selectedConversationId)
     DisposableEffect(context) {

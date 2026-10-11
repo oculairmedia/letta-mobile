@@ -214,7 +214,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             onOpenCanvas = { context.openCanvas(it) },
             onNewCanvas = { canvasShell.createNew(focus.selectedAgentId) },
             onArchiveCanvas = canvasShell.library::setArchived,
-            conversationMarks = remember(chatController) { chatController.conversationMarks.rowActions() },
+            conversationMarks = remember(chatController) { chatController.conversationManagement.marks.rowActions() },
             chatOptions = rememberDesktopChatOptionsActions(chatController),
         ),
         // letta-mobile-3io8k: model, context meter and Compact under the agent's name.

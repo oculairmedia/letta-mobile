@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
 import kotlin.time.Instant
@@ -34,7 +35,7 @@ object ShellSidebarMapping {
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
     ): List<ShellConversationRowModel> =
-        ConversationListOrder.arrange(conversations, marks.pinnedIds, marks.settledIds) { it.id }.map { conversation ->
+        ConversationListOrder.arrange(conversations, ConversationListGroups(marks.pinnedIds, marks.settledIds)) { it.id }.map { conversation ->
             ShellConversationRowModel(
                 id = conversation.id,
                 title = conversation.displayTitle(),

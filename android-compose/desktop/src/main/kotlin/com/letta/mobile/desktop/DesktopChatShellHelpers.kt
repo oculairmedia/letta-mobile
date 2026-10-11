@@ -340,6 +340,8 @@ internal data class DesktopClientCommandRoutes(
     val onSearch: () -> Unit = {},
     val onOpenModelPicker: () -> Unit = {},
     val onRenameChat: () -> Unit = {},
+    /** `/new`: the shell's new chat for the focused agent (which pins it when "Pin new chats" is on). */
+    val onNewChat: () -> Unit = {},
 )
 
 /** The desktop's route for each [ClientSlashCommand]. */
@@ -355,10 +357,10 @@ internal fun desktopClientCommand(
         // Skills & Tools is where the desktop lists and merges MCP servers.
         ClientSlashCommand.Mcp -> { { params.onNavigate(DesktopDestination.Agents) } }
         ClientSlashCommand.Models -> client.onOpenModelPicker
-        ClientSlashCommand.New -> controller::createConversation
+        ClientSlashCommand.New -> client.onNewChat
         ClientSlashCommand.Rename -> client.onRenameChat
         ClientSlashCommand.Connect -> { { params.onNavigate(DesktopDestination.Providers) } }
-        ClientSlashCommand.Recompile -> controller::recompileSelectedConversation
+        ClientSlashCommand.Recompile -> controller.conversationManagement::recompileOpenConversation
     }
     return ComposerCommand(command.id, command.description, run = run)
 }

@@ -13,6 +13,7 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatDisplayPrefs
 import com.letta.mobile.data.chat.runtime.ConversationListPrefs
+import com.letta.mobile.data.chat.runtime.ConversationMarker
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -66,8 +67,8 @@ internal class SharedNavDrawerViewModel @Inject constructor(
 
     /** Settle / move to active and the marker, for the drawer's row menus. */
     val conversationMarkActions = ShellConversationMarkActions(
-        onSettle = listMarks::setSettled,
-        onSetMarker = listMarks::setMarker,
+        onSettle = { id, settled -> listMarks.setSettled(ConversationId(id), settled) },
+        onSetMarker = { id, marker -> listMarks.setMarker(ConversationId(id), marker?.let(::ConversationMarker)) },
         markerChoices = ConversationListPrefs.MARKER_CHOICES,
     )
 

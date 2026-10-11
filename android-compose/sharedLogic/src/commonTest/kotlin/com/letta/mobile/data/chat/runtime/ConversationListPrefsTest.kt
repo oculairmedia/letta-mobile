@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.data.model.ConversationId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,14 +11,16 @@ import kotlin.test.assertTrue
 class ConversationListPrefsTest {
     private val star = ConversationListPrefs.MARKER_CHOICES[0]
     private val bug = ConversationListPrefs.MARKER_CHOICES[3]
+    private val convA = ConversationId("conv-a")
+    private val convB = ConversationId("conv-b")
 
     @Test
     fun settledChatsAndMarkersSurviveARestart() {
         val store = MapSettingsStore()
         ConversationListPrefs(store).apply {
-            setSettled("conv-a", true)
-            setMarker("conv-a", star)
-            setMarker("conv-b", bug)
+            setSettled(convA, true)
+            setMarker(convA, ConversationMarker(star))
+            setMarker(convB, ConversationMarker(bug))
             setAutoPinNewChats(true)
         }
 
@@ -32,11 +35,11 @@ class ConversationListPrefsTest {
     fun moveToActiveAndClearingAMarkerDropTheirKeys() {
         val store = MapSettingsStore()
         val prefs = ConversationListPrefs(store)
-        prefs.setSettled("conv-a", true)
-        prefs.setMarker("conv-a", star)
+        prefs.setSettled(convA, true)
+        prefs.setMarker(convA, ConversationMarker(star))
 
-        prefs.setSettled("conv-a", false)
-        prefs.setMarker("conv-a", null)
+        prefs.setSettled(convA, false)
+        prefs.setMarker(convA, null)
 
         assertEquals(emptySet(), prefs.settled.value)
         assertEquals(emptyMap(), prefs.markers.value)
@@ -47,30 +50,30 @@ class ConversationListPrefsTest {
     @Test
     fun aMarkerOutsideTheChoicesIsNotStored() {
         val prefs = ConversationListPrefs(MapSettingsStore())
-        prefs.setMarker("conv-a", "not-an-emoji")
+        prefs.setMarker(convA, ConversationMarker("not-an-emoji"))
         assertEquals(emptyMap(), prefs.markers.value)
     }
 
     @Test
     fun aNewChatIsPinnedOnlyWhileAutoPinIsOn() {
         val prefs = ConversationListPrefs(MapSettingsStore())
-        val pinned = mutableListOf<String>()
+        val pinned = mutableListOf<ConversationId>()
 
-        prefs.onConversationCreated("conv-1", pinned::add)
+        prefs.onConversationCreated(ConversationId("conv-1"), pinned::add)
         assertFalse(prefs.autoPinNewChats.value)
         prefs.setAutoPinNewChats(true)
-        prefs.onConversationCreated("conv-2", pinned::add)
+        prefs.onConversationCreated(ConversationId("conv-2"), pinned::add)
 
-        assertEquals(listOf("conv-2"), pinned)
+        assertEquals(listOf(ConversationId("conv-2")), pinned)
     }
 
     @Test
     fun forgettingAChatDropsItsMarks() {
         val prefs = ConversationListPrefs(MapSettingsStore())
-        prefs.setSettled("conv-a", true)
-        prefs.setMarker("conv-a", star)
+        prefs.setSettled(convA, true)
+        prefs.setMarker(convA, ConversationMarker(star))
 
-        prefs.forget("conv-a")
+        prefs.forget(convA)
 
         assertEquals(emptySet(), prefs.settled.value)
         assertEquals(emptyMap(), prefs.markers.value)
@@ -79,7 +82,7 @@ class ConversationListPrefsTest {
     @Test
     fun pinnedLeadSettledTrailAndEachGroupKeepsItsOrder() {
         val recency = listOf("c1", "c2", "c3", "c4", "c5")
-        val arranged = ConversationListOrder.arrange(recency, pinned = setOf("c4"), settled = setOf("c1", "c4", "c3")) { it }
+        val arranged = ConversationListOrder.arrange(recency, ConversationListGroups(pinned = setOf("c4"), settled = setOf("c1", "c4", "c3"))) { it }
         assertEquals(listOf("c4", "c2", "c5", "c1", "c3"), arranged)
     }
 

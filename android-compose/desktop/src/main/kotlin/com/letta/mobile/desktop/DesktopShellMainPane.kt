@@ -110,6 +110,7 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
                 onSearch = { context.overlays.commandPalette = true },
                 onOpenModelPicker = { context.overlays.modelPicker = true },
                 onRenameChat = { context.overlays.renameChat = true },
+                onNewChat = { context.openNewChatForFocusedAgent(focus) },
             ),
         ),
     )

@@ -20,7 +20,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellConversationMarkActions
  */
 @Composable
 internal fun rememberDesktopSidebarListMarks(context: DesktopShellContext, frame: DesktopShellFrame): DesktopSidebarListMarks {
-    val marks = context.core.chatController.conversationMarks
+    val marks = context.core.chatController.conversationManagement.marks
     val settled by marks.settled.collectAsState()
     val markers by marks.markers.collectAsState()
     val autoPin by marks.autoPinNewChats.collectAsState()
@@ -55,7 +55,7 @@ internal fun DesktopConversationMarks.rowActions(): ShellConversationMarkActions
 internal fun rememberDesktopChatOptionsActions(controller: DesktopChatController): ShellChatOptionsActions {
     val setFontScale by rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
     return remember(controller) {
-        val marks = controller.conversationMarks
+        val marks = controller.conversationManagement.marks
         ShellChatOptionsActions(
             onDisplayChange = marks::setDisplayOptions,
             onTextSizeChange = { size -> setFontScale(size.fontScale) },
@@ -66,8 +66,8 @@ internal fun rememberDesktopChatOptionsActions(controller: DesktopChatController
 }
 
 private fun downloadTranscript(controller: DesktopChatController) {
-    val transcript = DesktopTranscriptExport.transcriptOf(controller.state.value, controller.conversationMarks.displayOptions.value)
+    val transcript = DesktopTranscriptExport.transcriptOf(controller.state.value, controller.conversationManagement.marks.displayOptions.value)
         ?: return
     runCatching { DesktopTranscriptExport.save(transcript) }
-        .onFailure { controller.reportError("Couldn't save the transcript: ${it.message ?: it::class.simpleName}") }
+        .onFailure { controller.conversationManagement.reportError("Couldn't save the transcript: ${it.message ?: it::class.simpleName}") }
 }
