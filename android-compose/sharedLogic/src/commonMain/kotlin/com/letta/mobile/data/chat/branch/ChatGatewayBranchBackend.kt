@@ -5,6 +5,7 @@ import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.timeline.TimelineTransport
 
 /** How many of the newest stored messages a branch reads to place its fork point. */
@@ -39,10 +40,10 @@ fun ChatGateway.branchBackendOrNull(): BranchBackend? {
             extras?.createConversation(agentId) ?: throw BranchUnavailableException(NO_CREATE)
         },
         history = { conversationId -> branchHistory(conversationId) },
-        rename = summaries?.let { gateway ->
-            { conversation, name ->
-                gateway.setConversationSummary(ConversationSummaryUpdate(conversation.id, ConversationSummary(name)))
-            }
-        },
+        rename = summaries?.let(::renameThrough),
     )
 }
+
+/** A named fork's rename, through the gateway's summary (title) write. */
+private fun renameThrough(gateway: ConversationSummaryGateway): suspend (Conversation, String) -> Conversation =
+    { conversation, name -> gateway.setConversationSummary(ConversationSummaryUpdate(conversation.id, ConversationSummary(name))) }
