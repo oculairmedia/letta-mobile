@@ -59,7 +59,7 @@ class MessageActionPolicyTest {
     }
 
     @Test
-    fun `a prompt with images is edited and rerun with them, unless only a pointer was kept`() {
+    fun `a prompt with images is edited and rerun with them unless only a pointer was kept`() {
         val support = BranchActionSupport(fork = true, edit = true, rerun = true)
         val withImage = message(role = "user").copy(
             attachments = listOf(UiImageAttachment(base64 = "image", mediaType = "image/png")),
@@ -76,7 +76,7 @@ class MessageActionPolicyTest {
     }
 
     @Test
-    fun `rerun is offered on prompts only, and only when the owner can rerun in a fork`() {
+    fun `rerun is offered on prompts only and only when the owner can rerun in a fork`() {
         val support = BranchActionSupport(fork = true, edit = true, rerun = true)
         assertTrue(availability(message(role = "user"), branching = support).canRerun)
         assertFalse(availability(message(role = "assistant"), branching = support).canRerun)
