@@ -86,6 +86,8 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.ConversationCompact -> AmbiguousMutation(dedupKey = null)
             // A replayed fork makes a second copy of the conversation.
             is AppServerConversationFork -> AmbiguousMutation(dedupKey = null)
+            // A recompile rewrites the stored system prompt; it is not replayed blindly.
+            is AppServerConversationRecompile -> AmbiguousMutation(dedupKey = null)
 
             // Control capabilities (lgns8.8): model listing is a read; skill
             // enable/disable are idempotent-by-target but treated as ambiguous.

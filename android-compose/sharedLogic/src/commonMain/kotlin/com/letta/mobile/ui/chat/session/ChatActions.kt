@@ -117,6 +117,9 @@ interface ChatActions {
 
     /** Asks the agent to keep working on the active goal. */
     fun continueGoal()
+
+    /** letta-mobile-zxk2n.5: the page has shown a finished `/recompile` answer; the owner may clear it. */
+    fun dismissRecompileStatus() = Unit
 }
 
 /**

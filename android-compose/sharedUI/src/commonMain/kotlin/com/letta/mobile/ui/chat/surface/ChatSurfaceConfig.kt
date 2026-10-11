@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.model.UiImageAttachment
 
@@ -33,6 +34,11 @@ data class ChatSurfaceAppearance(
      * head. Pointer keeps the desktop card, the floating panel and the minimised mascot.
      */
     val platformStyle: ChatPlatformStyle = ChatPlatformStyle.Pointer,
+    /**
+     * letta-mobile-zxk2n.5 (G91): which rows and readouts the timeline leaves out (reasoning,
+     * compaction summaries, token usage). The host reads them from its settings.
+     */
+    val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
 )
 
 /**
