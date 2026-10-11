@@ -55,15 +55,24 @@ interface ChatActions {
 
     /**
      * letta-mobile-bzvro.15 (F15): branch the conversation from [message] into a new one and open
-     * it ([ChatSurfaceCapabilities.fork]). The original conversation is not changed.
+     * it ([ChatSurfaceCapabilities.fork]), named [name] when given ([ChatSurfaceCapabilities.nameForks]).
+     * The original conversation is not changed.
      */
-    fun forkFromMessage(message: UiMessage) = Unit
+    fun forkFromMessage(message: UiMessage, name: String? = null) = Unit
 
     /**
      * letta-mobile-bzvro.16 (F16): fork just before the user's [message], open the fork, and put
      * the prompt's text in its composer to edit and send ([ChatSurfaceCapabilities.editAndResend]).
      */
     fun editAndResend(message: UiMessage) = Unit
+
+    /**
+     * letta-mobile-7mys7 (G36): fork just before the user's [message], open the fork and send the
+     * prompt there again, so it is answered afresh while the original keeps its answer
+     * ([ChatSurfaceCapabilities.rerunInFork]). Unlike [rerun] ("Send again"), nothing is appended
+     * to this conversation.
+     */
+    fun rerunInFork(message: UiMessage) = Unit
 
     fun submitApproval(answer: ChatApprovalAnswer)
 
@@ -139,6 +148,10 @@ data class ChatSurfaceCapabilities(
     val fork: Boolean = false,
     /** "Edit and resend" on the user's prompt ([ChatActions.editAndResend]). */
     val editAndResend: Boolean = false,
+    /** "Rerun" on the user's prompt: fork before it and send it again there ([ChatActions.rerunInFork]). */
+    val rerunInFork: Boolean = false,
+    /** A fork can be given a name as it is made ([ChatActions.forkFromMessage]'s `name`). */
+    val nameForks: Boolean = false,
 ) {
     companion object {
         val Default = ChatSurfaceCapabilities()

@@ -942,9 +942,8 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        // letta-mobile-bzvro.16: an "Edit and resend" left its text for the fork it opened.
-        com.letta.mobile.data.chat.branch.PendingComposerDrafts.shared.take(conversationId)
-            ?.let(::handleComposerTextChanged)
+        // letta-mobile-bzvro.16 / 7mys7: an "Edit and resend" or "Rerun" left its prompt for the fork it opened.
+        com.letta.mobile.data.chat.branch.PendingComposerDrafts.shared.take(conversationId)?.let(::applyBranchDraft)
         viewModelScope.launch { beginTimelineObserver(conversationId) }
     }
 
@@ -1161,6 +1160,13 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun editAndResend(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
         branchOrigin(open)?.let { conversationBranching.editAndResend(it, message) }
+    }
+
+    /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
+    private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
+        handleComposerTextChanged(pending.draft.text)
+        pending.draft.images.forEach(::addAttachment)
+        if (pending.sendNow) submitComposer(pending.draft.text)
     }
 
     fun interruptRun() {
