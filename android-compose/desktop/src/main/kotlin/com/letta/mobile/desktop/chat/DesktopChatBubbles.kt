@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.chat.branch.MessageMenu
 import com.letta.mobile.ui.chat.branch.onSecondaryClick
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
@@ -305,7 +306,6 @@ internal fun UserPrompt(
     // affordance's reveal-on-hover must keep working even when the card
     // itself isn't clickable.
     val cardHoverSource = remember(message.id) { MutableInteractionSource() }
-    val cardHovered by cardHoverSource.collectIsHoveredAsState()
     // letta-mobile-7mys7: Edit and resend, Rerun, Fork from here (right-click, or the hover button).
     val menu = rememberDesktopMessageMenu(message)
     Surface(
@@ -388,17 +388,26 @@ internal fun UserPrompt(
             if (overflowed || expanded) {
                 PromptExpandButton(expanded = expanded, onToggle = { expanded = !expanded })
             }
-            // letta-mobile-7mys7: the message actions, beside Copy, where the backend can fork.
-            DesktopMessageMenuButton(menu, visible = cardHovered)
-            if (message.content.isNotBlank()) {
-                CopyIconButton(
-                    text = message.content,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
-                    visible = cardHovered,
-                )
-            }
+            PromptCardHoverActions(message, menu, cardHoverSource)
         }
+    }
+}
+
+/**
+ * The prompt card's hover actions: the message menu (letta-mobile-7mys7: edit, rerun, fork, where
+ * the backend can fork) and Copy.
+ */
+@Composable
+private fun PromptCardHoverActions(message: UiMessage, menu: MessageMenu?, cardHover: MutableInteractionSource) {
+    val hovered by cardHover.collectIsHoveredAsState()
+    DesktopMessageMenuButton(menu, visible = hovered)
+    if (message.content.isNotBlank()) {
+        CopyIconButton(
+            text = message.content,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
+            visible = hovered,
+        )
     }
 }
 
