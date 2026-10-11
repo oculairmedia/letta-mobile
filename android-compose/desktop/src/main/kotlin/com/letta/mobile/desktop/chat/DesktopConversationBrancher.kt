@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.branch.BranchDraft
 import com.letta.mobile.data.chat.branch.BranchOpener
 import com.letta.mobile.data.chat.branch.BranchOutcome
+import com.letta.mobile.data.chat.branch.BranchSlashCommand
 import com.letta.mobile.data.chat.branch.BranchSource
 import com.letta.mobile.data.chat.branch.BranchState
 import com.letta.mobile.data.chat.branch.ConversationBranchController
@@ -38,6 +39,25 @@ internal fun DesktopChatController.applyBranchDraft(branch: DesktopOpenedBranch)
     updateComposerText(draft.text)
     draft.images.forEach(::attachImage)
     if (branch.sendNow) send()
+}
+
+/**
+ * letta-mobile-7mys7: `/fork [name]` in the composer forks the selected conversation (letta-code's
+ * terminal command, which the App Server does not run) instead of sending it as a message. True
+ * when the draft was that command and the fork started.
+ */
+internal fun DesktopChatController.runBranchCommand(): Boolean {
+    val fork = BranchSlashCommand.parse(state.value.composerText) as? BranchSlashCommand.Fork ?: return false
+    val selected = state.value.selectedConversation ?: return false
+    if (!conversationManagement.supportsBranching) return false
+    conversationManagement.forkConversation(DesktopBranchOrigin(selected.id, selected.agentId?.takeIf(String::isNotBlank)), fork.name)
+    updateComposerText("")
+    return true
+}
+
+/** The composer's send: a `/fork` runs as a branch, anything else is sent. */
+internal fun DesktopChatController.sendOrBranch() {
+    if (!runBranchCommand()) send()
 }
 
 /** What [DesktopConversationBrancher] needs from the controller. */

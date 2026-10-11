@@ -302,7 +302,7 @@ internal class DesktopChatActions(
 
     override fun updateComposerText(text: String) = controller.updateComposerText(text)
 
-    override fun send() = controller.send()
+    override fun send() = controller.sendOrBranch()
 
     /** A draft-free send: the user's draft and staged images stay exactly as they are. */
     override fun sendText(text: String) = controller.sendText(text)

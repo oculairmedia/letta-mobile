@@ -77,6 +77,9 @@ class ChatConversationBranching(
 
     fun rerun(origin: Origin, message: UiMessage) = start(origin) { controller.rerun(origin.source, message) }
 
+    /** letta-mobile-7mys7: `/fork [name]`: all of the conversation, named when given. */
+    fun forkConversation(origin: Origin, name: String?) = start(origin) { controller.forkConversation(origin.source, name) }
+
     private fun start(origin: Origin, request: () -> Boolean) {
         open = origin.open
         request()

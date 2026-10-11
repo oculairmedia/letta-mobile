@@ -335,6 +335,10 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     val chatController = params.chatController
     val onNavigate = params.onNavigate
     add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
+    // letta-mobile-7mys7: letta-code's /fork [name], run by the client (the App Server does not).
+    if (chatController.conversationManagement.supportsBranching) {
+        add(ComposerCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) { chatController.updateComposerText("/fork ") })
+    }
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
     add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
@@ -471,7 +475,7 @@ internal fun createDesktopChatDetailPaneActions(
     val chatController = params.chatController
     return ChatDetailPaneActions(
         onComposerTextChanged = chatController::updateComposerText,
-        onSend = chatController::send,
+        onSend = chatController::sendOrBranch,
         onSubmitApproval = if (params.canSubmitApprovals) {
             { requestId, toolCallIds, approve, reason ->
                 chatController.submitApproval(ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
