@@ -137,24 +137,26 @@ class WsActiveSubagentSourceTest {
     }
 
     @Test
-    fun `startedAt seeds the lastUpdateAt baseline for the stuck heuristic`() {
-        // letta-mobile-dvobc: a parseable ISO timestamp becomes the baseline.
-        val withTs = SubagentEntry(
+    fun `host last activity, not the start time, is the stuck baseline`() {
+        // letta-mobile-ulcg6 (RC4): seeding from startedAt made every long run
+        // read as stuck. The host's last observed progress is the baseline.
+        val active = SubagentEntry(
             toolCallId = "toolu_1",
             status = SubagentStatus.RUNNING,
             startedAt = "2026-06-05T00:00:00Z",
+            lastActivityAtMs = 1_791_641_990_000L,
         ).toActiveSubagent()
-        assertEquals(
-            java.time.Instant.parse("2026-06-05T00:00:00Z").toEpochMilli(),
-            withTs.lastUpdateAt,
-        )
-        // A malformed timestamp must not crash — it degrades to null.
-        val bad = SubagentEntry(
+        assertEquals(1_791_641_990_000L, active.lastUpdateAt)
+        assertEquals(RingState.RUNNING, active.ringState(now = 1_791_641_990_000L + 141_263L))
+
+        // No host activity time (older host): unknown, so never stuck.
+        val unknown = SubagentEntry(
             toolCallId = "toolu_2",
             status = SubagentStatus.RUNNING,
-            startedAt = "not-a-date",
+            startedAt = "2026-06-05T00:00:00Z",
         ).toActiveSubagent()
-        assertNull(bad.lastUpdateAt)
+        assertNull(unknown.lastUpdateAt)
+        assertEquals(RingState.RUNNING, unknown.ringState(now = Long.MAX_VALUE))
     }
 
     @Test

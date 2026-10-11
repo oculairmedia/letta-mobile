@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.doubleOrNull
@@ -21,6 +22,12 @@ data class AppServerSubagentSnapshot(
     @SerialName("tool_call_id") val toolCallId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
+    /**
+     * letta-mobile-ulcg6: letta-code sends the child's identity as `agent_url`,
+     * never `agent_id`; for a local agent it IS the agent id, for a cloud agent a
+     * chat URL ending in it. See [childAgentId].
+     */
+    @SerialName("agent_url") val agentUrl: String? = null,
     val description: String? = null,
     @SerialName("subagent_type") val subagentType: String? = null,
     val status: String? = null,
@@ -33,6 +40,12 @@ data class AppServerSubagentSnapshot(
     @SerialName("start_time") val startTime: JsonElement? = null,
     @SerialName("started_at") val startedAt: String? = null,
     val activity: SubagentActivitySnapshot? = null,
+    // letta-mobile-ulcg6 (RC5): native letta-code progress fields.
+    @SerialName("tool_calls") val toolCalls: JsonElement? = null,
+    @SerialName("total_tokens") val totalTokens: Long? = null,
+    @SerialName("duration_ms") val durationMs: Long? = null,
+    val model: String? = null,
+    @SerialName("is_background") val isBackground: Boolean? = null,
 )
 
 /**
@@ -53,19 +66,25 @@ object AppServerSubagentSnapshotAdapter {
         val identity = snapshot.toolCallId?.takeIf { it.isNotBlank() }
             ?: snapshot.subagentId?.takeIf { it.isNotBlank() }
             ?: return null
+        val native = SubagentNativeProgressParser.parse(snapshot.toolCalls)
         return SubagentEntry(
             toolCallId = identity,
             description = snapshot.description.orEmpty(),
             subagentType = snapshot.subagentType.orEmpty(),
             status = normalizeStatus(snapshot.status, snapshot.error),
             taskId = snapshot.taskId,
-            subagentAgentId = snapshot.agentId,
+            subagentAgentId = snapshot.agentId?.takeIf(String::isNotBlank) ?: childAgentId(snapshot.agentUrl),
             subagentConversationId = snapshot.conversationId,
             parentRunId = snapshot.parentRunId,
             parentAgentId = snapshot.parentAgentId ?: parent.agentId,
             parentConversationId = snapshot.parentConversationId ?: parent.conversationId,
             startedAt = startedAt(snapshot),
-            activity = snapshot.activity?.bounded(),
+            activity = snapshot.activity?.bounded() ?: native.activity,
+            toolCallCount = native.toolCallCount,
+            model = snapshot.model?.takeIf(String::isNotBlank),
+            totalTokens = snapshot.totalTokens,
+            durationMs = snapshot.durationMs,
+            isBackground = snapshot.isBackground,
         )
     }
 
@@ -94,6 +113,7 @@ object AppServerSubagentSnapshotAdapter {
             "subagent_conversation_id",
         ),
         agentId = alias(raw, decoded?.agentId, "agent_id", "agentId", "subagent_agent_id"),
+        agentUrl = alias(raw, decoded?.agentUrl, "agent_url", "agentUrl", "agentURL"),
         description = alias(raw, decoded?.description, "description"),
         subagentType = alias(raw, decoded?.subagentType, "subagent_type", "subagentType"),
         status = alias(raw, decoded?.status, "status"),
@@ -110,7 +130,25 @@ object AppServerSubagentSnapshotAdapter {
         startTime = listOfNotNull(raw["start_time"], raw["started_at_ms"], decoded?.startTime).firstOrNull(),
         startedAt = alias(raw, decoded?.startedAt, "started_at", "startedAt"),
         activity = listOfNotNull(decodeActivity(raw["activity"]), decoded?.activity).firstOrNull(),
+        toolCalls = raw["tool_calls"] ?: raw["toolCalls"] ?: decoded?.toolCalls,
+        totalTokens = firstLong(raw, "total_tokens", "totalTokens") ?: decoded?.totalTokens,
+        durationMs = firstLong(raw, "duration_ms", "durationMs") ?: decoded?.durationMs,
+        model = alias(raw, decoded?.model, "model"),
+        isBackground = firstBoolean(raw, "is_background", "isBackground") ?: decoded?.isBackground,
     )
+
+    /** The agent id inside letta-code's `agent_url` (a bare local id or a URL ending in one). */
+    private fun childAgentId(agentUrl: String?): String? =
+        agentUrl?.trim()?.substringBefore('?')?.trimEnd('/')?.substringAfterLast('/')
+            ?.takeIf { it.startsWith(AGENT_ID_PREFIX) }
+
+    private const val AGENT_ID_PREFIX = "agent-"
+
+    private fun firstLong(raw: JsonObject, vararg keys: String): Long? =
+        keys.firstNotNullOfOrNull { key -> (raw[key] as? JsonPrimitive)?.let(::numericTimestamp) }
+
+    private fun firstBoolean(raw: JsonObject, vararg keys: String): Boolean? =
+        keys.firstNotNullOfOrNull { key -> (raw[key] as? JsonPrimitive)?.booleanOrNull }
 
     private fun hasIdentity(snapshot: AppServerSubagentSnapshot?): Boolean {
         if (snapshot == null) return false

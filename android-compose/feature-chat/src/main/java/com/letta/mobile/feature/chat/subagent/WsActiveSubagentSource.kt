@@ -185,23 +185,14 @@ class WsActiveSubagentSource(
             progress = todoProgress?.let {
                 SubagentTodoProgress(completed = it.completed, total = it.total)
             },
-            // letta-mobile-dvobc: baseline for the stuck heuristic. The
-            // registry snapshot does not yet carry a per-todo-change
-            // timestamp, so we seed it from `startedAt` when present. FOLLOW-UP
-            // (shim): emit last-todo-change so "stuck" reflects real stalls,
-            // not just long total runtime.
-            lastUpdateAt = startedAt?.let(::parseIsoMillis),
+            // letta-mobile-ulcg6 (RC4): the stuck baseline is the host's last
+            // observed PROGRESS (a new tool call or lifecycle change), never
+            // the start time - seeding from startedAt made every run longer
+            // than the threshold read as stuck. A host that does not report
+            // it leaves the baseline unknown, which reads as not stuck.
+            lastUpdateAt = lastActivityAtMs,
             terminalAt = terminalAtEpochMs,
         )
-
-        /**
-         * Best-effort ISO-8601 -> epoch-ms parse. Returns null on any
-         * malformed value so a bad timestamp never crashes the bar (the chip
-         * simply reads as not-stuck).
-         */
-        internal fun parseIsoMillis(iso: String): Long? = runCatching {
-            java.time.Instant.parse(iso).toEpochMilli()
-        }.getOrNull()
 
         /**
          * letta-mobile-al6q5: canonicalize through the SHARED vocabulary before

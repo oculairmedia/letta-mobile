@@ -220,6 +220,8 @@ class DurableSubagentRegistry(
             firstSeenEpochMs = now,
             lastSeenEpochMs = now,
             terminalAtEpochMs = if (observation.state.isTerminal) now else null,
+            progress = observation.progress,
+            lastActivityEpochMs = now,
         )
         entries[observation.key] = record
         enforceCapacityLocked()
@@ -251,7 +253,18 @@ class DurableSubagentRegistry(
         lastSeenEpochMs = now,
         terminalAtEpochMs = terminalAtEpochMs
             ?: now.takeIf { observation.state.isTerminal },
+        progress = progress.mergedWith(observation.progress),
+        lastActivityEpochMs = if (madeProgress(observation)) now else lastActivityEpochMs ?: lastSeenEpochMs,
     )
+
+    /**
+     * letta-mobile-ulcg6 (RC4): a re-delivered identical snapshot is not
+     * progress. A new tool call, new activity lines or a lifecycle change is.
+     */
+    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
+        observation.state != state ||
+            progress.advancedBy(observation.progress) ||
+            (observation.activity != null && observation.activity.lines != activity?.lines)
 
     private fun newerActivity(
         current: com.letta.mobile.data.model.SubagentActivitySnapshot?,
