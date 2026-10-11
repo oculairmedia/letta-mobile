@@ -499,6 +499,7 @@ internal fun createDesktopChatDetailPaneActions(
         onOpenAgent = params.onOpenAgent,
         queue = desktopQueuedSendActions(chatController),
         queueControls = chatController::canonicalSendQueue,
+        messageMenu = { com.letta.mobile.desktop.chat.desktopMessageMenu(chatController) },
     )
 }
 

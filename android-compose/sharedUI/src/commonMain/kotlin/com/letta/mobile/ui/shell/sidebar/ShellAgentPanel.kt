@@ -309,6 +309,7 @@ private fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: 
                     deleteBehavior = actions.deleteBehavior,
                     onRename = actions.onRenameConversation?.let { rename -> { title -> rename(conversation.id, title) } },
                     onPinToggle = actions.onPinConversation?.let { pin -> { pin(conversation.id, !conversation.pinned) } },
+                    onFork = actions.onForkConversation?.let { fork -> { name -> fork(conversation.id, name) } },
                 ),
             )
         }

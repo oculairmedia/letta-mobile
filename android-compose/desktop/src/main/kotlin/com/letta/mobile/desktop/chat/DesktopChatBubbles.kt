@@ -68,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.chat.branch.onSecondaryClick
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
 import com.letta.mobile.ui.theme.customColors
@@ -127,13 +128,16 @@ private fun AssistantMessageColumn(
         if (message.isReasoning && message.content.isNotBlank()) {
             ReasoningRow(message.content)
         } else if (message.content.isNotBlank()) {
-            AgentText(
-                AgentTextParams(
-                    text = message.content,
-                    isError = message.isError,
-                    isStreaming = streamingMessageId?.value == message.id,
-                ),
-            )
+            // letta-mobile-7mys7: a right-click on a reply forks from it.
+            DesktopReplyMenuArea(message) {
+                AgentText(
+                    AgentTextParams(
+                        text = message.content,
+                        isError = message.isError,
+                        isStreaming = streamingMessageId?.value == message.id,
+                    ),
+                )
+            }
         }
         DesktopImageAttachmentsGrid(
             attachments = message.attachments,
@@ -302,6 +306,8 @@ internal fun UserPrompt(
     // itself isn't clickable.
     val cardHoverSource = remember(message.id) { MutableInteractionSource() }
     val cardHovered by cardHoverSource.collectIsHoveredAsState()
+    // letta-mobile-7mys7: Edit and resend, Rerun, Fork from here (right-click, or the hover button).
+    val menu = rememberDesktopMessageMenu(message)
     Surface(
         onClick = { expanded = !expanded },
         enabled = overflowed || expanded,
@@ -309,6 +315,7 @@ internal fun UserPrompt(
             .fillMaxWidth()
             .padding(bottom = LettaDimens.Space.sm)
             .hoverable(cardHoverSource)
+            .onSecondaryClick(menu?.openMenu)
             .drawBehind {
                 val stroke = 1.dp.toPx()
                 val radius = LettaDimens.Space.md.toPx()
@@ -381,9 +388,8 @@ internal fun UserPrompt(
             if (overflowed || expanded) {
                 PromptExpandButton(expanded = expanded, onToggle = { expanded = !expanded })
             }
-            // Copy is the only other wired affordance — a message "edit"/resend
-            // needs conversation-fork support that isn't in place, so it's
-            // omitted rather than shown as a dead control.
+            // letta-mobile-7mys7: the message actions, beside Copy, where the backend can fork.
+            DesktopMessageMenuButton(menu, visible = cardHovered)
             if (message.content.isNotBlank()) {
                 CopyIconButton(
                     text = message.content,

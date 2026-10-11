@@ -47,7 +47,15 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
     private val allConversations: IAllConversationsRepository,
+    /** letta-mobile-7mys7 (G37): each fork's source conversation; null in tests. */
+    private val lineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
 ) : ViewModel() {
+
+    /** Each fork's source conversation id, so a fork's row reads "Forked from …". */
+    val conversationParents: StateFlow<Map<String, String>> =
+        (lineage?.parents ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap()))
+            .map { parents -> parents.mapValues { it.value.conversationId } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)

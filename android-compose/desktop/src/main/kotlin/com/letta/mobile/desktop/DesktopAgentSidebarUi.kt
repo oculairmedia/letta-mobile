@@ -81,6 +81,7 @@ internal fun DesktopAgentSidebarState.toShellPanelState(): ShellAgentPanelState 
             thinkingId = thinkingConversationId,
             deletingIds = deletingConversationIds,
             pinnedIds = pinnedConversationIds,
+            parentIds = conversationParents,
         ),
         timeLabel = ::formatRelativeTimestamp,
     ),
@@ -107,6 +108,7 @@ internal fun DesktopAgentSidebarActions.toShellPanelActions(mode: WorkPlayMode):
     deleteBehavior = deleteBehavior,
     onRenameConversation = onRenameConversation,
     onPinConversation = onPinConversation,
+    onForkConversation = onForkConversation,
     onOpenCanvas = onOpenCanvas,
     onArchiveCanvas = onArchiveCanvas,
 )

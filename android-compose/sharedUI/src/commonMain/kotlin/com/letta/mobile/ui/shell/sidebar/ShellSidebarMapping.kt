@@ -12,6 +12,8 @@ data class ShellConversationMarks(
     val deletingIds: Set<String> = emptySet(),
     /** letta-mobile-bzvro.17: pinned conversations, listed first. */
     val pinnedIds: Set<String> = emptySet(),
+    /** letta-mobile-7mys7 (G37): each fork's source conversation id (ConversationLineage), for "Forked from …". */
+    val parentIds: Map<String, String> = emptyMap(),
 )
 
 /** Pure mapping from the platform-neutral conversation summaries to the panel's rows. */
@@ -28,8 +30,9 @@ object ShellSidebarMapping {
         conversations: List<ChatConversationSummary>,
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
-    ): List<ShellConversationRowModel> =
-        PinnedConversations.pinnedFirst(conversations, marks.pinnedIds) { it.id }.map { conversation ->
+    ): List<ShellConversationRowModel> {
+        val titles = conversations.associate { it.id to it.displayTitle() }
+        return PinnedConversations.pinnedFirst(conversations, marks.pinnedIds) { it.id }.map { conversation ->
             ShellConversationRowModel(
                 id = conversation.id,
                 title = conversation.displayTitle(),
@@ -40,8 +43,13 @@ object ShellSidebarMapping {
                 deleting = conversation.id in marks.deletingIds,
                 archived = conversation.archived,
                 pinned = conversation.id in marks.pinnedIds,
+                forkedFrom = marks.parentIds[conversation.id]?.let { parent -> titles[parent] ?: UNLISTED_PARENT },
             )
         }
+    }
+
+    /** A fork whose source is not in the list (archived, another agent's, or gone). */
+    const val UNLISTED_PARENT = "an earlier chat"
 
     /** The preview line under a title: trimmed, and blank for the loading placeholder. */
     fun cleanPreview(raw: String): String =

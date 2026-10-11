@@ -45,6 +45,8 @@ data class ShellNavDrawerInput(
     val archiveFilter: ShellArchiveFilter = ShellArchiveFilter.Active,
     /** Pinned conversations list first and show the pin mark. */
     val pinnedConversationIds: Set<String> = emptySet(),
+    /** letta-mobile-7mys7: each fork's source conversation, so its row reads "Forked from …". */
+    val conversationParents: Map<String, String> = emptyMap(),
     /** Canvases are shared across agents, so these are all of them. */
     val canvases: List<CanvasDocument> = emptyList(),
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
@@ -74,7 +76,11 @@ object ShellNavDrawerMapping {
             conversations = ShellSidebarMapping.conversationRows(
                 conversations = input.conversations.toChatConversationSummaries()
                     .filter { input.archiveFilter.admits(it.archived) },
-                marks = ShellConversationMarks(selectedId = input.openConversationId, pinnedIds = input.pinnedConversationIds),
+                marks = ShellConversationMarks(
+                    selectedId = input.openConversationId,
+                    pinnedIds = input.pinnedConversationIds,
+                    parentIds = input.conversationParents,
+                ),
                 timeLabel = { ShellRelativeTime.compact(it, now) },
             ),
             canvases = canvasRows(input, now),

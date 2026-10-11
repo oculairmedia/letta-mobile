@@ -49,6 +49,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
     val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
+    val conversationParents by drawer.conversationParents.collectAsStateWithLifecycle()
     val identities = LocalMascotRegistry.current.identities
     val context = LocalContext.current
     LaunchedEffect(drawer) {
@@ -76,6 +77,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
         pinnedConversationIds = pinnedConversationIds,
+        conversationParents = conversationParents,
         canvases = canvases,
         hiddenSections = androidHiddenDrawerSections(state.params.navigation),
     ).withRoster(roster)

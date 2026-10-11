@@ -47,6 +47,7 @@ import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
+import com.letta.mobile.ui.chat.branch.ForkNameDialog
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
@@ -58,6 +59,8 @@ data class ShellConversationRowActions(
     val onDelete: () -> Unit,
     val onRename: ((String) -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
+    /** letta-mobile-7mys7 (G37): fork the chat under the given name (null keeps the backend's title); null hides it. */
+    val onFork: ((name: String?) -> Unit)? = null,
     /** What [onDelete] really does on this backend; the confirm dialog and the row menu follow it. */
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
 )
@@ -98,6 +101,7 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
     val hovered by interactionSource.collectIsHoveredAsState()
     var confirmDelete by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var forking by remember { mutableStateOf(false) }
     val onRename = actions.onRename
     if (renaming && onRename != null) {
         ShellConversationRenameField(title = model.title, onRename = onRename, onDone = { renaming = false })
@@ -114,6 +118,7 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
                 pinned = model.pinned,
                 onRenameRequest = onRename?.let { { renaming = true } },
                 onPinToggle = actions.onPinToggle,
+                onForkRequest = actions.onFork?.let { { forking = true } },
             ),
         ),
     )
@@ -121,6 +126,16 @@ fun ShellConversationRow(model: ShellConversationRowModel, actions: ShellConvers
         decorations.tooltip(model.title) {
             ShellConversationRowSurface(model, hovered, interactionSource, actions)
         }
+    }
+    val onFork = actions.onFork
+    if (forking && onFork != null) {
+        ForkNameDialog(
+            onFork = { name ->
+                forking = false
+                onFork(name)
+            },
+            onDismiss = { forking = false },
+        )
     }
     if (confirmDelete) {
         decorations.confirm(
@@ -166,9 +181,9 @@ private fun ShellConversationRowSurface(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (model.preview.isNotBlank() && model.preview != model.title) {
+                if (model.subtitle.isNotBlank() && model.subtitle != model.title) {
                     Text(
-                        text = model.preview,
+                        text = model.subtitle,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = PREVIEW_ALPHA),
                         maxLines = 1,

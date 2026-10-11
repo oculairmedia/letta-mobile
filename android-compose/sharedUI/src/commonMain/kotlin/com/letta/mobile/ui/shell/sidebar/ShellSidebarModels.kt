@@ -46,7 +46,12 @@ data class ShellConversationRowModel(
     val archived: Boolean = false,
     /** letta-mobile-bzvro.17: pinned rows lead the list and show a pin. */
     val pinned: Boolean = false,
-)
+    /** letta-mobile-7mys7 (G37): the title of the conversation this one was forked from; its preview line says so. */
+    val forkedFrom: String? = null,
+) {
+    /** The line under the title: where a fork came from, else the latest message. */
+    val subtitle: String get() = forkedFrom?.let { "Forked from $it" } ?: preview
+}
 
 /** One canvas row in the panel's library. */
 @Immutable
@@ -103,6 +108,8 @@ data class ShellAgentPanelActions(
     val onRenameConversation: ((id: String, title: String) -> Unit)? = null,
     /** letta-mobile-bzvro.17: pin or unpin a conversation; null means the host keeps no pins. */
     val onPinConversation: ((id: String, pinned: Boolean) -> Unit)? = null,
+    /** letta-mobile-7mys7 (G37): fork a conversation, named or not; null means the backend cannot fork. */
+    val onForkConversation: ((id: String, name: String?) -> Unit)? = null,
     val onOpenCanvas: (CanvasId) -> Unit = {},
     val onArchiveCanvas: ((id: CanvasId, archived: Boolean) -> Unit)? = null,
 )
