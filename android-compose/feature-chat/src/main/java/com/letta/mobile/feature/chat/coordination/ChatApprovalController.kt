@@ -57,14 +57,13 @@ internal class ChatApprovalController(
 
     /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
     fun submit(answer: ChatApprovalAnswer, conversationOverride: ConversationId? = null) {
-        val requestId = answer.requestId
         val conversationId = conversationOverride?.value ?: activeConversationId()
         scope.launch {
-            markApprovalInFlight(requestId, conversationId)
+            markApprovalInFlight(answer, conversationId)
             val submitted = try {
                 accepted(coordinator.submitApproval(agentId, conversationId, answer))
             } catch (cancelled: CancellationException) {
-                failApprovalInFlight(requestId)
+                failApprovalInFlight(answer)
                 throw cancelled
             } catch (e: Exception) {
                 bannerController.showError(e.message ?: "Failed to submit approval")
@@ -75,9 +74,9 @@ internal class ChatApprovalController(
             if (submitted) {
                 // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot.
                 answer.toolCallIds.forEach { relay?.resolve(it) }
-                settleApprovalPresence(requestId)
+                settleApprovalPresence(answer)
             } else {
-                failApprovalInFlight(requestId)
+                failApprovalInFlight(answer)
             }
         }
     }
@@ -94,13 +93,15 @@ internal class ChatApprovalController(
         return false
     }
 
-    private fun settleApprovalPresence(requestId: String) {
+    private fun settleApprovalPresence(answer: ChatApprovalAnswer) {
+        val requestId = answer.requestId
         uiState.update {
             if (it.activeApprovalRequestId != requestId) it else it.copy(isStreaming = false, isAgentTyping = false)
         }
     }
 
-    private fun markApprovalInFlight(requestId: String, conversationId: String?) {
+    private fun markApprovalInFlight(answer: ChatApprovalAnswer, conversationId: String?) {
+        val requestId = answer.requestId
         tracker.begin(requestId, conversationId ?: NO_CONVERSATION)
         uiState.update {
             it.copy(
@@ -111,7 +112,8 @@ internal class ChatApprovalController(
         }
     }
 
-    private fun failApprovalInFlight(requestId: String) {
+    private fun failApprovalInFlight(answer: ChatApprovalAnswer) {
+        val requestId = answer.requestId
         tracker.clear(requestId)
         uiState.update {
             if (it.activeApprovalRequestId != requestId) {
