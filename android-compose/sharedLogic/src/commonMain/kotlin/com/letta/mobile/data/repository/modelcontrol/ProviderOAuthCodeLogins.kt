@@ -1,13 +1,7 @@
 package com.letta.mobile.data.repository.modelcontrol
 
-import com.letta.mobile.data.canvas.compose.Sha256
 import io.ktor.http.Parameters
-import io.ktor.http.Url
 import io.ktor.http.formUrlEncode
-import io.ktor.http.parseQueryString
-import kotlin.io.encoding.Base64
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -114,79 +108,4 @@ internal class OpenRouterCodeLogin(
         const val KEYS_URL = "https://openrouter.ai/api/v1/auth/keys"
         const val CALLBACK_URL = "http://localhost:3000/letta/openrouter/callback"
     }
-}
-
-/** RFC 7636 S256 verifier and challenge. */
-internal class Pkce private constructor(val verifier: String, val challenge: String) {
-    override fun toString(): String = "Pkce(<redacted>)"
-
-    companion object {
-        const val METHOD = "S256"
-        private const val VERIFIER_BYTES = 32
-        private val urlSafe = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
-
-        fun create(random: (Int) -> ByteArray): Pkce {
-            val verifier = token(random(VERIFIER_BYTES))
-            return Pkce(verifier, urlSafe.encode(Sha256.digest(verifier.encodeToByteArray())))
-        }
-
-        /** Base64url without padding. */
-        fun token(bytes: ByteArray): String = urlSafe.encode(bytes)
-    }
-}
-
-/**
- * What the user pasted after approving: the whole address the browser ended
- * on, a `code=…&state=…` query, `code#state`, or the bare code.
- */
-internal data class PastedCode(val code: String, val state: String?) {
-    override fun toString(): String = "PastedCode(<redacted>)"
-
-    companion object {
-        fun parse(pasted: String, expectedState: String?): PastedCode {
-            val parsed = split(pasted.trim())
-            if (parsed.code.isBlank()) throw ProviderSignInException("Paste the code from the sign-in page", SignInFailure.BAD_CODE)
-            if (parsed.contradicts(expectedState)) {
-                throw ProviderSignInException("That code is from a different sign-in; start again", SignInFailure.BAD_CODE)
-            }
-            return parsed
-        }
-
-        /** A pasted state that differs from the one this sign-in sent; no state on either side is no contradiction. */
-        private fun PastedCode.contradicts(expectedState: String?): Boolean {
-            val pastedState = state ?: return false
-            return expectedState?.let { it != pastedState } ?: false
-        }
-
-        private fun split(value: String): PastedCode = when {
-            value.startsWith("http://") || value.startsWith("https://") -> fromQuery(Url(value).encodedQuery)
-            value.contains("code=") -> fromQuery(value.substringAfter('?'))
-            value.contains('#') -> PastedCode(value.substringBefore('#'), value.substringAfter('#').ifBlank { null })
-            else -> PastedCode(value, null)
-        }
-
-        private fun fromQuery(query: String): PastedCode {
-            val params = parseQueryString(query)
-            return PastedCode(params["code"].orEmpty(), params["state"])
-        }
-    }
-}
-
-/**
- * Random bytes for PKCE and state from [Uuid.random], which the standard
- * library documents as drawn from a cryptographically secure source on every
- * target. Each UUID gives 122 random bits; enough are concatenated to cover
- * [size] bytes.
- */
-@OptIn(ExperimentalUuidApi::class)
-internal fun secureRandomBytes(size: Int): ByteArray {
-    val out = ByteArray(size)
-    var filled = 0
-    while (filled < size) {
-        val chunk = Uuid.random().toByteArray()
-        val take = minOf(chunk.size, size - filled)
-        chunk.copyInto(out, destinationOffset = filled, endIndex = take)
-        filled += take
-    }
-    return out
 }
