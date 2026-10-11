@@ -76,22 +76,8 @@ class AppServerWorkspaceDirectorySource(
         return DirectoryListing(path = response.path ?: path, folders = response.folders, hasMore = response.hasMore)
     }
 
-    private suspend fun <T> guarded(call: suspend () -> T): T = try {
-        call()
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (timeout: AppServerRequestTimeoutException) {
-        throw DirectoryBrowseException(DirectoryBrowseErrors.TIMEOUT, timeout)
-    } catch (notRelayed: WorkspaceRelayException) {
-        throw DirectoryBrowseException(DirectoryBrowseErrors.BROWSE_UNAVAILABLE, notRelayed)
-    } catch (unsupported: UnsupportedOperationException) {
-        throw DirectoryBrowseException(DirectoryBrowseErrors.BROWSE_UNAVAILABLE, unsupported)
-    } catch (noConnection: IllegalStateException) {
-        val message = if (noConnection.message == WorkspaceClientRoute.NO_CONNECTION) DirectoryBrowseErrors.BROWSE_UNAVAILABLE else null
-        throw DirectoryBrowseException(message ?: noConnection.message ?: "The App Server request failed.", noConnection)
-    } catch (error: Exception) {
-        throw DirectoryBrowseException(error.message ?: "The App Server request failed.", error)
-    }
+    private suspend fun <T> guarded(call: suspend () -> T): T =
+        runCatching { call() }.getOrElse { throw browseFailure(it) }
 
     companion object {
         /** Enough for any folder a person scrolls through; the rest are reached by typing a path. */
@@ -107,3 +93,17 @@ private data class ListResponse(
     val success: Boolean = false,
     val error: String? = null,
 )
+
+/** [error] as what the picker shows; cancellation and our own failures pass through unchanged. */
+private fun browseFailure(error: Throwable): Throwable = when (error) {
+    is CancellationException, is DirectoryBrowseException -> error
+    is AppServerRequestTimeoutException -> DirectoryBrowseException(DirectoryBrowseErrors.TIMEOUT, error)
+    // Not an allowlisted Iroh relay method, or a client that cannot carry workspace commands.
+    is WorkspaceRelayException, is UnsupportedOperationException ->
+        DirectoryBrowseException(DirectoryBrowseErrors.BROWSE_UNAVAILABLE, error)
+    else -> {
+        val noConnection = error is IllegalStateException && error.message == WorkspaceClientRoute.NO_CONNECTION
+        val message = if (noConnection) DirectoryBrowseErrors.BROWSE_UNAVAILABLE else error.message
+        DirectoryBrowseException(message ?: "The App Server request failed.", error)
+    }
+}

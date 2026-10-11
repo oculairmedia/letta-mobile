@@ -8,6 +8,9 @@ import com.letta.mobile.data.workspace.WorkspacePaths
  */
 object DirectoryPaths {
     private val WINDOWS_DRIVE_ROOT = Regex("^[A-Za-z]:[\\\\/]?$")
+    private val POSIX_ROOTS = setOf("/", "\\")
+    private val RESERVED_NAMES = setOf("", ".", "..")
+    private val FORBIDDEN_NAME_CHARS = setOf('/', '\\', '\u0000')
 
     /** [path] trimmed, without a trailing separator unless it is a root (`/`, `C:\`). */
     fun normalize(path: String): String {
@@ -22,7 +25,7 @@ object DirectoryPaths {
     /** True at a file-system root, which has no parent. */
     fun isRoot(path: String): Boolean {
         val normalized = normalize(path)
-        return normalized == "/" || normalized == "\\" || WINDOWS_DRIVE_ROOT.matches(normalized)
+        return normalized in POSIX_ROOTS || WINDOWS_DRIVE_ROOT.matches(normalized)
     }
 
     /** The folder containing [path], or null at a root. */
@@ -56,8 +59,8 @@ object DirectoryPaths {
     /** A folder name the picker may create: one segment, not `.`/`..`, no separator or NUL. */
     fun isValidFolderName(name: String): Boolean {
         val trimmed = name.trim()
-        return trimmed.isNotEmpty() && trimmed != "." && trimmed != ".." &&
-            trimmed.none { it == '/' || it == '\\' || it == '\u0000' }
+        if (trimmed in RESERVED_NAMES) return false
+        return trimmed.none { it in FORBIDDEN_NAME_CHARS }
     }
 
     /** Two paths name the same folder, ignoring a trailing separator. */

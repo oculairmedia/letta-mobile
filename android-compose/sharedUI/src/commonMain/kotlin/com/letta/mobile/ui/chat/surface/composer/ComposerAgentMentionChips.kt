@@ -42,12 +42,6 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.stringResource
 
-/** Test tags of the `@agent` mention chips. */
-object ComposerAgentMentionTags {
-    const val ROW = "composer-agent-mentions"
-    const val CHIP = "composer-agent-mention-"
-}
-
 /**
  * letta-mobile-zxk2n.6 (G31): the agents the draft mentions, one input chip each, above the
  * prompt. The reference itself stays in the text (that is what the agent receives, see

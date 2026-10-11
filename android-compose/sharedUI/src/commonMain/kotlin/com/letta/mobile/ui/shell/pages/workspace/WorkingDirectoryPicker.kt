@@ -86,6 +86,7 @@ import com.letta.mobile.sharedui.resources.cwd_picker_worktree_search
 import com.letta.mobile.sharedui.resources.cwd_picker_worktrees
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -248,18 +249,12 @@ private fun PickerToolbar(state: WorkingDirectoryPickerState, actions: WorkingDi
     var naming by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md)) {
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
-            ToolbarButton(Lucide.FolderPlus, stringResource(Res.string.cwd_picker_new_folder), WorkingDirectoryPickerTags.NEW_FOLDER, state.canCreateFolder) {
-                naming = true
-            }
+            ToolbarButton(NewFolderButton, enabled = state.canCreateFolder) { naming = true }
             val folder = state.folder
             host.openInFileManager?.takeIf { folder != null }?.let { open ->
-                ToolbarButton(Lucide.ExternalLink, stringResource(Res.string.cwd_picker_open_file_manager), WorkingDirectoryPickerTags.FILE_MANAGER) {
-                    folder?.let(open)
-                }
+                ToolbarButton(FileManagerButton) { folder?.let(open) }
             }
-            host.pickWithSystemDialog?.let { pick ->
-                ToolbarButton(Lucide.Folder, stringResource(Res.string.cwd_picker_system_dialog), WorkingDirectoryPickerTags.SYSTEM_DIALOG, onClick = pick)
-            }
+            host.pickWithSystemDialog?.let { pick -> ToolbarButton(SystemDialogButton, onClick = pick) }
         }
         state.createFolderUnavailableReason?.let { reason ->
             Text(
@@ -281,11 +276,20 @@ private fun PickerToolbar(state: WorkingDirectoryPickerState, actions: WorkingDi
     }
 }
 
+/** One toolbar control: its icon, label and test tag. */
+@Immutable
+private class ToolbarSpec(val icon: ImageVector, val label: StringResource, val tag: String)
+
+private val NewFolderButton = ToolbarSpec(Lucide.FolderPlus, Res.string.cwd_picker_new_folder, WorkingDirectoryPickerTags.NEW_FOLDER)
+private val FileManagerButton =
+    ToolbarSpec(Lucide.ExternalLink, Res.string.cwd_picker_open_file_manager, WorkingDirectoryPickerTags.FILE_MANAGER)
+private val SystemDialogButton = ToolbarSpec(Lucide.Folder, Res.string.cwd_picker_system_dialog, WorkingDirectoryPickerTags.SYSTEM_DIALOG)
+
 @Composable
-private fun ToolbarButton(icon: ImageVector, label: String, tag: String, enabled: Boolean = true, onClick: () -> Unit) {
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.testTag(tag)) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-        Text(label, modifier = Modifier.padding(start = LettaDimens.Space.xs))
+private fun ToolbarButton(spec: ToolbarSpec, enabled: Boolean = true, onClick: () -> Unit) {
+    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.testTag(spec.tag)) {
+        Icon(spec.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
+        Text(stringResource(spec.label), modifier = Modifier.padding(start = LettaDimens.Space.xs))
     }
 }
 
@@ -348,22 +352,16 @@ private fun PickerList(state: WorkingDirectoryPickerState, actions: WorkingDirec
     LazyColumn(modifier.fillMaxWidth()) {
         if (state.recents.isNotEmpty()) {
             section(recentTitle)
-            pathRows(state.recents, Lucide.History, WorkingDirectoryPickerTags.RECENT_ROW, showPath = true, onClick = actions::browse)
+            pathRows(state.recents, RecentRows, onClick = actions::browse)
         }
         if (state.worktrees.paths.isNotEmpty()) {
             section(worktreesTitle)
             item(key = "worktree-search") { WorktreeSearch(worktreeQuery, onQueryChange = { worktreeQuery = it }) }
-            pathRows(worktrees, Lucide.GitFork, WorkingDirectoryPickerTags.WORKTREE_ROW, showPath = false, onClick = actions::browse)
+            pathRows(worktrees, WorktreeRows, onClick = actions::browse)
         }
         val folder = state.folder ?: return@LazyColumn
         section(foldersTitle)
-        pathRows(
-            state.folders.map { DirectoryPaths.child(folder, it) },
-            Lucide.Folder,
-            WorkingDirectoryPickerTags.FOLDER_ROW,
-            showPath = false,
-            onClick = actions::browse,
-        )
+        pathRows(state.folders.map { DirectoryPaths.child(folder, it) }, FolderRows, onClick = actions::browse)
         folderListFooter(state)
     }
 }
@@ -379,17 +377,25 @@ private fun LazyListScope.section(title: String) {
     }
 }
 
-private fun LazyListScope.pathRows(paths: List<String>, icon: ImageVector, tagPrefix: String, showPath: Boolean, onClick: (String) -> Unit) {
-    items(paths, key = { tagPrefix + it }) { path ->
+/** How one list section draws its paths: the icon, the test-tag prefix, and whether the full path shows. */
+@Immutable
+private class PathRowStyle(val icon: ImageVector, val tagPrefix: String, val showPath: Boolean)
+
+private val RecentRows = PathRowStyle(Lucide.History, WorkingDirectoryPickerTags.RECENT_ROW, showPath = true)
+private val WorktreeRows = PathRowStyle(Lucide.GitFork, WorkingDirectoryPickerTags.WORKTREE_ROW, showPath = false)
+private val FolderRows = PathRowStyle(Lucide.Folder, WorkingDirectoryPickerTags.FOLDER_ROW, showPath = false)
+
+private fun LazyListScope.pathRows(paths: List<String>, style: PathRowStyle, onClick: (String) -> Unit) {
+    items(paths, key = { style.tagPrefix + it }) { path ->
         ListItem(
             headlineContent = { Text(DirectoryPaths.name(path), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = if (showPath) {
+            supportingContent = if (style.showPath) {
                 { Text(path, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall) }
             } else {
                 null
             },
-            leadingContent = { Icon(icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-            modifier = Modifier.clickable { onClick(path) }.testTag(tagPrefix + DirectoryPaths.name(path)),
+            leadingContent = { Icon(style.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+            modifier = Modifier.clickable { onClick(path) }.testTag(style.tagPrefix + DirectoryPaths.name(path)),
         )
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.workspace.directory.AppServerWorkspaceDirectorySource
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
 import com.letta.mobile.data.workspace.directory.DirectoryPaths
@@ -48,8 +49,15 @@ internal class DesktopWorkingDirectoryPicker(
     fun open(currentCwd: String?) = controller.open(currentCwd)
 }
 
+/** The picker for [port]'s conversation (the shared chat page). */
 @Composable
-internal fun rememberDesktopWorkingDirectoryPicker(port: DesktopChatSessionPort): DesktopWorkingDirectoryPicker {
+internal fun rememberDesktopWorkingDirectoryPicker(port: DesktopChatSessionPort): DesktopWorkingDirectoryPicker =
+    rememberDesktopWorkingDirectoryPicker { path -> port.actions.changeWorkingDirectory(ChatWorkingDirectory(path)) }
+
+/** A picker that hands the chosen folder to [onChosen] (the legacy chat pane binds its own). */
+@Composable
+internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): DesktopWorkingDirectoryPicker {
+    val latestOnChosen by rememberUpdatedState(onChosen)
     val scope = rememberCoroutineScope()
     // The LOCAL registry holds a client only while the bundled child runs on this computer.
     val localClient by DesktopLocalAppServerClientRegistry.shared.clients.collectAsState(
@@ -62,7 +70,7 @@ internal fun rememberDesktopWorkingDirectoryPicker(port: DesktopChatSessionPort)
         WorkingDirectoryPickerController(
             source = AppServerWorkspaceDirectorySource(client = sources::client, requestId = sources::requestId),
             scope = scope,
-            onChosen = { path -> port.actions.changeWorkingDirectory(ChatWorkingDirectory(path)) },
+            onChosen = { path -> latestOnChosen(path) },
             recents = recents,
             folderCreator = if (isLocal) DesktopLocalFolderCreator else null,
         )

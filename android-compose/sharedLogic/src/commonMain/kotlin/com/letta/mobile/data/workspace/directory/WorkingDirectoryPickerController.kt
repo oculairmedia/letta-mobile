@@ -42,7 +42,11 @@ data class WorkingDirectoryPickerState(
     val worktrees: WorktreeListState = WorktreeListState(),
 ) {
     val canGoUp: Boolean get() = folder?.let(DirectoryPaths::parent) != null
-    val canCreateFolder: Boolean get() = createFolderUnavailableReason == null && folder != null && !isCreatingFolder
+    val canCreateFolder: Boolean
+        get() = when {
+            createFolderUnavailableReason != null || isCreatingFolder -> false
+            else -> folder != null
+        }
 }
 
 /** What the picker's controls do; [WorkingDirectoryPickerController] is the shared implementation. */
@@ -195,10 +199,5 @@ class WorkingDirectoryPickerController(
 }
 
 /** [block]'s result or failure; cancellation still cancels. */
-private suspend fun <T> attempt(block: suspend () -> T): Result<T> = try {
-    Result.success(block())
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (error: Exception) {
-    Result.failure(error)
-}
+private suspend fun <T> attempt(block: suspend () -> T): Result<T> =
+    runCatching { block() }.onFailure { if (it is CancellationException) throw it }
