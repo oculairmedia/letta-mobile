@@ -400,6 +400,11 @@ class NotebookLocalStore(
         (document.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
     }?.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let { Json.decodeFromString<CanvasDocument>(it) }?.also { remember(id, it) }
 
+    /** The canvas's metadata (identity, revision, ownership) without its board. */
+    private fun metadataFrom(read: Read): CanvasDocument? =
+        (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
+            ?.let { Json.decodeFromString<CanvasDocument>(it) }
+
     private fun canvasFrom(read: Read): CanvasDocument? {
         val metadata = (read.get(ObjectId.ROOT, "canvasMetadata").orElse(null) as? AmValue.Str)?.value
             ?: return null
@@ -429,10 +434,11 @@ class NotebookLocalStore(
         }
     }
 
-    /** A canvas write, its scene parsed up front. */
+    /** A canvas write, its scene parsed and digested up front, once. */
     private class CanvasWrite(val doc: CanvasDocument, private val expectedRevision: Long?) {
         val incoming = NotebookBoardStorage.sceneBoard(doc.sceneJson)
-        val base = NotebookBoardStorage.sceneBaseOf(doc.sceneJson)
+        val base = NotebookBoardStorage.sceneBaseOf(incoming, blank = doc.sceneJson.isEmpty())
+        val save = NotebookBoardStorage.CanvasSave(incoming, base)
 
         /** Whether [current] is at the revision this write expects, if it expects one. */
         fun expects(current: CanvasDocument?): Boolean = expectedRevision == null || current?.revision == expectedRevision
@@ -441,14 +447,13 @@ class NotebookLocalStore(
     /** [write] in [tx]: false on a stale revision, null if the notebook holds another canvas. */
     private fun applyCanvasWrite(tx: Transaction, write: CanvasWrite): Boolean? {
         val doc = write.doc
-        val current = canvasFrom(tx)
+        // Only the metadata: the board is not read back whole to compare it. The merge writes
+        // what differs from the canvas's last write, so an unchanged scene writes nothing.
+        val current = metadataFrom(tx)
         if (!write.expects(current)) return false
         if (current != null && current.id != doc.id) return null
         val base = NotebookBoardStorage.readSceneBase(tx)
-        when {
-            base == null -> NotebookBoardStorage.writeBoard(tx, write.incoming)
-            current?.sceneJson != doc.sceneJson -> NotebookBoardStorage.mergeCanvasBoard(tx, base, write.incoming)
-        }
+        if (base == null) NotebookBoardStorage.writeBoard(tx, write.incoming) else NotebookBoardStorage.mergeCanvasBoard(tx, base, write.save)
         val metadata = Json.encodeToString(CanvasDocument.serializer(), doc.copy(sceneJson = ""))
         NotebookBoardStorage.setStringIfChanged(tx, ObjectId.ROOT, "canvasMetadata", metadata)
         NotebookBoardStorage.writeSceneBase(tx, write.base)
