@@ -16,8 +16,9 @@ import kotlinx.serialization.json.contentOrNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProviderSettingsTest {
+    /** No sign-in client: subscription rows take the host-terminal steps on every platform. */
     private fun controller(scope: CoroutineScope, invoker: RecordingInvoker) =
-        ModelControlSession(invoker).managementController(scope)
+        ModelControlSession(invoker, oauthHttp = null).managementController(scope)
 
     private fun ProviderManagementController.provider(id: String) = state.value.providers.single { it.id == id }
 
@@ -40,7 +41,14 @@ class ProviderSettingsTest {
         val controller = controller(backgroundScope, ProviderControlFixtures.invoker())
         controller.refresh()
 
-        assertEquals(ProviderConnectMethod.TERMINAL_SIGN_IN, controller.provider("openai-codex-oauth").connectMethod)
+        assertEquals(ProviderConnectMethod.SIGN_IN, controller.provider("openai-codex-oauth").connectMethod)
+        assertEquals(ProviderConnectMethod.SIGN_IN, controller.provider("anthropic-oauth").connectMethod)
+        val unknown = controller.provider("anthropic-oauth").copy(id = "github-copilot", oauthProviderId = "github-copilot")
+        assertEquals(ProviderConnectMethod.TERMINAL_SIGN_IN, unknown.connectMethod, "no in-app login: terminal steps")
+        val codex = controller.provider("openai-codex-oauth")
+        assertEquals(false, controller.state.value.inAppSignIn, "this session has no sign-in client")
+        assertEquals(ProviderConnectMethod.TERMINAL_SIGN_IN, codex.connectMethodOn(inAppSignIn = false))
+        assertEquals(ProviderConnectMethod.SIGN_IN, codex.connectMethodOn(inAppSignIn = true))
         assertEquals(ProviderConnectMethod.API_KEY, controller.provider("anthropic").connectMethod)
         assertEquals(ProviderConnectMethod.ENDPOINT, controller.provider("openai-compatible").connectMethod)
         assertEquals("http://127.0.0.1:8082/v1", controller.provider("lmstudio").connectedBaseUrl)

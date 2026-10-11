@@ -51,13 +51,17 @@ enum class ProviderSettingsPage(val label: String) {
     MODELS(ModelControlStrings.PAGE_MODELS),
 }
 
-/** Callbacks of [ProviderSettingsPane]: the management ones plus the terminal sign-in and endpoint edit. */
+/**
+ * Callbacks of [ProviderSettingsPane]: the management ones, the sign-in
+ * (in-app, or the terminal steps with "Check again") and endpoint edit.
+ */
 data class ProviderSettingsActions(
     val management: ProviderManagementActions,
     val onOpenSignIn: (ConnectableProvider) -> Unit,
     val onCheckSignIn: () -> Unit,
     val onDismissSignIn: () -> Unit,
     val onEdit: (ConnectableProvider) -> Unit,
+    val signIn: ProviderSignInActions = ProviderSignInActions.NONE,
 ) {
     companion object {
         fun bind(controller: ProviderManagementController) = ProviderSettingsActions(
@@ -66,6 +70,7 @@ data class ProviderSettingsActions(
             onCheckSignIn = controller::checkSignIn,
             onDismissSignIn = controller::dismissSignIn,
             onEdit = controller::openEdit,
+            signIn = ProviderSignInActions.bind(controller.signIn),
         )
     }
 }
@@ -190,7 +195,8 @@ private fun PageColumn(context: ProviderPageContext, page: ProviderSettingsPage,
 @Composable
 private fun PageStatus(state: ProviderManagementState) {
     if (state.loading || state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-    if (state.signIn == null) ModelControlNotice(error = state.error.takeIf { state.form == null }, message = state.message)
+    val dialogOpen = state.signIn != null || state.oauth.provider != null
+    if (!dialogOpen) ModelControlNotice(error = state.error.takeIf { state.form == null }, message = state.message)
 }
 
 @Composable
@@ -237,6 +243,7 @@ private fun PageHeader(page: ProviderSettingsPage, state: ProviderManagementStat
 @Composable
 private fun PaneDialogs(state: ProviderManagementState, actions: ProviderSettingsActions, page: ProviderSettingsPage) {
     if (page == ProviderSettingsPage.MODELS) return
+    ProviderSignInDialog(state.oauth, actions.signIn)
     state.signIn?.let { provider ->
         TerminalSignInDialog(
             provider = provider,

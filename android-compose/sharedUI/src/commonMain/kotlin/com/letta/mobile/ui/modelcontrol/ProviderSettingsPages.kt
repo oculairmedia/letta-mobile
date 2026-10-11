@@ -30,7 +30,7 @@ import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
 import com.letta.mobile.data.repository.modelcontrol.ProviderSettingsLists
-import com.letta.mobile.data.repository.modelcontrol.connectMethod
+import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.data.repository.modelcontrol.connectedBaseUrl
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -55,13 +55,13 @@ private fun LazyListScope.accountsSection(accounts: List<ConnectableProvider>, c
     items(accounts, key = { "account-${it.id}" }) { provider ->
         ProviderCard(
             provider = provider,
-            description = ModelControlStrings.METHOD_TERMINAL,
-            leading = LettaIcons.Terminal,
+            description = context.methodLabel(provider),
+            leading = context.methodIcon(provider),
             busy = context.state.busy,
             onClick = { context.actions.onOpenSignIn(provider) },
         )
     }
-    item("browser-note") { Hint(ModelControlStrings.METHOD_BROWSER_UNSUPPORTED) }
+    item("sign-in-note") { Hint(ModelControlStrings.SIGN_IN_NOTE) }
     item("have-key") {
         TextButton(
             onClick = { context.onPageChange(ProviderSettingsPage.API_KEYS) },
@@ -76,8 +76,8 @@ private fun LazyListScope.connectedSection(connected: List<ConnectableProvider>,
     items(connected, key = { "connected-${it.id}" }) { provider ->
         ProviderCard(
             provider = provider,
-            description = connectedDescription(provider),
-            leading = methodIcon(provider),
+            description = context.connectedDescription(provider),
+            leading = context.methodIcon(provider),
             busy = context.state.busy,
             connected = true,
             onRemove = { context.actions.management.onDisconnect(provider) },
@@ -88,8 +88,8 @@ private fun LazyListScope.connectedSection(connected: List<ConnectableProvider>,
 
 /** A connected card leads to where its connection is managed. */
 private fun openConnected(provider: ConnectableProvider, context: ProviderPageContext) {
-    when (provider.connectMethod) {
-        ProviderConnectMethod.TERMINAL_SIGN_IN -> context.actions.onOpenSignIn(provider)
+    when (context.methodOf(provider)) {
+        ProviderConnectMethod.SIGN_IN, ProviderConnectMethod.TERMINAL_SIGN_IN -> context.actions.onOpenSignIn(provider)
         ProviderConnectMethod.API_KEY -> context.onPageChange(ProviderSettingsPage.API_KEYS)
         ProviderConnectMethod.ENDPOINT -> context.onPageChange(ProviderSettingsPage.ENDPOINTS)
         ProviderConnectMethod.NONE -> Unit
@@ -102,8 +102,8 @@ private fun LazyListScope.otherSection(other: List<ConnectableProvider>, context
     items(other, key = { "other-${it.id}" }) { provider ->
         ProviderCard(
             provider = provider,
-            description = provider.description.ifBlank { methodLabel(provider) },
-            leading = methodIcon(provider),
+            description = provider.description.ifBlank { context.methodLabel(provider) },
+            leading = context.methodIcon(provider),
             busy = context.state.busy,
             onClick = { context.actions.management.onConnect(provider) },
         )
@@ -144,7 +144,7 @@ private fun CredentialCard(kind: CredentialsKind, provider: ConnectableProvider,
     val busy = context.state.busy
     CardSurface(provider) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            MethodIcon(methodIcon(provider))
+            MethodIcon(context.methodIcon(provider))
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(provider.displayName)
                 if (provider.isConnected) ConnectedBadge()
@@ -300,20 +300,26 @@ private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-private fun methodIcon(provider: ConnectableProvider): ImageVector = when (provider.connectMethod) {
+private fun ProviderPageContext.methodIcon(provider: ConnectableProvider): ImageVector = when (methodOf(provider)) {
+    ProviderConnectMethod.SIGN_IN -> LettaIcons.AccountCircle
     ProviderConnectMethod.TERMINAL_SIGN_IN -> LettaIcons.Terminal
     ProviderConnectMethod.ENDPOINT -> LettaIcons.Server
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> LettaIcons.Key
 }
 
-private fun methodLabel(provider: ConnectableProvider): String = when (provider.connectMethod) {
+private fun ProviderPageContext.methodLabel(provider: ConnectableProvider): String = when (methodOf(provider)) {
+    ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN
     ProviderConnectMethod.TERMINAL_SIGN_IN -> ModelControlStrings.METHOD_TERMINAL
     ProviderConnectMethod.ENDPOINT -> ModelControlStrings.PAGE_ENDPOINTS
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> ModelControlStrings.METHOD_API_KEY
 }
 
-private fun connectedDescription(provider: ConnectableProvider): String = when (provider.connectMethod) {
+private fun ProviderPageContext.connectedDescription(provider: ConnectableProvider): String = when (methodOf(provider)) {
+    ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN_CONNECTED
     ProviderConnectMethod.TERMINAL_SIGN_IN -> ModelControlStrings.METHOD_TERMINAL_CONNECTED
     ProviderConnectMethod.ENDPOINT -> provider.connectedBaseUrl ?: ModelControlStrings.PAGE_ENDPOINTS
     ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> ModelControlStrings.METHOD_API_KEY
 }
+
+/** How [provider] connects on this client: a sign-in row takes the terminal steps where the app can't run sign-ins. */
+private fun ProviderPageContext.methodOf(provider: ConnectableProvider): ProviderConnectMethod = provider.connectMethodOn(state.inAppSignIn)
