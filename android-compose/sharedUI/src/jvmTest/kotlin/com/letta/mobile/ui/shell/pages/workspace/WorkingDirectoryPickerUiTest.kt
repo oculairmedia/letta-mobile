@@ -23,8 +23,9 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseErrors
 import com.letta.mobile.data.workspace.directory.DirectoryListing
-import com.letta.mobile.data.workspace.directory.DirectoryPaths
+import com.letta.mobile.data.workspace.directory.DevicePath
 import com.letta.mobile.data.workspace.directory.FolderCreator
+import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerController
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerGates
 import com.letta.mobile.data.workspace.directory.WorkspaceDirectorySource
@@ -106,7 +107,7 @@ class WorkingDirectoryPickerUiTest {
     @Test
     fun creatingAFolderMovesIntoIt() = runComposeUiTest {
         val creator = FolderCreator { parent, name ->
-            DirectoryPaths.child(parent, name).also { tree[it] = emptyList() }
+            DevicePath(parent).child(FolderName(name)).value.also { tree[it] = emptyList() }
         }
         show("/work/repo", creator = creator)
         onNodeWithTag(WorkingDirectoryPickerTags.NEW_FOLDER).assertIsEnabled().performClick()

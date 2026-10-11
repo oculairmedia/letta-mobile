@@ -23,33 +23,35 @@ class RecentFolders(
     val recent: StateFlow<List<String>> = _recent.asStateFlow()
 
     /** Moves [path] to the front. A blank or relative path is ignored. */
-    fun record(path: String) {
-        if (path.isBlank() || !DirectoryPaths.isAbsolute(path)) return
-        val wanted = DirectoryPaths.normalize(path)
-        val next = (listOf(wanted) + load().filterNot { DirectoryPaths.same(it, wanted) }).take(limit)
+    fun record(path: DevicePath) {
+        if (path.value.isBlank() || !path.isAbsolute) return
+        val wanted = path.normalized
+        val next = (listOf(wanted.value) + load().filterNot { wanted.sameAs(DevicePath(it)) }).take(limit)
         if (next == _recent.value) return
         _recent.value = next
-        runCatching { store.putString(key, next.joinToString("\n")) }
+        runCatching { store.putString(key, next.joinToString(SEPARATOR)) }
     }
 
     /** Drops [path] (a folder that no longer exists). */
-    fun forget(path: String) {
-        val next = load().filterNot { DirectoryPaths.same(it, path) }
+    fun forget(path: DevicePath) {
+        val next = load().filterNot { path.sameAs(DevicePath(it)) }
         _recent.value = next
-        runCatching { if (next.isEmpty()) store.remove(key) else store.putString(key, next.joinToString("\n")) }
+        runCatching { if (next.isEmpty()) store.remove(key) else store.putString(key, next.joinToString(SEPARATOR)) }
     }
 
     private fun load(): List<String> =
         runCatching { store.getString(key) }.getOrNull()
             ?.lines()
             ?.map(String::trim)
-            ?.filter { it.isNotEmpty() && DirectoryPaths.isAbsolute(it) }
-            ?.distinctBy(DirectoryPaths::normalize)
+            ?.filter { it.isNotEmpty() && DevicePath(it).isAbsolute }
+            ?.map { DevicePath(it).normalized.value }
+            ?.distinct()
             ?.take(limit)
             .orEmpty()
 
     companion object {
         const val DEFAULT_KEY: String = "workspace.recent_folders"
         const val DEFAULT_LIMIT: Int = 8
+        private const val SEPARATOR = "\n"
     }
 }

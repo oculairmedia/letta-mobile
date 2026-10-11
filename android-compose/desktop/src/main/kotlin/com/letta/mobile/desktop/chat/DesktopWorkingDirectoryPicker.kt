@@ -9,8 +9,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.workspace.directory.AppServerWorkspaceDirectorySource
 import com.letta.mobile.data.workspace.directory.DirectoryBrowseException
-import com.letta.mobile.data.workspace.directory.DirectoryPaths
 import com.letta.mobile.data.workspace.directory.FolderCreator
+import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.RecentFolders
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerController
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
@@ -104,7 +104,7 @@ internal fun DesktopWorkingDirectoryPickerHost(picker: DesktopWorkingDirectoryPi
 /** Creates folders on this computer: only bound while the App Server is the bundled local child. */
 internal object DesktopLocalFolderCreator : FolderCreator {
     override suspend fun create(parent: String, name: String): String = withContext(Dispatchers.IO) {
-        if (!DirectoryPaths.isValidFolderName(name)) throw DirectoryBrowseException("Folder names cannot contain a slash.")
+        if (!FolderName(name).isValid) throw DirectoryBrowseException("Folder names cannot contain a slash.")
         val target = try {
             Paths.get(parent).resolve(name.trim())
         } catch (invalid: InvalidPathException) {

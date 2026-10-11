@@ -22,9 +22,9 @@ class RecentFoldersTest {
     fun recordingMovesAFolderToTheFrontOnceAndPersistsIt() {
         val store = MapStore()
         val recents = RecentFolders(store, limit = 3)
-        recents.record("/a")
-        recents.record("/b/")
-        recents.record("/a/")
+        recents.record(DevicePath("/a"))
+        recents.record(DevicePath("/b/"))
+        recents.record(DevicePath("/a/"))
         assertEquals(listOf("/a", "/b"), recents.recent.value)
         assertEquals(listOf("/a", "/b"), RecentFolders(store).recent.value)
     }
@@ -32,7 +32,7 @@ class RecentFoldersTest {
     @Test
     fun theListIsCappedAndIgnoresRelativeOrBlankPaths() {
         val recents = RecentFolders(MapStore(), limit = 2)
-        listOf("/1", "/2", "/3", "relative", " ").forEach(recents::record)
+        listOf("/1", "/2", "/3", "relative", " ").forEach { recents.record(DevicePath(it)) }
         assertEquals(listOf("/3", "/2"), recents.recent.value)
     }
 
@@ -40,8 +40,8 @@ class RecentFoldersTest {
     fun forgettingDropsAFolder() {
         val store = MapStore()
         val recents = RecentFolders(store)
-        recents.record("/a")
-        recents.forget("/a/")
+        recents.record(DevicePath("/a"))
+        recents.forget(DevicePath("/a/"))
         assertEquals(emptyList(), recents.recent.value)
         assertEquals(null, store.values[RecentFolders.DEFAULT_KEY])
     }

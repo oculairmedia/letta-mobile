@@ -41,7 +41,7 @@ data class WorkingDirectoryPickerState(
     val worktree: WorktreeLocation? = null,
     val worktrees: WorktreeListState = WorktreeListState(),
 ) {
-    val canGoUp: Boolean get() = folder?.let(DirectoryPaths::parent) != null
+    val canGoUp: Boolean get() = devicePathOrNull(folder)?.parent != null
     val canCreateFolder: Boolean
         get() = when {
             createFolderUnavailableReason != null || isCreatingFolder -> false
@@ -98,49 +98,45 @@ class WorkingDirectoryPickerController(
 
     /** Opens on the conversation's [currentCwd] (when known), with its worktrees. */
     fun open(currentCwd: String?) {
-        val cwd = currentCwd?.takeIf { it.isNotBlank() && DirectoryPaths.isAbsolute(it) }?.let(DirectoryPaths::normalize)
+        val cwd = devicePathOrNull(currentCwd)?.takeIf { it.isAbsolute }?.normalized
         _state.value = WorkingDirectoryPickerState(
             isOpen = true,
-            currentCwd = cwd,
+            currentCwd = cwd?.value,
             recents = recents?.recent?.value.orEmpty(),
             createFolderUnavailableReason = if (folderCreator == null) WorkingDirectoryPickerGates.CREATE_FOLDER_UNAVAILABLE else null,
             worktree = WorktreePaths.locate(cwd),
         )
         if (cwd != null) {
-            browse(cwd)
+            browse(cwd.value)
             loadWorktrees(WorktreePaths.repositoryOf(cwd))
         }
     }
 
     override fun browse(path: String) {
-        if (!DirectoryPaths.isAbsolute(path)) {
-            _state.update { it.copy(error = WorkingDirectoryPickerGates.NOT_ABSOLUTE) }
-            return
-        }
-        val target = DirectoryPaths.normalize(path)
+        val target = absoluteOrReport(path)?.value ?: return
         browseJob?.cancel()
         _state.update { it.copy(folder = target, folders = emptyList(), hasMore = false, isLoading = true, error = null) }
         browseJob = scope.launch {
             val result = attempt { source.list(target) }
             _state.update { current ->
-                if (!DirectoryPaths.same(current.folder, target)) return@update current
+                if (!DevicePath(target).sameAs(devicePathOrNull(current.folder))) return@update current
                 result.fold(
                     onSuccess = { listing -> current.copy(folders = listing.folders, hasMore = listing.hasMore, isLoading = false) },
                     onFailure = { error -> current.copy(isLoading = false, error = messageOf(error)) },
                 )
             }
-            if (result.exceptionOrNull()?.message == DirectoryBrowseErrors.NOT_FOUND) forgetRecent(target)
+            if (result.exceptionOrNull()?.message == DirectoryBrowseErrors.NOT_FOUND) forgetRecent(DevicePath(target))
         }
     }
 
     override fun up() {
-        _state.value.folder?.let(DirectoryPaths::parent)?.let(::browse)
+        devicePathOrNull(_state.value.folder)?.parent?.let { browse(it.value) }
     }
 
     override fun createFolder(name: String) {
         val creator = folderCreator ?: return
         val parent = _state.value.folder ?: return
-        if (!DirectoryPaths.isValidFolderName(name)) {
+        if (!FolderName(name).isValid) {
             _state.update { it.copy(error = DirectoryBrowseErrors.INVALID_NAME) }
             return
         }
@@ -153,14 +149,10 @@ class WorkingDirectoryPickerController(
     }
 
     override fun choose(path: String) {
-        if (!DirectoryPaths.isAbsolute(path)) {
-            _state.update { it.copy(error = WorkingDirectoryPickerGates.NOT_ABSOLUTE) }
-            return
-        }
-        val chosen = DirectoryPaths.normalize(path)
+        val chosen = absoluteOrReport(path) ?: return
         recents?.record(chosen)
         dismiss()
-        onChosen(chosen)
+        onChosen(chosen.value)
     }
 
     override fun dismiss() {
@@ -173,23 +165,31 @@ class WorkingDirectoryPickerController(
         _state.update { it.copy(error = null) }
     }
 
-    private fun loadWorktrees(repository: String) {
+    private fun loadWorktrees(repository: DevicePath) {
         worktreesJob?.cancel()
-        _state.update { it.copy(worktrees = WorktreeListState(repository = repository, isLoading = true)) }
+        _state.update { it.copy(worktrees = WorktreeListState(repository = repository.value, isLoading = true)) }
         worktreesJob = scope.launch {
             // No `.letta/worktrees` (or no browsing on this connection) is simply no worktrees.
-            val paths = attempt { source.list(WorktreePaths.worktreesFolder(repository)) }
-                .map { listing -> listing.folders.map { DirectoryPaths.child(listing.path, it) } }
+            val paths = attempt { source.list(WorktreePaths.worktreesFolder(repository).value) }
+                .map { listing -> listing.folders.map { DevicePath(listing.path).child(FolderName(it)).value } }
                 .getOrDefault(emptyList())
-            _state.update { it.copy(worktrees = WorktreeListState(repository = repository, paths = paths)) }
+            _state.update { it.copy(worktrees = WorktreeListState(repository = repository.value, paths = paths)) }
         }
     }
 
-    private fun forgetRecent(path: String) {
+    private fun forgetRecent(path: DevicePath) {
         val store = recents ?: return
-        if (store.recent.value.none { DirectoryPaths.same(it, path) }) return
+        if (store.recent.value.none { path.sameAs(DevicePath(it)) }) return
         store.forget(path)
         _state.update { it.copy(recents = store.recent.value) }
+    }
+
+    /** [path] normalized when absolute; otherwise shows why and returns null. */
+    private fun absoluteOrReport(path: String): DevicePath? {
+        val candidate = DevicePath(path)
+        if (candidate.isAbsolute) return candidate.normalized
+        _state.update { it.copy(error = WorkingDirectoryPickerGates.NOT_ABSOLUTE) }
+        return null
     }
 
     private fun messageOf(error: Throwable): String = when (error) {

@@ -112,7 +112,7 @@ class WorkingDirectoryPickerControllerTest {
     @Test
     fun aMissingFolderShowsWhyAndIsForgottenFromRecents() = runTest {
         val recents = RecentFolders(MapStore())
-        recents.record("/gone")
+        recents.record(DevicePath("/gone"))
         val picker = controller(recents = recents)
         picker.open(null)
         assertEquals(listOf("/gone"), picker.state.value.recents)
@@ -158,7 +158,7 @@ class WorkingDirectoryPickerControllerTest {
         val source = FakeSource(tree + ("/work/new" to emptyList()))
         val picker = controller(source, creator = FolderCreator { parent, name ->
             created += parent to name
-            DirectoryPaths.child(parent, name)
+            DevicePath(parent).child(FolderName(name)).value
         })
         picker.open("/work")
         runCurrent()

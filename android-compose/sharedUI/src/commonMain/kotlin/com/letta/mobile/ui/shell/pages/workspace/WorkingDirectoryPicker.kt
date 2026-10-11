@@ -58,10 +58,12 @@ import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 import com.letta.mobile.data.search.TextMatch
-import com.letta.mobile.data.workspace.directory.DirectoryPaths
+import com.letta.mobile.data.workspace.directory.DevicePath
+import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerActions
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerState
 import com.letta.mobile.data.workspace.directory.WorktreeLocation
+import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.cwd_picker_back_to_repository
 import com.letta.mobile.sharedui.resources.cwd_picker_cancel
@@ -296,7 +298,7 @@ private fun ToolbarButton(spec: ToolbarSpec, enabled: Boolean = true, onClick: (
 @Composable
 private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
-    val valid = DirectoryPaths.isValidFolderName(name)
+    val valid = FolderName(name).isValid
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.cwd_picker_new_folder)) },
@@ -344,7 +346,7 @@ private fun PickerError(error: String?) {
 private fun PickerList(state: WorkingDirectoryPickerState, actions: WorkingDirectoryPickerActions, modifier: Modifier) {
     var worktreeQuery by remember { mutableStateOf("") }
     val worktrees = remember(state.worktrees.paths, worktreeQuery) {
-        state.worktrees.paths.filter { TextMatch.matches(worktreeQuery, DirectoryPaths.name(it)) }
+        state.worktrees.paths.filter { TextMatch.matches(worktreeQuery, DevicePath(it).name) }
     }
     val recentTitle = stringResource(Res.string.cwd_picker_recent)
     val worktreesTitle = stringResource(Res.string.cwd_picker_worktrees)
@@ -361,7 +363,7 @@ private fun PickerList(state: WorkingDirectoryPickerState, actions: WorkingDirec
         }
         val folder = state.folder ?: return@LazyColumn
         section(foldersTitle)
-        pathRows(state.folders.map { DirectoryPaths.child(folder, it) }, FolderRows, onClick = actions::browse)
+        pathRows(state.folders.map { DevicePath(folder).child(FolderName(it)).value }, FolderRows, onClick = actions::browse)
         folderListFooter(state)
     }
 }
@@ -388,14 +390,14 @@ private val FolderRows = PathRowStyle(Lucide.Folder, WorkingDirectoryPickerTags.
 private fun LazyListScope.pathRows(paths: List<String>, style: PathRowStyle, onClick: (String) -> Unit) {
     items(paths, key = { style.tagPrefix + it }) { path ->
         ListItem(
-            headlineContent = { Text(DirectoryPaths.name(path), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            headlineContent = { Text(DevicePath(path).name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = if (style.showPath) {
                 { Text(path, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall) }
             } else {
                 null
             },
             leadingContent = { Icon(style.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-            modifier = Modifier.clickable { onClick(path) }.testTag(style.tagPrefix + DirectoryPaths.name(path)),
+            modifier = Modifier.clickable { onClick(path) }.testTag(style.tagPrefix + DevicePath(path).name),
         )
     }
 }
@@ -444,7 +446,7 @@ private fun PickerFooter(state: WorkingDirectoryPickerState, actions: WorkingDir
         val folder = state.folder
         Button(
             onClick = { folder?.let(actions::choose) },
-            enabled = folder != null && !DirectoryPaths.same(folder, state.currentCwd),
+            enabled = folder != null && !DevicePath(folder).sameAs(devicePathOrNull(state.currentCwd)),
             modifier = Modifier.testTag(WorkingDirectoryPickerTags.USE),
         ) { Text(stringResource(Res.string.cwd_picker_use)) }
     }

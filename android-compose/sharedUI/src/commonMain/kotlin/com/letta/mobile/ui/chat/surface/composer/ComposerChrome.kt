@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Folder
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.workspace.directory.WorktreePaths
+import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_dismiss_error
 import com.letta.mobile.sharedui.resources.composer_hint
@@ -83,7 +84,7 @@ internal fun ComposerWorkingDirectoryRow(
             modifier = Modifier.weight(1f),
         )
         // letta-mobile-zxk2n.6: the "in worktree" banner, from the path letta-code put the worktree at.
-        WorktreePaths.locate(path)?.let { worktree -> ComposerWorktreeBadge(worktree.name) }
+        WorktreePaths.locate(devicePathOrNull(path))?.let { worktree -> ComposerWorktreeBadge(worktree.name) }
         if (onPick != null) {
             Text(
                 text = stringResource(Res.string.composer_working_directory_change),
