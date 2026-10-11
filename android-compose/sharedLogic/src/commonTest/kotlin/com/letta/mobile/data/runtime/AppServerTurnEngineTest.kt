@@ -58,105 +58,26 @@ import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineTest {
+    /**
+     * letta-mobile-4rxis: letta-code owns context management from the agent's own compaction
+     * settings. A user turn goes straight to runtime_start + input; the engine never reads the
+     * agent, stamps a context window, lists messages or calls conversation_compact first.
+     */
     @Test
-    fun contextPreflightRunsBeforeRuntimeStartForUserMessages() = runTest {
+    fun userTurnSendsNoContextManagementCommandsBeforeInput() = runTest {
         val order = mutableListOf<String>()
         val client = FakeAppServerClient(onRuntimeStart = { order += "runtime_start" }, onInput = { order += "input" })
-        val engine = AppServerTurnEngine(
-            client = client,
-            turnContextPreflight = TurnContextPreflight { agentId, conversationId ->
-                assertEquals("agent-1", agentId)
-                assertEquals("conv-1", conversationId)
-                order += "preflight"
-                TurnContextPreflightResult(configuredContextLimit = true)
-            },
-        )
+        val engine = AppServerTurnEngine(client = client)
 
         engine.runTurn(command).test {
             awaitItem()
-            assertEquals(listOf("preflight", "runtime_start", "input"), order)
+            assertEquals(listOf("runtime_start", "input"), order)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
             awaitItem()
             awaitItem()
             awaitComplete()
         }
-    }
-
-    @Test
-    fun contextPreflightSkipsApprovalResponses() = runTest {
-        var preflightCalls = 0
-        val client = FakeAppServerClient()
-        val engine = AppServerTurnEngine(
-            client = client,
-            turnContextPreflight = TurnContextPreflight { _, _ ->
-                preflightCalls += 1
-                TurnContextPreflightResult()
-            },
-        )
-        val approvalCommand = command.copy(
-            input = TurnInput.ToolApprovalResponse(
-                ToolApprovalDecision(
-                    approvalId = ToolApprovalId("approval-1"),
-                    callId = ToolCallId("call-1"),
-                    decision = ToolApprovalDecisionValue.Approved,
-                    scope = ToolApprovalScope.Once,
-                ),
-            ),
-        )
-
-        engine.runTurn(approvalCommand).test {
-            awaitItem()
-            assertEquals(0, preflightCalls)
-            assertIs<AppServerInputPayload.ApprovalResponse>(
-                assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload,
-            )
-            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            awaitItem()
-            awaitItem()
-            awaitComplete()
-        }
-    }
-
-    @Test
-    fun contextPreflightFailureInvalidatesCachedRuntimeForRetry() = runTest {
-        var failPreflight = false
-        val client = FakeAppServerClient()
-        val engine = AppServerTurnEngine(
-            client = client,
-            turnContextPreflight = TurnContextPreflight { _, _ ->
-                if (failPreflight) error("conversation_messages_list failed")
-                TurnContextPreflightResult()
-            },
-        )
-
-        engine.runTurn(command).test {
-            awaitItem()
-            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            awaitItem()
-            awaitItem()
-            awaitComplete()
-        }
-        assertEquals(1, client.runtimeStartCommands.size)
-
-        failPreflight = true
-        engine.runTurn(command).test {
-            val error = awaitError()
-            assertTrue(error.message.orEmpty().contains("conversation_messages_list failed"))
-        }
-
-        failPreflight = false
-        engine.runTurn(command).test {
-            awaitItem()
-            client.emit(streamDelta(messageType = "stop_reason", runId = "run-2"))
-            awaitItem()
-            awaitItem()
-            awaitComplete()
-        }
-        assertEquals(
-            2,
-            client.runtimeStartCommands.size,
-            "failed preflight must drop the cached runtime so the retry reseeds",
-        )
     }
 
     @Test

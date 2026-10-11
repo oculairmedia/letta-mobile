@@ -15,7 +15,6 @@ import com.letta.mobile.data.runtime.reanswerReplayedApproval
 import com.letta.mobile.data.runtime.releaseUserInputGateUnlessRejected
 import com.letta.mobile.data.runtime.DeviceStateChanger
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
-import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.runtime.TurnInboundSource
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -72,10 +71,6 @@ class DefaultAppServerController(
      * and tool-call turns never hang. Null = no controller tools.
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
-    /**
-     * Optional safety check for backend-owned active context.
-     */
-    private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     private val clock: Clock = Clock.System,
     /**
      * Extra context for the controller-owned router collector. Tests pass
@@ -248,7 +243,6 @@ class DefaultAppServerController(
             },
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
-            turnContextPreflight = turnContextPreflight,
             eventRouter = eventRouter,
             runtimeScopeResolver = { command ->
                 runtimeMutex.withLock {
@@ -281,7 +275,7 @@ class DefaultAppServerController(
         val key = RuntimeKey(command.agentId.value, command.conversationId.value)
         val recordId = "${command.agentId.value}:${command.conversationId.value}"
         // Preserve cwd from the durable registry so reconnect doesn't lose the
-        // project directory when a mutating preflight restarts the runtime.
+        // project directory when the runtime is restarted.
         val existingCwd = runtimeRegistry?.load(recordId)?.cwd
         val canonical = runtimeMutex.withLock {
             if (connectionGeneration.value != startedGeneration) return@withLock null

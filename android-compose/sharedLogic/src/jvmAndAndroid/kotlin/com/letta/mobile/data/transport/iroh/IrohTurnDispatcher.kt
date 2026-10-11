@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -135,7 +136,7 @@ internal class IrohTurnDispatcher(
         }
 
     private suspend fun reportBusyTurn(request: IrohTurnDispatch, engine: AppServerTurnEngine) {
-        val owner = engine.activeTurnOwnerFor(request.agentId, request.conversationId)
+        val owner = engine.activeTurnOwnerFor(TurnRuntimeKey(request.agentId, request.conversationId))
         val ownerAcquiredAtMs = owner?.acquiredAtMs
         Telemetry.event(
             "IrohTransport", "turn.busy",

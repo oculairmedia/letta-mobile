@@ -33,7 +33,6 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
@@ -43,7 +42,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
@@ -88,7 +86,6 @@ class AppServerTurnEngine(
      */
     private val turnIdleTimeoutMs: Long = DEFAULT_TURN_IDLE_TIMEOUT_MS,
     private val terminalSettleQuietMs: Long = DEFAULT_TERMINAL_SETTLE_QUIET_MS,
-    private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     /**
      * lgns8.17: controller-owned external tools. letta-code's App-Server (WS)
      * route does NOT self-execute tool calls — it emits external_tool_call_request
@@ -125,14 +122,14 @@ class AppServerTurnEngine(
     private val inboundControlRegistry: InboundControlRequestRegistry =
         eventRouter?.inboundControlRegistry() ?: InboundControlRequestRegistry(),
     /**
-     * Invoked when [invalidateRuntime] clears the engine cache (e.g. after a
-     * mutating context preflight) so controllers can drop their matching cache.
+     * Invoked when [invalidateRuntime] clears the engine cache (e.g. on
+     * transport disconnect) so controllers can drop their matching cache.
      */
     private val onRuntimeInvalidated: suspend () -> Unit = {},
     /**
      * Invoked after [ensureRuntime] issues a fresh `runtime_start` so controllers
      * can refill their cache (needed for [DefaultAppServerController.submitApproval]
-     * after preflight-driven restart). [startedGeneration] is the connection
+     * after a runtime restart). [startedGeneration] is the connection
      * generation observed before the RPC; hosts must ignore stale completions.
      */
     private val onRuntimeEnsured: suspend (
@@ -286,7 +283,7 @@ class AppServerTurnEngine(
      * Connection-wide, so every keyed scope is dropped.
      *
      * @param notifyHost when true, also invokes [onRuntimeInvalidated] so a
-     *   controller cache cannot undo a mutating preflight. Hosts that already
+     *   stale controller cache cannot outlive the engine's. Hosts that already
      *   cleared their own cache (stop/disconnect) pass false.
      */
     suspend fun invalidateRuntime(notifyHost: Boolean = true) {
@@ -499,8 +496,7 @@ class AppServerTurnEngine(
      * This is what a busy rejection must report — the owner of the lease the
      * INCOMING send collides with, not "whoever happens to hold a lease".
      */
-    fun activeTurnOwnerFor(agentId: String, conversationId: String): ActiveTurnOwner? =
-        leases.peek(TurnRuntimeKey(agentId, conversationId))?.owner
+    fun activeTurnOwnerFor(key: TurnRuntimeKey): ActiveTurnOwner? = leases.peek(key)?.owner
 
     /**
      * Aggregate owner accessor for call sites that hold no key (telemetry).
@@ -677,7 +673,6 @@ class AppServerTurnEngine(
         var releaseCause: Throwable? = null
         try {
             val turnPermissionMode = permissionModeProvider(command)
-            prepareContextIfNeeded(command)
             slot.updateLease { cur ->
                 if (cur?.token == leaseToken) cur.copy(phase = TurnLeasePhase.Starting) else cur
             }
@@ -801,61 +796,6 @@ class AppServerTurnEngine(
                 )
             }
         }
-    }
-
-    private suspend fun prepareContextIfNeeded(command: TurnCommand) {
-        if (command.input !is TurnInput.UserMessage) return
-        val result = runPreflightOrInvalidate(command) ?: return
-        if (!result.configuredContextLimit && !result.compacted) return
-
-        invalidateRuntime()
-        Telemetry.event(
-            "AppServerTurnEngine",
-            "context.preflightApplied",
-            "agentId" to command.agentId.value,
-            "conversationId" to command.conversationId.value,
-            "configuredContextLimit" to result.configuredContextLimit.toString(),
-            "compacted" to result.compacted.toString(),
-        )
-    }
-
-    private suspend fun runPreflightOrInvalidate(command: TurnCommand): TurnContextPreflightResult? {
-        return try {
-            // Bound the whole preflight while activeTurn is held — individual
-            // RPCs have their own timeouts, but the sum must not wedge the engine.
-            withTimeout(PREFLIGHT_TIMEOUT_MS.milliseconds) {
-                turnContextPreflight.prepare(
-                    agentId = command.agentId.value,
-                    conversationId = command.conversationId.value,
-                )
-            }
-        } catch (e: TimeoutCancellationException) {
-            // withTimeout wraps expiry as TimeoutCancellationException (a
-            // CancellationException subclass). Treat it as a failed preflight —
-            // partial mutations (e.g. persisted context limit) must not leave a
-            // stale runtime cached — while still propagating genuine parent cancel.
-            recordPreflightFailure(command, "TimeoutCancellationException")
-            throw e
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Preflight may have already mutated agent/conversation state (e.g.
-            // persisted a context limit) before failing on message list/compact.
-            // Drop any cached runtime so the next turn reseeds from the update.
-            recordPreflightFailure(command, e::class.simpleName ?: "Exception")
-            throw e
-        }
-    }
-
-    private suspend fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
-        invalidateRuntime()
-        Telemetry.event(
-            "AppServerTurnEngine",
-            "context.preflightFailed",
-            "agentId" to command.agentId.value,
-            "conversationId" to command.conversationId.value,
-            "errorClass" to errorClass,
-        )
     }
 
     /**
@@ -1930,10 +1870,6 @@ class AppServerTurnEngine(
          * a negative value can never collide with a live lease's claim.
          */
         internal const val UNLEASED_LEASE_TOKEN: Long = -1L
-
-        /** Fail-fast budget for busy-path run.get / run.list liveness probes. */
-        /** Aggregate budget for turn-context preflight while activeTurn is held. */
-        const val PREFLIGHT_TIMEOUT_MS: Long = 15_000L
 
         // letta-mobile-vilsn.6: while the watchdog is paused on an outstanding
         // user-input gate it re-checks on this cadence (capped at the idle window)

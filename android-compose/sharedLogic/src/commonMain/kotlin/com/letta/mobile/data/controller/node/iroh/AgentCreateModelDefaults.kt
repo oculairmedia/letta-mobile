@@ -2,12 +2,14 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalogNormalizer
-import com.letta.mobile.data.runtime.DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
+
+/** Generic agent-create context window for a model the catalog does not recognize. */
+private const val UNKNOWN_MODEL_CONTEXT_WINDOW_LIMIT: Int = 200_000
 
 /**
  * Agent-create body defaults for known model handles (context window + max output).
@@ -23,7 +25,7 @@ internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
         )
     }
     val contextDefault = known?.contextWindow
-        ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT.takeIf { recognizedId == null }
+        ?: UNKNOWN_MODEL_CONTEXT_WINDOW_LIMIT.takeIf { recognizedId == null }
     val modelSettingsKey = when {
         body?.containsKey("model_settings") == true -> "model_settings"
         body?.containsKey("modelSettings") == true -> "modelSettings"
