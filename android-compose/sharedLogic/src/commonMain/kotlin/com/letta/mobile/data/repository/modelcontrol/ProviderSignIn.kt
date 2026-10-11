@@ -128,8 +128,13 @@ class ProviderSignInController(
         start(provider)
     }
 
-    /** Stops any polling or exchange and closes the sheet. Nothing reaches the host after this. */
+    /**
+     * Stops any polling or code exchange and closes the sheet. Ignored while
+     * the tokens are being handed to the host: that call may already have
+     * landed, and the sheet must report how it ended.
+     */
     fun cancel() {
+        if (_state.value is ProviderSignInState.Connecting) return
         cancelWork()
         _state.value = ProviderSignInState.Idle
     }

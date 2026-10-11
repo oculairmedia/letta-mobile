@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -215,6 +216,37 @@ class ProviderSignInControllerTest {
         assertIs<ProviderSignInState.AwaitingApproval>(h.controller.state.value)
         assertEquals(2, h.http.to(XAI_DEVICE).size)
         h.controller.cancel()
+    }
+
+    @Test
+    fun cancelIsIgnoredWhileTheTokensAreBeingHandedOver() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val clock: () -> Long = { testScheduler.currentTime }
+        val http = FakeTokenEndpoint(clock)
+        val invoker = AdminRpcInvoker { method, _ ->
+            when (method) {
+                "provider.list" -> ProviderSignInFixtures.providerList
+                "provider.connect" -> {
+                    gate.await()
+                    ProviderSignInFixtures.mutation()
+                }
+                else -> ProviderControlFixtures.modelList
+            }
+        }
+        val providers = ProviderConnectionRepository(invoker)
+        val controller = ProviderSignInController(backgroundScope, http, providers, ModelCatalogRepository(invoker), clock)
+        http.on(XAI_DEVICE, xaiDevice())
+        http.on(XAI_TOKEN, reply(200, """{"access_token":"test-access","refresh_token":"test-refresh"}"""))
+
+        controller.start(providers.refresh().single { it.id == "xai" })
+        advanceTimeBy(5_001)
+        assertIs<ProviderSignInState.Connecting>(controller.state.value)
+
+        controller.cancel()
+        assertIs<ProviderSignInState.Connecting>(controller.state.value, "the host may already have the tokens")
+        gate.complete(Unit)
+        runCurrent()
+        assertIs<ProviderSignInState.Connected>(controller.state.value)
     }
 
     // --- ChatGPT device code ---

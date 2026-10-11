@@ -91,7 +91,8 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
     )
     val finished = state is ProviderSignInState.Connected || state is ProviderSignInState.Failed
     AlertDialog(
-        onDismissRequest = actions.onClose,
+        // A stray tap outside or Back must not drop a running sign-in; Cancel does that explicitly.
+        onDismissRequest = { if (finished) actions.onClose() },
         icon = { Icon(LettaIcons.AccountCircle, contentDescription = null) },
         title = { Text(provider.signInTitle) },
         text = {
@@ -102,7 +103,11 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
         },
         confirmButton = { ConfirmButton(state, actions) },
         dismissButton = {
-            TextButton(onClick = actions.onClose, modifier = Modifier.testTag(ProviderSignInTags.CLOSE)) {
+            TextButton(
+                onClick = actions.onClose,
+                enabled = state !is ProviderSignInState.Connecting,
+                modifier = Modifier.testTag(ProviderSignInTags.CLOSE),
+            ) {
                 Text(if (finished) ModelControlStrings.CLOSE else ModelControlStrings.CANCEL)
             }
         },

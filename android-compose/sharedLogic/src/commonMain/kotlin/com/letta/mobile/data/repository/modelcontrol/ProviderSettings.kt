@@ -52,6 +52,16 @@ val ConnectableProvider.connectMethod: ProviderConnectMethod
         else -> ProviderConnectMethod.API_KEY
     }
 
+/**
+ * [connectMethod] on a host that may not run in-app sign-ins: without a
+ * sign-in client ([ProviderManagementState.inAppSignIn] false) a sign-in row
+ * takes the terminal steps, and says so.
+ */
+fun ConnectableProvider.connectMethodOn(inAppSignIn: Boolean): ProviderConnectMethod {
+    val method = connectMethod
+    return if (method == ProviderConnectMethod.SIGN_IN && !inAppSignIn) ProviderConnectMethod.TERMINAL_SIGN_IN else method
+}
+
 /** A subscription account, whichever way it signs in. */
 val ConnectableProvider.isSubscription: Boolean
     get() = connectMethod == ProviderConnectMethod.SIGN_IN || connectMethod == ProviderConnectMethod.TERMINAL_SIGN_IN

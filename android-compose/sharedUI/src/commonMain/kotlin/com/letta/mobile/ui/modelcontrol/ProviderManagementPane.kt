@@ -191,7 +191,7 @@ private fun LazyListScope.providerSection(
 ) {
     val section = visible.section
     item("provider-${section.key}") {
-        ProviderHeaderRow(section, expanded = expanded, onClick = { actions.onToggleExpanded(section.key) })
+        ProviderHeaderRow(section, expanded = expanded, inAppSignIn = actions.canSignIn, onClick = { actions.onToggleExpanded(section.key) })
     }
     if (!expanded) return
     item("actions-${section.key}") { ProviderActionsRow(section, busy = busy, actions = actions) }

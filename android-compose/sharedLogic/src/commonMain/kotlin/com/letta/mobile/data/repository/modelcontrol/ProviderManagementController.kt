@@ -44,6 +44,8 @@ data class ProviderManagementState(
     val signIn: ConnectableProvider? = null,
     /** The in-app subscription sign-in (letta-mobile-zxk2n.3); Idle when none is open. */
     val oauth: ProviderSignInState = ProviderSignInState.Idle,
+    /** True when this client can run subscription sign-ins itself; otherwise they take the terminal steps. */
+    val inAppSignIn: Boolean = false,
 ) {
     val totalModels: Int get() = sections.sumOf { it.models.size }
     val shownModels: Int get() = sections.sumOf { it.exposedCount }
@@ -96,11 +98,11 @@ class ProviderManagementController(
     private val catalog: ModelCatalogRepository,
     oauthHttp: ProviderOAuthHttp? = null,
 ) {
-    private val _state = MutableStateFlow(ProviderManagementState())
-    val state: StateFlow<ProviderManagementState> = _state.asStateFlow()
-
     /** The in-app sign-in, when this host can run one. */
     val signIn: ProviderSignInController? = oauthHttp?.let { ProviderSignInController(scope, it, providers, catalog) }
+
+    private val _state = MutableStateFlow(ProviderManagementState(inAppSignIn = signIn != null))
+    val state: StateFlow<ProviderManagementState> = _state.asStateFlow()
 
     init {
         scope.launch {

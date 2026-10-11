@@ -28,6 +28,7 @@ import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectMethod
 import com.letta.mobile.data.repository.modelcontrol.ProviderSection
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
+import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -39,7 +40,7 @@ private const val HIDDEN_ALPHA = 0.5f
 private val rowIndent = LettaDimens.Orb.md + LettaDimens.Space.sm + LettaDimens.Space.md
 
 @Composable
-internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, onClick: () -> Unit) {
+internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAppSignIn: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = MaterialTheme.shapes.medium,
@@ -57,7 +58,7 @@ internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, onCl
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                     StatusDot(connected = section.isConnected)
                     Text(
-                        text = providerSubtitle(section),
+                        text = providerSubtitle(section, inAppSignIn),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -117,12 +118,12 @@ private fun CountPill(section: ProviderSection) {
     )
 }
 
-private fun providerSubtitle(section: ProviderSection): String {
+private fun providerSubtitle(section: ProviderSection, inAppSignIn: Boolean): String {
     val provider = section.provider ?: return "Served by the host"
     val connection = provider.connections.firstOrNull()
     return when {
         connection != null -> listOfNotNull("Connected", connection.baseUrl ?: connection.providerName).joinToString(" · ")
-        provider.connectMethod == ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN
+        provider.connectMethodOn(inAppSignIn) == ProviderConnectMethod.SIGN_IN -> ModelControlStrings.METHOD_SIGN_IN
         provider.isOauth -> ModelControlStrings.METHOD_TERMINAL
         !provider.canConnectFromApp -> "Nothing to connect from the app"
         provider.description.isNotBlank() -> provider.description
