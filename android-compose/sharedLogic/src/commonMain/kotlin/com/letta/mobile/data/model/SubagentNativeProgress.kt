@@ -5,7 +5,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 
 /**
  * letta-mobile-ulcg6 (RC5): progress read from letta-code's native
@@ -58,3 +61,41 @@ internal object SubagentNativeProgressParser {
         AppServerProtocol.json.parseToJsonElement(text) as? JsonObject
     }.getOrNull()
 }
+
+private const val AGENT_ID_PREFIX = "agent-"
+private val TOOL_CALLS_KEYS = listOf("tool_calls", "toolCalls")
+private val TOTAL_TOKENS_KEYS = listOf("total_tokens", "totalTokens")
+private val DURATION_KEYS = listOf("duration_ms", "durationMs")
+private val MODEL_KEYS = listOf("model")
+private val BACKGROUND_KEYS = listOf("is_background", "isBackground")
+
+/**
+ * letta-mobile-ulcg6 (RC5): the native progress fields read leniently (snake or
+ * camel case), for snapshots the strict decode could not identify.
+ */
+internal fun AppServerSubagentSnapshot.withNativeAliases(
+    raw: JsonObject,
+    decoded: AppServerSubagentSnapshot?,
+): AppServerSubagentSnapshot = copy(
+    toolCalls = raw.first(TOOL_CALLS_KEYS) ?: decoded?.toolCalls,
+    totalTokens = raw.firstPrimitive(TOTAL_TOKENS_KEYS)?.longValue() ?: decoded?.totalTokens,
+    durationMs = raw.firstPrimitive(DURATION_KEYS)?.longValue() ?: decoded?.durationMs,
+    model = raw.firstPrimitive(MODEL_KEYS)?.contentOrNull?.takeIf { it.isNotBlank() } ?: decoded?.model,
+    isBackground = raw.firstPrimitive(BACKGROUND_KEYS)?.booleanOrNull ?: decoded?.isBackground,
+)
+
+/**
+ * The child agent: `agent_id` when a producer sends it, else the id inside
+ * letta-code's `agent_url` (a bare local agent id, or a chat URL ending in one).
+ */
+internal fun AppServerSubagentSnapshot.childAgentId(): String? =
+    agentId?.takeIf { it.isNotBlank() }
+        ?: agentUrl?.trim()?.substringBefore('?')?.trimEnd('/')?.substringAfterLast('/')
+            ?.takeIf { it.startsWith(AGENT_ID_PREFIX) }
+
+private fun JsonObject.first(keys: List<String>): JsonElement? = keys.firstNotNullOfOrNull { this[it] }
+
+private fun JsonObject.firstPrimitive(keys: List<String>): JsonPrimitive? =
+    keys.firstNotNullOfOrNull { this[it] as? JsonPrimitive }
+
+private fun JsonPrimitive.longValue(): Long? = longOrNull ?: doubleOrNull?.toLong() ?: contentOrNull?.toLongOrNull()

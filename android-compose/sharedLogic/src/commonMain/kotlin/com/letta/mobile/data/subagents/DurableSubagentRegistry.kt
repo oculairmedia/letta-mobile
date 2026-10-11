@@ -238,16 +238,9 @@ class DurableSubagentRegistry(
     private fun SubagentChipRecord.mergedWith(
         observation: SubagentChipObservation,
         now: Long,
-    ): SubagentChipRecord = copy(
+    ): SubagentChipRecord = backfilledFrom(observation).copy(
         state = observation.state,
         source = observation.source,
-        description = description.ifEmpty { observation.description },
-        subagentType = subagentType.ifEmpty { observation.subagentType },
-        taskId = taskId ?: observation.taskId,
-        subagentAgentId = subagentAgentId ?: observation.subagentAgentId,
-        subagentConversationId = subagentConversationId ?: observation.subagentConversationId,
-        parentRunId = parentRunId ?: observation.parentRunId,
-        startedAt = startedAt ?: observation.startedAt,
         activity = newerActivity(activity, observation.activity, generation, observation.generation),
         generation = maxOf(generation, observation.generation),
         lastSeenEpochMs = now,
@@ -255,6 +248,17 @@ class DurableSubagentRegistry(
             ?: now.takeIf { observation.state.isTerminal },
         progress = progress.mergedWith(observation.progress),
         lastActivityEpochMs = if (madeProgress(observation)) now else lastActivityEpochMs ?: lastSeenEpochMs,
+    )
+
+    /** Provenance only fills gaps: a populated value is never replaced. */
+    private fun SubagentChipRecord.backfilledFrom(observation: SubagentChipObservation): SubagentChipRecord = copy(
+        description = description.ifEmpty { observation.description },
+        subagentType = subagentType.ifEmpty { observation.subagentType },
+        taskId = taskId ?: observation.taskId,
+        subagentAgentId = subagentAgentId ?: observation.subagentAgentId,
+        subagentConversationId = subagentConversationId ?: observation.subagentConversationId,
+        parentRunId = parentRunId ?: observation.parentRunId,
+        startedAt = startedAt ?: observation.startedAt,
     )
 
     /**
