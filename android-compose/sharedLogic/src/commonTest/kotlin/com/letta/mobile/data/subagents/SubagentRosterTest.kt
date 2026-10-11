@@ -20,22 +20,18 @@ class SubagentRosterTest {
         id: String,
         status: String = SubagentStatus.RUNNING,
         type: String = "General-purpose",
-        agentId: String? = null,
-        parentAgentId: String = PARENT,
-        conversationId: String? = null,
-        lastActivityAtMs: Long? = null,
     ) = SubagentEntry(
         toolCallId = id,
         description = "work $id",
         subagentType = type,
         status = status,
-        subagentAgentId = agentId,
-        subagentConversationId = conversationId,
-        parentAgentId = parentAgentId,
+        parentAgentId = PARENT,
         parentConversationId = "local-conv-517",
         startedAt = (now - 88_000L).toString(),
-        lastActivityAtMs = lastActivityAtMs,
     )
+
+    private fun SubagentEntry.child(agentId: String, conversationId: String? = null) =
+        copy(subagentAgentId = agentId, subagentConversationId = conversationId)
 
     @Test
     fun splitsRunningFinishedAndBackgroundRuns() {
@@ -69,7 +65,7 @@ class SubagentRosterTest {
     @Test
     fun quietIsAStateOfRunningNeverAFailure() {
         val roster = projectSubagentRoster(
-            listOf(entry("toolu_quiet", lastActivityAtMs = now - QUIET_AFTER_MS - 1)),
+            listOf(entry("toolu_quiet").copy(lastActivityAtMs = now - QUIET_AFTER_MS - 1)),
             now = now,
         )
         val item = roster.running.single()
@@ -101,9 +97,9 @@ class SubagentRosterTest {
     fun nestedSubagentFollowsItsParentOneLevelDeep() {
         val roster = projectSubagentRoster(
             listOf(
-                entry("toolu_grandchild", parentAgentId = "agent-local-child"),
+                entry("toolu_grandchild").copy(parentAgentId = "agent-local-child"),
                 entry("toolu_other"),
-                entry("toolu_child", agentId = "agent-local-child"),
+                entry("toolu_child").child("agent-local-child"),
             ),
             now = now,
         )
@@ -136,8 +132,8 @@ class SubagentRosterTest {
     fun conversationOpensOnlyOnceTheChildConversationExists() {
         val roster = projectSubagentRoster(
             listOf(
-                entry("toolu_running", agentId = "agent-local-a"),
-                entry("toolu_done", status = "success", agentId = "agent-local-b", conversationId = "default"),
+                entry("toolu_running").child("agent-local-a"),
+                entry("toolu_done", status = "success").child("agent-local-b", "default"),
             ),
             now = now,
         )

@@ -64,25 +64,25 @@ class SubagentRosterListUiTest {
             }
         }
 
-        onNodeWithTag(SubagentRosterTags.running("toolu_quiet")).assertIsDisplayed()
-        onNodeWithTag(SubagentRosterTags.subtitle("toolu_quiet"), useUnmergedTree = true)
+        onNodeWithTag(SubagentRosterTag.RUNNING.of("toolu_quiet")).assertIsDisplayed()
+        onNodeWithTag(SubagentRosterTag.SUBTITLE.of("toolu_quiet"), useUnmergedTree = true)
             .assertTextContains("12 tools", substring = true)
             .assertTextContains("quiet", substring = true)
         // Only the latest activity line until the card is tapped.
         onNodeWithText("› Bash git status").assertIsDisplayed()
         onNodeWithText("› Read src/A.kt").assertDoesNotExist()
-        onNodeWithTag(SubagentRosterTags.running("toolu_quiet")).performClick()
+        onNodeWithTag(SubagentRosterTag.RUNNING.of("toolu_quiet")).performClick()
         onNodeWithText("› Read src/A.kt").assertIsDisplayed()
 
-        onNodeWithTag(SubagentRosterTags.badge("toolu_cc"), useUnmergedTree = true).assertTextContains("Claude Code")
-        onNodeWithTag(SubagentRosterTags.open("toolu_quiet")).assertDoesNotExist()
+        onNodeWithTag(SubagentRosterTag.BADGE.of("toolu_cc"), useUnmergedTree = true).assertTextContains("Claude Code")
+        onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_quiet")).assertDoesNotExist()
 
-        onNodeWithTag(SubagentRosterTags.open("toolu_done")).performClick()
+        onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_done")).performClick()
         assertEquals("agent-local-b", opened?.childAgentId)
 
-        onNodeWithTag(SubagentRosterTags.ended("subagent-1791641853470-1")).assertDoesNotExist()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("subagent-1791641853470-1")).assertDoesNotExist()
         onNodeWithText("Show").performClick()
-        onNodeWithTag(SubagentRosterTags.ended("subagent-1791641853470-1")).assertIsDisplayed()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("subagent-1791641853470-1")).assertIsDisplayed()
     }
 
     @Test
@@ -92,7 +92,7 @@ class SubagentRosterListUiTest {
                 SubagentRosterList(roster = projectSubagentRoster(entries, now), onOpenConversation = null, onClearFinished = {})
             }
         }
-        onNodeWithTag(SubagentRosterTags.open("toolu_done")).assertDoesNotExist()
+        onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_done")).assertDoesNotExist()
     }
 
     @Test
@@ -108,8 +108,8 @@ class SubagentRosterListUiTest {
                 )
             }
         }
-        onNodeWithTag(SubagentRosterTags.ended("toolu_done")).assertIsDisplayed()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertIsDisplayed()
         onNodeWithText("Clear").performClick()
-        onNodeWithTag(SubagentRosterTags.ended("toolu_done")).assertDoesNotExist()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertDoesNotExist()
     }
 }

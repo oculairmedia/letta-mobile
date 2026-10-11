@@ -69,7 +69,7 @@ fun SubagentRosterList(
                 text = "No subagents",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = LettaDimens.Space.lg).testTag(SubagentRosterTags.EMPTY),
+                modifier = Modifier.padding(vertical = LettaDimens.Space.lg).testTag(SUBAGENT_ROSTER_EMPTY_TAG),
             )
             return@Column
         }
@@ -137,7 +137,7 @@ private fun RunningCard(item: SubagentRosterItem, onOpenConversation: ((Subagent
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = LettaDimens.Space.lg * item.depth)
-            .testTag(SubagentRosterTags.running(item.key)),
+            .testTag(SubagentRosterTag.RUNNING.of(item.key)),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
@@ -171,7 +171,7 @@ private fun EndedRow(item: SubagentRosterItem, onOpenConversation: ((SubagentRos
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = LettaDimens.Space.lg * item.depth)
-            .testTag(SubagentRosterTags.ended(item.key)),
+            .testTag(SubagentRosterTag.ENDED.of(item.key)),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Row(
@@ -209,7 +209,7 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            item.identity.label?.let { label -> IdentityBadge(label, item.key) }
+            if (item.identity.label != null) IdentityBadge(item)
         }
         Text(
             text = item.subtitle(),
@@ -217,23 +217,23 @@ private fun TitleBlock(item: SubagentRosterItem, modifier: Modifier = Modifier) 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.testTag(SubagentRosterTags.subtitle(item.key)),
+            modifier = Modifier.testTag(SubagentRosterTag.SUBTITLE.of(item.key)),
         )
     }
 }
 
 /** External coding agents (Claude Code, Codex) are named, so their work is never mistaken for Letta's. */
 @Composable
-private fun IdentityBadge(label: String, key: String) {
+private fun IdentityBadge(item: SubagentRosterItem) {
     Surface(
         shape = MaterialTheme.shapes.small,
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {
         Text(
-            text = label,
+            text = item.identity.label.orEmpty(),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.xs).testTag(SubagentRosterTags.badge(key)),
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.xs).testTag(SubagentRosterTag.BADGE.of(item.key)),
         )
     }
 }
@@ -254,36 +254,45 @@ private fun ConversationAction(item: SubagentRosterItem, onOpenConversation: ((S
     if (onOpenConversation == null || !item.canOpenConversation) return
     TextButton(
         onClick = { onOpenConversation(item) },
-        modifier = Modifier.testTag(SubagentRosterTags.open(item.key)),
+        modifier = Modifier.testTag(SubagentRosterTag.OPEN.of(item.key)),
     ) {
         Text("View conversation", style = MaterialTheme.typography.labelMedium)
     }
 }
 
 /** "General-purpose · 1m 28s · 12 tools · claude-sonnet-5-5 · quiet". */
-fun SubagentRosterItem.subtitle(): String = buildList {
-    typeLabel.takeIf { it.isNotBlank() }?.let(::add)
-    if (status.isTerminal) add(statusWord(status))
-    elapsedMs?.let { add(formatSubagentElapsed(it)) }
-    toolCallCount?.takeIf { it > 0 }?.let { add(if (it == 1) "1 tool" else "$it tools") }
-    model?.let(::add)
-    if (status == SubagentRosterStatus.QUIET) add("quiet")
-}.joinToString(" · ")
-
-fun statusWord(status: SubagentRosterStatus): String = when (status) {
-    SubagentRosterStatus.RUNNING -> "Running"
-    SubagentRosterStatus.QUIET -> "Quiet"
-    SubagentRosterStatus.COMPLETED -> "Finished"
-    SubagentRosterStatus.FAILED -> "Failed"
-    SubagentRosterStatus.CANCELLED -> "Stopped"
+fun SubagentRosterItem.subtitle(): String {
+    val parts = mutableListOf<String>()
+    typeLabel.takeIf { it.isNotBlank() }?.let(parts::add)
+    if (status.isTerminal) parts += statusWord(status)
+    elapsedMs?.let { parts += formatSubagentElapsed(it) }
+    toolCallCount?.takeIf { it > 0 }?.let { parts += if (it == 1) "1 tool" else "$it tools" }
+    model?.let(parts::add)
+    if (status == SubagentRosterStatus.QUIET) parts += "quiet"
+    return parts.joinToString(" · ")
 }
 
-/** Test tags shared by both clients' UI tests. */
-object SubagentRosterTags {
-    const val EMPTY = "subagent-roster-empty"
-    fun running(key: String) = "subagent-roster-running-$key"
-    fun ended(key: String) = "subagent-roster-ended-$key"
-    fun subtitle(key: String) = "subagent-roster-subtitle-$key"
-    fun badge(key: String) = "subagent-roster-badge-$key"
-    fun open(key: String) = "subagent-roster-open-$key"
+fun statusWord(status: SubagentRosterStatus): String = STATUS_WORDS.getValue(status)
+
+private val STATUS_WORDS = mapOf(
+    SubagentRosterStatus.RUNNING to "Running",
+    SubagentRosterStatus.QUIET to "Quiet",
+    SubagentRosterStatus.COMPLETED to "Finished",
+    SubagentRosterStatus.FAILED to "Failed",
+    SubagentRosterStatus.CANCELLED to "Stopped",
+)
+
+/** Test tag of the roster's empty state. */
+const val SUBAGENT_ROSTER_EMPTY_TAG = "subagent-roster-empty"
+
+/** Test tags shared by both clients' UI tests, one per roster element kind. */
+enum class SubagentRosterTag(private val prefix: String) {
+    RUNNING("subagent-roster-running"),
+    ENDED("subagent-roster-ended"),
+    SUBTITLE("subagent-roster-subtitle"),
+    BADGE("subagent-roster-badge"),
+    OPEN("subagent-roster-open"),
+    ;
+
+    fun of(key: String): String = "$prefix-$key"
 }
