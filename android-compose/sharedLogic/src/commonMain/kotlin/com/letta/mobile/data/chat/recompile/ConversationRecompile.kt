@@ -65,7 +65,8 @@ sealed interface RecompileStatus {
  */
 class ConversationRecompileController(
     private val scope: CoroutineScope,
-    private val gateway: () -> Any?,
+    /** The chat's gateway as a recompiler; null where it has no recompile route. */
+    private val gateway: () -> ConversationRecompileGateway?,
     /** Why this connection cannot recompile, when its gateway has no recompile route. */
     private val unavailableReason: () -> String = { UNAVAILABLE_DEFAULT },
 ) {
@@ -75,7 +76,7 @@ class ConversationRecompileController(
 
     fun recompile(request: ConversationRecompileRequest) {
         if (_status.value == RecompileStatus.Queued) return
-        val recompiler = gateway() as? ConversationRecompileGateway
+        val recompiler = gateway()
         if (recompiler == null) {
             _status.value = RecompileStatus.Unavailable(unavailableReason())
             return

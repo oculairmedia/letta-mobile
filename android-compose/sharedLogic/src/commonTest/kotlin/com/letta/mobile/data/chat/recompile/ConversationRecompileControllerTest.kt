@@ -50,7 +50,7 @@ class ConversationRecompileControllerTest {
 
     @Test
     fun noRouteIsUnavailableWithTheHostsReason() = runTest(StandardTestDispatcher()) {
-        val noRoute = ConversationRecompileController(this, { Any() }, { ConversationRecompileController.UNAVAILABLE_OVER_IROH })
+        val noRoute = ConversationRecompileController(this, { null }, { ConversationRecompileController.UNAVAILABLE_OVER_IROH })
         noRoute.recompile(request)
         assertEquals(RecompileStatus.Unavailable(ConversationRecompileController.UNAVAILABLE_OVER_IROH), noRoute.status.value)
 

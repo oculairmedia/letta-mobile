@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
@@ -50,7 +51,7 @@ internal class DesktopConversationManagement(
      */
     val recompile = ConversationRecompileController(
         scope = scope,
-        gateway = { host.gateway },
+        gateway = { host.gateway as? ConversationRecompileGateway },
         unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
     )
 

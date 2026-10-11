@@ -50,7 +50,7 @@ class ConversationListPrefs(
         if (id.value.isBlank()) return
         val chosen = marker?.emoji?.takeIf { it in MARKER_CHOICES }
         _markers.update { if (chosen == null) it - id.value else it + (id.value to chosen) }
-        persistLines(Key.Markers, _markers.value.toSortedMap().map { (conversation, emoji) -> "$conversation$FIELD$emoji" })
+        persistLines(Key.Markers, _markers.value.entries.sortedBy { it.key }.map { "${it.key}$FIELD${it.value}" })
     }
 
     fun setAutoPinNewChats(enabled: Boolean) {
