@@ -16,8 +16,6 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -28,6 +26,12 @@ import kotlinx.serialization.json.longOrNull
 /** The sign-in state machine against a fake token endpoint and a fake host (letta-mobile-zxk2n.3). */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProviderSignInControllerTest {
+    /** The flow runs in backgroundScope, which advanceUntilIdle does not wait for: run the clock well past any code's lifetime. */
+    private fun TestScope.settle() {
+        advanceTimeBy(SETTLE_MS)
+        runCurrent()
+    }
+
     private class Harness(scope: TestScope, connectFails: Boolean = false) {
         val clock: () -> Long = { scope.testScheduler.currentTime }
         val http = FakeTokenEndpoint(clock)
@@ -77,7 +81,7 @@ class ProviderSignInControllerTest {
         assertFalse(waiting.toString().contains("dev-secret-1"), "the device secret never reaches the state")
         assertEquals(mapOf("client_id" to XAI_CLIENT, "scope" to XAI_SCOPE), h.http.to(XAI_DEVICE).single().body.form())
 
-        advanceUntilIdle()
+        settle()
 
         val polls = h.http.to(XAI_TOKEN)
         assertEquals(listOf(5_000L, 10_000L), polls.map { it.atMillis }, "the first poll waits one interval")
@@ -119,7 +123,7 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_TOKEN, error("access_denied"))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         val failed = assertIs<ProviderSignInState.Failed>(h.controller.state.value)
         assertEquals(SignInFailure.DENIED, failed.failure)
@@ -133,7 +137,7 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_TOKEN, error("expired_token"))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         assertEquals(SignInFailure.EXPIRED, assertIs<ProviderSignInState.Failed>(h.controller.state.value).failure)
     }
@@ -145,12 +149,11 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_TOKEN, error("authorization_pending"))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         val failed = assertIs<ProviderSignInState.Failed>(h.controller.state.value)
         assertEquals(SignInFailure.TIMED_OUT, failed.failure)
         assertEquals(listOf(5_000L, 10_000L), h.http.to(XAI_TOKEN).map { it.atMillis })
-        assertEquals(12_000L, currentTime)
         assertEquals(0, h.connects())
     }
 
@@ -163,7 +166,7 @@ class ProviderSignInControllerTest {
         h.controller.start(h.provider("xai"))
         runCurrent()
         h.controller.cancel()
-        advanceUntilIdle()
+        settle()
 
         assertEquals(ProviderSignInState.Idle, h.controller.state.value)
         assertTrue(h.http.to(XAI_TOKEN).isEmpty())
@@ -176,7 +179,7 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_DEVICE, reply(500, """{"error":"server_error","error_description":"try later","device_code":"leak"}"""))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         val failed = assertIs<ProviderSignInState.Failed>(h.controller.state.value)
         assertEquals(SignInFailure.PROVIDER_ERROR, failed.failure)
@@ -189,7 +192,7 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_DEVICE, reply(200, """{"device_code":"d","user_code":"u","verification_uri":"http://evil.example","expires_in":600}"""))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         assertTrue(assertIs<ProviderSignInState.Failed>(h.controller.state.value).message.contains("untrusted"))
     }
@@ -201,7 +204,7 @@ class ProviderSignInControllerTest {
         h.http.on(XAI_TOKEN, reply(200, """{"access_token":"test-access","refresh_token":"test-refresh"}"""))
 
         h.controller.start(h.provider("xai"))
-        advanceUntilIdle()
+        settle()
 
         val failed = assertIs<ProviderSignInState.Failed>(h.controller.state.value)
         assertEquals(SignInFailure.HOST_REJECTED, failed.failure)
@@ -237,7 +240,7 @@ class ProviderSignInControllerTest {
         val waiting = assertIs<ProviderSignInState.AwaitingApproval>(h.controller.state.value)
         assertEquals("WXYZ-9876", waiting.userCode)
         assertEquals("https://auth.openai.com/codex/device", waiting.verificationUrl)
-        advanceUntilIdle()
+        settle()
 
         assertEquals(listOf(3_000L, 6_000L, 9_000L), h.http.to(OPENAI_DEVICE_TOKEN).map { it.atMillis })
         val exchange = h.http.to(OPENAI_TOKEN).single().body.form()
@@ -269,7 +272,7 @@ class ProviderSignInControllerTest {
 
         h.controller.updateCode("http://localhost:53692/callback?code=test-code&state=$state")
         h.controller.submitCode()
-        advanceUntilIdle()
+        settle()
 
         val body = h.http.to(CLAUDE_TOKEN).single().body.json()
         assertEquals("test-code", body["code"]!!.jsonPrimitive.content)
@@ -288,7 +291,7 @@ class ProviderSignInControllerTest {
 
         h.controller.updateCode("test-code#someone-elses-state")
         h.controller.submitCode()
-        advanceUntilIdle()
+        settle()
 
         val again = assertIs<ProviderSignInState.AwaitingCode>(h.controller.state.value)
         assertTrue(again.error.orEmpty().contains("different sign-in"))
@@ -309,7 +312,7 @@ class ProviderSignInControllerTest {
         assertEquals("openrouter.ai", Url(awaiting.authorizeUrl).host)
         h.controller.updateCode("http://localhost:3000/letta/openrouter/callback?code=test-code")
         h.controller.submitCode()
-        advanceUntilIdle()
+        settle()
 
         assertEquals("test-code", h.http.to(OPENROUTER_KEYS).single().body.json()["code"]!!.jsonPrimitive.content)
         val params = h.connectParams()
@@ -331,6 +334,7 @@ class ProviderSignInControllerTest {
     }
 
     private companion object {
+        const val SETTLE_MS = 3_600_000L
         const val XAI_CLIENT = "b1a00492-073a-47ea-816f-4c329264a828"
         const val XAI_SCOPE = "openid profile email offline_access grok-cli:access api:access"
     }

@@ -17,15 +17,12 @@ import kotlinx.serialization.json.jsonPrimitive
 class ProviderOAuthWireTest {
     @Test
     fun pkceMatchesTheRfc7636Example() {
-        val octets = intArrayOf(
-            116, 24, 223, 180, 151, 153, 224, 37, 79, 250, 96, 125, 216, 173, 187, 186,
-            22, 212, 37, 77, 105, 214, 191, 240, 91, 88, 5, 88, 83, 132, 141, 121,
-        ).map { it.toByte() }.toByteArray()
+        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", Pkce.challengeOf("dBjftJeZ4CVP-mJ92K9qbKgSFJ2t3W4f-BvBTnc-5gw"))
 
-        val pkce = Pkce.create { octets }
+        val pkce = Pkce.create { n -> ByteArray(n) { 0xFF.toByte() } }
 
-        assertEquals("dBjftJeZ4CVP-mJ92K9qbKgSFJ2t3W4f-BvBTnc-5gw", pkce.verifier)
-        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", pkce.challenge)
+        assertEquals("_".repeat(42) + "8", pkce.verifier, "32 bytes, base64url, no padding")
+        assertEquals(Pkce.challengeOf(pkce.verifier), pkce.challenge)
         assertFalse(pkce.toString().contains(pkce.verifier))
     }
 

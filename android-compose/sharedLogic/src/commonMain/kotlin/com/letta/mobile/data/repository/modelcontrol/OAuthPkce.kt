@@ -16,8 +16,11 @@ internal class Pkce private constructor(val verifier: String, val challenge: Str
 
         fun create(random: (Int) -> ByteArray): Pkce {
             val verifier = token(random(VERIFIER_BYTES))
-            return Pkce(verifier, urlSafe.encode(Sha256.digest(verifier.encodeToByteArray())))
+            return Pkce(verifier, challengeOf(verifier))
         }
+
+        /** S256: base64url(SHA-256(verifier)). */
+        fun challengeOf(verifier: String): String = urlSafe.encode(Sha256.digest(verifier.encodeToByteArray()))
 
         /** Base64url without padding. */
         fun token(bytes: ByteArray): String = urlSafe.encode(bytes)
