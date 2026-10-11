@@ -95,6 +95,7 @@ class WorkingDirectoryPickerController(
 
     private var browseJob: Job? = null
     private var worktreesJob: Job? = null
+    private var createJob: Job? = null
 
     /** Opens on the conversation's [currentCwd] (when known), with its worktrees. */
     fun open(currentCwd: String?) {
@@ -141,7 +142,9 @@ class WorkingDirectoryPickerController(
             return
         }
         _state.update { it.copy(isCreatingFolder = true, error = null) }
-        scope.launch {
+        createJob?.cancel()
+        // Cancelled by dismiss(): a picker closed mid-create neither reopens nor shows a stale result.
+        createJob = scope.launch {
             val created = attempt { creator.create(parent, name.trim()) }
             _state.update { it.copy(isCreatingFolder = false, error = created.exceptionOrNull()?.let(::messageOf)) }
             created.getOrNull()?.let(::browse)
@@ -158,6 +161,7 @@ class WorkingDirectoryPickerController(
     override fun dismiss() {
         browseJob?.cancel()
         worktreesJob?.cancel()
+        createJob?.cancel()
         _state.value = WorkingDirectoryPickerState()
     }
 

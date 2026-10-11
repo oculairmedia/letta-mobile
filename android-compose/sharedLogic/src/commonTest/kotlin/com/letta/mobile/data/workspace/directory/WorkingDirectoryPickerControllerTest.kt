@@ -173,6 +173,25 @@ class WorkingDirectoryPickerControllerTest {
     }
 
     @Test
+    fun closingThePickerMidCreateLeavesItClosed() = runTest {
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val picker = controller(creator = FolderCreator { parent, name ->
+            release.await()
+            DevicePath(parent).child(FolderName(name)).value
+        })
+        picker.open("/work")
+        runCurrent()
+        picker.createFolder("slow")
+        runCurrent()
+        picker.dismiss()
+        release.complete(Unit)
+        runCurrent()
+
+        assertFalse(picker.state.value.isOpen)
+        assertNull(picker.state.value.folder)
+    }
+
+    @Test
     fun anInvalidOrFailedNewFolderShowsWhy() = runTest {
         val picker = controller(creator = FolderCreator { _, _ -> throw DirectoryBrowseException("A folder with this name already exists.") })
         picker.open("/work")
