@@ -22,7 +22,10 @@ import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
  * creates a new chat on its first send, outside the drawer.
  */
 @Composable
-internal fun rememberAndroidChatOptionsState(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel): ShellChatOptionsState {
+internal fun rememberAndroidChatOptionsState(
+    state: AgentScaffoldRuntimeState,
+    drawer: SharedNavDrawerViewModel,
+): ShellChatOptionsState {
     val display by drawer.displayOptions.collectAsStateWithLifecycle()
     val fontScale by state.params.viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hasChat = state.conversationId != null
@@ -37,7 +40,10 @@ internal fun rememberAndroidChatOptionsState(state: AgentScaffoldRuntimeState, d
 }
 
 @Composable
-internal fun rememberAndroidChatOptionsActions(state: AgentScaffoldRuntimeState, drawer: SharedNavDrawerViewModel): ShellChatOptionsActions {
+internal fun rememberAndroidChatOptionsActions(
+    state: AgentScaffoldRuntimeState,
+    drawer: SharedNavDrawerViewModel,
+): ShellChatOptionsActions {
     val context = LocalContext.current
     return remember(state, drawer, context) {
         ShellChatOptionsActions(

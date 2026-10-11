@@ -274,7 +274,12 @@ private fun ShellAgentOverflowMenu(state: ShellAgentPanelState, actions: ShellAg
 private enum class ShellPanelDialog { None, Archived, ChatOptions }
 
 @Composable
-private fun ShellPanelDialogs(dialog: ShellPanelDialog, state: ShellAgentPanelState, actions: ShellAgentPanelActions, onDismiss: () -> Unit) {
+private fun ShellPanelDialogs(
+    dialog: ShellPanelDialog,
+    state: ShellAgentPanelState,
+    actions: ShellAgentPanelActions,
+    onDismiss: () -> Unit,
+) {
     when (dialog) {
         ShellPanelDialog.None -> Unit
         ShellPanelDialog.Archived -> ShellArchivedChatsDialog(

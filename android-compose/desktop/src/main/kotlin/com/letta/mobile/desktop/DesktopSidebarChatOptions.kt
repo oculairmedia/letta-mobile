@@ -66,8 +66,8 @@ internal fun rememberDesktopChatOptionsActions(controller: DesktopChatController
 }
 
 private fun downloadTranscript(controller: DesktopChatController) {
-    val transcript = DesktopTranscriptExport.transcriptOf(controller.state.value, controller.conversationManagement.marks.displayOptions.value)
-        ?: return
+    val options = controller.conversationManagement.marks.displayOptions.value
+    val transcript = DesktopTranscriptExport.transcriptOf(controller.state.value, options) ?: return
     runCatching { DesktopTranscriptExport.save(transcript) }
         .onFailure { controller.conversationManagement.reportError("Couldn't save the transcript: ${it.message ?: it::class.simpleName}") }
 }

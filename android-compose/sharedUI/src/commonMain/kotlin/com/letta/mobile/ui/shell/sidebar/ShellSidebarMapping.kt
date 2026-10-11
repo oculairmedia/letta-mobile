@@ -34,8 +34,9 @@ object ShellSidebarMapping {
         conversations: List<ChatConversationSummary>,
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
-    ): List<ShellConversationRowModel> =
-        ConversationListOrder.arrange(conversations, ConversationListGroups(marks.pinnedIds, marks.settledIds)) { it.id }.map { conversation ->
+    ): List<ShellConversationRowModel> {
+        val ordered = ConversationListOrder.arrange(conversations, ConversationListGroups(marks.pinnedIds, marks.settledIds)) { it.id }
+        return ordered.map { conversation ->
             ShellConversationRowModel(
                 id = conversation.id,
                 title = conversation.displayTitle(),
@@ -50,6 +51,7 @@ object ShellSidebarMapping {
                 marker = marks.markers[conversation.id],
             )
         }
+    }
 
     /** The preview line under a title: trimmed, and blank for the loading placeholder. */
     fun cleanPreview(raw: String): String =

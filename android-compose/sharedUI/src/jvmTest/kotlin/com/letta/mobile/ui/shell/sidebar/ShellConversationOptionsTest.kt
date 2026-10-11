@@ -141,7 +141,7 @@ class ShellConversationOptionsTest {
                 Panel(state.copy(conversations = listOf(active.copy(settled = true))), ShellAgentPanelActions(conversationMarks = marks))
             }
         }
-        onNodeWithTag(ShellConversationTags.SETTLED).assertExists()
+        onNodeWithTag(ShellConversationTags.SETTLED, useUnmergedTree = true).assertExists()
         onNodeWithText("menu:Move to active").performClick()
         assertEquals(listOf("c1:false"), events)
     }
