@@ -86,8 +86,9 @@ internal class DesktopConversationBrancher(
         source(view)?.let { controller.fork(it, message, name) }
     }
 
-    fun forkConversation(name: String? = null) {
-        source(DesktopBranchView(emptyList(), hasOlderMessages = true))?.let { controller.forkConversation(it, name) }
+    /** Forks all of [origin], which need not be the selected conversation (a sidebar row's "Fork chat…"). */
+    fun forkConversation(origin: DesktopBranchOrigin, name: String? = null) {
+        controller.forkConversation(BranchSource(origin.conversationId, origin.agentId?.takeIf(String::isNotBlank)), name)
     }
 
     fun editAndResend(message: UiMessage, view: DesktopBranchView) {

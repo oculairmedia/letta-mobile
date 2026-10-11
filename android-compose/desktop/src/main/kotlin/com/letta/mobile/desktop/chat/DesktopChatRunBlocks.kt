@@ -65,13 +65,16 @@ internal fun DesktopRunBlock(
             RunStepsCard(toolCalls)
         }
         narration.forEach { message ->
-            AgentText(
-                AgentTextParams(
-                    text = message.content,
-                    isError = message.isError,
-                    isStreaming = streamingMessageId?.value == message.id,
-                ),
-            )
+            // letta-mobile-7mys7: a right-click on a reply forks from it.
+            DesktopReplyMenuArea(message) {
+                AgentText(
+                    AgentTextParams(
+                        text = message.content,
+                        isError = message.isError,
+                        isStreaming = streamingMessageId?.value == message.id,
+                    ),
+                )
+            }
         }
         messages.forEach { message ->
             message.generatedUi?.let { GeneratedUiCard(it) }

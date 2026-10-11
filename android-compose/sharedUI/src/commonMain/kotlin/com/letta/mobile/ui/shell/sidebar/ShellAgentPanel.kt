@@ -329,6 +329,7 @@ private fun ShellConversationRowItem(conversation: ShellConversationRowModel, ac
             onRename = actions.onRenameConversation?.let { rename -> { title -> rename(conversation.id, title) } },
             onPinToggle = actions.onPinConversation?.let { pin -> { pin(conversation.id, !conversation.pinned) } },
             marks = actions.conversationMarks,
+            onFork = actions.onForkConversation?.let { fork -> { name -> fork(conversation.id, name) } },
         ),
     )
 }
