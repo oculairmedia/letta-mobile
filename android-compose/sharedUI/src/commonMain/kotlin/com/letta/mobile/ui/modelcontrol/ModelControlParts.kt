@@ -121,6 +121,7 @@ object ProviderManagementTags {
     const val FILTER_PREFIX = "provider_filter_"
     const val PROVIDER_PREFIX = "provider_row_"
     const val CONNECT_PREFIX = "provider_connect_"
+    const val SIGN_IN_PREFIX = "provider_sign_in_"
     const val DISCONNECT_PREFIX = "provider_disconnect_"
     const val SHOW_ALL_PREFIX = "provider_show_all_"
     const val HIDE_ALL_PREFIX = "provider_hide_all_"

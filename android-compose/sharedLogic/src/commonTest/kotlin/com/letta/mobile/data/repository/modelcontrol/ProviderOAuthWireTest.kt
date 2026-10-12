@@ -1,0 +1,101 @@
+package com.letta.mobile.data.repository.modelcontrol
+
+import com.letta.mobile.data.secrets.AgentSecretsRedaction
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+/** PKCE (S256), pasted-code parsing, login selection and credential redaction of the sign-ins (letta-mobile-zxk2n.3). */
+class ProviderOAuthWireTest {
+    @Test
+    fun pkceChallengeIsBase64UrlSha256OfTheVerifier() {
+        // Expected value computed independently: base64.urlsafe_b64encode(hashlib.sha256(verifier).digest()) without '='.
+        assertEquals("NT1g8wvn0aIGfdV2wO5IMHalrL6VFGKOOFL-eUNMOTE", Pkce.challengeOf("dBjftJeZ4CVP-mJ92K9qbKgSFJ2t3W4f-BvBTnc-5gw"))
+
+        val pkce = Pkce.create { n -> ByteArray(n) { 0xFF.toByte() } }
+
+        assertEquals("_".repeat(42) + "8", pkce.verifier, "32 bytes, base64url, no padding")
+        assertEquals(Pkce.challengeOf(pkce.verifier), pkce.challenge)
+        assertFalse(pkce.toString().contains(pkce.verifier))
+    }
+
+    @Test
+    fun secureRandomBytesFillsTheRequestedSize() {
+        assertEquals(32, secureRandomBytes(32).size)
+        assertEquals(5, secureRandomBytes(5).size)
+        assertFalse(secureRandomBytes(32).contentEquals(secureRandomBytes(32)))
+    }
+
+    @Test
+    fun aPastedCodeIsReadFromEveryShapeTheBrowserShows() {
+        assertEquals(PastedCode("abc", "st"), PastedCode.parse("http://localhost:53692/callback?code=abc&state=st", "st"))
+        assertEquals(PastedCode("abc", "st"), PastedCode.parse("  code=abc&state=st ", "st"))
+        assertEquals(PastedCode("abc", "st"), PastedCode.parse("abc#st", "st"))
+        assertEquals(PastedCode("abc", null), PastedCode.parse("abc", "st"))
+        assertEquals(PastedCode("abc", null), PastedCode.parse("https://example.test/cb?code=abc", null))
+        val blank = assertFailsWith<ProviderSignInException> { PastedCode.parse("   ", null) }
+        assertEquals(SignInFailure.BAD_CODE, blank.failure)
+        val other = assertFailsWith<ProviderSignInException> { PastedCode.parse("abc#other", "st") }
+        assertEquals(SignInFailure.BAD_CODE, other.failure)
+    }
+
+    @Test
+    fun theLoginFollowsTheOauthProviderId() {
+        val rows = ModelControlWire.providers(ProviderSignInFixtures.providerList).associateBy { it.id }
+
+        assertEquals(ProviderOAuthKind.XAI, ProviderOAuthKind.of(rows.getValue("xai")))
+        assertEquals(ProviderOAuthKind.CHATGPT, ProviderOAuthKind.of(rows.getValue("openai-codex-oauth")))
+        assertEquals(ProviderOAuthKind.CLAUDE, ProviderOAuthKind.of(rows.getValue("anthropic-oauth")))
+        assertEquals(ProviderOAuthKind.OPENROUTER, ProviderOAuthKind.of(rows.getValue("openrouter-oauth")))
+        assertNull(ProviderOAuthKind.of(rows.getValue("github-copilot")))
+        assertNull(ProviderOAuthKind.of(rows.getValue("openrouter")), "an API-key row signs in with a form")
+        assertTrue(ProviderOAuthKind.XAI.isDeviceCode && ProviderOAuthKind.CHATGPT.isDeviceCode)
+        assertFalse(ProviderOAuthKind.CLAUDE.isDeviceCode || ProviderOAuthKind.OPENROUTER.isDeviceCode)
+    }
+
+    @Test
+    fun aConnectRequestCarriesTheTokensButNeverPrintsThem() {
+        val tokens = SubscriptionTokens("test-access", "test-refresh", 42L)
+        assertFalse(tokens.toString().contains("test-access"))
+        val bundle = tokens.toOAuthConfig()
+        val request = ProviderConnectRequest("xai", authMethodId = null, fields = emptyMap(), oauthConfig = bundle)
+
+        val params = ModelControlWire.connectParams(request)
+
+        assertEquals(bundle, params["oauth_config"])
+        assertFalse(request.toString().contains("test-access"))
+        assertFalse(OAuthRequestBody.Form(mapOf("device_code" to "secret")).toString().contains("secret"))
+        assertFalse(OAuthHttpResponse(200, """{"access_token":"secret"}""").toString().contains("secret"))
+    }
+
+    @Test
+    fun connectFramesAreRedactedOnTheWireAndOverTheRelay() {
+        val redacted = AppServerProtocol.REDACTED_PLACEHOLDER
+        val direct = Json.parseToJsonElement(
+            """{"type":"connect_provider","provider_id":"xai","fields":{"apiKey":"sk-test"},
+               "oauth_config":{"type":"oauth","access":"test-access","refresh":"test-refresh","expires":1}}""",
+        ).jsonObject
+        val relayed = Json.parseToJsonElement(
+            """{"type":"admin_rpc","method":"provider.connect","params":{"provider_id":"xai",
+               "oauth_config":{"access_token":"test-access","id_token":"test-id"}}}""",
+        ).jsonObject
+
+        val a = AgentSecretsRedaction.redact(direct)
+        val b = AgentSecretsRedaction.redact(relayed)
+
+        assertEquals(redacted, a["fields"]!!.jsonObject["apiKey"]!!.jsonPrimitive.content)
+        assertTrue((a["oauth_config"] as JsonObject).values.all { it.jsonPrimitive.content == redacted })
+        assertEquals("xai", a["provider_id"]!!.jsonPrimitive.content)
+        val params = b["params"]!!.jsonObject
+        assertTrue((params["oauth_config"] as JsonObject).values.all { it.jsonPrimitive.content == redacted })
+        assertFalse(b.toString().contains("test-access"))
+    }
+}
