@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.home.HomeSearchState
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -47,7 +48,14 @@ internal fun LazyListScope.homeSearchResults(page: HomePageScope) {
 }
 
 @Immutable
-private class SearchHit(val id: String, val primary: String, val secondary: String?, val onClick: () -> Unit)
+private class SearchHit(
+    val id: String,
+    val primary: String,
+    val secondary: String?,
+    /** An agent hit is pictured by its [AgentAvatar] rather than the section's icon. */
+    val agentId: String? = null,
+    val onClick: () -> Unit,
+)
 
 @Immutable
 private class SearchSection(val key: String, val title: String, val icon: ImageVector, val hits: List<SearchHit>, val maxSecondaryLines: Int = 1)
@@ -55,7 +63,7 @@ private class SearchSection(val key: String, val title: String, val icon: ImageV
 private fun searchSections(search: HomeSearchState, page: HomePageScope): List<SearchSection> {
     val nav = page.navigation
     return listOf(
-        SearchSection("agents", "Agents", LettaIcons.Agent, search.agents.map { SearchHit(it.id.value, it.name, it.description) { nav.onOpenAgent(it.id.value) } }),
+        SearchSection("agents", "Agents", LettaIcons.Agent, search.agents.map { SearchHit(it.id.value, it.name, it.description, agentId = it.id.value) { nav.onOpenAgent(it.id.value) } }),
         SearchSection("tools", "Tools", LettaIcons.Tool, search.tools.map { SearchHit(it.id.value, it.name, it.description) { nav.onOpenTool(it.id.value) } }),
         SearchSection("blocks", "Blocks", LettaIcons.ViewModule, search.blocks.map { SearchHit(it.id.value, it.label ?: UNNAMED_BLOCK, it.description) { nav.onOpenBlock(it.id.value) } }),
         SearchSection(
@@ -110,7 +118,11 @@ private fun SearchHitRow(hit: SearchHit, section: SearchSection) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+        if (hit.agentId != null) {
+            AgentAvatar(agentId = hit.agentId, name = hit.primary, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
+        } else {
+            Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+        }
         Column(Modifier.weight(1f)) {
             Text(hit.primary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             hit.secondary?.takeIf { it.isNotBlank() }?.let {
