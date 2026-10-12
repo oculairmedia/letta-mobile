@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -61,7 +62,8 @@ fun AdaptiveScaffold(
         }
     } else {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val insetPolicy = navBackStackEntry?.destination.insetPolicy()
+        val destination = navBackStackEntry?.destination
+        val insetPolicy = remember(destination) { destination.insetPolicy() }
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
