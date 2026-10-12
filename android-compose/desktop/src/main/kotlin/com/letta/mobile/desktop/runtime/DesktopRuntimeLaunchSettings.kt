@@ -16,6 +16,10 @@ import java.util.UUID
  * - `USER_CWD` (plus `PERSIST_CWD=1`) and the process working directory from a "default working
  *   directory" preference, falling back to Documents, then home, then the temp directory,
  *   instead of the app's install directory.
+ * - letta-mobile-iczm7: `LETTA_ENABLE_WINDOWS_AUTO_REFLECTION=1` when the user allowed automatic
+ *   dreams on Windows. letta-code starts no automatic reflection on win32 without it
+ *   (`isAutoReflectionEnabled`), whatever the agent's dreaming trigger says; manual dreams run
+ *   either way.
  */
 internal data class DesktopRuntimeLaunchInputs(
     val totalMemoryBytes: Long?,
@@ -23,7 +27,12 @@ internal data class DesktopRuntimeLaunchInputs(
     val workingDirectory: File,
     /** The NODE_OPTIONS the desktop process itself inherited, kept and extended. */
     val inheritedNodeOptions: String? = null,
+    /** letta-mobile-iczm7: the user allowed automatic dreams on Windows. */
+    val allowWindowsAutoReflection: Boolean = false,
 )
+
+/** letta-code's switch for automatic reflection (dreaming) on Windows (letta.js 0.34.8 L:451887). */
+internal const val WINDOWS_AUTO_REFLECTION_ENV = "LETTA_ENABLE_WINDOWS_AUTO_REFLECTION"
 
 internal const val DESKTOP_RUNTIME_HEAP_FLOOR_MB = 4_096
 
@@ -49,10 +58,21 @@ internal fun desktopRuntimeLaunchContext(inputs: DesktopRuntimeLaunchInputs): De
             "LETTA_LISTENER_INSTANCE_ID" to "$INSTANCE_ID_PREFIX${inputs.instanceId}",
             "USER_CWD" to cwd,
             "PERSIST_CWD" to "1",
-        ),
+        ) + windowsAutoReflectionEnv(inputs.allowWindowsAutoReflection),
         workingDirectory = inputs.workingDirectory,
     )
 }
+
+/** The automatic-dream switch when allowed; nothing otherwise, so an inherited value still applies. */
+internal fun windowsAutoReflectionEnv(allowed: Boolean): Map<String, String> =
+    if (allowed) mapOf(WINDOWS_AUTO_REFLECTION_ENV to "1") else emptyMap()
+
+/**
+ * letta-mobile-iczm7: whether letta-code would skip automatic dreams in a runtime launched with
+ * [environment] on [osName]: only on Windows, and only without the switch set to "1".
+ */
+internal fun windowsBlocksAutoReflection(osName: String?, environment: Map<String, String?>): Boolean =
+    osName.orEmpty().startsWith("Windows", ignoreCase = true) && environment[WINDOWS_AUTO_REFLECTION_ENV] != "1"
 
 /**
  * The first existing directory of: the user's preference, Documents, home, temp. A preference
@@ -77,6 +97,10 @@ internal object DesktopRuntimeLaunchPreference {
     @Volatile
     var workingDirectory: File? = null
 
+    /** letta-mobile-iczm7: see [DesktopRuntimeLaunchInputs.allowWindowsAutoReflection]. */
+    @Volatile
+    var allowWindowsAutoReflection: Boolean = false
+
     /** The context for the next spawn, from the live preference and this machine. */
     fun currentContext(): DesktopRuntimeLaunchContext {
         val home = System.getProperty("user.home")?.takeIf { it.isNotBlank() }?.let(::File)
@@ -90,6 +114,7 @@ internal object DesktopRuntimeLaunchPreference {
                     temp = File(System.getProperty("java.io.tmpdir")),
                 ),
                 inheritedNodeOptions = System.getenv("NODE_OPTIONS"),
+                allowWindowsAutoReflection = allowWindowsAutoReflection,
             ),
         )
     }
@@ -105,6 +130,7 @@ internal object DesktopRuntimeLaunchPreference {
 internal object DesktopRuntimeLaunchSettings {
     private const val INSTANCE_ID_KEY = "letta.desktop.runtime.instanceId"
     private const val WORKING_DIRECTORY_KEY = "letta.desktop.runtime.defaultWorkingDirectory"
+    private const val WINDOWS_AUTO_REFLECTION_KEY = "letta.desktop.runtime.windowsAutoReflection"
 
     /** The stable per-install id, minted and saved on first use. */
     fun loadOrCreateInstanceId(store: SecureSettingsStore, mint: () -> String = { UUID.randomUUID().toString() }): String =
@@ -118,6 +144,15 @@ internal object DesktopRuntimeLaunchSettings {
     fun applyStored(store: SecureSettingsStore) {
         DesktopRuntimeLaunchPreference.instanceId = loadOrCreateInstanceId(store)
         DesktopRuntimeLaunchPreference.workingDirectory = readWorkingDirectory(store)?.let(::File)
+        DesktopRuntimeLaunchPreference.allowWindowsAutoReflection = readWindowsAutoReflection(store)
+    }
+
+    fun readWindowsAutoReflection(store: SecureSettingsStore): Boolean = store.getString(WINDOWS_AUTO_REFLECTION_KEY) == "true"
+
+    /** letta-mobile-iczm7: saves the choice; it reaches letta-code when the runtime next starts. */
+    fun saveWindowsAutoReflection(store: SecureSettingsStore, allowed: Boolean) {
+        store.putString(WINDOWS_AUTO_REFLECTION_KEY, allowed.toString())
+        DesktopRuntimeLaunchPreference.allowWindowsAutoReflection = allowed
     }
 
     /** Saves [path] when it is an existing directory; returns the reason when it is not. */

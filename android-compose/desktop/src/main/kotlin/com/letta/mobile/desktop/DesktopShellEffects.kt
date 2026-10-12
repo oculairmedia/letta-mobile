@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import com.letta.mobile.data.desktopshell.ConversationTabsState
+import com.letta.mobile.data.dreaming.DreamNotifyPrefs
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 
@@ -105,6 +107,15 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             // paths do, or the editor branch keeps rendering over Settings.
             onOpenSettings = { context.navigator.navigate(DesktopDestination.Settings) },
             onQuickQuery = context.shell.quickQuery::open,
+        ),
+    )
+    val dreamPrefs = remember(context.core.bootstrap.secureSettingsStore) { DreamNotifyPrefs(context.core.bootstrap.secureSettingsStore) }
+    DreamFinishedNotificationsEffect(
+        entries = frame.lists.activeSubagents,
+        prefs = dreamPrefs,
+        sink = DreamNotificationSink(
+            agentName = { id -> frame.focus.railAgents.firstOrNull { it.first == id }?.second },
+            onActivate = { activateDesktopWindow(context.shell.window) },
         ),
     )
 }
