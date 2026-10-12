@@ -17,4 +17,12 @@ data object PairLinkLaunchTarget : AppLaunchTarget {
         if (intent?.action != Intent.ACTION_VIEW) return null
         return if (PendingPairLink.offer(intent.dataString)) PairLinkLaunchTarget else null
     }
+
+    /**
+     * The activity's launch target. A pairing link carries a one-time secret: once it
+     * is handed over (in memory) it is cleared from the intent, so recreating the
+     * activity cannot replay it.
+     */
+    fun consume(intent: Intent): AppLaunchTarget? =
+        fromIntent(intent)?.also { intent.data = null } ?: AppLaunchTarget.fromIntent(intent)
 }

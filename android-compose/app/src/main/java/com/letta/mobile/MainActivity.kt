@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ProfileCaptureKeyguardHelper.allowProfileCaptureLaunch(this)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = consumeLaunchTarget(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent)
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
@@ -207,17 +207,8 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = consumeLaunchTarget(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent)
     }
-
-    /**
-     * letta-mobile-dpv7m.3: a pairing link carries a one-time secret. Once it is
-     * handed over (in memory) it is cleared from the intent, so recreating the
-     * activity cannot replay it.
-     */
-    private fun consumeLaunchTarget(intent: Intent): AppLaunchTarget? =
-        PairLinkLaunchTarget.fromIntent(intent)?.also { intent.data = null }
-            ?: AppLaunchTarget.fromIntent(intent)
 
     private fun importAutomationPayloadFromLaunchIntent() {
         val encodedPayload = intent.getStringExtra(AutomationAuthBootstrap.EXTRA_PAYLOAD_BASE64)

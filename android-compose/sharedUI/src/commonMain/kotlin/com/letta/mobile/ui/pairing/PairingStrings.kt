@@ -50,6 +50,15 @@ object PairingStrings {
     fun expiresAt(minutesLeft: Long) = if (minutesLeft <= 0) "Expires in under a minute" else "Expires in $minutesLeft min"
 
     fun deviceScope(agentCount: Int?) = if (agentCount == null) "All agents" else "$agentCount agent${if (agentCount == 1) "" else "s"}"
+
+    // Install-and-pair card (letta-mobile-dpv7m.3).
+    const val JOIN_TITLE = "Connect to a host with a pairing link"
+    const val JOIN_BODY = "Paste the link from another device's \"Pair a device\" screen or the host's `pair` command."
+    const val INSTALL_TITLE = "1. Get the Meridian app on the phone"
+    const val INSTALL_BODY = "Scan with the phone's camera to download the Android app, then scan the pairing code below."
+
+    /** The latest Android release; the APK is attached to every GitHub release. */
+    const val APP_DOWNLOAD_URL = "https://github.com/oculairmedia/letta-mobile/releases/latest"
 }
 
 /** Test tags for the pairing surfaces. */
