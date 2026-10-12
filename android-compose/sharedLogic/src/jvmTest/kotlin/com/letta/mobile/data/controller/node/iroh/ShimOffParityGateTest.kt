@@ -166,14 +166,14 @@ class ShimOffParityGateTest {
             AppServerInboundFrame.GetReflectionSettingsResponse(
                 command.requestId,
                 true,
-                buildJsonObject { put("trigger", "manual") },
+                buildJsonObject { put("trigger", "step-count") },
             )
 
         override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) =
             AppServerInboundFrame.SetReflectionSettingsResponse(
                 command.requestId,
                 true,
-                buildJsonObject { put("trigger", "manual") },
+                buildJsonObject { put("trigger", "step-count") },
             )
 
         override suspend fun listModels(command: AppServerCommand.ListModels) =
@@ -262,6 +262,9 @@ class ShimOffParityGateTest {
         override val state: Flow<AppServerControllerState> = flowOf(AppServerControllerState.Connected)
 
         var submittedApprovalRequestId: String? = null
+
+        // letta-mobile-bzvro.40: permission_mode.set confirms through the live controller.
+        override suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean = true
 
         override suspend fun startRuntime(
             agentId: AgentId,
@@ -358,7 +361,7 @@ class ShimOffParityGateTest {
         // dpv7m.1: pair.invite.revoke addresses an invite by its non-secret id (an unknown id
         // answers revoked=false, which is still a native success).
         put("invite_id", "0123456789abcdef")
-        put("trigger", "manual")
+        put("trigger", "step-count")
         put("step_count", "5")
         // lgns8.9 addressable rows: a schedule (cron task), a catalog tool, and
         // the ids the fixture store holds for the local_backend_store bucket.
@@ -375,6 +378,8 @@ class ShimOffParityGateTest {
         put("exposed", false)
         // letta-mobile-joigh: conversation.context_limit.
         put("tokens", 200_000)
+        // letta-mobile-bzvro.40: permission_mode.set (conversation.compact reads `mode` as its own field).
+        if (method == "permission_mode.set") put("mode", "standard")
         if (method == "schedule.create") {
             put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
             put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))

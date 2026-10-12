@@ -6,14 +6,19 @@ import kotlinx.coroutines.CoroutineScope
  * One host's provider and catalog repositories, shared by every model-control
  * surface of a client (picker, Models sheet, Providers settings) so a change in
  * one shows in the others at once. Android gets the same sharing from Hilt
- * singletons; desktop holds one of these per data binding.
+ * singletons; desktop holds one of these per data binding. [oauthHttp] runs
+ * in-app subscription sign-ins (letta-mobile-zxk2n.3); null keeps the
+ * host-terminal steps.
  */
-class ModelControlSession(rpc: AdminRpcInvoker) {
+class ModelControlSession(
+    rpc: AdminRpcInvoker,
+    private val oauthHttp: ProviderOAuthHttp? = defaultProviderOAuthHttp(),
+) {
     val providers: ProviderConnectionRepository = ProviderConnectionRepository(rpc)
     val catalog: ModelCatalogRepository = ModelCatalogRepository(rpc)
 
     fun pickerSource(): ModelPickerSource = ModelPickerSource.catalog(providers, catalog)
 
     fun managementController(scope: CoroutineScope): ProviderManagementController =
-        ProviderManagementController(scope, providers, catalog)
+        ProviderManagementController(scope, providers, catalog, oauthHttp)
 }

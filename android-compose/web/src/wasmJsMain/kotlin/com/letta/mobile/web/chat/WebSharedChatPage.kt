@@ -26,7 +26,12 @@ import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
 import com.letta.mobile.ui.chat.surface.ChatCanvasActions
 import com.letta.mobile.ui.chat.surface.ChatSurface
-import com.letta.mobile.web.WebChatCanvas
+
+/** The board docked under the conversation: where it is kept, and whether the page opens on it. */
+internal data class WebChatCanvas(
+    val store: CanvasDocumentStore,
+    val openOnCanvas: Boolean,
+)
 
 /** Where the page's host affordances go in the web shell. */
 internal data class WebChatPageNavigation(

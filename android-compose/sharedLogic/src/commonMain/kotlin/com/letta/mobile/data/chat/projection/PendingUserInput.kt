@@ -1,6 +1,10 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
+import com.letta.mobile.ui.chat.render.ChatUiState
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableSet
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
@@ -46,6 +50,11 @@ private fun PendingApprovalDetails.sameRequestAs(other: PendingApprovalDetails?)
  * [messages] with each approval request joined to the parked control request that [details]
  * (by tool call id) holds for it. Returns the same list when nothing joins, so an idle
  * conversation keeps its list identity.
+ *
+ * letta-mobile-bzvro.40: a message that shows the call only as a plain tool row (no approval
+ * request) gets one built from the parked request when [details] names one of its calls. That is
+ * how an Iroh client, whose own engine never sees the host's control requests, draws the card: the
+ * host's `pending_approvals` snapshot is the only thing that says the call waits on the person.
  */
 fun withPendingApprovalDetails(
     messages: List<UiMessage>,
@@ -54,16 +63,47 @@ fun withPendingApprovalDetails(
     if (details.isEmpty()) return messages
     var changed = false
     val joined = messages.map { message ->
-        val request = message.approvalRequest ?: return@map message
-        val match = request.toolCalls.firstNotNullOfOrNull { details[it.toolCallId] }
-        // Parked details are immutable per control request, so the approval id is their identity:
-        // comparing it (not the whole data class) keeps this per-frame join from walking diff text.
-        if (match == null || match.isCurrentIn(request)) {
-            message
-        } else {
-            changed = true
-            message.copy(approvalRequest = request.copy(details = match))
-        }
+        val next = message.joinedWith(details)
+        if (next !== message) changed = true
+        next
     }
     return if (changed) joined else messages
+}
+
+/**
+ * letta-mobile-bzvro.40: [state] with its messages joined to [details]; the same state when nothing
+ * joins. A join rewrites rows anywhere in the list, so it is reported as a full change.
+ */
+fun ChatUiState.withPendingApprovalDetails(details: Map<String, PendingApprovalDetails>): ChatUiState {
+    val joined = withPendingApprovalDetails(messages, details)
+    if (joined === messages) return this
+    return copy(messages = joined.toImmutableList(), messageListChange = ChatMessageListChange.Full)
+}
+
+/** letta-mobile-bzvro.14: [this] marking [queued] approvals as waiting in the outbox; the same state when unchanged. */
+fun ChatUiState.withQueuedApprovals(queued: Set<String>): ChatUiState =
+    if (queued == queuedApprovalRequestIds) this else copy(queuedApprovalRequestIds = queued.toImmutableSet())
+
+private fun UiMessage.joinedWith(details: Map<String, PendingApprovalDetails>): UiMessage {
+    val request = approvalRequest ?: return withParkedToolCall(details)
+    val match = request.toolCalls.firstNotNullOfOrNull { details[it.toolCallId] }
+    // Parked details are immutable per control request, so the approval id is their identity:
+    // comparing it (not the whole data class) keeps this per-frame join from walking diff text.
+    if (match == null || match.isCurrentIn(request)) return this
+    return copy(approvalRequest = request.copy(details = match))
+}
+
+/** A plain tool row whose call is parked: the request the card answers, named by the control request's own id. */
+private fun UiMessage.withParkedToolCall(details: Map<String, PendingApprovalDetails>): UiMessage {
+    if (approvalResponse != null) return this
+    val calls = toolCalls ?: return this
+    val (parkedCall, parked) = calls.firstNotNullOfOrNull { call ->
+        call.toolCallId?.let(details::get)?.takeIf { call.result == null }?.let { call to it }
+    } ?: return this
+    val request = UiApprovalRequest(
+        requestId = parked.approvalId,
+        toolCalls = listOf(UiApprovalToolCall(toolCallId = parked.toolCallId, name = parkedCall.name, arguments = parkedCall.arguments)),
+        details = parked,
+    )
+    return copy(approvalRequest = request)
 }

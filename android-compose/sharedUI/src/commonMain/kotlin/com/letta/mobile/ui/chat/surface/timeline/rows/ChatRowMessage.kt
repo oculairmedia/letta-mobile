@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +33,10 @@ import com.letta.mobile.sharedui.resources.rows_role_error
 import com.letta.mobile.sharedui.resources.rows_role_tool_activity
 import com.letta.mobile.sharedui.resources.rows_role_tool_output
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
+import com.letta.mobile.ui.chat.branch.MessageMenuPopup
+import com.letta.mobile.ui.chat.branch.asMessageMenuActions
+import com.letta.mobile.ui.chat.branch.onSecondaryClick
+import com.letta.mobile.ui.chat.branch.rememberMessageMenu
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.render.shouldPulseForStreamingReveal
@@ -60,6 +65,8 @@ internal fun ChatMessageRow(
     callbacks: ChatRowCallbacks,
     position: GroupPosition = GroupPosition.None,
 ) {
+    // letta-mobile-zxk2n.5: a row the chat options hide (a paged row the list cannot drop) draws nothing.
+    if (context.displayOptions.hides(message)) return
     when {
         message.isCompaction -> CompactionDividerRow(message.content)
         isUserRole(message.role) && message.subagentNotification == null ->
@@ -76,13 +83,18 @@ private fun AssistantMessageColumn(
     callbacks: ChatRowCallbacks,
     position: GroupPosition,
 ) {
+    // letta-mobile-7mys7: a reply's actions (Fork from here, Copy) open with a right-click, or from
+    // the fork button that shows beside Copy on hover.
+    val menuActions = remember(callbacks.actions) { callbacks.actions.asMessageMenuActions() }
+    val menu = rememberMessageMenu(message, context.capabilities, menuActions, sendAgain = false)
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().onSecondaryClick(menu.openMenu),
         verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
     ) {
         if (touchStyle() && showsSpeakerHeader(message, position)) SpeakerHeader(message, context)
         message.agentMessageProvenance?.let { ProvenanceLabel(message, callbacks) }
-        AssistantPrimaryContent(message, context, callbacks)
+        AssistantPrimaryContent(message, context, callbacks, onFork = menu.fork)
+        MessageMenuPopup(menu)
         MessageImages(message, callbacks)
         val toolCalls = message.toolCalls.orEmpty()
         if (toolCalls.isNotEmpty()) {
@@ -97,7 +109,7 @@ private fun AssistantMessageColumn(
         }
         message.generatedUi?.let { GeneratedUiCard(it, context, callbacks) }
         if (message.artifacts.isNotEmpty()) CanvasArtifactCards(message.artifacts, callbacks)
-        message.approvalRequest?.let { ApprovalRequestCard(it, context, callbacks) }
+        ApprovalRequestSlot(message.approvalRequest, context, callbacks)
         message.approvalResponse?.let { ApprovalResponseCard(it) }
     }
 }
@@ -107,6 +119,7 @@ private fun AssistantPrimaryContent(
     message: UiMessage,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
+    onFork: (() -> Unit)? = null,
 ) {
     val notification = message.subagentNotification
     when {
@@ -119,6 +132,7 @@ private fun AssistantPrimaryContent(
                 isError = false,
                 isStreaming = context.isStreaming(message),
                 deliveryTimestamp = message.timestamp.takeIf { message.id == context.newestMessageId && !context.isStreaming(message) },
+                onFork = onFork.takeUnless { context.isStreaming(message) },
             ),
         )
     }
@@ -224,6 +238,8 @@ internal data class AgentTextParams(
     val isStreaming: Boolean = false,
     /** Set on the conversation's newest settled reply: its delivery time reads under the text. */
     val deliveryTimestamp: String? = null,
+    /** letta-mobile-7mys7: "Fork from here", shown beside Copy on hover; null hides it. */
+    val onFork: (() -> Unit)? = null,
 )
 
 /**
@@ -295,14 +311,17 @@ internal fun AgentText(params: AgentTextParams) {
             },
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
-            CopyIconButton(
-                CopyAction(
-                    text = params.text,
-                    contentDescription = stringResource(Res.string.rows_copy_response),
-                    emphasized = hovered,
-                    visible = hovered,
-                ),
-            )
+            Row {
+                params.onFork?.let { fork -> ForkIconButton(visible = hovered, onClick = fork) }
+                CopyIconButton(
+                    CopyAction(
+                        text = params.text,
+                        contentDescription = stringResource(Res.string.rows_copy_response),
+                        emphasized = hovered,
+                        visible = hovered,
+                    ),
+                )
+            }
         }
     }
 }

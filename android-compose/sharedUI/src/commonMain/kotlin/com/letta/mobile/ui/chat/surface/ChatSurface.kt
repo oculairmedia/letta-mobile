@@ -76,6 +76,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
 import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalRequestCard
+import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalOwner
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalDecider
 import org.jetbrains.compose.resources.stringResource
 
@@ -140,7 +141,7 @@ fun ChatSurface(
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
         pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     }
-    val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
+    val snackbars = rememberChatSurfaceSnackbars(uiState, port)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
     ReleaseImagesOnConversationChange(conversationId)
@@ -439,12 +440,10 @@ private fun TouchCanvasInput(frame: ChatSurfaceFrame, approval: UiApprovalReques
     if (!touchInputPending(frame, approval)) return
     TouchInputTray {
         if (approval != null) {
-            val decider = rememberApprovalDecider(
-                approval = approval,
-                activeApprovalRequestId = frame.uiState.activeApprovalRequestId,
-                approvalsEnabled = frame.capabilities.approvals,
-                actions = frame.port.actions,
-            )
+            val owner = remember(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions) {
+                ApprovalOwner.of(frame.uiState.activeApprovalRequestId, frame.capabilities.approvals, frame.port.actions)
+            }
+            val decider = rememberApprovalDecider(approval, owner)
             ApprovalRequestCard(approval, decider)
         }
         A2uiSurfaceStack(
@@ -708,7 +707,8 @@ private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
 private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     ChatComposerPanel(
         inputs = ComposerInputs(
-            composer = frame.composer,
+            // letta-mobile-zxk2n.5: "Token usage" off hides the composer's context meter.
+            composer = if (frame.appearance.displayOptions.showTokenUsage) frame.composer else frame.composer.copy(contextUsage = null),
             uiState = frame.uiState,
             actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
             capabilities = frame.capabilities,

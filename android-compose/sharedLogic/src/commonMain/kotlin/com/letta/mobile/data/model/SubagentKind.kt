@@ -10,9 +10,22 @@ package com.letta.mobile.data.model
  * reflection run was ever hidden. Every surface that decides visibility (the
  * Android chip bar, rings and linger tick, the desktop Background tasks panel)
  * must ask this classifier instead of comparing strings.
+ *
+ * letta-mobile-iczm7: letta-code's memory upkeep workers (git-conflict repair, invalid-memory
+ * repair) run as subagentType `memory` (wire label "Memory"), always silent. Like reflection
+ * (dreaming) they are background work, shown only on the Dreaming surface.
  */
 enum class SubagentKind {
     Reflection,
+
+    /**
+     * letta-mobile-ulcg6: letta-code's memory upkeep worker (memory git-conflict
+     * and invalid-memory repair; wire label "Memory", always silent).
+     */
+    Memory,
+
+    /** Sleep-time runs marketed as "Dreaming". */
+    Dream,
     GeneralPurpose,
     Fork,
     Recall,
@@ -20,11 +33,15 @@ enum class SubagentKind {
     ;
 
     /**
-     * Background work the user did not ask to see (sleeptime reflection and
-     * its integration step). Hidden from the active-subagent chrome.
+     * Background work the user did not ask to see (sleeptime reflection, its
+     * integration step, memory upkeep, dream runs). Hidden from the active-subagent chrome.
      */
     val isBackground: Boolean
-        get() = this == Reflection
+        get() = this == Reflection || this == Memory || this == Dream
+
+    /** letta-mobile-iczm7: a dream (sleep-time reflection) run, as opposed to memory upkeep. */
+    val isDream: Boolean
+        get() = this == Reflection || this == Dream
 
     companion object {
         /** Trimmed, case-insensitive; any label starting with "reflection" is [Reflection]. */
@@ -32,6 +49,8 @@ enum class SubagentKind {
             val normalized = raw?.trim()?.lowercase().orEmpty()
             return when {
                 normalized.startsWith(REFLECTION_PREFIX) -> Reflection
+                normalized == "memory" -> Memory
+                normalized.startsWith("dream") -> Dream
                 normalized in GENERAL_PURPOSE_LABELS -> GeneralPurpose
                 normalized == "fork" -> Fork
                 normalized == "recall" -> Recall

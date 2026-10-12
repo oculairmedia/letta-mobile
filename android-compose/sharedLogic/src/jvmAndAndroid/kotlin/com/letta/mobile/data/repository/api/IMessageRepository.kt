@@ -110,6 +110,15 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     ) = submitApproval(AgentId(agentId), approvalRequestId, toolCallIds, approve, reason, conversationId)
 
     /**
+     * letta-mobile-bzvro.40: [submitApproval] that may carry always-allow rule ids. A repository that
+     * cannot deliver them refuses rather than approve without the rule.
+     */
+    suspend fun submitApproval(answer: MessageApprovalAnswer) {
+        require(answer.selectedSuggestionIds.isEmpty()) { "always-allow rules need an Iroh host" }
+        submitApproval(answer.agentId, answer.approvalRequestId, answer.toolCallIds, answer.approve, answer.reason, answer.conversationId)
+    }
+
+    /**
      * Reset all messages for an agent (agent-scoped, not conversation-scoped).
      *
      * Keep this contract aligned with MessageApi.resetMessages(agentId); do not
@@ -119,3 +128,25 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     suspend fun resetMessages(agentId: AgentId)
     suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
 }
+
+/** letta-mobile-bzvro.40: one approval answer, with the always-allow rule ids the person chose. */
+data class MessageApprovalAnswer(
+    val agentId: AgentId,
+    val approvalRequestId: String,
+    val toolCallIds: List<String>,
+    val approve: Boolean,
+    val reason: String? = null,
+    val conversationId: String? = null,
+    val selectedSuggestionIds: List<String> = emptyList(),
+)
+
+/** letta-mobile-bzvro.14: an answer the offline outbox replays, as the repository sends it. */
+fun com.letta.mobile.data.chat.approval.OutboxApproval.toMessageAnswer() = MessageApprovalAnswer(
+    agentId = AgentId(agentId),
+    approvalRequestId = requestId,
+    toolCallIds = toolCallIds,
+    approve = approve,
+    reason = reason,
+    conversationId = conversationId,
+    selectedSuggestionIds = selectedSuggestionIds,
+)

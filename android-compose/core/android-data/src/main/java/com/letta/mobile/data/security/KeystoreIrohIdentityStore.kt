@@ -84,9 +84,13 @@ class KeystoreIrohIdentityStore(
         const val SEALED_FILE = "iroh-client-identity.enc"
         const val LEGACY_FILE = "iroh-client-identity.key"
 
-        /** The one identity store every Iroh dial on this device uses (session + pairing). */
+        /**
+         * The one identity store every Iroh dial on this device uses (session + pairing).
+         * Callers pass the Hilt `@ApplicationContext`; `filesDir` is the same app-private
+         * directory for every Context of this package, so no `applicationContext` hop.
+         */
         fun forApp(context: Context): KeystoreIrohIdentityStore =
-            KeystoreIrohIdentityStore(context.applicationContext.filesDir, AndroidKeystoreSealer())
+            KeystoreIrohIdentityStore(context.filesDir, AndroidKeystoreSealer())
     }
 }
 

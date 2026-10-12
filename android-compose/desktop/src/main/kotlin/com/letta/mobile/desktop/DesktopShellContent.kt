@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.canvas.CanvasLibrary
@@ -22,6 +23,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
+import com.letta.mobile.desktop.chat.DesktopBranchOrigin
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
@@ -31,6 +33,7 @@ import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
 import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.ui.mascot.MascotTransportLayer
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
 
 /** The window's surface: the rail, the agent sidebar and the main pane, with the overlays over them. */
 @Composable
@@ -51,6 +54,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 // until the host's plugin catalog reaches the client, none is, and every element is its card.
                 CompositionLocalProvider(
                     LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
+                    LocalAttentionPrefs provides context.core.attentionPrefs,
                 ) {
                     ProvideDesktopPluginViews(DesktopPluginBindings.None) {
                         DesktopShellLayoutBody(context, frame)
@@ -175,6 +179,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val deleteBehavior by chatController.deleteBehavior.collectAsState()
     val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
+    val conversationParents by chatController.conversationManagement.conversationParents.collectAsState()
     val archiveFilter = frame.lists.archiveFilter
     DesktopAgentSidebar(
         state = DesktopAgentSidebarState(
@@ -187,6 +192,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             thinkingConversationId = frame.activity.thinkingConversationId,
             deletingConversationIds = deletingConversationIds,
             pinnedConversationIds = pinnedConversationIds,
+            conversationParents = conversationParents.mapValues { it.value.conversationId },
             archiveFilter = archiveFilter,
             selectedDestination = navigator.selectedDestination,
             mode = navigator.workPlayMode,
@@ -194,6 +200,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             canvases = CanvasLibrary.filter(canvasDocuments, archivedCanvasIds, archiveFilter.toCanvasArchiveFilter()),
             activeCanvasId = canvasShell.activeSession?.canvasId,
             archivedCanvasIds = archivedCanvasIds,
+            listMarks = rememberDesktopSidebarListMarks(context, frame),
         ),
         actions = DesktopAgentSidebarActions(
             onArchiveFilterChange = chatController::setArchiveFilter,
@@ -207,11 +214,16 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
                 chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
             },
             onPinConversation = { id, pinned -> chatController.conversationManagement.setPinned(ConversationId(id), pinned) },
+            onForkConversation = chatController.conversationManagement.takeIf { it.supportsBranching }?.let { management ->
+                { id, name -> management.forkConversation(DesktopBranchOrigin(id, focus.selectedAgentId), name) }
+            },
             onNewChat = { context.openNewChatForFocusedAgent(focus) },
             onEditAgent = { navigator.editAgentId = focus.selectedAgentId },
             onOpenCanvas = { context.openCanvas(it) },
             onNewCanvas = { canvasShell.createNew(focus.selectedAgentId) },
             onArchiveCanvas = canvasShell.library::setArchived,
+            conversationMarks = remember(chatController) { chatController.conversationManagement.marks.rowActions() },
+            chatOptions = rememberDesktopChatOptionsActions(chatController),
         ),
         // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
         agentCard = { DesktopAgentContextCard(context, frame) },
@@ -225,7 +237,6 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     if (navigator.showBackgroundTasks && repository != null) {
         DesktopBackgroundTasksSidePane(
             subagents = frame.lists.activeSubagents,
-            onFetchTodos = { toolCallId -> repository.todos(toolCallId).getOrDefault(emptyList()) },
             onClose = { navigator.showBackgroundTasks = false },
         )
     }

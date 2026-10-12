@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import com.letta.mobile.data.desktopshell.ConversationTabsState
+import com.letta.mobile.data.dreaming.DreamNotifyPrefs
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 
@@ -41,6 +43,8 @@ private fun DesktopShellChatEffects(
         chatController.refreshSelectedConversationWorkingDirectory()
     }
     CommandPaletteKeyDispatcherEffect(onOpenPalette = { context.overlays.commandPalette = true })
+    // letta-mobile-zxk2n.5: mod+Alt+Up / Down for the previous / next conversation.
+    ConversationStepKeyDispatcherEffect(context, frame)
     DesktopControllerLifecycles(
         DesktopControllerLifecycleParams(
             chatController = chatController,
@@ -88,6 +92,7 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             },
             onOpenConversation = { context.router.openConversation(ConversationId(it)) },
             onReplyToConversation = chatController::replyFromNotification,
+            attention = rememberShellAttentionBindings(context),
         ),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(
@@ -107,6 +112,37 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             onQuickQuery = context.shell.quickQuery::open,
         ),
     )
+    val dreamPrefs = remember(context.core.bootstrap.secureSettingsStore) { DreamNotifyPrefs(context.core.bootstrap.secureSettingsStore) }
+    DreamFinishedNotificationsEffect(
+        entries = frame.lists.activeSubagents,
+        prefs = dreamPrefs,
+        sink = DreamNotificationSink(
+            agentName = { id -> frame.focus.railAgents.firstOrNull { it.first == id }?.second },
+            onActivate = { activateDesktopWindow(context.shell.window) },
+        ),
+    )
+}
+
+/**
+ * letta-mobile-bzvro.27: the window's run registry and the person's mutes, with agent and
+ * conversation lookups read through the controller's live state (the toasts fire from coroutines).
+ */
+@Composable
+private fun rememberShellAttentionBindings(context: DesktopShellContext): DesktopAttentionBindings {
+    val chatController = context.core.chatController
+    val prefs = context.core.attentionPrefs
+    return remember(chatController, prefs) {
+        DesktopAttentionBindings(
+            runs = chatController.runs,
+            prefs = prefs,
+            agentNameFor = { agentId ->
+                chatController.state.value.conversations.firstOrNull { it.agentId == agentId }?.agentName
+            },
+            agentIdForConversation = { conversationId ->
+                chatController.state.value.conversations.firstOrNull { it.id == conversationId }?.agentId
+            },
+        )
+    }
 }
 
 /**

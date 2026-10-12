@@ -5,13 +5,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-sealed interface WebConnectionState {
-    data object Unconfigured : WebConnectionState
-    data object Connecting : WebConnectionState
-    data class Connected(val transport: String) : WebConnectionState
-    data class Failed(val message: String) : WebConnectionState
-}
-
 internal fun resolveWebSocketUrl(serverUrl: String): String {
     val trimmed = serverUrl.trim().removeSuffix("/")
     return when {

@@ -7,7 +7,7 @@ Letta Mobile is a Kotlin Multiplatform project that ships **two clients** from o
 - **Android app** (`com.letta.mobile` / `.dev`) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. letta-code pins (desktop bundled runtime and wire contract baseline 0.33.6; Android embedded runtime 0.26.1 is a documented ceiling (nodejs-mobile Node 18); restart-replay evidence stays at 0.29.12 until re-captured live) are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. letta-code pins (desktop bundled runtime and wire contract baseline 0.34.8; Android embedded runtime 0.26.1 is a documented ceiling (nodejs-mobile Node 18); restart-replay evidence stays at 0.29.12 until re-captured live) are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
 
 **Location:** `/opt/stacks/letta-mobile`
 **Build root:** `android-compose/` (the Gradle workspace)
@@ -35,7 +35,7 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract-baseline `@letta-ai/letta-code@0.33.6`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33 server" is desktop/remote-only, never the embedded Android runtime.
+For App Server contract work, also provision Node `v24.18.0` and the contract-baseline `@letta-ai/letta-code@0.34.8`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
 
 ---
 
@@ -63,6 +63,8 @@ For App Server contract work, also provision Node `v24.18.0` and the contract-ba
 - `appserver-cli/` — JVM probe toolchain for App Server contract verification
 
 **The cardinal rule:** feature logic goes in `sharedLogic/commonMain`. Platform modules (`app/`, `desktop/`) only bind. Duplicating repository logic across `app/` and `desktop/` is the documented anti-pattern — the `shared-multiplatform` required CI gate backstops this.
+
+**All UI is shared (`sharedUI`); platform modules are containers** (hard cut `letta-mobile-ckmub`, gate `letta-mobile-ckmub.7`; advisory now, required from slice S20). `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's `LettaHost` container (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). New screens, rows, dialogs, pickers, sheets, headers and settings cards go in `sharedUI/commonMain` and compose the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`); platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding. `scripts/ci/platform-ui-gate.sh` (CI job `platform-ui-gate`) fails a new `@Composable` file under those trees unless it is in `scripts/ci/platform-ui-allowlist.txt` with a `Platform-UI-Reason:` line in the PR body, and fails an allowlisted legacy file that grows past its recorded line count (+5). Copying a surface instead of composing the primitives is a review blocker. Android pages are edge-to-edge: `LettaPageScaffold` owns insets; pages never call `systemBars`/`statusBars`/`navigationBars`/`ime` padding themselves. Full rule text: `AGENTS.md` → Module map.
 
 ---
 

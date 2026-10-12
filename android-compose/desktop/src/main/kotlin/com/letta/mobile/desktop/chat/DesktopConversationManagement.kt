@@ -1,5 +1,10 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.branch.BranchState
+import com.letta.mobile.data.chat.branch.ConversationParent
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -38,9 +43,39 @@ internal class DesktopConversationManagement(
 ) {
     private val brancher = DesktopConversationBrancher(scope, host)
 
+    /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
+    val marks = DesktopConversationMarks(prefs)
+
+    /**
+     * letta-mobile-zxk2n.5: `/recompile` for the open conversation, and where it stands. The local
+     * App Server and REST backends recompile; over Iroh the host has no relay yet, which is the
+     * only desktop backend without a route.
+     */
+    val recompile = ConversationRecompileController(
+        scope = scope,
+        gateway = { host.gateway as? ConversationRecompileGateway },
+        unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
+    )
+
+    /** Recompiles the open conversation's system prompt; with nothing open, nothing happens. */
+    fun recompileOpenConversation() {
+        if (host.isClosed) return
+        val origin = host.origin() ?: return
+        recompile.recompile(ConversationRecompileRequest(origin.conversationId, origin.agentId.orEmpty()))
+    }
+
+    /** Shows [message] as the chat's error, for shell actions that fail outside the chat (a transcript save). */
+    fun reportError(message: String) {
+        if (!host.isClosed) host.showError(message)
+    }
+
     /** The pinned conversation ids; the sidebar lists them first. */
     val pinnedConversationIds: StateFlow<Set<String>> =
         prefs.pins?.pinned ?: MutableStateFlow(emptySet<String>()).asStateFlow()
+
+    /** letta-mobile-7mys7: each fork's source conversation id, for the sidebar's "Forked from …". */
+    val conversationParents: StateFlow<Map<String, ConversationParent>> =
+        prefs.lineage?.parents ?: MutableStateFlow(emptyMap<String, ConversationParent>()).asStateFlow()
 
     /** Models switched to most recently (newest first), for the picker's "Recent" group. */
     val recentModels: StateFlow<List<String>> =
@@ -88,11 +123,27 @@ internal class DesktopConversationManagement(
         withContext(Dispatchers.IO) { recents.record(model) }
     }
 
-    fun forkFrom(message: UiMessage, view: DesktopBranchView) {
-        if (!host.isClosed) brancher.forkFrom(message, view)
+    fun forkFrom(message: UiMessage, view: DesktopBranchView, name: String? = null) {
+        if (!host.isClosed) brancher.forkFrom(message, view, name)
     }
 
     fun editAndResend(message: UiMessage, view: DesktopBranchView) {
         if (!host.isClosed) brancher.editAndResend(message, view)
     }
+
+    /** letta-mobile-7mys7: forks before the prompt and sends it again there; the original keeps its answer. */
+    fun rerun(message: UiMessage, view: DesktopBranchView) {
+        if (!host.isClosed) brancher.rerun(message, view)
+    }
+
+    /** letta-mobile-7mys7 (G37): forks all of [origin] (the sidebar's "Fork chat…"), named [name] when given. */
+    fun forkConversation(origin: DesktopBranchOrigin, name: String? = null) {
+        if (!host.isClosed) brancher.forkConversation(origin, name)
+    }
+
+    /** Whether a fork can be named on this backend. */
+    val canNameForks: Boolean get() = brancher.canName
+
+    /** The fork, edit or rerun in flight, or the last failure. */
+    val branchState: StateFlow<BranchState> get() = brancher.state
 }

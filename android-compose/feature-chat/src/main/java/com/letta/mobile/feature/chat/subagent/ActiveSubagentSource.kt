@@ -33,6 +33,14 @@ interface ActiveSubagentSource {
     val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>>
 
     /**
+     * letta-mobile-ulcg6 (PR4): the parent conversation's registry entries, for
+     * the shared subagent roster (`SubagentRosterList`) the sheet shows. Empty
+     * by default so previews and fakes need no wiring.
+     */
+    val rosterEntries: StateFlow<List<com.letta.mobile.data.model.SubagentEntry>>
+        get() = NO_ROSTER_ENTRIES
+
+    /**
      * letta-mobile-73o2h.3: fetch one subagent's latest TodoWrite snapshot
      * for the tap-to-todolist sheet. Keyed by the chip id (the parent Agent
      * tool_call_id). Default returns empty so previews/fakes need no wiring;
@@ -55,6 +63,9 @@ interface ActiveSubagentSource {
         Result.success(activeSubagents.value.firstOrNull { it.id == id })
 
     companion object {
+        internal val NO_ROSTER_ENTRIES: StateFlow<List<com.letta.mobile.data.model.SubagentEntry>> =
+            MutableStateFlow<List<com.letta.mobile.data.model.SubagentEntry>>(emptyList()).asStateFlow()
+
         /**
          * The active-only visibility rule, applied as a flow operator. Keeps
          * the rule in one place so both the fake and the (future) real WS

@@ -21,6 +21,8 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
+import com.letta.mobile.data.chat.projection.withQueuedApprovals
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -105,6 +107,7 @@ import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
+import com.letta.mobile.data.chat.branch.branchHistory
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -174,6 +177,15 @@ internal class AdminChatViewModel @Inject constructor(
         com.letta.mobile.data.presence.ConversationRunRegistry(),
     /** letta-mobile-w4q4p: conversation-scoped model switch; null keeps the agent-update path. */
     private val modelControl: com.letta.mobile.feature.chat.coordination.ChatModelControl? = null,
+    /**
+     * letta-mobile-7mys7 (bzvro.32): the canonical transport the paged timeline reads, so a fork,
+     * edit or rerun places its fork point on the server's stored messages; null in tests.
+     */
+    private val timelineTransport: com.letta.mobile.data.timeline.TimelineTransport? = null,
+    /** letta-mobile-7mys7 (G37): forks record their parent here; null in tests. */
+    private val conversationLineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the permission-mode chip; null leaves both off. */
+    private val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -185,6 +197,9 @@ internal class AdminChatViewModel @Inject constructor(
      * construction, and cached repositories can deliver events before the constructor returns.
      */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
+
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the mode chip (inert without a relay). */
+    private val approvalBinding = com.letta.mobile.feature.chat.coordination.ChatApprovalBinding(approvalRelay, routeArgs.agentId)
 
     /**
      * letta-mobile-bzvro.7: the status line's detail for this screen's conversation, as the shared
@@ -282,7 +297,10 @@ internal class AdminChatViewModel @Inject constructor(
         conversationRepository = conversationRepository,
         backgroundRefreshScope = viewModelScope,
     )
-    private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
+    private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository) { entry ->
+        // letta-mobile-bzvro.14: over the Iroh channel an answer made offline waits in the outbox.
+        approvalBinding.deliver(entry, overChannel = usesChannelTransport.value)
+    }
     // The route's agent is this screen's for its whole life. The shared chat page reads it from
     // here to draw the agent's mascot (the Touch chat head, the composer companion) and to scope
     // foreign-agent rows out of the timeline (c4igq.4); without it every mascot site fell back
@@ -319,7 +337,12 @@ internal class AdminChatViewModel @Inject constructor(
     @Composable
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
-        return state
+        // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
+        val parked by approvalBinding.pendingDetails.collectAsState()
+        val queued by approvalBinding.queuedRequestIds.collectAsState()
+        return androidx.compose.runtime.remember(state, parked, queued) {
+            state.withPendingApprovalDetails(parked).withQueuedApprovals(queued)
+        }
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
@@ -539,6 +562,7 @@ internal class AdminChatViewModel @Inject constructor(
         bannerController = chatBannerController,
         agentId = agentId.value,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
+        relay = approvalRelay,
     )
 
     private val adminChatA2uiCoordinator: AdminChatA2uiCoordinator by lazy {
@@ -942,9 +966,8 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        // letta-mobile-bzvro.16: an "Edit and resend" left its text for the fork it opened.
-        com.letta.mobile.data.chat.branch.PendingComposerDrafts.shared.take(conversationId)
-            ?.let(::handleComposerTextChanged)
+        // letta-mobile-bzvro.16 / 7mys7: an "Edit and resend" or "Rerun" left its prompt for the fork it opened.
+        com.letta.mobile.data.chat.branch.PendingComposerDrafts.shared.take(conversationId)?.let(::applyBranchDraft)
         viewModelScope.launch { beginTimelineObserver(conversationId) }
     }
 
@@ -1073,6 +1096,18 @@ internal class AdminChatViewModel @Inject constructor(
         reason: String? = null,
     ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason)
 
+    /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
+    fun submitApproval(answer: com.letta.mobile.ui.chat.session.ChatApprovalAnswer) = chatApprovalController.submit(answer)
+
+    /** letta-mobile-bzvro.40: the conversation's permission-mode chip; null while the host offers none. */
+    val permissionMode: Flow<com.letta.mobile.ui.chat.session.ChatPermissionModeUiState?> by lazy(LazyThreadSafetyMode.NONE) {
+        approvalBinding.permissionMode(_uiState.map { conversationId?.value })
+    }
+
+    /** letta-mobile-bzvro.40: asks the host for [mode]; the chip shows it pending until confirmed. */
+    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) =
+        approvalBinding.setPermissionMode(viewModelScope, conversationId?.value, mode)
+
     fun resetMessages() {
         viewModelScope.launch {
             try {
@@ -1141,14 +1176,20 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.rerunMessage(message)
     }
 
-    // letta-mobile-bzvro.15 / .16: fork from a message, and edit-and-resend, opening the fork.
+    // letta-mobile-bzvro.15 / .16 / 7mys7: fork from a message, edit-and-resend and rerun, opening the fork.
     private val conversationBranching by lazy(LazyThreadSafetyMode.NONE) {
         com.letta.mobile.feature.chat.coordination.ChatConversationBranching(
             viewModelScope,
             conversationRepository,
             onError = ::reportComposerError,
+            history = timelineTransport?.let { transport -> transport::branchHistory },
+            lineage = conversationLineage,
         )
     }
+
+    /** Whether this backend can fork (the embedded runtime cannot), so the page offers the branch actions. */
+    val canBranchConversations: Boolean
+        get() = conversationRepository.canForkConversations()
 
     private fun branchOrigin(open: (agentId: String, conversationId: String) -> Unit) =
         conversationId?.let { id ->
@@ -1161,6 +1202,23 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun editAndResend(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
         branchOrigin(open)?.let { conversationBranching.editAndResend(it, message) }
+    }
+
+    /** letta-mobile-7mys7: forks before the prompt and sends it again in the fork; this conversation is unchanged. */
+    fun rerunInFork(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.rerun(it, message) }
+    }
+
+    /** letta-mobile-7mys7: `/fork [name]` from the composer forks all of this conversation and opens the fork. */
+    fun forkConversation(name: String?, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.forkConversation(it, name) }
+    }
+
+    /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
+    private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
+        handleComposerTextChanged(pending.draft.text)
+        pending.draft.images.forEach(::addAttachment)
+        if (pending.sendNow) submitComposer(pending.draft.text)
     }
 
     fun interruptRun() {

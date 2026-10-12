@@ -269,7 +269,20 @@ private fun buildDesktopChatController(
         bootstrapState = runtime.bootstrapState,
         scope = runtime.chatScope,
         gatewayFactory = {
-            bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
+            bindings.irohTransport?.let { transport ->
+                IrohAdminRpcChatGateway(
+                    transport,
+                    deviceLabel = DESKTOP_DEVICE_ID,
+                    // letta-mobile-bzvro.40: the host's parked approvals and the permission-mode chip.
+                    approvalControls = com.letta.mobile.data.runtime.IrohApprovalControls(
+                        scope = runtime.chatScope,
+                        transport = transport,
+                        registry = runtime.dataBindings.permissionModeSettings.modes,
+                        // letta-mobile-bzvro.14: answers made offline survive a restart.
+                        outboxStore = com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore(bindings.secureSettingsStore),
+                    ),
+                )
+            }
                 ?: createDefaultDesktopChatGateway(
                     runtime.bootstrapState.config,
                     appServerGatewayFactory = defaultDesktopAppServerGatewayFactory(runtime.dataBindings.permissionModeSettings),

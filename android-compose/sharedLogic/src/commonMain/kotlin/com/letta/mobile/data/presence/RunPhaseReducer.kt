@@ -79,7 +79,22 @@ object RunPhaseReducer {
         }
         // letta-mobile-bzvro.7: the status line's detail, folded from the same event.
         val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
-        return if (live == phased.live) phased else phased.copy(live = live)
+        val tracked = phased.trackingApproval(event)
+        return if (live == tracked.live) tracked else tracked.copy(live = live)
+    }
+
+    /**
+     * letta-mobile-bzvro.27: remember which approval request the turn is parked on. A new request
+     * names itself; any other event keeps the id while the turn stays parked and drops it once the
+     * turn moves on.
+     */
+    private fun ConversationRunState.trackingApproval(event: RuntimeEventPayload): ConversationRunState {
+        val id = when {
+            event is RuntimeEventPayload.ApprovalRequested -> event.request.approvalId.value
+            phase == RunPhase.AWAITING_INPUT -> awaitingApprovalId
+            else -> null
+        }
+        return if (id == awaitingApprovalId) this else copy(awaitingApprovalId = id)
     }
 
     /**

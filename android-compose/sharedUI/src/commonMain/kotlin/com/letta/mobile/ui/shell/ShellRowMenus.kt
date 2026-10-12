@@ -73,15 +73,26 @@ data class ShellConversationMenuActions(
     val manage: ShellConversationManageMenu = ShellConversationManageMenu.None,
 )
 
-/** A conversation row's rename and pin entries; a null action is one the host does not offer. */
+/**
+ * A conversation row's manage entries: rename and pin (letta-mobile-bzvro.17), settle / move to
+ * active and the marker (letta-mobile-zxk2n.5). A null action is one the host does not offer.
+ */
 data class ShellConversationManageMenu(
     val pinned: Boolean = false,
     val onRenameRequest: (() -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
+    /** letta-mobile-7mys7 (G37): fork the chat, asking for the fork's name first. */
+    val onForkRequest: (() -> Unit)? = null,
+    val settled: Boolean = false,
+    val onSettleToggle: (() -> Unit)? = null,
+    val onMarkerRequest: (() -> Unit)? = null,
 ) {
     fun items(): List<ShellRowMenuItem> = listOfNotNull(
         onRenameRequest?.let { ShellRowMenuItem("Rename chat", it) },
         onPinToggle?.let { ShellRowMenuItem(if (pinned) "Unpin chat" else "Pin chat", it) },
+        onForkRequest?.let { ShellRowMenuItem("Fork chat…", it) },
+        onMarkerRequest?.let { ShellRowMenuItem("Set marker…", it) },
+        onSettleToggle?.let { ShellRowMenuItem(if (settled) "Move to active" else "Settle chat", it) },
     )
 
     companion object {

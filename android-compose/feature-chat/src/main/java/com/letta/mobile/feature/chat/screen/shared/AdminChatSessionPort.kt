@@ -40,13 +40,27 @@ internal class AdminChatSessionPort(
     /** letta-mobile-bzvro.37: workspace files for the composer's `@` suggestions. */
     fileMentions: Flow<List<Mentionable>> = flowOf(emptyList()),
 ) : ChatSessionPort {
+    /** letta-mobile-7mys7: the page can open a fork and the backend can make one (declared first: the composer reads it). */
+    private val branches: Boolean = onOpenConversation != null && viewModel.canBranchConversations
 
     override val uiState: StateFlow<ChatUiState> = viewModel.uiState
 
     override val composer: StateFlow<ChatComposerUiState> =
-        combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), fileMentions) { composer, ui, model, usage, files ->
-            composerSnapshot(composer, ui, model, usage).copy(mentionables = files.toImmutableList())
+        combine(composerWithoutMode(fileMentions), viewModel.permissionMode) { snapshot, permissionMode ->
+            // letta-mobile-bzvro.40: the permission-mode chip, over the Iroh host.
+            snapshot.copy(permissionMode = permissionMode)
         }.stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
+
+    private fun composerWithoutMode(fileMentions: Flow<List<Mentionable>>): Flow<ChatComposerUiState> =
+        combine(
+            viewModel.composerState,
+            viewModel.uiState,
+            modelFlow(),
+            contextUsageFlow(),
+            fileMentions,
+        ) { composer, ui, model, usage, files ->
+            composerSnapshot(composer, ui, model, usage).copy(mentionables = files.toImmutableList())
+        }
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport, onOpenConversation)
 
@@ -55,7 +69,7 @@ internal class AdminChatSessionPort(
 
     /** Android's support does not change while the page is open. */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = MutableStateFlow(
-        Capabilities.copy(fork = onOpenConversation != null, editAndResend = onOpenConversation != null),
+        branchCapabilities(Capabilities, branches = branches),
     )
 
     private fun initialComposer(): ChatComposerUiState = composerSnapshot(
@@ -113,11 +127,19 @@ internal class AdminChatSessionPort(
                 attachmentLimits = viewModel.attachmentLimits,
                 model = model,
                 contextUsage = contextUsage,
+                canFork = branches,
             ),
         )
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /**
+         * letta-mobile-7mys7: fork, edit-and-resend and rerun need a page that can open the fork and
+         * a backend that can make it (the embedded runtime cannot).
+         */
+        internal fun branchCapabilities(base: ChatSurfaceCapabilities, branches: Boolean): ChatSurfaceCapabilities =
+            base.copy(fork = branches, editAndResend = branches, rerunInFork = branches)
 
         val Capabilities = ChatSurfaceCapabilities(
             attachImages = true,

@@ -183,6 +183,29 @@ class UseCase {
         else el
     }
 
+    /**
+     * Each text element in [heights] given its measured height, in one pass; the same list when
+     * none of them is more than half a pixel off (see [syncTextMeasuredHeight]).
+     */
+    fun syncTextMeasuredHeights(elements: List<Element>, heights: Map<String, Float>): List<Element> {
+        if (heights.isEmpty()) return elements
+        var changed = false
+        val synced = elements.map { el ->
+            val height = (el as? Element.Text)?.driftedTo(heights[el.id])
+            if (height == null) {
+                el
+            } else {
+                changed = true
+                (el as Element.Text).copy(measuredHeight = height)
+            }
+        }
+        return if (changed) synced else elements
+    }
+
+    /** [height] when it is more than half a pixel from what this text has; null otherwise. */
+    private fun Element.Text.driftedTo(height: Float?): Float? =
+        height?.takeIf { kotlin.math.abs(measuredHeight - it) >= 0.5f }
+
     /** Replace the text of a single [Element.Text], or of a shape that [canHoldText]. */
     fun updateText(
         elements: List<Element>,

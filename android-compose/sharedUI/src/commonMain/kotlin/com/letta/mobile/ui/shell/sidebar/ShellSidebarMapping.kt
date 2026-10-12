@@ -1,7 +1,8 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
-import com.letta.mobile.data.chat.runtime.PinnedConversations
+import com.letta.mobile.data.chat.runtime.ConversationListGroups
+import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
 import kotlin.time.Instant
 
@@ -12,6 +13,12 @@ data class ShellConversationMarks(
     val deletingIds: Set<String> = emptySet(),
     /** letta-mobile-bzvro.17: pinned conversations, listed first. */
     val pinnedIds: Set<String> = emptySet(),
+    /** letta-mobile-7mys7 (G37): each fork's source conversation id (ConversationLineage), for "Forked from …". */
+    val parentIds: Map<String, String> = emptyMap(),
+    /** letta-mobile-zxk2n.5: settled conversations, listed after the active ones. */
+    val settledIds: Set<String> = emptySet(),
+    /** letta-mobile-zxk2n.5: each marked conversation's emoji. */
+    val markers: Map<String, String> = emptyMap(),
 )
 
 /** Pure mapping from the platform-neutral conversation summaries to the panel's rows. */
@@ -20,7 +27,8 @@ object ShellSidebarMapping {
     private const val LOADING_PREVIEW = "Loaded from backend"
 
     /**
-     * [conversations] as panel rows, the pinned ones first (each group keeps its order).
+     * [conversations] as panel rows, the pinned ones first and the settled ones last (each group
+     * keeps its order).
      * [timeLabel] turns a summary's `updatedAtLabel` into the row's trailing time (see
      * [ShellRelativeTime.compact]).
      */
@@ -28,8 +36,10 @@ object ShellSidebarMapping {
         conversations: List<ChatConversationSummary>,
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
-    ): List<ShellConversationRowModel> =
-        PinnedConversations.pinnedFirst(conversations, marks.pinnedIds) { it.id }.map { conversation ->
+    ): List<ShellConversationRowModel> {
+        val titles = conversations.associate { it.id to it.displayTitle() }
+        val ordered = ConversationListOrder.arrange(conversations, ConversationListGroups(marks.pinnedIds, marks.settledIds)) { it.id }
+        return ordered.map { conversation ->
             ShellConversationRowModel(
                 id = conversation.id,
                 title = conversation.displayTitle(),
@@ -40,8 +50,15 @@ object ShellSidebarMapping {
                 deleting = conversation.id in marks.deletingIds,
                 archived = conversation.archived,
                 pinned = conversation.id in marks.pinnedIds,
+                settled = conversation.id in marks.settledIds,
+                marker = marks.markers[conversation.id],
+                forkedFrom = marks.parentIds[conversation.id]?.let { parent -> titles[parent] ?: UNLISTED_PARENT },
             )
         }
+    }
+
+    /** A fork whose source is not in the list (archived, another agent's, or gone). */
+    const val UNLISTED_PARENT = "an earlier chat"
 
     /** The preview line under a title: trimmed, and blank for the loading placeholder. */
     fun cleanPreview(raw: String): String =

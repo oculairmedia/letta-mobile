@@ -11,8 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
@@ -32,6 +35,7 @@ import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.surface.recents.RECENTS_EMPTY_TAG
 import com.letta.mobile.ui.chat.surface.recents.RECENTS_LIST_TAG
 import com.letta.mobile.ui.chat.surface.recents.RECENTS_NEW_THREAD_TAG
+import com.letta.mobile.ui.chat.surface.recents.recentRowAvatarTag
 import com.letta.mobile.ui.chat.surface.recents.recentRowTag
 import com.letta.mobile.ui.shell.sidebar.ShellConversationRowModel
 import kotlin.test.AfterTest
@@ -172,10 +176,30 @@ class CanvasBubbleUiTest {
         onNodeWithTag(recentRowTag("conv-2")).performClick()
         waitForIdle()
         assertEquals(listOf("conv-2"), hops.opened)
-        assertEquals("half a thought", PendingComposerDrafts.shared.take("conv-1"), "the draft waits for the way back")
+        assertEquals("half a thought", PendingComposerDrafts.shared.take("conv-1")?.draft?.text, "the draft waits for the way back")
         assertTrue(CanvasBubbleArrival.take(), "the next conversation's card opens on arrival")
         onAllNodesWithTag(RECENTS_LIST_TAG).assertCountEquals(0)
         onNodeWithTag(BUBBLE_CARD_TAG).assertExists()
+    }
+
+    /** letta-mobile-zxk2n.27: each row pictures the agent through AgentAvatar, not a generic sphere. */
+    @Test
+    fun theRecentRowsPictureTheAgentThroughItsAvatar() = runComposeUiTest {
+        showTouch(Port(), Hops())
+        onNodeWithTag(TOUCH_HEAD_TAG).performClick()
+        waitForIdle()
+        onNodeWithTag(BUBBLE_PLUS_TAG).performClick()
+        waitForIdle()
+        defaultRows.forEach { row -> onNodeWithTag(recentRowAvatarTag(row.id), useUnmergedTree = true).assertExists() }
+        // The avatar is decorative: the row's one announcement is unchanged.
+        onNodeWithTag(recentRowTag("conv-2")).assertContentDescriptionContains("Garden ideas", substring = true)
+    }
+
+    /** letta-mobile-zxk2n.27: with no seat in the disc the head shows the agent's avatar (its initial, mascot-less). */
+    @Test
+    fun theHeadWithoutASeatShowsTheAgentsAvatar() = runComposeUiTest {
+        showTouch(Port(), Hops())
+        onNodeWithTag(TOUCH_HEAD_AVATAR_TAG, useUnmergedTree = true).onChild().assertTextEquals("M")
     }
 
     @Test

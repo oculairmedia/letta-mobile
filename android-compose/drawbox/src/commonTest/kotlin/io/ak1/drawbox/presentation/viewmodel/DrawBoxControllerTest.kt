@@ -138,6 +138,56 @@ class DrawBoxControllerTest {
     }
 
     @Test
+    fun aChangeFromElsewhereKeepsTheInstancesOfEveryElementItDidNotChange() {
+        val controller = newController()
+        listOf("a", "b", "c").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        val before = controller.state.value.elements
+        val moved = square("b").copy(points = listOf(androidx.compose.ui.geometry.Offset(5f, 5f), androidx.compose.ui.geometry.Offset(15f, 15f)))
+        // Parsed afresh, as a sync import is: every element a new instance.
+        controller.importExternal(
+            io.ak1.drawbox.domain.model.PayLoad(
+                bgColor = controller.state.value.bgColor,
+                elements = listOf(before[0].let { (it as io.ak1.drawbox.domain.model.Element.Shape).copy() }, moved.copy(zIndex = before[1].zIndex), before[2].let { (it as io.ak1.drawbox.domain.model.Element.Shape).copy() }),
+            ),
+        )
+        val after = controller.state.value.elements
+        assertTrue(after[0] === before[0] && after[2] === before[2], "unchanged elements keep their instances")
+        assertTrue(after[1] !== before[1])
+    }
+
+    @Test
+    fun aChangeFromElsewhereThatChangesNothingKeepsTheBoardsList() {
+        val controller = newController()
+        listOf("a", "b").forEach { controller.onIntent(Intent.AddElement(square(it))) }
+        val before = controller.state.value
+        controller.importExternal(
+            io.ak1.drawbox.domain.model.PayLoad(
+                bgColor = before.bgColor,
+                elements = before.elements.map { (it as io.ak1.drawbox.domain.model.Element.Shape).copy(points = it.points.toList()) },
+            ),
+        )
+        assertTrue(controller.state.value.elements === before.elements)
+    }
+
+    @Test
+    fun manyMeasuredHeightsLandAsOneChangeWithoutAnUndoStep() {
+        val controller = newController()
+        fun text(id: String) = io.ak1.drawbox.domain.model.Element.Text(
+            id = id, text = id, fontSize = 16f, color = Color.Black,
+            topLeft = androidx.compose.ui.geometry.Offset.Zero, wrapWidth = 100f, measuredHeight = 20f,
+        )
+        listOf("a", "b", "c").forEach { controller.onIntent(Intent.AddElement(text(it))) }
+        val history = controller.state.value.history
+        controller.onIntent(Intent.SyncTextMeasuredHeights(mapOf("a" to 40f, "c" to 60f, "b" to 20.2f)))
+        val heights = controller.state.value.elements.associate { it.id to (it as io.ak1.drawbox.domain.model.Element.Text).measuredHeight }
+        assertEquals(mapOf("a" to 40f, "b" to 20f, "c" to 60f), heights)
+        assertEquals(history, controller.state.value.history)
+        val settled = controller.state.value.elements
+        controller.onIntent(Intent.SyncTextMeasuredHeights(mapOf("a" to 40.3f)))
+        assertTrue(controller.state.value.elements === settled, "within half a pixel changes nothing")
+    }
+
+    @Test
     fun saveBitmapStillCapturesRightAfterAnIntent() {
         val controller = newController()
         var captured = 0

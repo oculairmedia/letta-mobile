@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,8 +28,10 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
-import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatImageViewer
+import com.letta.mobile.ui.chat.surface.timeline.rows.LocalApprovalStepper
+import com.letta.mobile.ui.chat.surface.timeline.rows.rememberApprovalStepper
+import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -98,13 +101,16 @@ internal fun ChatTimeline(
             }
             // The goal card, when there is one on top, already rests below the chrome; the list starts under it.
             val bodyTopInset = if (goal != null && !goalAtBottom) 0.dp else topInset
-            TimelineBody(
-                TimelineBodyParams(
-                    state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent,
-                    topReserve = bodyTopInset,
-                ),
-                Modifier.weight(1f).fillMaxWidth(),
-            )
+            // letta-mobile-bzvro.14: several approvals waiting at once are answered one at a time.
+            CompositionLocalProvider(LocalApprovalStepper provides rememberApprovalStepper(state.messages, actions)) {
+                TimelineBody(
+                    TimelineBodyParams(
+                        state, pagedTimeline, actions, capabilities, appearance, bindings, bottomReserve, listState, host.editAgent,
+                        topReserve = bodyTopInset,
+                    ),
+                    Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
             if (goal != null && goalAtBottom) {
                 GoalStatusCard(goal, state.isGoalStatusLoading, goalActions, Modifier.align(Alignment.CenterHorizontally))
             }

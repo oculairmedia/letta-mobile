@@ -163,6 +163,7 @@ private fun ComposerAboveCard(model: ComposerModel) {
     // The mode chip sits with the directory: chrome of the full page, not of the compact dock.
     if (model.mode != ChatSurfaceMode.Docked) {
         model.composer.permissionMode?.let { ComposerPermissionModeRow(it, actions::setPermissionMode) }
+        ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)
     }
     if (model.composer.backgroundProcesses.isNotEmpty()) {
         BackgroundProcessShelf(

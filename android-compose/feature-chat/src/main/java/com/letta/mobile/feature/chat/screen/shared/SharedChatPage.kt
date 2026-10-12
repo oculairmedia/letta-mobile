@@ -25,8 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
+import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.feature.chat.screen.AndroidClientCommands
+import com.letta.mobile.feature.chat.screen.LocalAndroidClientCommands
+import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
@@ -34,6 +41,9 @@ import com.letta.mobile.feature.chat.screen.saveAttachment
 import com.letta.mobile.feature.chat.screen.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
+import com.letta.mobile.ui.chat.session.ChatSessionPort
+import com.letta.mobile.ui.chat.session.ClientCommandRouting
+import com.letta.mobile.ui.chat.session.ClientCommandSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
@@ -130,7 +140,8 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         conversationId = params.viewModel.conversationId?.value,
     )
     val canvas = canvasContent(canvasSlot, target, params.topChromeInset)
-    val appearance = rememberSharedChatAppearance(params)
+    val appearance = rememberSharedChatAppearance(params, rememberSharedChatDisplayOptions())
+    val surfacePort = rememberClientCommandPort(port, params.viewModel, LocalAndroidClientCommands.current)
     // letta-mobile-bglj6.1.19: the shared page reads the OS "Remove animations" setting through
     // sharedUI's LocalReducedMotion, the same preference the legacy chat honours.
     val platform = rememberAndroidChatSurfacePlatform(
@@ -154,7 +165,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     ) {
         SharedChatWorkspaceFilesBox(workspaceFiles, port, target.agentId, modifier) {
             ChatSurface(
-                port = port,
+                port = surfacePort,
                 presentation = presentation,
                 onIntent = onIntent,
                 host = host,
@@ -222,10 +233,12 @@ private fun ReportHostHeaderHidden(report: ((Boolean) -> Unit)?, headerHidden: B
 }
 
 @Composable
-private fun rememberSharedChatAppearance(params: SharedChatPageParams): ChatSurfaceAppearance =
-    remember(params.chatMode, params.fontScale, params.hapticsEnabled) {
+private fun rememberSharedChatAppearance(params: SharedChatPageParams, displayOptions: ChatDisplayOptions): ChatSurfaceAppearance =
+    remember(params.chatMode, params.fontScale, params.hapticsEnabled, displayOptions) {
         ChatSurfaceAppearance(
             displayMode = params.chatMode.toChatDisplayMode(),
+            // letta-mobile-zxk2n.5: the drawer's Chat options (reasoning, compactions, usage).
+            displayOptions = displayOptions,
             fontScale = params.fontScale,
             hapticsEnabled = params.hapticsEnabled,
             // CachedSettingsRepository.setChatFontScale clamps to this range.
@@ -236,6 +249,48 @@ private fun rememberSharedChatAppearance(params: SharedChatPageParams): ChatSurf
             platformStyle = ChatPlatformStyle.Touch,
         )
     }
+
+/** The shared drawer's display options; the defaults where the scaffold has no shared drawer. */
+@Composable
+private fun rememberSharedChatDisplayOptions(): ChatDisplayOptions {
+    val drawer = LocalSharedNavDrawer.current ?: return ChatDisplayOptions.Default
+    return drawer.displayOptions.collectAsStateWithLifecycle().value
+}
+
+/**
+ * letta-mobile-zxk2n.5 (G92): the page's port with the scaffold's client-local `/` commands, and
+ * `/recompile` run here so its status reaches the page. Without a scaffold the owner's port as is.
+ */
+@Composable
+private fun rememberClientCommandPort(
+    port: AdminChatSessionPort,
+    viewModel: AdminChatViewModel,
+    commands: AndroidClientCommands?,
+): ChatSessionPort {
+    if (commands == null) return port
+    val current by rememberUpdatedState(commands)
+    return remember(port, viewModel, commands.offered) {
+        val recompile = ConversationRecompileController(
+            scope = viewModel.viewModelScope,
+            gateway = { current.recompileGateway },
+            unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
+        )
+        val routing = ClientCommandRouting(
+            offered = commands.offered,
+            run = { command ->
+                if (command == ClientSlashCommand.Recompile) {
+                    viewModel.conversationId?.let { id ->
+                        recompile.recompile(ConversationRecompileRequest(id.value, viewModel.agentId.value))
+                    }
+                } else {
+                    current.route(command)
+                }
+            },
+            recompile = recompile,
+        )
+        ClientCommandSessionPort(port, routing, viewModel.viewModelScope)
+    }
+}
 
 /** Full-screen "open canvas" leaves for the canvas screen until the docked mode ships. */
 internal fun routesToCanvasNavigation(
@@ -254,7 +309,7 @@ private fun rememberAdminChatSessionPort(
     val canOpenConversation = navigation.onOpenConversation != null
     return remember(viewModel, canOpenConversation, workspaceFiles) {
         AdminChatSessionPort(
-            fileMentions = workspaceFiles?.mentionables ?: flowOf(emptyList()),
+            fileMentions = workspaceFiles?.mentionablesFor(viewModel.agentId.value) ?: flowOf(emptyList()),
             viewModel = viewModel,
             scope = viewModel.viewModelScope,
             onOpenBugReport = { currentOnBugCommand?.invoke() },

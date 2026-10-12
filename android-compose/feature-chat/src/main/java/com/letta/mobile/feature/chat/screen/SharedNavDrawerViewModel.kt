@@ -10,11 +10,17 @@ import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
+import com.letta.mobile.data.chat.display.ChatDisplayPrefs
+import com.letta.mobile.data.chat.runtime.ConversationListPrefs
+import com.letta.mobile.data.chat.runtime.ConversationMarker
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.ui.shell.sidebar.ShellConversationMarkActions
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -47,7 +53,37 @@ internal class SharedNavDrawerViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val canvasStore: CanvasDocumentStore,
     private val allConversations: IAllConversationsRepository,
+    secureSettings: SecureSettingsStore,
+    /** letta-mobile-7mys7 (G37): each fork's source conversation; null in tests. */
+    private val lineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
 ) : ViewModel() {
+    /** letta-mobile-zxk2n.5: settled chats and markers (client marks; the server has no field for them). */
+    private val listMarks = ConversationListPrefs(secureSettings)
+
+    /** letta-mobile-zxk2n.5: the Chat options' display toggles, read by the shared chat page too. */
+    private val displayPrefs = ChatDisplayPrefs(secureSettings)
+
+    val settledConversationIds: StateFlow<Set<String>> = listMarks.settled
+    val conversationMarkers: StateFlow<Map<String, String>> = listMarks.markers
+    val displayOptions: StateFlow<ChatDisplayOptions> = displayPrefs.options
+
+    /** Settle / move to active and the marker, for the drawer's row menus. */
+    val conversationMarkActions = ShellConversationMarkActions(
+        onSettle = { id, settled -> listMarks.setSettled(ConversationId(id), settled) },
+        onSetMarker = { id, marker -> listMarks.setMarker(ConversationId(id), marker?.let(::ConversationMarker)) },
+        markerChoices = ConversationListPrefs.MARKER_CHOICES,
+    )
+
+    fun setDisplayOptions(options: ChatDisplayOptions) = displayPrefs.update { options }
+
+    /** Whether the active backend is Iroh, where `/recompile` has no route yet. */
+    val backendIsIroh: Boolean get() = settingsRepository.activeBackendIsIroh()
+
+    /** Each fork's source conversation id, so a fork's row reads "Forked from …". */
+    val conversationParents: StateFlow<Map<String, String>> =
+        (lineage?.parents ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap()))
+            .map { parents -> parents.mapValues { it.value.conversationId } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
 
     val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)

@@ -93,6 +93,7 @@ internal fun EditAgentContentList(params: EditAgentContentListParams) {
             titleRes = R.string.screen_agent_edit_section_memory,
             items = listOf(
                 "advanced_compaction" to { EditAgentCompactionCard(params) },
+                "dreaming" to { LocalEditAgentDreamingEntry.current() },
                 "memory_blocks" to { EditAgentMemoryBlocksCard(params) },
             ),
         )

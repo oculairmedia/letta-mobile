@@ -48,8 +48,10 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun failureReasonStringIsExactlyStreamTimeout() {
-        assertEquals("stream_timeout", SubagentRepository.FAILURE_REASON_STREAM_TIMEOUT)
+    fun unverifiableSilenceOutlastsTheLivenessCheck() {
+        // letta-mobile-ulcg6 (RC1): quiet entries are verified first; dropping an
+        // entry the host cannot be asked about must come much later.
+        assertTrue(SubagentRepository.UNVERIFIABLE_SILENCE_MS > SubagentRepository.STREAM_TIMEOUT_MS)
     }
 
     @Test

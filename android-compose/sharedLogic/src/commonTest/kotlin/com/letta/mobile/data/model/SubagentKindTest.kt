@@ -42,6 +42,16 @@ class SubagentKindTest {
     }
 
     @Test
+    fun memoryUpkeepIsBackground() {
+        // letta-mobile-iczm7: letta-code's git-conflict / invalid-memory repair workers.
+        listOf("Memory", "memory", " MEMORY ").forEach { label ->
+            assertEquals(SubagentKind.Memory, SubagentKind.fromWire(label), label)
+            assertTrue(SubagentKind.fromWire(label).isBackground, label)
+        }
+        assertFalse(SubagentKind.fromWire("Memory palace").isBackground)
+    }
+
+    @Test
     fun nullTypeIsOtherAndVisible() {
         assertEquals(SubagentKind.Other, SubagentKind.fromWire(null))
         assertFalse(SubagentKind.fromWire(null).isBackground)
@@ -56,5 +66,20 @@ class SubagentKindTest {
     @Test
     fun paddedMixedCaseLabelIsTrimmed() {
         assertEquals(SubagentKind.Reflection, SubagentKind.fromWire("  REFLECTION  "))
+    }
+
+    /**
+     * letta-mobile-ulcg6: letta-code (0.33.6 and 0.34.8) runs memory git-conflict
+     * and invalid-memory repair as subagentType "memory" (label "Memory"). It is
+     * background upkeep, not user work, exactly like reflection.
+     */
+    @Test
+    fun memoryRepairAndDreamRunsAreBackground() {
+        assertEquals(SubagentKind.Memory, SubagentKind.fromWire("Memory"))
+        assertTrue(SubagentKind.fromWire("Memory").isBackground)
+        assertEquals(SubagentKind.Dream, SubagentKind.fromWire("Dream"))
+        assertTrue(SubagentKind.fromWire("dreaming").isBackground)
+        assertFalse(SubagentKind.fromWire("Claude-code").isBackground)
+        assertFalse(SubagentKind.fromWire("Codex").isBackground)
     }
 }

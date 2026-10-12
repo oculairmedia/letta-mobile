@@ -119,8 +119,10 @@ internal class DesktopShellRouter(
         navigator.selectedDestination = DesktopDestination.Conversations
         // Target the focused agent explicitly - for a roster-only agent,
         // createConversation()'s conversation-derived agent id would miss it.
+        // letta-mobile-zxk2n.5: a chat started here is pinned when "Pin new chats" is on.
+        val marks = chatController.conversationManagement.marks
         agentId?.value
-            ?.let(chatController::createConversationForAgent)
+            ?.let { chatController.createConversationForAgent(it, onCreated = marks::onConversationCreated) }
             ?: chatController.createConversation()
     }
 

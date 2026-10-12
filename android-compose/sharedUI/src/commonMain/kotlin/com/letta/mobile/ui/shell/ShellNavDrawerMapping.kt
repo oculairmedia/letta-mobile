@@ -16,6 +16,7 @@ import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.shell.sidebar.ShellCanvasRowModel
+import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsState
 import com.letta.mobile.ui.shell.sidebar.ShellConversationMarks
 import com.letta.mobile.ui.shell.sidebar.ShellPanelAgent
 import com.letta.mobile.ui.shell.sidebar.ShellRelativeTime
@@ -45,6 +46,13 @@ data class ShellNavDrawerInput(
     val archiveFilter: ShellArchiveFilter = ShellArchiveFilter.Active,
     /** Pinned conversations list first and show the pin mark. */
     val pinnedConversationIds: Set<String> = emptySet(),
+    /** letta-mobile-zxk2n.5: settled conversations (last) and conversation markers. */
+    val settledConversationIds: Set<String> = emptySet(),
+    val conversationMarkers: Map<String, String> = emptyMap(),
+    /** letta-mobile-zxk2n.5: the Chat options dialog's state; null leaves it out of the agent menu. */
+    val chatOptions: ShellChatOptionsState? = null,
+    /** letta-mobile-7mys7: each fork's source conversation, so its row reads "Forked from …". */
+    val conversationParents: Map<String, String> = emptyMap(),
     /** Canvases are shared across agents, so these are all of them. */
     val canvases: List<CanvasDocument> = emptyList(),
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
@@ -67,17 +75,27 @@ object ShellNavDrawerMapping {
             entries = ShellRailMapping.entries(ShellRailMapping.groups(recents.agents, agentId), focus),
             hiddenAgentCount = recents.hiddenCount,
         )
+        val summaries = input.conversations.toChatConversationSummaries()
+        val marks = ShellConversationMarks(
+            selectedId = input.openConversationId,
+            pinnedIds = input.pinnedConversationIds,
+            settledIds = input.settledConversationIds,
+            markers = input.conversationMarkers,
+            parentIds = input.conversationParents,
+        )
+        val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
         val panel = ShellAgentPanelState(
             agent = input.agent.copy(identity = input.agent.identity ?: agentId?.let { input.identities[it] }),
             hiddenSections = input.hiddenSections,
             archiveFilter = input.archiveFilter,
             conversations = ShellSidebarMapping.conversationRows(
-                conversations = input.conversations.toChatConversationSummaries()
-                    .filter { input.archiveFilter.admits(it.archived) },
-                marks = ShellConversationMarks(selectedId = input.openConversationId, pinnedIds = input.pinnedConversationIds),
-                timeLabel = { ShellRelativeTime.compact(it, now) },
+                conversations = summaries.filter { input.archiveFilter.admits(it.archived) },
+                marks = marks,
+                timeLabel = timeLabel,
             ),
             canvases = canvasRows(input, now),
+            archivedConversations = ShellSidebarMapping.conversationRows(summaries.filter { it.archived }, marks, timeLabel),
+            chatOptions = input.chatOptions,
         )
         return ShellNavDrawerState(rail = rail, panel = panel)
     }

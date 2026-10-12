@@ -47,4 +47,16 @@
     <string name="chat_surface_recents_row">%1$s, %2$s</string>
     <string name="chat_surface_recents_row_current">%1$s, %2$s, current conversation</string>
     <string name="chat_surface_recents_row_archived">%1$s, %2$s, archived</string>
+    <!-- letta-mobile-zxk2n.29: the minimised chat's own layout (mascot size, bar width, how long a reply stays). -->
+    <string name="chat_surface_bubble_layout">Bubble layout</string>
+    <string name="chat_surface_bubble_layout_mascot">Mascot size</string>
+    <string name="chat_surface_bubble_layout_width">Text box width</string>
+    <string name="chat_surface_bubble_layout_hold">Reply bubble stays for</string>
+    <string name="chat_surface_bubble_layout_reset">Reset</string>
+    <string name="chat_surface_bubble_layout_full">Full</string>
+    <string name="chat_surface_bubble_layout_always">Always</string>
+    <string name="chat_surface_bubble_layout_auto">Auto</string>
+    <string name="chat_surface_bubble_layout_dp">%1$d dp</string>
+    <string name="chat_surface_bubble_layout_seconds">%1$d s</string>
+    <string name="chat_surface_bubble_layout_resize">Resize the text box</string>
 </resources>

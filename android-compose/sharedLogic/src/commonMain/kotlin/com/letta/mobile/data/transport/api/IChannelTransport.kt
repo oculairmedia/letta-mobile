@@ -68,6 +68,12 @@ interface IChannelTransport {
      */
     fun subscribe(runId: String, cursor: Long = 0L): Boolean
 
+    /**
+     * letta-mobile-bzvro.40: the feature capabilities the connected host advertised (Iroh `auth_response`),
+     * empty while disconnected or for a transport without such a handshake.
+     */
+    val hostCapabilities: Set<String> get() = emptySet()
+
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         error("admin_rpc is not supported by this transport")
 

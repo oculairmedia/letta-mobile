@@ -73,17 +73,13 @@ internal fun DesktopAgentSidebarState.toShellPanelState(): ShellAgentPanelState 
     selectedSection = WorkPlayLens.navDestinations(mode).firstOrNull { lensNavTarget(mode, it).first == selectedDestination },
     settingsSelected = selectedDestination == DesktopDestination.Settings,
     archiveFilter = archiveFilter.toShellArchiveFilter(),
-    conversations = ShellSidebarMapping.conversationRows(
-        conversations = conversations,
-        marks = ShellConversationMarks(
-            // A conversation reads as open only while the conversation page shows.
-            selectedId = selectedConversationId.takeIf { selectedDestination == DesktopDestination.Conversations },
-            thinkingId = thinkingConversationId,
-            deletingIds = deletingConversationIds,
-            pinnedIds = pinnedConversationIds,
-        ),
-        timeLabel = ::formatRelativeTimestamp,
+    conversations = ShellSidebarMapping.conversationRows(conversations, conversationMarks(), ::formatRelativeTimestamp),
+    archivedConversations = ShellSidebarMapping.conversationRows(
+        listMarks.archivedConversations,
+        conversationMarks(),
+        ::formatRelativeTimestamp,
     ),
+    chatOptions = listMarks.chatOptions,
     canvases = canvases.map { canvas ->
         ShellCanvasRowModel(
             id = canvas.id,
@@ -93,6 +89,18 @@ internal fun DesktopAgentSidebarState.toShellPanelState(): ShellAgentPanelState 
             archived = canvas.id in archivedCanvasIds,
         )
     },
+)
+
+/** Which rows the sidebar marks: the open one, the thinking one, those being deleted, pins and marks. */
+private fun DesktopAgentSidebarState.conversationMarks(): ShellConversationMarks = ShellConversationMarks(
+    // A conversation reads as open only while the conversation page shows.
+    selectedId = selectedConversationId.takeIf { selectedDestination == DesktopDestination.Conversations },
+    thinkingId = thinkingConversationId,
+    deletingIds = deletingConversationIds,
+    parentIds = conversationParents,
+    pinnedIds = pinnedConversationIds,
+    settledIds = listMarks.settledIds,
+    markers = listMarks.markers,
 )
 
 internal fun DesktopAgentSidebarActions.toShellPanelActions(mode: WorkPlayMode): ShellAgentPanelActions = ShellAgentPanelActions(
@@ -107,8 +115,11 @@ internal fun DesktopAgentSidebarActions.toShellPanelActions(mode: WorkPlayMode):
     deleteBehavior = deleteBehavior,
     onRenameConversation = onRenameConversation,
     onPinConversation = onPinConversation,
+    onForkConversation = onForkConversation,
     onOpenCanvas = onOpenCanvas,
     onArchiveCanvas = onArchiveCanvas,
+    conversationMarks = conversationMarks,
+    chatOptions = chatOptions,
 )
 
 internal fun ConversationArchiveFilter.toShellArchiveFilter(): ShellArchiveFilter = when (this) {
