@@ -61,8 +61,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * [com.letta.mobile.data.pairing.PairingFlow] (via [PairingViewModel]) parses,
  * dials the host, redeems the one-time invite, saves the host and makes it
  * active. [onPaired] then opens chat. A paste field is the fallback when the
- * camera is unavailable; [initialLink] is a pairing link opened from outside
- * the app (deep link).
+ * camera is unavailable; a link opened from outside the app arrives through
+ * [PendingPairLink].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,12 +70,12 @@ fun QrScanScreen(
     onPaired: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    initialLink: String? = null,
     viewModel: PairingViewModel = hiltViewModel(),
 ) {
     val camera = rememberCameraPermission()
     val pairingState by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(initialLink) { initialLink?.let(viewModel::submit) }
+    // A link opened from outside the app (deep link) is consumed once, from memory.
+    LaunchedEffect(Unit) { PendingPairLink.take()?.let(viewModel::submit) }
 
     Scaffold(
         modifier = modifier,

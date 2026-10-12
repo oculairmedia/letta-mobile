@@ -28,9 +28,6 @@ import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
-import com.letta.mobile.ui.screens.pairing.PairInviteScreen
-import com.letta.mobile.ui.screens.pairing.PendingPairLink
-import com.letta.mobile.ui.screens.pairing.QrScanScreen
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
@@ -120,35 +117,7 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
-    // letta-mobile-g2d2i / dpv7m.2: scan-to-pair (joining device) and
-    // "Pair a device" (inviter). Both talk to the HOST: the scanner redeems the
-    // host-minted invite and lands in chat; the inviter asks the host to mint.
-    composable<PairingScanRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        QrScanScreen(
-            onPaired = {
-                navController.navigate(ConversationsRoute) {
-                    popUpTo(0) { inclusive = true }
-                    launchSingleTop = true
-                }
-            },
-            onNavigateBack = { navController.popBackStack() },
-            initialLink = androidx.compose.runtime.remember { PendingPairLink.take() },
-        )
-    }
-
-    composable<PairingInviteRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        PairInviteScreen(onNavigateBack = { navController.popBackStack() })
-    }
+    pairingRoutes(navController)
 
     composable<TemplatesRoute>(
         enterTransition = drillInEnter,
