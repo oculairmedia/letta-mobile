@@ -283,11 +283,13 @@ class ChatRowInteractionUiTest {
         }
 
         // Collapsed, the header previews only the reasoning's first line.
+        awaitText("Weighing the options")
         onNodeWithText("Weighing the options", substring = true, useUnmergedTree = true).assertExists()
         onNodeWithText("Then picking the cheaper one", substring = true, useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.REASONING_TOGGLE).performClick()
         runOnIdle { assertEquals(listOf("r-1"), actions.toggledReasoning) }
         runOnIdle { expanded = setOf("r-1") }
+        awaitText("Then picking the cheaper one")
         onNodeWithText("Then picking the cheaper one", substring = true, useUnmergedTree = true).assertExists()
     }
 

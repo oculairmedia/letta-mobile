@@ -258,7 +258,6 @@ internal class EditAgentViewModel @Inject constructor(
 
     fun updateContextWindow(value: Int) = state.updateField { copy(contextWindow = value.coerceAtLeast(0)) }
 
-
     fun updateSummarizationPrompt(value: String) = state.updateField { copy(summarizationPrompt = value) }
 
     fun updateCompactionClipChars(value: Int) = state.updateField { copy(compactionClipChars = value.coerceAtLeast(1)) }

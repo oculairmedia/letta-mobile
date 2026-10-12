@@ -21,23 +21,23 @@ import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.surface.composer.description
 import com.letta.mobile.ui.chat.surface.composer.displayName
-import com.letta.mobile.ui.notify.AgentNotificationsStrings
 
-// letta-mobile-ckmub.3.12 (S10): the Settings page's standard sections, drawn the same on every
-// platform from the ports in com.letta.mobile.data.settings. A null port leaves its rows out.
+// letta-mobile-ckmub.3.12 (S10) / ckmub.3.12.1: the Settings page's standard sections, drawn the same
+// on every platform from the ports in com.letta.mobile.data.settings. A null port leaves its rows
+// out; the group header above each card names it, so the cards carry no title of their own.
 
 /** Theme, preset, dynamic colour and haptics; nothing when the platform binds none of them. */
 @Composable
 fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier = Modifier) {
     if (settings.isEmpty) return
-    SettingsSection(SettingsHeader("appearance", "Appearance"), modifier) {
+    SettingsSection(SettingsHeader("appearance", "Appearance", showTitle = false), modifier) {
         settings.theme?.let { EnumChoice(it, THEME_CHOICE) }
-        settings.dynamicColor?.let { ToggleSetting(it, ToggleText("appearance-dynamic-color", "Dynamic colour", "Use the colours of your wallpaper.")) }
+        settings.dynamicColor?.let { ToggleSetting(it, SettingsCopy.DYNAMIC_COLOR) }
         settings.themePreset?.let { preset ->
             val dynamicOn = settings.dynamicColor?.current?.collectAsState()?.value == true
-            EnumChoice(preset, PRESET_CHOICE.copy(supporting = if (dynamicOn) "Dynamic colour overrides the preset." else null))
+            EnumChoice(preset, PRESET_CHOICE.copy(supporting = if (dynamicOn) "Dynamic colour overrides the preset" else null))
         }
-        settings.haptics?.let { ToggleSetting(it, ToggleText("appearance-haptics", "Haptics", "Vibrate on streaming and tool activity.")) }
+        settings.haptics?.let { ToggleSetting(it, SettingsCopy.HAPTICS) }
     }
 }
 
@@ -45,10 +45,8 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier =
 @Composable
 fun ChatSettingsSection(settings: ChatSettings, modifier: Modifier = Modifier) {
     if (settings.isEmpty) return
-    SettingsSection(SettingsHeader("chat", "Chat"), modifier) {
-        settings.openChatsOnCanvas?.let {
-            ToggleSetting(it, ToggleText("chat-open-on-canvas", "Open conversations on the canvas", "Turn off to open the full-screen chat instead."))
-        }
+    SettingsSection(SettingsHeader("chat", "Chat", showTitle = false), modifier) {
+        settings.openChatsOnCanvas?.let { ToggleSetting(it, SettingsCopy.CANVAS) }
         settings.permissionMode?.let { PermissionModeRows(it) }
     }
 }
@@ -58,25 +56,26 @@ fun ChatSettingsSection(settings: ChatSettings, modifier: Modifier = Modifier) {
 fun NotificationSettingsSection(settings: NotificationSettings, modifier: Modifier = Modifier) {
     val attention = settings.attention ?: return
     val prefs by attention.prefs.collectAsState()
-    SettingsSection(SettingsHeader("notifications", "Notifications"), modifier) {
+    val label = SettingsCopy.APPROVALS
+    SettingsSection(SettingsHeader("notifications", "Notifications", showTitle = false), modifier) {
         ToggleRow(
             SettingsRow.Toggle(
-                key = "notifications-approvals",
-                title = AgentNotificationsStrings.APPROVALS_SWITCH,
+                key = label.key,
+                title = label.title,
                 checked = prefs.approvalNotificationsEnabled,
-                supporting = "Finished replies notify you either way; mute an agent from its own settings.",
+                supporting = label.helper,
                 onChange = attention::setApprovalNotificationsEnabled,
             ),
         )
     }
 }
 
-/** The way to the provider accounts, keys and models. */
+/** The way to the provider accounts, keys and models; it needs a connected host. */
 @Composable
 fun ProvidersSettingsSection(onOpenProviders: () -> Unit, modifier: Modifier = Modifier) {
-    val header = SettingsHeader("providers", "Providers", "Provider accounts, API keys and endpoints, and the models the picker offers.")
-    SettingsSection(header, modifier) {
-        ActionRow("providers-actions", listOf(ActionButton("providers-open", "Manage providers", onOpenProviders, primary = true)))
+    val label = SettingsCopy.PROVIDERS
+    SettingsSection(SettingsHeader("providers", "Providers", showTitle = false), modifier) {
+        LinkRow(SettingsRow.Link(key = label.key, title = label.title, supporting = label.helper, onClick = onOpenProviders))
     }
 }
 
@@ -84,37 +83,33 @@ fun ProvidersSettingsSection(onOpenProviders: () -> Unit, modifier: Modifier = M
 private fun SettingsScope.PermissionModeRows(settings: PermissionModeSettings) {
     val current by settings.defaultMode.collectAsState()
     var saveFailed by remember { mutableStateOf(false) }
+    val label = SettingsCopy.PERMISSION_MODE
     ChoiceRow(
         SettingsRow.Choice(
-            key = "chat-permission-mode",
-            title = "Default permission mode",
+            key = label.key,
+            title = label.title,
             options = AppServerPermissionMode.entries.map { SettingsOption(it.name, it.displayName(), it.description()) },
             selected = current.name,
-            supporting = "How tool calls are approved in conversations that have not picked a mode of their own. " +
-                "Running conversations keep theirs; Iroh nodes decide their own.",
+            supporting = label.helper,
             onSelect = { picked -> saveFailed = !settings.setDefaultMode(AppServerPermissionMode.valueOf(picked)) },
         ),
     )
     if (saveFailed) {
-        NoteRow(SettingsRow.Note("chat-permission-mode-failed", SettingsStatus("Could not save the default; it is unchanged.", SettingsTone.Error)))
+        NoteRow(SettingsRow.Note("chat-permission-mode-failed", SettingsStatus("Couldn't save the default; it is unchanged.", SettingsTone.Error)))
     }
 }
 
-/** A switch's key, title and explanation. */
-private class ToggleText(val key: String, val title: String, val supporting: String)
-
 @Composable
-private fun SettingsScope.ToggleSetting(setting: SettingValue<Boolean>, text: ToggleText) {
+private fun SettingsScope.ToggleSetting(setting: SettingValue<Boolean>, label: SettingsLabel) {
     val on by setting.current.collectAsState()
-    ToggleRow(SettingsRow.Toggle(key = text.key, title = text.title, checked = on, supporting = text.supporting, onChange = setting::set))
+    ToggleRow(SettingsRow.Toggle(key = label.key, title = label.title, checked = on, supporting = label.helper, onChange = setting::set))
 }
 
 /** A choice over an enum's values with their labels. */
 private data class EnumChoiceSpec<T : Enum<T>>(
-    val key: String,
-    val title: String,
+    val label: SettingsLabel,
     val entries: List<T>,
-    val label: (T) -> String,
+    val optionLabel: (T) -> String,
     val supporting: String? = null,
 )
 
@@ -123,19 +118,19 @@ private fun <T : Enum<T>> SettingsScope.EnumChoice(value: SettingValue<T>, spec:
     val current by value.current.collectAsState()
     ChoiceRow(
         SettingsRow.Choice(
-            key = spec.key,
-            title = spec.title,
-            options = spec.entries.map { SettingsOption(it.name, spec.label(it)) },
+            key = spec.label.key,
+            title = spec.label.title,
+            options = spec.entries.map { SettingsOption(it.name, spec.optionLabel(it)) },
             selected = current.name,
-            supporting = spec.supporting,
+            supporting = spec.supporting ?: spec.label.helper,
             onSelect = { picked -> spec.entries.firstOrNull { it.name == picked }?.let(value::set) },
         ),
     )
 }
 
-private val THEME_CHOICE = EnumChoiceSpec("appearance-theme", "Theme", AppTheme.entries, ::themeLabel)
+private val THEME_CHOICE = EnumChoiceSpec(SettingsCopy.THEME, AppTheme.entries, ::themeLabel)
 
-private val PRESET_CHOICE = EnumChoiceSpec("appearance-theme-preset", "Colour preset", ThemePreset.entries, ::presetLabel)
+private val PRESET_CHOICE = EnumChoiceSpec(SettingsCopy.PRESET, ThemePreset.entries, ::presetLabel)
 
 private fun themeLabel(theme: AppTheme): String = when (theme) {
     AppTheme.SYSTEM -> "System"

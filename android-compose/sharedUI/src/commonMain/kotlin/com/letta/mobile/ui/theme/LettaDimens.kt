@@ -100,6 +100,9 @@ object LettaDimens {
 
         /** Send button and other emphasised round actions. */
         val actionButton: Dp = 38.dp
+
+        /** The smallest hit target of a whole tappable row (a settings row): the platform minimum. */
+        val minTouchTarget: Dp = 48.dp
     }
 
     /** Agent orb sizes. The rail slot is wider than the orb so a selection marker fits beside it. */
@@ -178,6 +181,15 @@ object LettaDimens {
 
         /** Readable width of a settings page's content column. */
         val contentMaxWidth: Dp = 760.dp
+
+        /**
+         * The Settings page's form factors (letta-mobile-ckmub.3.12.1): below [settingsMediumBreakpoint]
+         * one list, up to [settingsWideBreakpoint] one list under a row of section chips, from it a
+         * section rail beside a column no wider than [settingsColumnMaxWidth].
+         */
+        val settingsMediumBreakpoint: Dp = 600.dp
+        val settingsWideBreakpoint: Dp = 840.dp
+        val settingsColumnMaxWidth: Dp = 640.dp
     }
 
     /**
