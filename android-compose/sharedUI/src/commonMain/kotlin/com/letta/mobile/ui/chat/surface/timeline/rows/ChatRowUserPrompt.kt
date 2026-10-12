@@ -34,35 +34,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import com.letta.mobile.data.chat.projection.BranchActionSupport
-import com.letta.mobile.data.chat.projection.MessageActionAvailability
-import com.letta.mobile.data.chat.projection.messageActionAvailability
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_collapse_prompt
-import com.letta.mobile.sharedui.resources.rows_copy
 import com.letta.mobile.sharedui.resources.rows_copy_message
-import com.letta.mobile.sharedui.resources.rows_edit_and_resend
 import com.letta.mobile.sharedui.resources.rows_expand_prompt
-import com.letta.mobile.sharedui.resources.rows_fork_from_here
 import com.letta.mobile.sharedui.resources.rows_message_actions
 import com.letta.mobile.sharedui.resources.rows_role_inter_agent
 import com.letta.mobile.sharedui.resources.rows_role_not_sent
 import com.letta.mobile.sharedui.resources.rows_role_you
-import com.letta.mobile.sharedui.resources.rows_send_again
+import com.letta.mobile.ui.chat.branch.MessageMenuPopup
+import com.letta.mobile.ui.chat.branch.asMessageMenuActions
+import com.letta.mobile.ui.chat.branch.onSecondaryClick
+import com.letta.mobile.ui.chat.branch.rememberMessageMenu
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightTarget
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.components.LettaMenuItem
-import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBubbleShapes
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowDimens
@@ -78,7 +70,6 @@ import org.jetbrains.compose.resources.stringResource
 private class PromptCardState {
     var expanded by mutableStateOf(false)
     var overflowed by mutableStateOf(false)
-    var menuOpen by mutableStateOf(false)
     val canToggle: Boolean get() = overflowed || expanded
 }
 
@@ -144,7 +135,7 @@ internal data class PromptGrouping(val leads: Boolean, val continues: Boolean) {
  * expandable to its metadata) the bubble's header line, inside it.
  *
  * Kept from the shared prompt card: a long prompt clamps to three lines with an expand chevron,
- * a long press opens the message actions (Copy, and Send again when the owner can rerun), a
+ * a long press (or a right-click) opens the message actions (edit, rerun, fork, copy), a
  * failed send reads "You · Not sent", and where a pointer can hover a copy action shows beside
  * the bubble.
  */
@@ -157,14 +148,9 @@ internal fun UserPromptRow(
 ) {
     val state = remember(message.id) { PromptCardState() }
     val capabilities = context.capabilities
-    val availability = remember(message, capabilities.rerun, capabilities.fork, capabilities.editAndResend) {
-        messageActionAvailability(
-            message,
-            message.content,
-            sendAgainAvailable = capabilities.rerun,
-            branching = BranchActionSupport(fork = capabilities.fork, edit = capabilities.editAndResend),
-        )
-    }
+    val menuActions = remember(callbacks.actions) { callbacks.actions.asMessageMenuActions() }
+    val menu = rememberMessageMenu(message, capabilities, menuActions)
+    val openMenu = menu.openMenu
     val hoverSource = remember(message.id) { MutableInteractionSource() }
     val hovered by hoverSource.collectIsHoveredAsState()
     val interAgent = message.agentMessageProvenance != null
@@ -201,12 +187,14 @@ internal fun UserPromptRow(
                             .then(rememberSendFlightTarget(message.sendFlightKey(), message.content))
                             .testTag(ChatRowTestTags.USER_PROMPT)
                             .clip(style.shape)
-                            .promptBubbleClicks(state, hasActions = availability.hasActions),
+                            .promptBubbleClicks(state, openMenu)
+                            // letta-mobile-7mys7: a pointer opens the same actions with a right-click.
+                            .onSecondaryClick(openMenu),
                     ) {
                         PromptBody(message, state, style, callbacks)
                         PromptExpandToggle(state)
                     }
-                    MessageActionsMenu(message, availability, state, callbacks)
+                    MessageMenuPopup(menu)
                 }
             }
         }
@@ -221,13 +209,13 @@ private fun UiMessage.sendFlightKey(): String {
 /** A tap toggles a clamped prompt; a long press opens the message actions when there are any. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Modifier.promptBubbleClicks(state: PromptCardState, hasActions: Boolean): Modifier {
+private fun Modifier.promptBubbleClicks(state: PromptCardState, openMenu: (() -> Unit)?): Modifier {
     val actionsLabel = stringResource(Res.string.rows_message_actions)
     val haptics = LocalHaptics.current
     return combinedClickable(
         onClickLabel = null,
         onLongClickLabel = actionsLabel,
-        onLongClick = if (hasActions) ({ haptics.play(LettaHapticCue.LongPress); state.menuOpen = true }) else null,
+        onLongClick = openMenu?.let { open -> { haptics.play(LettaHapticCue.LongPress); open() } },
         onClick = { if (state.canToggle) state.expanded = !state.expanded },
     )
 }
@@ -335,35 +323,4 @@ private fun PromptExpandToggle(state: PromptCardState) {
     ) {
         DisclosureChevron(expanded = state.expanded, contentDescription = description)
     }
-}
-
-@Composable
-private fun MessageActionsMenu(
-    message: UiMessage,
-    availability: MessageActionAvailability,
-    state: PromptCardState,
-    callbacks: ChatRowCallbacks,
-) {
-    if (!state.menuOpen) return
-    @Suppress("DEPRECATION")
-    val clipboard = LocalClipboardManager.current
-    val sendAgain = stringResource(Res.string.rows_send_again)
-    val edit = stringResource(Res.string.rows_edit_and_resend)
-    val fork = stringResource(Res.string.rows_fork_from_here)
-    val copy = stringResource(Res.string.rows_copy)
-    val items = buildList {
-        if (availability.canEdit) {
-            add(LettaMenuItem(label = edit, icon = LettaIcons.Edit) { callbacks.actions.editAndResend(message) })
-        }
-        if (availability.canSendAgain) {
-            add(LettaMenuItem(label = sendAgain, icon = LettaIcons.Send) { callbacks.actions.rerun(message) })
-        }
-        if (availability.canFork) {
-            add(LettaMenuItem(label = fork, icon = LettaIcons.ForkRight) { callbacks.actions.forkFromMessage(message) })
-        }
-        if (availability.canCopy) {
-            add(LettaMenuItem(label = copy, icon = LettaIcons.Copy) { clipboard.setText(AnnotatedString(message.content)) })
-        }
-    }
-    LettaPopupMenu(expanded = true, onDismiss = { state.menuOpen = false }, items = items)
 }

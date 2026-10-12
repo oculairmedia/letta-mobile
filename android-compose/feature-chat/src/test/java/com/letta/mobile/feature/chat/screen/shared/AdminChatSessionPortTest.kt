@@ -42,6 +42,16 @@ import org.junit.Test
 class AdminChatSessionPortTest {
 
     @Test
+    fun `fork, edit and rerun come and go together with the page's ability to branch`() {
+        val on = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = true)
+        val off = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = false)
+
+        assertTrue(on.fork && on.editAndResend && on.rerunInFork)
+        assertFalse(off.fork || off.editAndResend || off.rerunInFork)
+        assertTrue("send again stays: it is not a branch", off.rerun)
+    }
+
+    @Test
     fun `composer mirrors the view model draft and attachment limit`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         var viewModel: AdminChatViewModel? = null
@@ -159,6 +169,24 @@ class AdminChatSessionPortTest {
         verify(exactly = 1) { vm.selectSlashCommand(skill) }
         verify(exactly = 1) { vm.uninstallSlashCommand(skill) }
         verify(exactly = 1) { vm.selectSlashCommand(any()) }
+    }
+
+    @Test
+    fun `slash fork is offered where the page can fork and forks instead of sending`() {
+        // letta-mobile-7mys7: letta-code runs /fork in its terminal only, so the client runs it.
+        val state = ChatComposerState(inputText = "/fork Plan B")
+        val vm = mockViewModel(state)
+        every { vm.canBranchConversations } returns true
+        val actions = AdminChatActions(vm, onOpenBugReport = {}, onOpenConversation = { _, _ -> })
+
+        val commands = AdminChatComposerMapping.composerUiState(composerInputs(state).copy(canFork = true)).commands
+        assertEquals(ChatComposerCommand.Fork, commands.first())
+        assertFalse(AdminChatComposerMapping.composerUiState(composerInputs(state)).commands.contains(ChatComposerCommand.Fork))
+
+        actions.send()
+
+        verify(exactly = 1) { vm.forkConversation("Plan B", any()) }
+        verify(exactly = 0) { vm.submitComposer(any()) }
     }
 
     @Test

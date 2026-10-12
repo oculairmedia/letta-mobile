@@ -110,11 +110,19 @@ internal class RecordingChatActions(private val onText: (String) -> Unit = {}) :
     }
 
     val forks = mutableListOf<UiMessage>()
+    val forkNames = mutableListOf<String?>()
     val edits = mutableListOf<UiMessage>()
+    val forkReruns = mutableListOf<UiMessage>()
 
-    override fun forkFromMessage(message: UiMessage) {
+    override fun forkFromMessage(message: UiMessage, name: String?) {
         record("forkFromMessage")
         forks += message
+        forkNames += name
+    }
+
+    override fun rerunInFork(message: UiMessage) {
+        record("rerunInFork")
+        forkReruns += message
     }
 
     override fun editAndResend(message: UiMessage) {
