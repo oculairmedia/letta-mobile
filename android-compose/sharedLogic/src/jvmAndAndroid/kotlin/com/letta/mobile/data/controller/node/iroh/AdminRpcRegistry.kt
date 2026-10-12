@@ -135,6 +135,8 @@ object AdminRpcRegistry {
          * and which NodeId/dial address it names. Null = no QR minting.
          */
         pairingQr: PairingQrConfig? = null,
+        /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to viewers; null pushes nothing. */
+        permissionModes: PermissionModePublisher? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -172,7 +174,7 @@ object AdminRpcRegistry {
         )
         ApprovalAdminHandlers.register(router, controller)
         // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
-        PermissionModeAdminHandlers.register(router, controller)
+        PermissionModeAdminHandlers.register(router, controller, permissionModes)
         PairingAdminHandlers.register(router, pairingService, pairingQr)
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)

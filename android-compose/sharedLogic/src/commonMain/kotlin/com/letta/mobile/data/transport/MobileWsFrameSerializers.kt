@@ -62,6 +62,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "subagent_todos_response" -> ServerFrame.SubagentTodosResponse.serializer()
             "subagents_updated" -> ServerFrame.SubagentsUpdated.serializer()
             "pending_approvals" -> ServerFrame.PendingApprovalsUpdated.serializer()
+            "permission_mode" -> ServerFrame.PermissionModeUpdated.serializer()
             else -> UnknownFrameDeserializer
         }
     }

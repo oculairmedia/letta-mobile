@@ -174,6 +174,10 @@ class IrohAdminRpcChatGateway(
         approvalControls?.modes?.sync(runtime)
     }
 
+    /** letta-mobile-a4tm7: this chip governs the Iroh host's runtime, shared with its other clients. */
+    override val permissionModeRuntime: com.letta.mobile.data.runtime.PermissionModeRuntime
+        get() = com.letta.mobile.data.runtime.PermissionModeRuntime.Host(transport.hostNodeId)
+
     override fun close() {
         approvalOutbox?.close()
         approvalControls?.close()
