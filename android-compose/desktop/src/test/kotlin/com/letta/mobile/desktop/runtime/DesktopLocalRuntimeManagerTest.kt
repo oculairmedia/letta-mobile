@@ -78,6 +78,54 @@ class DesktopLocalRuntimeManagerTest {
     }
 
     @Test
+    fun `every spawned child is recorded and forgotten when it ends`() {
+        val root = createTempDirectory("desktop-runtime-spawn-log").toFile()
+        val events = mutableListOf<String>()
+        val exits = mutableListOf<(Int?) -> Unit>()
+        val process = object : DesktopRuntimeProcess {
+            var alive = true
+            override val stdout = BufferedReader(StringReader("Listening on ws://127.0.0.1:43200\n"))
+            override val stderr = BufferedReader(StringReader(""))
+            override val descendants: List<DesktopRuntimeProcessHandle> = emptyList()
+            override val isAlive: Boolean get() = alive
+            override val exitCodeOrNull: Int? get() = null
+            override val pid: Long = 777
+            override fun destroy() {
+                alive = false
+                exits.forEach { it(1) }
+            }
+            override fun destroyForcibly() = destroy()
+            override fun waitFor(timeoutMs: Long): Boolean = !alive
+            override fun onExit(callback: (exitCode: Int?) -> Unit) { exits += callback }
+        }
+        try {
+            val manager = DesktopLocalRuntimeManager(
+                installationProvider = {
+                    DesktopLettaCodeInstallation(
+                        File(root, "node.exe").apply { createNewFile() },
+                        File(root, "letta.js").apply { createNewFile() },
+                    )
+                },
+                backendDirectory = { File(root, "backend") },
+                processLauncher = DesktopRuntimeProcessLauncher { process },
+                logLine = {},
+                readyTimeoutMs = 1_000,
+                stopTimeoutMs = 1,
+                spawnLog = object : DesktopRuntimeSpawnLog {
+                    override fun onSpawned(childPid: Long) { events += "spawned $childPid" }
+                    override fun onEnded(childPid: Long) { events += "ended $childPid" }
+                },
+            )
+            manager.ensureStarted()
+            manager.close()
+
+            assertEquals(listOf("spawned 777", "ended 777"), events)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `listen parser rejects non-loopback and malformed announcements`() {
         assertEquals("ws://127.0.0.1:4500", parseDesktopRuntimeListenUrl("Listening on ws://127.0.0.1:4500"))
         assertEquals("ws://localhost:4501", parseDesktopRuntimeListenUrl("Listening on ws://localhost:4501"))

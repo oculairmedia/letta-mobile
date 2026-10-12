@@ -65,6 +65,8 @@ class NativeAdminHandlersTest {
         // (and, like it, has no offset concept).
         val agentRosterSize: Int = 1,
         var updateSucceeds: Boolean = true,
+        // letta-mobile-fxoew.9: owning agent per listed conversation id.
+        val conversationAgentIds: Map<String, String> = emptyMap(),
     ) : AppServerClient {
         var lastAgentListQuery: kotlinx.serialization.json.JsonObject? = null
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
@@ -153,8 +155,14 @@ class NativeAdminHandlersTest {
                 requestId = command.requestId,
                 success = true,
                 conversations = buildJsonArray {
-                    add(buildJsonObject { put("id", "conv-1") })
-                    extraConversationIds.forEach { convId -> add(buildJsonObject { put("id", convId) }) }
+                    (listOf("conv-1") + extraConversationIds).forEach { convId ->
+                        add(
+                            buildJsonObject {
+                                put("id", convId)
+                                conversationAgentIds[convId]?.let { put("agent_id", it) }
+                            },
+                        )
+                    }
                 },
             ),
         )
@@ -506,6 +514,34 @@ class NativeAdminHandlersTest {
             ),
         )
         assertTrue(response.contains("conv-1") && response.contains("conv-2"), "manage/admin peer sees the full list: $response")
+    }
+
+    /** letta-mobile-fxoew.9: the chat list drops conversations owned by hidden (subagent) agents. */
+    @Test
+    fun agentWideConversationListDropsHiddenAgentConversations() = runTest {
+        val client = FakeNativeClient(
+            extraConversationIds = listOf("conv-subagent"),
+            conversationAgentIds = mapOf("conv-1" to "agent-1", "conv-subagent" to "agent-local-sub"),
+        )
+        val store = object : LocalBackendAdminStore(kotlin.io.path.createTempDirectory("fxoew9").toFile()) {
+            override fun hiddenAgentIds(): Set<String> = setOf("agent-local-sub")
+        }
+        val r = AdminRpcRouter()
+        ConversationAdminHandlers.register(r, tiers = NativeReadTiers(nativeClient = client, localBackendStore = store))
+
+        val chatList = dispatch(r, "conversation.list", emptyMap())
+        assertTrue(chatList.contains("conv-1"), chatList)
+        assertFalse(chatList.contains("conv-subagent"), "hidden agent's conversation leaked: $chatList")
+
+        val explicit = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "explicit-agent",
+                method = "conversation.list",
+                params = buildJsonObject { put("agent_id", "agent-local-sub") },
+                context = AdminRpcRequestContext(authenticated = true, authorizedConversationIds = null),
+            ),
+        )
+        assertTrue(explicit.contains("conv-subagent"), "an explicit agent list is served as is: $explicit")
     }
 
     @Test

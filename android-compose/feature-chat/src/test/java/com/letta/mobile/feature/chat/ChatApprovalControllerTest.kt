@@ -7,6 +7,7 @@ import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatApprovalResult
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.collections.immutable.persistentListOf
@@ -50,7 +51,7 @@ class ChatApprovalControllerTest {
     @Test
     fun `successful submit keeps the card in flight until the timeline decides it`() =
         runTest(UnconfinedTestDispatcher()) {
-            coEvery { coordinator.submitApproval(any(), any(), any(), any(), any(), any()) } returns
+            coEvery { coordinator.submitApproval(any(), any(), any<ChatApprovalAnswer>()) } returns
                 ChatApprovalResult.Submitted
             val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(pendingMessage("req-1"))))
             val controller = controller(uiState)
@@ -69,7 +70,7 @@ class ChatApprovalControllerTest {
 
     @Test
     fun `failed submit makes the card actionable again at once`() = runTest(UnconfinedTestDispatcher()) {
-        coEvery { coordinator.submitApproval(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { coordinator.submitApproval(any(), any(), any<ChatApprovalAnswer>()) } returns
             ChatApprovalResult.Failed("boom")
         val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf(pendingMessage("req-1"))))
         val controller = controller(uiState)

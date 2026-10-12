@@ -3,8 +3,9 @@ package com.letta.mobile.web.chat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.web.data.AgentItemState
-import com.letta.mobile.web.data.WebConnectionState
+import com.letta.mobile.web.data.displayMessage
 import kotlinx.coroutines.CancellationException
 
 /** Where the selected agent's conversation is on its way to the page. */
@@ -33,10 +34,10 @@ fun interface WebChatOpener {
 internal fun rememberWebChatLoad(
     opener: WebChatOpener,
     agent: AgentItemState?,
-    connection: WebConnectionState,
+    connection: BackendConnectionStatus,
 ): WebChatLoad {
     val load by produceState<WebChatLoad>(WebChatLoad.Idle, opener, agent?.id, connection) {
-        if (agent == null || connection !is WebConnectionState.Connected) {
+        if (agent == null || connection !is BackendConnectionStatus.Connected) {
             value = WebChatLoad.Idle
             return@produceState
         }
@@ -48,7 +49,7 @@ internal fun rememberWebChatLoad(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            value = WebChatLoad.Failed(failure.message ?: "Could not open the conversation")
+            value = WebChatLoad.Failed(failure.displayMessage("Could not open the conversation"))
             return@produceState
         }
         value = WebChatLoad.Ready(port)

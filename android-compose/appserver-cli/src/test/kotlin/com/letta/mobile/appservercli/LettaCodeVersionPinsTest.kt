@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 /**
  * letta-mobile-bzvro.10 (F10) / letta-mobile-340tc: the letta-code pins are stated in several
  * places that must agree. The desktop bundled runtime (`desktopLettaCodeVersion`, the runtime
- * package, its lock file and manifest) and the wire contract baseline move together (0.33.6). The
+ * package, its lock file and manifest) and the wire contract baseline move together (0.34.8). The
  * restart-replay evidence is a separate pin that is allowed to lag: it can only be re-captured
  * against a live server, so it is held at the version it was observed on and the README table
  * says so. The Android embedded runtime is a documented ceiling (0.26.1) and is checked against

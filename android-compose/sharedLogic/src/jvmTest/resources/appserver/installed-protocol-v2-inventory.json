@@ -1,12 +1,12 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.33.6",
+    "version": "0.34.8",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "b9147297cba4b64a7f2db68c3df2e2dd54e427eb2c8b915178e2f60a1392d506",
-    "protocol_corpus_sha256": "0768e96d46a567794d66aa425764ab04a0a79aef7c8a48dc20faf6e5fcfb9804",
+    "protocol_sha256": "87e0cf05f1f4e726f880dcd42c3f165c56f64d846c8375a8cb386dc3f763110e",
+    "protocol_corpus_sha256": "f1be347e560f37d9899c5ae2c9d2de7b347f7eae71c9495e8ace5191bdbec344",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -15,6 +15,7 @@
       "dist/types/types/approval-classification-protocol.d.ts",
       "dist/types/types/background-process-protocol.d.ts",
       "dist/types/types/chatgpt-oauth.d.ts",
+      "dist/types/types/client-preferences.d.ts",
       "dist/types/types/conversation-fork-protocol.d.ts",
       "dist/types/types/cwd-protocol.d.ts",
       "dist/types/types/external-tool-protocol.d.ts",
@@ -28,13 +29,15 @@
       "dist/types/types/subagent-protocol.d.ts",
       "dist/types/types/task-control-protocol.d.ts",
       "dist/types/types/teleport-protocol.d.ts",
-      "dist/types/types/toolset-protocol.d.ts"
+      "dist/types/types/toolset-protocol.d.ts",
+      "dist/types/types/turn-finished-protocol.d.ts"
     ],
     "source_map_origin": "src/types/protocol_v2.ts",
     "observation": "installed_package_declaration_unions",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "commands": [
+    "turn_finished_ack",
     "input",
     "change_device_state",
     "abort_message",
@@ -267,7 +270,8 @@
         "resume_queue",
         "teleport_request",
         "teleport_probe",
-        "teleport_failed"
+        "teleport_failed",
+        "turn_finished_ack"
       ],
       "messages": [
         "runtime_start_response",

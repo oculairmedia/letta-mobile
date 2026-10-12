@@ -263,6 +263,9 @@ class ShimOffParityGateTest {
 
         var submittedApprovalRequestId: String? = null
 
+        // letta-mobile-bzvro.40: permission_mode.set confirms through the live controller.
+        override suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean = true
+
         override suspend fun startRuntime(
             agentId: AgentId,
             conversationId: ConversationId,
@@ -375,6 +378,8 @@ class ShimOffParityGateTest {
         put("exposed", false)
         // letta-mobile-joigh: conversation.context_limit.
         put("tokens", 200_000)
+        // letta-mobile-bzvro.40: permission_mode.set (conversation.compact reads `mode` as its own field).
+        if (method == "permission_mode.set") put("mode", "standard")
         if (method == "schedule.create") {
             put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
             put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))

@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -187,6 +190,9 @@ fun SubagentTodoSheet(
     // action in the header that jumps to the subagent's transcript. Null hides
     // the affordance (no correlated agent id).
     onViewConversation: (() -> Unit)? = null,
+    // letta-mobile-ulcg6 (PR4): every subagent of this conversation, below this
+    // one's todos - the phone's view of the shared roster the desktop pane shows.
+    roster: (@Composable () -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val reducedMotion = rememberReducedMotionEnabled()
@@ -245,9 +251,21 @@ fun SubagentTodoSheet(
                     is SubagentTodoSheetState.Content -> SubagentTodoContent(current)
                 }
             }
+            roster?.let { section ->
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = LettaDimens.Pane.editorMinHeight * ROSTER_MAX_HEIGHT_SCALE)
+                        .verticalScroll(rememberScrollState()),
+                ) { section() }
+            }
         }
     }
 }
+
+/** The roster scrolls inside the sheet past this many editor-heights, so the todos stay in view. */
+private const val ROSTER_MAX_HEIGHT_SCALE = 2
 
 /**
  * letta-mobile-vo9y1: header action that jumps from the todo sheet to the

@@ -29,6 +29,32 @@ data class AppServerBackgroundProcess(
     val description: String? = null,
     val startedAt: String? = null,
     val ageSeconds: Long? = null,
+    /** letta-code 0.34+: worker counts of a `workflow` process; null for other kinds and older servers. */
+    val progress: AppServerWorkflowProgress? = null,
+)
+
+/**
+ * letta-code 0.34+ `WorkflowProgressSummary` (`background-process-protocol.ts`). [agentsTotal]
+ * counts workers scheduled so far, not a planned total; [phases] may run concurrently.
+ */
+data class AppServerWorkflowProgress(
+    val counts: AppServerWorkflowProgressCounts,
+    val phases: List<AppServerWorkflowPhase> = emptyList(),
+)
+
+/** `WorkflowProgressCounts`; a missing or malformed counter reads as 0. */
+data class AppServerWorkflowProgressCounts(
+    val agentsTotal: Long = 0,
+    val agentsDone: Long = 0,
+    val agentsFailed: Long = 0,
+    val agentsRunning: Long = 0,
+    val totalTokens: Long = 0,
+)
+
+/** One pipeline phase of a workflow, with its own counters. */
+data class AppServerWorkflowPhase(
+    val title: String,
+    val counts: AppServerWorkflowProgressCounts,
 )
 
 /** An experiment flag reported by the App Server (letta-mobile-bzvro.19). */
@@ -64,7 +90,7 @@ data class AppServerDeviceStatusSnapshot(
     val cwdRevision: Long? = null,
     /** Git branch and recent branches for the current working directory. */
     val gitContext: AppServerGitContext? = null,
-    /** Server version string (e.g. "0.33.6"). */
+    /** Server version string (e.g. "0.34.8"). */
     val lettaCodeVersion: String? = null,
     /** Slash commands supported by the device. */
     val supportedCommands: List<String> = emptyList(),
@@ -142,8 +168,28 @@ private fun JsonObject.toBackgroundProcess(): AppServerBackgroundProcess? {
         description = firstString("description"),
         startedAt = firstString("started_at", "startedAt"),
         ageSeconds = firstLong("age_seconds", "ageSeconds", "age"),
+        progress = (this["progress"] as? JsonObject)?.toWorkflowProgress(),
     )
 }
+
+private fun JsonObject.toWorkflowProgress(): AppServerWorkflowProgress =
+    AppServerWorkflowProgress(
+        counts = toWorkflowCounts(),
+        phases = firstArray("phases")?.mapNotNull { phase ->
+            val phaseObject = phase as? JsonObject ?: return@mapNotNull null
+            val title = phaseObject.firstString("title") ?: return@mapNotNull null
+            AppServerWorkflowPhase(title = title, counts = phaseObject.toWorkflowCounts())
+        } ?: emptyList(),
+    )
+
+private fun JsonObject.toWorkflowCounts(): AppServerWorkflowProgressCounts =
+    AppServerWorkflowProgressCounts(
+        agentsTotal = firstLong("agents_total") ?: 0,
+        agentsDone = firstLong("agents_done") ?: 0,
+        agentsFailed = firstLong("agents_failed") ?: 0,
+        agentsRunning = firstLong("agents_running") ?: 0,
+        totalTokens = firstLong("total_tokens") ?: 0,
+    )
 
 private fun JsonObject.toPendingControlRequest(): AppServerPendingControlRequest? {
     val requestId = firstString("request_id", "requestId") ?: return null

@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -37,6 +40,32 @@ internal class DesktopConversationManagement(
     private val prefs: DesktopConversationPrefs,
 ) {
     private val brancher = DesktopConversationBrancher(scope, host)
+
+    /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
+    val marks = DesktopConversationMarks(prefs)
+
+    /**
+     * letta-mobile-zxk2n.5: `/recompile` for the open conversation, and where it stands. The local
+     * App Server and REST backends recompile; over Iroh the host has no relay yet, which is the
+     * only desktop backend without a route.
+     */
+    val recompile = ConversationRecompileController(
+        scope = scope,
+        gateway = { host.gateway as? ConversationRecompileGateway },
+        unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
+    )
+
+    /** Recompiles the open conversation's system prompt; with nothing open, nothing happens. */
+    fun recompileOpenConversation() {
+        if (host.isClosed) return
+        val origin = host.origin() ?: return
+        recompile.recompile(ConversationRecompileRequest(origin.conversationId, origin.agentId.orEmpty()))
+    }
+
+    /** Shows [message] as the chat's error, for shell actions that fail outside the chat (a transcript save). */
+    fun reportError(message: String) {
+        if (!host.isClosed) host.showError(message)
+    }
 
     /** The pinned conversation ids; the sidebar lists them first. */
     val pinnedConversationIds: StateFlow<Set<String>> =

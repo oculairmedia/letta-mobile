@@ -170,6 +170,23 @@ open class CachedMessageRepository(
         )
     }
 
+    override suspend fun submitApproval(answer: com.letta.mobile.data.repository.api.MessageApprovalAnswer) {
+        MessageRepositoryApproval.submitApproval(
+            ApprovalSubmitParams(
+                remote = remote,
+                irohApprovalSource = irohApprovalSource,
+                json = json,
+                agentId = answer.agentId,
+                approvalRequestId = answer.approvalRequestId,
+                toolCallIds = answer.toolCallIds,
+                approve = answer.approve,
+                reason = answer.reason,
+                conversationId = answer.conversationId,
+                selectedSuggestionIds = answer.selectedSuggestionIds,
+            ),
+        )
+    }
+
     override suspend fun resetMessages(agentId: AgentId) {
         remote.resetMessages(agentId)
     }

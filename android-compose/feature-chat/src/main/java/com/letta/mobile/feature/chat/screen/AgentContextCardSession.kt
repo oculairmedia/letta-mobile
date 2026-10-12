@@ -21,6 +21,7 @@ import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
 import com.letta.mobile.ui.context.AgentContextPresentation
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,8 +69,9 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
         val fallback = ModelPickerSource.of(viewModel.llmModels) { viewModel.refreshModels() }
         viewModel.modelPickerSource()?.let { ModelPickerSource.withFallback(it, fallback) } ?: fallback
     }
-    val deps = remember(session, pickerSource) {
-        AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource, session.contextLimit)
+    val attentionPrefs = LocalAttentionPrefs.current
+    val deps = remember(session, pickerSource, attentionPrefs) {
+        AgentContextCardDeps(session.readings, session.breakdown, session.compaction, pickerSource, session.contextLimit, attentionPrefs)
     }
     val binding = remember(deps, viewModel) {
         AgentContextCardBinding(

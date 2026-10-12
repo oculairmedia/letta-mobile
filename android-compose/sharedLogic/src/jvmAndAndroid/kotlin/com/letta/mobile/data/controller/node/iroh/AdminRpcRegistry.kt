@@ -167,6 +167,8 @@ object AdminRpcRegistry {
             skillsListing = skillsListing,
         )
         ApprovalAdminHandlers.register(router, controller)
+        // letta-mobile-bzvro.40: the conversation's permission mode for Iroh clients.
+        PermissionModeAdminHandlers.register(router, controller)
         PairingAdminHandlers.register(router, pairingService, pairingQr)
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)

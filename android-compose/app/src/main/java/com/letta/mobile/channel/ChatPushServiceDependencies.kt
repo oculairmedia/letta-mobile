@@ -22,4 +22,6 @@ class ChatPushServiceDependencies @Inject constructor(
     val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
     val channelNotificationPublisher: ChannelNotificationPublisher,
     val currentConversationTracker: CurrentConversationTracker,
+    /** letta-mobile-bzvro.27: approval notifications, watched for as long as the service lives. */
+    val approvalAttention: AndroidApprovalAttention,
 )

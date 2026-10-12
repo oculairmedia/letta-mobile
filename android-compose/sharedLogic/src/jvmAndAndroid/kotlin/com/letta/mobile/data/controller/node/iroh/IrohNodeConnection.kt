@@ -724,7 +724,9 @@ class IrohNodeConnection(
                     agentId = AgentId(agentId),
                     conversationId = ConversationId(conversationId),
                     cwd = cwd,
-                    mode = mode ?: AppServerPermissionMode.Unrestricted,
+                    // letta-mobile-bzvro.40: no mode keeps the one the runtime already has (or the host
+                    // default); a mode a client chose with permission_mode.set is never loosened here.
+                    mode = mode,
                     recoverApprovals = false,
                     forceDeviceStatus = false,
                 )

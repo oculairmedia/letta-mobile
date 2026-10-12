@@ -7,6 +7,8 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
+import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -39,6 +41,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -89,6 +92,12 @@ internal class DesktopChatSessionPort(
     ) { runs, selected -> selected?.let(runs::get)?.live ?: RuntimeLiveStatus.Idle }
         .distinctUntilChanged()
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RuntimeLiveStatus.Idle)
+
+    /** letta-mobile-zxk2n.5: what the Chat options show and hide, for the page's appearance. */
+    val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationManagement.marks.displayOptions
+
+    /** letta-mobile-zxk2n.5: `/recompile`'s status, from the controller. */
+    override val recompileStatus: StateFlow<RecompileStatus> = controller.conversationManagement.recompile.status
 
     override val actions: ChatActions = DesktopChatActions(
         controller = controller,
@@ -213,11 +222,14 @@ internal class DesktopChatSessionPort(
             .distinctUntilChanged()
             .flatMapLatest { (target, gateway) ->
                 val agentId = target?.first
-                val modes = (gateway as? DesktopPermissionModeController)?.permissionModes
+                val controller = gateway as? DesktopPermissionModeController
+                val modes = controller?.permissionModes
                 if (agentId == null || modes == null) {
                     flowOf(null)
                 } else {
-                    modes.observe(AppServerRuntimeScope(agentId, target.second)).map { it.toUiState() }
+                    val runtime = AppServerRuntimeScope(agentId, target.second)
+                    // letta-mobile-bzvro.40: a relaying host's mode is read (or this client's choice re-sent) on open.
+                    modes.observe(runtime).map { it.toUiState() }.onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
                 }
             }
 
@@ -305,6 +317,8 @@ internal class DesktopChatActions(
     }
 
     override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
+
+    override fun dismissRecompileStatus() = controller.conversationManagement.recompile.dismiss()
 
     override fun stopRun() {
         selectedConversationId?.let(controller::stopActiveRun)

@@ -112,6 +112,7 @@ internal object ChatRowTestTags {
     const val APPROVAL_REJECT_CONFIRM = "chat-approval-reject-confirm"
     const val APPROVAL_TOOL_CALL = "chat-approval-tool-call"
     const val APPROVAL_REQUESTING_INPUT = "chat-approval-requesting-input"
+    const val APPROVAL_SLOT = "chat-approval-slot"
     const val APPROVAL_BLOCKED_PATH = "chat-approval-blocked-path"
     const val APPROVAL_DIFF = "chat-approval-diff"
     const val APPROVAL_DIFF_SHOW_ALL = "chat-approval-diff-show-all"

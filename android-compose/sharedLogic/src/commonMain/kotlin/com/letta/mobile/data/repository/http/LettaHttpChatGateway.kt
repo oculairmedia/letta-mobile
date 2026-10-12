@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository.http
 
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -49,6 +51,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Platform-neutral Ktor implementation of the chat [ChatGateway] (conversations,
@@ -63,7 +66,12 @@ import kotlinx.serialization.json.jsonPrimitive
 open class LettaHttpChatGateway(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ConversationForkGateway, AutoCloseable {
+) : ChatGateway,
+    ChatGatewayExtras,
+    ConversationSummaryGateway,
+    ConversationForkGateway,
+    ConversationRecompileGateway,
+    AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     private data class MessageListQuery(
@@ -275,6 +283,17 @@ open class LettaHttpChatGateway(
         val forkedId = response.body<JsonObject>()["id"]?.jsonPrimitive?.contentOrNull
             ?: throw TimelineTransportHttpException(response.status.value, "fork returned no conversation id")
         return getConversation(forkedId)
+    }
+
+    /** letta-mobile-zxk2n.5: `POST /v1/conversations/{id}/recompile` (saved, not a dry run). */
+    override suspend fun recompileConversation(request: ConversationRecompileRequest) {
+        val response = httpClient.post("$baseUrl/v1/conversations/${request.conversationId}/recompile") {
+            applyAuth()
+            contentType(ContentType.Application.Json)
+            parameter("dry_run", false)
+            setBody(buildJsonObject { request.agentId.takeIf(String::isNotBlank)?.let { put("agent_id", it) } })
+        }
+        response.requireSuccess()
     }
 
     override fun close() {

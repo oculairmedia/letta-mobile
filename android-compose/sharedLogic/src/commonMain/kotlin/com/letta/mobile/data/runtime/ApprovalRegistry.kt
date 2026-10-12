@@ -54,6 +54,7 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
      */
     private val parked = PendingApprovalDetailsStore()
     val parkedDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = parked.pending
+    val parkedByRuntime: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>> get() = parked.byRuntime
 
     fun park(key: TurnRuntimeKey, request: ToolApprovalRequest) = parked.record(key, PendingApprovalDetails.of(request))
 

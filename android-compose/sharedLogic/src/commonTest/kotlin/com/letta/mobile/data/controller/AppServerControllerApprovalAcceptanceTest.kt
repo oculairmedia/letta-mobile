@@ -3,6 +3,12 @@ package com.letta.mobile.data.controller
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.APPROVAL_NOT_PENDING_ERROR
 import com.letta.mobile.data.runtime.InputAckFixture
+import com.letta.mobile.data.runtime.TEST_APPROVAL_REQUEST_ID
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.letta.mobile.data.runtime.TurnEngineTestAckingClient
 import com.letta.mobile.data.runtime.TurnEngineTestFrames
 import com.letta.mobile.data.runtime.approvalCards
@@ -20,6 +26,7 @@ import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -98,6 +105,66 @@ class AppServerControllerApprovalAcceptanceTest {
 
         assertEquals(2, client.approvalInputs().size)
     }
+
+    /** letta-mobile-bzvro.40: an Iroh client's always-allow is sent only for the request that offered it. */
+    @Test
+    fun alwaysAllowCarriesTheRuleForTheParkedRequestThatOfferedIt() = withController { client, controller ->
+        val turn = launch { controller.runTurn(command).collect {} }
+        runCurrent()
+        client.emit(frames.approvalControlRequest().offering("rule-1"))
+        runCurrent()
+
+        val result = controller.submitApproval(alwaysAllow(approvalRequestId = TEST_APPROVAL_REQUEST_ID, rule = "rule-1"))
+
+        assertEquals(ApprovalSubmitResult.Accepted, result)
+        val decision = assertIs<AppServerApprovalResponseDecision.Allow>(client.approvalInputs().single().approvalDecision())
+        assertEquals(listOf("rule-1"), decision.selectedPermissionSuggestionIds)
+        turn.cancel()
+    }
+
+    @Test
+    fun aRuleTheParkedRequestDoesNotOfferIsRefusedAndNothingIsSent() = withController { client, controller ->
+        val turn = launch { controller.runTurn(command).collect {} }
+        runCurrent()
+        client.emit(frames.approvalControlRequest().offering("rule-1"))
+        runCurrent()
+
+        val wrongRule = controller.submitApproval(alwaysAllow(approvalRequestId = TEST_APPROVAL_REQUEST_ID, rule = "rule-2"))
+        val wrongRequest = controller.submitApproval(alwaysAllow(approvalRequestId = "another-request", rule = "rule-1"))
+
+        assertIs<ApprovalSubmitResult.Rejected>(wrongRule)
+        assertIs<ApprovalSubmitResult.Rejected>(wrongRequest)
+        assertEquals(emptyList(), client.approvalInputs())
+        turn.cancel()
+    }
+
+    /** letta-mobile-bzvro.40: a client's later `runtime_start` naming its own default never loosens a chosen mode. */
+    @Test
+    fun aChosenModeIsPinnedAgainstALooserStart() = withController { _, controller ->
+        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+
+        assertTrue(controller.changePermissionMode(runtime, AppServerPermissionMode.Strict))
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"), mode = AppServerPermissionMode.Unrestricted)
+
+        assertEquals(AppServerPermissionMode.Strict, controller.permissionModeOf(runtime))
+    }
+
+    private fun AppServerInboundFrame.ControlRequest.offering(vararg rules: String) = copy(
+        request = JsonObject(
+            request + ("permission_suggestions" to buildJsonArray {
+                rules.forEach { rule -> add(buildJsonObject { put("id", rule); put("text", "Allow $rule") }) }
+            }),
+        ),
+    )
+
+    private fun alwaysAllow(approvalRequestId: String, rule: String) = ControllerApprovalAnswer(
+        agentId = AgentId("agent-1"),
+        conversationId = ConversationId("conv-1"),
+        approvalRequestId = approvalRequestId,
+        approve = true,
+        toolCallId = "tool-call-1",
+        selectedSuggestionIds = listOf(rule),
+    )
 
     private fun withController(
         configure: TurnEngineTestAckingClient.() -> Unit = {},

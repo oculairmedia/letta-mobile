@@ -527,6 +527,8 @@
     <string name="screen_chat_tool_approval_chip_requesting_input">requesting input</string>
     <string name="channel_notifications_name">Agent updates</string>
     <string name="channel_notifications_description">Background delivery for new Letta messages</string>
+    <string name="approval_notifications_channel_name">Approval requests</string>
+    <string name="approval_notifications_channel_description">An agent is paused until you allow or deny a tool call</string>
     <string name="channel_notifications_fallback_title">Letta update</string>
     <string name="channel_notifications_fallback_text">Open the conversation to see the latest update.</string>
     <string name="push_service_channel_name">Live chat sync</string>

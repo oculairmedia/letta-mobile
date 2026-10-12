@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.FakeConversationRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.testutil.MainDispatcherRule
 import com.letta.mobile.ui.shell.ShellNavDrawerInput
 import com.letta.mobile.ui.shell.ShellNavDrawerMapping
@@ -58,7 +59,7 @@ class SharedNavDrawerBindingTest {
 
     private val now = Instant.parse("2026-10-17T12:00:00Z")
 
-    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, allConversations)
+    private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore())
 
     @Test
     fun followsTheSettingsFlag() = runTest(mainDispatcherRule.dispatcher) {
@@ -107,7 +108,7 @@ class SharedNavDrawerBindingTest {
                 Conversation(id = ConversationId("c2"), agentId = agent, summary = "Keep"),
             ),
         )
-        val vm = SharedNavDrawerViewModel(settings, canvasStore, allConversations)
+        val vm = SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore())
         vm.renameConversation(fake, ConversationId("c1"), agent, ConversationSummary("  Plan B  "))
         vm.renameConversation(fake, ConversationId("c2"), agent, ConversationSummary("   "))
         advanceUntilIdle()

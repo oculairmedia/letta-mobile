@@ -60,6 +60,8 @@ internal fun ChatMessageRow(
     callbacks: ChatRowCallbacks,
     position: GroupPosition = GroupPosition.None,
 ) {
+    // letta-mobile-zxk2n.5: a row the chat options hide (a paged row the list cannot drop) draws nothing.
+    if (context.displayOptions.hides(message)) return
     when {
         message.isCompaction -> CompactionDividerRow(message.content)
         isUserRole(message.role) && message.subagentNotification == null ->
@@ -97,7 +99,7 @@ private fun AssistantMessageColumn(
         }
         message.generatedUi?.let { GeneratedUiCard(it, context, callbacks) }
         if (message.artifacts.isNotEmpty()) CanvasArtifactCards(message.artifacts, callbacks)
-        message.approvalRequest?.let { ApprovalRequestCard(it, context, callbacks) }
+        ApprovalRequestSlot(message.approvalRequest, context, callbacks)
         message.approvalResponse?.let { ApprovalResponseCard(it) }
     }
 }
