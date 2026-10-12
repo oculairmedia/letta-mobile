@@ -166,14 +166,14 @@ class ShimOffParityGateTest {
             AppServerInboundFrame.GetReflectionSettingsResponse(
                 command.requestId,
                 true,
-                buildJsonObject { put("trigger", "manual") },
+                buildJsonObject { put("trigger", "step-count") },
             )
 
         override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) =
             AppServerInboundFrame.SetReflectionSettingsResponse(
                 command.requestId,
                 true,
-                buildJsonObject { put("trigger", "manual") },
+                buildJsonObject { put("trigger", "step-count") },
             )
 
         override suspend fun listModels(command: AppServerCommand.ListModels) =
@@ -355,7 +355,7 @@ class ShimOffParityGateTest {
         // pairing rows address a peer by node id; reflection.set carries settings
         put("node_id", PEER_NODE_ID)
         put("capabilities", "chat.read")
-        put("trigger", "manual")
+        put("trigger", "step-count")
         put("step_count", "5")
         // lgns8.9 addressable rows: a schedule (cron task), a catalog tool, and
         // the ids the fixture store holds for the local_backend_store bucket.
