@@ -7,10 +7,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.compaction.AdminRpcCompactionRepository
 import com.letta.mobile.data.compaction.CompactionController
 import com.letta.mobile.data.context.ContextBreakdownLoader
-import com.letta.mobile.data.context.contextWindowTokensOf
+import com.letta.mobile.data.context.ConversationModelView
 import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
 import com.letta.mobile.data.context.limit.ContextLimitController
-import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.session.SessionGraph
@@ -83,17 +82,18 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
             presentation = AgentContextPresentation.Sheet,
         )
     }
-    val current = state.availableModels.firstOrNull { it.handle == state.activeAgentModel || it.id == state.activeAgentModel }
+    // letta-mobile-dxz5s: the same resolution desktop uses — the conversation's own model and window first.
+    val view = ConversationModelView.of(selections, state.conversationId, agent, state.availableModels)
     AgentContextCardHost(
         binding = binding,
         focus = AgentContextFocus(
             agentId = state.agentIdValue,
             conversationId = state.conversationId,
-            modelLabel = current?.displayName ?: state.activeAgentModel,
-            modelValue = state.activeAgentModel,
-            effort = current?.reasoningEffort,
-            windowTokens = contextWindowTokensOf(agent, state.availableModels, state.conversationId?.let(selections::get)),
-            modelWindowTokens = modelCatalogWindowOf(state.availableModels, state.activeAgentModel),
+            modelLabel = view.label,
+            modelValue = view.model,
+            effort = view.effort,
+            windowTokens = view.windowTokens,
+            modelWindowTokens = view.modelWindowTokens,
             turnRunning = state.uiState.isStreaming || state.uiState.isAgentTyping,
             picksTargetConversation = viewModel.modelPicksTargetConversation(),
         ),

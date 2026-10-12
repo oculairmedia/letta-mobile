@@ -6,11 +6,14 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 
 /**
  * letta-mobile-r2zo8: the focused conversation's context window, from data a client already
  * holds — no extra call:
  *
+ *  0. the conversation's own window as the host records it ([conversationWindow], letta-mobile-dxz5s:
+ *     `context_window_limit` on the conversation record), which describes the model it runs;
  *  1. a per-conversation model switch ([modelOverride]) uses that model's catalog window,
  *     since the agent's own limit describes a different model;
  *  2. otherwise the agent's `context_window_limit`, then its `llm_config.context_window`;
@@ -23,7 +26,9 @@ fun contextWindowTokensOf(
     agent: Agent?,
     models: List<LlmModel>,
     modelOverride: String? = null,
+    conversationWindow: Int? = null,
 ): Int? {
+    conversationWindow.positive()?.let { return it }
     val override = modelOverride?.takeIf { it.isNotBlank() }
     if (override != null) return modelCatalogWindowOf(models, override)
     if (agent == null) return null
@@ -31,6 +36,18 @@ fun contextWindowTokensOf(
         ?: agent.llmConfig?.contextWindow.positive()
         ?: modelCatalogWindowOf(models, agent.model)
 }
+
+/**
+ * letta-mobile-dxz5s: the one resolution Android and desktop share for [conversationId]'s window:
+ * the conversation's own host window, else its model's catalog window, else the agent's.
+ */
+fun ConversationModelChoices.windowTokensFor(conversationId: String?, agent: Agent?, models: List<LlmModel>): Int? =
+    contextWindowTokensOf(
+        agent = agent,
+        models = models,
+        modelOverride = conversationId?.let(::get),
+        conversationWindow = conversationId?.let(::windowOf),
+    )
 
 /**
  * letta-mobile-joigh: the catalog window of model [value] (a picker token, handle, id or alias):

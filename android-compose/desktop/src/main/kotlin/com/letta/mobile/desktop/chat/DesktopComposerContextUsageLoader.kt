@@ -12,10 +12,11 @@ import com.letta.mobile.data.context.ContextWindowUsageKey
 import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.context.contextUsageStates
-import com.letta.mobile.data.context.contextWindowTokensOf
 import com.letta.mobile.data.context.readingFor
+import com.letta.mobile.data.context.windowTokensFor
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 
 /** The conversation the composer's context chip describes. */
 internal data class DesktopContextFocus(
@@ -29,8 +30,8 @@ internal data class DesktopContextFocus(
 internal data class DesktopContextWindowSources(
     val agents: List<Agent>,
     val models: List<LlmModel>,
-    /** conversation id -> the model switched to this session. */
-    val modelSelections: Map<String, String>,
+    /** Each conversation's own model and window (host override or this session's switch). */
+    val modelSelections: ConversationModelChoices,
 )
 
 /**
@@ -48,12 +49,11 @@ internal fun rememberFocusedContextUsage(
 ): ContextWindowUsageState {
     val byConversation by readings.readings.collectAsState()
     val agent = window.agents.firstOrNull { it.id.value == focus.agentId }
-    // Same order as Android: this conversation's own model switch first, then the agent's limit.
-    val override = focus.conversationId?.let(window.modelSelections::get)
+    // Same resolution as Android: the conversation's own window and model first, then the agent's.
     val inputs = ContextReadingInputs(
         key = ContextWindowUsageKey(focus.agentId, focus.conversationId, focus.settled),
         contextTokens = byConversation.readingFor(focus.agentId, focus.conversationId),
-        windowTokens = contextWindowTokensOf(agent, window.models, override),
+        windowTokens = window.modelSelections.windowTokensFor(focus.conversationId, agent, window.models),
     )
     val latest by rememberUpdatedState(inputs)
     val states = remember { snapshotFlow { latest }.contextUsageStates() }

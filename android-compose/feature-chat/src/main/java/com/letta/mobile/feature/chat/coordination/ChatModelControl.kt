@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelRepository
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
@@ -10,6 +12,7 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderManagementControlle
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -36,9 +39,13 @@ class ChatModelControl @Inject constructor(
 
     fun reasoningEffortsFor(handle: ModelHandle?): List<String> = catalog.reasoningEffortsFor(handle)
 
-    /** letta-mobile-okvyf: conversation id -> model applied by a per-conversation switch. */
-    val conversationSelections: StateFlow<Map<String, String>>
-        get() = conversationModels.selections.byConversation
+    /** letta-mobile-okvyf / dxz5s: each conversation's own model (host override or this session's pick) and window. */
+    val conversationSelections: StateFlow<ConversationModelChoices>
+        get() = conversationModels.selections.choices
+
+    /** letta-mobile-dxz5s: seeds [conversationSelections] from the host's conversation records until cancelled. */
+    suspend fun followHostModels(conversations: Flow<List<Conversation>>) =
+        conversationModels.selections.followHost(conversations)
 
     suspend fun switchConversationModel(target: ConversationModelTarget, pick: ModelPick) {
         conversationModels.updateModel(target, pick.handle, pick.effort.toChoice())

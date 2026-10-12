@@ -10,13 +10,12 @@ import com.letta.mobile.data.compaction.CompactionController
 import com.letta.mobile.data.compaction.CompactionRepository
 import com.letta.mobile.data.compaction.orElse
 import com.letta.mobile.data.context.ContextBreakdownLoader
-import com.letta.mobile.data.context.contextWindowTokensOf
+import com.letta.mobile.data.context.ConversationModelView
 import com.letta.mobile.data.context.limit.AdminRpcContextLimitRepository
 import com.letta.mobile.data.context.limit.AppServerContextLimitRepository
 import com.letta.mobile.data.context.limit.ContextLimitController
 import com.letta.mobile.data.context.limit.ContextLimitRepository
 import com.letta.mobile.data.context.limit.orElse
-import com.letta.mobile.data.context.modelCatalogWindowOf
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
@@ -60,7 +59,8 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
     val selections by chatController.conversationModelSelections.collectAsState()
     val conversationId = frame.chatState.selectedConversationId
     val agent = frame.focus.rosterAgents.firstOrNull { it.id.value == agentId }
-    val override = conversationId?.let(selections::get)
+    // letta-mobile-dxz5s: the same resolution Android uses — the conversation's own model and window first.
+    val view = ConversationModelView.of(selections, conversationId, agent, models)
     val binding = remember(deps, chatController) {
         AgentContextCardBinding(
             deps = deps,
@@ -74,10 +74,10 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
             agentId = agentId,
             conversationId = conversationId,
             modelLabel = frame.chatState.composerModelLabel,
-            modelValue = override ?: agent?.model,
-            effort = null,
-            windowTokens = contextWindowTokensOf(agent, models, override),
-            modelWindowTokens = modelCatalogWindowOf(models, override ?: agent?.model),
+            modelValue = view.model,
+            effort = view.effort,
+            windowTokens = view.windowTokens,
+            modelWindowTokens = view.modelWindowTokens,
             turnRunning = frame.activity.isThinkingSelected || frame.activity.isStreamingReplySelected,
         ),
     )

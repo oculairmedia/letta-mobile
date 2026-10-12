@@ -17,9 +17,11 @@ import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -457,13 +459,13 @@ class DesktopChatController(
         connectionWatcher.start(next)
     }
 
-    // Per-conversation model overrides set this session (the picker). The
-    // effective composer model otherwise comes from the conversation's agent.
+    // Per-conversation model overrides: the host's (seeded from each conversation list, dxz5s) and
+    // this session's picks. The effective composer model otherwise comes from the conversation's agent.
     private val conversationModels = ConversationModelSelections()
 
-    /** conversation id -> the model switched to this session; the context chip sizes its window from it. */
-    val conversationModelSelections: StateFlow<Map<String, String>>
-        get() = conversationModels.byConversation
+    /** Each conversation's own model and window; the context chip and card size their window from it. */
+    val conversationModelSelections: StateFlow<ConversationModelChoices>
+        get() = conversationModels.choices
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
@@ -869,6 +871,19 @@ class DesktopChatController(
         }
     }
 
+    /**
+     * letta-mobile-dxz5s: takes each listed conversation's own model and window from the host, so an
+     * override made outside this app shows after a cold start; the open conversation's composer
+     * label follows when its model changed.
+     */
+    private fun seedHostConversationModels(conversations: List<Conversation>) {
+        val selectedId = _state.value.selectedConversationId
+        val before = selectedId?.let(conversationModels::get)
+        conversationModels.seedFromHost(conversations)
+        if (selectedId == null || conversationModels[selectedId] == before) return
+        applyComposerModelLabel(selectedId, _state.value.selectedConversation?.agentId)
+    }
+
     private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
         scope.launch {
             val agentModel = if (conversationModels[conversationId] == null && !agentId.isNullOrBlank()) {
@@ -1249,6 +1264,7 @@ class DesktopChatController(
 
     private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
+        seedHostConversationModels(conversations)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         // An empty map here silently degrades every conversation label to its
         // raw `agent-<uuid>`, so the failure must not be invisible.

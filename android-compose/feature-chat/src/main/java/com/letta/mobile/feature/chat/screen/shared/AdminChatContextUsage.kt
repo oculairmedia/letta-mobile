@@ -5,10 +5,11 @@ import com.letta.mobile.data.context.ContextReadingKey
 import com.letta.mobile.data.context.ContextWindowUsageKey
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.context.contextUsageStates
-import com.letta.mobile.data.context.contextWindowTokensOf
 import com.letta.mobile.data.context.readingFor
+import com.letta.mobile.data.context.windowTokensFor
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import kotlinx.coroutines.flow.Flow
@@ -25,15 +26,15 @@ internal data class AdminChatContextSources(
     val readings: Flow<Map<ContextReadingKey, Int>>,
     val agent: Flow<Agent?>,
     val models: Flow<List<LlmModel>>,
-    /** Per-conversation model switches, keyed by conversation id. */
-    val modelSelections: Flow<Map<String, String>>,
+    /** Per-conversation models and windows (host override or this session's switch). */
+    val modelSelections: Flow<ConversationModelChoices>,
 )
 
 /** What the model window is drawn from at one instant. */
 private data class WindowInputs(
     val agent: Agent?,
     val models: List<LlmModel>,
-    val selections: Map<String, String>,
+    val selections: ConversationModelChoices,
 )
 
 /**
@@ -59,6 +60,6 @@ private fun AdminChatContextSources.inputsFor(
             settled = !state.isStreaming && !state.isAgentTyping,
         ),
         contextTokens = byConversation.readingFor(agentId, conversationId),
-        windowTokens = contextWindowTokensOf(window.agent, window.models, conversationId?.let(window.selections::get)),
+        windowTokens = window.selections.windowTokensFor(conversationId, window.agent, window.models),
     )
 }

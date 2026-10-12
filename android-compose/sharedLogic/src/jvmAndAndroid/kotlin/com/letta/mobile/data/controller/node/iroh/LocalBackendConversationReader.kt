@@ -177,8 +177,11 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
         put("hidden", parseBooleanFlag(c.raw["hidden"])?.let(::JsonPrimitive) ?: JsonNull)
         put("in_context_message_ids", c.inContextMessageIds)
         put("isolated_block_ids", JsonArray(emptyList()))
-        put("model", JsonNull)
-        put("model_settings", JsonNull)
+        // letta-mobile-dxz5s: the conversation's own model override, as the store records it; it used
+        // to be blanked here, so clients fell back to the agent's model and window.
+        put("model", (c.raw["model"] as? JsonPrimitive)?.takeIf { it.isString } ?: JsonNull)
+        put("model_settings", c.raw["model_settings"] as? JsonObject ?: JsonNull)
+        put("context_window_limit", (c.raw["context_window_limit"] as? JsonPrimitive)?.takeIf { !it.isString } ?: JsonNull)
     }
 
     companion object {

@@ -166,6 +166,28 @@ class LocalBackendAdminStoreTest {
     }
 
     @Test
+    fun `conversation list carries the conversation's own model override`() {
+        // letta-mobile-dxz5s: the record's model, model_settings and context_window_limit used to be
+        // blanked here, so a client showed the agent's model and window instead of the override.
+        val base = tempStore()
+        writeConversation(
+            base, "conversation:local-conv-517",
+            """{"id":"local-conv-517","agent_id":"agent-1","last_message_at":"2026-10-11T00:00:00.000Z",
+               "model":"anthropic/claude-opus-5-5","context_window_limit":1000000,
+               "model_settings":{"provider_type":"anthropic","context_window_limit":1000000,"max_tokens":128000,
+               "effort":"low","thinking":{"type":"enabled","budget_tokens":10000},"reasoning_effort":"low"}}""",
+        )
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val row = store.listConversationsProjected("agent-1", "active", null, null)!!.single().jsonObject
+
+        val decoded = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromJsonElement(com.letta.mobile.data.model.Conversation.serializer(), row)
+        assertEquals("anthropic/claude-opus-5-5", decoded.model)
+        assertEquals(1_000_000, decoded.hostContextWindowLimit)
+        assertEquals("low", decoded.modelSettings?.effectiveEffort)
+    }
+
+    @Test
     fun `conversation list filters archived and scopes to the agent`() {
         val base = tempStore()
         writeConversation(base, "conversation:c-active", """{"id":"c-active","agent_id":"agent-1","last_message_at":"2025-02-02T00:00:00.000Z"}""")

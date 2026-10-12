@@ -471,6 +471,28 @@ class LettaDatabaseMigrationTest {
         assertEquals("user-1", domainDoc?.acl?.ownerUserId)
         assertTrue(domainDoc?.acl?.canWrite("user-2") == true)
     }
+
+    @Test
+    fun `migrates legacy database to v19 and keeps a conversation's own model`() = runBlocking {
+        createLegacyDatabase(version = 1) { db ->
+            createAgentsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val conversation = com.letta.mobile.data.model.Conversation(
+            id = com.letta.mobile.data.model.ConversationId("local-conv-517"),
+            agentId = com.letta.mobile.data.model.AgentId("agent-1"),
+            model = "anthropic/claude-opus-5-5",
+            modelSettings = com.letta.mobile.data.model.ConversationModelSettings(contextWindowLimit = 1_000_000, effort = "low"),
+        )
+        db.conversationDao().replaceForAgent("agent-1", listOf(ConversationEntity.fromConversation(conversation)), refreshedAtMillis = 1L)
+
+        val cached = db.conversationDao().getForAgentOnce("agent-1").single().toConversation()
+        assertEquals("anthropic/claude-opus-5-5", cached.model)
+        assertEquals(1_000_000, cached.hostContextWindowLimit)
+        assertEquals("low", cached.modelSettings?.effectiveEffort)
+    }
+
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
