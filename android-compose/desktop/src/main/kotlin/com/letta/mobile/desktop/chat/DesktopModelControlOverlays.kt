@@ -12,8 +12,8 @@ import com.letta.mobile.data.repository.modelcontrol.ModelControlSession
 import com.letta.mobile.data.repository.modelcontrol.ModelLoad
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
-import com.letta.mobile.ui.modelcontrol.ModelControlModal
-import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
@@ -119,7 +119,7 @@ private fun DesktopModelPicker(
             onEditModels = onEditModels,
         )
     }
-    ModelControlModal(ModelControlPresentation.Dialog, onDismiss = onDismiss) {
+    LettaPane(LettaPaneKind.Modal, onDismiss = onDismiss) {
         ModelPickerContent(state = state, actions = actions, autoFocusSearch = true)
     }
 }
@@ -136,7 +136,7 @@ private fun DesktopModelsEditor(
     LaunchedEffect(controller) { if (controller.state.value.sections.isEmpty()) controller.refresh() }
     val state by controller.state.collectAsState()
     val actions = remember(controller) { ModelsEditActions.bind(controller, onClose = onDismiss, onAddProvider = onAddProvider) }
-    ModelControlModal(ModelControlPresentation.Dialog, onDismiss = onDismiss) {
+    LettaPane(LettaPaneKind.Modal, onDismiss = onDismiss) {
         ModelsEditContent(state = state, actions = actions, autoFocusSearch = true)
     }
 }

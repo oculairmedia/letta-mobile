@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
+import com.letta.mobile.ui.host.LettaDialogFrame
+import com.letta.mobile.ui.host.PaneSpec
 import com.letta.mobile.ui.theme.LettaColorTokens
 import com.letta.mobile.ui.theme.LettaDimens
 import java.io.File
@@ -136,7 +138,11 @@ class ModelControlSnapshotTest {
     @Composable
     private fun Modal(form: Form, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
         when (form) {
-            Form.DESKTOP -> ModelControlModal(ModelControlPresentation.Dialog, onDismiss = {}, content = content)
+            // The pointer host's dialog frame, drawn in place over the scrim its window would add.
+            Form.DESKTOP -> Box(
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = SCRIM)),
+                contentAlignment = Alignment.Center,
+            ) { LettaDialogFrame(PaneSpec(onDismiss = {}), content = content) }
             Form.PHONE -> Box(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = SCRIM)),
                 contentAlignment = Alignment.BottomCenter,

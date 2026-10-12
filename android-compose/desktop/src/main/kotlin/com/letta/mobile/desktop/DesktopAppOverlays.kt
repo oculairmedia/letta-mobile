@@ -15,6 +15,8 @@ import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.chat.DesktopModelControlOverlays
 import com.letta.mobile.desktop.chat.DesktopModelSurfaces
 import com.letta.mobile.ui.components.ImageDropOverlay
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
 
 /** Avatar chips shown in the New Conversation "Recent" row. */
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
@@ -118,8 +120,8 @@ internal fun DesktopAppOverlays(
         ImageDropOverlay()
     }
     if (visibility.irohResetConfirm) {
-        DesktopConfirmDialog(
-            request = ConfirmDialogRequest(
+        LettaConfirmPane(
+            request = LettaConfirmRequest(
                 title = "Reset Iroh identity?",
                 message = "This mints a new NodeId and breaks existing device pairings until you re-pair.",
                 confirmLabel = "Reset identity",

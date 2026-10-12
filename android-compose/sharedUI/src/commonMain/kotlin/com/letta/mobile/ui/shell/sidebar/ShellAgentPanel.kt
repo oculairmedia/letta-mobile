@@ -62,7 +62,7 @@ import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAtWork
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
+import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
@@ -130,7 +130,7 @@ data class ShellNavRowModel(
 @Composable
 fun ShellNavRow(model: ShellNavRowModel, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val content = if (model.selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-    LocalShellChromeDecorations.current.tooltip(model.tooltip ?: model.label) {
+    LocalLettaHost.current.tooltip(model.tooltip ?: model.label) {
         Row(
             modifier = modifier
                 .fillMaxWidth()

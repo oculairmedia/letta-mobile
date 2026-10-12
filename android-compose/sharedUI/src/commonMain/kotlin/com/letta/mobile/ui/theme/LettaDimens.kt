@@ -163,6 +163,9 @@ object LettaDimens {
         val modalWidth: Dp = 520.dp
         val modalMaxHeight: Dp = 600.dp
 
+        /** A confirmation (LettaPane Alert): narrower than a modal, one message and two actions. */
+        val alertWidth: Dp = 420.dp
+
         /** A pairing QR code (letta-mobile-dpv7m): big enough to scan across a desk, no bigger. */
         val qrCodeMaxWidth: Dp = 320.dp
 

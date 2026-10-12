@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 import java.io.File
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -34,7 +36,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * Changing this setting swaps in a WHOLE separate set of live data (agents,
  * conversations) — this is not a neutral path field. Picking a new folder
- * therefore requires an explicit confirmation ([DesktopConfirmDialog]) that
+ * therefore requires an explicit confirmation ([LettaConfirmPane]) that
  * spells out the consequence and, when the folder already has content,
  * tells the user that instead of silently adopting it.
  */
@@ -54,8 +56,8 @@ internal fun DesktopLocalBackendDirectorySettingsCard(
     }
 
     pendingPath?.let { candidate ->
-        DesktopConfirmDialog(
-            request = ConfirmDialogRequest(
+        LettaConfirmPane(
+            request = LettaConfirmRequest(
                 title = "Switch local backend data directory?",
                 message = confirmSwitchMessage(candidate),
                 confirmLabel = "Use this folder",
