@@ -112,28 +112,48 @@ fun SettingsPage(
 private fun SettingsGroups(state: SettingsPageState, services: SettingsPageServices) {
     var form by remember(state.config) { mutableStateOf(BackendSettingsForm.of(state.config)) }
     val anchor = remember { BringIntoViewRequester() }
-    // The first frame draws only the Backend form (the first screen of an unconfigured install);
-    // every other section, the pairing card and its QR included, joins on the next frame.
-    val rest by produceState(false) {
-        withFrameNanos { }
-        value = true
-    }
-    LaunchedEffect(state.section, rest) { if (state.section != null && rest) anchor.bringIntoView() }
-    val inputs = StandardSectionInputs(state, services, BackendFormState(state.config, form) { form = it }, rest)
-    val contributions = services.contributions.filter { it.showForMode == null || it.showForMode == form.mode }
+    val afterFirstFrame = rememberAfterFirstFrame()
+    LaunchedEffect(state.section, afterFirstFrame) { if (state.section != null && afterFirstFrame) anchor.bringIntoView() }
+    val inputs = StandardSectionInputs(state, services, BackendFormState(state.config, form) { form = it }, afterFirstFrame)
     Column(
         modifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
         state.connection?.let { ConnectionHeader(it) }
-        SettingsGroup.entries.forEach { group ->
-            val groupContributions = contributions.filter { it.group == group }
-            val shown = group == SettingsGroup.Backend || rest
-            if (shown && (services.hasStandardSection(group) || groupContributions.isNotEmpty())) {
-                SettingsGroupBlock(group, inputs, GroupExtras(groupContributions.takeIf { rest }.orEmpty(), anchor))
-            }
+        services.visibleGroups(form.mode, afterFirstFrame).forEach { (group, contributions) ->
+            SettingsGroupBlock(group, inputs, GroupExtras(contributions, anchor))
         }
     }
+}
+
+/**
+ * False for the page's first frame, true from the next one. The first frame draws only the Backend
+ * form (the first screen of an unconfigured install); every other section, the pairing card and its
+ * QR included, joins on the next frame.
+ */
+@Composable
+private fun rememberAfterFirstFrame(): Boolean {
+    val after by produceState(false) {
+        withFrameNanos { }
+        value = true
+    }
+    return after
+}
+
+/**
+ * The groups the page draws now, each with the platform sections it holds: a group shows when it has
+ * a standard section or a platform section for [mode]; before the first frame is out only Backend
+ * shows, without its platform sections.
+ */
+internal fun SettingsPageServices.visibleGroups(
+    mode: LettaConfig.Mode,
+    afterFirstFrame: Boolean,
+): List<Pair<SettingsGroup, List<SettingsContribution>>> {
+    val forMode = contributions.filter { it.showForMode == null || it.showForMode == mode }
+    val groups = if (afterFirstFrame) SettingsGroup.entries else listOf(SettingsGroup.Backend)
+    return groups
+        .map { group -> group to forMode.filter { it.group == group }.takeIf { afterFirstFrame }.orEmpty() }
+        .filter { (group, groupContributions) -> hasStandardSection(group) || groupContributions.isNotEmpty() }
 }
 
 /** A group's platform sections and the page's anchor. */
@@ -143,9 +163,7 @@ private class GroupExtras(val contributions: List<SettingsContribution>, val anc
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SettingsGroupBlock(group: SettingsGroup, inputs: StandardSectionInputs, extras: GroupExtras) {
-    val section = inputs.state.section
-    // Pairing anchors its own card inside the Backend group.
-    val anchored = section != null && section != ShellSettingsSection.Pairing && section.group == group
+    val anchored = inputs.state.section?.anchorsGroup(group) == true
     Column(
         modifier = Modifier
             .then(if (anchored) Modifier.bringIntoViewRequester(extras.anchor) else Modifier)
@@ -209,6 +227,10 @@ private fun SettingsPageServices.hasStandardSection(group: SettingsGroup): Boole
 private fun BackendConnectionFailure(message: String) {
     Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
 }
+
+/** Whether this anchor scrolls [group] into view; Pairing anchors its own card inside Backend instead. */
+private fun ShellSettingsSection.anchorsGroup(group: SettingsGroup): Boolean =
+    this != ShellSettingsSection.Pairing && this.group == group
 
 /** The group an anchor opens on. */
 val ShellSettingsSection.group: SettingsGroup

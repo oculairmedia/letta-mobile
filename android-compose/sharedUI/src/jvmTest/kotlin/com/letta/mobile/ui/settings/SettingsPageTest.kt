@@ -204,6 +204,20 @@ class SettingsPageTest {
     }
 
     @Test
+    fun theFirstFrameDrawsOnlyTheBackendGroupAndModeOnlySectionsFollowTheMode() {
+        val local = SettingsContribution(SettingsGroup.Backend, SettingsSectionModel("m", "Model", emptyList()), showForMode = LettaConfig.Mode.LOCAL)
+        val about = SettingsContribution(SettingsGroup.About, SettingsSectionModel("a", "About", emptyList()))
+        val services = SettingsPageServices(BackendSettingsActions(onConfigSaved = {}), contributions = listOf(local, about))
+
+        assertEquals(listOf(SettingsGroup.Backend to emptyList()), services.visibleGroups(LettaConfig.Mode.LOCAL, afterFirstFrame = false))
+        assertEquals(
+            listOf(SettingsGroup.Backend to listOf(local), SettingsGroup.About to listOf(about)),
+            services.visibleGroups(LettaConfig.Mode.LOCAL, afterFirstFrame = true),
+        )
+        assertEquals(listOf(SettingsGroup.Backend to emptyList(), SettingsGroup.About to listOf(about)), services.visibleGroups(LettaConfig.Mode.SELF_HOSTED, true))
+    }
+
+    @Test
     fun theAboutAnchorScrollsItsGroupIntoView() = runComposeUiTest {
         val about = SettingsContribution(SettingsGroup.About, SettingsSectionModel("about", "About", listOf(SettingsRow.Info("v", "Version", "1.0"))))
         setContent {
