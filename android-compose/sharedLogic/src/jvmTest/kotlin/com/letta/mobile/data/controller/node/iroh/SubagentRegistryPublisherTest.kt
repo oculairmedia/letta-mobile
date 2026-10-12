@@ -74,6 +74,9 @@ class SubagentRegistryPublisherTest {
             pushed.subagentsActive.associate { it.toolCallId to it.status },
         )
         assertTrue(pushed.subagentsActive.all { it.parentConversationId == CONVERSATION && it.parentAgentId == AGENT })
+        // letta-mobile-ulcg6 (RC2): the frame names its scope so clients fold it there only.
+        assertEquals(AGENT, pushed.parentAgentId)
+        assertEquals(CONVERSATION, pushed.parentConversationId)
         publisher.close()
     }
 

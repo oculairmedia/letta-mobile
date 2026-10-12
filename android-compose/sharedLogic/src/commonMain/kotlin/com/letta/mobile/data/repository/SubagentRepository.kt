@@ -49,7 +49,11 @@ import kotlin.time.Duration.Companion.milliseconds
  *    duplicate fetches fire. A failed fetch is retried by the next collection.
  *  - A `subagents_updated` push folds its `subagents_active` snapshot into the
  *    cache without dropping previously running entries that are merely omitted;
- *    explicit terminal states remove entries.
+ *    explicit terminal states remove entries. A push only touches the parent
+ *    scope it describes (letta-mobile-ulcg6 RC2), and an ended entry never
+ *    returns to running (RC3).
+ *  - A RUNNING entry nobody has mentioned for [STREAM_TIMEOUT_MS] is verified
+ *    with the host, never failed for being quiet (RC1).
  *  - On WS reconnect (`Disconnected → Connected`) every scope still being
  *    collected is re-fetched so the UI doesn't keep showing a stale list after
  *    a dropped socket.
@@ -98,13 +102,12 @@ open class SubagentRepository(
 
     private val pushJob = repositoryScope.launch { observePushEvents() }
     private val reconnectJob = repositoryScope.launch { observeReconnects() }
-    // letta-mobile-ve08r AC#4: stream-timeout watchdog. Periodic sweep that flips
-    // RUNNING entries to FAILED once they have been silent (no observed progress)
-    // for STREAM_TIMEOUT_MS. Coarser than the typical push cadence but finer than
-    // the threshold; cheap O(N) over the snapshot.
+    // letta-mobile-ulcg6 (RC1): liveness check. Periodic sweep that VERIFIES
+    // RUNNING entries quiet for STREAM_TIMEOUT_MS with the host instead of
+    // failing them; see sweepStreamTimeouts.
     private val watchdogJob = repositoryScope.launch { observeStreamTimeout() }
 
-    /** Stops the periodic stream-timeout sweep. */
+    /** Runs the periodic liveness check until [close]. */
     private suspend fun observeStreamTimeout() {
         while (true) {
             kotlinx.coroutines.delay(streamTimeoutSweepIntervalMs.milliseconds)
@@ -235,9 +238,12 @@ open class SubagentRepository(
         val stampedTerminal = terminal
             ?.takeIf { it.status in TERMINAL_STATUSES }
             ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: now) }
-        val completeIncoming = (if (stampedTerminal == null) incoming else incoming + stampedTerminal)
-            .map { entry -> entry.markSeen(now) }
         val (cached, untouched) = state.value.partition { scope == null || it.isInScope(scope) }
+        val completeIncoming = keepTerminalOutcomes(
+            incoming = (if (stampedTerminal == null) incoming else incoming + stampedTerminal)
+                .map { entry -> entry.markSeen(now) },
+            cached = cached,
+        )
         val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
         val terminalKey = stampedTerminal?.cacheKey()
 
@@ -267,6 +273,31 @@ open class SubagentRepository(
                 previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
         }
         return (completeIncoming + retained + previousTerminals + untouched).distinctBy { it.cacheKey() }
+    }
+
+    /**
+     * letta-mobile-ulcg6 (RC3): a subagent that has ended stays ended. The host
+     * registry forbids terminal -> running (DurableSubagentRegistry
+     * canAdvanceTo); the cache mirrors that, so a late or replayed RUNNING
+     * snapshot can no longer flap a finished chip back to running.
+     */
+    private fun keepTerminalOutcomes(
+        incoming: List<SubagentEntry>,
+        cached: List<SubagentEntry>,
+    ): List<SubagentEntry> {
+        val endedByKey = cached.filter { it.status in TERMINAL_STATUSES }.associateBy { it.cacheKey() }
+        if (endedByKey.isEmpty()) return incoming
+        return incoming.map { entry ->
+            val ended = endedByKey[entry.cacheKey()]
+            if (ended == null || entry.status != SubagentStatus.RUNNING) return@map entry
+            Telemetry.event(
+                "SubagentRepo",
+                "merge.terminalKept",
+                "cacheKey" to entry.cacheKey(),
+                "terminalStatus" to ended.status,
+            )
+            ended
+        }
     }
 
     private fun SubagentEntry.markSeen(now: Long): SubagentEntry =
@@ -357,46 +388,101 @@ open class SubagentRepository(
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
             if (frame !is ServerFrame.SubagentsUpdated) return@collect
-            // mergeSnapshot stamps lastSeenAtMs for the watchdog (ve08r AC#4).
+            // mergeSnapshot stamps lastSeenAtMs for the liveness check (ve08r AC#4).
             stateMutex.withLock {
                 state.value = mergeSnapshot(
                     frame.subagentsActive,
                     terminal = frame.subagent,
                     kind = SnapshotKind.INCREMENTAL,
+                    scope = frame.pushScope(),
                 )
             }
         }
     }
 
     /**
-     * letta-mobile-ve08r AC#4: stream-timeout watchdog. Walks the current snapshot,
-     * flips RUNNING entries to FAILED with [FAILURE_REASON_STREAM_TIMEOUT] once
-     * `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. Mutates state once per call (single
-     * publication via atomic StateFlow).
+     * letta-mobile-ulcg6 (RC1): liveness check for quiet RUNNING entries.
+     *
+     * Silence is not failure. letta-code emits `update_subagent_state` only
+     * when a subagent's store entry changes and the host re-publishes only on
+     * a registry change, so a subagent that thinks for minutes without a tool
+     * call (every post-turn reflection, any slow model) sends nothing. This
+     * used to flip such entries to FAILED `stream_timeout`: a red ring for a
+     * healthy run (8x in the 2026-10-10 desktop log, ageMs 125-149s).
+     *
+     * Now a RUNNING entry quiet for [STREAM_TIMEOUT_MS] is VERIFIED with the
+     * host: a scoped `subagent.list` (authoritative merge) re-stamps it if the
+     * host still runs it, applies the host's terminal state if it ended, and
+     * starts the bounded absence linger if the host no longer knows it. When
+     * the host cannot be asked the entry stays as it is; only after
+     * [UNVERIFIABLE_SILENCE_MS] of unverifiable silence is it dropped (never
+     * failed), so a transport without `subagent.list` cannot pin a chip forever.
      */
-    private suspend fun sweepStreamTimeouts() = stateMutex.withLock {
+    private suspend fun sweepStreamTimeouts() {
         val now = clock()
-        val current = state.value
-        if (current.isEmpty()) return
-        val timed = current.filter { it.status == SubagentStatus.RUNNING && (now - it.lastSeenAtMs) > STREAM_TIMEOUT_MS }
-        if (timed.isEmpty()) return
-        val updated = current.map { entry ->
-            val expired = timed.firstOrNull { it.cacheKey() == entry.cacheKey() }
-            if (expired != null && entry.status == SubagentStatus.RUNNING) {
-                Telemetry.event(
-                    "SubagentRepo",
-                    "merge.timeoutFlippedToFailed",
-                    "cacheKey" to entry.cacheKey(),
-                    "ageMs" to (now - entry.lastSeenAtMs),
-                )
-                entry.copy(
-                    status = SubagentStatus.FAILED,
-                    failureReason = FAILURE_REASON_STREAM_TIMEOUT,
-                    terminalAtEpochMs = entry.terminalAtEpochMs ?: now,
-                )
-            } else entry
+        val quiet = state.value.filter { it.status == SubagentStatus.RUNNING && now - it.lastSeenAtMs > STREAM_TIMEOUT_MS }
+        if (quiet.isEmpty()) return
+        quiet.groupBy { it.parentScopeOrNull() }.forEach { (scope, entries) -> verifyQuiet(scope, entries) }
+    }
+
+    private suspend fun verifyQuiet(scope: SubagentParentScope?, entries: List<SubagentEntry>) {
+        val conversationLabel = scope?.parentConversationId ?: UNSCOPED_LABEL
+        Telemetry.event(
+            "SubagentRepo",
+            "liveness.verify",
+            "conversationId" to conversationLabel,
+            "entries" to entries.size,
+            "maxQuietMs" to entries.maxOf { clock() - it.lastSeenAtMs },
+        )
+        val verified = if (scope != null) refreshScope(scope) else refresh()
+        if (verified.isSuccess) return
+        Telemetry.event(
+            "SubagentRepo",
+            "liveness.unverifiable",
+            "conversationId" to conversationLabel,
+            "error" to (verified.exceptionOrNull()?.message ?: "unknown"),
+        )
+        dropUnverifiable(entries.mapTo(mutableSetOf()) { it.cacheKey() })
+    }
+
+    private suspend fun dropUnverifiable(keys: Set<String>) = stateMutex.withLock {
+        val now = clock()
+        val (dropped, kept) = state.value.partition { entry ->
+            entry.cacheKey() in keys &&
+                entry.status == SubagentStatus.RUNNING &&
+                now - entry.lastSeenAtMs > UNVERIFIABLE_SILENCE_MS
         }
-        state.value = updated.distinctBy { it.cacheKey() }
+        if (dropped.isEmpty()) return@withLock
+        dropped.forEach { entry ->
+            Telemetry.event(
+                "SubagentRepo",
+                "liveness.unverifiableDropped",
+                "cacheKey" to entry.cacheKey(),
+                "quietMs" to (now - entry.lastSeenAtMs),
+            )
+        }
+        state.value = kept
+    }
+
+    private fun SubagentEntry.parentScopeOrNull(): SubagentParentScope? {
+        val agentId = parentAgentId?.takeIf { it.isNotBlank() } ?: return null
+        val conversationId = parentConversationId?.takeIf { it.isNotBlank() } ?: return null
+        return SubagentParentScope(agentId, conversationId)
+    }
+
+    /**
+     * letta-mobile-ulcg6 (RC2): the parent scope a push describes. The host
+     * names it on the frame; an older host does not, so a push whose entries
+     * all share one parent scope is read as that scope. Anything else (an
+     * empty or mixed push from an unscoped producer) keeps the legacy
+     * whole-cache behaviour.
+     */
+    private fun ServerFrame.SubagentsUpdated.pushScope(): SubagentParentScope? {
+        val agentId = parentAgentId?.takeIf { it.isNotBlank() }
+        val conversationId = parentConversationId?.takeIf { it.isNotBlank() }
+        if (agentId != null && conversationId != null) return SubagentParentScope(agentId, conversationId)
+        val scopes = (subagentsActive + listOfNotNull(subagent)).map { it.parentScopeOrNull() }.toSet()
+        return scopes.singleOrNull()
     }
 
     private fun List<SubagentEntry>.filterNotExpired(now: Long): List<SubagentEntry> =
@@ -422,18 +508,20 @@ open class SubagentRepository(
     companion object {
         private const val TERMINAL_LINGER_MS = 8_000L
         private const val RUNNING_ABSENCE_LINGER_MS = 60_000L
-        // letta-mobile-ve08r AC#4: stream-timeout watchdog. A RUNNING entry with
-        // no observed progress (no push mentioning it) for this long is flipped
-        // to FAILED with failureReason = "stream_timeout".
+        // letta-mobile-ulcg6 (RC1): a RUNNING entry nobody has mentioned for
+        // this long is verified with the host (scoped subagent.list). It is
+        // never failed for being quiet.
         internal const val STREAM_TIMEOUT_MS = 120_000L
         // Coarser than the typical push cadence but finer than STREAM_TIMEOUT_MS.
         internal const val STREAM_TIMEOUT_SWEEP_INTERVAL_MS = 30_000L
+        // Unverifiable silence (no subagent.list) after which a RUNNING entry
+        // is dropped - not failed - so it cannot pin a chip forever.
+        internal const val UNVERIFIABLE_SILENCE_MS = 30 * 60_000L
+        private const val UNSCOPED_LABEL = "<unscoped>"
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,
             SubagentStatus.CANCELLED,
         )
-        /** Public for testability. */
-        internal const val FAILURE_REASON_STREAM_TIMEOUT = "stream_timeout"
     }
 }
