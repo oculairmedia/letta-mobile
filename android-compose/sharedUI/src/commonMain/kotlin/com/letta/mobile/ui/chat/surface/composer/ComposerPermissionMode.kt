@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Shield
+import com.letta.mobile.data.runtime.PermissionModeRuntime
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_permission_mode
@@ -36,6 +37,9 @@ import com.letta.mobile.sharedui.resources.composer_permission_mode_changing
 import com.letta.mobile.sharedui.resources.composer_permission_mode_failed
 import com.letta.mobile.sharedui.resources.composer_permission_mode_not_saved
 import com.letta.mobile.sharedui.resources.composer_permission_mode_on_start
+import com.letta.mobile.sharedui.resources.composer_permission_mode_runtime_host
+import com.letta.mobile.sharedui.resources.composer_permission_mode_runtime_host_unknown
+import com.letta.mobile.sharedui.resources.composer_permission_mode_runtime_local
 import com.letta.mobile.sharedui.resources.composer_permission_mode_unconfirmed
 import com.letta.mobile.sharedui.resources.composer_permission_mode_standard
 import com.letta.mobile.sharedui.resources.composer_permission_mode_standard_hint
@@ -85,6 +89,7 @@ internal fun ComposerPermissionModeRow(
     var open by remember { mutableStateOf(false) }
     val shown = state.pending ?: state.unconfirmed ?: state.selected
     val label = shown.displayName()
+    val runtimeLabel = state.runtime?.let { permissionModeRuntimeLabel(it) }
     Column(
         modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
@@ -103,7 +108,7 @@ internal fun ComposerPermissionModeRow(
                 enabled = state.canChange,
                 modifier = Modifier
                     .testTag(ComposerTestTags.PERMISSION_MODE_CHIP)
-                    .semantics { contentDescription = label },
+                    .semantics { contentDescription = runtimeLabel?.let { "$label, $it" } ?: label },
             )
             if (open && state.canChange) {
                 PermissionModePopover(state, onSelect = { open = false; onSelect(it) }, onDismiss = { open = false })
@@ -120,6 +125,15 @@ internal fun ComposerPermissionModeRow(
             )
         }
     }
+}
+
+/** letta-mobile-a4tm7: "Host: <node id short>" or "This device's bundled runtime". */
+@Composable
+internal fun permissionModeRuntimeLabel(runtime: PermissionModeRuntime): String = when (runtime) {
+    is PermissionModeRuntime.Host -> runtime.shortId
+        ?.let { stringResource(Res.string.composer_permission_mode_runtime_host, it) }
+        ?: stringResource(Res.string.composer_permission_mode_runtime_host_unknown)
+    PermissionModeRuntime.Local -> stringResource(Res.string.composer_permission_mode_runtime_local)
 }
 
 /** The chip's text: the mode, as pending or unconfirmed when its change is not settled. */
@@ -149,6 +163,18 @@ private fun PermissionModePopover(
         testTag = ComposerTestTags.PERMISSION_MODE_POPOVER,
     ) {
         ComposerPopoverHeader(stringResource(Res.string.composer_permission_mode))
+        // letta-mobile-a4tm7: which runtime this governs, so a desktop on its own runtime is not
+        // expected to follow a phone on an Iroh host (and two clients of one host visibly share it).
+        state.runtime?.let { runtime ->
+            Text(
+                text = permissionModeRuntimeLabel(runtime),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs)
+                    .testTag(ComposerTestTags.PERMISSION_MODE_RUNTIME),
+            )
+        }
         state.options.forEach { mode ->
             val selected = mode == state.selected
             Row(

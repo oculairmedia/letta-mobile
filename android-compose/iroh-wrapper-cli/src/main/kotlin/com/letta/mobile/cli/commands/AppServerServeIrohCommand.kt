@@ -522,6 +522,8 @@ class AppServerServeIrohCommand : CliktCommand(
         val conversationChanges = com.letta.mobile.data.controller.node.iroh.ConversationChangeNotifier(scope)
         // letta-mobile-fxoew.2: the registry pushes its snapshot to conversation viewers.
         var subagentPublisher: com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher? = null
+        // letta-mobile-a4tm7: a confirmed permission_mode.set reaches every viewer's chip.
+        val permissionModes = com.letta.mobile.data.controller.node.iroh.PermissionModePublisher(scope)
         val adminRpcRouter = buildProductionAdminRouter(
             controller = admin.controller,
             pairingService = admin.pairingService,
@@ -540,7 +542,9 @@ class AppServerServeIrohCommand : CliktCommand(
                 com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher(scope, source)
                     .also { subagentPublisher = it }
             },
+            permissionModes = permissionModes,
         )
+        endpoint.attachPermissionModePublisher(permissionModes)
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         subagentPublisher?.let(endpoint::attachSubagentPublisher)
         // letta-mobile-bzvro.40: parked approvals (rules, blocked path, diffs) reach the viewers.

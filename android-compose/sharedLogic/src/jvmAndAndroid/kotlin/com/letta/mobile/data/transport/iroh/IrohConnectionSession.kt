@@ -37,8 +37,15 @@ internal class IrohConnectionSession(
     /** Capabilities the host advertised for the current Ready handle; empty when not ready. */
     fun hostCapabilities(): Set<String> = readyCapabilities
 
+    @Volatile
+    private var readyTicket: String? = null
+
+    /** letta-mobile-a4tm7: the Ready handle's host node id (hex); null when not ready or unparseable. */
+    fun hostNodeId(): String? = readyTicket?.let(::nodeIdOf)
+
     fun onReady(handle: IrohConnectionHandle) {
         readyCapabilities = handle.serverCapabilities.orEmpty()
+        readyTicket = handle.ticket
         val readyGeneration = nextGeneration()
         startObserverIngest(handle, readyGeneration)
         reSubscribeViewedConversation(readyGeneration)
@@ -61,6 +68,7 @@ internal class IrohConnectionSession(
 
     private fun stopSessionWork(reason: SessionStopReason): Job? {
         readyCapabilities = emptySet()
+        readyTicket = null
         nextGeneration()
         resubscribeJob?.cancel()
         resubscribeJob = null
@@ -163,6 +171,17 @@ internal class IrohConnectionSession(
         ObserverStreamUnavailable("no_observer_stream"),
     }
 }
+
+/** The node id a dialed `iroh://` address names: the `<hex>@…` short form directly, else the parsed ticket's. */
+private fun nodeIdOf(ticket: String): String? {
+    val shortForm = ticket.substringBefore('@', missingDelimiterValue = "")
+    if (shortForm.length == NODE_ID_HEX_CHARS && shortForm.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) return shortForm.lowercase()
+    return runCatching { IrohDiagnostics.endpointIdHex(IrohAppServerTransportAdapter.parseIrohAddress(ticket).id()) }
+        .getOrNull()
+        ?.takeIf { it.isNotBlank() }
+}
+
+private const val NODE_ID_HEX_CHARS = 64
 
 /** A validated message-list route for the conversation currently viewed on this connection. */
 internal data class IrohViewedConversation(

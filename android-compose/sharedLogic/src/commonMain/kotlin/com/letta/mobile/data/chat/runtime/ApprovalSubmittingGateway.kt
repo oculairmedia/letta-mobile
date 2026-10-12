@@ -77,4 +77,11 @@ interface PermissionModeGateway {
 
     /** Brings the chip and the server into agreement when a conversation is opened (a relaying host). */
     suspend fun syncPermissionMode(runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) = Unit
+
+    /**
+     * letta-mobile-a4tm7: which runtime the chip governs, named on the chip so a desktop on its own
+     * bundled runtime is not expected to mirror a phone talking to an Iroh host.
+     */
+    val permissionModeRuntime: com.letta.mobile.data.runtime.PermissionModeRuntime
+        get() = com.letta.mobile.data.runtime.PermissionModeRuntime.Local
 }
