@@ -5,22 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ScheduleApi
-import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.schedules.CronScheduleSource
+import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleLibraryState
-import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
-
-typealias ScheduleListUiState = ScheduleLibraryState
 
 @HiltViewModel
 class ScheduleListViewModel @Inject constructor(
@@ -54,9 +48,8 @@ class ScheduleListViewModel @Inject constructor(
         cronSource = CronScheduleSource { agentId -> scheduleApi.listCrons(agentId) },
     )
 
-    val uiState: StateFlow<UiState<ScheduleListUiState>> = controller.state
-        .map { it.toUiState() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+    /** The shared Schedules page's library state (letta-mobile-ckmub.3.16). */
+    val state: StateFlow<ScheduleLibraryState> = controller.state
 
     init {
         controller.start()
@@ -70,8 +63,9 @@ class ScheduleListViewModel @Inject constructor(
         controller.selectAgent(agentId)
     }
 
-    fun createSchedule(agentId: String, params: ScheduleCreateParams) {
-        controller.createSchedule(agentId, params)
+    /** The page's "New schedule": a recurring schedule through the native schedule route. */
+    fun create(request: ScheduleCreateRequest) {
+        controller.createRecurringSchedule(request)
     }
 
     fun deleteSchedule(scheduledMessageId: String) {
@@ -80,15 +74,6 @@ class ScheduleListViewModel @Inject constructor(
 
     override fun onCleared() {
         controller.close()
-    }
-}
-
-private fun ScheduleLibraryState.toUiState(): UiState<ScheduleListUiState> {
-    val message = errorMessage
-    return when {
-        isLoading && agents.isEmpty() && schedules.isEmpty() -> UiState.Loading
-        message != null -> UiState.Error(message)
-        else -> UiState.Success(this)
     }
 }
 

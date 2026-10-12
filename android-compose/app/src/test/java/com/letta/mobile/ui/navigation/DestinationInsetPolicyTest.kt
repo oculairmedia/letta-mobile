@@ -32,6 +32,7 @@ class DestinationInsetPolicyTest {
             composable<AdminRoute> {}
             composable<ChannelsRoute> {}
             composable<MemoryRoute> {}
+            composable<SchedulesRoute> {}
             composable<SkillsRoute> {}
             composable<AllToolsRoute> {}
             composable<ConversationsRoute> {}
@@ -43,7 +44,7 @@ class DestinationInsetPolicyTest {
 
     @Test
     fun sharedPagesOwnTheirInsets() {
-        listOf("AdminRoute", "ChannelsRoute", "MemoryRoute", "SkillsRoute", "AllToolsRoute").forEach {
+        listOf("AdminRoute", "ChannelsRoute", "MemoryRoute", "SchedulesRoute", "SkillsRoute", "AllToolsRoute").forEach {
             assertEquals(it, DestinationInsetPolicy.PageScaffold, policyOf(it))
         }
     }

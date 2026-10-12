@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
@@ -13,6 +14,7 @@ import androidx.compose.ui.focus.FocusRequester
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.skills.SkillsCatalogController
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.notify.StoredAttentionPrefs
 import com.letta.mobile.data.repository.SubagentRepository
@@ -65,7 +67,8 @@ internal data class DesktopShellCore(
 internal data class DesktopShellPanels(
     val httpApis: DesktopHttpApis,
     val cronPanel: DesktopCronPanelState,
-    val skillsPanel: DesktopSkillsPanelState,
+    /** letta-mobile-zxk2n.33: the shared skills catalog for the Skills page. */
+    val skills: SkillsCatalogController,
     /** The focused agent's server slash commands, for the composer palette. */
     val agentSlashCommands: MutableState<List<AgentSlashCommand>>,
     val subagents: DesktopSubagentRegistry,
@@ -196,7 +199,8 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     val sessionGraph = core.sessionGraph.value
     val httpApis = rememberDesktopHttpApis(core.bootstrap.activeConfig, core.iroh.transport != null, core.iroh.agentDirectory)
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
-    val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
+    val skills = remember(httpApis.skillApi) { SkillsCatalogController(httpApis.skillApi, chatScope) }
+    DisposableEffect(skills) { onDispose { skills.close() } }
     val agentSlashCommands = remember(httpApis.slashCommandApi) {
         mutableStateOf<List<AgentSlashCommand>>(emptyList())
     }
@@ -210,7 +214,7 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     return DesktopShellPanels(
         httpApis = httpApis,
         cronPanel = cronPanel,
-        skillsPanel = skillsPanel,
+        skills = skills,
         agentSlashCommands = agentSlashCommands,
         subagents = subagents,
         chatDockGeometry = rememberDesktopChatDockGeometry(),

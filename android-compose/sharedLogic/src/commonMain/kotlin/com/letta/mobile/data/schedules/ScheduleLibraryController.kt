@@ -287,6 +287,15 @@ class ScheduleLibraryController(
         }
     }
 
+    /**
+     * Creates the Schedules page's recurring schedule through the native schedule route, for the
+     * request's agent or, when it names none, the selected one. No agent: nothing to create.
+     */
+    fun createRecurringSchedule(request: ScheduleCreateRequest) {
+        val agentId = request.agentId ?: stateFlow.value.selectedAgentId ?: return
+        createSchedule(agentId, request.toCreateParams())
+    }
+
     fun deleteSchedule(scheduledMessageId: String) {
         mutationJob?.cancel()
         mutationJob = scope.launch {

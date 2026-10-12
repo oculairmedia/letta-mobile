@@ -192,7 +192,6 @@
     <string name="screen_agents_view_list">List</string>
     <string name="screen_agents_view_grid">Grid</string>
     <string name="screen_agents_filter_all">All</string>
-    <string name="screen_tools_filter_all">All</string>
     <string name="action_create">Create</string>
     <string name="action_delete">Delete</string>
     <string name="action_save">Save</string>
@@ -237,9 +236,7 @@
     <string name="screen_drawer_reset_icon_description">Reset</string>
     <string name="common_selected">Selected</string>
     <string name="screen_tools_empty">No tools available</string>
-    <string name="screen_tools_search_hint">Search tools…</string>
     <string name="screen_tools_empty_search">No tools matching “%1$s”</string>
-    <string name="screen_tools_create_action">Create Tool</string>
     
     <string name="action_send_message">Send message</string>
     <string name="action_stop_run">Stop run</string>
@@ -834,18 +831,6 @@
     <string name="screen_providers_region_input">Region</string>
     <string name="screen_providers_refreshing_details">Refreshing provider details…</string>
     <string name="screen_schedules_title">Schedules</string>
-    <string name="screen_schedules_empty">No schedules configured</string>
-    <string name="screen_schedules_unavailable">Schedule admin isn\'t available on this Letta server.</string>
-    <string name="screen_schedules_add_title">Add Schedule</string>
-    <string name="screen_schedules_delete_title">Delete Schedule</string>
-    <string name="screen_schedules_delete_confirm">Delete schedule %1$s?</string>
-    <string name="screen_schedules_message_label">Message</string>
-    <string name="screen_schedules_recurring_toggle">Recurring</string>
-    <string name="screen_schedules_cron_label">Cron Expression</string>
-    <string name="screen_schedules_scheduled_at_label">Scheduled At (epoch seconds)</string>
-    <string name="screen_schedules_scheduled_at_placeholder">1700000000</string>
-    <string name="screen_schedules_one_time_label">One-time: %1$s</string>
-    <string name="screen_schedules_recurring_label">Recurring: %1$s</string>
     <string name="screen_runs_title">Run Monitor</string>
     <string name="screen_runs_search_hint">Search runs…</string>
     <string name="screen_runs_empty">No runs available</string>
