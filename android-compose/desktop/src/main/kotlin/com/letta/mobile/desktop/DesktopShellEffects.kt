@@ -113,9 +113,11 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
     DreamFinishedNotificationsEffect(
         entries = frame.lists.activeSubagents,
         prefs = dreamPrefs,
-        controller = context.core.nucleusController,
-        agentName = { id -> frame.focus.railAgents.firstOrNull { it.first == id }?.second },
-        onActivate = { activateDesktopWindow(context.shell.window) },
+        sink = DreamNotificationSink(
+            controller = context.core.nucleusController,
+            agentName = { id -> frame.focus.railAgents.firstOrNull { it.first == id }?.second },
+            onActivate = { activateDesktopWindow(context.shell.window) },
+        ),
     )
 }
 

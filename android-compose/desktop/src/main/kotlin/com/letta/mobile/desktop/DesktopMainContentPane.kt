@@ -23,6 +23,7 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
 import com.letta.mobile.desktop.workspace.DesktopAgentSettingsPane
+import com.letta.mobile.desktop.workspace.DesktopDreamingDeps
 import com.letta.mobile.desktop.workspace.DesktopDreamingPane
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
@@ -153,7 +154,7 @@ private fun EditAgentSidePane(agentId: String, inputs: DesktopMainContentInputs,
             agentId = agentId,
             scope = inputs.chatScope,
             dreaming = { modifier ->
-                DesktopDreamingPane(agentId, inputs.chatScope, inputs.secureSettingsStore, inputs.subagentRepository, modifier)
+                DesktopDreamingPane(agentId, inputs.chatScope, DesktopDreamingDeps(inputs.secureSettingsStore, inputs.subagentRepository), modifier)
             },
         ) { modifier ->
             DesktopEditAgentSurface(

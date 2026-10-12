@@ -38,14 +38,13 @@ import kotlinx.coroutines.flow.emptyFlow
  * or an App Server URL); the dream log from the same MemFS route as the memory browser; live runs
  * from the subagent registry; and the Windows automatic-dream switch of the bundled runtime.
  */
+/** The desktop session pieces the Dreaming view reads: the settings store and the subagent registry. */
+internal class DesktopDreamingDeps(val store: SecureSettingsStore, val subagents: ISubagentRepository?)
+
 @Composable
-internal fun DesktopDreamingPane(
-    agentId: String,
-    scope: CoroutineScope,
-    store: SecureSettingsStore,
-    subagents: ISubagentRepository?,
-    modifier: Modifier = Modifier,
-) {
+internal fun DesktopDreamingPane(agentId: String, scope: CoroutineScope, deps: DesktopDreamingDeps, modifier: Modifier = Modifier) {
+    val subagents = deps.subagents
+    val store = deps.store
     val controller = remember(agentId, scope, subagents) {
         val sources = DesktopWorkspaceSources()
         DreamingController(
