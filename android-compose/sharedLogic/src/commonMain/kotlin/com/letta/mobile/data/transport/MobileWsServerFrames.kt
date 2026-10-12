@@ -693,6 +693,27 @@ sealed interface ServerFrame {
     }
 
     /**
+     * letta-mobile-a4tm7: an Iroh host's runtime for one conversation now runs in [mode] (a client
+     * changed it with `permission_mode.set`). Routing-only: it feeds the permission-mode chip
+     * ([com.letta.mobile.data.runtime.RelayedPermissionModes]), never the timeline.
+     */
+    @Serializable
+    data class PermissionModeUpdated(
+        override val v: Int = 1,
+        val type: String = com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
+        override val id: String = "",
+        override val ts: String = "",
+        @SerialName("agent_id") val agentId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val mode: String,
+        val at: String = "",
+    ) : ServerFrame {
+        /** The mode, or null when it is not one this client knows (a newer host). */
+        fun permissionMode(): com.letta.mobile.data.transport.appserver.AppServerPermissionMode? =
+            com.letta.mobile.data.transport.appserver.AppServerPermissionMode.fromWireValue(mode)
+    }
+
+    /**
      * Forward-compat sink for unknown `type` values. Spec §2 mandates
      * silent-ignore; surfacing as a typed value (rather than throwing)
      * lets callers tell apart "deserialization failed" from "frame the

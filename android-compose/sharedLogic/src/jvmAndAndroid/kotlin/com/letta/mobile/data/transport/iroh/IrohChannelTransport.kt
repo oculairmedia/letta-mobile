@@ -117,6 +117,7 @@ class IrohChannelTransport(
     override val events: SharedFlow<ServerFrame> = framePublisher.events
 
     override val hostCapabilities: Set<String> get() = connectionSession.hostCapabilities()
+    override val hostNodeId: String? get() = connectionSession.hostNodeId()
     override val frameEvents: SharedFlow<TransportFrameEvent> = framePublisher.frameEvents
     override val collectorOverflows: SharedFlow<FrameCollectorOverflowIncident> = framePublisher.collectorOverflows
     override val frameCollectorConnectionGeneration: Long

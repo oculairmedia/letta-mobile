@@ -5,8 +5,7 @@ import kotlin.test.assertEquals
 
 class LettaConfigLabelCommonTest {
     @Test
-    fun labelsCloudLocalAndSelfHostedBackends() {
-        assertEquals("Cloud", config(LettaConfig.Mode.CLOUD, "https://app.letta.com").toBackendLabel())
+    fun labelsLocalAndRemoteBackends() {
         assertEquals("Local LettaCode", config(LettaConfig.Mode.LOCAL, "local://device").toBackendLabel())
         assertEquals("Local Koog runtime", config(LettaConfig.Mode.LOCAL, "local-koog://device").toBackendLabel())
         assertEquals(

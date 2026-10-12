@@ -82,6 +82,26 @@ class RelayedPermissionModes(
         }
     }
 
+    /**
+     * letta-mobile-a4tm7: folds the host's `permission_mode` pushes from [frames] (a channel
+     * transport's `events`) until [scope] ends, so a change another client made moves this chip
+     * without reopening the conversation.
+     *
+     * A push is only ever recorded as what the host runs ([PermissionModeRegistry.observed]): a change
+     * this client has in flight stays requested (and enforced as the stricter of the two) until its own
+     * answer settles it, and nothing is re-sent from here, so two clients never ping-pong a mode.
+     */
+    fun bind(scope: CoroutineScope, frames: Flow<ServerFrame>): Job = scope.launch {
+        frames.filterIsInstance<ServerFrame.PermissionModeUpdated>().collect(::adopt)
+    }
+
+    internal fun adopt(push: ServerFrame.PermissionModeUpdated) {
+        val mode = push.permissionMode() ?: return
+        if (push.agentId.isBlank() || push.conversationId.isBlank()) return
+        modes.observed(AppServerRuntimeScope(push.agentId, push.conversationId), mode)
+        Telemetry.event("RelayedPermissionModes", "push.adopted", "mode" to PermissionModeRpc.wire(mode))
+    }
+
     private suspend fun request(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): ModeChangeResult = try {
         val result = rpc.invoke(PermissionModeRpc.SET, params(runtime, mode))
         if (PermissionModeRpc.confirmedOf(result) && PermissionModeRpc.modeOf(result) == mode) {
@@ -122,7 +142,11 @@ class IrohApprovalControls(
     )
     private val job: Job = relay.bind(scope, transport.events)
 
+    /** letta-mobile-a4tm7: another client's mode change on the host moves this chip. */
+    private val modeJob: Job = modes.bind(scope, transport.events)
+
     override fun close() {
         job.cancel()
+        modeJob.cancel()
     }
 }
