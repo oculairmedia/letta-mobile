@@ -1,617 +1,295 @@
 package com.letta.mobile.ui.screens.conversations
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.PreviewLightDark
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import ca.oculair.meridian.R
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.ui.components.ShimmerConversationList
+import com.letta.mobile.data.chat.runtime.toChatConversationSummary
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.components.picker.LettaPicker
+import com.letta.mobile.ui.components.picker.LettaPickerSpec
+import com.letta.mobile.ui.components.picker.PickerCallbacks
+import com.letta.mobile.ui.components.picker.PickerItem
+import com.letta.mobile.ui.components.picker.PickerPane
+import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.preview.LettaPreviewFrame
-import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageActions
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageInput
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageMapping
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageState
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.shell.scaffold.ShellListDetail
+import com.letta.mobile.ui.shell.shellConversationsPage
+import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
+import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import kotlin.time.Clock
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Where the conversations page sends the user. */
+data class ConversationsScreenNavigation(
+    /** Opens a chat full screen (a narrow window); a null conversation starts a new one. */
+    val onOpenChat: (agentId: String, conversationId: String?, agentName: String?) -> Unit,
+    val onNavigateToSettings: () -> Unit,
+    val onNavigateToAgentList: () -> Unit,
+    val onCreateFirstAgent: () -> Unit,
+    val activeBackendLabel: String? = null,
+    val onNavigateToBackendSwitcher: (() -> Unit)? = null,
+)
+
+/** The chat a wide window shows beside the list; a null [conversationId] is a new chat. */
+@Immutable
+data class ConversationsDetail(val agentId: String, val conversationId: String?, val agentName: String?)
+
+/** Draws [ConversationsDetail] (or the empty pane for null) beside the list; [onClose] empties it, [onOpen] switches it. */
+fun interface ConversationsDetailPane {
+    @Composable
+    fun Content(detail: ConversationsDetail?, onClose: () -> Unit, onOpen: (ConversationsDetail) -> Unit)
+}
+
+object ConversationsScreenTags {
+    const val NEW_CHAT = "conversations-new-chat"
+    const val AGENT_PICKER = "conversations-agent-picker"
+}
+
+private val DetailSaver = listSaver<ConversationsDetail?, String?>(
+    save = { detail -> detail?.let { listOf(it.agentId, it.conversationId, it.agentName) } ?: emptyList() },
+    restore = { values -> values.firstOrNull()?.let { ConversationsDetail(it, values[1], values[2]) } },
+)
+
+/**
+ * letta-mobile-ckmub.2.4 (hard cut S16): the Chat tab's root. A container only: the shared shell
+ * header, the shared conversations page ([ShellPage] on a chat destination without an agent) and the
+ * shell's wide layout ([ShellListDetail]), bound to [ConversationsViewModel]. In a wide window a chat
+ * opens beside the list in [detailPane]; in a narrow one it opens full screen.
+ */
 @Composable
 fun ConversationsScreen(
-    onNavigateToChat: (agentId: String, conversationId: String, agentName: String?) -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToAgentList: () -> Unit,
-    onNavigateToTemplates: () -> Unit = {},
-    onNavigateToArchives: () -> Unit = {},
-    onNavigateToFolders: () -> Unit = {},
-    onNavigateToGroups: () -> Unit = {},
-    onNavigateToProviders: () -> Unit = {},
-    onNavigateToBlocks: () -> Unit = {},
-    onNavigateToIdentities: () -> Unit = {},
-    onNavigateToSchedules: () -> Unit = {},
-    onNavigateToRuns: () -> Unit = {},
-    onNavigateToJobs: () -> Unit = {},
-    onNavigateToMessageBatches: () -> Unit = {},
-    onNavigateToMcp: () -> Unit = {},
-    onNavigateToAbout: () -> Unit = {},
-    onNavigateToBotSettings: () -> Unit = {},
-    onNavigateToProjects: () -> Unit = {},
-    onCreateFirstAgent: () -> Unit = onNavigateToAgentList,
-    activeBackendLabel: String? = null,
-    onNavigateToBackendSwitcher: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
+    navigation: ConversationsScreenNavigation,
+    detailPane: ConversationsDetailPane,
     viewModel: ConversationsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showNewChat by rememberSaveable { mutableStateOf(false) }
-    var showOverflowMenu by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val navigation = remember(
-        onNavigateToTemplates,
-        onNavigateToArchives,
-        onNavigateToFolders,
-        onNavigateToGroups,
-        onNavigateToProviders,
-        onNavigateToBlocks,
-        onNavigateToIdentities,
-        onNavigateToSchedules,
-        onNavigateToRuns,
-        onNavigateToJobs,
-        onNavigateToMessageBatches,
-        onNavigateToMcp,
-        onNavigateToProjects,
-        onNavigateToAbout,
-    ) {
-        ConversationsNavigation(
-            onNavigateToTemplates = onNavigateToTemplates,
-            onNavigateToArchives = onNavigateToArchives,
-            onNavigateToFolders = onNavigateToFolders,
-            onNavigateToGroups = onNavigateToGroups,
-            onNavigateToProviders = onNavigateToProviders,
-            onNavigateToBlocks = onNavigateToBlocks,
-            onNavigateToIdentities = onNavigateToIdentities,
-            onNavigateToSchedules = onNavigateToSchedules,
-            onNavigateToRuns = onNavigateToRuns,
-            onNavigateToJobs = onNavigateToJobs,
-            onNavigateToMessageBatches = onNavigateToMessageBatches,
-            onNavigateToMcp = onNavigateToMcp,
-            onNavigateToProjects = onNavigateToProjects,
-            onNavigateToAbout = onNavigateToAbout,
-        )
+    var filter by rememberSaveable { mutableStateOf(ShellArchiveFilter.Active) }
+    var detail by rememberSaveable(stateSaver = DetailSaver) { mutableStateOf<ConversationsDetail?>(null) }
+    var pickingAgent by rememberSaveable { mutableStateOf(false) }
+    val layout = remember { ConversationsLayout() }
+    val open: (ConversationsDetail) -> Unit = { target ->
+        if (layout.wide) detail = target else navigation.onOpenChat(target.agentId, target.conversationId, target.agentName)
     }
-
-    if (showNewChat) {
-        NewChatAgentScreen(
-            agents = uiState.agents,
-            onBack = { showNewChat = false },
-            onAgentSelected = { agent ->
-                viewModel.createConversation(agent.id) { conversationId ->
-                    showNewChat = false
-                    onNavigateToChat(
-                        agent.id.value,
-                        conversationId.value,
-                        agent.name.takeIf(String::isNotBlank),
-                    )
-                }
-            },
-            modifier = modifier,
-        )
-        return
-    }
-
-    LaunchedEffect(uiState.createConversationError) {
-        val message = uiState.createConversationError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        viewModel.clearCreateConversationError()
-    }
-
-    val filteredConversations = remember(uiState.conversations, uiState.searchQuery, uiState.filter) {
-        viewModel.getFilteredConversations()
-    }
-    val listActions = remember(onNavigateToChat, viewModel) {
-        ConversationListActions(
-            onConversationClick = { display ->
-                onNavigateToChat(
-                    display.conversation.agentId.value,
-                    display.conversation.id.value,
-                    display.routeAgentName(),
-                )
-            },
-            onOpenAdmin = viewModel::openConversationAdmin,
-            onDeleteConversation = { viewModel.deleteConversation(it.conversation.id) },
-            onRenameConversation = { display, newName ->
-                viewModel.renameConversation(
-                    display.conversation.id,
-                    display.conversation.agentId,
-                    newName,
-                )
-            },
-            onTogglePinned = viewModel::toggleConversationPinned,
-            onForkConversation = { display ->
-                viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { newConvId ->
-                    onNavigateToChat(
-                        display.conversation.agentId.value,
-                        newConvId.value,
-                        display.routeAgentName(),
-                    )
-                }
-            },
-            onArchiveToggle = { display -> viewModel.setConversationArchived(display, display.conversation.archived != true) },
-            onRefresh = viewModel::refresh,
-        )
-    }
-
-    ConversationsScreenContent(
-        state = ConversationsScreenState(
-            isLoading = uiState.isLoading,
-            error = uiState.error,
-            hasConversations = uiState.conversations.isNotEmpty(),
-            conversations = filteredConversations,
-            isRefreshing = uiState.isRefreshing,
-            filter = uiState.filter,
-            localReadiness = uiState.localLettaCodeReadiness,
-            showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
-            activeBackendLabel = activeBackendLabel,
-            showOverflowMenu = showOverflowMenu,
-            onCreateFirstAgent = onCreateFirstAgent,
-            onOpenLocalSettings = onNavigateToSettings,
-            onNewChatClick = { showNewChat = true },
+    val binding = ConversationsBinding(viewModel, uiState, open)
+    val pageState = remember(uiState, filter, detail) { binding.pageState(filter, detail?.conversationId) }
+    ConversationsRouteContent(
+        page = ConversationsRoutePage(
+            state = pageState,
+            actions = binding.pageActions(onFilter = { filter = it }, onCreateAgent = navigation.onCreateFirstAgent),
+            chrome = ConversationsChrome(
+                backendLabel = navigation.activeBackendLabel,
+                onBackendClick = navigation.onNavigateToBackendSwitcher,
+                onAgents = navigation.onNavigateToAgentList,
+                onSettings = navigation.onNavigateToSettings,
+                onNewChat = { pickingAgent = true },
+            ),
         ),
-        callbacks = ConversationsScreenCallbacks(
-            onShowOverflowMenuChange = { showOverflowMenu = it },
-            onFilterChange = viewModel::setFilter,
-            onNavigateToSettings = onNavigateToSettings,
-            onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
-            onConversationClick = listActions.onConversationClick,
-            onOpenAdmin = listActions.onOpenAdmin,
-            onDeleteConversation = listActions.onDeleteConversation,
-            onRenameConversation = listActions.onRenameConversation,
-            onTogglePinned = listActions.onTogglePinned,
-            onForkConversation = listActions.onForkConversation,
-            onArchiveToggle = listActions.onArchiveToggle,
-            onRefresh = listActions.onRefresh,
-            onRetryLoad = viewModel::loadConversations,
-            navigation = navigation,
-            scrollBehavior = scrollBehavior,
-        ),
-        snackbarHostState = snackbarHostState,
-        modifier = modifier,
+        onWideChange = { layout.wide = it },
+        detail = { detailPane.Content(detail, onClose = { detail = null }, onOpen = { detail = it }) },
     )
-
-    uiState.selectedConversation?.let { display ->
-        ConversationAdminDialog(
-            state = ConversationAdminDialogState(
-                display = display,
-                recompilePreview = uiState.recompilePreview,
-                inspectorMessages = uiState.inspectorMessages,
-                isInspectorLoading = uiState.isInspectorLoading,
-                inspectorError = uiState.inspectorError,
-            ),
-            callbacks = ConversationAdminDialogCallbacks(
-                onDismiss = { viewModel.closeConversationAdmin() },
-                onRename = { newName ->
-                    viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
-                },
-                onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
-                onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
-                onCancelRuns = { viewModel.cancelConversationRuns(display) },
-                onRecompile = { viewModel.recompileConversation(display) },
-                onDelete = { viewModel.deleteConversation(display.conversation.id) },
-            ),
-        )
+    if (pickingAgent) {
+        NewChatAgentPicker(uiState.agents, onDismiss = { pickingAgent = false }) { agent ->
+            pickingAgent = false
+            open(ConversationsDetail(agent.id.value, conversationId = null, agentName = agent.name.takeIf(String::isNotBlank)))
+        }
     }
+    ConversationInspector(viewModel, uiState)
 }
 
-/**
- * Everything [ConversationsScreenContent]/[ConversationsScreenBody] need to
- * render the screen body, sourced from [ConversationsUiState] plus the
- * screen-level local state ([ConversationsScreen] owns the latter).
- *
- * [conversations] is already filtered (mirrors the `filteredConversations`
- * value the production screen used to compute inline). [hasConversations]
- * tracks the *unfiltered* list's emptiness separately, because the
- * loading/error full-screen branches must gate on whether there is any
- * cached data at all, not on whether the current search filter happens to
- * produce zero rows.
- */
-internal data class ConversationsScreenState(
-    val isLoading: Boolean,
-    val error: String?,
-    val hasConversations: Boolean,
-    val conversations: List<ConversationDisplay>,
-    val isRefreshing: Boolean,
-    val filter: ConversationFilter,
-    val localReadiness: LocalLettaCodeCreateReadiness,
-    val showFirstRunOnboarding: Boolean,
-    val activeBackendLabel: String?,
-    val showOverflowMenu: Boolean,
-    val onCreateFirstAgent: () -> Unit,
-    val onOpenLocalSettings: () -> Unit,
-    val onNewChatClick: () -> Unit,
-)
+/** Whether the list is docked beside a detail pane right now (read when a row opens). */
+private class ConversationsLayout {
+    var wide = false
+}
 
-internal data class ConversationsScreenCallbacks(
-    val onShowOverflowMenuChange: (Boolean) -> Unit,
-    val onFilterChange: (ConversationFilter) -> Unit,
-    val onNavigateToSettings: () -> Unit,
-    val onNavigateToBackendSwitcher: (() -> Unit)?,
-    val onConversationClick: (ConversationDisplay) -> Unit,
-    val onOpenAdmin: (ConversationDisplay) -> Unit,
-    val onDeleteConversation: (ConversationDisplay) -> Unit,
-    val onRenameConversation: (ConversationDisplay, String) -> Unit,
-    val onTogglePinned: (ConversationDisplay) -> Unit,
-    val onForkConversation: (ConversationDisplay) -> Unit,
-    val onArchiveToggle: (ConversationDisplay) -> Unit,
-    val onRefresh: () -> Unit,
-    val onRetryLoad: () -> Unit,
-    val navigation: ConversationsNavigation,
-    val scrollBehavior: TopAppBarScrollBehavior,
-)
-
-private fun ConversationsScreenCallbacks.toListActions() = ConversationListActions(
-    onConversationClick = onConversationClick,
-    onOpenAdmin = onOpenAdmin,
-    onDeleteConversation = onDeleteConversation,
-    onRenameConversation = onRenameConversation,
-    onTogglePinned = onTogglePinned,
-    onForkConversation = onForkConversation,
-    onArchiveToggle = onArchiveToggle,
-    onRefresh = onRefresh,
-)
-
-/**
- * Real production body: the [Scaffold] with the actual [ConversationsTopBar]
- * and [FloatingActionButton], plus the loading/error/list `when`. Everything
- * outside of this (view-model wiring, the `showNewChat` early return, the
- * snackbar [LaunchedEffect], and the trailing admin dialog) stays in
- * [ConversationsScreen].
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun ConversationsScreenContent(
-    state: ConversationsScreenState,
-    callbacks: ConversationsScreenCallbacks,
-    snackbarHostState: SnackbarHostState,
-    modifier: Modifier = Modifier,
+/** The view model's state and calls, as the shared page's state and actions. */
+private class ConversationsBinding(
+    private val viewModel: ConversationsViewModel,
+    private val uiState: ConversationsUiState,
+    private val open: (ConversationsDetail) -> Unit,
 ) {
-    Scaffold(
-        modifier = modifier.nestedScroll(callbacks.scrollBehavior.nestedScrollConnection),
-        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            ConversationsTopBar(
-                state = ConversationsTopBarState(
-                    showOverflowMenu = state.showOverflowMenu,
-                    scrollBehavior = callbacks.scrollBehavior,
-                ),
-                callbacks = ConversationsTopBarCallbacks(
-                    onNavigateToSettings = callbacks.onNavigateToSettings,
-                    onShowOverflowMenuChange = callbacks.onShowOverflowMenuChange,
-                ),
-                navigation = callbacks.navigation,
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = state.onNewChatClick,
-                icon = { Icon(LettaIcons.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.screen_conversations_new_action)) },
-            )
-        },
-    ) { paddingValues ->
-        val error = state.error
-        when {
-            state.isLoading && !state.hasConversations -> {
-                ShimmerConversationList(modifier = Modifier.padding(paddingValues))
-            }
-            error != null && !state.hasConversations -> {
-                ConversationsErrorContent(
-                    message = error,
-                    onRetry = callbacks.onRetryLoad,
-                    modifier = Modifier.padding(paddingValues),
-                )
-            }
-            else -> {
-                Column(modifier = Modifier.padding(paddingValues)) {
-                    // The list's header: what it shows (the backend it comes from) and the filter menu.
-                    if (state.hasConversations) {
-                        ConversationListHeader(
-                            label = state.activeBackendLabel,
-                            filter = state.filter,
-                            onFilterChange = callbacks.onFilterChange,
-                            onLabelClick = callbacks.onNavigateToBackendSwitcher,
-                        )
-                    }
-                    ConversationListContent(
-                        state = ConversationListContentState(
-                            conversations = state.conversations,
-                            isRefreshing = state.isRefreshing,
-                            isSearchActive = false,
-                            showFirstRunOnboarding = state.showFirstRunOnboarding,
-                            localReadiness = state.localReadiness,
-                            onCreateFirstAgent = state.onCreateFirstAgent,
-                            onOpenLocalSettings = state.onOpenLocalSettings,
-                        ),
-                        actions = callbacks.toListActions(),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+    private fun display(id: String): ConversationDisplay? = uiState.conversations.firstOrNull { it.conversation.id.value == id }
+
+    fun pageState(filter: ShellArchiveFilter, openConversationId: String?): ConversationsPageState {
+        val state = ConversationsPageMapping.state(
+            ConversationsPageInput(
+                conversations = uiState.conversations.map { it.conversation.toChatConversationSummary(mapOf(it.conversation.agentId.value to it.agentName)) },
+                archiveFilter = filter,
+                pinnedIds = uiState.conversations.filter { it.isPinned }.map { it.conversation.id.value }.toSet(),
+                workingIds = uiState.conversations.filter { it.isWorking }.map { it.conversation.id.value }.toSet(),
+                loading = uiState.isLoading,
+                error = uiState.error,
+                noAgents = uiState.shouldShowFirstRunOnboarding(),
+            ),
+            Clock.System.now(),
+        )
+        return state.copy(
+            pinned = state.pinned.map { it.copy(selected = it.id == openConversationId) },
+            groups = state.groups.map { group -> group.copy(rows = group.rows.map { it.copy(selected = it.id == openConversationId) }) },
+        )
+    }
+
+    fun pageActions(onFilter: (ShellArchiveFilter) -> Unit, onCreateAgent: () -> Unit) = ConversationsPageActions(
+        conversations = ShellAgentPanelActions(
+            onArchiveFilterChange = onFilter,
+            onConversationSelected = { id -> display(id)?.let { open(it.toDetail()) } },
+            onArchiveConversation = { id, archived -> display(id)?.let { viewModel.setConversationArchived(it, archived) } },
+            onDeleteConversation = { id -> display(id)?.let { viewModel.deleteConversation(it.conversation.id) } },
+            deleteBehavior = viewModel.deleteBehavior,
+            onRenameConversation = { id, title -> display(id)?.let { viewModel.renameConversation(it.conversation.id, it.conversation.agentId, title) } },
+            onPinConversation = { id, pinned -> display(id)?.takeIf { it.isPinned != pinned }?.let(viewModel::toggleConversationPinned) },
+            onForkConversation = { id, name -> display(id)?.let { fork(it, name) } },
+        ),
+        onRetry = viewModel::loadConversations,
+        onCreateAgent = onCreateAgent,
+        rowMenu = { model -> listOf(LettaMenuItem("Inspect…") { display(model.id)?.let(viewModel::openConversationAdmin) }) },
+    )
+
+    /** Forks, names the fork when asked to, and opens it. */
+    private fun fork(source: ConversationDisplay, name: String?) {
+        val agentId = source.conversation.agentId
+        viewModel.forkConversation(source.conversation.id, agentId) { forkId ->
+            name?.takeIf { it.isNotBlank() }?.let { viewModel.renameConversation(forkId, agentId, it) }
+            open(ConversationsDetail(agentId.value, forkId.value, source.agentName))
         }
     }
 }
 
+private fun ConversationDisplay.toDetail() = ConversationsDetail(
+    agentId = conversation.agentId.value,
+    conversationId = conversation.id.value,
+    agentName = agentName.takeIf { it.isNotBlank() },
+)
+
+/** The header's controls and the new-chat action. */
+internal data class ConversationsChrome(
+    val backendLabel: String? = null,
+    val onBackendClick: (() -> Unit)? = null,
+    val onAgents: () -> Unit = {},
+    val onSettings: () -> Unit = {},
+    val onNewChat: () -> Unit = {},
+)
+
+internal data class ConversationsRoutePage(
+    val state: ConversationsPageState,
+    val actions: ConversationsPageActions,
+    val chrome: ConversationsChrome,
+)
+
 /**
- * Preview-safe body: same loading/error/list `when` logic as
- * [ConversationsScreenContent], but with a plain title row instead of a real
- * [Scaffold]/`TopAppBar` (Material3 `TopAppBar` throws `NoSuchMethodError` in
- * the layoutlib preview renderer, same as [ConversationsTopBarTitlePreview]).
- *
- * The empty/first-run branch still routes through the real
- * [ConversationListContent] entry point, since its empty-state path never
- * reaches `PullToRefreshBox`. The populated-list branch renders
- * [ConversationCard] rows directly in a plain scrollable [Column] instead —
- * going through [ConversationListContent] there would hit
- * `ConversationListRefreshableContent`'s `PullToRefreshBox`, which throws the
- * same `NoSuchMethodError` that [ConversationListContentPreview] works around
- * by calling the (file-private, so unavailable here) section renderer
- * directly.
+ * The route's layout, without a view model: the shell's list-and-detail layout with the shared
+ * header, the shared conversations page and the new-chat button in the list pane.
  */
 @Composable
-internal fun ConversationsScreenBody(
-    state: ConversationsScreenState,
-    callbacks: ConversationsScreenCallbacks,
-    modifier: Modifier = Modifier,
+internal fun ConversationsRouteContent(
+    page: ConversationsRoutePage,
+    onWideChange: (Boolean) -> Unit = {},
+    detail: @Composable () -> Unit = {},
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = stringResource(R.string.common_conversations),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(LettaDimens.Space.lg),
-        )
-        val error = state.error
-        when {
-            state.isLoading && !state.hasConversations -> {
-                ShimmerConversationList(modifier = Modifier.weight(1f))
-            }
-            error != null && !state.hasConversations -> {
-                ConversationsErrorContent(
-                    message = error,
-                    onRetry = callbacks.onRetryLoad,
-                    modifier = Modifier.weight(1f),
+    ShellListDetail(
+        list = { wide ->
+            SideEffect { onWideChange(wide) }
+            LettaPageScaffold(
+                containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
+                header = { ConversationsHeader(page.chrome) },
+                floatingAction = { NewChatButton(page.chrome.onNewChat) },
+            ) { padding ->
+                ShellPage(
+                    destination = ShellDestination.Chat(),
+                    deps = ShellPageDeps(chat = shellConversationsPage(page.state, page.actions)),
+                    modifier = Modifier.padding(padding),
                 )
             }
-            state.conversations.isEmpty() -> {
-                ConversationListContent(
-                    state = ConversationListContentState(
-                        conversations = state.conversations,
-                        isRefreshing = state.isRefreshing,
-                        isSearchActive = false,
-                        showFirstRunOnboarding = state.showFirstRunOnboarding,
-                        localReadiness = state.localReadiness,
-                        onCreateFirstAgent = state.onCreateFirstAgent,
-                        onOpenLocalSettings = state.onOpenLocalSettings,
-                    ),
-                    actions = callbacks.toListActions(),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            else -> {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(LettaDimens.Space.lg),
-                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                ) {
-                    state.conversations.forEach { display ->
-                        ConversationCard(
-                            display = display,
-                            callbacks = ConversationCardCallbacks(
-                                onClick = { callbacks.onConversationClick(display) },
-                                onOpenAdmin = { callbacks.onOpenAdmin(display) },
-                                onDelete = { callbacks.onDeleteConversation(display) },
-                                onRename = { newName -> callbacks.onRenameConversation(display, newName) },
-                                onTogglePinned = { callbacks.onTogglePinned(display) },
-                                onFork = { callbacks.onForkConversation(display) },
-                                onArchiveToggle = { callbacks.onArchiveToggle(display) },
-                            ),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// region Previews
-
-private fun previewConversationDisplay(id: String, summary: String, pinned: Boolean = false): ConversationDisplay =
-    ConversationDisplay(
-        conversation = Conversation(
-            id = ConversationId(id),
-            agentId = AgentId("agent-1"),
-            summary = summary,
-            createdAt = "2026-08-01T09:00:00Z",
-            lastMessageAt = "2026-08-07T18:30:00Z",
-        ),
-        agentName = "General Assistant",
-        isPinned = pinned,
+        },
+        detail = detail,
     )
-
-private fun previewConversations(): List<ConversationDisplay> = listOf(
-    previewConversationDisplay("conv-1", "Weekly planning check-in", pinned = true),
-    previewConversationDisplay("conv-2", "Release triage"),
-    previewConversationDisplay("conv-3", "Research digest"),
-    previewConversationDisplay("conv-4", "Onboarding notes"),
-)
-
-private fun previewConversationsScreenState(
-    conversations: List<ConversationDisplay> = emptyList(),
-    isLoading: Boolean = false,
-    error: String? = null,
-    showFirstRunOnboarding: Boolean = false,
-    filter: ConversationFilter = ConversationFilter.ALL,
-) = ConversationsScreenState(
-    isLoading = isLoading,
-    error = error,
-    hasConversations = conversations.isNotEmpty(),
-    conversations = conversations,
-    isRefreshing = false,
-    filter = filter,
-    localReadiness = LocalLettaCodeCreateReadiness(),
-    showFirstRunOnboarding = showFirstRunOnboarding,
-    activeBackendLabel = null,
-    showOverflowMenu = false,
-    onCreateFirstAgent = {},
-    onOpenLocalSettings = {},
-    onNewChatClick = {},
-)
-
-private fun previewConversationsNavigation() = ConversationsNavigation(
-    onNavigateToTemplates = {},
-    onNavigateToArchives = {},
-    onNavigateToFolders = {},
-    onNavigateToGroups = {},
-    onNavigateToProviders = {},
-    onNavigateToBlocks = {},
-    onNavigateToIdentities = {},
-    onNavigateToSchedules = {},
-    onNavigateToRuns = {},
-    onNavigateToJobs = {},
-    onNavigateToMessageBatches = {},
-    onNavigateToMcp = {},
-    onNavigateToProjects = {},
-    onNavigateToAbout = {},
-)
-
-// pinnedScrollBehavior() is @ExperimentalMaterial3Api and must be created in
-// a composable context; centralizing it here keeps every preview below free
-// of its own @OptIn.
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun previewConversationsScreenCallbacks() = ConversationsScreenCallbacks(
-    onShowOverflowMenuChange = {},
-    onFilterChange = {},
-    onNavigateToSettings = {},
-    onNavigateToBackendSwitcher = null,
-    onConversationClick = {},
-    onOpenAdmin = {},
-    onDeleteConversation = {},
-    onRenameConversation = { _, _ -> },
-    onTogglePinned = {},
-    onForkConversation = {},
-    onArchiveToggle = {},
-    onRefresh = {},
-    onRetryLoad = {},
-    navigation = previewConversationsNavigation(),
-    scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
-)
-
-@PreviewLightDark
-@Composable
-private fun ConversationsScreenPopulatedPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(conversations = previewConversations()),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
 }
 
-@PreviewLightDark
 @Composable
-private fun ConversationsScreenLoadingPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(isLoading = true),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ConversationsScreenEmptyPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ConversationsScreenErrorPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(error = "Failed to load conversations"),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ConversationsScreenFirstRunPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(showFirstRunOnboarding = true),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ConversationsScreenArchivedFilterPreview() {
-    LettaPreviewFrame {
-        ConversationsScreenBody(
-            state = previewConversationsScreenState(
-                conversations = previewConversations().take(1),
-                filter = ConversationFilter.ARCHIVED,
+private fun ConversationsHeader(chrome: ConversationsChrome) {
+    ShellHeader(
+        // The backend label under the title opens the switcher, when this host can switch.
+        title = HeaderTitle.Text("Conversations", chrome.backendLabel, onSubtitleClick = chrome.onBackendClick),
+        controls = HeaderControls(
+            actions = listOf(
+                HeaderAction.Icon(LettaIcons.People, "Agents", chrome.onAgents),
+                HeaderAction.Icon(LettaIcons.Settings, "Settings", chrome.onSettings),
             ),
-            callbacks = previewConversationsScreenCallbacks(),
-        )
-    }
+        ),
+    )
 }
 
-// A Tier-2 preview of ConversationsScreenContent (the real Scaffold) is
-// deliberately omitted: it composes both ConversationsTopBar's TopAppBar and
-// ConversationListContent's PullToRefreshBox, and this file's own precedent
-// (ConversationsTopBarTitlePreview in ConversationsTopBar.kt,
-// ConversationListContentPreview in ConversationListContent.kt) already
-// documents that both throw NoSuchMethodError in the layoutlib preview
-// renderer individually — combining them would fail the same way.
+@Composable
+private fun NewChatButton(onClick: () -> Unit) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        icon = { Icon(LettaIcons.Add, contentDescription = null) },
+        text = { Text("New chat") },
+        modifier = Modifier.padding(LettaDimens.Space.lg).testTag(ConversationsScreenTags.NEW_CHAT),
+    )
+}
 
-// endregion
+/** New chat: pick the agent it is with (the shared picker), then the chat opens fresh. */
+@Composable
+private fun NewChatAgentPicker(agents: List<Agent>, onDismiss: () -> Unit, onPick: (Agent) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val items = remember(agents) {
+        agents.map { agent -> PickerItem(key = agent.id.value, value = agent, title = agent.name.ifBlank { agent.id.value }, subtitle = agent.model) }
+    }
+    LettaPicker(
+        spec = LettaPickerSpec(sections = listOf(PickerSection(key = "agents", title = null, items = items)), query = query),
+        callbacks = PickerCallbacks(onQuery = { query = it }, onPick = { onPick(it.value) }, onDismiss = onDismiss),
+        pane = PickerPane(title = "New chat with…", testTag = ConversationsScreenTags.AGENT_PICKER),
+    )
+}
+
+/** The conversation inspector (details, recompile, cancel runs), opened from a row's "Inspect…". */
+@Composable
+private fun ConversationInspector(viewModel: ConversationsViewModel, uiState: ConversationsUiState) {
+    val display = uiState.selectedConversation ?: return
+    ConversationAdminDialog(
+        state = ConversationAdminDialogState(
+            display = display,
+            recompilePreview = uiState.recompilePreview,
+            inspectorMessages = uiState.inspectorMessages,
+            isInspectorLoading = uiState.isInspectorLoading,
+            inspectorError = uiState.inspectorError,
+        ),
+        callbacks = ConversationAdminDialogCallbacks(
+            onDismiss = viewModel::closeConversationAdmin,
+            onRename = { viewModel.renameConversation(display.conversation.id, display.conversation.agentId, it) },
+            onToggleArchived = { viewModel.setConversationArchived(display, it) },
+            onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
+            onCancelRuns = { viewModel.cancelConversationRuns(display) },
+            onRecompile = { viewModel.recompileConversation(display) },
+            onDelete = { viewModel.deleteConversation(display.conversation.id) },
+        ),
+    )
+}

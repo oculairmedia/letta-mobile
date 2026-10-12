@@ -51,6 +51,10 @@ private val PageScaffoldRouteNames: Set<String> by lazy {
         MemoryRoute.serializer().descriptor.serialName,
         SkillsRoute.serializer().descriptor.serialName,
         AllToolsRoute.serializer().descriptor.serialName,
+        // letta-mobile-ckmub.2.4: the conversations and agents pages (its wide chat pane insets itself).
+        ConversationsRoute.serializer().descriptor.serialName,
+        AgentListRoute.serializer().descriptor.serialName,
+        ShareToAgentRoute.serializer().descriptor.serialName,
     )
 }
 
@@ -59,7 +63,7 @@ private fun NavDestination.routeName(): String? = route?.substringBefore('/')?.s
 
 internal fun NavDestination?.insetPolicy(): DestinationInsetPolicy = when {
     this == null -> DestinationInsetPolicy.Host
-    TopLevelDestination.CHAT.isSelected(this) || hasRoute(CanvasRoute::class) -> DestinationInsetPolicy.SelfVertical
     routeName() in PageScaffoldRouteNames -> DestinationInsetPolicy.PageScaffold
+    TopLevelDestination.CHAT.isSelected(this) || hasRoute(CanvasRoute::class) -> DestinationInsetPolicy.SelfVertical
     else -> DestinationInsetPolicy.Host
 }

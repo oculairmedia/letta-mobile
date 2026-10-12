@@ -490,13 +490,7 @@ class AgentListViewModelTest {
 
         assertTrue(viewModel.uiState.value.agents.isEmpty())
         assertFalse(viewModel.uiState.value.isLoading)
-        assertTrue(
-            shouldShowEmptyAgentCreateAction(
-                isShareMode = false,
-                isHydrating = viewModel.uiState.value.isHydrating,
-                searchQuery = viewModel.uiState.value.searchQuery,
-            )
-        )
+        assertFalse(viewModel.uiState.value.isHydrating)
     }
 
     @Test
@@ -509,13 +503,6 @@ class AgentListViewModelTest {
         viewModel.showCreateDialog()
 
         assertTrue(viewModel.uiState.value.showCreateDialog)
-    }
-
-    @Test
-    fun `empty create action hidden while searching or sharing`() = runTest {
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = true, isHydrating = false, searchQuery = ""))
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = false, searchQuery = "missing"))
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = true, searchQuery = ""))
     }
 
     @Test
