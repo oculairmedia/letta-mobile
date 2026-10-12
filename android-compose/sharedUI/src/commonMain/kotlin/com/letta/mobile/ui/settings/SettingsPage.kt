@@ -76,7 +76,47 @@ class SettingsPageServices(
     val notifications: NotificationSettings? = null,
     val onOpenProviders: (() -> Unit)? = null,
     val contributions: List<SettingsContribution> = emptyList(),
-)
+) {
+    /**
+     * The groups the page draws now, each with the platform sections it holds: a group shows when it
+     * has a standard section or a platform section for [mode]; before the first frame is out only
+     * Backend shows, without its platform sections. The danger zone shows when there is a token to
+     * remove or an identity to reset.
+     */
+    internal fun visibleGroups(
+        mode: LettaConfig.Mode,
+        afterFirstFrame: Boolean,
+        hasSavedToken: Boolean = false,
+    ): List<Pair<SettingsGroup, List<SettingsContribution>>> {
+        val forMode = contributions.filter { it.showForMode == null || it.showForMode == mode }
+        val groups = if (afterFirstFrame) SettingsGroup.entries else listOf(SettingsGroup.Backend)
+        return groups
+            .map { group -> group to forMode.filter { it.group == group }.takeIf { afterFirstFrame }.orEmpty() }
+            .filter { (group, groupContributions) -> hasStandardSection(group, hasSavedToken) || groupContributions.isNotEmpty() }
+    }
+
+    /**
+     * The page's groups for this frame: on the first one only Backend is drawn (without its platform
+     * sections) and the groups that will follow are fixed-height placeholders, so nothing jumps.
+     */
+    internal fun pageGroups(mode: LettaConfig.Mode, afterFirstFrame: Boolean, hasSavedToken: Boolean): PageGroups {
+        val all = visibleGroups(mode, afterFirstFrame = true, hasSavedToken = hasSavedToken)
+        val first = if (afterFirstFrame) all else visibleGroups(mode, afterFirstFrame = false, hasSavedToken = hasSavedToken)
+        val rest = all.filter { (group, _) -> first.none { it.first == group } }
+        return PageGroups(first + rest, first.size)
+    }
+
+    /** Whether [group] has a standard section here (the Backend one always does). */
+    private fun hasStandardSection(group: SettingsGroup, hasSavedToken: Boolean): Boolean = when (group) {
+        SettingsGroup.Backend -> true
+        SettingsGroup.Appearance -> appearance?.isEmpty == false
+        SettingsGroup.Chat -> chat?.isEmpty == false
+        SettingsGroup.Notifications -> notifications?.attention != null
+        SettingsGroup.Providers -> onOpenProviders != null
+        SettingsGroup.Danger -> hasSavedToken || backend.onIrohIdentityReset != null
+        SettingsGroup.About, SettingsGroup.Developer -> false
+    }
+}
 
 object SettingsPageTags {
     const val PAGE = "settings-page"
@@ -266,40 +306,10 @@ private fun rememberAfterFirstFrame(): Boolean {
     return after
 }
 
-/**
- * The groups the page draws now, each with the platform sections it holds: a group shows when it has
- * a standard section or a platform section for [mode]; before the first frame is out only Backend
- * shows, without its platform sections. The danger zone shows when there is a token to remove or an
- * identity to reset.
- */
-internal fun SettingsPageServices.visibleGroups(
-    mode: LettaConfig.Mode,
-    afterFirstFrame: Boolean,
-    hasSavedToken: Boolean = false,
-): List<Pair<SettingsGroup, List<SettingsContribution>>> {
-    val forMode = contributions.filter { it.showForMode == null || it.showForMode == mode }
-    val groups = if (afterFirstFrame) SettingsGroup.entries else listOf(SettingsGroup.Backend)
-    return groups
-        .map { group -> group to forMode.filter { it.group == group }.takeIf { afterFirstFrame }.orEmpty() }
-        .filter { (group, groupContributions) -> hasStandardSection(group, hasSavedToken) || groupContributions.isNotEmpty() }
-}
-
 /** Every group of the page in order, and how many of them (from the top) are drawn now; the rest are placeholders. */
 internal class PageGroups(val groups: List<Pair<SettingsGroup, List<SettingsContribution>>>, val drawn: Int) {
     /** The groups drawn as placeholders this frame. */
     val skeletons: List<SettingsGroup> get() = groups.drop(drawn).map { it.first }
-}
-
-/**
- * The page's groups for this frame: on the first one only Backend is drawn (without its platform
- * sections) and the groups that will follow are fixed-height placeholders, so nothing jumps.
- */
-internal fun SettingsPageServices.pageGroups(mode: LettaConfig.Mode, afterFirstFrame: Boolean, hasSavedToken: Boolean): PageGroups {
-    val all = visibleGroups(mode, afterFirstFrame = true, hasSavedToken = hasSavedToken)
-    if (afterFirstFrame) return PageGroups(all, all.size)
-    val first = visibleGroups(mode, afterFirstFrame = false, hasSavedToken = hasSavedToken)
-    val rest = all.filter { (group, _) -> first.none { it.first == group } }
-    return PageGroups(first + rest, first.size)
 }
 
 /** A group's platform sections and the page's anchor. */
@@ -365,17 +375,6 @@ private fun StandardSection(group: SettingsGroup, inputs: StandardSectionInputs,
         SettingsGroup.Danger -> DangerZoneSection(inputs.backend, services.backend)
         SettingsGroup.About, SettingsGroup.Developer -> Unit
     }
-}
-
-/** Whether [group] has a standard section here (the Backend one always does). */
-private fun SettingsPageServices.hasStandardSection(group: SettingsGroup, hasSavedToken: Boolean): Boolean = when (group) {
-    SettingsGroup.Backend -> true
-    SettingsGroup.Appearance -> appearance?.isEmpty == false
-    SettingsGroup.Chat -> chat?.isEmpty == false
-    SettingsGroup.Notifications -> notifications?.attention != null
-    SettingsGroup.Providers -> onOpenProviders != null
-    SettingsGroup.Danger -> hasSavedToken || backend.onIrohIdentityReset != null
-    SettingsGroup.About, SettingsGroup.Developer -> false
 }
 
 /** Whether this anchor scrolls [group] into view; Pairing anchors its own card inside Backend instead. */

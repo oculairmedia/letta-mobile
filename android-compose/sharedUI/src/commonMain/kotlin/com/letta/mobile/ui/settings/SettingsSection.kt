@@ -147,8 +147,7 @@ object SettingsScope {
     @Composable
     fun ChoiceRow(row: SettingsRow.Choice) {
         val lock = LocalSettingsLock.current
-        val pointer = LocalLettaHost.current.input == LettaInput.Pointer
-        if (row.inline || (pointer && row.options.size <= SEGMENTED_CHOICE_COUNT)) {
+        if (row.segmentedOn(LocalLettaHost.current.input)) {
             SegmentedChoice(row, lock)
         } else {
             ListChoice(row, lock)
@@ -469,6 +468,13 @@ private const val SEARCHABLE_CHOICE_COUNT = 8
 
 /** A pointer shows a choice of this many options or fewer as a segmented control. */
 private const val SEGMENTED_CHOICE_COUNT = 3
+
+/** Whether this choice draws as a segmented control on [input]: always when inline, else a short choice on a pointer. */
+internal fun SettingsRow.Choice.segmentedOn(input: LettaInput): Boolean {
+    if (inline) return true
+    val short = options.size <= SEGMENTED_CHOICE_COUNT
+    return short && input == LettaInput.Pointer
+}
 
 private const val COPY_LABEL = "Copy"
 private const val PASTE_LABEL = "Paste"
