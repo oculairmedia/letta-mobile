@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -52,50 +54,82 @@ fun AdaptiveScaffold(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val windowSizeClass = LocalWindowSizeClass.current
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    // Screens that lay themselves out edge to edge, drawing behind the system bars and insetting
+    // only their own controls: the chat, and the canvas (its board and the note opened full
+    // screen). Padding them here boxed the board in between two bars of scaffold colour.
+    val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination) ||
+        currentDestination?.hasRoute(CanvasRoute::class) == true
 
-    if (windowSizeClass.isExpandedWidth) {
+    AdaptiveScaffoldLayout(
+        expanded = LocalWindowSizeClass.current.isExpandedWidth,
+        edgeToEdge = isChatDestination,
+        navigationRail = { LettaNavigationRail(navController = navController) },
+        modifier = modifier,
+        content = content,
+    )
+}
+
+/**
+ * letta-mobile-v7aln: [content] sits at the same place in the composition whether the window is
+ * compact or expanded. Rotating a phone crosses that line (expanded is 600dp and wider), and the
+ * two layouts used to call [content] from different branches. Saved state is keyed by position,
+ * so the rotated Activity found none of what the NavHost had saved: every destination's
+ * rememberSaveable state (the chat's scroll position and display mode among them) was lost.
+ * Only the rail and the padding differ between the two widths now.
+ */
+@Composable
+internal fun AdaptiveScaffoldLayout(
+    expanded: Boolean,
+    edgeToEdge: Boolean,
+    navigationRail: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { innerPadding ->
+        val layoutDirection = LocalLayoutDirection.current
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                .then(
+                    if (expanded) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    else Modifier
+                ),
         ) {
-            LettaNavigationRail(navController = navController)
-            VerticalDivider()
-            content()
-        }
-    } else {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentDestination = navBackStackEntry?.destination
-        // Screens that lay themselves out edge to edge, drawing behind the system bars and insetting
-        // only their own controls: the chat, and the canvas (its board and the note opened full
-        // screen). Padding them here boxed the board in between two bars of scaffold colour.
-        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination) ||
-            currentDestination?.hasRoute(CanvasRoute::class) == true
-
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.surface,
-        ) { innerPadding ->
-            val layoutDirection = LocalLayoutDirection.current
+            if (expanded) {
+                navigationRail()
+                VerticalDivider()
+            }
             Box(
                 modifier = Modifier
-                    .padding(
-                        top = if (isChatDestination) 0.dp else innerPadding.calculateTopPadding(),
-                        bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
-                        start = innerPadding.calculateStartPadding(layoutDirection),
-                        end = innerPadding.calculateEndPadding(layoutDirection)
-                    )
-                    .then(
-                        if (isChatDestination) Modifier
-                        else Modifier.consumeWindowInsets(innerPadding)
-                    ),
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(if (expanded) Modifier else Modifier.compactContentPadding(innerPadding, edgeToEdge, layoutDirection)),
             ) {
                 content()
             }
         }
     }
 }
+
+/** The compact layout's content padding: edge-to-edge screens keep only the horizontal insets. */
+private fun Modifier.compactContentPadding(
+    innerPadding: PaddingValues,
+    edgeToEdge: Boolean,
+    layoutDirection: LayoutDirection,
+): Modifier =
+    this
+        .padding(
+            top = if (edgeToEdge) 0.dp else innerPadding.calculateTopPadding(),
+            bottom = if (edgeToEdge) 0.dp else innerPadding.calculateBottomPadding(),
+            start = innerPadding.calculateStartPadding(layoutDirection),
+            end = innerPadding.calculateEndPadding(layoutDirection),
+        )
+        .then(if (edgeToEdge) Modifier else Modifier.consumeWindowInsets(innerPadding))
 
 @Composable
 private fun LettaNavigationRail(
