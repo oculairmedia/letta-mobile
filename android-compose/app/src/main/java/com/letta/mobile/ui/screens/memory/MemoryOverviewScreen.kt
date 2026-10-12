@@ -5,13 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,9 +21,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.memory.MemoryPage
 import com.letta.mobile.ui.memory.MemoryPageOptions
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPage
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
@@ -69,14 +68,9 @@ fun MemoryOverviewScreen(
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.screen_memory_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = LettaTopBarDefaults.topAppBarColors(),
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_memory_title)),
+                navIcon = HeaderNav.Back(onBack, stringResource(R.string.action_back)),
             )
         },
     ) { paddingValues ->

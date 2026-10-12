@@ -48,7 +48,7 @@ class DesktopConversationTabsUiTest {
     }
 
     // The chevron picker is gone: unified search moved to a persistent field in
-    // the header (DesktopHeaderSearch / LettaSearchAnchoredField), which searches
+    // the shared shell header (ShellHeader's SearchSlot), which searches
     // agents and canvases too, not just this agent's conversations. What remains
     // on the strip is the "+".
     @Test

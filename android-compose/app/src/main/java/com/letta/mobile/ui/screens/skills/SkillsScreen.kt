@@ -2,10 +2,6 @@ package com.letta.mobile.ui.screens.skills
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,9 +14,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.data.skills.SkillsCatalogState
 import com.letta.mobile.data.tools.ToolLibraryState
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.screens.tools.AllToolsViewModel
 import com.letta.mobile.ui.screens.tools.CreateToolDialog
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.pages.skills.SkillsPage
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
@@ -51,14 +49,9 @@ fun SkillsScreen(
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.screen_skills_title)) },
-                navigationIcon = {
-                    IconButton(onClick = navigation.onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = LettaTopBarDefaults.topAppBarColors(),
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_skills_title)),
+                navIcon = HeaderNav.Back(navigation.onNavigateBack, stringResource(R.string.action_back)),
             )
         },
     ) { paddingValues ->

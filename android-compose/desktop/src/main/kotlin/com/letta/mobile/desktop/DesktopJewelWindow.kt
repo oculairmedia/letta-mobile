@@ -22,7 +22,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
@@ -49,27 +48,15 @@ import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.SearchSlot
+import com.letta.mobile.ui.shell.header.ShellHeader
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
 @Immutable
-/**
- * The header's unified search: a persistent field, with its results in a panel
- * under it. Not a chevron that opens a menu — the field is always there and is
- * typed into directly.
- *
- * [config] carries the scopes, the "Filter to this agent" toggle and the
- * placeholder, so the window only has to draw it.
- */
-internal data class DesktopHeaderSearch(
-    val query: String,
-    val onQueryChange: (String) -> Unit,
-    val sections: List<com.letta.mobile.ui.search.LettaSearchSection>,
-    val onRowSelected: (com.letta.mobile.ui.search.LettaSearchRow) -> Unit,
-    val onDismiss: () -> Unit,
-    val config: com.letta.mobile.ui.search.LettaSearchConfig,
-)
-
 internal data class DesktopHeaderSidebarOverflow(
     val mode: WorkPlayMode,
     val onNewChat: () -> Unit,
@@ -94,7 +81,8 @@ internal data class DesktopHeaderChromeState(
     val onToggleSidebar: () -> Unit,
     val sidebarToggleFocusRequester: FocusRequester? = null,
     val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
-    val search: DesktopHeaderSearch? = null,
+    /** The shared shell header's one search (letta-mobile-ckmub.3.5). */
+    val search: SearchSlot? = null,
     val conversationTabs: List<DesktopConversationTab> = emptyList(),
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
@@ -135,7 +123,6 @@ private val TabbedTitleBarHeight = LettaDimens.Control.actionButton
  * to the window's right edge at any width.
  */
 private val IdentityBlockMaxWidth = 320.dp
-private val HeaderSearchWidth = 260.dp
 
 /** Always leaves an unobstructed title-bar lane for native window dragging. */
 private val MinimumTitleBarDragWidth = 96.dp
@@ -213,141 +200,25 @@ internal fun DesktopJewelWindow(
                     windowStyle = windowStyle,
                     titleBarStyle = titleBarStyle,
                 ) {
+                    // letta-mobile-ckmub.3.1: panes, tooltips and row menus as a pointer window draws them.
+                    // The title bar gets the host too, so the header search's pane opens as a pointer popover.
+                    val lettaHost = remember { LettaHost.desktopPointer(::hoverTimeLabel) }
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = LettaDimens.Space.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // Sidebar toggle: the one control that survives
-                            // collapse (o5m90 AC #1) — lives in the
-                            // always-visible chrome so it stays discoverable
-                            // once the sidebar is hidden.
-                            DesktopSidebarToggleButton(
-                                collapsed = header.sidebarCollapsed,
-                                onToggle = header.onToggleSidebar,
-                                focusRequester = header.sidebarToggleFocusRequester,
+                        CompositionLocalProvider(LocalLettaHost provides lettaHost) {
+                            DesktopTitleBarHeader(
+                                title = title,
+                                header = header,
+                                modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.sm),
                             )
-                            header.sidebarOverflow?.let { overflow ->
-                                if (header.sidebarCollapsed) {
-                                    DesktopSidebarOverflowMenu(
-                                        mode = overflow.mode,
-                                        onNewChat = overflow.onNewChat,
-                                        onDestination = overflow.onDestination,
-                                        onSettings = overflow.onSettings,
-                                    )
-                                }
-                            }
-                            Box(modifier = Modifier.width(LettaDimens.Space.xs))
-                            header.search?.let { search ->
-                                com.letta.mobile.ui.search.LettaSearchAnchoredField(
-                                    query = search.query,
-                                    onQueryChange = search.onQueryChange,
-                                    sections = search.sections,
-                                    onRowSelected = search.onRowSelected,
-                                    onDismiss = search.onDismiss,
-                                    // Re-enable focus for this subtree. Nucleus's TitleBarCore
-                                    // applies `focusProperties { canFocus = false }` to the whole
-                                    // title bar on Windows/Linux, so Tab navigation cannot wander
-                                    // into the window-drag area — which also means no child there
-                                    // can take focus. Buttons never noticed; a text field could be
-                                    // clicked and never receive a keystroke. Nucleus's own comment
-                                    // notes macOS keeps focus enabled exactly so TextField children
-                                    // in the title bar work, so this restores that locally rather
-                                    // than moving the field out of the header.
-                                    modifier = Modifier
-                                        .width(HeaderSearchWidth)
-                                        .focusProperties { canFocus = true },
-                                    config = search.config,
-                                )
-                            }
-
-                            // Agent-first identity: leading avatar, conversation
-                            // title over agent name (letta-mobile-3arhe.1).
-                            val identity = header.identity
-                            if (header.conversationTabs.isNotEmpty()) {
-                                // Keep the weighted container itself non-interactive: the tab strip
-                                // fills it edge to edge, reserving the drag lane as a trailing blank
-                                // item inside the LazyRow itself (see DesktopConversationTabRow's
-                                // dragLaneWidth) rather than shrinking the row's own width via
-                                // widthIn(max = ...). A width-constrained LazyRow left the row's
-                                // measured/virtualized viewport narrower than the space a tab could
-                                // be dragged into, clipping the dragged tab the moment it crossed
-                                // that boundary; letting the row use the full weighted width and
-                                // spending the reserved lane as real (if invisible) row content keeps
-                                // every dragged position inside the row's own bounds. Blank space
-                                // both inside the tab strip and past its last tab remains draggable;
-                                // trailing controls stay fixed.
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                ) {
-                                    DesktopConversationTabRow(
-                                        tabs = header.conversationTabs,
-                                        activeConversationId = header.activeConversationId,
-                                        actions = DesktopConversationTabActions(
-                                            onSelect = header.onSelectConversationTab,
-                                            onClose = header.onCloseConversationTab,
-                                            onReorder = header.onReorderConversationTab,
-                                            onNewConversation = header.onNewConversationTab,
-                                        ),
-                                        dragLaneWidth = MinimumTitleBarDragWidth,
-                                        modifier = Modifier.fillMaxHeight(),
-                                    )
-                                }
-                            } else if (identity != null) {
-                                DesktopHeaderIdentityBlock(
-                                    state = identity,
-                                    actions = header.identityActions,
-                                    modifier = Modifier.widthIn(max = IdentityBlockMaxWidth),
-                                )
-                            } else {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .widthIn(max = IdentityBlockMaxWidth)
-                                        .padding(horizontal = LettaDimens.Space.sm),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.ChatBubbleOutline,
-                                        contentDescription = null,
-                                        tint = colorScheme.onSurface,
-                                        modifier = Modifier.size(LettaDimens.Control.icon),
-                                    )
-                                    Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Medium,
-                                        color = colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                            // Without tabs, this is the only weighted element. With tabs, the
-                            // weighted Box above doubles as the drag region around its tab strip
-                            // (a LazyRow filling the Box edge to edge). Either way, caption
-                            // controls remain fixed.
-                            if (header.conversationTabs.isEmpty()) {
-                                Box(modifier = Modifier.weight(1f).fillMaxHeight())
-                            }
-                            if (identity != null) {
-                                DesktopHeaderTrailingControls(state = identity, actions = header.identityActions)
-                            }
                         }
                     }
                     // The pen belongs to this window (two windows cannot take each other's strokes).
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
-                    // letta-mobile-ckmub.3.1: panes, tooltips and row menus as a pointer window draws them.
-                    val lettaHost = remember { LettaHost.desktopPointer(::hoverTimeLabel) }
                     // Text selected by touch gets finger-sized handles and a Copy / Quote bar;
                     // the mouse keeps its own, and the bar only shows just after a finger.
                     val touchToolbar = remember {
@@ -371,5 +242,94 @@ internal fun DesktopJewelWindow(
                 }
             }
         }
+    }
+}
+
+/**
+ * The shared [ShellHeader] in the title bar (letta-mobile-ckmub.3.5). Desktop supplies only its
+ * chrome-bound pieces: the sidebar toggle and collapsed overflow, the identity block or tab strip,
+ * and the run controls. The free width the header leaves stays the native drag lane; with tabs the
+ * strip reserves that lane itself ([MinimumTitleBarDragWidth]).
+ */
+@Composable
+private fun DesktopTitleBarHeader(title: String, header: DesktopHeaderChromeState, modifier: Modifier) {
+    val identity = header.identity
+    ShellHeader(
+        modifier = modifier,
+        navIcon = HeaderNav.Custom {
+            // The one control that survives collapse (o5m90 AC #1), so the hidden sidebar stays findable.
+            DesktopSidebarToggleButton(
+                collapsed = header.sidebarCollapsed,
+                onToggle = header.onToggleSidebar,
+                focusRequester = header.sidebarToggleFocusRequester,
+            )
+            header.sidebarOverflow?.takeIf { header.sidebarCollapsed }?.let { overflow ->
+                DesktopSidebarOverflowMenu(
+                    mode = overflow.mode,
+                    onNewChat = overflow.onNewChat,
+                    onDestination = overflow.onDestination,
+                    onSettings = overflow.onSettings,
+                )
+            }
+            Box(modifier = Modifier.width(LettaDimens.Space.xs))
+        },
+        title = desktopHeaderTitle(title, header),
+        search = header.search,
+        actions = identity?.let { state ->
+            listOf(HeaderAction.Custom { DesktopHeaderTrailingControls(state = state, actions = header.identityActions) })
+        }.orEmpty(),
+    )
+}
+
+/** The tab strip when tabs are open, else the agent identity block, else the window title. */
+private fun desktopHeaderTitle(title: String, header: DesktopHeaderChromeState): HeaderTitle {
+    val identity = header.identity
+    return when {
+        header.conversationTabs.isNotEmpty() -> HeaderTitle.Custom(fill = true) {
+            DesktopConversationTabRow(
+                tabs = header.conversationTabs,
+                activeConversationId = header.activeConversationId,
+                actions = DesktopConversationTabActions(
+                    onSelect = header.onSelectConversationTab,
+                    onClose = header.onCloseConversationTab,
+                    onReorder = header.onReorderConversationTab,
+                    onNewConversation = header.onNewConversationTab,
+                ),
+                dragLaneWidth = MinimumTitleBarDragWidth,
+                modifier = Modifier.fillMaxHeight(),
+            )
+        }
+        identity != null -> HeaderTitle.Custom {
+            DesktopHeaderIdentityBlock(
+                state = identity,
+                actions = header.identityActions,
+                modifier = Modifier.widthIn(max = IdentityBlockMaxWidth),
+            )
+        }
+        else -> HeaderTitle.Custom { DesktopWindowTitle(title) }
+    }
+}
+
+@Composable
+private fun DesktopWindowTitle(title: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.widthIn(max = IdentityBlockMaxWidth).padding(horizontal = LettaDimens.Space.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.ChatBubbleOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(LettaDimens.Control.icon),
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }

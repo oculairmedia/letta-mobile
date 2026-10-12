@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -51,10 +51,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.host.PaneAnchor
+import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -661,10 +662,11 @@ fun LettaSearchPopover(
 }
 
 /**
- * Anchored field: the header expression.
+ * Anchored field: the header expression (the shell header's SearchSlot).
  *
- * The header box is a TRIGGER, not the input. Clicking it opens a focusable
- * [Popup] directly beneath, and the real field lives in there.
+ * The header box is a TRIGGER, not the input. Clicking it opens a
+ * [LettaPaneKind.Popover] beneath it through the [com.letta.mobile.ui.host.LettaHost]
+ * in effect (letta-mobile-ckmub.3.5), and the real field lives in there.
  *
  * That indirection is forced by the host, not preference. Nucleus's title bar
  * applies `focusProperties { canFocus = false }` to its whole subtree on
@@ -672,11 +674,12 @@ fun LettaSearchPopover(
  * region — which also means NOTHING inside it can take keyboard focus. In
  * Compose a parent's `canFocus = false` deactivates the subtree and a
  * descendant cannot re-enable it, so an inline field there can be clicked and
- * will never receive a keystroke. A Popup composes in its own layer, outside
- * that focus scope, so the field inside one focuses normally.
+ * will never receive a keystroke. A popover composes in its own focusable
+ * layer, outside that focus scope, so the field inside one focuses normally.
  *
- * The trigger mirrors the live query, so it still reads as one control: you
- * click where the text is and type where the text appears.
+ * The trigger mirrors the live query, so it still reads as one control. With
+ * [compact] (a phone's header) the trigger is a search icon instead of a
+ * field-shaped box; the pane it opens is the same.
  *
  * It is the same [LettaSearchScaffold] as every other expression.
  */
@@ -689,65 +692,54 @@ fun LettaSearchAnchoredField(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     config: LettaSearchConfig = LettaSearchConfig(),
+    compact: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
-
-    val overlaying = expanded && config.anchorMode == LettaSearchAnchorMode.Overlay
     Box(modifier = modifier) {
-        // While the panel overlays it, the trigger keeps its space but draws
-        // nothing: the panel's own field is sitting on top of it, and showing
-        // both meant the same query rendered twice, once truncated.
-        LettaSearchTrigger(
-            query = query,
-            placeholder = config.placeholder,
-            onClick = { expanded = true },
-            visible = !overlaying,
-        )
+        if (compact) {
+            LettaSearchIconTrigger(active = query.isNotBlank(), label = config.placeholder, onClick = { expanded = true })
+        } else {
+            LettaSearchTrigger(query = query, placeholder = config.placeholder, onClick = { expanded = true })
+        }
         if (expanded) {
-            Popup(
-                alignment = Alignment.TopStart,
-                offset = IntOffset(0, 0),
-                onDismissRequest = {
+            LettaPane(
+                kind = LettaPaneKind.Popover(PaneAnchor.BelowStart),
+                onDismiss = {
                     expanded = false
                     onDismiss()
                 },
-                // Focusable, unlike the panel this replaced: taking focus is the
-                // entire reason the input lives out here.
-                properties = PopupProperties(focusable = true),
+                size = PaneSize(maxHeight = AnchoredPanelMaxPaneHeight),
+                testTag = SearchPanelTestTag,
             ) {
-                Surface(
-                    modifier = Modifier
-                        .padding(
-                            top = if (config.anchorMode == LettaSearchAnchorMode.Below) {
-                                AnchoredPanelTopInset
-                            } else {
-                                0.dp
-                            },
-                        )
-                        .widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth),
-                    shape = RoundedCornerShape(LettaDimens.Radius.lg),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    shadowElevation = PopoverElevation,
-                ) {
-                    LettaSearchScaffold(
-                        query = query,
-                        onQueryChange = onQueryChange,
-                        sections = sections,
-                        onRowSelected = { row ->
-                            expanded = false
-                            onRowSelected(row)
-                        },
-                        modifier = Modifier,
-                        config = config.copy(
-                            autoFocus = true,
-                            maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
-                        ),
-                        parts = if (config.showResults) LettaSearchParts.All else LettaSearchParts.FieldOnly,
-                    )
-                }
+                LettaSearchScaffold(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                    sections = sections,
+                    onRowSelected = { row ->
+                        expanded = false
+                        onRowSelected(row)
+                    },
+                    modifier = Modifier.widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth),
+                    config = config.copy(
+                        autoFocus = true,
+                        maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
+                    ),
+                    parts = if (config.showResults) LettaSearchParts.All else LettaSearchParts.FieldOnly,
+                )
             }
         }
+    }
+}
+
+/** The compact trigger: a search icon, tinted while a query is live. */
+@Composable
+private fun LettaSearchIconTrigger(active: Boolean, label: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.testTag(SearchTriggerTestTag)) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = label,
+            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -757,12 +749,11 @@ private fun LettaSearchTrigger(
     query: String,
     placeholder: String,
     onClick: () -> Unit,
-    visible: Boolean,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (visible) 1f else 0f)
+            .testTag(SearchTriggerTestTag)
             .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .clickable(onClick = onClick)
             .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
@@ -792,6 +783,12 @@ private fun LettaSearchTrigger(
 /** Stable handle for tests and automation to type into any Letta search. */
 const val SearchFieldTestTag: String = "letta-search-field"
 
+/** The anchored field's trigger (the header's search box or icon). */
+const val SearchTriggerTestTag: String = "letta-search-trigger"
+
+/** The anchored field's pane, whichever container the host drew it in. */
+const val SearchPanelTestTag: String = "letta-search-panel"
+
 private const val WEIGHT_FILL = 1f
 private const val ScrimAlpha = 0.45f
 
@@ -807,5 +804,5 @@ private val PopoverElevation = LettaDimens.Space.sm
 private val AnchoredPanelMinWidth = 280.dp
 private val AnchoredPanelMaxWidth = 380.dp
 private val AnchoredPanelMaxHeight = 280.dp
-private val AnchoredPanelTopInset = LettaDimens.Space.xxl
+private val AnchoredPanelMaxPaneHeight = 480.dp
 private val RecentTileWidth = 64.dp

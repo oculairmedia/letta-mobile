@@ -2,10 +2,6 @@ package com.letta.mobile.ui.screens.channels
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -13,7 +9,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
@@ -36,14 +34,9 @@ fun ChannelsScreen(
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.screen_channels_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = LettaTopBarDefaults.topAppBarColors(),
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_channels_title)),
+                navIcon = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back)),
             )
         },
     ) { paddingValues ->

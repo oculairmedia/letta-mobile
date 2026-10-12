@@ -2,15 +2,27 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.chat.runtime.displayTitle
+import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
+import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.shell.header.SearchSlot
+import com.letta.mobile.ui.shell.header.UnifiedSearchKind
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceFileViewerHost
 import dev.nucleusframework.application.NucleusApplicationScope
@@ -55,6 +67,100 @@ internal fun LettaDesktopApp(
         }
         DesktopShellHeaderChrome(context, frame, conversationTabs, onHeaderChromeChange)
     }
+}
+
+/**
+ * Lifts the header's state to the window title bar, which composes as a sibling of the shell
+ * (letta-mobile-3arhe.1): the identity block, sidebar toggle and overflow, the tab strip, and the
+ * shared shell search slot (letta-mobile-ckmub.3.5), which searches Home in place while Home shows.
+ */
+@Composable
+private fun DesktopShellHeaderChrome(
+    context: DesktopShellContext,
+    frame: DesktopShellFrame,
+    tabs: MutableState<ConversationTabsState>,
+    onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit,
+) {
+    val router = context.router
+    val layout = context.core.layout
+    val identity = desktopHeaderIdentity(context, frame)
+    val headerChrome = DesktopHeaderChromeState(
+        identity = identity.state,
+        identityActions = identity.actions,
+        sidebarCollapsed = !layout.controller.state.isSidebarVisible,
+        onToggleSidebar = { layout.controller.dispatch(ShellLayoutEvent.ToggleSidebar) },
+        sidebarToggleFocusRequester = layout.sidebarToggleFocusRequester,
+        sidebarOverflow = desktopSidebarOverflow(context, frame),
+        conversationTabs = rememberOpenTabs(tabs.value, frame.chatState.conversations),
+        activeConversationId = frame.chatState.selectedConversationId,
+        onSelectConversationTab = { router.openConversation(ConversationId(it)) },
+        onCloseConversationTab = { router.closeConversationTab(tabs, ConversationId(it)) },
+        onReorderConversationTab = { id, index -> tabs.value = ConversationTabsReducer.reorder(tabs.value, id, index) },
+        // Browser-style "+" on the strip: a new chat with the focused agent.
+        onNewConversationTab = { context.openNewChatForFocusedAgent(frame.focus) },
+        search = rememberDesktopShellSearch(context, frame),
+    )
+    SideEffect { onHeaderChromeChange(headerChrome) }
+}
+
+/** The shared header search over this window's conversations, roster and canvases. */
+@Composable
+private fun rememberDesktopShellSearch(context: DesktopShellContext, frame: DesktopShellFrame): SearchSlot {
+    val focus = frame.focus
+    val canvases by context.core.canvasShell.library.documents.collectAsState()
+    return rememberShellSearchSlot(
+        home = context.panels.libraries.home,
+        onHome = context.navigator.selectedDestination == DesktopDestination.Home,
+        sources = UnifiedSearchSources(
+            frame.chatState.conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId,
+        ),
+        onOpen = { hit ->
+            when (hit.kind) {
+                UnifiedSearchKind.Conversations -> context.router.openConversation(ConversationId(hit.id))
+                UnifiedSearchKind.Agents -> context.router.openAgent(AgentId(hit.id))
+                UnifiedSearchKind.Canvases -> context.openCanvas(CanvasId(hit.id))
+            }
+        },
+    )
+}
+
+@Composable
+private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHeaderIdentity =
+    DesktopNowActiveBarHost(
+        chatController = context.core.chatController,
+        chatState = frame.chatState,
+        host = NowActiveBarHostState(
+            thinkingConversationId = frame.activity.thinkingConversationId,
+            isStreamingReplySelected = frame.activity.isStreamingReplySelected,
+            avatarStyleByAgentId = frame.focus.avatarStyleByAgentId,
+            fallbackOrbIndex = frame.focus.selectedAgentOrbIndex,
+        ),
+        actions = NowActiveBarHostActions(
+            onOpenConversation = { context.router.openConversation(ConversationId(it)) },
+            onStopRun = context.core.chatController::stopActiveRun,
+        ),
+    )
+
+/** The open tabs, in strip order, for the conversations the chat surface still knows. */
+@Composable
+private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<DesktopConversationTab> {
+    val byId = remember(conversations) { conversations.associateBy { it.id } }
+    return remember(tabs, byId) {
+        tabs.openConversationIds.mapNotNull { id ->
+            byId[id]?.let { DesktopConversationTab(conversationId = it.id, title = it.displayTitle(), agentName = it.agentName) }
+        }
+    }
+}
+
+/** The collapsed sidebar's overflow menu in the header. */
+private fun desktopSidebarOverflow(context: DesktopShellContext, frame: DesktopShellFrame): DesktopHeaderSidebarOverflow {
+    val navigator = context.navigator
+    return DesktopHeaderSidebarOverflow(
+        mode = navigator.workPlayMode,
+        onNewChat = { context.openNewChatForFocusedAgent(frame.focus) },
+        onDestination = { navigator.navigate(lensNavTarget(navigator.workPlayMode, it).first) },
+        onSettings = { navigator.navigate(DesktopDestination.Settings) },
+    )
 }
 
 /** The window title, and deep links into the app. */
