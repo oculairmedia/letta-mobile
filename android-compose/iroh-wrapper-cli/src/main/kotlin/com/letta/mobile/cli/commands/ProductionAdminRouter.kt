@@ -57,6 +57,8 @@ fun buildProductionAdminRouter(
     subagentPublisher: ((ControllerSubagentRegistrySource) -> SubagentRegistryPublisher)? = null,
     /** letta-mobile-dpv7m.1: QR minting identity for pair.invite.create; null = no QR. */
     pairingQr: com.letta.mobile.data.controller.node.iroh.PairingQrConfig? = null,
+    /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to conversation viewers. */
+    permissionModes: com.letta.mobile.data.controller.node.iroh.PermissionModePublisher? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -112,6 +114,7 @@ fun buildProductionAdminRouter(
         modelExposureFile = modelExposureFile,
         turnIdentity = turnIdentity,
         pairingQr = pairingQr,
+        permissionModes = permissionModes,
     ).also { router ->
         if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
     }

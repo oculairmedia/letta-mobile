@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayout
 import com.letta.mobile.data.canvas.bubble.CanvasBubbleLayoutCodec
+import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
+import kotlinx.coroutines.Dispatchers
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.AtomicMoveNotSupportedException
@@ -62,6 +64,10 @@ class DesktopCanvasBubbleLayoutStore(
             Files.deleteIfExists(tmp)
         }
     }
+
+    /** This file as the shared bubble-layout host's storage, written on the IO pool. */
+    fun asLayoutPrefStorage(): LayoutPrefStorage<CanvasBubbleLayout> =
+        LayoutPrefStorage(load = ::load, save = ::save, io = Dispatchers.IO)
 
     companion object {
         fun defaultPath(): Path = defaultDesktopStateDirectory().resolve("canvas-bubble-layout.properties")
