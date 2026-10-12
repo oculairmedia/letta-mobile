@@ -7,6 +7,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.SideEffect
@@ -403,11 +404,15 @@ private fun rememberAndroidImageActions(context: android.content.Context): ChatI
 private fun DictationButton(onDictated: (String) -> Unit) {
     val voice: VoiceInputViewModel = hiltViewModel()
     val state by voice.uiState.collectAsStateWithLifecycle()
+    // letta-mobile-7a1vl: the page collects transcripts while composed; the view model never holds
+    // onDictated (it captures the page's send actions, and the recognizer's binder outlives us).
+    val currentOnDictated by rememberUpdatedState(onDictated)
+    LaunchedEffect(voice) {
+        voice.dictations.collect { dictated -> currentOnDictated(dictated) }
+    }
     HoldToDictateButton(
         isRecognizing = state.recognizing,
-        onStart = {
-            voice.startSpeechRecognition { dictated -> if (dictated.isNotBlank()) onDictated(dictated) }
-        },
+        onStart = voice::startSpeechRecognition,
         onStop = voice::stopSpeechRecognition,
         onCancel = voice::cancelSpeechRecognition,
     )
