@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.modelcontrol
+package com.letta.mobile.ui.components.picker
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,20 +26,20 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * The borderless "Search models" row at the top of the picker and the Models
- * sheet, with a hairline under it. [fieldModifier] goes on the text field
- * itself (tags, semantics); [autoFocus] puts the caret in it on open
- * (desktop), so typing filters at once.
+ * The borderless search row pinned at the top of a picker (and the Models sheet), with a hairline
+ * under it. [fieldModifier] goes on the text field itself (tags); [PickerSearch.autoFocus] puts the
+ * caret in it on open, so typing filters at once.
  */
 @Composable
-internal fun ModelSearchField(
+fun LettaPickerSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
+    search: PickerSearch,
     fieldModifier: Modifier = Modifier,
-    autoFocus: Boolean = false,
 ) {
+    val placeholder = search.placeholder
     val focusRequester = remember { FocusRequester() }
-    if (autoFocus) {
+    if (search.autoFocus) {
         LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     }
     Row(
@@ -63,15 +63,11 @@ internal fun ModelSearchField(
             modifier = fieldModifier
                 .weight(1f)
                 .focusRequester(focusRequester)
-                .semantics { contentDescription = ModelControlStrings.SEARCH_MODELS },
+                .semantics { contentDescription = placeholder },
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) {
-                        Text(
-                            ModelControlStrings.SEARCH_MODELS,
-                            style = textStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Text(placeholder, style = textStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                     }
                     inner()
                 }
@@ -79,20 +75,20 @@ internal fun ModelSearchField(
         )
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(LettaDimens.Control.iconButton)) {
-                Icon(LettaIcons.Clear, contentDescription = "Clear search", modifier = Modifier.size(LettaDimens.Control.icon))
+                Icon(LettaIcons.Clear, contentDescription = LettaPickerStrings.CLEAR_SEARCH, modifier = Modifier.size(LettaDimens.Control.icon))
             }
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
-/** A group's provider name in caps: the look of the picker's and the Models sheet's section headers. */
-@Composable
-internal fun ProviderCapsTitle(title: String, modifier: Modifier = Modifier) {
-    Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier,
-    )
+/** The picker's own words; a surface passes its own placeholder and empty text. */
+object LettaPickerStrings {
+    const val SEARCH = "Search"
+    const val CLEAR_SEARCH = "Clear search"
+    const val BACK = "Back"
+    const val NOTHING_HERE = "Nothing here yet"
+    const val LOADING = "Loading…"
+
+    fun noMatch(query: String): String = "No matches for \"$query\""
 }

@@ -34,6 +34,8 @@ import com.letta.mobile.data.repository.modelcontrol.CatalogRow
 import com.letta.mobile.data.repository.modelcontrol.ExposureChange
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
+import com.letta.mobile.ui.components.picker.LettaPickerSearchField
+import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -82,11 +84,11 @@ fun ColumnScope.ModelsEditContent(
 ) {
     Column(modifier = modifier.weight(1f, fill = false).testTag(ModelsEditTags.SHEET)) {
         TitleBar(onClose = actions.onClose)
-        ModelSearchField(
+        LettaPickerSearchField(
             query = state.query,
             onQueryChange = actions.onQueryChange,
+            search = PickerSearch(ModelControlStrings.SEARCH_MODELS, autoFocus = autoFocusSearch),
             fieldModifier = Modifier.testTag(ModelsEditTags.SEARCH),
-            autoFocus = autoFocusSearch,
         )
         if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         ModelControlNotice(error = state.error, message = null)

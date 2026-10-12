@@ -3,6 +3,7 @@ package com.letta.mobile.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -44,12 +45,16 @@ fun LettaEmptyHint(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** What a [LettaListRow] shows: title, optional leading icon, optional trailing label (a time, a count). */
+/**
+ * What a [LettaListRow] shows: title, optional leading icon, optional trailing label (a time, a
+ * count) and an optional second line under the title (a path, a description).
+ */
 data class LettaListRowSpec(
     val title: String,
     val icon: ImageVector? = null,
     val trailing: String? = null,
     val selected: Boolean = false,
+    val subtitle: String? = null,
 )
 
 /** A compact selectable row rendering a [LettaListRowSpec]. */
@@ -60,6 +65,8 @@ fun LettaListRow(
     modifier: Modifier = Modifier,
     /** Drawn where the icon goes, instead of it: a row that swaps its icon for an action on hover. */
     leading: (@Composable () -> Unit)? = null,
+    /** Drawn after the trailing label: a check, a checkbox, a drill-in chevron. */
+    end: (@Composable () -> Unit)? = null,
 ) {
     val (title, icon, trailing, selected) = spec
     val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
@@ -83,19 +90,36 @@ fun LettaListRow(
                 modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
+        RowTitle(title, spec.subtitle, Modifier.weight(1f))
+        if (trailing != null) {
+            Text(
+                text = trailing,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+        end?.invoke()
+    }
+}
+
+@Composable
+private fun RowTitle(title: String, subtitle: String?, modifier: Modifier) {
+    Column(modifier) {
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
         )
-        if (trailing != null) {
+        if (subtitle != null) {
             Text(
-                text = trailing,
+                text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }

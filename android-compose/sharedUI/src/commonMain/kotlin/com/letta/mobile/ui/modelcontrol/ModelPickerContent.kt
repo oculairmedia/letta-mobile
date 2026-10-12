@@ -5,7 +5,6 @@ import com.letta.mobile.ui.context.AgentContextStrings
 import com.letta.mobile.data.context.AgentContextCardModel
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -14,9 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -27,18 +23,27 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerGroup
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerState
-import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.picker.LettaPickerContent
+import com.letta.mobile.ui.components.picker.LettaPickerSpec
+import com.letta.mobile.ui.components.picker.PickerCallbacks
+import com.letta.mobile.ui.components.picker.PickerEmpty
+import com.letta.mobile.ui.components.picker.PickerItem
+import com.letta.mobile.ui.components.picker.PickerLevel
+import com.letta.mobile.ui.components.picker.PickerLoad
+import com.letta.mobile.ui.components.picker.PickerRowState
+import com.letta.mobile.ui.components.picker.PickerSearch
+import com.letta.mobile.ui.components.picker.PickerSection
+import com.letta.mobile.ui.components.picker.PickerSlots
+import com.letta.mobile.ui.components.picker.PickerTags
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -55,6 +60,11 @@ data class ModelPickerActions(
     val availableToolsets: List<com.letta.mobile.data.transport.appserver.AppServerToolset> = emptyList(),
     val currentToolset: String? = null,
     val onSelectToolset: ((String) -> Unit)? = null,
+    /**
+     * letta-mobile-pt1ze.5: set when the picker is the second level of a pane (the agent settings
+     * sheet); it then heads the list with a back arrow, and Escape goes back.
+     */
+    val onBack: (() -> Unit)? = null,
 ) {
     companion object {
         fun bind(
@@ -90,11 +100,24 @@ object ModelPickerTags {
 /** Tier tags sit after the name, quieter than it. */
 private const val TIER_ALPHA = 0.7f
 
+/** The picker's former tags, kept on the shared [LettaPickerContent] it now composes. */
+private val ModelPickerPickerTags = PickerTags(
+    root = ModelPickerTags.PICKER,
+    search = ModelPickerTags.SEARCH,
+    list = ModelPickerTags.LIST,
+    sectionPrefix = ModelPickerTags.GROUP_PREFIX,
+    rowPrefix = ModelPickerTags.ROW_PREFIX,
+    empty = ModelPickerTags.EMPTY,
+    error = ModelPickerTags.ERROR,
+)
+
 /**
  * The model picker (letta-mobile-w4q4p.6.1): "Search models", the exposed
  * models under collapsible provider headers, the current one marked, and a
- * footer with "Refresh Models" and "Edit Models…". Hosts put it in a
- * [com.letta.mobile.ui.host.LettaPane] (LettaPaneKind.Modal); Android and desktop render this same content.
+ * footer with "Refresh Models" and "Edit Models…". It composes the shared
+ * [LettaPickerContent] (letta-mobile-ckmub.3.6): the search stays pinned and the list owns the
+ * only scroll. Hosts put it in a [com.letta.mobile.ui.host.LettaPane] (LettaPaneKind.Modal), or
+ * show it as the second level of a pane they own (the agent settings sheet, [ModelPickerActions.onBack]).
  */
 @Composable
 fun ColumnScope.ModelPickerContent(
@@ -103,98 +126,73 @@ fun ColumnScope.ModelPickerContent(
     modifier: Modifier = Modifier,
     autoFocusSearch: Boolean = false,
 ) {
-    Column(modifier = modifier.weight(1f, fill = false).testTag(ModelPickerTags.PICKER)) {
-        ModelSearchField(
-            query = state.query,
-            onQueryChange = actions.onQueryChange,
-            fieldModifier = Modifier.testTag(ModelPickerTags.SEARCH),
-            autoFocus = autoFocusSearch,
-        )
-        val visible = state.visible
-        LazyColumn(modifier = Modifier.weight(1f, fill = false).fillMaxWidth().testTag(ModelPickerTags.LIST)) {
-            pickerEmptyState(state, visible)
-            visible.forEach { group -> pickerGroup(group, collapsed = state.isCollapsed(group), actions = actions) }
-        }
-        state.error?.let { error ->
-            Text(
-                text = error,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier
-                    .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
-                    .testTag(ModelPickerTags.ERROR),
-            )
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        actions.onSelectToolset?.let { onSelect ->
-            if (actions.availableToolsets.isNotEmpty()) {
-                ToolsetSelectorRow(
-                    toolsets = actions.availableToolsets,
-                    selectedId = actions.currentToolset,
-                    onSelect = onSelect,
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-        }
-        PickerFooter(state, actions)
-    }
+    val level = actions.onBack?.let { PickerLevel(ModelControlStrings.MODEL, onBack = it) }
+    val groups = state.visible
+    val spec = LettaPickerSpec(
+        sections = groups.map { group -> group.toSection(state.isCollapsed(group)) },
+        query = state.query,
+        load = state.error?.let(PickerLoad::Failed) ?: PickerLoad.Ready,
+        filterLocally = false,
+        search = PickerSearch(ModelControlStrings.SEARCH_MODELS, autoFocus = autoFocusSearch),
+        empty = emptyState(state),
+        level = level,
+        tags = ModelPickerPickerTags,
+    )
+    val callbacks = PickerCallbacks<ModelPickerEntry>(
+        onQuery = actions.onQueryChange,
+        onPick = { actions.onSelect(it.value) },
+        onToggleSection = { section -> groups.firstOrNull { it.key == section.key }?.let(actions.onToggleGroup) },
+    )
+    val slots = PickerSlots<ModelPickerEntry>(
+        row = { item, row -> PickerRow(item.value, row, actions) },
+        footer = { PickerFooterBar(state, actions) },
+    )
+    LettaPickerContent(spec, callbacks, modifier, slots)
 }
 
-private fun LazyListScope.pickerEmptyState(state: ModelPickerState, visible: List<ModelPickerGroup>) {
-    if (visible.isNotEmpty()) return
-    item("empty") {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.xl).testTag(ModelPickerTags.EMPTY),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-        ) {
-            val (title, hint) = when {
-                state.loading -> ModelControlStrings.LOADING_MODELS to null
-                state.searching -> ModelControlStrings.noMatch(state.query.trim()) to null
-                else -> ModelControlStrings.NO_MODELS to ModelControlStrings.NO_MODELS_HINT
-            }
-            Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            hint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-    }
-}
-
-private fun LazyListScope.pickerGroup(group: ModelPickerGroup, collapsed: Boolean, actions: ModelPickerActions) {
-    item("group-${group.key}") { GroupHeader(group, collapsed, onToggle = { actions.onToggleGroup(group) }) }
-    if (collapsed) return
+private fun ModelPickerGroup.toSection(collapsed: Boolean): PickerSection<ModelPickerEntry> = PickerSection(
+    key = key,
+    title = title,
     // Live catalogs can repeat a handle AND an id; the index keeps every key unique.
-    itemsIndexed(group.entries, key = { index, entry -> "row-${group.key}-$index-${entry.value}" }) { _, entry ->
-        PickerRow(entry, actions)
-    }
+    items = entries.mapIndexed { index, entry -> PickerItem("$key-$index-${entry.value}", entry, entry.displayName) },
+    collapsed = collapsed,
+)
+
+private fun emptyState(state: ModelPickerState): PickerEmpty = when {
+    state.loading -> PickerEmpty(ModelControlStrings.LOADING_MODELS)
+    state.searching -> PickerEmpty(ModelControlStrings.noMatch(state.query.trim()))
+    else -> PickerEmpty(ModelControlStrings.NO_MODELS, ModelControlStrings.NO_MODELS_HINT)
 }
 
 @Composable
-private fun GroupHeader(group: ModelPickerGroup, collapsed: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClickLabel = ModelControlStrings.groupToggle(group.title, collapsed), onClick = onToggle)
-            .semantics {
-                heading()
-                stateDescription = if (collapsed) "Collapsed" else "Expanded"
-            }
-            .padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.md, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs)
-            .testTag("${ModelPickerTags.GROUP_PREFIX}${group.key}"),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        ProviderCapsTitle(group.title, modifier = Modifier.weight(1f))
-        DisclosureChevron(expanded = !collapsed, compact = true)
+private fun PickerFooterBar(state: ModelPickerState, actions: ModelPickerActions) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    actions.onSelectToolset?.let { onSelect ->
+        if (actions.availableToolsets.isNotEmpty()) {
+            ToolsetSelectorRow(
+                toolsets = actions.availableToolsets,
+                selectedId = actions.currentToolset,
+                onSelect = onSelect,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
     }
+    PickerFooter(state, actions)
 }
 
 @Composable
-private fun PickerRow(entry: ModelPickerEntry, actions: ModelPickerActions) {
-    val selectedColor = MaterialTheme.colorScheme.secondaryContainer
+private fun PickerRow(entry: ModelPickerEntry, row: PickerRowState, actions: ModelPickerActions) {
+    val background = when {
+        entry.selected -> MaterialTheme.colorScheme.secondaryContainer
+        row.highlighted -> MaterialTheme.colorScheme.surfaceContainerHighest
+        else -> null
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (entry.selected) Modifier.background(selectedColor) else Modifier)
-            .selectable(selected = entry.selected, role = Role.RadioButton, onClick = { actions.onSelect(entry) })
+            .clip(MaterialTheme.shapes.small)
+            .then(if (background != null) Modifier.background(background) else Modifier)
+            .selectable(selected = entry.selected, role = Role.RadioButton, onClick = row.onClick)
             .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)
             .testTag("${ModelPickerTags.ROW_PREFIX}${entry.value}"),
     ) {

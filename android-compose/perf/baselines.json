@@ -33,12 +33,13 @@
       ]
     },
     "startup.warm.p95_ms": {
-      "baseline": 405.889,
+      "baseline": 542.299,
       "tolerance_pct": 20,
       "source": "StartupBenchmark.warmStartup",
       "metric": "timeToInitialDisplayMs",
       "min_samples": 10,
       "notes": [
+        "letta-mobile-gvswz: rebaselined 405.889 -> 542.299 ms (canonical workflow_dispatch rebaseline run 38234220478; main runs at bfefbbd75/039089398 measured 566.986, 513.742, 548.294, 513.269 ms). Not a startup slowdown: the benchmark launches an unconfigured install, whose real first screen is the settings form (ConfigRoute). Before #1886 the start destination was resolved from placeholder settings (hasConfig=true, no chat), so the first frame drew a throwaway ConversationsRoute that was replaced by ConfigRoute a frame later; TTID stopped at that cheap placeholder frame. #1886 resolves the real route on the first frame, so TTID now includes rendering the settings form, whose extra Skia ops (path/stroke/rrect shaders compiled on the swiftshader GPU) dominate the delta. Perfetto on a local API 36 emulator: main-thread first-frame work +48 ms, RenderThread first-frame flush 418 -> 957 ms; the settings screen itself was fully rendered ~1.6 s sooner on main than on 0c85c41e5. Cold startup improved on the same change (1476 -> 1204-1396 ms) and keeps its baseline.",
         "Startup-only CI gate v1. FrameTimingMetric benchmarks stay non-gating until the app exposes a deterministic benchmark launch surface on the canonical emulator (letta-mobile-4ccv).",
         "Warm startup is gated from at least 10 samples so a missing or undersampled warm-open result fails closed.",
         "The warm baseline was refreshed to 405.889 ms after consecutive canonical PR runs measured 353.541 ms and 405.889 ms while cold startup remained below baseline, showing that the previous 285.988 ms seed no longer represented the runner.",

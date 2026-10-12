@@ -7,19 +7,14 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -27,9 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,8 +39,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.ArrowRight
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.ExternalLink
@@ -57,7 +48,6 @@ import com.composables.icons.lucide.GitFork
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
-import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.data.workspace.directory.DevicePath
 import com.letta.mobile.data.workspace.directory.FolderName
 import com.letta.mobile.data.workspace.directory.WorkingDirectoryPickerActions
@@ -86,6 +76,17 @@ import com.letta.mobile.sharedui.resources.cwd_picker_up
 import com.letta.mobile.sharedui.resources.cwd_picker_use
 import com.letta.mobile.sharedui.resources.cwd_picker_worktree_search
 import com.letta.mobile.sharedui.resources.cwd_picker_worktrees
+import com.letta.mobile.ui.components.picker.LettaPickerContent
+import com.letta.mobile.ui.components.picker.LettaPickerSpec
+import com.letta.mobile.ui.components.picker.PickerCallbacks
+import com.letta.mobile.ui.components.picker.PickerEmpty
+import com.letta.mobile.ui.components.picker.PickerItem
+import com.letta.mobile.ui.components.picker.PickerSearch
+import com.letta.mobile.ui.components.picker.PickerSection
+import com.letta.mobile.ui.components.picker.PickerSlots
+import com.letta.mobile.ui.components.picker.PickerTags
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.StringResource
@@ -142,27 +143,16 @@ fun WorkingDirectoryPicker(
 ) {
     if (!state.isOpen) return
     BoxWithConstraints(modifier) {
-        if (maxWidth >= LettaDimens.Pane.wideBreakpoint && !host.forceSheet) {
-            Dialog(onDismissRequest = actions::dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                Surface(
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier
-                        .widthIn(max = LettaDimens.Pane.modalWidth)
-                        .heightIn(max = LettaDimens.Pane.modalMaxHeight)
-                        .padding(LettaDimens.Space.xl),
-                ) { PickerContent(state, actions, host) }
-            }
-        } else {
-            ModalBottomSheet(onDismissRequest = actions::dismiss) { PickerContent(state, actions, host) }
-        }
+        // A dialog in a wide window, a sheet on a phone (or a phone frame inside a desktop window).
+        val kind = if (maxWidth >= LettaDimens.Pane.wideBreakpoint && !host.forceSheet) LettaPaneKind.Dialog else LettaPaneKind.Sheet
+        LettaPane(kind, onDismiss = actions::dismiss) { PickerContent(state, actions, host) }
     }
 }
 
 @Composable
-private fun PickerContent(state: WorkingDirectoryPickerState, actions: WorkingDirectoryPickerActions, host: WorkingDirectoryPickerHost) {
+private fun ColumnScope.PickerContent(state: WorkingDirectoryPickerState, actions: WorkingDirectoryPickerActions, host: WorkingDirectoryPickerHost) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.ROOT),
+        modifier = Modifier.weight(1f, fill = false).fillMaxWidth().padding(bottom = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.ROOT),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         PickerHeader(onClose = actions::dismiss)
@@ -171,7 +161,7 @@ private fun PickerContent(state: WorkingDirectoryPickerState, actions: WorkingDi
         PickerToolbar(state, actions, host)
         PickerError(state.error)
         if (state.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg))
-        PickerList(state, actions, Modifier.weight(1f, fill = false))
+        PickerList(state, actions)
         PickerFooter(state, actions)
     }
 }
@@ -342,91 +332,83 @@ private fun PickerError(error: String?) {
     }
 }
 
+/**
+ * The recent folders, the worktrees and the browsed folder's children, as one [LettaPickerContent]
+ * (letta-mobile-ckmub.3.6). Its pinned search filters the worktrees only and shows while there are
+ * worktrees; a pick browses into the path.
+ */
 @Composable
-private fun PickerList(state: WorkingDirectoryPickerState, actions: WorkingDirectoryPickerActions, modifier: Modifier) {
+private fun ColumnScope.PickerList(state: WorkingDirectoryPickerState, actions: WorkingDirectoryPickerActions) {
     var worktreeQuery by remember { mutableStateOf("") }
-    val worktrees = remember(state.worktrees.paths, worktreeQuery) {
-        state.worktrees.paths.filter { TextMatch.matches(worktreeQuery, DevicePath(it).name) }
-    }
-    val recentTitle = stringResource(Res.string.cwd_picker_recent)
-    val worktreesTitle = stringResource(Res.string.cwd_picker_worktrees)
-    val foldersTitle = stringResource(Res.string.cwd_picker_folders)
-    LazyColumn(modifier.fillMaxWidth()) {
-        if (state.recents.isNotEmpty()) {
-            section(recentTitle)
-            pathRows(state.recents, RecentRows, onClick = actions::browse)
-        }
-        if (state.worktrees.paths.isNotEmpty()) {
-            section(worktreesTitle)
-            item(key = "worktree-search") { WorktreeSearch(worktreeQuery, onQueryChange = { worktreeQuery = it }) }
-            pathRows(worktrees, WorktreeRows, onClick = actions::browse)
-        }
-        val folder = state.folder ?: return@LazyColumn
-        section(foldersTitle)
-        pathRows(state.folders.map { DevicePath(folder).child(FolderName(it)).value }, FolderRows, onClick = actions::browse)
-        folderListFooter(state)
-    }
+    val titles = DirectorySectionTitles(
+        recent = stringResource(Res.string.cwd_picker_recent),
+        worktrees = stringResource(Res.string.cwd_picker_worktrees),
+        folders = stringResource(Res.string.cwd_picker_folders),
+    )
+    val sections = remember(state.recents, state.worktrees.paths, state.folder, state.folders, titles) { directorySections(state, titles) }
+    val note = folderNote(state)?.let { stringResource(it) }
+    val searchLabel = stringResource(Res.string.cwd_picker_worktree_search)
+    LettaPickerContent(
+        spec = LettaPickerSpec(
+            sections = sections,
+            query = worktreeQuery,
+            search = PickerSearch(searchLabel, autoFocus = false).takeIf { state.worktrees.paths.isNotEmpty() },
+            empty = PickerEmpty(note.orEmpty()),
+            tags = PickerTags(search = WorkingDirectoryPickerTags.WORKTREE_SEARCH),
+        ),
+        callbacks = PickerCallbacks(onQuery = { worktreeQuery = it }, onPick = { actions.browse(it.value) }, onDismiss = actions::dismiss),
+        slots = PickerSlots(footer = { if (note != null && sections.isNotEmpty()) FolderNote(note) }),
+    )
 }
 
-private fun LazyListScope.section(title: String) {
-    item(key = "section-$title") {
-        Text(
-            title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
-        )
-    }
+@Immutable
+private data class DirectorySectionTitles(val recent: String, val worktrees: String, val folders: String)
+
+private fun directorySections(state: WorkingDirectoryPickerState, titles: DirectorySectionTitles): List<PickerSection<String>> {
+    val folder = state.folder
+    val children = folder?.let { parent -> state.folders.map { DevicePath(parent).child(FolderName(it)).value } }.orEmpty()
+    return listOf(
+        PickerSection("recent", titles.recent, state.recents.map(RecentRows::item), searchable = false),
+        PickerSection("worktrees", titles.worktrees, state.worktrees.paths.map(WorktreeRows::item)),
+        PickerSection("folders", titles.folders, children.map(FolderRows::item), searchable = false),
+    ).filter { it.items.isNotEmpty() }
 }
 
 /** How one list section draws its paths: the icon, the test-tag prefix, and whether the full path shows. */
 @Immutable
-private class PathRowStyle(val icon: ImageVector, val tagPrefix: String, val showPath: Boolean)
+private class PathRowStyle(val icon: ImageVector, val tagPrefix: String, val showPath: Boolean) {
+    fun item(path: String): PickerItem<String> {
+        val name = DevicePath(path).name
+        return PickerItem(
+            key = tagPrefix + path,
+            value = path,
+            title = name,
+            subtitle = path.takeIf { showPath },
+            icon = icon,
+            testTag = tagPrefix + name,
+        )
+    }
+}
 
 private val RecentRows = PathRowStyle(Lucide.History, WorkingDirectoryPickerTags.RECENT_ROW, showPath = true)
 private val WorktreeRows = PathRowStyle(Lucide.GitFork, WorkingDirectoryPickerTags.WORKTREE_ROW, showPath = false)
 private val FolderRows = PathRowStyle(Lucide.Folder, WorkingDirectoryPickerTags.FOLDER_ROW, showPath = false)
 
-private fun LazyListScope.pathRows(paths: List<String>, style: PathRowStyle, onClick: (String) -> Unit) {
-    items(paths, key = { style.tagPrefix + it }) { path ->
-        ListItem(
-            headlineContent = { Text(DevicePath(path).name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            supportingContent = if (style.showPath) {
-                { Text(path, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall) }
-            } else {
-                null
-            },
-            leadingContent = { Icon(style.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
-            modifier = Modifier.clickable { onClick(path) }.testTag(style.tagPrefix + DevicePath(path).name),
-        )
-    }
-}
-
-private fun LazyListScope.folderListFooter(state: WorkingDirectoryPickerState) {
-    val note = when {
-        state.isLoading || state.error != null -> null
-        state.folders.isEmpty() -> Res.string.cwd_picker_empty
-        state.hasMore -> Res.string.cwd_picker_more
-        else -> null
-    } ?: return
-    item(key = "folder-note") {
-        Text(
-            stringResource(note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        )
-    }
+/** Why the folder list ends where it does: an empty folder, or more than one listing returns. */
+private fun folderNote(state: WorkingDirectoryPickerState): StringResource? = when {
+    state.isLoading || state.error != null || state.folder == null -> null
+    state.folders.isEmpty() -> Res.string.cwd_picker_empty
+    state.hasMore -> Res.string.cwd_picker_more
+    else -> null
 }
 
 @Composable
-private fun WorktreeSearch(query: String, onQueryChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        label = { Text(stringResource(Res.string.cwd_picker_worktree_search)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.WORKTREE_SEARCH),
+private fun FolderNote(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
     )
 }
 
