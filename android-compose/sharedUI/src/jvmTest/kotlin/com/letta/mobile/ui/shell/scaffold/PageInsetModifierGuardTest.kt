@@ -26,7 +26,7 @@ class PageInsetModifierGuardTest {
          * lift by its keyboard inset (ChatSurfaceInsets).
          */
         val ALLOWLIST: Map<String, String> = mapOf(
-            "ModelControlModal.kt" to "modal bottom sheet container pads its own content above the navigation bar",
+            "LettaPaneDefaults.kt" to "the shared bottom-sheet pane container (S3 LettaHost) pads its own content above the navigation bar",
         )
 
         private val PER_PAGE_INSET_MODIFIER = Regex(

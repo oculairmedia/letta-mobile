@@ -39,7 +39,10 @@ internal fun withDesktopDayDividers(
         val day = row.timestampOrNull()
             ?.let { parseMessageTimestamp(IsoTimestamp(it), zone) }
             ?.toLocalDate()
-        if (day != null && day != currentDay) {
+        // letta-mobile-om38i: forward only. Chat order is not timestamp order (a compaction
+        // summary can be stamped earlier than its neighbours; a run block reads as its newest
+        // step), and re-opening a day already shown duplicated the `__day__<date>` LazyColumn key.
+        if (day != null && day > (currentDay ?: LocalDate.MIN)) {
             currentDay = day
             out += DesktopChatRow.DayDivider(day)
         }

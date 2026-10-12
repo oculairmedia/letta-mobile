@@ -29,6 +29,7 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import io.ak1.drawbox.domain.model.Mode
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -90,6 +91,13 @@ class CanvasKeyboardCameraUiTest {
             }
         }
         waitUntil(timeoutMillis = 10_000) { onAllNodesWithContentDescription("Note $NOTE").fetchSemanticsNodes().isNotEmpty() }
+        // The note card is drawn from the session's documents before the board has finished
+        // opening: the scene is parsed on Dispatchers.Default, which waitForIdle cannot see, and
+        // only then (after the load settle) does a phone's board fit itself once and switch to
+        // the select tool. On a loaded CI runner that fit landed after the test had parked the
+        // note and taken its "before" camera, and moved it (letta-mobile-vyi8l). Wait for the
+        // fit itself, so nothing but the keyboard moves the camera after this.
+        waitUntil(timeoutMillis = 10_000) { board.controller.state.value.mode == Mode.SELECT }
         waitForIdle()
         // Pixels and dp are the same here, which the keyboard and bar sizes below rely on.
         assertEquals(1f, density.density)

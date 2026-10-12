@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -47,27 +48,59 @@ fun AdaptiveScaffold(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val windowSizeClass = LocalWindowSizeClass.current
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val destination = navBackStackEntry?.destination
+    val insetPolicy = remember(destination) { destination.insetPolicy() }
 
-    if (windowSizeClass.isExpandedWidth) {
+    AdaptiveScaffoldLayout(
+        expanded = LocalWindowSizeClass.current.isExpandedWidth,
+        insetPolicy = insetPolicy,
+        navigationRail = { LettaNavigationRail(navController = navController) },
+        modifier = modifier,
+        content = content,
+    )
+}
+
+/**
+ * letta-mobile-v7aln: [content] sits at the same place in the composition whether the window is
+ * compact or expanded. Rotating a phone crosses that line (expanded is 600dp and wider), and the
+ * two layouts used to call [content] from different branches. Saved state is keyed by position,
+ * so the rotated Activity found none of what the NavHost had saved: every destination's
+ * rememberSaveable state (the chat's scroll position and display mode among them) was lost.
+ * Only the rail and the padding differ between the two widths now; [insetPolicy] decides who pads
+ * a compact destination for the system bars (letta-mobile-ckmub.2.1).
+ */
+@Composable
+internal fun AdaptiveScaffoldLayout(
+    expanded: Boolean,
+    insetPolicy: DestinationInsetPolicy,
+    navigationRail: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { innerPadding ->
+        val layoutDirection = LocalLayoutDirection.current
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                .then(
+                    if (expanded) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                    else Modifier
+                ),
         ) {
-            LettaNavigationRail(navController = navController)
-            VerticalDivider()
-            content()
-        }
-    } else {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val insetPolicy = navBackStackEntry?.destination.insetPolicy()
-
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.surface,
-        ) { innerPadding ->
-            Box(modifier = insetPolicy.frame(innerPadding, LocalLayoutDirection.current)) {
+            if (expanded) {
+                navigationRail()
+                VerticalDivider()
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .then(if (expanded) Modifier else insetPolicy.frame(innerPadding, layoutDirection)),
+            ) {
                 content()
             }
         }

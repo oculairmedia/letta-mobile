@@ -22,8 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
-import com.letta.mobile.ui.shell.ShellChromeDecorations
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -120,7 +120,7 @@ class ShellConversationOptionsTest {
             markerChoices = listOf("A", "B"),
         )
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+            CompositionLocalProvider(LocalLettaHost provides menuAsButtons) {
                 Panel(state.copy(conversations = listOf(active.copy(marker = "A"))), ShellAgentPanelActions(conversationMarks = marks))
             }
         }
@@ -137,7 +137,7 @@ class ShellConversationOptionsTest {
         val events = mutableListOf<String>()
         val marks = ShellConversationMarkActions({ id, settled -> events += "$id:$settled" }, { _, _ -> }, emptyList())
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+            CompositionLocalProvider(LocalLettaHost provides menuAsButtons) {
                 Panel(state.copy(conversations = listOf(active.copy(settled = true))), ShellAgentPanelActions(conversationMarks = marks))
             }
         }
@@ -164,7 +164,7 @@ class ShellConversationOptionsTest {
     }
 
     /** A stand-in host: the row menu's entries as plain buttons under the row. */
-    private val menuAsButtons = ShellChromeDecorations(
+    private val menuAsButtons = LettaHost(
         rowMenu = { items, content ->
             Column {
                 content()

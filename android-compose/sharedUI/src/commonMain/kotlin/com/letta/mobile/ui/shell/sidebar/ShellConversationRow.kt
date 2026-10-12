@@ -50,12 +50,12 @@ import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
-import com.letta.mobile.ui.shell.ShellConfirmRequest
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
 import com.letta.mobile.ui.chat.branch.ForkNameDialog
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
-import com.letta.mobile.ui.shell.ShellRowMenuItem
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -76,19 +76,19 @@ data class ShellConversationRowActions(
 
 /** The delete confirm dialog's wording: honest about what delete does on this backend. */
 internal object ShellDeleteConversationCopy {
-    fun request(title: String, behavior: ConversationDeleteBehavior): ShellConfirmRequest =
+    fun request(title: String, behavior: ConversationDeleteBehavior): LettaConfirmRequest =
         when (behavior) {
-            ConversationDeleteBehavior.Permanent -> ShellConfirmRequest(
+            ConversationDeleteBehavior.Permanent -> LettaConfirmRequest(
                 title = "Delete chat?",
                 message = "\"$title\" will be permanently removed. This can't be undone.",
                 confirmLabel = "Delete",
             )
-            ConversationDeleteBehavior.MovesToArchived -> ShellConfirmRequest(
+            ConversationDeleteBehavior.MovesToArchived -> LettaConfirmRequest(
                 title = "Archive chat?",
                 message = "\"$title\" will be moved to Archived. You can restore it from there.",
                 confirmLabel = "Archive",
             )
-            ConversationDeleteBehavior.RemovesFromLists -> ShellConfirmRequest(
+            ConversationDeleteBehavior.RemovesFromLists -> LettaConfirmRequest(
                 title = "Remove chat?",
                 message = "\"$title\" will be removed from your chats and won't appear under Archived. " +
                     "Undo, offered right after, is the only way back.",
@@ -125,12 +125,12 @@ private class ShellConversationRowUi {
 
 @Composable
 private fun ShellConversationRowBody(model: ShellConversationRowModel, actions: ShellConversationRowActions, row: ShellConversationRowUi) {
-    val decorations = LocalShellChromeDecorations.current
+    val host = LocalLettaHost.current
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     Box {
-        decorations.rowMenu(conversationMenuItems(model, actions, row)) {
-            decorations.tooltip(model.title) {
+        host.rowMenu(conversationMenuItems(model, actions, row)) {
+            host.tooltip(model.title) {
                 ShellConversationRowSurface(model, hovered, interactionSource, actions)
             }
         }
@@ -138,13 +138,13 @@ private fun ShellConversationRowBody(model: ShellConversationRowModel, actions: 
     }
     actions.onFork?.let { fork -> ShellForkNaming(row, fork) }
     if (row.confirmDelete) {
-        decorations.confirm(
+        LettaConfirmPane(
             ShellDeleteConversationCopy.request(model.title, actions.deleteBehavior),
-            {
+            onConfirm = {
                 row.confirmDelete = false
                 actions.onDelete()
             },
-            { row.confirmDelete = false },
+            onDismiss = { row.confirmDelete = false },
         )
     }
 }
@@ -154,7 +154,7 @@ private fun conversationMenuItems(
     model: ShellConversationRowModel,
     actions: ShellConversationRowActions,
     row: ShellConversationRowUi,
-): List<ShellRowMenuItem> {
+): List<LettaMenuItem> {
     val marks = actions.marks
     return ShellRowMenus.conversation(
         archived = model.archived,
@@ -335,7 +335,7 @@ fun ShellCanvasRow(model: ShellCanvasRowModel, onClick: () -> Unit, onArchiveTog
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     var focused by remember { mutableStateOf(false) }
-    LocalShellChromeDecorations.current.rowMenu(ShellRowMenus.canvas(model.archived, onArchiveToggle)) {
+    LocalLettaHost.current.rowMenu(ShellRowMenus.canvas(model.archived, onArchiveToggle)) {
         LettaListRow(
             spec = LettaListRowSpec(title = model.title, icon = Lucide.Palette, trailing = model.timeLabel, selected = model.selected),
             onClick = onClick,

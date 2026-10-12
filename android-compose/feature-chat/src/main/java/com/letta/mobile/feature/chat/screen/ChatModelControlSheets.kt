@@ -19,8 +19,8 @@ import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.feature.chat.coordination.EffortSelection
-import com.letta.mobile.ui.modelcontrol.ModelControlModal
-import com.letta.mobile.ui.modelcontrol.ModelControlPresentation
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.modelcontrol.ModelsEditActions
@@ -128,7 +128,7 @@ internal fun ModelPickerSheet(
     LaunchedEffect(controller) { controller.ensureLoaded() }
     val state by controller.state.collectAsState()
     val actions = rememberPickerActions(controller, callbacks)
-    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = callbacks.onDismiss) {
+    LettaPane(LettaPaneKind.Modal, onDismiss = callbacks.onDismiss) {
         ModelPickerContent(state = state, actions = actions, modifier = Modifier.testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET))
     }
 }
@@ -164,7 +164,7 @@ private fun rememberPickerActions(controller: ModelPickerController, callbacks: 
 internal fun ModelsEditSheet(controller: ProviderManagementController, actions: ModelsEditActions) {
     LaunchedEffect(controller) { if (controller.state.value.sections.isEmpty()) controller.refresh() }
     val state by controller.state.collectAsState()
-    ModelControlModal(ModelControlPresentation.Sheet, onDismiss = actions.onClose) {
+    LettaPane(LettaPaneKind.Modal, onDismiss = actions.onClose) {
         ModelsEditContent(state = state, actions = actions)
     }
 }
