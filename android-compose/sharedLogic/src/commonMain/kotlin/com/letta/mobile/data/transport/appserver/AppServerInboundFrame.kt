@@ -174,6 +174,11 @@ sealed interface AppServerInboundFrame {
         @SerialName("run_id") val runId: String? = null,
         val error: String? = null,
         val usage: JsonObject? = null,
+        /**
+         * letta-code 0.34+: the `input.terminal_consumer_id`s this terminal is durably replayed
+         * to until each answers with `turn_finished_ack`. Empty on older servers.
+         */
+        @SerialName("terminal_consumer_ids") val terminalConsumerIds: List<String> = emptyList(),
     ) : AppServerInboundFrame {
         @Transient
         override val type: String = "turn_finished"
