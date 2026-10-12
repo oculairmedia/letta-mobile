@@ -86,20 +86,25 @@ private data class SecretApplyResponse(
  * records or exports wire frames (a frame inspector, a diagnostics bundle, an Iroh trace). Over an
  * Iroh host the same values ride the workspace relay (letta-mobile-bzvro.37): a `secret.apply`
  * admin_rpc carries them in `params.set`, and an `admin_rpc_response` carries the relayed
- * `secret_list_response` in `result.frames`; both are blanked too. Other frames pass through
- * untouched.
+ * `secret_list_response` in `result.frames`; both are blanked too. A provider connect
+ * (letta-mobile-zxk2n.3) carries an API key in `fields` or a subscription sign-in's tokens in
+ * `oauth_config`, as `connect_provider` or as a relayed `provider.connect` admin_rpc; those are
+ * blanked as well. Other frames pass through untouched.
  */
 object AgentSecretsRedaction {
     private const val SECRET_LIST_RESPONSE = "secret_list_response"
     private const val SECRET_APPLY = "secret_apply"
+    private const val CONNECT_PROVIDER = "connect_provider"
     private const val ADMIN_RPC = "admin_rpc"
     private const val ADMIN_RPC_RESPONSE = "admin_rpc_response"
     private const val RELAYED_SECRET_APPLY = "secret.apply"
+    private const val RELAYED_PROVIDER_CONNECT = "provider.connect"
     private val Redacted = JsonPrimitive(AppServerProtocol.REDACTED_PLACEHOLDER)
 
     fun redact(frame: JsonObject): JsonObject = when (frame.text("type")) {
         SECRET_LIST_RESPONSE -> frame.replace("secrets", ::redactEntries)
         SECRET_APPLY -> frame.replace("set", ::redactValues)
+        CONNECT_PROVIDER -> redactProviderCredentials(frame)
         ADMIN_RPC -> redactRelayedRequest(frame)
         ADMIN_RPC_RESPONSE -> frame.replace("result", ::redactRelayedResult)
         else -> frame
@@ -110,11 +115,16 @@ object AgentSecretsRedaction {
 
     private fun redactValues(set: JsonElement): JsonElement = JsonObject((set as? JsonObject).orEmpty().mapValues { Redacted })
 
-    /** A `secret.apply` admin_rpc carries the values in `params.set`. */
-    private fun redactRelayedRequest(frame: JsonObject): JsonObject {
-        if (frame.text("method") != RELAYED_SECRET_APPLY) return frame
-        return frame.replace("params") { params -> (params as? JsonObject)?.replace("set", ::redactValues) ?: Redacted }
+    /** A `secret.apply` admin_rpc carries the values in `params.set`; a `provider.connect` its credentials. */
+    private fun redactRelayedRequest(frame: JsonObject): JsonObject = when (frame.text("method")) {
+        RELAYED_SECRET_APPLY -> frame.replace("params") { params -> (params as? JsonObject)?.replace("set", ::redactValues) ?: Redacted }
+        RELAYED_PROVIDER_CONNECT -> frame.replace("params") { params -> (params as? JsonObject)?.let(::redactProviderCredentials) ?: Redacted }
+        else -> frame
     }
+
+    /** Field values (an API key) and the whole OAuth token bundle; the keys stay so a trace still reads. */
+    private fun redactProviderCredentials(obj: JsonObject): JsonObject =
+        obj.replace("fields", ::redactValues).replace("oauth_config", ::redactValues)
 
     /** A relayed answer carries the App Server's frames in `result.frames`. */
     private fun redactRelayedResult(result: JsonElement): JsonElement {

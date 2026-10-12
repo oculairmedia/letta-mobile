@@ -8,6 +8,7 @@ import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.channel.NotificationDeliveryDecision
 import com.letta.mobile.data.channel.NotificationSuppressionReason
+import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +36,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
     private val currentConversationTracker: CurrentConversationTracker,
     private val syncStateStore: IChannelSyncStateStore,
     private val publisher: IChannelNotificationPublisher,
+    private val attentionPrefs: AttentionPrefsRepository,
 ) : NotificationDelivery {
     override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision {
         val notificationId = candidate.notificationIdentity
@@ -42,15 +44,20 @@ class NotificationDeliveryCoordinator @Inject constructor(
 
         val previewText = NotificationContentSanitizer.sanitizePreview(candidate.previewText)
 
-        if (previewText.fallbackApplied && (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal)) {
+        if (previewText.fallbackApplied && candidate.awaitsFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
+        }
+
+        // letta-mobile-bzvro.27: a muted agent posts nothing.
+        if (attentionPrefs.prefs.value.isMuted(candidate.agentId)) {
+            return candidate.suppressed(NotificationSuppressionReason.MutedAgent, notificationId)
         }
 
         if (currentConversationTracker.current == candidate.conversationId) {
             return candidate.suppressed(NotificationSuppressionReason.ForegroundConversation, notificationId)
         }
 
-        if (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal) {
+        if (candidate.awaitsFinal) {
             return candidate.deferred(NotificationDeferralReason.AwaitingFinalPreview, notificationId)
         }
 
@@ -98,18 +105,19 @@ class NotificationDeliveryCoordinator @Inject constructor(
         return NotificationDeliveryDecision.Suppressed(reason)
     }
 
-    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, Any?>> {
+    /** Telemetry attributes, rendered as text so the list stays one concrete type. */
+    private fun NotificationDeliveryCandidate.telemetryAttrs(notificationId: String?): Array<Pair<String, String>> {
         val sanitizedPreview = NotificationContentSanitizer.sanitizePreview(previewText)
         return arrayOf(
             "conversationId" to conversationId,
             "notificationId" to (notificationId ?: "<none>"),
-            "messageIdPresent" to (!messageId.isNullOrBlank()),
-            "runIdPresent" to (!runId.isNullOrBlank()),
+            "messageIdPresent" to (!messageId.isNullOrBlank()).toString(),
+            "runIdPresent" to (!runId.isNullOrBlank()).toString(),
             "source" to source.name,
             "phase" to phase.name,
-            "isFinal" to isFinal,
-            "rawPreviewLength" to previewText.length,
-            "normalizedPreviewLength" to sanitizedPreview.normalizedLength,
+            "isFinal" to isFinal.toString(),
+            "rawPreviewLength" to previewText.length.toString(),
+            "normalizedPreviewLength" to sanitizedPreview.normalizedLength.toString(),
             "previewFallbackReason" to sanitizedPreview.fallbackReason.name,
         )
     }
@@ -127,3 +135,7 @@ class NotificationDeliveryCoordinator @Inject constructor(
             messagePreview = previewText,
         )
 }
+
+/** A partial or not-yet-final candidate: its preview can still change, so it waits. */
+private val NotificationDeliveryCandidate.awaitsFinal: Boolean
+    get() = phase == NotificationCandidatePhase.Partial || !isFinal

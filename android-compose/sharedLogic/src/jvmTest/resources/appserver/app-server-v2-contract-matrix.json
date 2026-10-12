@@ -1,12 +1,12 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.33.6",
+    "version": "0.34.8",
     "node": "v24.18.0",
     "package_engine": ">=22.19.0",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "b9147297cba4b64a7f2db68c3df2e2dd54e427eb2c8b915178e2f60a1392d506",
-    "protocol_corpus_sha256": "0768e96d46a567794d66aa425764ab04a0a79aef7c8a48dc20faf6e5fcfb9804",
+    "protocol_sha256": "87e0cf05f1f4e726f880dcd42c3f165c56f64d846c8375a8cb386dc3f763110e",
+    "protocol_corpus_sha256": "f1be347e560f37d9899c5ae2c9d2de7b347f7eae71c9495e8ace5191bdbec344",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -15,6 +15,7 @@
       "dist/types/types/approval-classification-protocol.d.ts",
       "dist/types/types/background-process-protocol.d.ts",
       "dist/types/types/chatgpt-oauth.d.ts",
+      "dist/types/types/client-preferences.d.ts",
       "dist/types/types/conversation-fork-protocol.d.ts",
       "dist/types/types/cwd-protocol.d.ts",
       "dist/types/types/external-tool-protocol.d.ts",
@@ -28,20 +29,21 @@
       "dist/types/types/subagent-protocol.d.ts",
       "dist/types/types/task-control-protocol.d.ts",
       "dist/types/types/teleport-protocol.d.ts",
-      "dist/types/types/toolset-protocol.d.ts"
+      "dist/types/types/toolset-protocol.d.ts",
+      "dist/types/types/turn-finished-protocol.d.ts"
     ],
-    "captured_at": "2026-10-08",
+    "captured_at": "2026-10-11",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.33.6 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.34.8 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
     "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage",
     "live_server_golden_fixture": "golden/letta-code-0.32.3-live.jsonl",
-    "live_server_note": "The deployed App Server runs 0.32.3; its WsProtocolCommand/WsProtocolMessage unions equal the 0.32.10 baseline (100 commands, 111 messages); the 0.33.6 baseline adds exactly launch_subagent and launch_subagent_response (101 commands, 112 messages)."
+    "live_server_note": "The deployed App Server runs 0.32.3; its WsProtocolCommand/WsProtocolMessage unions equal the 0.32.10 baseline (100 commands, 111 messages); 0.33.6 added exactly launch_subagent and launch_subagent_response (101 commands, 112 messages); the 0.34.8 baseline adds exactly the turn_finished_ack command (102 commands, 112 messages)."
   },
   "downstream_ownership_policy": {
     "status": "mobile migration policy, not an upstream protocol limitation",
@@ -50,7 +52,7 @@
     "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
   },
   "upstream_socket_behavior": {
-    "source": "installed letta.js 0.33.6 (re-checked 2026-10-09; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
+    "source": "installed letta.js 0.34.8 (re-checked 2026-10-11; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
     "multiple_clients": "the listener accepts independent concurrent /ws clients; request correlation and runtime subscriptions are connection-local",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",
@@ -117,7 +119,7 @@
       ],
       "not_capabilities": [],
       "fixture": "cli-app-server-help.txt",
-      "note": "0.29.x-0.33.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout"
+      "note": "0.29.x-0.34.x: app-server prints deprecation on stderr and emits the unified letta server --listen help on stdout (0.34 adds --lifecycle-output jsonl)"
     }
   ],
   "frames": [
@@ -363,6 +365,24 @@
       "reconnect": "ambiguous_mutation",
       "idempotency": "request_id_correlated",
       "capability": "models_providers"
+    },
+    {
+      "type": "turn_finished",
+      "direction": "server_to_client",
+      "channel": "control",
+      "owner": "turn_engine",
+      "reconnect": "event",
+      "idempotency": "idempotency_key",
+      "capability": "app_server_v2"
+    },
+    {
+      "type": "turn_finished_ack",
+      "direction": "client_to_server",
+      "channel": "control",
+      "owner": "turn_engine",
+      "reconnect": "safe_read",
+      "idempotency": "idempotency_key",
+      "capability": "app_server_v2"
     }
   ]
 }

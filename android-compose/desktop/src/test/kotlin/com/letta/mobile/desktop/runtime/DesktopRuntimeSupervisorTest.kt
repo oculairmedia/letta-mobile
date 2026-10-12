@@ -160,6 +160,43 @@ class DesktopRuntimeSupervisorTest {
     }
 
     @Test
+    fun `the user can stop the runtime and start it again`() = supervised { f ->
+        val urls = mutableListOf<String>()
+        backgroundScope.launch { f.supervisor.restarted.collect { urls += it } }
+        f.supervisor.ensureStarted()
+
+        f.supervisor.stopByUser()
+        runCurrent()
+        assertFalse(f.latest.isAlive, "stop ends the child")
+        val stopped = f.supervisor.health.value
+        assertTrue(stopped.stoppedByUser)
+        assertFalse(stopped.active)
+        assertFalse(stopped.needsForceRestart, "a stop the user asked for is not a failure")
+        assertTrue(runCatching { f.supervisor.ensureStarted() }.exceptionOrNull() is DesktopRuntimeStoppedException)
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(1, f.launches.size, "nothing brings a stopped runtime back on its own")
+
+        f.supervisor.startByUser()
+        runCurrent()
+        assertEquals(2, f.launches.size)
+        assertTrue(f.supervisor.health.value.active)
+        assertFalse(f.supervisor.health.value.stoppedByUser)
+        assertEquals(listOf("ws://127.0.0.1:40002"), urls, "the chat is told to reconnect")
+    }
+
+    @Test
+    fun `wake does not restart a runtime the user stopped`() = supervised { f ->
+        f.supervisor.ensureStarted()
+        f.supervisor.stopByUser()
+        runCurrent()
+        f.supervisor.onResumed()
+        runCurrent()
+
+        assertEquals(1, f.launches.size)
+    }
+
+    @Test
     fun `a restart that dies before ready counts as a crash`() = supervised { f ->
         f.supervisor.ensureStarted()
         f.failNextStart = true
