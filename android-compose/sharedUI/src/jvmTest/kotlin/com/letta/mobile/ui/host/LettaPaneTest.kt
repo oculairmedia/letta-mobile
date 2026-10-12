@@ -103,30 +103,21 @@ class LettaPaneTest {
     }
 
     @Test
-    fun theAgentContextSheetOpensThroughTheHost() = runComposeUiTest {
-        val opened = mutableListOf<String>()
-        val recording = LettaHost.Pointer.copy(
-            sheet = { spec, content -> opened += "sheet"; Column { Text(spec.testTag.orEmpty()); content() } },
-            popover = { spec, content -> opened += "popover"; Column { Text(spec.testTag.orEmpty()); content() } },
-        )
-        setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }
-        onNodeWithTag(AgentContextTags.CARD).performClick()
-        waitForIdle()
-        assertEquals("popover", opened.distinct().single())
-        onNodeWithText(AgentContextTags.SHEET).assertExists()
-    }
+    fun theAgentContextSheetIsAPopoverOnPointer() = assertContextSheetOpensAs(LettaHost.Pointer, "popover")
 
     @Test
-    fun theAgentContextSheetIsABottomSheetOnTouch() = runComposeUiTest {
+    fun theAgentContextSheetIsABottomSheetOnTouch() = assertContextSheetOpensAs(LettaHost.Touch, "sheet")
+
+    /** Opens the migrated agent context card under [host] with recording containers. */
+    private fun assertContextSheetOpensAs(host: LettaHost, expected: String) = runComposeUiTest {
         val opened = mutableListOf<String>()
-        val recording = LettaHost.Touch.copy(
-            sheet = { _, content -> opened += "sheet"; Column(content = content) },
-            popover = { _, content -> opened += "popover"; Column(content = content) },
-        )
+        fun recorder(kind: String): PaneContainer = { spec, content -> opened += kind; Column { Text(spec.testTag.orEmpty()); content() } }
+        val recording = host.copy(sheet = recorder("sheet"), popover = recorder("popover"))
         setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
-        assertEquals("sheet", opened.distinct().single())
+        assertEquals(expected, opened.distinct().single())
+        onNodeWithText(AgentContextTags.SHEET).assertExists()
     }
 
     @Test
