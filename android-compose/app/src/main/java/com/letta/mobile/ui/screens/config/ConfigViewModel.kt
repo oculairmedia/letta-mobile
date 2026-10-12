@@ -145,7 +145,7 @@ class ConfigViewModel @Inject constructor(
                 throw cancelled
             } catch (e: Exception) {
                 if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
-                showLoadFailure(retainedState, e.message ?: "Failed to load config")
+                showLoadFailure(retainedState, e)
             }
         }
     }
@@ -228,7 +228,8 @@ class ConfigViewModel @Inject constructor(
     }
 
     /** A failed load: an error screen, or the retained form with the refresh error under it. */
-    private fun showLoadFailure(retainedState: ConfigUiState?, message: String) {
+    private fun showLoadFailure(retainedState: ConfigUiState?, error: Exception) {
+        val message = error.message ?: "Failed to load config"
         when (val failure = RetainedContentRefresh.failure(retainedContent = retainedState, message = message)) {
             is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
             is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(

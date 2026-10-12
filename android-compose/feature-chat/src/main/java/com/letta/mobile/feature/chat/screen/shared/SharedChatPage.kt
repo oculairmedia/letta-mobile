@@ -126,7 +126,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val currentSubagents by rememberUpdatedState(params.subagents)
     val agentMessages = LocalAndroidAgentMessageContext.current
     val host = remember(params.navigation, subagentSheet, agentMessages) {
-        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch, agentMessages = agentMessages)
+        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch).withAgentMessages(agentMessages)
     }
     val hasCanvasSlot = canvasSlot != null
     val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
@@ -332,14 +332,11 @@ private fun rememberAdminChatSessionPort(
 
 private fun ChatScreenNavigationCallbacks.toSurfaceHost(
     openSubagent: (toolCallId: String, subagentAgentId: String?, description: String) -> Unit,
-    agentMessages: AndroidAgentMessageContext,
 ): ChatSurfaceHost {
     val openPane = onOpenAgentPane
     return ChatSurfaceHost(
         openCanvas = onOpenCanvas,
-        // An inter-agent label opens that agent's latest conversation, as the legacy bubbles did.
-        openAgent = agentMessages.onAgentClick ?: openPane?.let { { _: String -> it() } },
-        resolveAgentName = agentMessages.resolveName,
+        openAgent = openPane?.let { { _: String -> it() } },
         openSubagent = openSubagent,
         openModelPicker = null,
         // The composer companion mascot opens the agent drawer, as the legacy page's does.
@@ -348,6 +345,10 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
         openAgentSwitcher = onOpenAgentSwitcher,
     )
 }
+
+/** An inter-agent label names its agent and opens that agent's latest conversation, as the legacy bubbles did. */
+private fun ChatSurfaceHost.withAgentMessages(agentMessages: AndroidAgentMessageContext): ChatSurfaceHost =
+    copy(openAgent = agentMessages.onAgentClick ?: openAgent, resolveAgentName = agentMessages.resolveName)
 
 /** Dictation needs the Hilt-provided recognizer; previews and tests without one get no mic. */
 @Composable

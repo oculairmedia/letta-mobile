@@ -17,7 +17,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.subagents.projectSubagentRoster
@@ -77,6 +76,28 @@ internal class SharedChatSubagentSheetState(
     fun dismiss() {
         target = null
     }
+
+    /**
+     * A ring's "view conversation": opens the subagent's conversation through [open] once it
+     * resolves ([onOpening] first), else its todo sheet with a banner saying why.
+     */
+    suspend fun viewConversation(subagent: ActiveSubagent, open: ((String, String) -> Unit)?, onOpening: () -> Unit) {
+        val conversation = if (open == null) null else conversationOf(subagent)
+        if (open != null && conversation != null) {
+            onOpening()
+            open(conversation.first, conversation.second)
+            return
+        }
+        target = subagent.sheetTarget()
+        bannerMessage = "Subagent conversation is not available yet"
+    }
+
+    /** The subagent's (agent id, conversation id), or null while either is unknown. */
+    private suspend fun conversationOf(subagent: ActiveSubagent): Pair<String, String>? {
+        val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() } ?: return null
+        val conversationId = source.resolveConversationId(subagent).getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        return agentId to conversationId
+    }
 }
 
 @Composable
@@ -128,12 +149,21 @@ internal fun SharedChatSubagentRings(
                 now = inputs.barState.lingerTick,
                 onRingClick = { subagent -> state.target = subagent.sheetTarget() },
                 onViewConversation = { subagent ->
-                    scope.launch { viewSubagentConversation(subagent, inputs.source, navigation, haptic, state) }
+                    scope.launch {
+                        state.viewConversation(subagent, navigation.onViewSubagentConversation) { HapticEffects.longPress(haptic) }
+                    }
                 },
                 modifier = Modifier.align(Alignment.TopEnd).padding(LettaDimens.Space.sm),
             )
         }
     }
+}
+
+/** The sheet's (agent id, conversation id) to offer, or null while either is unknown. */
+private fun SubagentTodoSheetTarget.conversation(): Pair<String, String>? {
+    val agentId = subagentAgentId?.takeIf { it.isNotBlank() } ?: return null
+    val conversationId = subagentNavigationConversationId ?: return null
+    return agentId to conversationId
 }
 
 private fun ActiveSubagent.sheetTarget() = SubagentTodoSheetTarget(
@@ -142,26 +172,6 @@ private fun ActiveSubagent.sheetTarget() = SubagentTodoSheetTarget(
     subagentAgentId = subagentAgentId,
     subagentConversationId = subagentConversationId,
 )
-
-/** Opens the subagent's conversation, or its todo sheet with a banner while it has none yet. */
-private suspend fun viewSubagentConversation(
-    subagent: ActiveSubagent,
-    source: ActiveSubagentSource,
-    navigation: ChatScreenNavigationCallbacks,
-    haptic: HapticFeedback,
-    state: SharedChatSubagentSheetState,
-) {
-    val open = navigation.onViewSubagentConversation
-    val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() }
-    val conversationId = agentId?.let { source.resolveConversationId(subagent).getOrNull()?.takeIf { it.isNotBlank() } }
-    if (open != null && agentId != null && conversationId != null) {
-        HapticEffects.longPress(haptic)
-        open(agentId, conversationId)
-        return
-    }
-    state.target = subagent.sheetTarget()
-    state.bannerMessage = "Subagent conversation is not available yet"
-}
 
 /**
  * The floating banner over the top of the page (canvas or full screen), shown for a few seconds
@@ -210,20 +220,18 @@ internal fun SharedChatSubagentSheet(
         }
         todoState = subagentTodoSheetStateFrom(todos)
     }
-    val open = navigation.onViewSubagentConversation
-    val agentId = sheetTarget.subagentAgentId?.takeIf { it.isNotBlank() }
-    val conversationId = sheetTarget.subagentNavigationConversationId
+    val conversation = sheetTarget.conversation()
     SubagentTodoSheet(
         description = sheetTarget.description,
         state = todoState,
         onDismiss = state::dismiss,
-        onViewConversation = if (open != null && agentId != null && conversationId != null) {
-            {
-                state.target = null
-                open(agentId, conversationId)
+        onViewConversation = navigation.onViewSubagentConversation?.let { open ->
+            conversation?.let { (agentId, conversationId) ->
+                {
+                    state.target = null
+                    open(agentId, conversationId)
+                }
             }
-        } else {
-            null
         },
         roster = { SharedChatSubagentRoster(inputs.source, navigation) { state.target = null } },
     )
