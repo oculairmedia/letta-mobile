@@ -38,6 +38,8 @@ import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerGroup
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -211,7 +213,12 @@ class ModelControlUiTest {
     @Test
     fun accountsListsAccountsToConnectTheConnectedOnesAndTheRest() = runComposeUiTest {
         val recorder = SettingsRecorder()
-        setContent { Frame(height = 1400) { ProviderSettingsPane(ModelControlUiFixtures.managementState(), recorder.actions) } }
+        // A pointer host: the refresh button is desktop's; touch pulls the page instead.
+        setContent {
+            Frame(height = 1400) {
+                ProvideLettaHost(LettaHost.Pointer) { ProviderSettingsPane(ModelControlUiFixtures.managementState(), recorder.actions) }
+            }
+        }
 
         listOf(ModelControlStrings.CONNECT_ACCOUNT, ModelControlStrings.CONNECTED, ModelControlStrings.OTHER_PROVIDERS).forEach {
             onNode(hasText(it) and isHeading()).assertExists()

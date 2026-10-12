@@ -11,21 +11,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -40,24 +39,24 @@ import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
 import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.components.isPointerHost
 import com.letta.mobile.ui.theme.LettaDimens
 
+/**
+ * The list's header: the filter field first (directly under the host's Blocks | Files mode switch),
+ * then the Current | History tabs. The title row shows only when the host does not title the page,
+ * and the refresh button only on a pointer host - touch pulls the list instead
+ * (letta-mobile-ckmub.3.21).
+ */
 @Composable
 internal fun MemfsHeader(page: MemfsPageScope) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                if (page.options.showTitle) Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
-            }
-            IconButton(onClick = page.actions::refresh, modifier = Modifier.testTag(MemfsPageTags.REFRESH)) {
-                Icon(Icons.Outlined.Refresh, contentDescription = REFRESH_LABEL)
-            }
-        }
-        MemfsTabs(page)
+        MemfsTitleRow(page)
         if (page.state.tab == MemfsTab.Files) {
             OutlinedTextField(
                 value = page.state.query,
@@ -69,6 +68,7 @@ internal fun MemfsHeader(page: MemfsPageScope) {
                 modifier = Modifier.fillMaxWidth().testTag(MemfsPageTags.SEARCH),
             )
         }
+        MemfsTabs(page)
         if (page.state.isLoading || page.state.history.loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
@@ -76,18 +76,33 @@ internal fun MemfsHeader(page: MemfsPageScope) {
 }
 
 @Composable
+private fun MemfsTitleRow(page: MemfsPageScope) {
+    val pointer = isPointerHost()
+    if (!page.options.showTitle && !pointer) return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f)) {
+            if (page.options.showTitle) Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
+        }
+        LettaRefreshAction(
+            refreshing = page.state.isLoading,
+            onRefresh = page.actions::refresh,
+            modifier = Modifier.testTag(MemfsPageTags.REFRESH),
+        )
+    }
+}
+
+/** Files' sub-view: the current tree or its history; "Current", since the mode switch already says Files. */
+@Composable
 private fun MemfsTabs(page: MemfsPageScope) {
     val tabs = MemfsTab.entries
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        tabs.forEachIndexed { index, tab ->
-            SegmentedButton(
+    SecondaryTabRow(selectedTabIndex = tabs.indexOf(page.state.tab), modifier = Modifier.fillMaxWidth()) {
+        tabs.forEach { tab ->
+            Tab(
                 selected = page.state.tab == tab,
                 onClick = { page.actions.selectTab(tab) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = tabs.size),
+                text = { Text(if (tab == MemfsTab.Files) CURRENT_TAB else HISTORY_TAB) },
                 modifier = Modifier.testTag(MemfsPageTags.tab(tab)),
-            ) {
-                Text(if (tab == MemfsTab.Files) FILES_TAB else HISTORY_TAB)
-            }
+            )
         }
     }
 }
@@ -158,8 +173,9 @@ private fun MemfsMessage(
     color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
     actions: @Composable () -> Unit = {},
 ) {
+    // Scrolls (with nothing to scroll) so a pull on the message still reaches LettaRefreshable.
     Column(
-        modifier = modifier.fillMaxWidth().padding(LettaDimens.Space.xl),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
@@ -192,9 +208,8 @@ private const val KILOBYTE = 1024L
 private const val TENTHS = 10.0
 private const val SYSTEM_PREFIX = "system/"
 private const val PAGE_TITLE = "Memory files"
-private const val REFRESH_LABEL = "Refresh"
 private const val SEARCH_PLACEHOLDER = "Filter memory files"
-private const val FILES_TAB = "Files"
+private const val CURRENT_TAB = "Current"
 private const val HISTORY_TAB = "History"
 private const val SYSTEM_SECTION = "System"
 private const val EXTERNAL_SECTION = "External"

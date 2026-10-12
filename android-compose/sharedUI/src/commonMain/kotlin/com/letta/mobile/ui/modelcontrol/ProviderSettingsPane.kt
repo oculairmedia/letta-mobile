@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
@@ -40,7 +38,8 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderManagementControlle
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.settingsLists
-import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** The sub-pages of Providers, in navigation order. */
@@ -204,11 +203,14 @@ private fun PageBody(context: ProviderPageContext, page: ProviderSettingsPage) {
     val lists = context.state.settingsLists
     // widthIn before fillMaxSize: the cap has to narrow the constraints before they are filled.
     val pageModifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxSize()
-    when (page) {
-        ProviderSettingsPage.ACCOUNTS -> AccountsPage(lists, context, pageModifier)
-        ProviderSettingsPage.API_KEYS -> CredentialsPage(CredentialsKind.API_KEYS, lists.apiKeys, context, pageModifier)
-        ProviderSettingsPage.ENDPOINTS -> CredentialsPage(CredentialsKind.ENDPOINTS, lists.endpoints, context, pageModifier)
-        ProviderSettingsPage.MODELS -> Unit
+    // The status bar above shows the load, so the pull only asks for it.
+    LettaRefreshable(refreshing = false, onRefresh = context.actions.management.onRefresh, modifier = Modifier.fillMaxSize()) {
+        when (page) {
+            ProviderSettingsPage.ACCOUNTS -> AccountsPage(lists, context, pageModifier)
+            ProviderSettingsPage.API_KEYS -> CredentialsPage(CredentialsKind.API_KEYS, lists.apiKeys, context, pageModifier)
+            ProviderSettingsPage.ENDPOINTS -> CredentialsPage(CredentialsKind.ENDPOINTS, lists.endpoints, context, pageModifier)
+            ProviderSettingsPage.MODELS -> Unit
+        }
     }
 }
 
@@ -223,11 +225,12 @@ private fun PageHeader(page: ProviderSettingsPage, state: ProviderManagementStat
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
-        IconButton(
-            onClick = onRefresh,
-            enabled = !state.loading,
+        // Pointer only: touch pulls the page body (PageBody's LettaRefreshable).
+        LettaRefreshAction(
+            refreshing = state.loading,
+            onRefresh = onRefresh,
             modifier = Modifier.testTag(ProviderSettingsTags.REFRESH),
-        ) { Icon(LettaIcons.Refresh, contentDescription = ModelControlStrings.REFRESH_PROVIDERS) }
+        )
     }
     HorizontalDivider(
         color = MaterialTheme.colorScheme.outlineVariant,

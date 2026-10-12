@@ -14,7 +14,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.channel.ChannelDisplayItem
@@ -23,6 +25,8 @@ import com.letta.mobile.data.channel.ChannelLibraryState
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageReducer
 import com.letta.mobile.data.channel.ChannelsPageState
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -51,13 +55,14 @@ class ChannelsPageTest {
     private fun ComposeUiTest.show(
         state: ChannelsPageState,
         actions: ChannelsPageActions,
-        width: Dp,
-        options: ChannelsPageOptions = ChannelsPageOptions(),
+        screen: Screen,
     ) {
         setContent {
             MaterialTheme {
-                Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    ChannelsPage(state = state, actions = actions, options = options)
+                ProvideLettaHost(screen.host) {
+                    Box(Modifier.width(screen.width).height(PAGE_HEIGHT)) {
+                        ChannelsPage(state = state, actions = actions, options = screen.options)
+                    }
                 }
             }
         }
@@ -65,7 +70,7 @@ class ChannelsPageTest {
 
     @Test
     fun liveAndStaleChannelsRenderWithTheirStatus() = runComposeUiTest {
-        show(stateOf(live, redialing), RecordingActions(), WIDE)
+        show(stateOf(live, redialing), RecordingActions(), Screen(WIDE))
         onNodeWithTag(ChannelsPageTags.card("iroh")).assertExists()
         onNodeWithTag(ChannelsPageTags.card("ws")).assertExists()
         onNodeWithText("Code 1006").assertExists()
@@ -75,7 +80,7 @@ class ChannelsPageTest {
 
     @Test
     fun anEmptyLibrarySaysSo() = runComposeUiTest {
-        show(stateOf(), RecordingActions(), COMPACT)
+        show(stateOf(), RecordingActions(), Screen(COMPACT))
         onNodeWithTag(ChannelsPageTags.EMPTY).assertExists()
         onNodeWithText("No live channels are available for the active backend.").assertExists()
     }
@@ -83,14 +88,14 @@ class ChannelsPageTest {
     @Test
     fun aFilterThatMatchesNothingSaysSo() = runComposeUiTest {
         val state = ChannelsPageReducer.withQuery(stateOf(live), "nothing like this")
-        show(state, RecordingActions(), WIDE)
+        show(state, RecordingActions(), Screen(WIDE))
         onNodeWithText("No channels match your filter.").assertExists()
     }
 
     @Test
     fun headerControlsReachTheActions() = runComposeUiTest {
         val actions = RecordingActions()
-        show(stateOf(live, redialing), actions, COMPACT)
+        show(stateOf(live, redialing), actions, Screen(COMPACT, host = LettaHost.Pointer))
         onNodeWithTag(ChannelsPageTags.REFRESH).performClick()
         onNodeWithTag(ChannelsPageTags.filter("Reconnecting")).performClick()
         onNodeWithTag(ChannelsPageTags.SEARCH).performTextInput("iroh")
@@ -98,9 +103,19 @@ class ChannelsPageTest {
     }
 
     @Test
+    fun onTouchTheListPullsToRefreshAndTheHeaderHasNoRefreshButton() = runComposeUiTest {
+        val actions = RecordingActions()
+        show(stateOf(live, redialing), actions, Screen(COMPACT, PhoneOptions))
+        onNodeWithTag(ChannelsPageTags.REFRESH).assertDoesNotExist()
+        onNodeWithTag(ChannelsPageTags.LIST).performTouchInput { swipeDown(startY = top, endY = bottom, durationMillis = 600) }
+        waitForIdle()
+        assertEquals(listOf("refresh"), actions.calls)
+    }
+
+    @Test
     fun theActiveFilterChipIsSelected() = runComposeUiTest {
         val state = ChannelsPageReducer.withStatusFilter(stateOf(live, redialing), ChannelDisplayStatus.Connected)
-        show(state, RecordingActions(), WIDE)
+        show(state, RecordingActions(), Screen(WIDE))
         onNodeWithTag(ChannelsPageTags.filter("Connected")).assertIsSelected()
         onNodeWithTag(ChannelsPageTags.card("ws")).assertDoesNotExist()
     }
@@ -108,7 +123,7 @@ class ChannelsPageTest {
     @Test
     fun cardsOpenTheDetailOnlyWhenTheHostAsks() = runComposeUiTest {
         val actions = RecordingActions()
-        show(stateOf(live), actions, WIDE)
+        show(stateOf(live), actions, Screen(WIDE))
         onNodeWithTag(ChannelsPageTags.card("iroh")).performClick()
         assertEquals(emptyList(), actions.calls)
     }
@@ -116,7 +131,7 @@ class ChannelsPageTest {
     @Test
     fun aTappedCardOpensItsDetail() = runComposeUiTest {
         val actions = RecordingActions()
-        show(stateOf(live), actions, COMPACT, PhoneOptions)
+        show(stateOf(live), actions, Screen(COMPACT, PhoneOptions))
         onNodeWithTag(ChannelsPageTags.card("iroh")).performClick()
         assertEquals(listOf("select:iroh"), actions.calls)
     }
@@ -125,13 +140,20 @@ class ChannelsPageTest {
     fun theWideDetailShowsTransportAndRefreshes() = runComposeUiTest {
         val actions = RecordingActions()
         val state = ChannelsPageReducer.withSelection(stateOf(live, redialing), "ws")
-        show(state, actions, WIDE, PhoneOptions)
+        show(state, actions, Screen(WIDE, PhoneOptions, LettaHost.Pointer))
         onNodeWithTag(ChannelsPageTags.DETAIL).assertExists()
         onNodeWithText("This channel is not live: anything it shows may be stale.").assertExists()
         onNodeWithTag(ChannelsPageTags.DETAIL_REFRESH).performClick()
         onNodeWithTag(ChannelsPageTags.DETAIL_CLOSE).performClick()
         assertEquals(listOf("refresh", "clear"), actions.calls)
     }
+
+    /** Where the page is shown: window width, page options and input host. */
+    private data class Screen(
+        val width: Dp,
+        val options: ChannelsPageOptions = ChannelsPageOptions(),
+        val host: LettaHost = LettaHost.Touch,
+    )
 
     private class RecordingActions : ChannelsPageActions {
         val calls = mutableListOf<String>()

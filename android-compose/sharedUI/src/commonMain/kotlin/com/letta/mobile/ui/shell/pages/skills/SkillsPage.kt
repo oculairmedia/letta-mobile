@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.tools.ToolLibraryState
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
@@ -178,7 +179,17 @@ internal class SkillsPageScope(
     val listState: LazyListState,
     val controls: SkillsPageControls,
     val selectedSkill: Skill?,
-)
+) {
+    /** A reload of skills or tools already listed (a first load shows its own info row instead). */
+    val refreshing: Boolean
+        get() = (state.skillsLoading && state.skills.isNotEmpty()) || (state.tools.isLoading && state.tools.tools.isNotEmpty())
+
+    /** One refresh reloads both sections. */
+    fun refresh() {
+        actions.onRefreshSkills()
+        actions.onRefreshTools()
+    }
+}
 
 private fun CoroutineScope.jumpTo(listState: LazyListState, rows: List<SkillsPageRow>, section: SkillsPageSection) {
     val index = SkillsPageRows.indexOf(rows, section)
@@ -226,15 +237,18 @@ private fun CompactSkillsLayout(page: SkillsPageScope) {
     page.selectedSkill?.let { skill -> SkillDetailSheet(skill, page) }
 }
 
+/** Skills then tools, pulled down on touch to reload both. */
 @Composable
 private fun SkillsBody(page: SkillsPageScope, contentPadding: PaddingValues) {
-    LazyColumn(
-        state = page.listState,
-        modifier = Modifier.fillMaxSize().testTag(SkillsPageTags.LIST),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        contentPadding = contentPadding,
-    ) {
-        items(page.rows, key = { it.key }) { row -> SkillsPageRowContent(row, page) }
+    LettaRefreshable(refreshing = page.refreshing, onRefresh = page::refresh, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = page.listState,
+            modifier = Modifier.fillMaxSize().testTag(SkillsPageTags.LIST),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+            contentPadding = contentPadding,
+        ) {
+            items(page.rows, key = { it.key }) { row -> SkillsPageRowContent(row, page) }
+        }
     }
 }
 

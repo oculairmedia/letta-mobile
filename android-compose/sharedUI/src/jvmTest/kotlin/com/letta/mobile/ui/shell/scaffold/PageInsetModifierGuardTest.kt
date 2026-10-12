@@ -1,10 +1,6 @@
 package com.letta.mobile.ui.shell.scaffold
 
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.name
-import kotlin.io.path.readText
+import com.letta.mobile.ui.guard.SharedUiSourceScan
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -73,34 +69,6 @@ class PageInsetModifierGuardTest {
         assertTrue(findViolations("// see statusBarsPadding docs").isEmpty())
     }
 
-    private fun scanProductionSources(): Map<String, List<String>> {
-        val sharedUi = locateSharedUiDir()
-        val roots = listOf("commonMain", "jvmMain", "androidMain", "skikoMain", "wasmJsMain")
-            .map { sharedUi.resolve("src/$it/kotlin") }
-            .filter { Files.isDirectory(it) }
-        assertTrue(roots.isNotEmpty(), "sharedUI production sources not found under $sharedUi")
-        val hits = mutableMapOf<String, List<String>>()
-        roots.forEach { root ->
-            Files.walk(root).use { stream ->
-                stream.filter { it.isRegularFile() && it.name.endsWith(".kt") && it.name != OWNER }.forEach { file ->
-                    val found = findViolations(file.readText())
-                    if (found.isNotEmpty()) hits[file.name] = found
-                }
-            }
-        }
-        return hits
-    }
-
-    private fun locateSharedUiDir(): Path {
-        var candidate: Path? = Path.of(System.getProperty("user.dir")).toAbsolutePath()
-        while (candidate != null) {
-            if (candidate.fileName?.toString() == "sharedUI") return candidate
-            val direct = candidate.resolve("sharedUI")
-            if (Files.isDirectory(direct)) return direct
-            val nested = candidate.resolve("android-compose/sharedUI")
-            if (Files.isDirectory(nested)) return nested
-            candidate = candidate.parent
-        }
-        error("Unable to locate sharedUI from ${System.getProperty("user.dir")}")
-    }
+    private fun scanProductionSources(): Map<String, List<String>> =
+        SharedUiSourceScan.scan(skip = setOf(OWNER), find = ::findViolations)
 }

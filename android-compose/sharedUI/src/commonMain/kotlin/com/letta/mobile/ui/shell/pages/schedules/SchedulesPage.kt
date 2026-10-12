@@ -74,7 +74,7 @@ fun SchedulesPage(
     SchedulesPageLayout(
         ui = ui,
         parts = SchedulesPageParts(
-            header = ui.headerParams(state.canCreate, options),
+            header = ui.headerParams(state.canCreate, options, SchedulesRefresh(state.library.isLoading, actions.onRefresh)),
             body = ui.body(state, data, actions.onRefresh),
             rail = ui.railParams(data, actions.onTogglePause),
             onSelectAgent = actions.onSelectAgent,
@@ -140,13 +140,14 @@ private class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate)
     /** Week / Agenda / Rules keep the overview docked; Timeline and History go full width until a pick. */
     val showsDockedRail: Boolean get() = rail !is ScheduleRailState.Overview || view.docksOverview
 
-    fun headerParams(canCreate: Boolean, options: SchedulesPageOptions) = SchedulesHeaderParams(
+    fun headerParams(canCreate: Boolean, options: SchedulesPageOptions, refresh: SchedulesRefresh) = SchedulesHeaderParams(
         view = view,
         onView = { view = it },
         rangeLabel = SchedulesPageModel.weekRangeLabel(weekStart),
         onShiftWeek = { weeks -> weekStart = weekStart.plus(weeks * DAYS_PER_WEEK, DateTimeUnit.DAY) },
         onNew = { creating = true }.takeIf { canCreate },
         options = options,
+        refresh = refresh,
     )
 
     fun railParams(data: SchedulesData, onTogglePause: ((String, Boolean) -> Unit)?) = ScheduleRailParams(

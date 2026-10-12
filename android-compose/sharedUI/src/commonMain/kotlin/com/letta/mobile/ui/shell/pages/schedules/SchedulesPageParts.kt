@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronLeft
@@ -39,6 +40,8 @@ import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.data.schedules.SchedulesView
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterListTag
@@ -70,7 +73,11 @@ internal class SchedulesHeaderParams(
     /** Null hides "New schedule". */
     val onNew: (() -> Unit)?,
     val options: SchedulesPageOptions,
+    val refresh: SchedulesRefresh,
 )
+
+/** Reloading the library: the header's refresh icon on pointer hosts, the body's pull on touch. */
+internal class SchedulesRefresh(val refreshing: Boolean, val onRefresh: () -> Unit)
 
 /** The title and "New schedule", then the view tabs with the week navigation beside them. */
 @Composable
@@ -83,6 +90,8 @@ internal fun SchedulesHeader(params: SchedulesHeaderParams) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SchedulesTabs(params.view, params.onView, params.options.touch, Modifier.weight(1f))
             WeekNavigation(params)
+            // Touch pulls the body down instead (SchedulesMainContent's LettaRefreshable).
+            LettaRefreshAction(refreshing = params.refresh.refreshing, onRefresh = params.refresh.onRefresh)
         }
     }
 }
@@ -192,12 +201,16 @@ internal class SchedulesBody(
     val onSelectSchedule: (String) -> Unit,
 )
 
-/** The current view, or the loading / error / empty state when there is nothing to project. */
+/**
+ * The current view, or the loading / error / empty state when there is nothing to project. On touch
+ * the whole body pulls to refresh; the empty, loading and error states scroll (with nothing to
+ * scroll) so the pull reaches it.
+ */
 @Composable
 internal fun SchedulesMainContent(body: SchedulesBody, modifier: Modifier) {
     val library = body.state.library
     val error = library.errorMessage
-    Box(modifier) {
+    LettaRefreshable(refreshing = library.isLoading, onRefresh = body.onRefresh, modifier = modifier) {
         when {
             body.defs.isNotEmpty() -> Box(Modifier.fillMaxSize().testTag(SchedulesPageTags.view(body.view))) { ActiveScheduleView(body) }
             error != null -> SchedulesError(error, library.isLoading, body.onRefresh)
@@ -282,7 +295,7 @@ private fun SchedulesRulesView(body: SchedulesBody) {
 @Composable
 private fun SchedulesError(message: String, retrying: Boolean, onRetry: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().padding(LettaDimens.Space.xxl).testTag(SchedulesPageTags.ERROR),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xxl).testTag(SchedulesPageTags.ERROR),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
@@ -300,7 +313,7 @@ private fun SchedulesEmpty(state: SchedulesPageState) {
         else -> "Schedules created elsewhere will appear here."
     }
     Column(
-        Modifier.fillMaxSize().padding(LettaDimens.Space.xl).testTag(SchedulesPageTags.EMPTY),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xl).testTag(SchedulesPageTags.EMPTY),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -313,7 +326,7 @@ private fun SchedulesEmpty(state: SchedulesPageState) {
 
 @Composable
 private fun CenteredNote(text: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }

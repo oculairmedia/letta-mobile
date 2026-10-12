@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.secrets.AgentVaultActions
 import com.letta.mobile.data.secrets.AgentVaultLoad
 import com.letta.mobile.data.secrets.AgentVaultState
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -143,9 +145,11 @@ private fun VaultHeader(page: AgentVaultPageScope) {
             Box(Modifier.weight(1f)) {
                 if (page.options.showTitle) Text(PAGE_TITLE, style = MaterialTheme.typography.headlineSmall)
             }
-            IconButton(onClick = page.actions::refresh, modifier = Modifier.testTag(AgentVaultPageTags.REFRESH)) {
-                Icon(Icons.Outlined.Refresh, contentDescription = REFRESH_LABEL)
-            }
+            LettaRefreshAction(
+                refreshing = page.state.load == AgentVaultLoad.Loading,
+                onRefresh = page.actions::refresh,
+                modifier = Modifier.testTag(AgentVaultPageTags.REFRESH),
+            )
             Button(
                 onClick = page.actions::startAdding,
                 enabled = page.state.agentId != null && !page.state.saving,
@@ -170,8 +174,16 @@ private fun VaultError(page: AgentVaultPageScope) {
     }
 }
 
+/** The secrets list, pulled down on touch to reload it (the header's progress bar shows the load). */
 @Composable
 private fun VaultBody(page: AgentVaultPageScope) {
+    LettaRefreshable(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.fillMaxSize()) {
+        VaultBodyContent(page)
+    }
+}
+
+@Composable
+private fun VaultBodyContent(page: AgentVaultPageScope) {
     val state = page.state
     val load = state.load
     val empty = state.emptyMessage
@@ -192,8 +204,9 @@ private fun VaultBody(page: AgentVaultPageScope) {
 
 @Composable
 private fun VaultMessage(message: String, modifier: Modifier, actions: @Composable () -> Unit = {}) {
+    // Scrolls (with nothing to scroll) so a pull on the message still reaches LettaRefreshable.
     Column(
-        modifier = modifier.fillMaxWidth().padding(LettaDimens.Space.xl),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
@@ -219,7 +232,6 @@ private fun DeleteSecretDialog(page: AgentVaultPageScope) {
 }
 
 private const val PAGE_TITLE = "Secrets"
-private const val REFRESH_LABEL = "Refresh"
 private const val ADD_LABEL = "Add secret"
 private const val DISMISS_LABEL = "Dismiss"
 private const val RETRY_LABEL = "Try again"

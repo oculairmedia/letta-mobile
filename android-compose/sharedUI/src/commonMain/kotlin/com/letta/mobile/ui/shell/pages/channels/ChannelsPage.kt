@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.VerticalDivider
@@ -23,6 +25,7 @@ import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.ui.components.LettaCatalogGridPadding
 import com.letta.mobile.ui.components.LettaInfoBox
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.lettaCardGrid
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -124,15 +127,26 @@ private fun CompactChannelsLayout(page: ChannelsPageScope) {
     page.openChannel?.let { channel -> ChannelDetailSheet(channel, page) }
 }
 
+/** The cards, pulled down on touch to reload them; the source reports no progress, so the pull springs back. */
 @Composable
 private fun ChannelsBody(page: ChannelsPageScope, columns: Int, contentPadding: PaddingValues) {
+    LettaRefreshable(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.fillMaxSize()) {
+        ChannelsBodyContent(page, columns, contentPadding)
+    }
+}
+
+@Composable
+private fun ChannelsBodyContent(page: ChannelsPageScope, columns: Int, contentPadding: PaddingValues) {
     val empty = page.state.emptyReason
     if (empty != null) {
-        LettaInfoBox(
-            message = empty.message,
-            modifier = Modifier.testTag(ChannelsPageTags.EMPTY),
-            contentPadding = if (page.wide) WideInfoPadding else CompactInfoPadding,
-        )
+        // Scrolls (with nothing to scroll) so a pull on an empty page still refreshes it.
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            LettaInfoBox(
+                message = empty.message,
+                modifier = Modifier.testTag(ChannelsPageTags.EMPTY),
+                contentPadding = if (page.wide) WideInfoPadding else CompactInfoPadding,
+            )
+        }
         return
     }
     LazyColumn(
