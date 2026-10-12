@@ -21,7 +21,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -33,6 +32,7 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderSettingsLists
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.data.repository.modelcontrol.connectedBaseUrl
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.theme.LettaDimens
 
 private val pagePadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
@@ -56,7 +56,6 @@ private fun LazyListScope.accountsSection(accounts: List<ConnectableProvider>, c
         ProviderCard(
             provider = provider,
             description = context.methodLabel(provider),
-            leading = context.methodIcon(provider),
             busy = context.state.busy,
             onClick = { context.actions.onOpenSignIn(provider) },
         )
@@ -77,7 +76,6 @@ private fun LazyListScope.connectedSection(connected: List<ConnectableProvider>,
         ProviderCard(
             provider = provider,
             description = context.connectedDescription(provider),
-            leading = context.methodIcon(provider),
             busy = context.state.busy,
             connected = true,
             onRemove = { context.actions.management.onDisconnect(provider) },
@@ -103,7 +101,6 @@ private fun LazyListScope.otherSection(other: List<ConnectableProvider>, context
         ProviderCard(
             provider = provider,
             description = provider.description.ifBlank { context.methodLabel(provider) },
-            leading = context.methodIcon(provider),
             busy = context.state.busy,
             onClick = { context.actions.management.onConnect(provider) },
         )
@@ -144,7 +141,7 @@ private fun CredentialCard(kind: CredentialsKind, provider: ConnectableProvider,
     val busy = context.state.busy
     CardSurface(provider) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            MethodIcon(context.methodIcon(provider))
+            CardMark(provider)
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(provider.displayName)
                 if (provider.isConnected) ConnectedBadge()
@@ -194,7 +191,6 @@ private fun InlineForm(kind: CredentialsKind, form: ProviderConnectForm, context
 private fun ProviderCard(
     provider: ConnectableProvider,
     description: String,
-    leading: ImageVector,
     busy: Boolean,
     onClick: () -> Unit,
     connected: Boolean = false,
@@ -202,7 +198,7 @@ private fun ProviderCard(
 ) {
     CardSurface(provider, onClick = onClick, enabled = !busy) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            MethodIcon(leading)
+            CardMark(provider)
             Column(modifier = Modifier.weight(1f)) {
                 CardTitle(provider.displayName)
                 if (connected) ConnectedBadge()
@@ -243,9 +239,15 @@ private fun CardSurface(
     }
 }
 
+/** The provider's logo tile, or its initial where the app has no logo for it. */
 @Composable
-private fun MethodIcon(icon: ImageVector) {
-    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))
+private fun CardMark(provider: ConnectableProvider) {
+    ProviderIcon(
+        providerId = provider.id,
+        connected = provider.isConnected,
+        label = provider.displayName,
+        aliases = provider.brandIds(),
+    )
 }
 
 @Composable
@@ -298,13 +300,6 @@ private fun SectionTitle(title: String, subtitle: String? = null) {
 @Composable
 private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-private fun ProviderPageContext.methodIcon(provider: ConnectableProvider): ImageVector = when (methodOf(provider)) {
-    ProviderConnectMethod.SIGN_IN -> LettaIcons.AccountCircle
-    ProviderConnectMethod.TERMINAL_SIGN_IN -> LettaIcons.Terminal
-    ProviderConnectMethod.ENDPOINT -> LettaIcons.Server
-    ProviderConnectMethod.API_KEY, ProviderConnectMethod.NONE -> LettaIcons.Key
 }
 
 private fun ProviderPageContext.methodLabel(provider: ConnectableProvider): String = when (methodOf(provider)) {

@@ -30,6 +30,7 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderSection
 import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.providers.icons.ProviderIcon
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
@@ -72,25 +73,15 @@ internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAp
     }
 }
 
-/** A circle with the provider's initial, filled when it is connected. */
+/** The provider's logo, or its initial, filled when it is connected. */
 @Composable
 private fun ProviderMark(section: ProviderSection) {
-    val connected = section.isConnected
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(LettaDimens.Orb.md)
-            .background(
-                color = if (connected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                shape = CircleShape,
-            ),
-    ) {
-        Text(
-            text = section.displayName.take(1).uppercase(),
-            style = MaterialTheme.typography.titleSmall,
-            color = if (connected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    ProviderIcon(
+        providerId = section.key,
+        connected = section.isConnected,
+        label = section.displayName,
+        aliases = section.provider?.brandIds().orEmpty() + section.displayName,
+    )
 }
 
 @Composable
