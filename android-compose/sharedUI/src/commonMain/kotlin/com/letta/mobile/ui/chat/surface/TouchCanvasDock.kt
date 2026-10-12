@@ -92,10 +92,10 @@ import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_dismiss
 import com.letta.mobile.sharedui.resources.chat_surface_docked_reply_expand
 import com.letta.mobile.sharedui.resources.chat_surface_head
 import com.letta.mobile.sharedui.resources.chat_surface_head_agent
-import com.letta.mobile.ui.chat.AgentSphere
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatHeadDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
@@ -324,7 +324,7 @@ private class HeadPlace(val lane: HeadLane, val drag: Animatable<Offset, *>, val
 
 /**
  * The disc with the agent: its mascot (the page's one companion seat stands over it, scaled to
- * the disc) or, without one, the agent's sphere. Drag it anywhere; let go and it snaps to the
+ * the disc) or, where no seat stands, the agent's own [AgentAvatar]. Drag it anywhere; let go and it snaps to the
  * nearer edge. Nothing glows around it: the mascot's animation says the agent is working.
  */
 @Composable
@@ -388,7 +388,14 @@ private fun ChatHead(content: TouchHeadContent, place: HeadPlace, onTap: () -> U
         if (mascot && anchors != null) {
             CompanionSeatAnchor(anchors, size = ChatHeadDimens.seat)
         } else {
-            AgentSphere(size = ChatHeadDimens.fallbackSphere)
+            // letta-mobile-zxk2n.27: no seat here (off the chat page, or no mascot): the agent's own
+            // avatar - its mascot when it has one, else its initial - never a generic sphere.
+            AgentAvatar(
+                agentId = content.agentId,
+                name = content.agentName,
+                size = ChatHeadDimens.avatar,
+                modifier = Modifier.testTag(TOUCH_HEAD_AVATAR_TAG),
+            )
         }
     }
 }
@@ -703,6 +710,7 @@ private const val HEAD_FADE_SPEED = 2f
 internal const val TOUCH_DOCK_TAG = "chat-touch-dock"
 internal const val TOUCH_CANVAS_TAG = "chat-touch-canvas"
 internal const val TOUCH_HEAD_TAG = "chat-touch-head"
+internal const val TOUCH_HEAD_AVATAR_TAG = "chat-touch-head-avatar"
 internal const val TOUCH_POPUP_TAG = "chat-touch-popup"
 internal const val TOUCH_POPUP_DISMISS_TAG = "chat-touch-popup-dismiss"
 internal const val TOUCH_POPUP_TEXT_TAG = "chat-touch-popup-text"

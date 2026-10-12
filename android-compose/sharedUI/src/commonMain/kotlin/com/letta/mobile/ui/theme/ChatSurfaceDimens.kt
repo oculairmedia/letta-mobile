@@ -85,8 +85,8 @@ object ChatHeadDimens {
     /** The mascot's seat inside the disc (the character overflows the disc a little, as in the badge). */
     val seat: Dp = 84.dp
 
-    /** The sphere drawn for an agent without a mascot. */
-    val fallbackSphere: Dp = 44.dp
+    /** The agent's own avatar in the disc when the page's companion seat does not stand there. */
+    val avatar: Dp = 44.dp
 
     /** Between the head and the screen edge it is snapped to. */
     val edgeMargin: Dp = LettaDimens.Space.md
