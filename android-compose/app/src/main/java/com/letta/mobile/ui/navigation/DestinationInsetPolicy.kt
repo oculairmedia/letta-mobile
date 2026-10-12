@@ -49,6 +49,7 @@ private val PageScaffoldRouteNames: Set<String> by lazy {
         AdminRoute.serializer().descriptor.serialName,
         ChannelsRoute.serializer().descriptor.serialName,
         MemoryRoute.serializer().descriptor.serialName,
+        SchedulesRoute.serializer().descriptor.serialName,
         SkillsRoute.serializer().descriptor.serialName,
         AllToolsRoute.serializer().descriptor.serialName,
     )
