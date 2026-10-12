@@ -247,7 +247,7 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/TouchStallDiagnostics.kt 35 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/ChatCanvasSlot.kt 31 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatHaptics.kt 59 legacy-pending(ckmub.2)
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatPage.kt 449 legacy-pending(ckmub.2)
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatPage.kt 454 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatRichMarkdown.kt 91 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatSubagents.kt 270 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatWorkspaceFiles.kt 78 legacy-pending(ckmub.2)
