@@ -97,6 +97,37 @@ class TimelineRowKeyUniquenessTest {
     }
 
     @Test
+    fun twoCompactionsOnTheSameDayEmitEachDayHeaderOnce() {
+        // The second reported screenshot: compacted, messages, Yesterday, compacted again, Today,
+        // messages, with two compactions landing today (each stamped earlier than its neighbours).
+        // The old builder re-emitted the day header after every compaction: __day__2026-10-12 x3.
+        val (rows, keys) = lazyColumnKeys(
+            listOf(
+                compaction("c0", "2026-10-10T08:00:00Z"),
+                user("d1", "2026-10-10T09:00:00Z"),
+                user("y1", "2026-10-11T10:00:00Z"),
+                compaction("c1", "2026-10-11T09:30:00Z"),
+                user("t1", "2026-10-12T08:00:00Z"),
+                compaction("c2", "2026-10-11T23:00:00Z"),
+                assistant("t2", "2026-10-12T09:00:00Z"),
+                compaction("c3", "2026-10-11T23:30:00Z"),
+                user("t3", "2026-10-12T10:00:00Z"),
+            ),
+        )
+        assertUnique(keys)
+        assertEquals(listOf(yesterday, today), rows.dividerDates(), "one header per calendar day")
+        assertEquals(
+            listOf(
+                "msg-c0", "msg-otid-d1",
+                "__day__2026-10-11", "msg-otid-y1", "msg-c1",
+                "__day__2026-10-12", "msg-otid-t1", "msg-c2", "msg-t2", "msg-c3", "msg-otid-t3",
+            ),
+            rows.asReversed().map { it.key },
+            "each day chip sits once at its first row; compaction dividers stay inline where they were",
+        )
+    }
+
+    @Test
     fun runBlockSpanningMidnightThenACompactionAndTodaysRows() {
         // A run block reads as its NEWEST step, so it opens today ahead of an older-stamped row.
         val (rows, keys) = lazyColumnKeys(
