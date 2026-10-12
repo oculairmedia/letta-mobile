@@ -586,7 +586,7 @@ class AgentListViewModelTest {
 
     private fun remoteConfig(): LettaConfig = LettaConfig(
         id = "remote-config",
-        mode = LettaConfig.Mode.CLOUD,
+        mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl = "https://api.letta.com",
     )
 

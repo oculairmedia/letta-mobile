@@ -25,8 +25,8 @@ class IrohAdminRouteTest {
         val settings = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
                 id = "t",
-                mode = if (shouldUseIroh) LettaConfig.Mode.SELF_HOSTED else LettaConfig.Mode.CLOUD,
-                serverUrl = if (shouldUseIroh) "iroh://test" else "https://api.letta.com",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = if (shouldUseIroh) "iroh://test" else "https://remote.example.test",
                 accessToken = "t",
             ),
         )

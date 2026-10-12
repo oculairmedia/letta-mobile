@@ -43,9 +43,23 @@ data class LettaConfig(
      */
     val parkedServerUrl: String? = null,
     val parkedAccessToken: String? = null,
+    /**
+     * letta-mobile-ckmub.9: what the Settings page tells the user about a config that was
+     * migrated on read (a saved Letta Cloud config, see [LettaConfigMigration]). Never persisted:
+     * it reappears on every read until the migrated config is saved once.
+     */
+    val migrationNotice: String? = null,
 ) {
+    /**
+     * The two backends the product offers (letta-mobile-ckmub.9): the on-device / bundled
+     * runtime ([LOCAL]) and a remote letta-code App Server, usually over Iroh ([SELF_HOSTED],
+     * shown as "Remote host"). The names are the persisted values, so they never change.
+     *
+     * Letta Cloud is not offered FOR NOW. The seam for adding it back is [BackendKind] (classify the
+     * config) plus a gateway binding in the session graph factories; see the KDoc there. A stored
+     * `"CLOUD"` mode is migrated on read by [LettaConfigMigration].
+     */
     enum class Mode {
-        CLOUD,
         SELF_HOSTED,
         LOCAL,
     }

@@ -22,6 +22,7 @@ import java.util.UUID
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -149,6 +150,8 @@ class ConfigListViewModel @Inject constructor(
             try {
                 settingsRepository.setActiveConfigId(configId)
                 _actionError.value = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _actionError.value = e.message ?: "Failed to set active config"
             }
@@ -163,6 +166,8 @@ class ConfigListViewModel @Inject constructor(
                 if (settingsRepository.activeConfig.value == null) {
                     ChatPushAlarmScheduler.cancel(appContext)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _actionError.value = e.message ?: "Failed to delete config"
             }
@@ -188,17 +193,13 @@ class ConfigListViewModel @Inject constructor(
                     settingsRepository.setActiveConfigId(configId)
                 }
                 _actionError.value = null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 _actionError.value = e.message ?: "Failed to connect embedded runtime"
             }
         }
     }
-}
-
-private fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
-    LettaConfig.Mode.CLOUD -> ServerMode.CLOUD
-    LettaConfig.Mode.SELF_HOSTED -> ServerMode.SELF_HOSTED
-    LettaConfig.Mode.LOCAL -> ServerMode.LOCAL
 }
 
 private fun LettaConfig.isEmbeddedLettaCodeConfig(): Boolean {
