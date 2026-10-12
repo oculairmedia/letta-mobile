@@ -1,6 +1,7 @@
 package com.letta.mobile.web
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.cleanBrowserErrorMessage
 import kotlin.test.Test
@@ -51,16 +52,40 @@ class WebShellStateTest {
         val actions = shell.navDrawerActions(afterNavigate = { closed += 1 })
 
         actions.panel.onOpenSettings()
-        assertEquals(WebDestination.SETTINGS, shell.destination)
+        assertEquals(ShellDestination.Settings(), shell.destination)
         assertTrue(shell.navDrawerState(now).panel.settingsSelected)
 
         actions.rail.onHome()
         assertTrue(shell.navDrawerState(now).rail.homeSelected)
 
         actions.rail.onAgentSelected(ada.id)
-        assertEquals(WebDestination.CHAT, shell.destination)
+        assertEquals(ShellDestination.Chat(ada.id), shell.destination)
         assertEquals(ada.id, shell.selectedAgent?.id)
         assertEquals(3, closed)
+    }
+
+    // letta-mobile-ckmub.3.4: the web's route model is the canonical ShellRoute in the URL fragment.
+    @Test
+    fun theRouteRoundTripsThroughTheUrlFragment() {
+        val shell = WebShellState(config)
+        shell.rosterLoaded(listOf(nora, ada))
+        shell.selectAgent(ada.id)
+        assertEquals("chat?agent=agent-2", shell.route)
+
+        val reopened = WebShellState(config)
+        assertTrue(reopened.openRoute(shell.route))
+        reopened.rosterLoaded(listOf(nora, ada))
+        assertEquals(ada.id, reopened.selectedAgent?.id)
+        assertEquals(shell.route, reopened.route)
+
+        assertTrue(reopened.openRoute("settings"))
+        assertEquals(ShellDestination.Settings(), reopened.destination)
+        reopened.closeSettings()
+        assertEquals(ShellDestination.Chat(ada.id), reopened.destination)
+
+        assertFalse(reopened.openRoute("nowhere"))
+        assertFalse(reopened.openRoute(""))
+        assertEquals(ShellDestination.Chat(ada.id), reopened.destination)
     }
 
     @Test
