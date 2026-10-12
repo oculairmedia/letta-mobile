@@ -75,7 +75,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ProfileCaptureKeyguardHelper.allowProfileCaptureLaunch(this)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = AppLaunchTarget.fromIntent(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent)
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
@@ -207,7 +207,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = AppLaunchTarget.fromIntent(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent)
     }
 
     private fun importAutomationPayloadFromLaunchIntent() {

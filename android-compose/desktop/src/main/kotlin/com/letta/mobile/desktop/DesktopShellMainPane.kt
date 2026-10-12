@@ -245,6 +245,7 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
         nucleus = nucleusState,
         localRuntimeProvider = core.localConfig.providerState,
         localBackendDirectory = core.localConfig.directoryState,
+        pairing = com.letta.mobile.desktop.qr.desktopInstallAndPairBindings(context, focus),
         localRuntime = core.localConfig.runtime,
     )
 }

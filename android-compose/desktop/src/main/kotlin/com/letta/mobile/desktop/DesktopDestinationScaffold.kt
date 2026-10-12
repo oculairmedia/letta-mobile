@@ -125,6 +125,7 @@ internal data class DestinationContentInputs(
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
     val localRuntime: DesktopLocalRuntimeController,
+    val pairing: com.letta.mobile.ui.pairing.InstallAndPairBindings? = null, // dpv7m.3 install-and-pair card
 )
 
 internal data class DestinationNucleusActions(
@@ -174,6 +175,7 @@ private data class ScrollableDestinationInputs(
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
     val localRuntime: DesktopLocalRuntimeController,
     val railRecencyDays: Int,
+    val pairing: com.letta.mobile.ui.pairing.InstallAndPairBindings? = null,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -242,6 +244,7 @@ internal fun DestinationContent(
                 localRuntimeProvider = inputs.localRuntimeProvider,
                 localBackendDirectory = inputs.localBackendDirectory,
                 localRuntime = inputs.localRuntime,
+                pairing = inputs.pairing,
             ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
@@ -415,6 +418,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     onIrohIdentityReset = settings.onIrohIdentityReset,
                 )
             }
+            inputs.pairing?.let { item { com.letta.mobile.ui.pairing.InstallAndPairCard(it) } }
             item {
                 LocalRuntimeProviderSettingsCard(
                     state = inputs.localRuntimeProvider,
