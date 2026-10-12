@@ -217,6 +217,8 @@ data class HomeStatTile(
     val caption: String? = null,
     /** Only a tile whose value is a point on this series draws it ("active today" of "active per day"). */
     val series: List<Int>? = null,
+    /** The page this figure summarises; a host that offers it opens it when the figure is tapped. */
+    val shortcut: HomeShortcut? = null,
 )
 
 /**
@@ -226,23 +228,34 @@ data class HomeStatTile(
 fun HomePageState.statTiles(): List<HomeStatTile> {
     val summary = fleet.summary
     val fleetTiles = listOf(
-        HomeStatTile("Agents", summary.agentsLabel, caption = "roster truncated by backend".takeIf { summary.rosterTruncated }),
-        HomeStatTile("Conversations", summary.conversationsLabel),
-        HomeStatTile("Active today", summary.activeToday.toString(), "agents active · ${summary.agentsActiveByDay.size}d", summary.agentsActiveByDay),
-        HomeStatTile("Running now", summary.runningNow.toString()),
+        HomeStatTile(
+            "Agents",
+            summary.agentsLabel,
+            caption = "roster truncated by backend".takeIf { summary.rosterTruncated },
+            shortcut = HomeShortcut.AGENTS,
+        ),
+        HomeStatTile("Conversations", summary.conversationsLabel, shortcut = HomeShortcut.CONVERSATIONS),
+        HomeStatTile(
+            "Active today",
+            summary.activeToday.toString(),
+            "agents active · ${summary.agentsActiveByDay.size}d",
+            summary.agentsActiveByDay,
+            HomeShortcut.AGENTS,
+        ),
+        HomeStatTile("Running now", summary.runningNow.toString(), shortcut = HomeShortcut.RUNS),
     )
     val usage = stats.usage
     val backendTiles = listOfNotNull(
-        backendTile("Tools", stats.toolCount),
-        backendTile("Blocks", stats.blockCount),
-        backendTile("Tokens · ${USAGE_WINDOW_HOURS}h", usage?.totalTokens)?.copy(caption = usage?.let(::usageCaption)),
+        backendTile("Tools", stats.toolCount, HomeShortcut.TOOLS),
+        backendTile("Blocks", stats.blockCount, HomeShortcut.BLOCKS),
+        backendTile("Tokens · ${USAGE_WINDOW_HOURS}h", usage?.totalTokens, HomeShortcut.USAGE)?.copy(caption = usage?.let(::usageCaption)),
     )
     return fleetTiles + backendTiles
 }
 
-private fun HomePageState.backendTile(label: String, value: Int?): HomeStatTile? = when {
-    value != null -> HomeStatTile(label, formatGroupedNumber(value))
-    stats.loading -> HomeStatTile(label, "—")
+private fun HomePageState.backendTile(label: String, value: Int?, shortcut: HomeShortcut): HomeStatTile? = when {
+    value != null -> HomeStatTile(label, formatGroupedNumber(value), shortcut = shortcut)
+    stats.loading -> HomeStatTile(label, "—", shortcut = shortcut)
     else -> null
 }
 

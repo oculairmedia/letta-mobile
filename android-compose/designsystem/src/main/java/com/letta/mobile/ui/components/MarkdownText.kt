@@ -251,6 +251,7 @@ internal fun splitDisplayMathSegments(text: String): List<MathSegment> {
  * splitter's contract. `$$` escapes are left for the display-math pass.
  */
 internal fun splitInlineMathSegments(text: String): List<MathSegment> {
+    if (looksLikeShell(text)) return listOf(MathSegment.Text(text))
     val out = mutableListOf<MathSegment>()
     var last = 0
     for (match in inlineMathRegex.findAll(text)) {
@@ -287,18 +288,27 @@ private data class MathMarkers(val hasDisplay: Boolean, val hasInline: Boolean)
  */
 internal fun containsLikelyInlineMath(text: String): Boolean {
     if (!text.contains('$')) return false
+    if (looksLikeShell(text)) return false
     return inlineMathRegex.containsMatchIn(text)
 }
 
+/**
+ * letta-mobile-qvkmg: text carrying shell expansions (`$(…)` command substitution or `${…}`
+ * parameter expansion) is never TeX — `T=$(grep …); A=$(cat …)` used to pair its two `$` into
+ * an italic serif math span. Single-`$` inline math is disabled for the whole text then;
+ * explicit `$$…$$` display math is unaffected.
+ */
+internal fun looksLikeShell(text: String): Boolean = shellExpansionRegex.containsMatchIn(text)
+
 // (?<=^|[^\w$]) — opening must follow a non-word, non-$ boundary
 // \$           — literal $
-// (?![\s\d])   — not followed by whitespace or digit (rules out $100, $ x$)
+// (?![\s\d({]) — not followed by whitespace, digit, `(` or `{` (rules out $100, $ x$, $(cmd), ${VAR})
 // ([^$\n]+?)   — body: no $ or newline, non-greedy
 // (?<!\s)      — closing $ not preceded by whitespace
 // \$           — literal closing $
 // (?!\w)       — closing not followed by a word char (rules out `$x$abc`-style runs bleeding into identifiers)
 private const val INLINE_MATH_PATTERN =
-    "(?<=^|[^\\w$])\\$(?![\\s\\d])([^$\\n]+?)(?<!\\s)\\$(?!\\w)"
+    "(?<=^|[^\\w$])\\$(?![\\s\\d({])([^$\\n]+?)(?<!\\s)\\$(?!\\w)"
 
 // perf/frame-budget-audit: precompile the math regexes once at class-load
 // instead of `Regex(...)` per call. These were rebuilt on every invocation
@@ -306,6 +316,7 @@ private const val INLINE_MATH_PATTERN =
 // which sit on the streaming markdown render path.
 private val inlineMathRegex = Regex(INLINE_MATH_PATTERN)
 private val displayMathRegex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
+private val shellExpansionRegex = Regex("\\$[({]")
 
 /**
  * Auto-linkify bare URLs in the text by wrapping them in markdown link syntax.

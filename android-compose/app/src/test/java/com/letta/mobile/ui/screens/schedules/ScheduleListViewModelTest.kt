@@ -13,6 +13,8 @@ import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.testutil.FakeAgentApi
+import com.letta.mobile.data.schedules.ScheduleCreateRequest
+import com.letta.mobile.data.schedules.ScheduleLibraryState
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -74,8 +76,7 @@ class ScheduleListViewModelTest {
             fakeScheduleRepo,
         )
 
-        val state = vm.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
-            .let { (it as com.letta.mobile.ui.common.UiState.Success).data }
+        val state = vm.state.first { it.isLoaded }
         assertEquals("a2", state.selectedAgentId)
         assertEquals("s2", state.schedules.first().id)
     }
@@ -104,15 +105,10 @@ class ScheduleListViewModelTest {
     @Test
     fun `createSchedule delegates to repository`() = runTest {
         awaitSuccessState()
-        viewModel.createSchedule(
-            "a2",
-            ScheduleCreateParams(
-                messages = listOf(ScheduleMessage(content = "hello", role = "user")),
-                schedule = ScheduleDefinition(type = "one-time", scheduledAt = 1_700_000_000.0),
-            )
-        )
+        viewModel.create(ScheduleCreateRequest("a2", "Hello", "hello", "0 9 * * *", "UTC"))
 
         assertEquals(1, fakeScheduleRepo.createdSchedules.size)
+        assertEquals("0 9 * * *", fakeScheduleRepo.createdSchedules.single().schedule.cronExpression)
         val state = awaitSuccessState()
         assertEquals("a2", state.selectedAgentId)
         assertEquals(true, state.schedules.any { it.id == "created-1" })
@@ -156,8 +152,7 @@ class ScheduleListViewModelTest {
 
         viewModel.loadData()
 
-        val state = viewModel.uiState.first { it is com.letta.mobile.ui.common.UiState.Error }
-            .let { (it as com.letta.mobile.ui.common.UiState.Error).message }
+        val state = viewModel.state.first { it.errorMessage != null }.errorMessage
         assertEquals("Failed to load schedules", state)
     }
 
@@ -182,10 +177,9 @@ class ScheduleListViewModelTest {
         assertEquals("", (item.timing as com.letta.mobile.data.schedules.ScheduleTiming.Recurring).cronExpression)
     }
 
-    private suspend fun awaitSuccessState(): ScheduleListUiState {
-        return viewModel.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
-            .let { (it as com.letta.mobile.ui.common.UiState.Success).data }
-    }
+    private suspend fun awaitSuccessState(): ScheduleLibraryState = viewModel.state.first { it.isLoaded }
+
+    private val ScheduleLibraryState.isLoaded: Boolean get() = !isLoading && errorMessage == null
 
     private class FakeAgentRepo : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(
