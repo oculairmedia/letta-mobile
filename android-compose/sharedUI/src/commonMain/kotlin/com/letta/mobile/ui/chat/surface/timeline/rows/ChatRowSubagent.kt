@@ -223,7 +223,7 @@ private class NotificationActions(
 
 private fun UiSubagentNotification.activityLabel(): StringResource {
     return when {
-        taskId?.startsWith("exec_") == true -> Res.string.rows_activity_command
+        isCommand() -> Res.string.rows_activity_command
         !subagentAgentId.isNullOrBlank() -> Res.string.rows_activity_subagent
         else -> Res.string.rows_activity_task
     }
@@ -305,7 +305,7 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
     }
     NotificationActionRow(model, expanded, actions)
     if (expanded && model.hasDetails()) {
-        model.report?.let { SharedMarkdownText(text = it) }
+        model.report?.let { NotificationReport(report = it, model = model) }
         notification.transcriptUri?.let { transcript ->
             Text(
                 text = stringResource(Res.string.rows_transcript, transcript),
@@ -317,6 +317,24 @@ private fun NotificationBody(model: NotificationModel, expanded: Boolean, action
         }
     }
 }
+
+/**
+ * letta-mobile-qvkmg: a background command's report is its stdout — preformatted text, never
+ * prose. Fed through markdown, shell like `T=$(grep …); A=$(cat …)` paired its `$`s into TeX
+ * math and column-aligned output ran together into one paragraph, so command reports take the
+ * tool-output block (monospace, line-preserving, horizontally scrollable). A subagent's report
+ * is the agent's own prose and keeps the markdown paint.
+ */
+@Composable
+private fun NotificationReport(report: String, model: NotificationModel) {
+    if (model.notification.isCommand()) {
+        ToolOutputBlock(text = report, isError = model.isFailure)
+    } else {
+        SharedMarkdownText(text = report)
+    }
+}
+
+private fun UiSubagentNotification.isCommand(): Boolean = taskId?.startsWith("exec_") == true
 
 @Composable
 private fun NotificationActionRow(model: NotificationModel, expanded: Boolean, actions: NotificationActions) {
