@@ -149,10 +149,10 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotCu
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotStage.kt 29 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNewAgentDialog.kt 244 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNewConversationSurface.kt 180 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNowActiveBar.kt 354 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNowActiveBar.kt 125 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNucleusEffects.kt 510 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopProvidersDestination.kt 29 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopQuickQuery.kt 215 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopQuickQuery.kt 208 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRailPrefs.kt 33 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRecentInteractions.kt 47 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSettingsPage.kt 177 container
@@ -181,9 +181,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopC
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasLibrary.kt 109 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasShell.kt 68 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAmbientChatBackground.kt 219 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopBackgroundTasksPanel.kt 139 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopCanvasBubbleLayout.kt 40 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatDockGeometry.kt 54 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopComposerContextUsageLoader.kt 62 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopModelControlOverlays.kt 164 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopSharedChatPage.kt 326 legacy-pending(ckmub.3)

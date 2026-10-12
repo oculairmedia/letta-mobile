@@ -54,6 +54,10 @@ import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.nowactive.NowActiveBarActions
+import com.letta.mobile.ui.shell.nowactive.NowActiveBarState
+import com.letta.mobile.ui.shell.nowactive.NowActiveIdentity
+import com.letta.mobile.ui.shell.nowactive.NowActiveRunControls
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
@@ -94,7 +98,7 @@ internal data class DesktopHeaderChromeState(
     companion object {
         val Empty = DesktopHeaderChromeState(
             identity = null,
-            identityActions = NowActiveBarActions(onOpenConversation = {}, onJumpToBackgroundWork = {}),
+            identityActions = NowActiveBarActions.None,
             sidebarCollapsed = true,
             onToggleSidebar = {},
         )
@@ -266,7 +270,7 @@ private fun DesktopTitleBarHeader(title: String, header: DesktopHeaderChromeStat
 private fun desktopHeaderControls(header: DesktopHeaderChromeState): HeaderControls = HeaderControls(
     nav = HeaderNav.Custom { DesktopSidebarControls(header) },
     actions = header.identity?.let { state ->
-        listOf(HeaderAction.Custom { DesktopHeaderTrailingControls(state = state, actions = header.identityActions) })
+        listOf(HeaderAction.Custom { NowActiveRunControls(state = state, actions = header.identityActions) })
     }.orEmpty(),
 )
 
@@ -308,7 +312,7 @@ private fun desktopHeaderTitle(title: String, header: DesktopHeaderChromeState):
             )
         }
         identity != null -> HeaderTitle.Custom {
-            DesktopHeaderIdentityBlock(
+            NowActiveIdentity(
                 state = identity,
                 actions = header.identityActions,
                 modifier = Modifier.widthIn(max = IdentityBlockMaxWidth),
