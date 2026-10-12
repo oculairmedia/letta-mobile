@@ -173,15 +173,25 @@ internal class IrohConnectionSession(
 }
 
 /** The node id a dialed `iroh://` address names: the `<hex>@…` short form directly, else the parsed ticket's. */
-private fun nodeIdOf(ticket: String): String? {
-    val shortForm = ticket.substringBefore('@', missingDelimiterValue = "")
-    if (shortForm.length == NODE_ID_HEX_CHARS && shortForm.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) return shortForm.lowercase()
-    return runCatching { IrohDiagnostics.endpointIdHex(IrohAppServerTransportAdapter.parseIrohAddress(ticket).id()) }
+private fun nodeIdOf(ticket: String): String? =
+    shortFormNodeId(ticket) ?: parsedTicketNodeId(ticket)
+
+/** `<64 hex>@host:port…`: the id is spelled out before the `@`. */
+private fun shortFormNodeId(ticket: String): String? =
+    ticket.substringBefore('@', missingDelimiterValue = "").takeIf(::isNodeIdHex)?.lowercase()
+
+private fun parsedTicketNodeId(ticket: String): String? =
+    runCatching { IrohDiagnostics.endpointIdHex(IrohAppServerTransportAdapter.parseIrohAddress(ticket).id()) }
         .getOrNull()
         ?.takeIf { it.isNotBlank() }
-}
+
+private fun isNodeIdHex(candidate: String): Boolean =
+    candidate.length == NODE_ID_HEX_CHARS && candidate.all(::isHexDigit)
+
+private fun isHexDigit(c: Char): Boolean = c.lowercaseChar() in HEX_DIGITS
 
 private const val NODE_ID_HEX_CHARS = 64
+private const val HEX_DIGITS = "0123456789abcdef"
 
 /** A validated message-list route for the conversation currently viewed on this connection. */
 internal data class IrohViewedConversation(
