@@ -317,8 +317,8 @@ const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and mess
 
 private const val CLEAR_SEARCH = "Clear search"
 private const val SEND_LABEL = "Send message"
-private const val RECENT_LABEL = "Recent conversations"
-private const val NO_CONVERSATIONS = "No conversations yet. Start one from the chatbox."
+internal const val RECENT_LABEL = "Recent conversations"
+internal const val NO_CONVERSATIONS = "No conversations yet. Start one from the chatbox."
 private const val COMPOSER_MAX_LINES = 5
 private const val WIDE_STAT_COLUMNS = 4
 private const val COMPACT_STAT_COLUMNS = 2

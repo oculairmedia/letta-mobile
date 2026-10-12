@@ -20,6 +20,23 @@ object HomePageTags {
     const val STATS = "home_stats"
     const val ERROR = "home_error"
 
+    /** Compact Home (phone): the one-line "running now" strip, recents, the agent avatar row and the stats strip. */
+    const val NOW_STRIP = "home_now_strip"
+    const val RECENTS = "home_recents"
+    const val AGENT_ROW = "home_agent_row"
+    const val STATS_STRIP = "home_stats_strip"
+    const val STATS_EXPAND = "home_stats_expand"
+    const val STATS_TREND = "home_stats_trend"
+    const val STATS_MENU = "home_stats_menu"
+    const val CUSTOMIZE = "home_customize"
+    const val SHORTCUT_ROW = "home_shortcut_row"
+
+    fun seeAll(shortcut: HomeShortcut): String = "home_see_all_${shortcut.name}"
+
+    fun agentAvatar(agentId: String): String = "home_avatar_$agentId"
+
+    fun stat(label: String): String = "home_stat_$label"
+
     fun pin(item: HomePinnedItem): String = "home_pin_${item.key}"
 
     fun unpin(item: HomePinnedItem): String = "home_unpin_${item.key}"
