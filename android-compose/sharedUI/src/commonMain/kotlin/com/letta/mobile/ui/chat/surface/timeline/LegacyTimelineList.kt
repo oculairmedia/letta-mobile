@@ -48,8 +48,9 @@ internal class LegacyTimelineParams(
     val topReserve: Dp = 0.dp,
 )
 
-private const val THINKING_KEY = "__thinking__"
-private const val LOADING_OLDER_KEY = "__loading_older__"
+// Internal (not private) so the key-uniqueness test can hold the edge rows to the same invariant.
+internal const val THINKING_KEY = "__thinking__"
+internal const val LOADING_OLDER_KEY = "__loading_older__"
 
 /**
  * letta-mobile-bglj6.1: the timeline over `ChatUiState.messages`, for owners without a canonical

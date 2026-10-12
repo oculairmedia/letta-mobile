@@ -66,8 +66,6 @@ internal class PagedTimelineParams(
     val topReserve: Dp = 0.dp,
 )
 
-private const val THINKING_KEY = "__thinking__"
-
 /**
  * letta-mobile-bglj6.1: the canonical paged timeline. Paging owns load hints, retries and page
  * dropping; this never materializes the settled history, so a 28k-message conversation costs the
