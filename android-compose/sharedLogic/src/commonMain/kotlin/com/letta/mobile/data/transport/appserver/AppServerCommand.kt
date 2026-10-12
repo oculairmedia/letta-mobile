@@ -56,7 +56,37 @@ sealed interface AppServerCommand {
          * acceptance only, not turn completion. Leave null unless the caller awaits the ack.
          */
         @SerialName("request_id") val requestId: String? = null,
+        /**
+         * letta-code 0.34+: names this client as a durable consumer of the turn's terminal event.
+         * The server then replays `turn_finished` (listing it in `terminal_consumer_ids`) until
+         * the client answers with [TurnFinishedAck]. Must satisfy [AppServerTerminalConsumerId].
+         * Older servers ignore it.
+         */
+        @SerialName("terminal_consumer_id") val terminalConsumerId: String? = null,
     ) : AppServerCommand
+
+    /**
+     * letta-code 0.34+ (`turn-finished-protocol.ts`): a peer receipt for a durably replayed
+     * `turn_finished`. [idempotencyKey] is the terminal frame's key and [consumerId] the id this
+     * client sent as `input.terminal_consumer_id`. No response frame; repeating it is harmless.
+     */
+    @Serializable
+    @SerialName("turn_finished_ack")
+    data class TurnFinishedAck(
+        val runtime: AppServerTerminalAckScope,
+        @SerialName("idempotency_key") val idempotencyKey: String,
+        @SerialName("consumer_id") val consumerId: String,
+    ) : AppServerCommand {
+        companion object {
+            /** The receipt for [frame] on behalf of [consumerId]. */
+            fun of(frame: AppServerInboundFrame.TurnFinished, consumerId: String): TurnFinishedAck =
+                TurnFinishedAck(
+                    runtime = AppServerTerminalAckScope.of(frame.runtime),
+                    idempotencyKey = frame.idempotencyKey,
+                    consumerId = consumerId,
+                )
+        }
+    }
 
     /**
      * Changes the device's permission mode, working directory or bound runtime. It replaces the

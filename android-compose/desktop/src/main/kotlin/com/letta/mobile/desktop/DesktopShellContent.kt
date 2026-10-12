@@ -31,6 +31,7 @@ import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
 import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.ui.mascot.MascotTransportLayer
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
 
 /** The window's surface: the rail, the agent sidebar and the main pane, with the overlays over them. */
 @Composable
@@ -51,6 +52,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 // until the host's plugin catalog reaches the client, none is, and every element is its card.
                 CompositionLocalProvider(
                     LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
+                    LocalAttentionPrefs provides context.core.attentionPrefs,
                 ) {
                     ProvideDesktopPluginViews(DesktopPluginBindings.None) {
                         DesktopShellLayoutBody(context, frame)

@@ -85,6 +85,8 @@ internal data class DesktopNucleusEffectBindings(
     val onOpenConversation: (String) -> Unit,
     /** Send inline-typed toast text into the conversation without activating. */
     val onReplyToConversation: (String, String) -> Unit,
+    /** letta-mobile-bzvro.27: approval notifications and per-agent mutes. */
+    val attention: DesktopAttentionBindings,
 )
 
 @Immutable
@@ -149,6 +151,8 @@ private data class AgentCompletionBindings(
     val replyPreviewFor: (String) -> String?,
     val onOpenConversation: (String) -> Unit,
     val onReplyToConversation: (String, String) -> Unit,
+    /** Mute and dedup for the finished toast of a conversation (shared attention gate). */
+    val allowsTurnDone: (String?) -> Boolean,
 )
 
 private data class AgentFailureBindings(
@@ -186,6 +190,7 @@ internal fun DesktopNucleusEffects(
 ) {
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
+    val attention = rememberDesktopAttention(bindings.attention, window)
 
     // Route toast clicks that no longer match an in-memory reply handler
     // (toasts posted by a previous process instance, still in the Action
@@ -214,6 +219,10 @@ internal fun DesktopNucleusEffects(
         actions = actions,
     )
     AgentWorkEffect(window, state)
+    ApprovalAttentionEffect(attention) { conversationId ->
+        activate()
+        bindings.onOpenConversation(conversationId)
+    }
     AgentCompletionEffect(
         bindings = AgentCompletionBindings(
             window = window,
@@ -222,6 +231,7 @@ internal fun DesktopNucleusEffects(
             replyPreviewFor = bindings.replyPreviewFor,
             onOpenConversation = bindings.onOpenConversation,
             onReplyToConversation = bindings.onReplyToConversation,
+            allowsTurnDone = attention::allowsTurnDone,
         ),
         state = state,
     )
@@ -293,8 +303,8 @@ private fun AgentCompletionEffect(
     var lastWorkingConversationId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.isAgentWorking, state.workingConversationId) {
         state.workingConversationId?.let { lastWorkingConversationId = it }
-        if (shouldNotifyCompletion(wasWorking, state, bindings.window)) {
-            val conversationId = lastWorkingConversationId
+        val conversationId = lastWorkingConversationId
+        if (shouldNotifyCompletion(wasWorking, state, bindings.window) && bindings.allowsTurnDone(conversationId)) {
             bindings.controller.notifyAgentFinished(
                 agentName = state.agentName,
                 replyPreview = conversationId?.let(bindings.replyPreviewFor),

@@ -14,6 +14,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.mascot.ProvideMascotShell
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -84,14 +86,6 @@ class MainActivity : ComponentActivity() {
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
             val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestPermission(),
-                onResult = { granted ->
-                    if (granted) {
-                        ChatPushService.start(this@MainActivity)
-                    }
-                },
-            )
 
             LaunchedEffect(Unit) {
                 snackbarDispatcher.messages.collect { message ->
@@ -107,42 +101,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Surface the previous crash briefly without blocking the composer.
-            // Copy/dismiss leaves the diagnostic record available on disk.
-            val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
-            LaunchedEffect(lastCrashState.value) {
-                val crash = lastCrashState.value ?: return@LaunchedEffect
-                HapticEffects.reject(haptic, view)
-                val label = if (crash.sentryEventId != null) "Copy id" else "Details"
-                val summary = "App crashed last run (${crash.type.substringAfterLast('.')}). Tap to copy."
-                val result = snackbarHostState.showSnackbar(
-                    message = summary,
-                    actionLabel = label,
-                    withDismissAction = true,
-                    duration = androidx.compose.material3.SnackbarDuration.Long,
-                )
-                if (result == SnackbarResult.ActionPerformed) {
-                    val payload = crash.sentryEventId
-                        ?: "${crash.type}: ${crash.message}\n${crash.stackHead}"
-                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
-                    clipboard?.setPrimaryClip(ClipData.newPlainText("letta-mobile crash", payload))
-                    Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                }
-                crashReporter.dismiss()
-            }
-
-            LaunchedEffect(Unit) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    return@LaunchedEffect
-                }
-                // letta-mobile-mge5: start the foreground service that keeps
-                // resume-stream subscribers alive even when the app is
-                // backgrounded or the screen is off.
-                ChatPushService.start(this@MainActivity)
-            }
+            LastCrashSnackbarEffect(snackbarHostState)
+            ChatPushServiceStartEffect()
 
             LettaTheme(
                 appTheme = appThemeState.value,
@@ -152,6 +112,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalSnackbarDispatcher provides snackbarDispatcher,
                     LocalWindowSizeClass provides windowSizeClass,
+                    LocalAttentionPrefs provides deps.attentionPrefs,
                 ) {
                     ProvideMascotShell(
                         agents = deps.agentRepository.agents,
@@ -176,6 +137,63 @@ class MainActivity : ComponentActivity() {
         // (Play Console) for accurate cold-start measurement beyond TTID. Called
         // once — subsequent calls on the same activity are no-ops.
         reportFullyDrawn()
+    }
+
+    /**
+     * Surface the previous crash briefly without blocking the composer.
+     * Copy/dismiss leaves the diagnostic record available on disk.
+     */
+    @Composable
+    private fun LastCrashSnackbarEffect(snackbarHostState: SnackbarHostState) {
+        val haptic = LocalHapticFeedback.current
+        val view = LocalView.current
+        val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
+        LaunchedEffect(lastCrashState.value) {
+            val crash = lastCrashState.value ?: return@LaunchedEffect
+            HapticEffects.reject(haptic, view)
+            val label = if (crash.sentryEventId != null) "Copy id" else "Details"
+            val summary = "App crashed last run (${crash.type.substringAfterLast('.')}). Tap to copy."
+            val result = snackbarHostState.showSnackbar(
+                message = summary,
+                actionLabel = label,
+                withDismissAction = true,
+                duration = androidx.compose.material3.SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                val payload = crash.sentryEventId
+                    ?: "${crash.type}: ${crash.message}\n${crash.stackHead}"
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("letta-mobile crash", payload))
+                Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            crashReporter.dismiss()
+        }
+    }
+
+    /**
+     * letta-mobile-mge5: start the foreground service that keeps resume-stream subscribers alive
+     * even when the app is backgrounded or the screen is off, asking for POST_NOTIFICATIONS first
+     * where Android requires it.
+     */
+    @Composable
+    private fun ChatPushServiceStartEffect() {
+        val notificationPermissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+            onResult = { granted ->
+                if (granted) {
+                    ChatPushService.start(this@MainActivity)
+                }
+            },
+        )
+        LaunchedEffect(Unit) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return@LaunchedEffect
+            }
+            ChatPushService.start(this@MainActivity)
+        }
     }
 
     /** letta-mobile-erx7m: logs DOWN/UP/CANCEL reaching the window and whether it was handled. */

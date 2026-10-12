@@ -26,6 +26,8 @@ import dev.nucleusframework.autolaunch.AutoLaunchState
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.systemcolor.isSystemInHighContrast
 import dev.nucleusframework.systemcolor.systemAccentColor
+import com.letta.mobile.ui.notify.ApprovalNotificationsSwitch
+import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
@@ -96,7 +98,7 @@ private fun NotificationSettingsSection(state: DesktopNucleusState, actions: Des
     SettingsSection(
         title = "Notifications",
         supporting = state.notificationMessage ?: if (state.notificationsAvailable) {
-            "Native notifications are available for completed responses and failures."
+            "Native notifications are available for completed responses, approval requests and failures."
         } else {
             "The current desktop session could not initialize native notifications."
         },
@@ -107,6 +109,7 @@ private fun NotificationSettingsSection(state: DesktopNucleusState, actions: Des
         ) {
             DesktopButtonContent("Send test notification")
         }
+        LocalAttentionPrefs.current?.let { ApprovalNotificationsSwitch(it) }
     }
 }
 

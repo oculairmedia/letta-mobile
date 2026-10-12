@@ -61,11 +61,34 @@ object ModelControlStrings {
     const val NO_ACCOUNTS_LEFT = "Every subscription account the host knows is connected."
     const val NOTHING_CONNECTED = "Nothing is connected yet."
 
+    const val METHOD_SIGN_IN = "Sign in with your account in the browser"
+    const val METHOD_SIGN_IN_CONNECTED = "Subscription account"
     const val METHOD_TERMINAL = "Sign in once in your terminal, then come back to chat"
     const val METHOD_TERMINAL_CONNECTED = "Subscription account, signed in from the terminal"
     const val METHOD_API_KEY = "API key"
-    const val METHOD_BROWSER_UNSUPPORTED =
-        "Browser sign-in isn't available: this host accepts subscription sign-ins only from its own terminal."
+    const val SIGN_IN_NOTE =
+        "Signing in hands the account to the host, which keeps it; this device doesn't store it. Accounts the app " +
+            "can't sign in show the terminal steps instead."
+
+    // In-app subscription sign-in (letta-mobile-zxk2n.3)
+    const val SIGN_IN = "Sign in"
+    const val SIGN_IN_STARTING = "Asking for a sign-in code…"
+    const val SIGN_IN_ENTER_CODE = "Open the sign-in page and enter this code:"
+    const val SIGN_IN_WAITING = "Waiting for you to approve…"
+    const val SIGN_IN_SLOWED = "The provider asked the app to check less often."
+    const val SIGN_IN_OPEN_PAGE = "Open sign-in page"
+    const val SIGN_IN_COPY_CODE = "Copy code"
+    const val SIGN_IN_COPY_LINK = "Copy link"
+    const val SIGN_IN_CODE_STEP_1 = "Open the sign-in page and approve access."
+    const val SIGN_IN_CODE_STEP_2 =
+        "The browser then shows a code, or lands on a page that doesn't load. Copy the code or that page's address and paste it here."
+    const val SIGN_IN_CODE_LABEL = "Code or page address"
+    const val SIGN_IN_CONNECT = "Connect"
+    const val SIGN_IN_CONNECTING = "Connecting to the host…"
+    const val SIGN_IN_TRY_AGAIN = "Try again"
+    const val SIGN_IN_DONE = "Done"
+    const val SIGN_IN_TITLE_PREFIX_TEXT = "Sign in to "
+    const val SIGN_IN_CONNECTED_SUFFIX = " is connected. Its models are in the picker now."
 
     const val SIGN_IN_TITLE_PREFIX = "Connect "
     const val SIGN_IN_STEP_1 = "On the computer running the App Server, open a terminal and run:"
