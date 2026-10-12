@@ -144,6 +144,11 @@ class ApprovalOutbox(
     /** Every queued answer, oldest first. */
     val entries: StateFlow<ApprovalOutboxSnapshot> = state.asStateFlow()
 
+    private val queued = MutableStateFlow(state.value.requestIds())
+
+    /** The request ids of [entries], kept in step with every change. */
+    val queuedRequestIds: StateFlow<Set<String>> = queued.asStateFlow()
+
     fun queuedFor(conversationId: String): List<OutboxApproval> = state.value.entries.filter { it.conversationId == conversationId }
 
     /** Queues [entry]; false when its tool call is already queued or answered (it would answer twice). */
@@ -212,6 +217,7 @@ class ApprovalOutbox(
 
     private fun update(change: (ApprovalOutboxSnapshot) -> ApprovalOutboxSnapshot) {
         val next = synchronizedUpdate(change)
+        queued.value = state.value.requestIds()
         store.save(next)
     }
 
@@ -222,6 +228,8 @@ class ApprovalOutbox(
             if (state.compareAndSet(current, next)) return next
         }
     }
+
+    private fun ApprovalOutboxSnapshot.requestIds(): Set<String> = entries.mapTo(HashSet()) { it.requestId }
 
     private fun ApprovalOutboxSnapshot.answering(key: String) =
         copy(answered = (answered - key + key).takeLast(MAX_ANSWERED))

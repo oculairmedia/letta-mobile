@@ -7,13 +7,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** How a submitted answer was handled. */
@@ -42,14 +40,17 @@ sealed interface OutboxNotice {
 
 /**
  * letta-mobile-bzvro.14 (F14): routes approval answers through the [outbox]: sent at once while
- * [connected], queued otherwise (or when the send fails on the connection), and flushed after each
+ * [isConnected], queued otherwise (or when the send fails on the connection), and flushed after each
  * reconnect once the host has had [settle] to replay what it still holds (its `pending_approvals`
  * snapshot, which [stillPending] reads).
  */
 class ApprovalOutboxCoordinator(
     private val scope: CoroutineScope,
     val outbox: ApprovalOutbox,
-    private val connected: StateFlow<Boolean>,
+    /** Whether the link is up now. */
+    private val isConnected: () -> Boolean,
+    /** Every change of the link (true when it comes back up). */
+    private val connectionChanges: Flow<Boolean>,
     private val stillPending: (OutboxApproval) -> Boolean?,
     private val send: suspend (OutboxApproval) -> OutboxSendOutcome,
     private val settle: Duration = DEFAULT_SETTLE,
@@ -58,12 +59,10 @@ class ApprovalOutboxCoordinator(
     val notices: SharedFlow<OutboxNotice> = _notices.asSharedFlow()
 
     /** The request ids answered offline and still waiting, for the cards' queued state. */
-    val queuedRequestIds: StateFlow<Set<String>> = outbox.entries
-        .map { snapshot -> snapshot.entries.mapTo(HashSet()) { it.requestId } }
-        .stateIn(scope, SharingStarted.Eagerly, outbox.entries.value.entries.mapTo(HashSet()) { it.requestId })
+    val queuedRequestIds: StateFlow<Set<String>> get() = outbox.queuedRequestIds
 
     private val reconnects: Job = scope.launch {
-        connected.collect { up ->
+        connectionChanges.collect { up ->
             if (up && outbox.entries.value.entries.isNotEmpty()) {
                 delay(settle)
                 flushNow()
@@ -72,7 +71,7 @@ class ApprovalOutboxCoordinator(
     }
 
     suspend fun submit(entry: OutboxApproval): OutboxSubmitResult {
-        if (!connected.value) return queue(entry)
+        if (!isConnected()) return queue(entry)
         if (entry.key in outbox.entries.value.answered) return OutboxSubmitResult.Duplicate
         return when (attempt(entry)) {
             OutboxSendOutcome.Accepted -> OutboxSubmitResult.Sent.also { outbox.markAnswered(entry) }
@@ -87,7 +86,7 @@ class ApprovalOutboxCoordinator(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-        if (connected.value) throw error
+        if (isConnected()) throw error
         OutboxSendOutcome.Offline
     }
 

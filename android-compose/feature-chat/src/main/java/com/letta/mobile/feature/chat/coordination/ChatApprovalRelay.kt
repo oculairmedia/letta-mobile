@@ -71,10 +71,10 @@ class ChatApprovalRelay @Inject constructor(
  * conversations; inert (no parked requests, no chip) when the screen has no relay.
  */
 internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, private val agentId: String) {
-    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: NONE
+    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: MutableStateFlow(emptyMap())
 
     /** letta-mobile-bzvro.14: the requests answered offline and waiting. */
-    val queuedRequestIds: StateFlow<Set<String>> = relay?.outbox?.queuedRequestIds ?: NONE_QUEUED
+    val queuedRequestIds: StateFlow<Set<String>> = relay?.outbox?.queuedRequestIds ?: MutableStateFlow(emptySet())
 
     /** letta-mobile-bzvro.14: what the person is told once queued answers are sent or dropped. */
     val outboxNotices: Flow<OutboxNotice> = relay?.outbox?.notices ?: emptyFlow()
@@ -102,10 +102,5 @@ internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, privat
     private fun runtimeOf(conversationId: String?): AppServerRuntimeScope? {
         val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
         return agentId.takeIf { it.isNotBlank() }?.let { AppServerRuntimeScope(it, conversation) }
-    }
-
-    private companion object {
-        val NONE: StateFlow<Map<String, PendingApprovalDetails>> = MutableStateFlow(emptyMap())
-        val NONE_QUEUED: StateFlow<Set<String>> = MutableStateFlow(emptySet())
     }
 }

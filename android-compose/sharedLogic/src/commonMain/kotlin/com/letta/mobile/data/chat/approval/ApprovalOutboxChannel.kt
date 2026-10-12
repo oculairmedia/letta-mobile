@@ -6,10 +6,9 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 
 /**
  * letta-mobile-bzvro.14 (F14): the offline outbox over an Iroh channel [transport], shared by the
@@ -30,7 +29,8 @@ class ApprovalOutboxChannel(
     fun coordinator(scope: CoroutineScope, outbox: ApprovalOutbox): ApprovalOutboxCoordinator = ApprovalOutboxCoordinator(
         scope = scope,
         outbox = outbox,
-        connected = transport.state.map(::isConnected).stateIn(scope, SharingStarted.Eagerly, isConnected(transport.state.value)),
+        isConnected = { isConnected(transport.state.value) },
+        connectionChanges = transport.state.map(::isConnected).distinctUntilChanged(),
         stillPending = ::stillPending,
         send = ::sendOnce,
     )
