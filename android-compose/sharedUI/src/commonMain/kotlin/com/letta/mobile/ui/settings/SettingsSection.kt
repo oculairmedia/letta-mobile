@@ -4,13 +4,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -22,8 +25,12 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,21 +39,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
 import com.letta.mobile.data.settings.SettingsRow
-import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
@@ -55,6 +60,12 @@ import com.letta.mobile.ui.components.picker.PickerItem
 import com.letta.mobile.ui.components.picker.PickerPane
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSection
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
+import com.letta.mobile.ui.host.LettaInput
+import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.PaneAnchor
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -65,29 +76,40 @@ object SettingsSectionTags {
     const val OPTION_PREFIX = "settings-option-"
     const val ACTION_PREFIX = "settings-action-"
     const val PROBLEM_PREFIX = "settings-problem-"
+    const val PASTE_PREFIX = "settings-paste-"
 }
 
-/** A settings card's heading: its key (the test tag), its title and an optional explanation. */
-data class SettingsHeader(val key: String, val title: String, val supporting: String? = null)
+/**
+ * A settings card's heading: its key (the test tag), its title and an optional explanation.
+ * [showTitle] false leaves the title to the group header above the card (a group's own section).
+ */
+data class SettingsHeader(val key: String, val title: String, val supporting: String? = null, val showTitle: Boolean = true)
 
 /**
- * letta-mobile-ckmub.3.12 (hard cut S10, primitive P9): one settings card. Every Settings row on
- * every platform is drawn by the [SettingsScope] rows inside one of these, from the row models in
- * com.letta.mobile.data.settings; a platform describes its own sections as data instead of drawing.
+ * letta-mobile-ckmub.3.12 (hard cut S10, primitive P9) / ckmub.3.12.1: one rounded settings card.
+ * Every Settings row on every platform is drawn by the [SettingsScope] rows inside one of these, from
+ * the row models in com.letta.mobile.data.settings; a platform describes its own sections as data.
  */
 @Composable
 fun SettingsSection(header: SettingsHeader, modifier: Modifier = Modifier, content: @Composable SettingsScope.() -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth().testTag(SettingsSectionTags.SECTION_PREFIX + header.key),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = MaterialTheme.shapes.large,
+        border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.xl),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
-            Text(header.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (header.showTitle) {
+                Text(
+                    header.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = LettaDimens.Space.sm),
+                )
+            }
             header.supporting?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -96,124 +118,168 @@ fun SettingsSection(header: SettingsHeader, modifier: Modifier = Modifier, conte
     }
 }
 
-/** The rows a [SettingsSection] holds: a switch, a choice, a text field, buttons, facts and notes. */
+/**
+ * The rows a [SettingsSection] holds. Toggle, choice, info, status and link rows share one anatomy
+ * (label, one-line helper, trailing value, a whole-row hit target); fields, buttons, notes, logs and
+ * progress keep their own shape.
+ */
 object SettingsScope {
-    /** A switch with its title and explanation. */
+    /** A switch: the whole row toggles it. */
     @Composable
     fun ToggleRow(row: SettingsRow.Toggle) {
-        Row(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        val lock = LocalSettingsLock.current
+        val enabled = row.enabled && lock == null
+        SettingsRowFrame(
+            tag = SettingsSectionTags.ROW_PREFIX + row.key,
+            words = RowWords(row.title, lock ?: row.supporting),
+            enabled = enabled,
+            interaction = Modifier.toggleable(value = row.checked, enabled = enabled, role = Role.Switch, onValueChange = row.onChange),
         ) {
-            RowText(row.title, row.supporting, Modifier.weight(1f))
-            Switch(checked = row.checked, onCheckedChange = row.onChange, enabled = row.enabled)
-        }
-    }
-
-    /** The chosen option; a click opens all of them in a LettaPicker. */
-    @Composable
-    fun ChoiceRow(row: SettingsRow.Choice) {
-        var open by remember { mutableStateOf(false) }
-        val current = row.options.firstOrNull { it.key == row.selected }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = row.enabled) { open = true }
-                .semantics { role = Role.Button }
-                .testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        ) {
-            RowText(row.title, row.supporting ?: current?.description, Modifier.weight(1f))
-            Text(
-                current?.label.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (row.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
-        }
-        if (open) {
-            ChoicePicker(row, onPick = { picked ->
-                open = false
-                if (picked != row.selected) row.onSelect(picked)
-            }, onDismiss = { open = false })
+            Switch(checked = row.checked, onCheckedChange = null, enabled = enabled)
         }
     }
 
     /**
-     * A text field showing [value]; edits go to [onValueChange]. A secret row hides its text behind
-     * a show/hide toggle; the row's problem marks it invalid once something is typed.
+     * One of the row's options. A segmented control when the row is [SettingsRow.Choice.inline], or
+     * on a pointer for three options or fewer; otherwise the current value, opening a bottom sheet on
+     * touch and an anchored list on a pointer.
      */
     @Composable
-    fun TextFieldRow(row: SettingsRow.Text, value: String, onValueChange: (String) -> Unit) {
+    fun ChoiceRow(row: SettingsRow.Choice) {
+        val lock = LocalSettingsLock.current
+        val pointer = LocalLettaHost.current.input == LettaInput.Pointer
+        if (row.inline || (pointer && row.options.size <= SEGMENTED_CHOICE_COUNT)) {
+            SegmentedChoice(row, lock)
+        } else {
+            ListChoice(row, lock)
+        }
+    }
+
+    /**
+     * A text field with its label above it, showing [value]; edits go to [onValueChange]. A secret
+     * row hides its text behind a show/hide toggle; [paste] adds a Paste button. The row's problem
+     * marks it invalid once something is typed, in words under the field.
+     */
+    @Composable
+    fun TextFieldRow(row: SettingsRow.Text, value: String, paste: Boolean = false, onValueChange: (String) -> Unit) {
+        val enabled = LocalSettingsLock.current == null
         var revealed by rememberSaveable(row.key) { mutableStateOf(false) }
         val problem = row.problem?.invoke(value)?.takeIf { value.isNotBlank() }
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            label = { Text(row.title) },
-            placeholder = row.placeholder?.let { { Text(it) } },
-            isError = problem != null,
-            supportingText = if (problem != null) {
-                { Text(problem, modifier = Modifier.testTag(SettingsSectionTags.PROBLEM_PREFIX + row.key)) }
-            } else {
-                row.supporting?.let { text -> { Text(text) } }
-            },
-            singleLine = true,
-            visualTransformation = if (row.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = if (row.numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-            trailingIcon = if (row.secret) {
-                { SecretToggle(revealed) { revealed = !revealed } }
-            } else {
-                null
-            },
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-        )
+        Column(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+            Text(row.title, style = MaterialTheme.typography.labelLarge)
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                enabled = enabled,
+                placeholder = row.placeholder?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+                isError = problem != null,
+                supportingText = fieldSupport(row, problem),
+                singleLine = true,
+                visualTransformation = if (row.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
+                keyboardOptions = if (row.numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+                trailingIcon = fieldTrailing(row, FieldExtras(paste, revealed, { revealed = !revealed }, onValueChange)),
+                modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+            )
+        }
     }
 
     /** A row of buttons; the primary one is filled. */
     @OptIn(ExperimentalLayoutApi::class)
     @Composable
     fun ActionRow(key: String, actions: List<ActionButton>) {
+        val unlocked = LocalSettingsLock.current == null
         FlowRow(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs).testTag(SettingsSectionTags.ROW_PREFIX + key),
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             actions.forEach { action ->
                 val tag = Modifier.testTag(SettingsSectionTags.ACTION_PREFIX + action.key)
+                val enabled = action.enabled && unlocked
                 if (action.primary) {
-                    Button(onClick = action.onClick, enabled = action.enabled, modifier = tag) { Text(action.label) }
+                    Button(onClick = action.onClick, enabled = enabled, modifier = tag) { Text(action.label) }
                 } else {
-                    OutlinedButton(onClick = action.onClick, enabled = action.enabled, modifier = tag) { Text(action.label) }
+                    OutlinedButton(onClick = action.onClick, enabled = enabled, modifier = tag) { Text(action.label) }
                 }
             }
         }
     }
 
-    /** A fact: its label at the start, its value at the end. */
+    /** A fact: its label at the start, its value at the end; a click copies the value. */
     @Composable
     fun InfoRow(row: SettingsRow.Info) {
-        Row(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+        @Suppress("DEPRECATION")
+        val clipboard = LocalClipboardManager.current
+        SettingsRowFrame(
+            tag = SettingsSectionTags.ROW_PREFIX + row.key,
+            words = RowWords(row.title, row.supporting),
+            enabled = true,
+            interaction = Modifier.clickable(onClickLabel = COPY_LABEL) { clipboard.setText(AnnotatedString(row.value)) },
         ) {
-            Text(row.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(row.value, style = MaterialTheme.typography.bodyMedium, color = toneColor(row.tone, MaterialTheme.colorScheme.onSurfaceVariant))
+            Text(
+                row.value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = row.tone.color(MaterialTheme.colorScheme.onSurfaceVariant),
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
         }
     }
 
-    /** A line of explanation or status in its tone's colour. */
+    /** A state with its badge: a dot or glyph and words. */
+    @Composable
+    fun StatusRow(row: SettingsRow.Status) {
+        SettingsRowFrame(SettingsSectionTags.ROW_PREFIX + row.key, RowWords(row.title, row.supporting), enabled = true) {
+            SettingsStatusBadge(row.status)
+        }
+    }
+
+    /** One action as a row; a destructive one reads red and asks first. */
+    @Composable
+    fun LinkRow(row: SettingsRow.Link) {
+        val lock = LocalSettingsLock.current
+        val enabled = row.enabled && lock == null
+        var asking by remember { mutableStateOf(false) }
+        val confirm = row.confirm
+        SettingsRowFrame(
+            tag = SettingsSectionTags.ROW_PREFIX + row.key,
+            words = RowWords(row.title, lock ?: row.supporting, row.destructive),
+            enabled = enabled,
+            interaction = Modifier.clickable(enabled = enabled, role = Role.Button) {
+                if (confirm != null) {
+                    asking = true
+                } else {
+                    row.onClick()
+                }
+            },
+        ) {
+            row.value?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            if (!row.destructive) Chevron()
+        }
+        if (asking && confirm != null) {
+            LettaConfirmPane(
+                request = LettaConfirmRequest(title = confirm.title, message = confirm.message, confirmLabel = confirm.confirmLabel),
+                onConfirm = {
+                    asking = false
+                    row.onClick()
+                },
+                onDismiss = { asking = false },
+            )
+        }
+    }
+
+    /** A line of explanation or status in its tone's colour, with its tone's glyph. */
     @Composable
     fun NoteRow(row: SettingsRow.Note) {
-        Text(
-            row.status.text,
-            style = MaterialTheme.typography.bodySmall,
-            color = toneColor(row.status.tone, MaterialTheme.colorScheme.onSurfaceVariant),
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
-        )
+        val color = row.status.tone.color(MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs).testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+        ) {
+            row.status.tone.glyph?.let { Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.iconSm)) }
+            Text(row.status.text, style = MaterialTheme.typography.bodySmall, color = color)
+        }
     }
 
     /** Monospaced text on a well, for a log tail. */
@@ -236,7 +302,7 @@ object SettingsScope {
     @Composable
     fun ProgressRow(row: SettingsRow.Progress) {
         Column(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+            modifier = Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.xs).testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             val fraction = row.fraction
@@ -263,11 +329,103 @@ internal fun SettingsAction.toButton(drafts: SettingsDrafts): ActionButton = Act
 )
 
 @Composable
-private fun RowText(title: String, supporting: String?, modifier: Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
-        Text(title, style = MaterialTheme.typography.bodyMedium)
-        supporting?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+private fun SegmentedChoice(row: SettingsRow.Choice, lock: String?) {
+    val enabled = row.enabled && lock == null
+    val current = row.options.firstOrNull { it.key == row.selected }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LettaDimens.Control.minTouchTarget)
+            .padding(vertical = LettaDimens.Space.xs)
+            .testTag(SettingsSectionTags.ROW_PREFIX + row.key),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        RowWordsColumn(RowWords(row.title, lock ?: row.supporting ?: current?.description), enabled)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            row.options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = option.key == row.selected,
+                    onClick = { if (option.key != row.selected) row.onSelect(option.key) },
+                    enabled = enabled,
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = row.options.size),
+                    modifier = Modifier.testTag(SettingsSectionTags.OPTION_PREFIX + row.key + "-" + option.key),
+                ) { Text(option.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        }
     }
+}
+
+@Composable
+private fun ListChoice(row: SettingsRow.Choice, lock: String?) {
+    val enabled = row.enabled && lock == null
+    var open by remember { mutableStateOf(false) }
+    val current = row.options.firstOrNull { it.key == row.selected }
+    SettingsRowFrame(
+        tag = SettingsSectionTags.ROW_PREFIX + row.key,
+        words = RowWords(row.title, lock ?: row.supporting ?: current?.description),
+        enabled = enabled,
+        interaction = Modifier.clickable(enabled = enabled, role = Role.DropdownList) { open = true },
+    ) {
+        Box {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+                Text(
+                    current?.label.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Chevron()
+            }
+            if (open) {
+                ChoicePicker(row, onPick = { picked ->
+                    open = false
+                    if (picked != row.selected) row.onSelect(picked)
+                }, onDismiss = { open = false })
+            }
+        }
+    }
+}
+
+@Composable
+private fun Chevron() {
+    Icon(
+        LettaIcons.ChevronRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(LettaDimens.Control.icon),
+    )
+}
+
+/** A field's trailing controls and what they act on. */
+private class FieldExtras(val paste: Boolean, val revealed: Boolean, val onToggleReveal: () -> Unit, val onValueChange: (String) -> Unit)
+
+private fun fieldSupport(row: SettingsRow.Text, problem: String?): (@Composable () -> Unit)? = when {
+    problem != null -> {
+        { Text(problem, modifier = Modifier.testTag(SettingsSectionTags.PROBLEM_PREFIX + row.key)) }
+    }
+    row.supporting != null -> {
+        { Text(row.supporting.orEmpty()) }
+    }
+    else -> null
+}
+
+private fun fieldTrailing(row: SettingsRow.Text, extras: FieldExtras): (@Composable () -> Unit)? {
+    if (!row.secret && !extras.paste) return null
+    return {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (extras.paste) PasteButton(row.key, extras.onValueChange)
+            if (row.secret) SecretToggle(extras.revealed, extras.onToggleReveal)
+        }
+    }
+}
+
+@Composable
+private fun PasteButton(key: String, onPaste: (String) -> Unit) {
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
+    TextButton(
+        onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let(onPaste) },
+        modifier = Modifier.testTag(SettingsSectionTags.PASTE_PREFIX + key),
+    ) { Text(PASTE_LABEL) }
 }
 
 @Composable
@@ -301,17 +459,16 @@ private fun ChoicePicker(row: SettingsRow.Choice, onPick: (String) -> Unit, onDi
             search = if (row.options.size > SEARCHABLE_CHOICE_COUNT) PickerSearch() else null,
         ),
         callbacks = PickerCallbacks(onQuery = { query = it }, onPick = { onPick(it.value) }, onDismiss = onDismiss),
-        pane = PickerPane(title = row.title),
+        // A bottom sheet on touch, a list anchored under the value on a pointer.
+        pane = PickerPane(kind = LettaPaneKind.Adaptive(PaneAnchor.BelowEnd), title = row.title),
     )
-}
-
-@Composable
-private fun toneColor(tone: SettingsTone, normal: Color): Color = when (tone) {
-    SettingsTone.Normal -> normal
-    SettingsTone.Positive -> MaterialTheme.colorScheme.primary
-    SettingsTone.Warning -> MaterialTheme.colorScheme.tertiary
-    SettingsTone.Error -> MaterialTheme.colorScheme.error
 }
 
 /** A choice longer than this gets a search field. */
 private const val SEARCHABLE_CHOICE_COUNT = 8
+
+/** A pointer shows a choice of this many options or fewer as a segmented control. */
+private const val SEGMENTED_CHOICE_COUNT = 3
+
+private const val COPY_LABEL = "Copy"
+private const val PASTE_LABEL = "Paste"

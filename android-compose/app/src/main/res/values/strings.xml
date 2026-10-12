@@ -525,7 +525,6 @@
     <string name="screen_blocks_empty_available">No reusable blocks available</string>
     <string name="common_max_output_tokens">Max Output Tokens</string>
     <string name="common_parallel_tool_calls">Parallel Tool Calls</string>
-    <string name="common_enable_sleeptime">Enable Sleeptime</string>
     <string name="action_save_settings">Save Settings</string>
     <string name="screen_agents_dialog_delete_confirm_permanent">Are you sure you want to delete this agent? This action cannot be undone.</string>
     <string name="screen_settings_export_ready">Agent export ready to share</string>

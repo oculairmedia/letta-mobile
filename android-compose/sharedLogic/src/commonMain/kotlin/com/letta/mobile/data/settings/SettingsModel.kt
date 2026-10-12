@@ -11,15 +11,19 @@ import kotlinx.coroutines.flow.emptyFlow
  * here (from its services, in plain Kotlin) and the sharedUI SettingsSection primitives draw it.
  */
 
-/** Where a section sits on the Settings page, in page order. */
+/**
+ * Where a section sits on the Settings page, in page order (letta-mobile-ckmub.3.12.1): the backend
+ * first, the danger zone last and on its own.
+ */
 enum class SettingsGroup(val title: String) {
     Backend("Backend"),
-    Appearance("Appearance"),
     Chat("Chat"),
+    Appearance("Appearance"),
     Notifications("Notifications"),
     Providers("Providers"),
     About("Diagnostics & about"),
     Developer("Developer"),
+    Danger("Danger zone"),
 }
 
 /** How a line reads: plain, good news, a caution, or a failure. */
@@ -62,7 +66,11 @@ sealed interface SettingsRow {
         val onChange: (Boolean) -> Unit,
     ) : SettingsRow
 
-    /** One of [options], picked in a LettaPicker. */
+    /**
+     * One of [options]: a bottom sheet on touch, an anchored list or (three options or fewer) a
+     * segmented control on a pointer. [inline] keeps the segmented control on every platform (the
+     * backend mode).
+     */
     data class Choice(
         override val key: String,
         val title: String,
@@ -70,6 +78,7 @@ sealed interface SettingsRow {
         val selected: String,
         val supporting: String? = null,
         val enabled: Boolean = true,
+        val inline: Boolean = false,
         val onSelect: (String) -> Unit,
     ) : SettingsRow
 
@@ -92,12 +101,36 @@ sealed interface SettingsRow {
 
     data class Actions(override val key: String, val actions: List<SettingsAction>) : SettingsRow
 
-    /** A fact: a label and its value. */
+    /** A fact: a label and its value; a click copies the value. */
     data class Info(
         override val key: String,
         val title: String,
         val value: String,
         val tone: SettingsTone = SettingsTone.Normal,
+        val supporting: String? = null,
+    ) : SettingsRow
+
+    /** A state: its label, and the status as a dot, a glyph and words (never colour alone). */
+    data class Status(
+        override val key: String,
+        val title: String,
+        val status: SettingsStatus,
+        val supporting: String? = null,
+    ) : SettingsRow
+
+    /**
+     * One action as a whole row: a label (a verb), an optional explanation and a trailing value. A
+     * [destructive] row reads red and asks [confirm] first.
+     */
+    data class Link(
+        override val key: String,
+        val title: String,
+        val supporting: String? = null,
+        val value: String? = null,
+        val destructive: Boolean = false,
+        val enabled: Boolean = true,
+        val confirm: SettingsConfirmText? = null,
+        val onClick: () -> Unit,
     ) : SettingsRow
 
     /** A line of explanation or status. */
@@ -109,6 +142,9 @@ sealed interface SettingsRow {
     /** A progress bar; a null [fraction] is indeterminate. */
     data class Progress(override val key: String, val fraction: Float?, val label: String? = null) : SettingsRow
 }
+
+/** What a destructive row asks before it acts: the consequence, and whether it can be undone. */
+data class SettingsConfirmText(val title: String, val message: String, val confirmLabel: String)
 
 /** A confirmation the section asks for before it acts (switching a data directory). */
 data class SettingsConfirm(
@@ -132,12 +168,14 @@ data class SettingsSectionModel(
  * A platform's own section of the Settings page (the desktop's bundled runtime, Android's on-device
  * model): where it sits, what it shows first and how it changes. [showForMode] limits it to one
  * backend mode of the Backend form (Android's on-device model only matters for the local runtime).
+ * A section that [needsHost] is drawn disabled, saying why, while no host is connected.
  */
 class SettingsContribution(
     val group: SettingsGroup,
     val initial: SettingsSectionModel,
     val updates: Flow<SettingsSectionModel> = emptyFlow(),
     val showForMode: LettaConfig.Mode? = null,
+    val needsHost: Boolean = false,
 ) {
     companion object {
         /** A section that follows [state]. */
