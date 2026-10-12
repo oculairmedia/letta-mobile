@@ -39,6 +39,9 @@ object AgentContextTags {
     const val CARD_USAGE = "agent-context-card-usage"
     const val SHEET = "agent-context-sheet"
     const val SCOPE = "agent-context-scope"
+
+    /** The sheet's "Model" row that opens the model list as a second level (letta-mobile-pt1ze.5). */
+    const val MODEL_ROW = "agent-context-model-row"
     const val PROVENANCE = "agent-context-provenance"
     const val TOTAL = "agent-context-total"
     const val COMPACT = "agent-context-compact"

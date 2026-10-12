@@ -1,71 +1,31 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.letta.mobile.data.search.CommandPalette
 import com.letta.mobile.data.search.PaletteItem
-import com.letta.mobile.data.search.PaletteItemKind
-import com.letta.mobile.data.search.mascotAgentId
-import com.letta.mobile.desktop.chat.PaletteItemLeading
+import com.letta.mobile.ui.shell.palette.QuickQueryActions
+import com.letta.mobile.ui.shell.palette.QuickQueryPanel
+import com.letta.mobile.ui.theme.LettaDimens
 import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.jetbrains.jewel.ui.component.TextField as JewelTextField
-import com.letta.mobile.ui.chat.AgentOrb
-import com.letta.mobile.ui.theme.LettaDimens
 
 /** Actions the quick-query window routes back into the main app. */
 @Immutable
@@ -171,9 +131,9 @@ internal fun quickQueryPrompt(text: String, ambientContext: String?): String {
 
 /**
  * Spotlight/Raycast-style floating query bar: frameless, transparent,
- * always-on-top, centered. Search results open in the main window; free text
- * goes to the current agent (Ctrl+Enter, or Enter with no matches). Dismisses
- * on Esc or focus loss.
+ * always-on-top, centered. The bar itself is the shared [QuickQueryPanel]
+ * (letta-mobile-ckmub.3.6); this window is its container. Dismisses on Esc or
+ * focus loss.
  */
 @Composable
 internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) {
@@ -217,8 +177,7 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         }
         // Each Compose window is its own composition root: NO composition
         // locals from the main window propagate here. That means the theme
-        // stack (Jewel's TextField throws "No TextFieldStyle provided"
-        // otherwise) AND the crash-reporting exception handler must both be
+        // stack AND the crash-reporting exception handler must both be
         // re-provided, or an exception in this window kills the app with no
         // dialog and no crash-log entry.
         @OptIn(ExperimentalComposeUiApi::class)
@@ -227,336 +186,30 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         ) {
             DesktopJewelTheme {
                 DesktopMaterialTheme {
-                    QuickQueryContent(coordinator)
+                    QuickQueryBinding(coordinator)
                 }
             }
         }
     }
 }
 
+/** Feeds the coordinator's items and actions to the shared bar. */
 @Composable
-private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
-    var query by remember { mutableStateOf(TextFieldValue("")) }
+private fun QuickQueryBinding(coordinator: DesktopQuickQueryCoordinator) {
     val items by coordinator.items.collectAsState()
     val actions by coordinator.actions.collectAsState()
     val ambient by coordinator.ambientContext.collectAsState()
-    var includeContext by remember { mutableStateOf(true) }
-    val groups = remember(items, query.text) { CommandPalette.grouped(items, query.text) }
-    val flatResults = remember(groups) { groups.flatMap { it.second } }
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-    fun submitPrompt() {
-        val text = query.text.trim()
-        if (text.isEmpty()) return
-        // letta-mobile-sspxj: never forward the raw window title — sanitize at the
-        // UI boundary so the LLM never sees an attacker-controlled string with
-        // un-escaped quotes or newlines. The chip already shows the sanitized
-        // preview, so what the user sees matches what the agent receives.
-        val sanitized = if (includeContext) sanitizeAmbientContext(ambient) else null
-        actions?.onSubmitPrompt(text, sanitized)
-        coordinator.close()
+    // letta-mobile-sspxj: never forward the raw window title — sanitize at the
+    // UI boundary so the chip previews exactly what the agent receives.
+    val sanitized = remember(ambient) { sanitizeAmbientContext(ambient) }
+    val bound = remember(actions, coordinator) {
+        QuickQueryActions(
+            onSelectItem = { item -> actions?.onSelectItem(item) },
+            onSubmitPrompt = { text, context -> actions?.onSubmitPrompt(text, context) },
+            onClose = coordinator::close,
+        )
     }
-
-    fun openTopResult() {
-        val top = flatResults.firstOrNull() ?: return
-        actions?.onSelectItem(top)
-        coordinator.close()
-    }
-
     Box(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm), contentAlignment = Alignment.TopCenter) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LettaDimens.Radius.lg),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = LettaDimens.Space.md,
-        ) {
-            Column {
-                QuickQuerySearchRow(
-                    query = query,
-                    onQueryChange = { query = it },
-                    focusRequester = focusRequester,
-                    onKeyEvent = { event ->
-                        handleQuickQueryKey(
-                            event = event,
-                            hasResults = flatResults.isNotEmpty(),
-                            keys = QuickQueryKeyActions(
-                                onClose = coordinator::close,
-                                onOpenTop = ::openTopResult,
-                                onSubmit = ::submitPrompt,
-                            ),
-                        )
-                    },
-                )
-                // Only show the chip when sanitization yields a title the agent
-                // would actually receive — never preview the raw OS string.
-                val sanitizedAmbient = if (includeContext) sanitizeAmbientContext(ambient) else null
-                if (sanitizedAmbient != null) {
-                    AmbientContextChip(title = sanitizedAmbient, onDismiss = { includeContext = false })
-                }
-                QuickQueryDivider()
-                QuickQueryResults(
-                    query = query.text,
-                    items = items,
-                    groups = groups,
-                    onSelect = { item ->
-                        actions?.onSelectItem(item)
-                        coordinator.close()
-                    },
-                )
-                QuickQueryFooter()
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickQueryFooter() {
-    QuickQueryDivider()
-    Text(
-        text = "⏎ open top result · Ctrl+⏎ ask current agent · Esc close",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-    )
-}
-
-private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9
-
-@Composable
-private fun QuickQuerySearchRow(
-    query: TextFieldValue,
-    onQueryChange: (TextFieldValue) -> Unit,
-    focusRequester: FocusRequester,
-    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
-        JewelTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            // Borderless: the bar's Surface is the visual frame; Jewel's own
-            // focus ring reads as a stray outline here.
-            undecorated = true,
-            placeholder = {
-                // Explicit compact style: the M3 default leaks a larger size
-                // into Jewel's text slot and clips the descenders.
-                Text(
-                    text = "Search agents, or ask anything…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                )
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = LettaDimens.Orb.lg)
-                .focusRequester(focusRequester)
-                .onPreviewKeyEvent(onKeyEvent),
-        )
-    }
-}
-
-private data class QuickQueryKeyActions(
-    val onClose: () -> Unit,
-    val onOpenTop: () -> Unit,
-    val onSubmit: () -> Unit,
-)
-
-/** Escape closes; Ctrl+Enter always submits; Enter opens the top match or submits. */
-private fun handleQuickQueryKey(
-    event: androidx.compose.ui.input.key.KeyEvent,
-    hasResults: Boolean,
-    keys: QuickQueryKeyActions,
-): Boolean {
-    if (event.type != KeyEventType.KeyDown) return false
-    return when (event.key) {
-        Key.Escape -> {
-            keys.onClose()
-            true
-        }
-        Key.Enter -> {
-            if (event.isCtrlPressed) {
-                keys.onSubmit()
-            } else if (hasResults) {
-                keys.onOpenTop()
-            } else {
-                keys.onSubmit()
-            }
-            true
-        }
-        else -> false
-    }
-}
-
-@Composable
-private fun QuickQueryResults(
-    query: String,
-    items: List<PaletteItem>,
-    groups: List<Pair<PaletteItemKind, List<PaletteItem>>>,
-    onSelect: (PaletteItem) -> Unit,
-) {
-    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-        // Element-style "recently viewed" strip: the most recent agents as
-        // avatar chips, pinned above the result groups.
-        val recentAgents = items.filter { it.kind == PaletteItemKind.Agent }
-            .take(QUICK_QUERY_RECENT_AGENTS_LIMIT)
-        if (query.isBlank() && recentAgents.isNotEmpty()) {
-            item(key = "qq-recent-agents") {
-                RecentAgentsStrip(agents = recentAgents, onSelect = onSelect)
-            }
-        }
-        groups.forEach { (kind, results) ->
-            item(key = "qq-h-$kind") {
-                Text(
-                    text = CommandPalette.sectionTitle(kind).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.xs),
-                )
-            }
-            items(results, key = { "qq-$kind-${it.id}" }) { item ->
-                QuickQueryRow(item = item, onClick = { onSelect(item) })
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecentAgentsStrip(
-    agents: List<PaletteItem>,
-    onSelect: (PaletteItem) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "RECENTLY VIEWED",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.lg, top = LettaDimens.Space.md, bottom = LettaDimens.Space.sm),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = LettaDimens.Space.md),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-        ) {
-            agents.forEach { item ->
-                Column(
-                    modifier = Modifier
-                        .clickable(onClick = { onSelect(item) })
-                        .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm)
-                        .width(64.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    AgentOrb(
-                        index = item.orbIndex ?: 0,
-                        size = LettaDimens.Orb.railSlotHeight,
-                        cornerRadius = LettaDimens.Radius.md,
-                        agentId = item.mascotAgentId(),
-                    )
-                    Text(
-                        text = item.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(top = LettaDimens.Space.sm),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickQueryDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant),
-    )
-}
-
-@Composable
-private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = LettaDimens.Space.lg)
-            .padding(bottom = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            ) {
-                Text(
-                    // Caller passes an already-sanitized title (see QuickQueryContent).
-                    text = "Looking at: $title",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Remove context",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(LettaDimens.Control.icon).clickable(onClick = onDismiss),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickQueryRow(item: PaletteItem, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        PaletteItemLeading(item)
-        Text(
-            text = item.label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        item.sublabel?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
+        QuickQueryPanel(items = items, ambientContext = sanitized, actions = bound)
     }
 }
