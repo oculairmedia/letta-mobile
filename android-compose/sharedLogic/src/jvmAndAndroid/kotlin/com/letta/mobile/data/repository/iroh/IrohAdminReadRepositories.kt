@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
@@ -153,38 +154,44 @@ internal class IrohModelRepository(
 internal class IrohPassageRepository(
     private val source: IrohAdminRpcPassageSource,
 ) : IPassageRepository {
-    private val cacheLock = Any()
-    private val passagesByAgent = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
-    private val flowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
+    private val cache = AgentPassageCache()
 
-    override fun getPassages(agentId: String): StateFlow<List<Passage>> =
-        synchronized(cacheLock) {
-            flowsByAgent
-                .getOrPut(agentId) { MutableStateFlow(passagesByAgent.value[agentId].orEmpty()) }
-                .asStateFlow()
-        }
+    override fun getPassages(agentId: String): StateFlow<List<Passage>> = cache.observe(AgentId(agentId))
 
     override suspend fun refreshPassages(agentId: String) {
         val passages = source.listPassages(agentId)
-        mutateCached(agentId) { passages }
+        cache.update(AgentId(agentId)) { passages }
     }
 
     override suspend fun createPassage(agentId: String, text: String): Passage {
         val passage = source.createPassage(agentId, text)
-        mutateCached(agentId) { it + passage }
+        cache.update(AgentId(agentId)) { it + passage }
         return passage
     }
 
     override suspend fun deletePassage(agentId: String, passageId: String) {
         source.deletePassage(agentId, passageId)
-        mutateCached(agentId) { current -> current.filterNot { it.id == passageId } }
+        cache.update(AgentId(agentId)) { current -> current.filterNot { it.id == passageId } }
     }
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
         unsupported("passage.searchArchival($agentId)")
+}
 
-    private fun mutateCached(agentId: String, transform: (List<Passage>) -> List<Passage>) {
-        synchronized(cacheLock) {
+/** Each agent's cached passages, observable per agent. */
+private class AgentPassageCache {
+    private val lock = Any()
+    private val passagesByAgent = MutableStateFlow<Map<AgentId, List<Passage>>>(emptyMap())
+    private val flowsByAgent = mutableMapOf<AgentId, MutableStateFlow<List<Passage>>>()
+
+    fun observe(agentId: AgentId): StateFlow<List<Passage>> = synchronized(lock) {
+        flowsByAgent
+            .getOrPut(agentId) { MutableStateFlow(passagesByAgent.value[agentId].orEmpty()) }
+            .asStateFlow()
+    }
+
+    fun update(agentId: AgentId, transform: (List<Passage>) -> List<Passage>) {
+        synchronized(lock) {
             val next = transform(passagesByAgent.value[agentId].orEmpty())
             passagesByAgent.update { it + (agentId to next) }
             flowsByAgent[agentId]?.value = next

@@ -34,8 +34,11 @@ class VibesyncDebugViewModel @Inject constructor() : ViewModel() {
         _uiState.value = UiState.Error(UNAVAILABLE)
     }
 
-    @Suppress("UNUSED_PARAMETER")
-    fun refreshAgentsMd(dryRun: Boolean = true) = Unit
+    /** The AGENTS.md refresh has no route either; the page reports which request it could not make. */
+    fun refreshAgentsMd(dryRun: Boolean = true) {
+        val request = if (dryRun) "AGENTS.md dry run" else "AGENTS.md refresh"
+        _uiState.value = UiState.Error("$request is not available: no App Server or Iroh route serves it.")
+    }
 
     private companion object {
         const val UNAVAILABLE = "VibeSync debug is not available: no App Server or Iroh route serves it."
