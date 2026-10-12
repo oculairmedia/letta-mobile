@@ -14,7 +14,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.channel.ChannelDisplayItem
@@ -23,6 +25,8 @@ import com.letta.mobile.data.channel.ChannelLibraryState
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageReducer
 import com.letta.mobile.data.channel.ChannelsPageState
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -53,11 +57,14 @@ class ChannelsPageTest {
         actions: ChannelsPageActions,
         width: Dp,
         options: ChannelsPageOptions = ChannelsPageOptions(),
+        host: LettaHost = LettaHost.Touch,
     ) {
         setContent {
             MaterialTheme {
-                Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    ChannelsPage(state = state, actions = actions, options = options)
+                ProvideLettaHost(host) {
+                    Box(Modifier.width(width).height(PAGE_HEIGHT)) {
+                        ChannelsPage(state = state, actions = actions, options = options)
+                    }
                 }
             }
         }
@@ -90,11 +97,21 @@ class ChannelsPageTest {
     @Test
     fun headerControlsReachTheActions() = runComposeUiTest {
         val actions = RecordingActions()
-        show(stateOf(live, redialing), actions, COMPACT)
+        show(stateOf(live, redialing), actions, COMPACT, host = LettaHost.Pointer)
         onNodeWithTag(ChannelsPageTags.REFRESH).performClick()
         onNodeWithTag(ChannelsPageTags.filter("Reconnecting")).performClick()
         onNodeWithTag(ChannelsPageTags.SEARCH).performTextInput("iroh")
         assertEquals(listOf("refresh", "filter:Reconnecting", "query:iroh"), actions.calls)
+    }
+
+    @Test
+    fun onTouchTheListPullsToRefreshAndTheHeaderHasNoRefreshButton() = runComposeUiTest {
+        val actions = RecordingActions()
+        show(stateOf(live, redialing), actions, COMPACT, PhoneOptions)
+        onNodeWithTag(ChannelsPageTags.REFRESH).assertDoesNotExist()
+        onNodeWithTag(ChannelsPageTags.LIST).performTouchInput { swipeDown(startY = top, endY = bottom, durationMillis = 600) }
+        waitForIdle()
+        assertEquals(listOf("refresh"), actions.calls)
     }
 
     @Test
@@ -125,7 +142,7 @@ class ChannelsPageTest {
     fun theWideDetailShowsTransportAndRefreshes() = runComposeUiTest {
         val actions = RecordingActions()
         val state = ChannelsPageReducer.withSelection(stateOf(live, redialing), "ws")
-        show(state, actions, WIDE, PhoneOptions)
+        show(state, actions, WIDE, PhoneOptions, host = LettaHost.Pointer)
         onNodeWithTag(ChannelsPageTags.DETAIL).assertExists()
         onNodeWithText("This channel is not live: anything it shows may be stale.").assertExists()
         onNodeWithTag(ChannelsPageTags.DETAIL_REFRESH).performClick()

@@ -22,10 +22,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.zIndex
 import com.letta.mobile.data.memory.graph.MemoryGraphPoint
 import com.letta.mobile.data.memory.graph.MemoryNodeSelection
 import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -45,8 +47,14 @@ fun MemoryPage(
     options: MemoryPageOptions = MemoryPageOptions(),
 ) {
     val reducedMotion = options.reducedMotion
+    // A reload of a graph already drawn; the first load shows the graph area's own spinner.
+    val refreshing = state.parity.isLoading && !state.view.isEmpty
     Column(modifier.fillMaxSize()) {
-        MemoryPageChrome(state.parity, actions, MemoryChromeOptions(options.showTitle, state.canCreateBlock))
+        // Only the chrome pulls to refresh: the graph's drags pan it, and the node card scrolls its own
+        // text. Drawn above the graph so the indicator can drop below the chrome.
+        LettaRefreshable(refreshing = refreshing, onRefresh = actions::refresh, modifier = Modifier.fillMaxWidth().zIndex(1f)) {
+            MemoryPageChrome(state.parity, actions, MemoryChromeOptions(options.showTitle, state.canCreateBlock))
+        }
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
             val layout = MemoryPageLayout(state, actions, reducedMotion)
             if (maxWidth >= LettaDimens.Pane.wideBreakpoint) {

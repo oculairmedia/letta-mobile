@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
@@ -40,7 +42,11 @@ import com.letta.mobile.ui.theme.customColors
 /** [showTitle]: the host does not title the screen; [canCreateBlock]: offer "New block". */
 internal data class MemoryChromeOptions(val showTitle: Boolean, val canCreateBlock: Boolean)
 
-/** Title row, agent picker and stats strip above the graph. */
+/**
+ * Title row, agent picker and stats strip above the graph. The chrome scrolls (with nothing to
+ * scroll) so a pull on it reaches the page's LettaRefreshable on touch; the graph keeps its drags
+ * for panning.
+ */
 @Composable
 internal fun MemoryPageChrome(
     parity: MemoryParityControllerState,
@@ -49,7 +55,10 @@ internal fun MemoryPageChrome(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         MemoryHeaderRow(parity, actions, options)
@@ -82,9 +91,8 @@ private fun MemoryHeaderRow(
                 Icon(LettaIcons.Add, contentDescription = "New block")
             }
         }
-        IconButton(onClick = actions::refresh, enabled = !parity.isLoading) {
-            Icon(LettaIcons.Refresh, contentDescription = if (parity.isLoading) "Refreshing" else "Refresh")
-        }
+        // Touch pulls the chrome down instead (MemoryPage's LettaRefreshable).
+        LettaRefreshAction(refreshing = parity.isLoading, onRefresh = actions::refresh)
     }
 }
 

@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -38,6 +37,8 @@ import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaPill
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshIconButton
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -47,7 +48,7 @@ fun interface ChannelsSearchFieldSlot {
     fun Content(query: String, onQueryChange: (String) -> Unit, placeholder: String, modifier: Modifier)
 }
 
-/** The header's refresh action; [modifier] carries the page's test tag. */
+/** The header's refresh action on a pointer host (touch pulls instead); [modifier] carries the page's test tag. */
 fun interface ChannelsRefreshActionSlot {
     @Composable
     fun Content(onRefresh: () -> Unit, modifier: Modifier)
@@ -76,9 +77,7 @@ private val DefaultChannelsSearchField = ChannelsSearchFieldSlot { query, onQuer
 }
 
 private val DefaultChannelsRefreshAction = ChannelsRefreshActionSlot { onRefresh, modifier ->
-    IconButton(onClick = onRefresh, modifier = modifier) {
-        Icon(Icons.Outlined.Refresh, contentDescription = REFRESH_LABEL)
-    }
+    LettaRefreshIconButton(onRefresh, modifier)
 }
 
 @Composable
@@ -93,7 +92,10 @@ internal fun ChannelsHeader(page: ChannelsPageScope) {
             if (page.wide) {
                 ChannelsSearch(page, Modifier.width(WideSearchWidth))
             }
-            page.slots.refreshAction.Content(page.actions::refresh, Modifier.testTag(ChannelsPageTags.REFRESH))
+            // Pointer only: touch pulls the list (ChannelsPage's LettaRefreshable).
+            LettaRefreshAction(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.testTag(ChannelsPageTags.REFRESH)) { onRefresh, modifier ->
+                page.slots.refreshAction.Content(onRefresh, modifier)
+            }
         }
         if (!page.wide) ChannelsSearch(page, Modifier.fillMaxWidth())
         ChannelsFilterChips(page)
@@ -190,9 +192,9 @@ internal fun ChannelDetail(channel: ChannelDisplayItem, page: ChannelsPageScope)
         if (channel.status.isStale) {
             Text(STALE_NOTICE, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
         }
-        OutlinedButton(onClick = page.actions::refresh, modifier = Modifier.testTag(ChannelsPageTags.DETAIL_REFRESH)) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Text(REFRESH_LABEL, modifier = Modifier.padding(start = LettaDimens.Space.sm))
+        // Pointer only: on touch the user pulls the list behind the sheet.
+        LettaRefreshAction(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.testTag(ChannelsPageTags.DETAIL_REFRESH)) { onRefresh, modifier ->
+            OutlinedButton(onClick = onRefresh, modifier = modifier) { Text(REFRESH_LABEL) }
         }
     }
 }

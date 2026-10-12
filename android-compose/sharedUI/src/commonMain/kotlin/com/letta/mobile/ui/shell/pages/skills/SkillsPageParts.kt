@@ -45,6 +45,7 @@ import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaInfoBox
 import com.letta.mobile.ui.components.LettaPill
+import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -62,13 +63,12 @@ internal fun SkillsHeader(page: SkillsPageScope) {
                 }
             }
             if (page.wide) SkillsSearch(page, Modifier.width(LettaDimens.Pane.navWidth))
-            page.options.slots.refreshAction.Content(
-                onRefresh = {
-                    page.actions.onRefreshSkills()
-                    page.actions.onRefreshTools()
-                },
+            // Pointer only: touch pulls the list (SkillsPage's LettaRefreshable).
+            LettaRefreshAction(
+                refreshing = page.refreshing,
+                onRefresh = page::refresh,
                 modifier = Modifier.testTag(SkillsPageTags.REFRESH),
-            )
+            ) { onRefresh, modifier -> page.options.slots.refreshAction.Content(onRefresh, modifier) }
         }
         if (!page.wide) SkillsSearch(page, Modifier.fillMaxWidth())
         SkillsHeaderChips(page)

@@ -14,9 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsPageActions
 import com.letta.mobile.data.memory.memfs.MemfsPageState
 import com.letta.mobile.data.memory.memfs.MemfsTab
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -100,6 +102,13 @@ internal class MemfsPageScope(
             MemfsTab.Files -> state.editor != null
             MemfsTab.History -> state.history.selectedSha != null
         }
+
+    /** A reload of what is already listed (the first load shows the header's progress bar instead). */
+    val refreshing: Boolean
+        get() = when (state.tab) {
+            MemfsTab.Files -> state.load == MemfsLoad.Refreshing
+            MemfsTab.History -> state.history.loading && state.history.commits.isNotEmpty()
+        }
 }
 
 @Composable
@@ -128,12 +137,14 @@ private fun CompactMemfsLayout(page: MemfsPageScope) {
     }
 }
 
-/** The left pane: the file tree or the commit list, by tab. */
+/** The left pane: the file tree or the commit list, by tab; pulled down on touch to reload it. */
 @Composable
 private fun MemfsListPane(page: MemfsPageScope) {
-    when (page.state.tab) {
-        MemfsTab.Files -> MemfsFileList(page)
-        MemfsTab.History -> MemfsCommitList(page)
+    LettaRefreshable(refreshing = page.refreshing, onRefresh = page.actions::refresh, modifier = Modifier.fillMaxSize()) {
+        when (page.state.tab) {
+            MemfsTab.Files -> MemfsFileList(page)
+            MemfsTab.History -> MemfsCommitList(page)
+        }
     }
 }
 

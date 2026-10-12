@@ -29,6 +29,8 @@ import com.letta.mobile.data.repository.modelcontrol.ProviderManagementControlle
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementState
 import com.letta.mobile.data.repository.modelcontrol.VisibleSection
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -96,18 +98,21 @@ fun ProviderManagementPane(
         PaneToolbar(state, actions)
         val visible = state.visible
         val (connected, available) = visible.partition { it.section.isConnected }
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            if (state.sections.isEmpty() && !state.loading) {
-                item("empty") { LettaEmptyHint(if (state.error == null) "No providers reported by the host yet" else "Nothing to show") }
-            } else if (visible.isEmpty()) {
-                item("no-match") { LettaEmptyHint("No providers or models match") }
+        // The progress bar above shows the load, so the pull only asks for it.
+        LettaRefreshable(refreshing = false, onRefresh = actions.onRefresh, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (state.sections.isEmpty() && !state.loading) {
+                    item("empty") { LettaEmptyHint(if (state.error == null) "No providers reported by the host yet" else "Nothing to show") }
+                } else if (visible.isEmpty()) {
+                    item("no-match") { LettaEmptyHint("No providers or models match") }
+                }
+                providerGroup("Connected", connected, state, actions)
+                providerGroup("Available", available, state, actions)
             }
-            providerGroup("Connected", connected, state, actions)
-            providerGroup("Available", available, state, actions)
         }
     }
     state.form?.let { ProviderConnectDialog(it, busy = state.busy, actions = actions.form) }
@@ -155,11 +160,12 @@ private fun PaneToolbar(state: ProviderManagementState, actions: ProviderManagem
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            IconButton(
-                onClick = actions.onRefresh,
-                enabled = !state.loading,
+            // Pointer only: touch pulls the list.
+            LettaRefreshAction(
+                refreshing = state.loading,
+                onRefresh = actions.onRefresh,
                 modifier = Modifier.testTag(ProviderManagementTags.REFRESH),
-            ) { Icon(LettaIcons.Refresh, contentDescription = "Refresh providers and models") }
+            )
         }
     }
 }
