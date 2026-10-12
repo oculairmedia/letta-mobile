@@ -34,6 +34,7 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -108,7 +109,8 @@ class RunSummarySnapshotTest {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         ChatSurface(
-                            port = FixturePort(settled),
+                            // zxk2n.37: runs fold under their summary line; the expanded shot opens run-2.
+                            port = FixturePort(if (shot.expandTools) settled.copy(collapsedRunIds = persistentSetOf("run-2")) else settled),
                             presentation = shot.presentation,
                             onIntent = {},
                             host = ChatSurfaceHost(openCanvas = {}),

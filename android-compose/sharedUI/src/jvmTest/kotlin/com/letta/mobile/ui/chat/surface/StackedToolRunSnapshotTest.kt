@@ -35,6 +35,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -81,6 +82,8 @@ class StackedToolRunSnapshotTest {
             ).toPersistentList(),
         isLoadingMessages = false,
         isStreaming = true,
+        // zxk2n.37: a run folds under its summary line by default; this shot reviews it opened.
+        collapsedRunIds = (99..103).map { "local-run-$it" }.toPersistentSet(),
         agentName = "Meridian",
         agentId = "agent-1",
     )

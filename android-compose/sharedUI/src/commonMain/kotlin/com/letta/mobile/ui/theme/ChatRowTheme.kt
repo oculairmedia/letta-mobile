@@ -32,13 +32,9 @@ object ChatRowType {
     val summaryLine: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
 
-    /** A run header's title ("Worked for 1.2s"): legacy RunActivityDisclosure's labelMedium. */
+    /** A run's summary line ("Worked · 1.2s · 2 tools"): legacy RunActivityDisclosure's labelMedium. */
     val runHeaderTitle: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium
-
-    /** A run header's counts ("2 tools", "1 failure"): legacy RunActivityDisclosure's labelSmall. */
-    val runHeaderCount: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelSmall
 
     /** The "You" label on a prompt bubble: ChatTypography.roleLabel. */
     val roleLabel: TextStyle
@@ -92,6 +88,15 @@ object ChatRowSpacing {
     val runHeaderHorizontal: Dp = LettaDimens.Space.xs
     val runHeaderVertical: Dp = LettaDimens.Space.hair
     val settledRunBodyLift: Dp = 22.dp
+
+    /** The run summary line's status glyph (check, spinner, warning). */
+    val runGlyphSize: Dp = LettaDimens.Control.iconSm
+
+    /**
+     * letta-mobile-zxk2n.37: an expanded run's work steps (reasoning, the tool line) sit indented
+     * under its summary line, flush with the summary's label (past its inset and glyph).
+     */
+    val runStepIndent: Dp = runHeaderHorizontal + runGlyphSize + LettaDimens.Space.sm
 
     /** The thinking row's reserved height and its text's floor. */
     val thinkingRowHeight: Dp = LettaDimens.Space.xxl

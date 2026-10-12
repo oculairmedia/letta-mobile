@@ -34,7 +34,11 @@ import kotlin.test.assertTrue
  * own line above the steps, its label inset by the legacy xs, and, once a run of several steps
  * settles, the fold that collapses the run to its last step. A one-message run's header is a plain
  * label. The tool summary keeps the run's one tool chevron, ending at the run's right edge.
- */class ChatRowRunAlignmentUiTest {
+ *
+ * letta-mobile-zxk2n.37: a run with work folds by default under its one summary line; opened, its
+ * tool line sits indented under the summary's label.
+ */
+class ChatRowRunAlignmentUiTest {
     private fun call(id: String) = UiToolCall(name = "shell", arguments = "ls", result = "ok", status = "success", toolCallId = id)
 
     private val run = ChatRenderItem.RunBlock(
@@ -54,11 +58,18 @@ import kotlin.test.assertTrue
         ).map { it to GroupPosition.None },
     )
 
-    private fun ComposeUiTest.show(item: ChatRenderItem, newest: String?, details: ChatToolDetails, widthDp: Int = 400) {
+    /** [opened] runs are in the page's toggle set: the person opened them (zxk2n.37: folded by default). */
+    private fun ComposeUiTest.show(
+        item: ChatRenderItem,
+        newest: String?,
+        details: ChatToolDetails,
+        widthDp: Int = 400,
+        opened: Set<String> = setOf("run-1"),
+    ) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(widthDp.dp)) {
-                    RenderRow(item, rowContext(newestMessageId = newest, toolDetails = details))
+                    RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = opened), newestMessageId = newest, toolDetails = details))
                 }
             }
         }
@@ -89,9 +100,10 @@ import kotlin.test.assertTrue
                     assertEquals(1, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")
                     val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
                     val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
-                    // The chevron ends at the run's right edge; the line starts at the prose's gutter.
+                    val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                    // The chevron ends at the run's right edge; the step sits indented under the summary's label.
                     assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the chevron is inset: ${tools.right} vs ${block.right}")
-                    assertTrue(abs(tools.left - proseLeft()) < TOLERANCE_PX, "the tool summary is inset ($details @ $width)")
+                    assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")
                 }
             }
         }
@@ -115,12 +127,12 @@ import kotlin.test.assertTrue
         assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
     }
     @Test
-    fun anOlderRunDropsItsLabelAndKeepsItsToolSummaryFlush() = runComposeUiTest {
-        // Not the newest row (the row context carries no newest id): the settled run reads as its steps alone.
-        show(run, newest = null, details = ChatToolDetails.Inline)
-        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertDoesNotExist()
-        val tools = onNodeWithText("Ran 2 commands", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
-        assertTrue(abs(tools - proseLeft()) < TOLERANCE_PX, "the tool summary is inset: $tools vs the prose at ${proseLeft()}")
+    fun anOlderRunKeepsItsSummaryLineAndFoldsItsToolLine() = runComposeUiTest {
+        // Not the newest row: the summary line is the only way to the folded steps, so it stays.
+        show(run, newest = null, details = ChatToolDetails.Inline, opened = emptySet())
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
+        onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithText("All done here.", substring = true).assertExists()
     }
 
     private companion object {
