@@ -19,6 +19,8 @@ internal data class ApprovalSubmitParams(
     val approve: Boolean,
     val reason: String?,
     val conversationId: String? = null,
+    /** letta-mobile-bzvro.40: always-allow rule ids; only an Iroh host can apply them. */
+    val selectedSuggestionIds: List<String> = emptyList(),
 )
 
 internal data class ApprovalRequestBuildParams(
@@ -28,6 +30,7 @@ internal data class ApprovalRequestBuildParams(
     val approve: Boolean,
     val reason: String?,
     val updatedInput: JsonObject?,
+    val selectedSuggestionIds: List<String> = emptyList(),
 )
 
 internal object MessageRepositoryApproval {
@@ -46,6 +49,7 @@ internal object MessageRepositoryApproval {
                 approve = params.approve,
                 reason = effectiveReason,
                 updatedInput = decodedAnswer,
+                selectedSuggestionIds = params.selectedSuggestionIds.takeIf { params.approve }.orEmpty(),
             ),
         )
 
@@ -53,6 +57,7 @@ internal object MessageRepositoryApproval {
         if (irohApproval?.shouldUseIroh() == true) {
             irohApproval.submitApproval(params.agentId, request, params.conversationId)
         } else {
+            require(params.selectedSuggestionIds.isEmpty()) { "always-allow rules need an Iroh host" }
             params.remote.sendMessage(params.agentId, request)
         }
     }
@@ -74,6 +79,7 @@ internal object MessageRepositoryApproval {
                         approvalRequestId = params.approvalRequestId,
                         reason = params.reason,
                         updatedInput = params.updatedInput,
+                        selectedPermissionSuggestionIds = params.selectedSuggestionIds.ifEmpty { null },
                     )
                 )
             ),

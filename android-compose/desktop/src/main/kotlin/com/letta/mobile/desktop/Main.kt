@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.desktop.chat.DesktopCanvasBubbleLayoutHost
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -185,6 +186,8 @@ private fun runDesktopApplication(
                         DesktopChatFontScaleHost {
                             // Every mascot in the app looks toward the cursor; capture it once, at the root.
                             MascotCursorCapture(mascots) {
+                            // The minimised chat's mascot size, bar width and reply hold (letta-mobile-zxk2n.29).
+                            DesktopCanvasBubbleLayoutHost {
                             LettaDesktopApp(
                                 shell = DesktopAppShellBindings(
                                     nucleusApplicationScope = nucleusScope,
@@ -195,6 +198,7 @@ private fun runDesktopApplication(
                                 onActiveTitleChange = { windowTitle = it },
                                 onHeaderChromeChange = { headerChrome = it },
                             )
+                            }
                             }
                         }
                     }

@@ -569,6 +569,10 @@ class AppServerServeIrohCommand : CliktCommand(
         )
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
         subagentPublisher?.let(endpoint::attachSubagentPublisher)
+        // letta-mobile-bzvro.40: parked approvals (rules, blocked path, diffs) reach the viewers.
+        endpoint.attachPendingApprovalsPublisher(
+            com.letta.mobile.data.controller.node.iroh.PendingApprovalsPublisher(scope, admin.controller.pendingApprovals),
+        )
         agentChanges.attach(endpoint.agentChangeTarget())
         conversationChanges.attach(endpoint.conversationChangeTarget())
         println(

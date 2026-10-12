@@ -46,6 +46,15 @@ class LocalAwareActiveSubagentSource(
             initialValue = persistentListOf(),
         )
 
+    override val rosterEntries: StateFlow<List<com.letta.mobile.data.model.SubagentEntry>> =
+        combine(delegate.rosterEntries, isLocalBoundFlow) { entries, localBound ->
+            if (localBound) emptyList() else entries
+        }.stateIn(
+            scope = scope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            initialValue = emptyList(),
+        )
+
     override suspend fun todos(toolCallId: String): Result<List<SubagentTodo>> =
         delegate.todos(toolCallId)
 

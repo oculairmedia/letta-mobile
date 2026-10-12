@@ -97,6 +97,7 @@ internal fun rememberRowContexts(
         state.a2uiResolvedActionCounters,
         appearance.displayMode,
         appearance.toolDetails,
+        appearance.displayOptions,
         capabilities,
         fontScale,
     ) {
@@ -108,6 +109,7 @@ internal fun rememberRowContexts(
             capabilities = capabilities,
             fontScale = fontScale,
             toolDetails = appearance.toolDetails,
+            displayOptions = appearance.displayOptions,
         )
         TimelineRowContexts(base, streamingId?.let { base.copy(streamingMessageId = it) }, newestId)
     }

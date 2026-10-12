@@ -3,7 +3,9 @@ package com.letta.mobile.web.data
 import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -123,8 +125,12 @@ internal suspend fun connectWasmAppServerSession(
     val transport: AppServerTransport
     val label: String
     val closeTransport: suspend () -> Unit
-    if (config.serverUrl.startsWith("iroh://")) {
-        val iroh = IrohWasmAppServerTransport.connect(config.serverUrl, scope)
+    if (isIrohBackendUrl(config.serverUrl)) {
+        // letta-mobile-ckmub.8: read the address here (a ticket, a short URL or a bare id) so a bad one
+        // fails with a message that says what is expected, and the browser binding only ever gets
+        // the endpoint id it can dial (through the relay; direct UDP is not available in a browser).
+        val address = IrohServerAddress.parse(config.serverUrl)
+        val iroh = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
         transport = iroh
         label = "Iroh"
         closeTransport = iroh::close

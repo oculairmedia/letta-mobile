@@ -78,7 +78,8 @@ internal fun RunBlockRow(
     val active = isRunStreaming(messages, context)
     val activity = remember(messages, active) { projectRunActivity(messages, active) } ?: return
     val title = RunSummaryTitle(activity, visible = activity.isActive || context.isNewest)
-    val steps = remember(messages) { compactRunSteps(messages) }
+    // letta-mobile-zxk2n.5: hidden reasoning leaves the run's steps, so no empty step keeps its gap.
+    val steps = remember(messages, context.displayOptions) { compactRunSteps(context.displayOptions.visible(messages)) }
     val lead = steps.firstOrNull() as? RunStep.ToolCalls
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
         if (lead != null) {
