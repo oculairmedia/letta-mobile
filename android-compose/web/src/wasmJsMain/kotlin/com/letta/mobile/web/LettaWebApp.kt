@@ -30,9 +30,13 @@ import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
 import com.letta.mobile.ui.settings.BackendSettingsActions
-import com.letta.mobile.ui.settings.SettingsPage
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellNavDrawer
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageContent
+import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.shellSettingsPage
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.SharedMaterialTheme
 import com.letta.mobile.web.chat.WebChatCanvas
@@ -65,6 +69,8 @@ fun LettaWebApp() {
     val canvas = remember { WebChatCanvas(InMemoryCanvasDocumentStore(), savedSettings.openChatsOnCanvas) }
     val connection by gateway.state.collectAsState()
     LoadRoster(gateway, shell)
+    LaunchedEffect(Unit) { shell.openRoute(kotlinx.browser.window.location.hash.removePrefix("#")) }
+    LaunchedEffect(shell.route) { kotlinx.browser.window.location.hash = shell.route }
     val chat = rememberWebChatLoad(remember(gateway) { WebChatOpener(gateway::openChat) }, shell.selectedAgent, connection)
     val page = WebPageInputs(
         chat = chat,
@@ -155,28 +161,20 @@ private fun WebNavigation(
     )
 }
 
-/** The page beside the navigation. [onShowAgents] opens the navigation where it is hidden (narrow windows). */
+/**
+ * The shared ShellPage beside the navigation; [onShowAgents] opens the navigation where it is hidden.
+ * Home and a conversation that has not opened fall back to the connection notice (until the web binds Home).
+ */
 @Composable
 private fun WebPage(shell: WebShellState, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
-    val chat = page.chat
-    when {
-        shell.destination == WebDestination.SETTINGS -> SettingsPage(
-            state = SettingsPageState(shell.config, page.connection),
-            actions = page.settings,
-            modifier = modifier,
-            onBack = { shell.destination = WebDestination.CHAT },
-        )
-        shell.destination == WebDestination.CHAT && chat is WebChatLoad.Ready -> WebSharedChatPage(
-            port = chat.port,
-            canvas = page.canvas,
-            navigation = WebChatPageNavigation(
-                openAgentPane = onShowAgents ?: {},
-                agentNamesById = shell.agents.associate { it.id to it.name },
-            ),
-            modifier = modifier,
-        )
-        else -> WebWaitingPage(shell, page, onShowAgents, modifier)
-    }
+    val ready = page.chat as? WebChatLoad.Ready
+    val navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.agents.associate { it.id to it.name })
+    val deps = ShellPageDeps(
+        chat = ready?.let { ShellPageContent { _, m -> WebSharedChatPage(it.port, page.canvas, navigation, m) } },
+        settings = shellSettingsPage(SettingsPageState(shell.config, page.connection), page.settings, onBack = shell::closeSettings),
+        fallback = ShellPageContent { _, m -> WebWaitingPage(shell, page, onShowAgents, m) },
+    )
+    ShellPage(destination = shell.destination, deps = deps, modifier = modifier)
 }
 
 /** Home, or a conversation that has not opened: the connection, what to do next, and the way on. */
@@ -184,14 +182,14 @@ private fun WebPage(shell: WebShellState, page: WebPageInputs, onShowAgents: (()
 private fun WebWaitingPage(shell: WebShellState, page: WebPageInputs, onShowAgents: (() -> Unit)?, modifier: Modifier) {
     val chat = page.chat
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (shell.destination == WebDestination.CHAT && chat == WebChatLoad.Opening) {
+        if (shell.destination is ShellDestination.Chat && chat == WebChatLoad.Opening) {
             CircularProgressIndicator()
         } else {
             BackendConnectionNotice(
                 status = page.connection,
                 error = (chat as? WebChatLoad.Failed)?.message ?: (page.connection as? BackendConnectionStatus.Failed)?.message,
                 actions = BackendConnectionNoticeActions(
-                    onOpenSettings = { shell.destination = WebDestination.SETTINGS },
+                    onOpenSettings = { shell.destination = ShellDestination.Settings() },
                     onShowAgents = onShowAgents,
                     onRetry = shell::retry.takeIf { page.connection is BackendConnectionStatus.Failed },
                 ),

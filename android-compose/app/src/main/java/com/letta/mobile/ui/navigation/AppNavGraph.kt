@@ -36,7 +36,8 @@ import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.chatGraph
 import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
 import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
-import com.letta.mobile.feature.editagent.EditAgentRoute
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -102,15 +103,16 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 }
             }
         },
-        onNavigateToSettings = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+        // letta-mobile-ckmub.3.4: shared destinations go through their Android route mapping.
+        onNavigateToSettings = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
         onNavigateToArchival = { agentId -> navController.navigate(ArchivalRoute(agentId)) },
-        onNavigateToTools = { navController.navigate(AllToolsRoute) },
-        onNavigateToMemory = { agentId -> navController.navigate(MemoryRoute(agentId)) },
-        onNavigateToAdmin = { navController.navigate(AdminRoute) },
-        onNavigateToProviders = { navController.navigate(ProvidersRoute) },
-        onNavigateToSchedules = { agentId -> navController.navigate(SchedulesRoute(agentId)) },
+        onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
+        onNavigateToMemory = { agentId -> navController.navigateTo(ShellDestination.Memory(agentId)) },
+        onNavigateToAdmin = { navController.navigateTo(ShellDestination.Home) },
+        onNavigateToProviders = { navController.navigateTo(ShellDestination.Providers) },
+        onNavigateToSchedules = { agentId -> navController.navigateTo(ShellDestination.Schedules(agentId)) },
         onNavigateToProjects = { navController.navigate(HomeRoute) },
-        onNavigateToConversationList = { navController.navigate(ConversationsRoute) },
+        onNavigateToConversationList = { navController.navigateTo(ShellDestination.Chat()) },
         onSwitchConversation = { route ->
             navController.navigate(route) {
                 popUpTo<AgentChatRoute> { inclusive = true }
@@ -121,10 +123,10 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
             )
         },
-        onNavigateToAppSettings = { navController.navigate(ConfigRoute()) },
-        onOpenCanvas = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
-        onNavigateToChannels = { navController.navigate(ChannelsRoute) },
-        onNavigateToSkills = { agentId -> navController.navigate(SkillsRoute(agentId)) },
+        onNavigateToAppSettings = { navController.navigateTo(ShellDestination.Settings()) },
+        onOpenCanvas = { canvasId -> navController.navigateTo(ShellDestination.Canvas(canvasId = canvasId)) },
+        onNavigateToChannels = { navController.navigateTo(ShellDestination.Channels) },
+        onNavigateToSkills = { agentId -> navController.navigateTo(ShellDestination.Skills(agentId)) },
     )
 }
 

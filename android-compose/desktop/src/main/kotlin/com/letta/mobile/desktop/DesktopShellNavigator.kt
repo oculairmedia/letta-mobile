@@ -14,6 +14,9 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellSettingsSection
+import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.data.home.preferredComposerConversationId
@@ -56,11 +59,41 @@ internal class DesktopShellNavigator(
     /** Work | Play presentation lens over the same agents/memory/conversations. */
     var workPlayMode: WorkPlayMode by mutableStateOf(WorkPlayMode.Work)
 
+    /** Where the Skills page opens: its Tools anchor when a tool link led there (zxk2n.32). */
+    var skillsSection: ShellSkillsSection by mutableStateOf(ShellSkillsSection.Skills)
+
+    /** The Settings anchor, set when a pairing link opened Settings. */
+    var settingsSection: ShellSettingsSection? by mutableStateOf<ShellSettingsSection?>(null)
+
     /** Leaves any agent editor, then shows [destination]. */
     fun navigate(destination: DesktopDestination) {
         editAgentId = null
+        skillsSection = ShellSkillsSection.Skills
+        settingsSection = null
         selectedDestination = destination
     }
+
+    /**
+     * letta-mobile-ckmub.3.4: shows a shared [destination] - the desktop route it maps to. Selecting
+     * the conversation or agent it names stays with [DesktopShellRouter] (deep links buffer it).
+     */
+    fun navigate(destination: ShellDestination) {
+        val route = destination.toDesktopRoute()
+        navigate(route.destination)
+        skillsSection = route.skillsSection
+        settingsSection = route.settingsSection
+        editAgentId = route.editAgentId
+    }
+
+    /** The desktop route on screen, refined by the chat's selection and the focused agent. */
+    fun currentRoute(selectedConversationId: String?, focusedAgentId: String?): DesktopShellRoute = DesktopShellRoute(
+        destination = selectedDestination,
+        agentId = focusedAgentId,
+        conversationId = selectedConversationId,
+        editAgentId = editAgentId,
+        skillsSection = skillsSection,
+        settingsSection = settingsSection,
+    )
 
     /** The editor saved [identity] for the agent it had open: show it at once, and close the editor. */
     fun recordSavedIdentity(identity: MascotIdentity) {
