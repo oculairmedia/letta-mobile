@@ -38,8 +38,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(
-    onNavigateBack: () -> Unit,
-    onNavigateToToolDetail: (String) -> Unit = {},
+    navigation: SkillsScreenNavigation,
     initialSection: SkillsPageSection = SkillsPageSection.Skills,
     skillsViewModel: SkillsViewModel = hiltViewModel(),
     toolsViewModel: AllToolsViewModel = hiltViewModel(),
@@ -47,18 +46,8 @@ fun SkillsScreen(
     val catalog by skillsViewModel.state.collectAsStateWithLifecycle()
     val tools by toolsViewModel.toolState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
-    val actions = remember(skillsViewModel, toolsViewModel, onNavigateToToolDetail) {
-        SkillsPageActions(
-            onRefreshSkills = skillsViewModel::refresh,
-            onInstallSkill = skillsViewModel::install,
-            onUninstallSkill = skillsViewModel::uninstall,
-            onRefreshTools = toolsViewModel::loadTools,
-            onToolTagToggled = toolsViewModel::toggleTag,
-            onClearToolTags = toolsViewModel::clearTags,
-            onLoadMoreTools = toolsViewModel::loadMoreTools,
-            onToolClick = { tool -> onNavigateToToolDetail(tool.id.value) },
-            onAddTool = { showCreateDialog = true },
-        )
+    val actions = remember(skillsViewModel, toolsViewModel, navigation) {
+        skillsPageActions(skillsViewModel, toolsViewModel, navigation) { showCreateDialog = true }
     }
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
@@ -66,7 +55,7 @@ fun SkillsScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_skills_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = navigation.onNavigateBack) {
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
@@ -91,6 +80,29 @@ fun SkillsScreen(
         )
     }
 }
+
+/** Where the Skills screen leaves to: back, and a tool's detail page. */
+data class SkillsScreenNavigation(
+    val onNavigateBack: () -> Unit,
+    val onNavigateToToolDetail: (toolId: String) -> Unit = {},
+)
+
+private fun skillsPageActions(
+    skills: SkillsViewModel,
+    tools: AllToolsViewModel,
+    navigation: SkillsScreenNavigation,
+    onAddTool: () -> Unit,
+): SkillsPageActions = SkillsPageActions(
+    onRefreshSkills = skills::refresh,
+    onInstallSkill = skills::install,
+    onUninstallSkill = skills::uninstall,
+    onRefreshTools = tools::loadTools,
+    onToolTagToggled = tools::toggleTag,
+    onClearToolTags = tools::clearTags,
+    onLoadMoreTools = tools::loadMoreTools,
+    onToolClick = { tool -> navigation.onNavigateToToolDetail(tool.id.value) },
+    onAddTool = onAddTool,
+)
 
 internal fun skillsPageState(catalog: SkillsCatalogState, tools: ToolLibraryState): SkillsPageState = SkillsPageState(
     skills = catalog.skills,

@@ -139,6 +139,13 @@ class SkillsPageTest {
         assertEquals(true, SkillsPageRows.indexOf(rows, SkillsPageSection.Tools) > 0)
     }
 
+    @Test
+    fun pagingStaysOfferedWhileSearching() {
+        val paged = state().copy(tools = state().tools.copy(hasMorePages = true))
+        val rows = SkillsPageRows.build(paged, SkillsPageQuery(query = "nothing loaded matches"), columns = 1)
+        assertEquals(true, rows.any { it is SkillsPageRow.LoadMoreTools })
+    }
+
     private companion object {
         val WIDE = 1000.dp
         val COMPACT = 400.dp

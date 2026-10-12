@@ -5,6 +5,7 @@ import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillCategories
 import com.letta.mobile.data.skills.SkillsPageFilter
 import com.letta.mobile.data.tools.ToolLibraryFilter
+import com.letta.mobile.data.tools.ToolLibraryState
 
 /**
  * One row of the Skills page's list. Keys are prefixed per section, so a "Developer" group under
@@ -73,20 +74,27 @@ internal object SkillsPageRows {
         val library = state.tools
         val tools = visibleTools(state, filter)
         add(SkillsPageRow.SectionHeader(SkillsPageSection.Tools, tools.size))
+        addAll(toolsNotices(library))
+        addAll(toolsBody(library, tools, filter, columns))
+        // The search runs over the loaded pages, so paging stays offered while searching: a match
+        // may sit on a page not fetched yet.
+        if (library.canLoadMore()) add(SkillsPageRow.LoadMoreTools(library.isLoadingMore))
+    }
+
+    private fun ToolLibraryState.canLoadMore(): Boolean = hasMorePages && tools.isNotEmpty()
+
+    /** The error, the tag filter and the MCP handshake notice, above the tools. */
+    private fun toolsNotices(library: ToolLibraryState): List<SkillsPageRow> = buildList {
         library.errorMessage?.let { add(SkillsPageRow.Info("tools-error", "Couldn't load tools: $it")) }
         if (library.allTags.isNotEmpty()) add(SkillsPageRow.ToolTags(library.allTags, library.selectedTags))
         if (library.isLoadingMcpTools) add(SkillsPageRow.Info("tools-mcp-loading", "Loading MCP server tools…"))
-        when {
-            library.isLoading && library.tools.isEmpty() -> add(SkillsPageRow.Info("tools-loading", "Loading tools from the active backend."))
-            tools.isEmpty() -> add(SkillsPageRow.Info("tools-empty", emptyToolsMessage(filter)))
-            else -> SkillCategories.grouped(tools, nameOf = { it.name }, tagsOf = { it.tags }).forEach { (category, inGroup) ->
-                add(SkillsPageRow.Group(SkillsPageSection.Tools, category.label))
-                inGroup.chunked(columns).forEach { add(SkillsPageRow.ToolCards(it)) }
-            }
-        }
-        // Paging only while no search narrows the list: otherwise it fetches unrelated pages.
-        if (library.hasMorePages && library.tools.isNotEmpty() && filter.query.isBlank()) {
-            add(SkillsPageRow.LoadMoreTools(library.isLoadingMore))
+    }
+
+    private fun toolsBody(library: ToolLibraryState, tools: List<Tool>, filter: SkillsPageQuery, columns: Int): List<SkillsPageRow> = when {
+        library.isLoading && library.tools.isEmpty() -> listOf(SkillsPageRow.Info("tools-loading", "Loading tools from the active backend."))
+        tools.isEmpty() -> listOf(SkillsPageRow.Info("tools-empty", emptyToolsMessage(filter)))
+        else -> SkillCategories.grouped(tools, nameOf = { it.name }, tagsOf = { it.tags }).flatMap { (category, inGroup) ->
+            listOf(SkillsPageRow.Group(SkillsPageSection.Tools, category.label)) + inGroup.chunked(columns).map { SkillsPageRow.ToolCards(it) }
         }
     }
 

@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -73,6 +74,8 @@ class AllToolsViewModel @Inject constructor(
             try {
                 toolRepository.upsertTool(ToolCreateParams(sourceCode = sourceCode))
                 controller.loadTools()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 controller.showError(mapErrorToUserMessage(e, "Failed to create tool"))
             }
