@@ -27,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import com.letta.mobile.desktop.components.DesktopChipTab
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.ScheduleRun
@@ -50,6 +49,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.ui.schedules.AgendaView
 import com.letta.mobile.ui.schedules.AgendaViewParams
 import com.letta.mobile.ui.schedules.HistoryView
+import com.letta.mobile.ui.schedules.ScheduleRail
+import com.letta.mobile.ui.schedules.ScheduleRailParams
+import com.letta.mobile.ui.schedules.ScheduleRailState
 import com.letta.mobile.ui.schedules.TimelineView
 import com.letta.mobile.ui.schedules.TimelineViewParams
 import com.letta.mobile.ui.schedules.WeekView
@@ -63,15 +65,7 @@ internal enum class ScheduleView(val label: String) {
     History("History"),
 }
 
-internal sealed interface RailState {
-    data object Overview : RailState
-    data class Detail(val scheduleId: String) : RailState
-    data class Run(val run: ScheduleRun) : RailState
-}
-
-internal val RAIL_WIDTH = 372.dp
 internal const val NOW_TICK_MILLIS = 30_000L
-
 /**
  * Phase-7 Schedules surface, rebuilt to the Penpot mockups: a Week / Agenda /
  * Timeline / History tab switcher with a persistent right rail (OVERVIEW stats
@@ -143,13 +137,13 @@ fun DesktopScheduleSurface(
     val historySummary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
 
     var view by remember { mutableStateOf(ScheduleView.Week) }
-    var rail by remember { mutableStateOf<RailState>(RailState.Overview) }
+    var rail by remember { mutableStateOf<ScheduleRailState>(ScheduleRailState.Overview) }
     var selectedDate by remember(today) { mutableStateOf(today) }
     var weekStart by remember(today) { mutableStateOf(ScheduleProjection.mondayOf(today)) }
     var showCreate by remember { mutableStateOf(false) }
 
     val weekRange = remember(weekStart) { formatWeekRange(weekStart) }
-    val selectedId = (rail as? RailState.Detail)?.scheduleId
+    val selectedId = (rail as? ScheduleRailState.Detail)?.scheduleId
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize()) {
@@ -180,15 +174,15 @@ fun DesktopScheduleSurface(
                             canCreate = canCreate,
                             onRefresh = onRefresh,
                             onSelectDate = { selectedDate = it },
-                            onSelectRun = { rail = RailState.Run(it) },
-                            onSelectLane = { rail = RailState.Detail(it) },
+                            onSelectRun = { rail = ScheduleRailState.Run(it) },
+                            onSelectLane = { rail = ScheduleRailState.Detail(it) },
                         ),
                     )
                 }
                 // Week/Agenda always show the rail (Overview or detail). Timeline
                 // and History are full-width like the mockups, unless a schedule
                 // is selected (then the detail panel appears).
-                val showRail = rail !is RailState.Overview || view == ScheduleView.Week || view == ScheduleView.Agenda
+                val showRail = rail !is ScheduleRailState.Overview || view == ScheduleView.Week || view == ScheduleView.Agenda
                 if (showRail) {
                     ScheduleRail(
                         ScheduleRailParams(
@@ -198,9 +192,9 @@ fun DesktopScheduleSurface(
                             history = historySummary,
                             now = now,
                             zone = zone,
-                            onSelectSchedule = { rail = RailState.Detail(it) },
-                            onBackToOverview = { rail = RailState.Overview },
-                            onDelete = { onDeleteCron(it); rail = RailState.Overview },
+                            onSelectSchedule = { rail = ScheduleRailState.Detail(it) },
+                            onBackToOverview = { rail = ScheduleRailState.Overview },
+                            onDelete = { onDeleteCron(it); rail = ScheduleRailState.Overview },
                             onTogglePause = onTogglePauseCron,
                         ),
                     )

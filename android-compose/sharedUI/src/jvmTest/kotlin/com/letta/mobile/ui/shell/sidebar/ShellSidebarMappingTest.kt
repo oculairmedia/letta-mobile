@@ -23,6 +23,36 @@ class ShellSidebarMappingTest {
         assertEquals("now", ShellRelativeTime.compact(now + 5.minutes, now))
     }
 
+    /** letta-mobile-ckmub.3.10: a host's sidebar input becomes the panel it draws (the desktop's binding). */
+    @Test
+    fun panelStateMarksTheOpenChatTheActiveCanvasAndForks() {
+        val chats = listOf(
+            ChatConversationSummary(id = "c1", title = "Shipping notes", agentName = "", updatedAtLabel = "2026-10-07T11:00:00Z", lastMessagePreview = "Loaded from backend"),
+            ChatConversationSummary(id = "c2", title = "Fork", agentName = "", updatedAtLabel = "", lastMessagePreview = "hi"),
+        )
+        val state = ShellSidebarMapping.panelState(
+            ShellSidebarInput(
+                agent = ShellPanelAgent(name = "Meridian"),
+                home = true,
+                conversations = chats,
+                marks = ShellConversationMarks(selectedId = "c1", thinkingId = "c1", parentIds = mapOf("c2" to "c1")),
+                canvases = listOf(
+                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.canvas.CanvasId("a"), title = "Roadmap"),
+                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.canvas.CanvasId("b"), title = "Old"),
+                ),
+                activeCanvasId = com.letta.mobile.data.canvas.CanvasId("a"),
+                archivedCanvasIds = setOf(com.letta.mobile.data.canvas.CanvasId("b")),
+            ),
+            now,
+        )
+        val (open, fork) = state.conversations
+        assertEquals(true, state.home)
+        assertEquals(listOf(true, true, "", "1h"), listOf(open.selected, open.thinking, open.preview, open.timeLabel))
+        assertEquals("Forked from Shipping notes", fork.subtitle)
+        assertEquals(listOf(true, false), state.canvases.map { it.selected })
+        assertEquals(listOf(false, true), state.canvases.map { it.archived })
+    }
+
     @Test
     fun relativeTimeParsesIsoAndPassesOtherTextThrough() {
         assertEquals("1h", ShellRelativeTime.compact("2026-10-07T11:00:00Z", now))

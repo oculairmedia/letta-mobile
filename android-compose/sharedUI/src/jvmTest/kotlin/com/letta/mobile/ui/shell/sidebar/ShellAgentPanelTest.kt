@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasId
@@ -131,6 +132,53 @@ class ShellAgentPanelTest {
         onNodeWithText("Handoff from local-code").performMouseInput { moveTo(center) }
         onNodeWithContentDescription("Archive chat").performClick()
         assertEquals(listOf("c1" to true), toggled)
+    }
+
+    /** Canvases are archived like conversations: hover the icon to set one aside or bring it back. */
+    @Test
+    fun hoveringACanvasOffersArchiveOrRestore() = runComposeUiTest {
+        val toggled = mutableListOf<Pair<CanvasId, Boolean>>()
+        val canvases = state.copy(
+            canvases = listOf(
+                ShellCanvasRowModel(id = CanvasId("a"), title = "Roadmap", timeLabel = "1h"),
+                ShellCanvasRowModel(id = CanvasId("b"), title = "Old board", timeLabel = "2w", archived = true),
+            ),
+        )
+        setContent { Panel(canvases, ShellAgentPanelActions(onArchiveCanvas = { id, archived -> toggled += id to archived })) }
+        onNodeWithText("Roadmap").performMouseInput { moveTo(center) }
+        onNodeWithContentDescription("Archive canvas").performClick()
+        onNodeWithText("Old board").performMouseInput { moveTo(center) }
+        onNodeWithContentDescription("Restore canvas").performClick()
+        assertEquals(listOf(CanvasId("a") to true, CanvasId("b") to false), toggled)
+    }
+
+    /** letta-mobile-ckmub.3.10: the chats and canvases are one roster, walked from the keyboard. */
+    @Test
+    fun theKeyboardWalksChatsThenCanvasesAndF2RenamesAChat() = runComposeUiTest {
+        val events = mutableListOf<String>()
+        setContent {
+            Panel(
+                state,
+                ShellAgentPanelActions(
+                    onConversationSelected = { events += "open:$it" },
+                    onOpenCanvas = { events += "canvas:${it.value}" },
+                    onRenameConversation = { id, title -> events += "rename:$id:$title" },
+                ),
+            )
+        }
+        val library = onNodeWithTag(ShellAgentPanelTags.LIBRARY)
+        library.requestFocus()
+        library.performKeyInput {
+            pressKey(Key.DirectionDown)
+            pressKey(Key.Enter)
+            pressKey(Key.DirectionDown)
+            pressKey(Key.Enter)
+            pressKey(Key.DirectionUp)
+            pressKey(Key.F2)
+        }
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performTextReplacement("Lisbon")
+        onNodeWithTag(ShellConversationTags.RENAME_FIELD).performKeyInput { pressKey(Key.Enter) }
+        runOnIdle { assertEquals(listOf("open:c1", "canvas:k1", "rename:c1:Lisbon"), events) }
     }
 
     @Test

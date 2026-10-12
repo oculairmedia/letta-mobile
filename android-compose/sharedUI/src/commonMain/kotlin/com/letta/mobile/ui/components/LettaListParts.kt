@@ -55,9 +55,15 @@ data class LettaListRowSpec(
     val trailing: String? = null,
     val selected: Boolean = false,
     val subtitle: String? = null,
+    /** The title reads semibold (the open conversation). */
+    val emphasized: Boolean = false,
+    /** The title reads muted (a settled or deleting conversation). */
+    val quiet: Boolean = false,
+    /** A disabled row draws but takes no click (a conversation being deleted). */
+    val enabled: Boolean = true,
 )
 
-/** A compact selectable row rendering a [LettaListRowSpec]. */
+/** A compact selectable row rendering a [LettaListRowSpec]; every roster row is one (see RosterList). */
 @Composable
 fun LettaListRow(
     spec: LettaListRowSpec,
@@ -68,14 +74,14 @@ fun LettaListRow(
     /** Drawn after the trailing label: a check, a checkbox, a drill-in chevron. */
     end: (@Composable () -> Unit)? = null,
 ) {
-    val (title, icon, trailing, selected) = spec
+    val (_, icon, trailing, selected) = spec
     val background = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(enabled = spec.enabled, onClick = onClick)
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
@@ -90,7 +96,7 @@ fun LettaListRow(
                 modifier = Modifier.size(LettaDimens.Control.icon),
             )
         }
-        RowTitle(title, spec.subtitle, Modifier.weight(1f))
+        RowTitle(spec, Modifier.weight(1f))
         if (trailing != null) {
             Text(
                 text = trailing,
@@ -104,12 +110,14 @@ fun LettaListRow(
 }
 
 @Composable
-private fun RowTitle(title: String, subtitle: String?, modifier: Modifier) {
+private fun RowTitle(spec: LettaListRowSpec, modifier: Modifier) {
+    val subtitle = spec.subtitle
     Column(modifier) {
         Text(
-            text = title,
+            text = spec.title,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (spec.emphasized) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (spec.quiet) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
