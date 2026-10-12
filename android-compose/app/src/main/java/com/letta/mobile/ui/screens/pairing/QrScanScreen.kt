@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.pairing.CameraAccess
+import com.letta.mobile.ui.pairing.PairingScan
 import com.letta.mobile.ui.pairing.PairingScanScreen
 import com.letta.mobile.ui.pairing.ScanCamera
 import com.letta.mobile.ui.pairing.TorchControl
@@ -52,10 +53,9 @@ fun QrScanScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     // A link opened from outside the app (deep link) is consumed once, from memory, and stops at the trust prompt.
     LaunchedEffect(Unit) { PendingPairLink.take()?.let(viewModel::submit) }
+    val actions = remember(viewModel) { viewModel.actions(onOpenChat = onPaired) }
     PairingScanScreen(
-        state = state,
-        camera = rememberAndroidScanCamera(),
-        actions = remember(viewModel) { viewModel.actions(onOpenChat = onPaired) },
+        scan = PairingScan(state, rememberAndroidScanCamera(), actions),
         clock = System::currentTimeMillis,
         onNavigateBack = onNavigateBack,
     )

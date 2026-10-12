@@ -84,9 +84,7 @@ class ScanCamera(
  */
 @Composable
 fun PairingScanScreen(
-    state: PairingState,
-    camera: ScanCamera,
-    actions: PairingScanActions,
+    scan: PairingScan,
     clock: () -> Long,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -101,14 +99,15 @@ fun PairingScanScreen(
         },
     ) { padding ->
         PairingScanContent(
-            state = state,
-            camera = camera,
-            actions = actions,
-            nowMs = rememberTickingNow(clock, active = state is PairingState.ConfirmHost),
+            scan = scan,
+            nowMs = rememberTickingNow(clock, active = scan.state is PairingState.ConfirmHost),
             modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()),
         )
     }
 }
+
+/** One scanner render: where the flow stands, the platform camera, and what the user can do. */
+class PairingScan(val state: PairingState, val camera: ScanCamera, val actions: PairingScanActions)
 
 /**
  * The scanner body, shared by every platform: viewfinder (corner brackets,
@@ -119,12 +118,13 @@ fun PairingScanScreen(
  */
 @Composable
 fun PairingScanContent(
-    state: PairingState,
-    camera: ScanCamera,
-    actions: PairingScanActions,
+    scan: PairingScan,
     nowMs: Long,
     modifier: Modifier = Modifier,
 ) {
+    val state = scan.state
+    val camera = scan.camera
+    val actions = scan.actions
     var pasting by remember { mutableStateOf(false) }
     val pasteOnly = camera.access == CameraAccess.UNAVAILABLE
     Column(
@@ -148,20 +148,9 @@ private fun PairingState.acceptsInput() = this is PairingState.Idle || this is P
 private fun CameraSection(camera: ScanCamera, onDecoded: (String) -> Unit, onPaste: () -> Unit) {
     when (camera.access) {
         CameraAccess.GRANTED -> Viewfinder(camera, onDecoded)
-        CameraAccess.DENIED -> CameraNotice(
-            tag = PairingTags.CAMERA_DENIED,
-            title = PairingStrings.CAMERA_DENIED_TITLE,
-            body = PairingStrings.CAMERA_DENIED_BODY,
-            actionLabel = PairingStrings.OPEN_SETTINGS,
-            actionTag = PairingTags.OPEN_SETTINGS,
-            onAction = camera.onOpenSettings,
-        )
+        CameraAccess.DENIED -> CameraNotice(CameraNoticeSpec.DENIED, onAction = camera.onOpenSettings)
         CameraAccess.NEEDS_RATIONALE, CameraAccess.REQUESTING -> CameraNotice(
-            tag = PairingTags.CAMERA_RATIONALE,
-            title = PairingStrings.CAMERA_RATIONALE_TITLE,
-            body = PairingStrings.CAMERA_RATIONALE_BODY,
-            actionLabel = PairingStrings.CAMERA_ALLOW,
-            actionTag = PairingTags.CAMERA_ALLOW,
+            CameraNoticeSpec.RATIONALE,
             onAction = camera.onRequestAccess,
             actionEnabled = camera.access == CameraAccess.NEEDS_RATIONALE,
         )
@@ -224,26 +213,42 @@ private fun ScanBrackets(modifier: Modifier) {
     }
 }
 
-@Composable
-private fun CameraNotice(
-    tag: String,
-    title: String,
-    body: String,
-    actionLabel: String,
-    actionTag: String,
-    onAction: () -> Unit,
-    actionEnabled: Boolean = true,
+/** The two camera notices: why the camera is needed (before the OS prompt), and that it is off. */
+private enum class CameraNoticeSpec(
+    val tag: String,
+    val title: String,
+    val body: String,
+    val actionLabel: String,
+    val actionTag: String,
 ) {
-    Surface(shape = MaterialTheme.shapes.large, tonalElevation = LettaDimens.Space.hair, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+    RATIONALE(
+        PairingTags.CAMERA_RATIONALE,
+        PairingStrings.CAMERA_RATIONALE_TITLE,
+        PairingStrings.CAMERA_RATIONALE_BODY,
+        PairingStrings.CAMERA_ALLOW,
+        PairingTags.CAMERA_ALLOW,
+    ),
+    DENIED(
+        PairingTags.CAMERA_DENIED,
+        PairingStrings.CAMERA_DENIED_TITLE,
+        PairingStrings.CAMERA_DENIED_BODY,
+        PairingStrings.OPEN_SETTINGS,
+        PairingTags.OPEN_SETTINGS,
+    ),
+}
+
+@Composable
+private fun CameraNotice(spec: CameraNoticeSpec, onAction: () -> Unit, actionEnabled: Boolean = true) {
+    Surface(shape = MaterialTheme.shapes.large, tonalElevation = LettaDimens.Space.hair, modifier = Modifier.fillMaxWidth().testTag(spec.tag)) {
         Column(
             modifier = Modifier.padding(LettaDimens.Space.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Icon(LettaIcons.Camera, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-            Text(body, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onAction, enabled = actionEnabled, modifier = Modifier.testTag(actionTag)) { Text(actionLabel) }
+            Text(spec.title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+            Text(spec.body, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onAction, enabled = actionEnabled, modifier = Modifier.testTag(spec.actionTag)) { Text(spec.actionLabel) }
         }
     }
 }

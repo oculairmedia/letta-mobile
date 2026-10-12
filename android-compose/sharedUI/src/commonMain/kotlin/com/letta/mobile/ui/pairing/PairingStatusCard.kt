@@ -31,7 +31,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import com.letta.mobile.data.pairing.HostIds
 import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
@@ -92,8 +91,8 @@ private fun TrustPrompt(state: PairingState.ConfirmHost, actions: PairingScanAct
         modifier = Modifier.testTag(PairingTags.TRUST_PROMPT),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        Text(PairingStrings.trustTitle(state.hostShortId), style = MaterialTheme.typography.titleMedium)
-        Text(PairingStrings.trustHostLine(state.hostShortId), style = MaterialTheme.typography.bodyMedium)
+        Text(PairingStrings.trustTitle(state), style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.trustHostLine(state), style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.TRUST_ACCESS, style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.trustExpiresLine(state.expiresAtMs - nowMs), style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.TRUST_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -132,7 +131,7 @@ private fun VerifyingContent(onCancel: () -> Unit) {
 @Composable
 private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
     Icon(LettaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-    Text(PairingStrings.pairedTitle(HostIds.short(state.host.nodeId)), style = MaterialTheme.typography.titleMedium)
+    Text(PairingStrings.pairedTitle(state), style = MaterialTheme.typography.titleMedium)
     Text(
         text = if (state.alreadyPaired) PairingStrings.ALREADY_PAIRED_BODY else PairingStrings.PAIRED_BODY,
         textAlign = TextAlign.Center,
@@ -140,7 +139,7 @@ private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
     )
     if (state.deviceName.isNotBlank()) {
         Text(
-            PairingStrings.pairedDeviceLine(state.deviceName),
+            PairingStrings.pairedDeviceLine(state),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

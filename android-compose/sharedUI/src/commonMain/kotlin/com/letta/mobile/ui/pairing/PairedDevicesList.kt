@@ -42,9 +42,9 @@ fun PairedDevicesList(
     actions: PairDeviceActions,
     nowMs: Long,
     modifier: Modifier = Modifier,
-    /** The invite already on the card above; not repeated under Pending. */
-    onScreenInviteId: String? = null,
 ) {
+    // The invite already on the card above is not repeated under Pending.
+    val onScreenInviteId = state.invite?.inviteId
     val groups = state.groups
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
         Text(PairingStrings.DEVICES_TITLE, style = MaterialTheme.typography.titleMedium)
@@ -83,10 +83,10 @@ private fun GroupLabel(text: String) {
 private fun DeviceRow(device: PairedDevice, statusLine: String, modifier: Modifier = Modifier, trailing: @Composable () -> Unit = {}) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth().testTag(PairingTags.deviceRow(device.nodeId))) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-            Text(device.name.ifBlank { device.nodeId.take(FINGERPRINT_CHARS) })
+            Text(device.displayName)
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
                 ScopeChip(PairingStrings.access(device.access))
-                ScopeChip(PairingStrings.agentScope(device.agentIds))
+                ScopeChip(PairingStrings.agentScope(device))
             }
             Text(statusLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -112,8 +112,7 @@ private fun ScopeChip(text: String) {
 @Composable
 private fun RevocableDeviceRow(device: PairedDevice, revoking: Boolean, nowMs: Long, onRevoke: (String) -> Unit) {
     var confirming by remember(device.nodeId) { mutableStateOf(false) }
-    val name = device.name.ifBlank { device.nodeId.take(FINGERPRINT_CHARS) }
-    DeviceRow(device, statusLine = PairingStrings.lastActive(device.lastSeenAtMs, nowMs)) {
+    DeviceRow(device, statusLine = PairingStrings.lastActive(device, nowMs)) {
         when {
             revoking -> Text(PairingStrings.REVOKING, modifier = Modifier.testTag(PairingTags.revoking(device.nodeId)))
             !confirming -> TextButton(onClick = { confirming = true }, modifier = Modifier.testTag(PairingTags.revokeDevice(device.nodeId))) {
@@ -123,9 +122,7 @@ private fun RevocableDeviceRow(device: PairedDevice, revoking: Boolean, nowMs: L
     }
     if (confirming && !revoking) {
         DestructiveConfirm(
-            message = PairingStrings.revokeConfirm(name),
-            confirmLabel = PairingStrings.REVOKE_ACCESS,
-            confirmTag = PairingTags.revokeConfirm(device.nodeId),
+            ConfirmSpec(PairingStrings.revokeConfirm(device), PairingStrings.REVOKE_ACCESS, PairingTags.revokeConfirm(device.nodeId)),
             onConfirm = { confirming = false; onRevoke(device.nodeId) },
             onCancel = { confirming = false },
         )
@@ -142,27 +139,28 @@ private fun RevokeAllOthers(onRevokeAll: () -> Unit) {
         return
     }
     DestructiveConfirm(
-        message = PairingStrings.REVOKE_ALL_OTHERS_BODY,
-        confirmLabel = PairingStrings.REVOKE_ALL_OTHERS,
-        confirmTag = PairingTags.REVOKE_ALL_CONFIRM,
+        ConfirmSpec(PairingStrings.REVOKE_ALL_OTHERS_BODY, PairingStrings.REVOKE_ALL_OTHERS, PairingTags.REVOKE_ALL_CONFIRM),
         onConfirm = { confirming = false; onRevokeAll() },
         onCancel = { confirming = false },
     )
 }
 
+/** What a destructive confirmation says, its button label, and the tag tests press it by. */
+private class ConfirmSpec(val message: String, val confirmLabel: String, val confirmTag: String)
+
 /** Inline confirmation: Cancel first (the safe default), the destructive action spelled out. */
 @Composable
-private fun DestructiveConfirm(message: String, confirmLabel: String, confirmTag: String, onConfirm: () -> Unit, onCancel: () -> Unit) {
+private fun DestructiveConfirm(spec: ConfirmSpec, onConfirm: () -> Unit, onCancel: () -> Unit) {
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = LettaDimens.Space.hair, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-            Text(message)
+            Text(spec.message)
             Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.align(Alignment.End)) {
                 TextButton(onClick = onCancel) { Text(PairingStrings.CANCEL) }
                 Button(
                     onClick = onConfirm,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                    modifier = Modifier.testTag(confirmTag),
-                ) { Text(confirmLabel) }
+                    modifier = Modifier.testTag(spec.confirmTag),
+                ) { Text(spec.confirmLabel) }
             }
         }
     }
@@ -192,5 +190,3 @@ private fun PendingInvites(pending: List<PendingInvite>, cancelling: Set<String>
         }
     }
 }
-
-private const val FINGERPRINT_CHARS = 8

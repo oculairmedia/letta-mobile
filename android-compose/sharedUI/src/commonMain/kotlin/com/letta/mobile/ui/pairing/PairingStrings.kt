@@ -1,7 +1,18 @@
 package com.letta.mobile.ui.pairing
 
 import com.letta.mobile.data.pairing.DeviceAccess
+import com.letta.mobile.data.pairing.HostIds
+import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PairingError
+import com.letta.mobile.data.pairing.PairingState
+
+/** What a new code will grant, as the inviter's form summarises it. Null [agentNames] = every agent. */
+data class InviteScopeSummary(val agentNames: List<String>?, val allowSettings: Boolean, val ttlMs: Long)
+
+/** A paired device's label: its name, or the start of its NodeId when it has none. */
+val PairedDevice.displayName: String get() = name.ifBlank { nodeId.take(DEVICE_FINGERPRINT_CHARS) }
+
+private const val DEVICE_FINGERPRINT_CHARS = 8
 
 /** Copy for the scan-to-pair surfaces (letta-mobile-dpv7m.2, UX pass dpv7m.5), shared by Android and desktop. */
 object PairingStrings {
@@ -26,11 +37,11 @@ object PairingStrings {
     const val PASTE_INSTEAD = "Paste link instead"
 
     // Trust prompt.
-    fun trustTitle(hostShortId: String) = "Connect to $hostShortId?"
+    fun trustTitle(prompt: PairingState.ConfirmHost) = "Connect to ${prompt.hostShortId}?"
 
     const val TRUST_BODY = "Only connect if you started pairing and this ID matches the one on the other screen."
 
-    fun trustHostLine(hostShortId: String) = "Host ID: $hostShortId"
+    fun trustHostLine(prompt: PairingState.ConfirmHost) = "Host ID: ${prompt.hostShortId}"
 
     fun trustExpiresLine(remainingMs: Long) = "Code expires in ${countdown(remainingMs)}"
 
@@ -45,9 +56,9 @@ object PairingStrings {
     const val VERIFYING_KEEP_OPEN = "Keep Meridian open on both devices."
 
     // Success.
-    fun pairedTitle(hostShortId: String) = "Paired with $hostShortId"
+    fun pairedTitle(paired: PairingState.Paired) = "Paired with ${HostIds.short(paired.host.nodeId)}"
 
-    fun pairedDeviceLine(deviceName: String) = "This device is listed on the host as \"$deviceName\"."
+    fun pairedDeviceLine(paired: PairingState.Paired) = "This device is listed on the host as \"${paired.deviceName}\"."
 
     const val PAIRED_BODY = "This device can now chat with the agents the host shared with it."
     const val ALREADY_PAIRED_BODY = "This device was already paired with this host. The code was not used."
@@ -112,13 +123,13 @@ object PairingStrings {
     fun countdownAnnouncement(thresholdSeconds: Long) =
         if (thresholdSeconds >= SECONDS_PER_MINUTE) "Pairing code expires in 1 minute" else "Pairing code expires in $thresholdSeconds seconds"
 
-    fun accessSummary(agentNames: List<String>?, allowSettings: Boolean, ttlMs: Long): String {
-        val agents = agentNames?.joinToString(", ")?.ifBlank { "no agents" } ?: INVITE_ALL_AGENTS
-        val level = if (allowSettings) "chat + settings" else "chat only"
-        return "Access: $agents · $level · expires in ${ttlMs / MS_PER_MINUTE} min"
+    fun accessSummary(scope: InviteScopeSummary): String {
+        val agents = scope.agentNames?.joinToString(", ")?.ifBlank { "no agents" } ?: INVITE_ALL_AGENTS
+        val level = if (scope.allowSettings) "chat + settings" else "chat only"
+        return "Access: $agents · $level · expires in ${scope.ttlMs / MS_PER_MINUTE} min"
     }
 
-    fun accepted(name: String) = "${name.ifBlank { "The device" }} is paired."
+    fun accepted(device: PairedDevice) = "${device.name.ifBlank { "The device" }} is paired."
 
     // Paired devices.
     const val DEVICES_TITLE = "Paired devices"
@@ -135,7 +146,7 @@ object PairingStrings {
     const val PENDING_TITLE = "Pending invites"
     const val CANCELLING = "Cancelling…"
 
-    fun revokeConfirm(name: String) = "$name will lose access immediately and any open chat ends."
+    fun revokeConfirm(device: PairedDevice) = "${device.displayName} will lose access immediately and any open chat ends."
 
     /**
      * Honest scope note (dpv7m.4 is open): the host filters agent LISTINGS for an
@@ -145,10 +156,9 @@ object PairingStrings {
         "Agent limits hide other agents from a device's lists. They are not yet a hard access boundary: " +
             "a device that already knows a conversation link can still open it."
 
-    fun agentScope(agentIds: Set<String>?) = when {
-        agentIds == null -> "All agents"
-        agentIds.size == 1 -> "Lists 1 agent"
-        else -> "Lists ${agentIds.size} agents"
+    fun agentScope(device: PairedDevice): String {
+        val agents = device.agentIds ?: return "All agents"
+        return if (agents.size == 1) "Lists 1 agent" else "Lists ${agents.size} agents"
     }
 
     fun access(access: DeviceAccess) = when (access) {
@@ -157,8 +167,8 @@ object PairingStrings {
         DeviceAccess.FULL_ADMIN -> "Full admin"
     }
 
-    fun lastActive(lastSeenAtMs: Long?, nowMs: Long): String {
-        lastSeenAtMs ?: return NOT_CONNECTED_YET
+    fun lastActive(device: PairedDevice, nowMs: Long): String {
+        val lastSeenAtMs = device.lastSeenAtMs ?: return NOT_CONNECTED_YET
         val minutes = ((nowMs - lastSeenAtMs).coerceAtLeast(0)) / MS_PER_MINUTE
         return when {
             minutes < 1 -> "Active just now"

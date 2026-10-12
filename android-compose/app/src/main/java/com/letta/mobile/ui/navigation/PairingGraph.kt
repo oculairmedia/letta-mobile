@@ -9,6 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
+import com.letta.mobile.ui.pairing.PairDeviceBinding
 import com.letta.mobile.ui.pairing.PairDevicePage
 import com.letta.mobile.ui.pairing.PairingStrings
 import com.letta.mobile.ui.screens.pairing.PairInviteViewModel
@@ -49,10 +50,7 @@ internal fun NavGraphBuilder.pairingRoutes(navController: NavHostController) {
         val agents by viewModel.agents.collectAsStateWithLifecycle()
         val context = LocalContext.current
         PairDevicePage(
-            session = viewModel.session,
-            agents = agents,
-            clock = System::currentTimeMillis,
-            onShareLink = { link -> sharePairLink(context, link) },
+            binding = PairDeviceBinding(viewModel.session, agents, System::currentTimeMillis) { link -> sharePairLink(context, link) },
             onNavigateBack = { navController.popBackStack() },
         )
     }

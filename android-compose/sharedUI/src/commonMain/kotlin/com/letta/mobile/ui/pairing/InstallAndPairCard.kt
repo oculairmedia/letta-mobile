@@ -87,9 +87,7 @@ private fun JoinHostSection(bindings: InstallAndPairBindings) {
     }
     Text(PairingStrings.JOIN_TITLE, style = MaterialTheme.typography.titleMedium)
     PairingScanContent(
-        state = state,
-        camera = ScanCamera.Unavailable,
-        actions = pairingScanActions(flow, scope, bindings.onOpenChat),
+        scan = PairingScan(state, ScanCamera.Unavailable, pairingScanActions(flow, scope, bindings.onOpenChat)),
         nowMs = rememberTickingNow(bindings.nowMs, active = state is PairingState.ConfirmHost),
     )
 }
@@ -117,5 +115,5 @@ private fun InviteSection(rpc: AdminRpcInvoker, bindings: InstallAndPairBindings
     val scope = rememberCoroutineScope()
     val session = remember(rpc) { PairInviteSession(PairingAdminRepository(rpc), bindings.qrEncoder, scope, bindings.nowMs) }
     LaunchedEffect(session) { session.identifySelf(runCatching { bindings.selfNodeId() }.getOrNull()) }
-    PairDeviceSessionPanel(session = session, agents = bindings.agents, clock = bindings.nowMs, onShareLink = bindings.onShareLink)
+    PairDeviceSessionPanel(PairDeviceBinding(session, bindings.agents, bindings.nowMs, bindings.onShareLink))
 }

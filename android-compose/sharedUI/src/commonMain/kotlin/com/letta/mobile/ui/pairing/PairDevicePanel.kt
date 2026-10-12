@@ -55,74 +55,70 @@ class PairDeviceActions(
     }
 }
 
+/** One inviter render: the session state, the agents the form may offer, and the time it is drawn at. */
+class PairDeviceView(val state: PairInviteUiState, val agents: List<AgentChoice>, val nowMs: Long) {
+    val phase: InvitePhase get() = InvitePhases.of(state, nowMs)
+}
+
+/** What a platform hands the shared inviter: the live session, agent choices, clock, and its share sheet (if any). */
+class PairDeviceBinding(
+    val session: PairInviteSession,
+    val agents: List<AgentChoice>,
+    val clock: () -> Long,
+    val onShareLink: ((String) -> Unit)?,
+)
+
 /**
  * The inviter side of scan-to-connect (letta-mobile-dpv7m.2/.5), shared by the
  * phone and desktop: the invite card (scope -> QR + countdown -> expired /
- * redeemed) above the paired-devices list. Stateless: [nowMs] is passed in.
+ * redeemed) above the paired-devices list. Stateless: [PairDeviceView.nowMs] is passed in.
  */
 @Composable
 fun PairDevicePanel(
-    state: PairInviteUiState,
-    agents: List<AgentChoice>,
+    view: PairDeviceView,
     actions: PairDeviceActions,
-    nowMs: Long,
     modifier: Modifier = Modifier,
 ) {
-    val phase = InvitePhases.of(state, nowMs)
+    val state = view.state
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
         Text(PairingStrings.INVITE_TITLE, style = MaterialTheme.typography.titleLarge)
         if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag(PairingTags.INVITE_ERROR))
         }
-        PairInviteCard(phase = phase, qr = state.qr, agents = agents, actions = actions, busy = state.busy)
+        PairInviteCard(view = view, actions = actions)
         HorizontalDivider()
-        PairedDevicesList(state = state, actions = actions, nowMs = nowMs, onScreenInviteId = state.invite?.inviteId)
+        PairedDevicesList(state = state, actions = actions, nowMs = view.nowMs)
     }
 }
 
 /**
  * [PairDevicePanel] bound to a live [PairInviteSession]: ticks the countdown
  * once a second while a code is live and polls the host so the redeeming
- * device shows up. Platforms only build the session.
+ * device shows up. Platforms only build the [PairDeviceBinding].
  */
 @Composable
-fun PairDeviceSessionPanel(
-    session: PairInviteSession,
-    agents: List<AgentChoice>,
-    clock: () -> Long,
-    onShareLink: ((String) -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
+fun PairDeviceSessionPanel(binding: PairDeviceBinding, modifier: Modifier = Modifier) {
+    val session = binding.session
     val state by session.state.collectAsState()
-    val live = state.invite != null
-    val nowMs = rememberTickingNow(clock, active = live)
+    val nowMs = rememberTickingNow(binding.clock, active = state.invite != null)
     LaunchedEffect(session) { session.refresh() }
     LaunchedEffect(state.invite?.inviteId) {
-        while (state.invite != null && InvitePhases.of(state, clock()) !is InvitePhase.Expired) {
+        while (state.invite != null && InvitePhases.of(state, binding.clock()) !is InvitePhase.Expired) {
             delay(INVITE_POLL_INTERVAL_MS)
             session.refresh()
         }
     }
     PairDevicePanel(
-        state = state,
-        agents = agents,
-        actions = PairDeviceActions.forSession(session, onShareLink),
-        nowMs = nowMs,
+        view = PairDeviceView(state, binding.agents, nowMs),
+        actions = PairDeviceActions.forSession(session, binding.onShareLink),
         modifier = modifier,
     )
 }
 
 /** "Pair a device" as a full page (Android route): header with back, then the session panel. */
 @Composable
-fun PairDevicePage(
-    session: PairInviteSession,
-    agents: List<AgentChoice>,
-    clock: () -> Long,
-    onShareLink: ((String) -> Unit)?,
-    onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun PairDevicePage(binding: PairDeviceBinding, onNavigateBack: () -> Unit, modifier: Modifier = Modifier) {
     LettaPageScaffold(
         modifier = modifier,
         header = {
@@ -133,10 +129,7 @@ fun PairDevicePage(
         },
     ) { padding ->
         PairDeviceSessionPanel(
-            session = session,
-            agents = agents,
-            clock = clock,
-            onShareLink = onShareLink,
+            binding = binding,
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()

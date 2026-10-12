@@ -54,7 +54,7 @@ class PairInviteSurfacesUiTest {
         val r = Recorder()
         setContent {
             MaterialTheme {
-                PairDevicePanel(PairInviteUiState(), listOf(AgentChoice("a1", "Sage"), AgentChoice("a2", "Atlas")), r.actions(), nowMs = 0)
+                PairDevicePanel(PairDeviceView(PairInviteUiState(), listOf(AgentChoice("a1", "Sage"), AgentChoice("a2", "Atlas")), 0), r.actions())
             }
         }
         onNodeWithTag(PairingTags.INVITE_SHOW).assertIsNotEnabled()
@@ -69,7 +69,7 @@ class PairInviteSurfacesUiTest {
     @Test
     fun allAgentsAndSettingsChangesAreExplicitOptIns() = runComposeUiTest {
         val r = Recorder()
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(), listOf(AgentChoice("a1", "Sage")), r.actions(), nowMs = 0) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(), listOf(AgentChoice("a1", "Sage")), 0), r.actions()) } }
         onNodeWithTag(PairingTags.INVITE_ALL_AGENTS).performClick()
         onNodeWithTag(PairingTags.INVITE_SETTINGS).performClick()
         onNodeWithTag(PairingTags.INVITE_SHOW).performClick()
@@ -80,7 +80,7 @@ class PairInviteSurfacesUiTest {
     @Test
     fun showingCodeHasQrCountdownAndAOneTapLinkEquivalent() = runComposeUiTest {
         val r = Recorder()
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(invite = invite, qr = qr), emptyList(), r.actions(), nowMs = 28_000) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 28_000), r.actions()) } }
         onNodeWithTag(PairingTags.INVITE_QR).assertIsDisplayed()
         onNodeWithTag(PairingTags.INVITE_COUNTDOWN).assertTextContains("Expires in 4:32")
         onNodeWithTag(PairingTags.INVITE_LINK).assertDoesNotExist()
@@ -95,21 +95,21 @@ class PairInviteSurfacesUiTest {
 
     @Test
     fun noShareSheetMeansCopyOnly() = runComposeUiTest {
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(invite = invite, qr = qr), emptyList(), Recorder().actions(share = false), nowMs = 0) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 0), Recorder().actions(share = false)) } }
         onNodeWithTag(PairingTags.INVITE_COPY).assertIsDisplayed()
         onNodeWithTag(PairingTags.INVITE_SHARE).assertDoesNotExist()
     }
 
     @Test
     fun theLastThirtySecondsSayExpiringInWords() = runComposeUiTest {
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(invite = invite, qr = qr), emptyList(), Recorder().actions(), nowMs = 290_000) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 290_000), Recorder().actions()) } }
         onNodeWithTag(PairingTags.INVITE_COUNTDOWN).assertTextContains(PairingStrings.EXPIRING_SOON, substring = true)
     }
 
     @Test
     fun expiredCodeIsMaskedAndOffersNewCodeNotAnAutoRefresh() = runComposeUiTest {
         val r = Recorder()
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(invite = invite, qr = qr), emptyList(), r.actions(), nowMs = 300_000) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 300_000), r.actions()) } }
         onNodeWithTag(PairingTags.INVITE_EXPIRED).assertTextContains(PairingStrings.CODE_EXPIRED)
         onNodeWithTag(PairingTags.INVITE_LINK).assertDoesNotExist()
         onNodeWithTag(PairingTags.INVITE_COPY).assertDoesNotExist()
@@ -120,14 +120,14 @@ class PairInviteSurfacesUiTest {
 
     @Test
     fun cancelledCodeSaysSo() = runComposeUiTest {
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(cancelled = true), emptyList(), Recorder().actions(), nowMs = 0) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(cancelled = true), emptyList(), 0), Recorder().actions()) } }
         onNodeWithTag(PairingTags.INVITE_CANCELLED).assertIsDisplayed()
     }
 
     @Test
     fun redeemedShowsTheNewDevice() = runComposeUiTest {
         val pixel = device("p", "Pixel")
-        setContent { MaterialTheme { PairDevicePanel(PairInviteUiState(accepted = pixel, devices = listOf(pixel)), emptyList(), Recorder().actions(), nowMs = 0) } }
+        setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(accepted = pixel, devices = listOf(pixel)), emptyList(), 0), Recorder().actions()) } }
         onNodeWithTag(PairingTags.INVITE_ACCEPTED).assertTextContains("Pixel", substring = true)
     }
 
@@ -153,7 +153,7 @@ class PairInviteSurfacesUiTest {
         setContent { MaterialTheme { PairedDevicesList(state, r.actions(), nowMs = 0) } }
         onNodeWithTag(PairingTags.revokeDevice("lap")).performClick()
         assertEquals(emptyList(), r.events, "one tap never revokes")
-        onNodeWithText(PairingStrings.revokeConfirm("Laptop")).assertIsDisplayed()
+        onNodeWithText("Laptop will lose access immediately and any open chat ends.").assertIsDisplayed()
         onNodeWithTag(PairingTags.revokeConfirm("lap")).performClick()
         assertEquals(listOf("revoke:lap"), r.events)
         state = state.copy(revoking = setOf("lap"))

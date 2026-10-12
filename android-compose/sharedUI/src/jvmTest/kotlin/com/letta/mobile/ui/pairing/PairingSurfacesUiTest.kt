@@ -74,7 +74,7 @@ class PairingSurfacesUiTest {
                 PairingStatusCard(PairingState.Paired(PairedHost(nodeId, nodeId), alreadyPaired = false, deviceName = "Pixel 9"), r.actions(), nowMs = 0)
             }
         }
-        onNodeWithText(PairingStrings.pairedDeviceLine("Pixel 9")).assertIsDisplayed()
+        onNodeWithText("This device is listed on the host as \"Pixel 9\".").assertIsDisplayed()
         onNodeWithTag(PairingTags.OPEN_CHAT).performClick()
         assertEquals(listOf("openChat"), r.events)
     }
@@ -83,7 +83,7 @@ class PairingSurfacesUiTest {
     fun trustPromptShowsTheShortHostIdAndExpiryWithConnectAndCancel() = runComposeUiTest {
         val r = Recorder()
         setContent { MaterialTheme { PairingStatusCard(PairingState.ConfirmHost(nodeId, expiresAtMs = 272_000), r.actions(), nowMs = 0) } }
-        onNodeWithText(PairingStrings.trustTitle("ababab…ababab")).assertIsDisplayed()
+        onNodeWithText("Connect to ababab…ababab?").assertIsDisplayed()
         onNodeWithText(PairingStrings.trustExpiresLine(272_000)).assertTextContains("4:32", substring = true)
         onNodeWithTag(PairingTags.TRUST_CANCEL).performClick()
         onNodeWithTag(PairingTags.TRUST_CONNECT).performClick()
@@ -125,7 +125,7 @@ class PairingSurfacesUiTest {
             val scope = rememberCoroutineScope()
             MaterialTheme {
                 val state = flow.state.collectAsState().value
-                PairingScanContent(state, ScanCamera.Unavailable, pairingScanActions(flow, scope) {}, nowMs = 0)
+                PairingScanContent(PairingScan(state, ScanCamera.Unavailable, pairingScanActions(flow, scope) {}), nowMs = 0)
             }
         }
         onNodeWithTag(PairingTags.PASTE_FIELD).performTextInput("  ${link()}  ")
@@ -140,7 +140,7 @@ class PairingSurfacesUiTest {
 
     @Test
     fun desktopAndWebArePasteOnly() = runComposeUiTest {
-        setContent { MaterialTheme { PairingScanContent(PairingState.Idle, ScanCamera.Unavailable, Recorder().actions(), nowMs = 0) } }
+        setContent { MaterialTheme { PairingScanContent(PairingScan(PairingState.Idle, ScanCamera.Unavailable, Recorder().actions()), nowMs = 0) } }
         onNodeWithTag(PairingTags.PASTE_FIELD).assertIsDisplayed()
         onNodeWithTag(PairingTags.CAMERA_AREA).assertDoesNotExist()
         onNodeWithTag(PairingTags.PASTE_TOGGLE).assertDoesNotExist()
@@ -151,7 +151,7 @@ class PairingSurfacesUiTest {
         var requested = 0
         setContent {
             MaterialTheme {
-                PairingScanContent(PairingState.Idle, ScanCamera(CameraAccess.NEEDS_RATIONALE, onRequestAccess = { requested++ }), Recorder().actions(), nowMs = 0)
+                PairingScanContent(PairingScan(PairingState.Idle, ScanCamera(CameraAccess.NEEDS_RATIONALE, onRequestAccess = { requested++ }), Recorder().actions()), nowMs = 0)
             }
         }
         onNodeWithText(PairingStrings.CAMERA_RATIONALE_BODY).assertIsDisplayed()
@@ -164,7 +164,7 @@ class PairingSurfacesUiTest {
         var settings = 0
         val r = Recorder()
         setContent {
-            MaterialTheme { PairingScanContent(PairingState.Idle, ScanCamera(CameraAccess.DENIED, onOpenSettings = { settings++ }), r.actions(), nowMs = 0) }
+            MaterialTheme { PairingScanContent(PairingScan(PairingState.Idle, ScanCamera(CameraAccess.DENIED, onOpenSettings = { settings++ }), r.actions()), nowMs = 0) }
         }
         onNodeWithText(PairingStrings.CAMERA_DENIED_TITLE).assertIsDisplayed()
         onNodeWithTag(PairingTags.OPEN_SETTINGS).performClick()
@@ -186,7 +186,7 @@ class PairingSurfacesUiTest {
             torch = TorchControl(on = false) { torchToggles++ },
             preview = { onDecoded -> deliver = onDecoded },
         )
-        setContent { MaterialTheme { PairingScanContent(state, camera, r.actions(), nowMs = 0) } }
+        setContent { MaterialTheme { PairingScanContent(PairingScan(state, camera, r.actions()), nowMs = 0) } }
         onNodeWithTag(PairingTags.CAMERA_AREA).assertIsDisplayed()
         onNodeWithTag(PairingTags.TORCH).performClick()
         assertEquals(1, torchToggles)
@@ -201,7 +201,7 @@ class PairingSurfacesUiTest {
     @Test
     fun pasteSubmitIsDisabledWhileAPromptIsOpen() = runComposeUiTest {
         setContent {
-            MaterialTheme { PairingScanContent(PairingState.ConfirmHost(nodeId, 900_000), ScanCamera.Unavailable, Recorder().actions(), nowMs = 0) }
+            MaterialTheme { PairingScanContent(PairingScan(PairingState.ConfirmHost(nodeId, 900_000), ScanCamera.Unavailable, Recorder().actions()), nowMs = 0) }
         }
         onNodeWithTag(PairingTags.PASTE_FIELD).assertIsNotEnabled()
     }

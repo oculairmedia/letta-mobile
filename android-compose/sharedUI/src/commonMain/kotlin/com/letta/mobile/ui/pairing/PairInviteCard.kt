@@ -42,6 +42,7 @@ import com.letta.mobile.data.pairing.InviteCountdown
 import com.letta.mobile.data.pairing.InvitePhase
 import com.letta.mobile.data.pairing.MintedPairInvite
 import com.letta.mobile.data.pairing.PairInviteRequest
+import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.QrModules
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -57,32 +58,37 @@ data class AgentChoice(val id: String, val name: String)
  */
 @Composable
 fun PairInviteCard(
-    phase: InvitePhase,
-    qr: QrModules?,
-    agents: List<AgentChoice>,
+    view: PairDeviceView,
     actions: PairDeviceActions,
-    busy: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val qr = view.state.qr
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-        when (phase) {
-            InvitePhase.Configuring -> InviteForm(agents = agents, enabled = !busy, onMint = actions.onMint)
-            is InvitePhase.Showing -> LiveInvite(phase.invite, qr, phase.remainingMs, expiring = false, actions)
-            is InvitePhase.Expiring -> LiveInvite(phase.invite, qr, phase.remainingMs, expiring = true, actions)
-            is InvitePhase.Expired -> EndedInvite(qr, PairingStrings.CODE_EXPIRED, PairingStrings.CODE_EXPIRED_BODY, PairingTags.INVITE_EXPIRED, actions)
-            InvitePhase.Cancelled -> EndedInvite(null, PairingStrings.CODE_CANCELLED, PairingStrings.CODE_CANCELLED_BODY, PairingTags.INVITE_CANCELLED, actions)
-            is InvitePhase.Redeemed -> Redeemed(phase.device.name, actions.onChangeAccess)
+        when (val phase = view.phase) {
+            InvitePhase.Configuring -> InviteForm(agents = view.agents, enabled = !view.state.busy, onMint = actions.onMint)
+            is InvitePhase.Showing -> LiveInvite(LiveCode(phase.invite, phase.remainingMs, expiring = false), qr, actions)
+            is InvitePhase.Expiring -> LiveInvite(LiveCode(phase.invite, phase.remainingMs, expiring = true), qr, actions)
+            is InvitePhase.Expired -> EndedInvite(qr, EndedCode.EXPIRED, actions)
+            InvitePhase.Cancelled -> EndedInvite(null, EndedCode.CANCELLED, actions)
+            is InvitePhase.Redeemed -> Redeemed(phase.device, actions.onChangeAccess)
         }
     }
+}
+
+/** The two scope radios of the form. */
+private enum class AgentScopeOption(val label: String, val tag: String) {
+    ALL(PairingStrings.INVITE_ALL_AGENTS, PairingTags.INVITE_ALL_AGENTS),
+    CHOOSE(PairingStrings.INVITE_CHOOSE_AGENTS, PairingTags.INVITE_CHOOSE_AGENTS),
 }
 
 @Composable
 private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (PairInviteRequest) -> Unit) {
     var name by remember { mutableStateOf("") }
     // Least privilege by default (dpv7m.5): named agents, chat only, five minutes.
-    var allAgents by remember { mutableStateOf(agents.isEmpty()) }
+    var scope by remember { mutableStateOf(if (agents.isEmpty()) AgentScopeOption.ALL else AgentScopeOption.CHOOSE) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var allowSettings by remember { mutableStateOf(false) }
+    val allAgents = scope == AgentScopeOption.ALL
     OutlinedTextField(
         value = name,
         onValueChange = { name = it },
@@ -91,31 +97,22 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
         modifier = Modifier.fillMaxWidth(),
     )
     Text(PairingStrings.INVITE_ACCESS, style = MaterialTheme.typography.labelLarge)
-    ChoiceRow(PairingStrings.INVITE_ALL_AGENTS, selected = allAgents, tag = PairingTags.INVITE_ALL_AGENTS) { allAgents = true }
-    if (agents.isNotEmpty()) {
-        ChoiceRow(PairingStrings.INVITE_CHOOSE_AGENTS, selected = !allAgents, tag = PairingTags.INVITE_CHOOSE_AGENTS) { allAgents = false }
-    }
-    if (!allAgents) {
-        AgentChecklist(agents, selected) { selected = it }
-    }
+    val options = if (agents.isEmpty()) listOf(AgentScopeOption.ALL) else AgentScopeOption.entries
+    options.forEach { option -> ChoiceRow(option, selected = scope == option) { scope = option } }
+    if (!allAgents) AgentChecklist(agents, selected) { selected = it }
     SettingsToggle(allowSettings) { allowSettings = it }
-    val chosenNames = agents.filter { it.id in selected }.map { it.name }
-    Text(
-        PairingStrings.accessSummary(if (allAgents) null else chosenNames, allowSettings, PairInviteRequest.DEFAULT_TTL_MS),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    val summary = InviteScopeSummary(
+        agentNames = if (allAgents) null else agents.filter { it.id in selected }.map { it.name },
+        allowSettings = allowSettings,
+        ttlMs = PairInviteRequest.DEFAULT_TTL_MS,
     )
+    Text(PairingStrings.accessSummary(summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     val ready = allAgents || selected.isNotEmpty()
     if (!ready) Text(PairingStrings.INVITE_CHOOSE_AT_LEAST_ONE, style = MaterialTheme.typography.bodySmall)
     Button(
         onClick = {
-            onMint(
-                PairInviteRequest(
-                    deviceName = name.trim(),
-                    agentIds = if (allAgents) emptySet() else selected,
-                    role = PairInviteRequest.roleFor(allowSettings),
-                ),
-            )
+            val agentIds = if (allAgents) emptySet() else selected
+            onMint(PairInviteRequest(deviceName = name.trim(), agentIds = agentIds, role = PairInviteRequest.roleFor(allowSettings)))
         },
         enabled = enabled && ready,
         modifier = Modifier.testTag(PairingTags.INVITE_SHOW),
@@ -123,13 +120,13 @@ private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (Pai
 }
 
 @Composable
-private fun ChoiceRow(label: String, selected: Boolean, tag: String, onSelect: () -> Unit) {
+private fun ChoiceRow(option: AgentScopeOption, selected: Boolean, onSelect: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect).testTag(tag),
+        modifier = Modifier.fillMaxWidth().selectable(selected = selected, role = Role.RadioButton, onClick = onSelect).testTag(option.tag),
     ) {
         RadioButton(selected = selected, onClick = null)
-        Text(label)
+        Text(option.label)
     }
 }
 
@@ -166,48 +163,51 @@ private fun SettingsToggle(checked: Boolean, onChange: (Boolean) -> Unit) {
     }
 }
 
+/** A code that can still be redeemed, and how long it has left. */
+private class LiveCode(val invite: MintedPairInvite, val remainingMs: Long, val expiring: Boolean)
+
 @Composable
-private fun LiveInvite(invite: MintedPairInvite, qr: QrModules?, remainingMs: Long, expiring: Boolean, actions: PairDeviceActions) {
-    var showLink by remember(invite.inviteId) { mutableStateOf(qr == null) }
+private fun LiveInvite(code: LiveCode, qr: QrModules?, actions: PairDeviceActions) {
+    var showLink by remember(code.invite.inviteId) { mutableStateOf(qr == null) }
     Text(PairingStrings.INVITE_STEP_1)
     Text(PairingStrings.INVITE_STEP_2)
     Text(PairingStrings.INVITE_STEP_3)
-    if (showLink || qr == null) {
-        PairLinkBlock(invite.pairLink)
-    } else {
-        QrCard(qr, remainingMs, dimmed = false)
-    }
-    Countdown(remainingMs, expiring)
-    LinkActions(invite.pairLink, showLink = showLink, canToggle = qr != null, onToggle = { showLink = !showLink }, onShare = actions.onShareLink)
+    if (showLink || qr == null) PairLinkBlock(code.invite) else QrCard(qr, remainingMs = code.remainingMs)
+    Countdown(code)
+    LinkActions(code.invite, toggle = qr?.let { LinkToggle(showLink) { showLink = !showLink } }, onShare = actions.onShareLink)
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         OutlinedButton(onClick = actions.onNewCode, modifier = Modifier.testTag(PairingTags.INVITE_NEW_CODE)) { Text(PairingStrings.NEW_CODE) }
-        TextButton(onClick = { actions.onRevokeInvite(invite.inviteId) }, modifier = Modifier.testTag(PairingTags.INVITE_CANCEL)) {
+        TextButton(onClick = { actions.onRevokeInvite(code.invite.inviteId) }, modifier = Modifier.testTag(PairingTags.INVITE_CANCEL)) {
             Text(PairingStrings.CANCEL_CODE)
         }
     }
 }
 
-/** The QR on a white card with a quiet zone, never theme-inverted, at least [LettaDimens.Pane.qrCodeMinWidth]. */
+/**
+ * The QR on a white card with a quiet zone, never theme-inverted, at least
+ * [LettaDimens.Pane.qrCodeMinWidth]. A null [remainingMs] is an ended code:
+ * greyed so it can no longer be scanned by accident.
+ */
 @Composable
-private fun QrCard(qr: QrModules, remainingMs: Long, dimmed: Boolean) {
+private fun QrCard(qr: QrModules, remainingMs: Long?) {
     Surface(color = Color.White, shape = MaterialTheme.shapes.large, modifier = Modifier.testTag(PairingTags.INVITE_QR)) {
         QrModulesImage(
             qr,
-            dimmed = dimmed,
+            dimmed = remainingMs == null,
             modifier = Modifier
                 .padding(LettaDimens.Space.md)
                 .widthIn(min = LettaDimens.Pane.qrCodeMinWidth, max = LettaDimens.Pane.qrCodeMaxWidth)
-                .clearAndSetSemantics { contentDescription = PairingStrings.qrDescription(remainingMs) },
+                .clearAndSetSemantics { contentDescription = PairingStrings.qrDescription(remainingMs ?: 0) },
         )
     }
 }
 
 /** The full pairing link (product decision: the fallback is the link, not a short code — a code cannot carry the host). */
 @Composable
-private fun PairLinkBlock(link: String) {
+private fun PairLinkBlock(invite: MintedPairInvite) {
     Surface(shape = MaterialTheme.shapes.medium, tonalElevation = LettaDimens.Space.hair, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(LettaDimens.Space.md), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-            Text(link, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(PairingTags.INVITE_LINK))
+            Text(invite.pairLink, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag(PairingTags.INVITE_LINK))
             Text(PairingStrings.LINK_SECRET_NOTE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -233,14 +233,14 @@ private class AnnouncementLatch {
  * out, not just coloured.
  */
 @Composable
-private fun Countdown(remainingMs: Long, expiring: Boolean) {
+private fun Countdown(code: LiveCode) {
     val latch = remember { AnnouncementLatch() }
-    val announcement = latch.update(remainingMs)
-    val label = PairingStrings.expiresIn(remainingMs) + if (expiring) " · ${PairingStrings.EXPIRING_SOON}" else ""
+    val announcement = latch.update(code.remainingMs)
+    val label = PairingStrings.expiresIn(code.remainingMs) + if (code.expiring) " · ${PairingStrings.EXPIRING_SOON}" else ""
     Text(
         label,
         style = MaterialTheme.typography.bodyMedium,
-        color = if (expiring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (code.expiring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.testTag(PairingTags.INVITE_COUNTDOWN),
     )
     if (announcement.isNotEmpty()) {
@@ -248,25 +248,28 @@ private fun Countdown(remainingMs: Long, expiring: Boolean) {
     }
 }
 
+/** The QR <-> link switch, present only when there is a QR to switch back to. */
+private class LinkToggle(val showingLink: Boolean, val onToggle: () -> Unit)
+
 @Composable
-private fun LinkActions(link: String, showLink: Boolean, canToggle: Boolean, onToggle: () -> Unit, onShare: ((String) -> Unit)?) {
+private fun LinkActions(invite: MintedPairInvite, toggle: LinkToggle?, onShare: ((String) -> Unit)?) {
     val clipboard = LocalClipboardManager.current
-    var copied by remember(link) { mutableStateOf(false) }
+    var copied by remember(invite.inviteId) { mutableStateOf(false) }
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs), verticalAlignment = Alignment.CenterVertically) {
-        if (canToggle) {
-            TextButton(onClick = onToggle, modifier = Modifier.testTag(PairingTags.INVITE_TOGGLE_LINK)) {
-                Text(if (showLink) PairingStrings.SHOW_QR else PairingStrings.SHOW_LINK)
+        toggle?.let {
+            TextButton(onClick = it.onToggle, modifier = Modifier.testTag(PairingTags.INVITE_TOGGLE_LINK)) {
+                Text(if (it.showingLink) PairingStrings.SHOW_QR else PairingStrings.SHOW_LINK)
             }
         }
         TextButton(
-            onClick = { clipboard.setText(AnnotatedString(link)); copied = true },
+            onClick = { clipboard.setText(AnnotatedString(invite.pairLink)); copied = true },
             modifier = Modifier.testTag(PairingTags.INVITE_COPY),
         ) {
             Icon(LettaIcons.Copy, contentDescription = null)
             Text(if (copied) PairingStrings.LINK_COPIED else PairingStrings.COPY_LINK)
         }
         onShare?.let { share ->
-            TextButton(onClick = { share(link) }, modifier = Modifier.testTag(PairingTags.INVITE_SHARE)) {
+            TextButton(onClick = { share(invite.pairLink) }, modifier = Modifier.testTag(PairingTags.INVITE_SHARE)) {
                 Icon(LettaIcons.Share, contentDescription = null)
                 Text(PairingStrings.SHARE_LINK)
             }
@@ -274,12 +277,18 @@ private fun LinkActions(link: String, showLink: Boolean, canToggle: Boolean, onT
     }
 }
 
+/** How a code ended: what the card says and the tag tests find it by. */
+private enum class EndedCode(val title: String, val body: String, val tag: String) {
+    EXPIRED(PairingStrings.CODE_EXPIRED, PairingStrings.CODE_EXPIRED_BODY, PairingTags.INVITE_EXPIRED),
+    CANCELLED(PairingStrings.CODE_CANCELLED, PairingStrings.CODE_CANCELLED_BODY, PairingTags.INVITE_CANCELLED),
+}
+
 @Composable
-private fun EndedInvite(qr: QrModules?, title: String, body: String, tag: String, actions: PairDeviceActions) {
+private fun EndedInvite(qr: QrModules?, ended: EndedCode, actions: PairDeviceActions) {
     // The secret is masked once the code is over: only a greyed QR, never the link.
-    qr?.let { QrCard(it, remainingMs = 0, dimmed = true) }
-    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(tag))
-    Text(body, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    qr?.let { QrCard(it, remainingMs = null) }
+    Text(ended.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag(ended.tag))
+    Text(ended.body, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Button(onClick = actions.onNewCode, modifier = Modifier.testTag(PairingTags.INVITE_NEW_CODE)) { Text(PairingStrings.NEW_CODE) }
         TextButton(onClick = actions.onChangeAccess) { Text(PairingStrings.CHANGE_ACCESS) }
@@ -287,10 +296,10 @@ private fun EndedInvite(qr: QrModules?, title: String, body: String, tag: String
 }
 
 @Composable
-private fun Redeemed(name: String, onDone: () -> Unit) {
+private fun Redeemed(device: PairedDevice, onDone: () -> Unit) {
     Icon(LettaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
     Text(
-        PairingStrings.accepted(name),
+        PairingStrings.accepted(device),
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }.testTag(PairingTags.INVITE_ACCEPTED),
     )
