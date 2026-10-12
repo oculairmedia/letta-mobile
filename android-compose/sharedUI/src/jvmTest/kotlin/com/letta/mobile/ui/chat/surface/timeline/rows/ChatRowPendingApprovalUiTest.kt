@@ -89,7 +89,9 @@ class ChatRowPendingApprovalUiTest {
 
         onNodeWithText("Approval requested").assertDoesNotExist()
         onNodeWithText("Waiting for your approval").assertDoesNotExist()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        // letta-mobile-zxk2n.37: nothing holds it open, so it folds under its one summary line.
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
     }
 
     private fun ComposeUiTest.assertCardShownAndActionable(actions: RecordingChatActions) {

@@ -165,7 +165,7 @@ class ChatRowMotionUiTest {
 
     private companion object {
         const val CARD = "tool-card-under-test"
-        const val WORKING = "Working"
+        const val WORKING = "Working…"
         const val WORKED = "Worked"
         const val SETTLE_MILLIS = 1_000L
     }

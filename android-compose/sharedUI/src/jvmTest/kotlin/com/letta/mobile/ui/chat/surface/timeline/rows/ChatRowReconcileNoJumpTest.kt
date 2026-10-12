@@ -79,7 +79,7 @@ class ChatRowReconcileNoJumpTest {
     }
 
     @Test
-    fun anOlderRunWithoutItsHeaderKeepsItsHeightOnReconcile() = runComposeUiTest {
+    fun anOlderFoldedRunKeepsItsHeightOnReconcile() = runComposeUiTest {
         assertNoJump(settledRun, newestId = null)
     }
 

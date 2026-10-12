@@ -99,19 +99,17 @@ internal class RunBlockPlan(
      */
     val awaitingApproval: Boolean = false,
 ) {
+    /** One message that is not a bare tool call draws as its own row under the header. */
+    val loneMessage: UiMessage? = loneRunMessage(visible, messageCount)
+
     /** A run folds when it has work to tuck under its summary line and nothing holds it open. */
-    val foldable: Boolean
-        get() = runFolds(RunFoldInputs(runId, hasWorkSteps = loneMessage == null && visible.any { it.isRunWorkMessage() }, awaitingApproval))
+    val foldable: Boolean = runFolds(RunFoldInputs(runId, hasWorkSteps(), awaitingApproval))
 
     /** Folded by default; the person's toggle opens it. */
-    val collapsed: Boolean get() = foldable && !toggledByOwner
+    val collapsed: Boolean = isCollapsed()
 
     /** A run that folds always shows its summary line: the line is the only way to its steps. */
-    val headerVisible: Boolean get() = headerPinned || foldable
-
-    /** One message that is not a bare tool call draws as its own row under the header. */
-    val loneMessage: UiMessage?
-        get() = visible.singleOrNull()?.takeIf { messageCount == 1 && !it.isRunToolCallMessage() }
+    val headerVisible: Boolean = isHeaderVisible()
 
     /**
      * Lifted whenever the header shows, working or settled: legacy's settled geometry, held from the
@@ -121,13 +119,41 @@ internal class RunBlockPlan(
 
     /** The header; a run that folds keeps the fold's floor, working and settled alike. */
     fun header(actions: ChatActions): RunHeaderState =
-        RunHeaderState(activity, headerVisible, tall = messageCount > 1 || foldable, fold = foldOf(actions), awaitingApproval = awaitingApproval)
+        RunHeaderState(activity, headerVisible, tall = isTall(), fold = foldOf(actions), awaitingApproval = awaitingApproval)
+
+    private fun hasWorkSteps(): Boolean {
+        if (loneMessage != null) return false
+        return visible.any { it.isRunWorkMessage() }
+    }
+
+    private fun isCollapsed(): Boolean {
+        if (!foldable) return false
+        return !toggledByOwner
+    }
+
+    private fun isHeaderVisible(): Boolean {
+        if (headerPinned) return true
+        return foldable
+    }
+
+    private fun isTall(): Boolean {
+        if (messageCount > 1) return true
+        return foldable
+    }
 
     private fun foldOf(actions: ChatActions): RunFold? {
         val id = runId ?: return null
         if (!foldable) return null
         return RunFold(collapsed) { actions.toggleRunCollapsed(ChatRunId(id)) }
     }
+}
+
+/** One message that is not a bare tool call: it draws as its own row under the header. */
+private fun loneRunMessage(visible: List<UiMessage>, messageCount: Int): UiMessage? {
+    if (messageCount != 1) return null
+    val only = visible.singleOrNull() ?: return null
+    if (only.isRunToolCallMessage()) return null
+    return only
 }
 
 /** What decides whether a run may fold. */
@@ -270,30 +296,30 @@ private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: 
     }
 }
 
-private fun stepPosition(index: Int, count: Int): GroupPosition = when {
-    count == 1 -> GroupPosition.None
-    index == 0 -> GroupPosition.First
-    index == count - 1 -> GroupPosition.Last
-    else -> GroupPosition.Middle
+private fun stepPosition(index: Int, count: Int): GroupPosition {
+    if (count == 1) return GroupPosition.None
+    if (index == 0) return GroupPosition.First
+    if (index == count - 1) return GroupPosition.Last
+    return GroupPosition.Middle
 }
 
 /**
  * The beat above one message step (legacy chatMessageRowVerticalPadding): reasoning and tool steps
  * take the grouped beat, as do the middle and last of a run's steps; the first takes the section break.
  */
-internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp = when {
-    message.isReasoning || !message.toolCalls.isNullOrEmpty() -> ChatRowSpacing.grouped
-    position == GroupPosition.Middle || position == GroupPosition.Last -> ChatRowSpacing.grouped
-    else -> ChatRowSpacing.ungrouped
+internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp {
+    if (message.isReasoning || !message.toolCalls.isNullOrEmpty()) return ChatRowSpacing.grouped
+    if (position == GroupPosition.Middle || position == GroupPosition.Last) return ChatRowSpacing.grouped
+    return ChatRowSpacing.ungrouped
 }
 
 /** A run step and its place among the run's visible steps (the legacy row's group position). */
 @Immutable
 private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
     /** The legacy row beat above it: a tool summary always takes the grouped beat. */
-    fun top(): Dp = when (step) {
-        is RunStep.Message -> runStepTop(step.message, position)
-        is RunStep.ToolCalls -> ChatRowSpacing.grouped
+    fun top(): Dp {
+        val message = (step as? RunStep.Message)?.message ?: return ChatRowSpacing.grouped
+        return runStepTop(message, position)
     }
 }
 
@@ -315,13 +341,16 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
 private const val RUN_BODY_LIFT_MILLIS = 220
 
 /** Work the summary line stands for (a reasoning, the tool line), as opposed to the run's prose. */
-internal fun RunStep.isWork(): Boolean = when (this) {
-    is RunStep.ToolCalls -> true
-    is RunStep.Message -> message.isReasoning
+internal fun RunStep.isWork(): Boolean {
+    val message = (this as? RunStep.Message)?.message ?: return true
+    return message.isReasoning
 }
 
 /** A message the summary line folds away: a reasoning, or one carrying the run's tool calls. */
-private fun UiMessage.isRunWorkMessage(): Boolean = isReasoning || isPlainAssistantStep()
+private fun UiMessage.isRunWorkMessage(): Boolean {
+    if (isReasoning) return true
+    return isPlainAssistantStep()
+}
 
 /** A step of a run, in chat order. */
 @Immutable

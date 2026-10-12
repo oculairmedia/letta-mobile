@@ -154,10 +154,16 @@ private fun failedParts(activity: RunActivityProjection): List<String> {
 /** "Worked · 10.8s · 1 tool" (or "Thought · 2.1s" for a run that only reasoned). */
 @Composable
 private fun doneParts(activity: RunActivityProjection): List<String> {
-    val verb = stringResource(if (activity.state == RunActivityState.Thought) Res.string.rows_run_thought else Res.string.rows_run_worked)
+    val verb = stringResource(if (onlyThought(activity)) Res.string.rows_run_thought else Res.string.rows_run_worked)
     val duration = activity.durationMs?.let { formatRunDuration(it) }
     val tools = activity.toolCount.takeIf { it > 0 }?.let { pluralStringResource(Res.plurals.rows_run_tool_count, it, it) }
     return listOfNotNull(verb, duration, tools)
+}
+
+/** A run that reasoned and ran no tools "Thought"; one that ran tools "Worked", reasoning or not. */
+private fun onlyThought(activity: RunActivityProjection): Boolean {
+    if (activity.toolCount > 0) return false
+    return activity.state == RunActivityState.Thought
 }
 
 @Composable
