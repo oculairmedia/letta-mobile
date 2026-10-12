@@ -16,10 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +65,7 @@ import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
@@ -340,7 +339,10 @@ private fun elapsedSecondsSince(startedAtEpochMs: Long?): Long? =
 
 private const val ELAPSED_TICK_MILLIS = 1_000L
 
-/** The run's calls in full, one [ToolCard] each, led by its step status. */
+/**
+ * The run's calls in full, one [ToolCard] each, led by its step status: in the window's inspector
+ * (docked when wide, a sheet when compact; letta-mobile-ckmub.3.15), titled with the run's line.
+ */
 @Composable
 private fun ToolRunDetailsSheet(
     sheet: ToolRunSheetContent,
@@ -351,10 +353,10 @@ private fun ToolRunDetailsSheet(
     val details = sheet.details
     val heading = sheet.heading
     val elapsed by rememberElapsedSeconds(heading.summary.running, heading.startedAtEpochMs)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_DETAILS),
+    InspectorPane(
+        title = toolRunLabel(heading.summary, elapsed),
+        onClose = onDismiss,
+        testTag = ChatRowTestTags.TOOL_RUN_DETAILS,
     ) {
         Column(
             modifier = Modifier
@@ -363,11 +365,6 @@ private fun ToolRunDetailsSheet(
                 .padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, bottom = LettaDimens.Space.xxl),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            Text(
-                text = toolRunLabel(heading.summary, elapsed),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
             details.approvals.forEach { ApprovalRequestCard(it, context, callbacks) }
             ToolRunCards(details.toolCalls, callbacks)
         }

@@ -32,7 +32,6 @@ import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopDefaultButton
-import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.schedules.ScheduleDef
 import com.letta.mobile.data.schedules.HistorySummary
@@ -46,6 +45,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 import kotlin.time.Duration.Companion.milliseconds
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.schedules.AgendaView
 import com.letta.mobile.ui.schedules.AgendaViewParams
 import com.letta.mobile.ui.schedules.HistoryView
@@ -286,7 +286,7 @@ private fun ScheduleMainContent(params: ScheduleContentParams) {
             ScheduleView.History -> HistoryView(params.historySummary)
         }
         scheduleError != null -> Box(Modifier.fillMaxSize().padding(LettaDimens.Space.xxl), contentAlignment = Alignment.TopCenter) {
-            DesktopInlineError(message = scheduleError, onRetry = params.onRefresh, retrying = params.state.isLoading)
+            LettaInlineError(message = scheduleError, onRetry = params.onRefresh, retrying = params.state.isLoading)
         }
         params.state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Loading schedules…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)

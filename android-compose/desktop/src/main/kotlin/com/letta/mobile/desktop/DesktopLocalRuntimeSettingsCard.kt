@@ -15,14 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.desktop.runtime.DesktopGitStatus
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.ui.theme.LettaDimens
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
@@ -146,34 +144,4 @@ private fun RuntimeLaunchSection(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-}
-
-/**
- * Chat-pane notice while the bundled runtime is down: "restarting" during backoff, and a Restart
- * action once automatic restarts gave up (F03). Shows nothing while the runtime is healthy.
- */
-@Composable
-internal fun DesktopLocalRuntimeBanner(modifier: Modifier = Modifier) {
-    val health by DesktopLocalRuntimeHost.health.collectAsState()
-    if (!health.needsChatBanner) return
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        Text(
-            text = "Local runtime: ${health.describe()}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            modifier = Modifier.weight(1f),
-        )
-        if (health.stoppedByUser) {
-            DesktopDefaultButton(onClick = DesktopLocalRuntimeHost::startByUser) { DesktopButtonContent("Start") }
-        } else if (health.needsForceRestart) {
-            DesktopDefaultButton(onClick = DesktopLocalRuntimeHost::forceRestart) { DesktopButtonContent("Restart") }
-        }
-    }
 }

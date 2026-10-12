@@ -35,10 +35,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.ui.notify.AgentNotificationsSection
 import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
-import com.letta.mobile.ui.host.LettaPane
-import com.letta.mobile.ui.host.LettaPaneKind
-import com.letta.mobile.ui.host.PaneAnchor
-import com.letta.mobile.ui.host.PaneSize
+import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
@@ -100,9 +97,9 @@ data class AgentContextCardActions(
 )
 
 /**
- * How a host binds the card: the session pieces and the model picks. Where the sheet opens is the
- * [com.letta.mobile.ui.host.LettaHost]'s call: a bottom sheet on touch, a popover under the card
- * on a pointer (letta-mobile-ckmub.3.1).
+ * How a host binds the card: the session pieces and the model picks. Where the detail opens is the
+ * window's: the [InspectorPane] docks on the right of a wide window's inspector frame and is a
+ * sheet on a compact one (letta-mobile-ckmub.3.15, S13).
  */
 data class AgentContextCardBinding(
     val deps: AgentContextCardDeps,
@@ -136,11 +133,11 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
         if (open) {
             // letta-mobile-pt1ze.5: Escape, back or a scrim tap first leaves the model list.
             val levels = rememberPickerDrillIn(AgentSettingsLevel.Root)
-            LettaPane(
-                kind = LettaPaneKind.Adaptive(PaneAnchor.BelowStart),
-                onDismiss = { if (!levels.back()) open = false },
-                size = PaneSize(AgentContextDimens.popoverWidth, AgentContextDimens.popoverMaxHeight),
+            InspectorPane(
+                title = INSPECTOR_TITLE,
+                onClose = { if (!levels.back()) open = false },
                 testTag = AgentContextTags.SHEET,
+                width = AgentContextDimens.popoverWidth,
             ) {
                 val limit = rememberLimitControl(
                     deps.contextLimit,
@@ -274,3 +271,4 @@ private fun rememberPicker(
 }
 
 private const val DEFAULT_CONVERSATION = "default"
+private const val INSPECTOR_TITLE = "Model and context"

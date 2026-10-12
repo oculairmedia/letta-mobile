@@ -3,10 +3,9 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,13 +15,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
@@ -30,9 +27,18 @@ import com.letta.mobile.desktop.phone.agentPaneVisible
 import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
 import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
+import com.letta.mobile.ui.chat.subagents.SubagentRosterPane
+import com.letta.mobile.ui.host.InspectorFrame
+import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.OverlayWhile
+import com.letta.mobile.ui.host.ProvideInspectorHost
+import com.letta.mobile.ui.host.rememberInspectorHost
+import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
+import com.letta.mobile.ui.shell.UndoDeleteOverlay
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
@@ -44,15 +50,12 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 @Composable
 internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: DesktopShellFrame) {
     val navigator = context.navigator
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-    ) {
-        Column(Modifier.fillMaxSize()) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        // The window's one overlay queue (snackbars, undo, banners), drawn over the whole shell.
+        OverlayHostRoot(rememberOverlayHost(), Modifier.fillMaxSize()) {
             Box(
                 Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .railLightDismiss(navigator.railExpanded) { navigator.railExpanded = false },
             ) {
                 // Plugin elements render live where a plugin view is bound (letta-mobile-s416w.14);
@@ -66,14 +69,14 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     }
                 }
                 DesktopShellOverlays(context, frame)
-                val chatController = context.core.chatController
-                val undoable by chatController.deletionUndo.pending.collectAsState()
-                DesktopUndoDeleteSnackbar(
-                    offer = undoable,
-                    onUndo = chatController::undoDeleteConversation,
-                    onExpire = { chatController.deletionUndo.clear(it.conversationId) },
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
+                // F03: the bundled runtime's crash notice, over every page while it is down.
+                val runtimeBanner = DesktopLocalRuntimeHost.health.collectAsState().value.runtimeBanner()
+                OverlayWhile(runtimeBanner, key = runtimeBanner?.let { it.message to it.action?.label })
+                val chat = context.core.chatController
+                val offer = chat.deletionUndo.pending.collectAsState().value
+                UndoDeleteOverlay(offer, offer?.behavior, { offer?.let(chat::undoDeleteConversation) }) {
+                    offer?.let { chat.deletionUndo.clear(it.conversationId) }
+                }
             }
         }
     }
@@ -84,14 +87,11 @@ private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopS
     val layout = context.core.layout
     // The phone preview folds the rail and sidebar into a drawer; null in the desktop app.
     val phone = LocalDesktopPhone.current
+    // The sidebar's card and the main pane's panels open their detail in the frame around the main pane.
+    val inspectors = rememberInspectorHost()
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Responsive shell: below the breakpoint (or when the user
-        // explicitly collapses it) the capability/history sidebar is
-        // fully removed - not shrunk to an icon rail - and the chat pane
-        // takes the full width. The breakpoint/collapse decision itself
-        // lives in sharedLogic's ShellLayoutReducer; this just reports
-        // the measured width into it. The 56dp agent rail always stays as
-        // the navigation affordance.
+        // Below the breakpoint (or when collapsed) the sidebar is removed, not shrunk, and the chat takes
+        // the width; ShellLayoutReducer decides, this reports the width. The 56dp agent rail always stays.
         val measuredWidthDp = maxWidth.value
         val desktopSidebarVisible = layout.controller.state.isSidebarVisible &&
             !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
@@ -101,13 +101,17 @@ private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopS
         ReportShellWidth(phone, measuredWidthDp) { layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) }
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
         MascotTransportLayer(reducedMotion = layout.reducedMotion) {
-            DesktopShellRow(
-                phone,
-                layout.reducedMotion,
-                navigationPanes = { DesktopShellNavigationPanes(context, frame, isSidebarVisible) },
-            ) {
-                DesktopShellMainPane(context, frame)
-                DesktopShellBackgroundTasks(context, frame)
+            ProvideInspectorHost(inspectors) {
+                DesktopShellRow(
+                    phone,
+                    layout.reducedMotion,
+                    navigationPanes = { DesktopShellNavigationPanes(context, frame, isSidebarVisible) },
+                ) {
+                    InspectorFrame(Modifier.weight(1f).fillMaxHeight(), host = inspectors) {
+                        Row(Modifier.fillMaxSize()) { DesktopShellMainPane(context, frame) }
+                    }
+                    DesktopShellBackgroundTasks(context, frame)
+                }
             }
         }
     }
@@ -206,13 +210,9 @@ private val SIDEBAR_WIDTH = 231.dp
 @Composable
 private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: DesktopShellFrame) {
     val navigator = context.navigator
-    val repository = context.panels.subagents.repository
-    if (navigator.showBackgroundTasks && repository != null) {
-        DesktopBackgroundTasksSidePane(
-            subagents = frame.lists.activeSubagents,
-            onClose = { navigator.showBackgroundTasks = false },
-        )
-    }
+    if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
+    // The roster opens in the window's inspector (docked beside the main pane when wide).
+    SubagentRosterPane(frame.lists.activeSubagents, onClose = { navigator.showBackgroundTasks = false })
 }
 
 @Composable

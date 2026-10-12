@@ -2,6 +2,9 @@ package com.letta.mobile.ui.common
 
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayDurations
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 
@@ -26,3 +29,18 @@ class SnackbarDispatcher {
 }
 
 val LocalSnackbarDispatcher = staticCompositionLocalOf { SnackbarDispatcher() }
+
+/**
+ * letta-mobile-ckmub.3.15 (hard cut S13): an app screen's message as a snackbar on the activity's
+ * [com.letta.mobile.ui.host.OverlayHost], the one queue every Android surface shares.
+ */
+fun SnackbarMessage.toOverlay(): Overlay.Snackbar = Overlay.Snackbar(
+    message = message,
+    durationMillis = when (duration) {
+        SnackbarDuration.Short -> OverlayDurations.SHORT
+        SnackbarDuration.Long -> OverlayDurations.LONG
+        SnackbarDuration.Indefinite -> null
+    },
+    action = actionLabel?.let { label -> OverlayAction(label) { onAction?.invoke() } },
+    dismissible = duration == SnackbarDuration.Indefinite,
+)
