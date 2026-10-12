@@ -51,8 +51,8 @@ import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.lettaFadingEdges
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
-import com.letta.mobile.ui.shell.ShellHoverCard
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LettaHoverCard
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -199,14 +199,14 @@ fun Modifier.railScrollFades(listState: LazyListState): Modifier {
 /** One orb: its hover card, and its agent menu (desktop: right-click, touch: long-press). */
 @Composable
 private fun ShellRailOrb(entry: ShellRailEntry, actions: ShellAgentRailActions) {
-    val card = ShellHoverCard(
+    val card = LettaHoverCard(
         title = entry.tooltip,
         timestamp = entry.activity?.updatedAtLabel,
         body = entry.activity?.preview?.trim()?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) },
     )
-    val decorations = LocalShellChromeDecorations.current
-    decorations.rowMenu(ShellRowMenus.agent(entry, actions)) {
-        decorations.hoverCard(card) {
+    val host = LocalLettaHost.current
+    host.rowMenu(ShellRowMenus.agent(entry, actions)) {
+        host.hoverCard(card) {
             Box(
                 modifier = Modifier
                     .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
@@ -311,7 +311,7 @@ private data class RailCircleButtonStyle(
 
 @Composable
 private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) {
-    LocalShellChromeDecorations.current.tooltip(style.description) {
+    LocalLettaHost.current.tooltip(style.description) {
         Box(
             modifier = Modifier
                 .size(style.diameter)

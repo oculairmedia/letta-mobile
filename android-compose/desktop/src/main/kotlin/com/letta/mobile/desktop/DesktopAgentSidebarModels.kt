@@ -72,10 +72,3 @@ internal data class DesktopSidebarListMarks(
     val archivedConversations: List<DesktopConversationSummary> = emptyList(),
     val chatOptions: ShellChatOptionsState? = null,
 )
-
-@Immutable
-internal data class ConfirmDialogRequest(
-    val title: String,
-    val message: String,
-    val confirmLabel: String,
-)

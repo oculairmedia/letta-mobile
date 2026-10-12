@@ -2,7 +2,6 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +15,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.host.LettaMenu
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** One row of a [LettaPopupMenu]. */
@@ -49,13 +49,8 @@ fun LettaPopupMenu(
     modifier: Modifier = Modifier,
 ) {
     val actionScope = LocalMenuActionScope.current
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
+    // The host's menu container (letta-mobile-ckmub.3.1): a dropdown on every platform today.
+    LettaMenu(expanded = expanded, onDismiss = onDismiss, modifier = modifier) {
         items.forEach { item ->
             DropdownMenuItem(
                 text = {

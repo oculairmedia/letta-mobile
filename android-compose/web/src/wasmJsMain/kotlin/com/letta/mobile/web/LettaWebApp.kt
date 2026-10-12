@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.model.BackendConnectionStatus
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
@@ -77,9 +79,11 @@ fun LettaWebApp() {
         ),
     )
     SharedMaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            BoxWithConstraints {
-                if (maxWidth < LettaDimens.Pane.wideBreakpoint) CompactWebShell(shell, page) else WideWebShell(shell, page)
+        ProvideLettaHost(LettaHost.Pointer) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                BoxWithConstraints {
+                    if (maxWidth < LettaDimens.Pane.wideBreakpoint) CompactWebShell(shell, page) else WideWebShell(shell, page)
+                }
             }
         }
     }

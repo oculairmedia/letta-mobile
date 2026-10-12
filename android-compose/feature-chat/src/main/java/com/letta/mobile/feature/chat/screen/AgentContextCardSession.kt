@@ -19,7 +19,6 @@ import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
-import com.letta.mobile.ui.context.AgentContextPresentation
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
@@ -79,7 +78,6 @@ internal fun AndroidAgentContextCard(state: AgentScaffoldRuntimeState) {
                 onModelSelected = { entry -> viewModel.updateActiveAgentModel(entry.handle.value) },
                 onEffortSelected = { entry, effort -> viewModel.updateActiveAgentModel(entry.handle.value, EffortSelection.Set(effort)) },
             ),
-            presentation = AgentContextPresentation.Sheet,
         )
     }
     // letta-mobile-dxz5s: the same resolution desktop uses — the conversation's own model and window first.

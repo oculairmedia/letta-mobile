@@ -22,7 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +41,7 @@ import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.search.TextMatch
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
+import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.shell.ShellRowMenus
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
@@ -149,19 +148,18 @@ internal fun DesktopAgentRail(
         onAgentSettings = actions.onAgentSettings,
         onShowAllAgents = actions.onShowAllAgents,
     )
-    CompositionLocalProvider(LocalShellChromeDecorations provides DesktopShellChromeDecorations) {
-        ShellAgentRail(
-            state = ShellAgentRailState(
-                entries = entries,
-                homeSelected = state.homeSelected,
-                expanded = state.expanded,
-                hiddenAgentCount = state.hiddenAgentCount,
-            ),
-            actions = railActions,
-            modifier = Modifier.background(MaterialTheme.colorScheme.background),
-            library = { ExpandedAgentLibrary(groups = groups, entries = entries, actions = railActions) },
-        )
-    }
+    // Hover cards and the right-click orb menu come from the window's LettaHost.
+    ShellAgentRail(
+        state = ShellAgentRailState(
+            entries = entries,
+            homeSelected = state.homeSelected,
+            expanded = state.expanded,
+            hiddenAgentCount = state.hiddenAgentCount,
+        ),
+        actions = railActions,
+        modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        library = { ExpandedAgentLibrary(groups = groups, entries = entries, actions = railActions) },
+    )
 }
 
 /**
@@ -215,7 +213,7 @@ private fun ColumnScope.ExpandedAgentLibrary(
             // Keyed by group name so per-row state (the thinking ring) follows its agent across recency reordering.
             items(spaceEntries, key = { "group-${it.key}" }) { entry ->
                 // The same agent menu as the collapsed orbs (right-click).
-                LocalShellChromeDecorations.current.rowMenu(ShellRowMenus.agent(entry, actions)) {
+                LocalLettaHost.current.rowMenu(ShellRowMenus.agent(entry, actions)) {
                     ExpandedAgentRow(entry = entry, onAgentSelected = actions.onAgentSelected)
                 }
             }

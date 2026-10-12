@@ -25,7 +25,7 @@ import com.letta.mobile.ui.shell.rail.ShellRailEntry
 /**
  * The secondary actions of the shell's rows, built once for every gesture that opens them: the
  * desktop's right-click menu and the touch long-press menu both receive these lists through
- * [ShellChromeDecorations.rowMenu], so a row's actions are defined in one place.
+ * [com.letta.mobile.ui.host.LettaHost.rowMenu], so a row's actions are defined in one place.
  */
 object ShellRowMenus {
     /**
@@ -38,31 +38,31 @@ object ShellRowMenus {
         deleting: Boolean,
         actions: ShellConversationMenuActions,
         deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
-    ): List<ShellRowMenuItem> =
+    ): List<LettaMenuItem> =
         if (deleting) {
             emptyList()
         } else {
             val offersDelete = !(archived && deleteBehavior == ConversationDeleteBehavior.MovesToArchived)
             actions.manage.items() + listOfNotNull(
-                ShellRowMenuItem(if (archived) "Restore chat" else "Archive chat", actions.onArchiveToggle),
-                ShellRowMenuItem("Delete chat", actions.onRequestDelete).takeIf { offersDelete },
+                LettaMenuItem(if (archived) "Restore chat" else "Archive chat", onClick = actions.onArchiveToggle),
+                LettaMenuItem("Delete chat", onClick = actions.onRequestDelete).takeIf { offersDelete },
             )
         }
 
     /** A canvas: archive or restore, when the host can archive canvases (null: it cannot). */
-    fun canvas(archived: Boolean, onArchiveToggle: (() -> Unit)?): List<ShellRowMenuItem> =
+    fun canvas(archived: Boolean, onArchiveToggle: (() -> Unit)?): List<LettaMenuItem> =
         listOfNotNull(
-            onArchiveToggle?.let { ShellRowMenuItem(if (archived) "Restore canvas" else "Archive canvas", it) },
+            onArchiveToggle?.let { LettaMenuItem(if (archived) "Restore canvas" else "Archive canvas", onClick = it) },
         )
 
     /** A rail agent: open it, pin or unpin it, open its settings (each when the host offers it). */
-    fun agent(entry: ShellRailEntry, actions: ShellAgentRailActions): List<ShellRowMenuItem> =
+    fun agent(entry: ShellRailEntry, actions: ShellAgentRailActions): List<LettaMenuItem> =
         listOfNotNull(
-            ShellRowMenuItem("Open") { actions.onAgentSelected(entry.agentId) },
+            LettaMenuItem("Open") { actions.onAgentSelected(entry.agentId) },
             actions.onAgentPinnedChange?.let { onPinned ->
-                ShellRowMenuItem(if (entry.pinned) "Unpin agent" else "Pin agent") { onPinned(entry.agentId, !entry.pinned) }
+                LettaMenuItem(if (entry.pinned) "Unpin agent" else "Pin agent") { onPinned(entry.agentId, !entry.pinned) }
             },
-            actions.onAgentSettings?.let { onSettings -> ShellRowMenuItem("Agent settings") { onSettings(entry.agentId) } },
+            actions.onAgentSettings?.let { onSettings -> LettaMenuItem("Agent settings") { onSettings(entry.agentId) } },
         )
 }
 
@@ -87,12 +87,12 @@ data class ShellConversationManageMenu(
     val onSettleToggle: (() -> Unit)? = null,
     val onMarkerRequest: (() -> Unit)? = null,
 ) {
-    fun items(): List<ShellRowMenuItem> = listOfNotNull(
-        onRenameRequest?.let { ShellRowMenuItem("Rename chat", it) },
-        onPinToggle?.let { ShellRowMenuItem(if (pinned) "Unpin chat" else "Pin chat", it) },
-        onForkRequest?.let { ShellRowMenuItem("Fork chat…", it) },
-        onMarkerRequest?.let { ShellRowMenuItem("Set marker…", it) },
-        onSettleToggle?.let { ShellRowMenuItem(if (settled) "Move to active" else "Settle chat", it) },
+    fun items(): List<LettaMenuItem> = listOfNotNull(
+        onRenameRequest?.let { LettaMenuItem("Rename chat", onClick = it) },
+        onPinToggle?.let { LettaMenuItem(if (pinned) "Unpin chat" else "Pin chat", onClick = it) },
+        onForkRequest?.let { LettaMenuItem("Fork chat…", onClick = it) },
+        onMarkerRequest?.let { LettaMenuItem("Set marker…", onClick = it) },
+        onSettleToggle?.let { LettaMenuItem(if (settled) "Move to active" else "Settle chat", onClick = it) },
     )
 
     companion object {
@@ -106,12 +106,12 @@ object ShellRowMenuTags {
 }
 
 /**
- * The touch row menu, [ShellChromeDecorations.rowMenu]'s default: a long-press on [content] (with a
+ * The touch row menu, [com.letta.mobile.ui.host.LettaHost.rowMenu]'s default: a long-press on [content] (with a
  * haptic tick) opens the [items] as a popup anchored to the row. A plain tap still reaches the row.
  * No items, no gesture.
  */
 @Composable
-fun ShellLongPressMenu(items: List<ShellRowMenuItem>, content: @Composable () -> Unit) {
+fun ShellLongPressMenu(items: List<LettaMenuItem>, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
     val onLongPress = remember(haptics) {
@@ -125,7 +125,7 @@ fun ShellLongPressMenu(items: List<ShellRowMenuItem>, content: @Composable () ->
         LettaPopupMenu(
             expanded = open && items.isNotEmpty(),
             onDismiss = { open = false },
-            items = items.map { LettaMenuItem(label = it.label, onClick = it.onClick) },
+            items = items,
             modifier = Modifier.testTag(ShellRowMenuTags.MENU),
         )
     }

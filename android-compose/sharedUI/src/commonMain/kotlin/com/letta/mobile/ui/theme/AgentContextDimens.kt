@@ -15,9 +15,6 @@ object AgentContextDimens {
     val popoverWidth: Dp = 360.dp
     val popoverMaxHeight: Dp = 620.dp
 
-    /** How far below the card the desktop popover opens. */
-    val popoverGap: Dp = 6.dp
-
     /** letta-mobile-joigh: room for the limit slider's widest label ("200k of 400k"), so the track never shifts. */
     val limitValueWidth: Dp = 84.dp
 

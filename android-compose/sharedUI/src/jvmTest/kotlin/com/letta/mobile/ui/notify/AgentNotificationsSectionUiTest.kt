@@ -17,7 +17,9 @@ import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
-import com.letta.mobile.ui.context.AgentContextPresentation
+import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.context.AgentContextTags
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -89,10 +91,9 @@ class AgentNotificationsSectionUiTest {
         )
         setContent {
             MaterialTheme {
-                AgentContextCardHost(
-                    AgentContextCardBinding(deps, AgentContextCardActions(onModelSelected = {}), AgentContextPresentation.Popover),
-                    focus,
-                )
+                CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) {
+                    AgentContextCardHost(AgentContextCardBinding(deps, AgentContextCardActions(onModelSelected = {})), focus)
+                }
             }
         }
         onNodeWithTag(AgentContextTags.CARD).performClick()
