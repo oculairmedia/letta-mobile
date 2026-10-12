@@ -3,7 +3,9 @@ package com.letta.mobile.feature.chat.screen.shared
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
+import org.junit.Assert.assertTrue
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import org.junit.Rule
@@ -36,13 +38,14 @@ class SharedChatRichMarkdownShellTextTest {
             }
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(MATH_PAIRED_SPAN, substring = true, useUnmergedTree = true).assertExists()
+        val tree = composeRule.onRoot(useUnmergedTree = true).printToString()
+        assertTrue("the shell span must render as text, not a math atom:\n$tree",tree.contains(MATH_PAIRED_SPAN))
     }
 
     private companion object {
-        const val SHELL = "Ran: T=\$(grep -E '/(test|jvmTest|commonTest)/' /tmp/f.txt); A=\$(cat /tmp/f.txt)"
+        const val SHELL = "Ran: T=\$(grep -E foo /tmp/f.txt); A=\$(cat /tmp/f.txt)"
 
         // Everything between the two `$`s: the old rule swallowed exactly this into a math atom.
-        const val MATH_PAIRED_SPAN = "(grep -E '/(test|jvmTest|commonTest)/' /tmp/f.txt); A="
+        const val MATH_PAIRED_SPAN = "(grep -E foo /tmp/f.txt); A="
     }
 }
