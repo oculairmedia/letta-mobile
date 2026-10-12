@@ -17,19 +17,21 @@ import com.letta.mobile.data.presence.AgentPresence
 fun AvatarDirector.applyPresence(previous: AgentPresence, presence: AgentPresence) {
     if (presence == previous) return
     if (presence.dozing != previous.dozing) setQuietHours(presence.dozing)
-    setActivity(
-        when (presence.activity) {
-            AgentActivityKind.THINKING -> AvatarActivity.THINKING
-            AgentActivityKind.WORKING -> AvatarActivity.WORKING
-            AgentActivityKind.DELEGATING -> AvatarActivity.DELEGATING
-            AgentActivityKind.SPEAKING -> AvatarActivity.SPEAKING
-            AgentActivityKind.IDLE -> AvatarActivity.IDLE
-        },
-    )
+    setActivity(presence.activity.toAvatarActivity())
     setUserTyping(presence.userTyping)
     setAwaitingApproval(presence.awaitingApproval)
     if (presence.error && !previous.error) notifyError()
-    if (previous.activity != AgentActivityKind.IDLE && presence.activity == AgentActivityKind.IDLE && !presence.error) {
-        notifyTaskSucceeded()
-    }
+    if (finishedCleanly(previous, presence)) notifyTaskSucceeded()
 }
+
+private fun AgentActivityKind.toAvatarActivity(): AvatarActivity = when (this) {
+    AgentActivityKind.THINKING -> AvatarActivity.THINKING
+    AgentActivityKind.WORKING -> AvatarActivity.WORKING
+    AgentActivityKind.DELEGATING -> AvatarActivity.DELEGATING
+    AgentActivityKind.SPEAKING -> AvatarActivity.SPEAKING
+    AgentActivityKind.IDLE -> AvatarActivity.IDLE
+}
+
+/** A run that ends without an error is a completed task. */
+private fun finishedCleanly(previous: AgentPresence, presence: AgentPresence): Boolean =
+    previous.activity != AgentActivityKind.IDLE && presence.activity == AgentActivityKind.IDLE && !presence.error
