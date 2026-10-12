@@ -32,6 +32,14 @@ import kotlin.time.Duration.Companion.milliseconds
  * fits in one day shows none. Rows whose timestamp is blank or unparseable emit no divider and
  * stay in the open section, so a malformed timestamp cannot tear a turn in half. Input and output
  * are in chat order (oldest first).
+ *
+ * letta-mobile-om38i: sections only ever move FORWARD. Chat order is not timestamp order: a
+ * compaction's summary row can carry an earlier stamp than the rows around it, and a run block's
+ * boundary is its NEWEST step, so a run spanning midnight reads as tomorrow while the row after it
+ * reads as today. Opening a section on any change re-emitted the same day's divider (yesterday,
+ * compaction, today, ..., today) and the duplicate `__day__<date>` key crashed the LazyColumn. A
+ * row stamped earlier than the open section stays in that section, exactly like an unreadable
+ * stamp, so each date opens at most one section and every divider key is unique by construction.
  */
 internal fun withDayDividers(
     chatOrderRows: List<TimelineRow>,
@@ -42,7 +50,7 @@ internal fun withDayDividers(
     var currentDay: LocalDate? = null
     chatOrderRows.forEach { row ->
         val day = row.timestampOrNull()?.let { parseTimelineLocalDate(it, zone) }
-        if (day != null && day != currentDay) {
+        if (day != null && opensNewSection(day, currentDay)) {
             if (currentDay != null) out += TimelineRow.DayDivider(day)
             currentDay = day
         }
@@ -50,6 +58,9 @@ internal fun withDayDividers(
     }
     return out
 }
+
+/** Only a strictly LATER day opens a section; an earlier-stamped row stays in the open one. */
+private fun opensNewSection(day: LocalDate, currentDay: LocalDate?): Boolean = currentDay == null || day > currentDay
 
 /**
  * The date a paged row's divider names, or null when its older neighbour shares its day. Emitted
@@ -66,7 +77,9 @@ internal fun pagedBoundaryDate(
     if (older == null) return null
     val newerDay = parseTimelineLocalDate(newer.boundaryTimestamp, zone) ?: return null
     val olderDay = parseTimelineLocalDate(older.boundaryTimestamp, zone)
-    return newerDay.takeIf { it != olderDay }
+    // letta-mobile-om38i: forward only, as in [withDayDividers]; an earlier-stamped row (a
+    // compaction summary) never names a day behind the one its older neighbour already opened.
+    return newerDay.takeIf { olderDay == null || it > olderDay }
 }
 
 /** ISO instant (`Z` or offset) in [zone], else a zone-less local date-time, else null. */

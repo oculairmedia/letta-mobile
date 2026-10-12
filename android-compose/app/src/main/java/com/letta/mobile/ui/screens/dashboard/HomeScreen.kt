@@ -13,24 +13,27 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.header.HeaderAction
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
-import com.letta.mobile.ui.shell.pages.home.HomePage
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.shell.shellHomePage
 import kotlinx.coroutines.launch
 
 /** The phone presentation of the shared Home page: the shell header and drawer carry title and search. */
 private val AndroidHomeOptions = HomePageOptions(showTitle = false, showSearch = false, touch = true)
 
 /**
- * The Admin tab's home: the shared shell header (search, backend chip, settings) and admin drawer around
+ * The Admin tab's home: the shared shell header (search, backend label, settings) and admin drawer around
  * the shared Home page (letta-mobile-c3np7.3.11.1).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,11 +151,11 @@ fun HomeScreen(
                 )
             },
         ) { paddingValues ->
-            HomePage(
-                state = state,
-                callbacks = HomePageCallbacks(viewModel.actions, navigation.homePageNavigation(state, routes)),
+            val callbacks = HomePageCallbacks(viewModel.actions, navigation.homePageNavigation(state, routes))
+            ShellPage(
+                destination = ShellDestination.Home,
+                deps = ShellPageDeps(home = shellHomePage(state, callbacks, AndroidHomeOptions)),
                 modifier = Modifier.padding(paddingValues),
-                options = AndroidHomeOptions,
             )
         }
     }

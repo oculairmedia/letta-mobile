@@ -9,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
-import kotlin.reflect.KClass
 
 /** Who pads a compact destination for the system bars in [AdaptiveScaffold]: the scaffold, or the page itself. */
 internal enum class DestinationInsetPolicy {
@@ -40,18 +39,27 @@ internal enum class DestinationInsetPolicy {
     }
 }
 
-/** Destinations whose host renders a shared page inside LettaPageScaffold. */
-private val PageScaffoldRoutes: List<KClass<*>> = listOf(
-    AdminRoute::class,
-    ChannelsRoute::class,
-    MemoryRoute::class,
-    SkillsRoute::class,
-    AllToolsRoute::class,
-)
+/**
+ * Destinations whose host renders a shared page inside LettaPageScaffold, by serial name. The names
+ * come from the compile-time serializers: `hasRoute(KClass)` looks each serializer up reflectively,
+ * which costs on the startup path in a minified build.
+ */
+private val PageScaffoldRouteNames: Set<String> by lazy {
+    setOf(
+        AdminRoute.serializer().descriptor.serialName,
+        ChannelsRoute.serializer().descriptor.serialName,
+        MemoryRoute.serializer().descriptor.serialName,
+        SkillsRoute.serializer().descriptor.serialName,
+        AllToolsRoute.serializer().descriptor.serialName,
+    )
+}
+
+/** A type-safe destination's route is its serial name, then any `/{arg}` path or `?arg=` query. */
+private fun NavDestination.routeName(): String? = route?.substringBefore('/')?.substringBefore('?')
 
 internal fun NavDestination?.insetPolicy(): DestinationInsetPolicy = when {
     this == null -> DestinationInsetPolicy.Host
-    PageScaffoldRoutes.any { hasRoute(it) } -> DestinationInsetPolicy.PageScaffold
     TopLevelDestination.CHAT.isSelected(this) || hasRoute(CanvasRoute::class) -> DestinationInsetPolicy.SelfVertical
+    routeName() in PageScaffoldRouteNames -> DestinationInsetPolicy.PageScaffold
     else -> DestinationInsetPolicy.Host
 }

@@ -31,20 +31,18 @@ import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.toBackendLabel
-import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.chatGraph
 import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
 import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
-import com.letta.mobile.feature.editagent.EditAgentRoute
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -105,15 +103,16 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 }
             }
         },
-        onNavigateToSettings = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+        // letta-mobile-ckmub.3.4: shared destinations go through their Android route mapping.
+        onNavigateToSettings = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
         onNavigateToArchival = { agentId -> navController.navigate(ArchivalRoute(agentId)) },
-        onNavigateToTools = { navController.navigate(AllToolsRoute) },
-        onNavigateToMemory = { agentId -> navController.navigate(MemoryRoute(agentId)) },
-        onNavigateToAdmin = { navController.navigate(AdminRoute) },
-        onNavigateToProviders = { navController.navigate(ProvidersRoute) },
-        onNavigateToSchedules = { agentId -> navController.navigate(SchedulesRoute(agentId)) },
+        onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
+        onNavigateToMemory = { agentId -> navController.navigateTo(ShellDestination.Memory(agentId)) },
+        onNavigateToAdmin = { navController.navigateTo(ShellDestination.Home) },
+        onNavigateToProviders = { navController.navigateTo(ShellDestination.Providers) },
+        onNavigateToSchedules = { agentId -> navController.navigateTo(ShellDestination.Schedules(agentId)) },
         onNavigateToProjects = { navController.navigate(HomeRoute) },
-        onNavigateToConversationList = { navController.navigate(ConversationsRoute) },
+        onNavigateToConversationList = { navController.navigateTo(ShellDestination.Chat()) },
         onSwitchConversation = { route ->
             navController.navigate(route) {
                 popUpTo<AgentChatRoute> { inclusive = true }
@@ -124,10 +123,10 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
                 CanvasRoute(canvasId = "", conversationId = conversationId, agentId = agentId, shareRecipient = shareRecipient),
             )
         },
-        onNavigateToAppSettings = { navController.navigate(ConfigRoute()) },
-        onOpenCanvas = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
-        onNavigateToChannels = { navController.navigate(ChannelsRoute) },
-        onNavigateToSkills = { agentId -> navController.navigate(SkillsRoute(agentId)) },
+        onNavigateToAppSettings = { navController.navigateTo(ShellDestination.Settings()) },
+        onOpenCanvas = { canvasId -> navController.navigateTo(ShellDestination.Canvas(canvasId = canvasId)) },
+        onNavigateToChannels = { navController.navigateTo(ShellDestination.Channels) },
+        onNavigateToSkills = { agentId -> navController.navigateTo(ShellDestination.Skills(agentId)) },
     )
 }
 
@@ -196,26 +195,6 @@ private fun androidx.navigation.NavGraphBuilder.appCanvasGraph(navController: Na
     }
 }
 
-@Suppress("NoAnyType")
-private fun resolveStartDestination(
-    hasConfig: Boolean,
-    initialNotificationTarget: AppLaunchTarget?,
-    restoredChatSelection: LastChatSelection?,
-    fallbackAgentId: String?,
-): Any = when {
-    hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
-    hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
-        AgentChatRoute(
-            agentId = selection.agentId,
-            agentName = selection.agentName,
-            conversationId = selection.conversationId,
-        )
-    }
-    hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
-    hasConfig -> ConversationsRoute
-    else -> ConfigRoute()
-}
-
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 @HiltViewModel
@@ -223,11 +202,13 @@ class NavViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    val hasConfig: Flow<Boolean> = settingsRepository.activeConfig.map { it != null }
     val activeConfig: StateFlow<LettaConfig?> = settingsRepository.activeConfig
-    val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
-    val adminAgentId: StateFlow<String?> = settingsRepository.adminAgentId
-    val lastChatSelection: StateFlow<LastChatSelection?> = settingsRepository.lastChatSelection
+    internal val startInputs = AppStartInputs(
+        activeConfig = settingsRepository.activeConfig,
+        lastChatSelection = settingsRepository.lastChatSelection,
+        favoriteAgentId = settingsRepository.favoriteAgentId,
+        adminAgentId = settingsRepository.adminAgentId,
+    )
 
     fun clearAllData() {
         ChatPushAlarmScheduler.cancel(appContext)
@@ -245,11 +226,7 @@ fun AppNavGraph(
     onNotificationTargetConsumed: () -> Unit = {},
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
-    val hasConfig by navViewModel.hasConfig.collectAsStateWithLifecycle(initialValue = true)
-    val activeConfig by navViewModel.activeConfig.collectAsStateWithLifecycle(initialValue = null)
-    val favoriteAgentId by navViewModel.favoriteAgentId.collectAsStateWithLifecycle(initialValue = null)
-    val adminAgentId by navViewModel.adminAgentId.collectAsStateWithLifecycle(initialValue = null)
-    val lastChatSelection by navViewModel.lastChatSelection.collectAsStateWithLifecycle(initialValue = null)
+    val activeConfig by navViewModel.activeConfig.collectAsStateWithLifecycle()
     val activeBackendLabel = activeConfig.toBackendLabel()
 
     // letta-mobile-cdlk: backend-switcher bottom sheet. State is lifted to
@@ -261,12 +238,8 @@ fun AppNavGraph(
     val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
 
     val initialNotificationTarget = remember { notificationTarget }
-    val startDestination = resolveStartDestination(
-        hasConfig = hasConfig,
-        initialNotificationTarget = initialNotificationTarget,
-        restoredChatSelection = lastChatSelection,
-        fallbackAgentId = favoriteAgentId ?: adminAgentId,
-    )
+    // letta-mobile-v7aln: stable across rotation; see rememberAppStartDestination.
+    val startDestination = rememberAppStartDestination(navViewModel.startInputs, initialNotificationTarget)
 
     HandleNotificationTarget(
         notificationTarget = notificationTarget,

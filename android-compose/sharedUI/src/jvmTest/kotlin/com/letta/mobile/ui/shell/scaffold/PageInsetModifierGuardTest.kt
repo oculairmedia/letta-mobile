@@ -25,7 +25,7 @@ class PageInsetModifierGuardTest {
             "ChatComposerPanel.kt" to "chat composer lifts itself over the keyboard until ChatSurface adopts the scaffold (S4)",
             "DockedChatPanel.kt" to "chat docked over the canvas sizes against the keyboard until ChatSurface adopts the scaffold (S4)",
             "CanvasBubbleCard.kt" to "chat bubble overlay on the canvas, a floating container, not a page (S4)",
-            "ModelControlModal.kt" to "modal bottom sheet container pads its own content above the navigation bar",
+            "LettaPaneDefaults.kt" to "the shared bottom-sheet pane container (S3 LettaHost) pads its own content above the navigation bar",
         )
 
         private val PER_PAGE_INSET_MODIFIER = Regex(

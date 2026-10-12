@@ -104,6 +104,24 @@ class DesktopChatDayDividersTest {
     }
 
     @Test
+    fun anEarlierStampedRowNeverReopensADay() {
+        // letta-mobile-om38i: yesterday, today, a compaction summary stamped yesterday, today again.
+        // Re-opening on every change emitted "__day__<today>" twice and crashed the LazyColumn.
+        val rows = withDesktopDayDividers(
+            listOf(
+                row("a", "2026-10-11T22:00:00Z"),
+                row("b", "2026-10-12T00:30:00Z"),
+                row("compaction", "2026-10-11T23:55:00Z"),
+                row("c", "2026-10-12T01:00:00Z"),
+            ),
+            utc,
+        )
+        assertEquals(listOf(LocalDate.of(2026, 10, 11), LocalDate.of(2026, 10, 12)), rows.dividerDates())
+        val keys = rows.map { it.key }
+        assertEquals(keys.size, keys.toSet().size, "duplicate LazyColumn keys crash the list")
+    }
+
+    @Test
     fun midnightWaitEndsExactlyAtTheDayBoundary() {
         val justBefore = ZonedDateTime.of(2026, 3, 4, 23, 59, 59, 0, utc)
         assertEquals(1_000L, millisUntilNextMidnight(justBefore))
