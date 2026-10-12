@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.document.DocumentSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
@@ -26,17 +27,18 @@ data class CanvasId(val value: String) {
     }
 }
 
+/** A board at a revision: the shared-document [DocumentSnapshot] for canvases. */
 @Serializable
 data class CanvasDocument(
-    val id: CanvasId,
+    override val id: CanvasId,
     val agentId: String? = null,
     val conversationId: String? = null,
     val title: String,
-    val revision: Long = 0L,
+    override val revision: Long = 0L,
     val sceneJson: String = "",
-    val updatedAtEpochMs: Long = 0L,
+    override val updatedAtEpochMs: Long = 0L,
     val acl: CanvasAcl? = null,
-)
+) : DocumentSnapshot<CanvasId>
 
 /**
  * A block document attached to a canvas: [json] is the Cascade editor document JSON and [frame]

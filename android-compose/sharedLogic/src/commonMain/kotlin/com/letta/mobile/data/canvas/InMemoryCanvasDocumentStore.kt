@@ -1,44 +1,22 @@
 package com.letta.mobile.data.canvas
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import com.letta.mobile.data.document.InMemoryDocumentStore
 
 /**
- * Thread-safe in-memory implementation of [CanvasDocumentStore] for tests and transient scenarios.
+ * Thread-safe in-memory implementation of [CanvasDocumentStore] for tests and transient scenarios:
+ * the shared-document [InMemoryDocumentStore] plus the conversation lookups.
  */
-class InMemoryCanvasDocumentStore : CanvasDocumentStore {
-    private val mutex = Mutex()
-    private val documents = mutableMapOf<CanvasId, CanvasDocument>()
-
-    override suspend fun get(id: CanvasId): CanvasDocument? = mutex.withLock {
-        documents[id]
-    }
-
-    override suspend fun getForConversation(conversationId: String): CanvasDocument? = mutex.withLock {
+class InMemoryCanvasDocumentStore : InMemoryDocumentStore<CanvasId, CanvasDocument>(), CanvasDocumentStore {
+    override suspend fun getForConversation(conversationId: String): CanvasDocument? = withDocuments { documents ->
         documents.values.firstOrNull { it.conversationId == conversationId }
     }
 
-    override suspend fun upsert(doc: CanvasDocument): Unit = mutex.withLock {
-        documents[doc.id] = doc
-    }
-
-    override suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean = mutex.withLock {
-        val current = documents[doc.id] ?: return@withLock false
-        if (current.revision != expectedRevision) return@withLock false
-        documents[doc.id] = doc
-        true
-    }
-
-    override suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument = mutex.withLock {
+    override suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument = withDocuments { documents ->
         val conversationId = requireNotNull(doc.conversationId) { "createForConversationIfAbsent needs a conversationId" }
         documents.values.firstOrNull { it.conversationId == conversationId } ?: doc.also { documents[it.id] = it }
     }
 
-    override suspend fun listForAgent(agentId: String): List<CanvasDocument> = mutex.withLock {
+    override suspend fun listForAgent(agentId: String): List<CanvasDocument> = withDocuments { documents ->
         documents.values.filter { it.agentId == agentId }
-    }
-
-    override suspend fun listAll(): List<CanvasDocument> = mutex.withLock {
-        documents.values.sortedByDescending { it.updatedAtEpochMs }
     }
 }

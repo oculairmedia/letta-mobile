@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.document.HistoryBudget
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -35,16 +36,18 @@ import org.automerge.repo.DocumentId
  * archives the document's full history to a compressed cold file and moves the board to a new
  * document holding only its current state ([NotebookHistoryArchive.compactToNewDocument]). Until
  * then, and if that move fails, the board shows a [CanvasStorageFault.Kind.OVER_BUDGET] error.
+ *
+ * The thresholds are the shared-document [HistoryBudget] ([history]), bounded by bytes only; this
+ * adds what is particular to a notebook (the restore list it carries over).
  */
 data class NotebookHistoryBudget(
     val maxDocumentBytes: Long = DEFAULT_MAX_DOCUMENT_BYTES,
     val warnFraction: Double = DEFAULT_WARN_FRACTION,
 ) {
-    init {
-        require(maxDocumentBytes > 0 && warnFraction > 0.0 && warnFraction <= 1.0)
-    }
+    /** The shared-document budget these thresholds are; validates them. */
+    val history: HistoryBudget = HistoryBudget(maxBytes = maxDocumentBytes, warnFraction = warnFraction)
 
-    val warnBytes: Long get() = (maxDocumentBytes * warnFraction).toLong()
+    val warnBytes: Long get() = history.warnBytes
 
     /**
      * How much of the deleted-element restore list a new document carries over; the rest is only
@@ -55,7 +58,7 @@ data class NotebookHistoryBudget(
     companion object {
         /** A phone's repository copies a document's snapshot about three times while saving it. */
         const val DEFAULT_MAX_DOCUMENT_BYTES: Long = 8L * 1024 * 1024
-        const val DEFAULT_WARN_FRACTION: Double = 0.75
+        const val DEFAULT_WARN_FRACTION: Double = HistoryBudget.DEFAULT_WARN_FRACTION
         private const val RESTORE_LIST_SHARE = 8
     }
 }

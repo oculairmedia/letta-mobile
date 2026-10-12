@@ -1,10 +1,14 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.document.DocumentStore
+
 /**
- * Persistence contract for [CanvasDocument].
+ * Persistence contract for [CanvasDocument]: the shared-document [DocumentStore] (get, upsert,
+ * compare-and-set by revision, library listing) plus the canvas's conversation lookups.
  *
- * Implemented via Room on Android ([com.letta.mobile.data.local.RoomCanvasDocumentStore])
- * and atomic JSON files on Desktop ([com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore]).
+ * Implemented over the Automerge notebook repository ([NotebookCanvasDocumentStore]), via Room on
+ * Android ([com.letta.mobile.data.local.RoomCanvasDocumentStore]) and atomic JSON files on Desktop
+ * ([com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore]).
  */
 data class CanvasDeletedElement(val elementId: String, val elementJson: String)
 
@@ -13,21 +17,9 @@ interface CanvasDeletedElementStore {
     suspend fun deletedElements(id: CanvasId): List<CanvasDeletedElement>
 }
 
-interface CanvasDocumentStore {
-    suspend fun get(id: CanvasId): CanvasDocument?
+interface CanvasDocumentStore : DocumentStore<CanvasId, CanvasDocument> {
     suspend fun getForConversation(conversationId: String): CanvasDocument?
-    suspend fun upsert(doc: CanvasDocument)
     suspend fun listForAgent(agentId: String): List<CanvasDocument>
-
-    /**
-     * Persists [doc] only if the stored document's revision is still [expectedRevision].
-     * The compare and the write are one atomic step, so two writers that both read revision N
-     * cannot both land: exactly one sees `true`, the other sees `false` and must re-read.
-     *
-     * A document that does not exist yet has no revision to compare, so this returns `false`
-     * for it; use [upsert] to create.
-     */
-    suspend fun upsertIfRevision(doc: CanvasDocument, expectedRevision: Long): Boolean
 
     /**
      * Returns the canvas already bound to [doc]'s `conversationId`, or inserts [doc] and
@@ -36,7 +28,4 @@ interface CanvasDocumentStore {
      * [doc] must carry a non-null `conversationId`.
      */
     suspend fun createForConversationIfAbsent(doc: CanvasDocument): CanvasDocument
-
-    /** Every stored canvas, most recently updated first. Canvases are shared, so this is the library view. */
-    suspend fun listAll(): List<CanvasDocument>
 }

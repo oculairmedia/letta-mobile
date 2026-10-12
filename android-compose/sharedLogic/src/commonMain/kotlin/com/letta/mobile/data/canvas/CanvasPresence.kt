@@ -1,72 +1,51 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.document.InMemoryPresenceTransport
+import com.letta.mobile.data.document.PeerPresence
+import com.letta.mobile.data.document.PresenceTransport
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 
 /**
- * Ephemeral peer presence for collaborative canvas editing.
+ * Ephemeral peer presence for collaborative canvas editing: a shared-document [PeerPresence] with
+ * a cursor on the board.
  */
 @Serializable
 data class CanvasPresence(
-    val peerId: String,
+    override val peerId: String,
     val displayName: String,
     val colorHex: String,
     val cursorX: Float,
     val cursorY: Float,
-    val lastActiveEpochMs: Long = 0L,
-    val isActive: Boolean = true,
-)
+    override val lastActiveEpochMs: Long = 0L,
+    override val isActive: Boolean = true,
+) : PeerPresence
 
 /**
- * Transport contract for peer presence telemetry.
- * Completely separate from persistent scene operations.
+ * Transport contract for peer presence telemetry: the shared-document [PresenceTransport] for
+ * canvases. Completely separate from persistent scene operations.
  */
-interface CanvasPresenceTransport {
-    suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence)
-    fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>>
+@Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE") // canvas callers and implementers name the id canvasId
+interface CanvasPresenceTransport : PresenceTransport<CanvasId, CanvasPresence> {
+    override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence)
+    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>>
 }
 
 /**
  * In-memory presence transport with automated TTL expiry (peers inactive for > 10s or isActive=false removed).
  */
+@Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE") // keeps the canvas's canvasId names for named callers
 class InMemoryCanvasPresenceTransport(
-    private val ttlMs: Long = 10_000L,
-    private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
-) : CanvasPresenceTransport {
-    private val mutex = Mutex()
-    private val presencesByCanvas = mutableMapOf<CanvasId, MutableMap<String, CanvasPresence>>()
-    // Reached from the non-suspending observe path as well as the suspending writer, so it cannot
-    // live behind the mutex. See [getOrCreate].
-    private val flowsByCanvas = MutableStateFlow<Map<CanvasId, MutableStateFlow<List<CanvasPresence>>>>(emptyMap())
+    ttlMs: Long = InMemoryPresenceTransport.DEFAULT_TTL_MS,
+    clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+) : InMemoryPresenceTransport<CanvasId, CanvasPresence>(
+    ttlMs,
+    clock,
+    { presence, now -> presence.copy(lastActiveEpochMs = now) },
+),
+    CanvasPresenceTransport {
+    override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) =
+        super.updatePresence(canvasId, presence)
 
-    private fun flowFor(canvasId: CanvasId): MutableStateFlow<List<CanvasPresence>> =
-        flowsByCanvas.getOrCreate(canvasId) { MutableStateFlow(emptyList()) }
-
-    override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) = mutex.withLock {
-        val map = presencesByCanvas.getOrPut(canvasId) { mutableMapOf() }
-        val now = clock()
-        if (!presence.isActive) {
-            map.remove(presence.peerId)
-        } else {
-            map[presence.peerId] = presence.copy(lastActiveEpochMs = now)
-        }
-
-        // Clean up expired peers
-        val iterator = map.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            if (now - entry.value.lastActiveEpochMs > ttlMs) {
-                iterator.remove()
-            }
-        }
-
-        flowFor(canvasId).value = map.values.toList()
-    }
-
-    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> =
-        flowFor(canvasId).asStateFlow()
+    override fun observePresence(canvasId: CanvasId): Flow<List<CanvasPresence>> = super.observePresence(canvasId)
 }
