@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -235,13 +236,15 @@ internal fun CollapsedDock(
         Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
             // Even insets on both sides keep the mascot over the bar's centre and the bubble clear
             // of the restore control. The mascot's own motion is the thinking cue: no glow here.
-            val sides = LettaDimens.Control.iconButtonLg + LettaDimens.Space.sm
+            val sides = maxOf(LettaDimens.Control.iconButtonLg, BubbleLayoutDimens.control) + LettaDimens.Space.sm
             CollapsedTurnColumn(
                 state,
                 content,
                 seated,
                 Modifier.align(Alignment.BottomCenter).padding(horizontal = sides),
             )
+            // letta-mobile-zxk2n.29: the person's own layout, opposite the restore control.
+            BubbleLayoutButton(Modifier.align(Alignment.BottomStart))
             RestoreButton(state, Modifier.align(Alignment.BottomEnd))
         }
     }
@@ -259,19 +262,22 @@ private fun CollapsedTurnColumn(
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
     val showReply = turn.hasReply && turn.dismissKey != dismissedTurn
+    val dismiss = { dismissedTurn = turn.dismissKey }
+    val hold = rememberReplyHold(turn, showReply, dismiss)
+    // Fading out, the bubble keeps the reply it showed, not the next turn's empty start.
+    val last = remember { LastShownTurn(turn) }
+    if (showReply) last.turn = turn
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        when {
-            showReply -> ReplyBubble(
-                turn = turn,
+        // letta-mobile-zxk2n.29: it fades in and out (the reply stays in the conversation either way).
+        AnimatedVisibility(visible = showReply, enter = hold.enter, exit = hold.exit) {
+            ReplyBubble(
+                turn = last.turn,
                 agentName = content.agentName,
-                actions = BubbleActions(
-                    open = state::restore,
-                    dismiss = { dismissedTurn = turn.dismissKey },
-                ),
-                modifier = Modifier.dockDrag(state),
+                actions = BubbleActions(open = state::restore, dismiss = dismiss),
+                modifier = Modifier.dockDrag(state).then(hold.watch),
             )
-            turn.busy && !turn.hasReply -> ThinkingAnnouncement(content.agentName)
         }
+        if (turn.busy && !turn.hasReply) ThinkingAnnouncement(content.agentName)
         CollapsedMascot(state, content, seated)
     }
 }
@@ -279,11 +285,14 @@ private fun CollapsedTurnColumn(
 /** The agent itself: its mascot, or a sphere for an agent without one. Tap opens the agent pane. */
 @Composable
 private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent, seated: Boolean) {
+    // letta-mobile-zxk2n.29: as big as the person set it (Ctrl/Cmd + wheel over it, or the layout menu).
+    val size = animatedBubbleMascotSize()
     Box(
         Modifier
-            .size(ChatMascotDimens.composerCompanion)
+            .size(size)
             .pointerHoverIcon(movePointerIcon())
             .dockDrag(state)
+            .then(rememberMascotWheelResize())
             .testTag(DOCK_COLLAPSED_MASCOT_TAG),
         contentAlignment = Alignment.Center,
     ) {
@@ -291,32 +300,35 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent,
         // open panel's badge as the dock folds); this spot only tells it where.
         val anchors = LocalCompanionSeatAnchors.current
         if (anchors != null && mascotAvailable(content.agentId)) {
-            if (seated) CompanionSeatAnchor(anchors)
+            if (seated) CompanionSeatAnchor(anchors, size = size)
         } else {
-            CollapsedOwnSeat(content)
+            CollapsedOwnSeat(content, size)
         }
     }
 }
 
 /** Off the chat page, or for an agent without a mascot: a seat of its own, with the sphere stand-in. */
 @Composable
-private fun CollapsedOwnSeat(content: CollapsedDockContent) {
+private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
     MascotSeat(
         agentId = content.agentId,
         stage = MascotStage.COMPOSER_COMPANION,
-        size = ChatMascotDimens.composerCompanion,
+        size = size,
         onClick = content.openAgent,
         onEdit = content.editAgent,
     ) { vacancy ->
         if (vacancy == MascotSeatVacancy.NO_MASCOT) {
             val open = content.openAgent
             AgentSphere(
-                size = ChatMascotDimens.collapsedFallbackSphere,
+                size = ChatMascotDimens.collapsedFallbackSphere * (size / ChatMascotDimens.composerCompanion),
                 modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
             )
         }
     }
 }
+
+/** The turn the reply bubble last showed (a plain holder: it is only read as the bubble fades). */
+private class LastShownTurn(var turn: CollapsedTurn)
 
 /** The bubble's intents. */
 @Immutable
@@ -338,7 +350,9 @@ private fun ReplyBubble(turn: CollapsedTurn, agentName: String, actions: BubbleA
     }
     val announcement = listOfNotNull(reply.takeIf { turn.text.isNotBlank() }, working)
         .joinToString(" ")
-    BubbleSurface(modifier.widthIn(max = ChatSurfaceDimens.collapsedBubbleMaxWidth)) {
+    // Where the person set the bar's width, the bubble may run as wide as the bar.
+    val maxWidth = currentBubbleLayout().composerWidthDp?.dp ?: ChatSurfaceDimens.collapsedBubbleMaxWidth
+    BubbleSurface(modifier.widthIn(max = maxWidth)) {
         Box {
             Column(
                 Modifier
