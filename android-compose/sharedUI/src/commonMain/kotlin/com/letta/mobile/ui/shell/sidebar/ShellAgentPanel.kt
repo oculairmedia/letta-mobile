@@ -12,15 +12,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
@@ -53,18 +49,14 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.ui.chat.AgentOrb
-import com.letta.mobile.ui.components.LettaChipTab
-import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
-import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /** Test tags for the agent panel's parts. */
 object ShellAgentPanelTags {
@@ -74,6 +66,8 @@ object ShellAgentPanelTags {
     const val HERO = "shell-agent-panel-hero"
     /** letta-mobile-3io8k: the host's model-and-context card under the agent's name. */
     const val AGENT_CARD = "shell-agent-panel-agent-card"
+    /** The roster of chats and canvases (letta-mobile-ckmub.3.10). */
+    const val LIBRARY = "shell-agent-panel-library"
 }
 
 /**
@@ -314,62 +308,4 @@ private fun ShellPanelSections(state: ShellAgentPanelState, actions: ShellAgentP
         model = ShellNavRowModel(label = WorkPlayLens.newConversationLabel(state.mode), icon = Icons.Outlined.Edit, selected = false),
         onClick = actions.onNewChat,
     )
-}
-
-/** One conversation row, its actions bound to the conversation. */
-@Composable
-private fun ShellConversationRowItem(conversation: ShellConversationRowModel, actions: ShellAgentPanelActions) {
-    ShellConversationRow(
-        model = conversation,
-        actions = ShellConversationRowActions(
-            onClick = { actions.onConversationSelected(conversation.id) },
-            onArchiveToggle = { actions.onArchiveConversation(conversation.id, !conversation.archived) },
-            onDelete = { actions.onDeleteConversation(conversation.id) },
-            deleteBehavior = actions.deleteBehavior,
-            onRename = actions.onRenameConversation?.let { rename -> { title -> rename(conversation.id, title) } },
-            onPinToggle = actions.onPinConversation?.let { pin -> { pin(conversation.id, !conversation.pinned) } },
-            marks = actions.conversationMarks,
-            onFork = actions.onForkConversation?.let { fork -> { name -> fork(conversation.id, name) } },
-        ),
-    )
-}
-
-/** A sidebar row's placement motion: displaced rows glide to their new places. Off under reduced motion. */
-@Composable
-internal fun LazyItemScope.shellRowMotion(): Modifier =
-    if (LocalReducedMotion.current) Modifier else Modifier.animateItem()
-
-/** Pinned conversations under their filter, then the canvases, in one scrolling list. */
-@Composable
-private fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions: ShellAgentPanelActions) {
-    LettaSectionLabel(WorkPlayLens.conversationsHeader(state.mode))
-    Row(
-        modifier = Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.sm),
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        ShellArchiveFilter.entries.forEach { filter ->
-            LettaChipTab(text = filter.label, active = state.archiveFilter == filter, onClick = { actions.onArchiveFilterChange(filter) })
-        }
-    }
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth().weight(1f),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-    ) {
-        items(items = state.conversations, key = { it.id }) { conversation ->
-            // letta-mobile-zxk2n.5: settling or pinning moves a row; it glides there instead of jumping.
-            Box(shellRowMotion()) {
-                ShellConversationRowItem(conversation, actions)
-            }
-        }
-        if (state.conversations.isEmpty()) item { LettaEmptyHint("No chats") }
-        item { LettaSectionLabel("Canvases") }
-        items(items = state.canvases, key = { "canvas-" + it.id.value }) { canvas ->
-            ShellCanvasRow(
-                model = canvas,
-                onClick = { actions.onOpenCanvas(canvas.id) },
-                onArchiveToggle = actions.onArchiveCanvas?.let { archive -> { archive(canvas.id, !canvas.archived) } },
-            )
-        }
-        if (state.canvases.isEmpty()) item { LettaEmptyHint("No canvases") }
-    }
 }

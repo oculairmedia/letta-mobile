@@ -1,29 +1,28 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.letta.mobile.data.canvas.CanvasLibrary
-import com.letta.mobile.data.chat.runtime.ConversationSummary
-import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
-import com.letta.mobile.desktop.chat.DesktopBranchOrigin
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
@@ -34,6 +33,12 @@ import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
+import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
+import com.letta.mobile.ui.shell.rail.ShellLibraryRail
+import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
+import com.letta.mobile.ui.shell.rail.ShellRailFocus
+import com.letta.mobile.ui.shell.rail.railLightDismiss
+import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 
 /** The window's surface: the rail, the agent sidebar and the main pane, with the overlays over them. */
 @Composable
@@ -108,11 +113,11 @@ private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopS
     }
 }
 
-/** The far-left workspace/agent rail and the agent sidebar beside it. */
+/** The far-left workspace/agent rail and the agent sidebar beside it, both the shared shell's. */
 @Composable
 private fun DesktopShellNavigationPanes(context: DesktopShellContext, frame: DesktopShellFrame, sidebarVisible: Boolean) {
     DesktopShellAgentRail(context, frame)
-    RailDivider()
+    VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     // Agent sidebar: agent header + nav + conversations. Fully
     // removed (not shrunk to an icon rail - AC #3) below the
     // breakpoint or when the user explicitly collapses it.
@@ -121,7 +126,7 @@ private fun DesktopShellNavigationPanes(context: DesktopShellContext, frame: Des
         reducedMotion = context.core.layout.reducedMotion,
     ) {
         DesktopShellAgentSidebar(context, frame)
-        RailDivider()
+        VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -129,17 +134,12 @@ private fun DesktopShellNavigationPanes(context: DesktopShellContext, frame: Des
 private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopShellFrame) {
     val navigator = context.navigator
     val focus = frame.focus
-    val recents = rememberRecentRailAgents(
-        frame.chatState.conversations,
-        focus.railAgents,
-        context.core.railPrefs,
-        focus.selectedAgentId,
-    )
-    DesktopAgentRail(
-        state = DesktopAgentRailState(
+    val recents = rememberRecentRailAgents(frame.chatState.conversations, focus.railAgents, context.core.railPrefs, focus.selectedAgentId)
+    ShellLibraryRail(
+        state = ShellLibraryRailState(
             agents = recents.agents,
             hiddenAgentCount = recents.hiddenCount,
-            focus = DesktopAgentRailFocus(
+            focus = ShellRailFocus(
                 selectedAgentId = focus.selectedAgentId,
                 activityByAgentId = focus.railActivityByAgentId,
                 thinkingAgentId = frame.activity.thinkingAgentId,
@@ -149,86 +149,59 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
             expanded = navigator.railExpanded,
             homeSelected = navigator.selectedDestination == DesktopDestination.Home,
         ),
-        actions = DesktopAgentRailActions(
+        // The desktop keeps no agent pins, so the orb menu (right-click) offers Open and Agent settings.
+        actions = ShellAgentRailActions(
             onHome = { navigator.navigate(DesktopDestination.Home) },
             onAgentSelected = { agentId ->
-                // Search-driven library: picking an agent is the
-                // "done" gesture, so the expanded panel closes.
+                // Search-driven library: picking an agent is the "done" gesture, so the expanded panel closes.
                 navigator.railExpanded = false
                 context.router.openAgent(AgentId(agentId))
             },
-            // Contacts-style picker over the persistent-agent
-            // roster; agent creation lives inside it.
+            // Contacts-style picker over the persistent-agent roster; agent creation lives inside it.
             onNewSession = { context.overlays.newConversation = true },
             // The same roster picker lists every agent the recents cut left off the rail.
             onShowAllAgents = { context.overlays.newConversation = true },
-            onToggleExpanded = { navigator.railExpanded = !navigator.railExpanded },
             onAgentSettings = { navigator.editAgentId = it },
         ),
     )
 }
 
+/** The shared agent panel, bound to the window (see [desktopSidebarPanelState] and [desktopSidebarActions]). */
 @Composable
 private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: DesktopShellFrame) {
     val chatController = context.core.chatController
+    val management = chatController.conversationManagement
     val canvasShell = context.core.canvasShell
-    val navigator = context.navigator
-    val focus = frame.focus
-    val canvasDocuments by canvasShell.library.documents.collectAsState()
-    val archivedCanvasIds by canvasShell.library.archived.collectAsState()
-    val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val inputs = DesktopSidebarInputs(
+        marks = DesktopSidebarMarks(
+            deletingIds = chatController.deletingConversationIds.collectAsState().value,
+            pinnedIds = management.pinnedConversationIds.collectAsState().value,
+            parentIds = management.conversationParents.collectAsState().value.mapValues { it.value.conversationId },
+            settledIds = management.marks.settled.collectAsState().value,
+            markers = management.marks.markers.collectAsState().value,
+        ),
+        canvases = canvasShell.library.documents.collectAsState().value,
+        archivedCanvasIds = canvasShell.library.archived.collectAsState().value,
+        activeCanvasId = canvasShell.activeSession?.canvasId,
+        chatOptions = desktopChatOptionsState(
+            display = management.marks.displayOptions.collectAsState().value,
+            fontScale = LocalDesktopChatFontScale.current,
+            autoPin = management.marks.autoPinNewChats.collectAsState().value,
+            hasChat = frame.chatState.selectedConversationId != null,
+        ),
+    )
     val deleteBehavior by chatController.deleteBehavior.collectAsState()
-    val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
-    val conversationParents by chatController.conversationManagement.conversationParents.collectAsState()
-    val archiveFilter = frame.lists.archiveFilter
-    DesktopAgentSidebar(
-        state = DesktopAgentSidebarState(
-            agentName = focus.selectedAgentName,
-            agentOrbIndex = focus.selectedAgentOrbIndex,
-            agentId = focus.selectedAgentId,
-            agentIdentity = focus.selectedAgentId?.let { focus.identityByAgentId[it] },
-            conversations = frame.lists.agentConversations,
-            selectedConversationId = frame.chatState.selectedConversationId,
-            thinkingConversationId = frame.activity.thinkingConversationId,
-            deletingConversationIds = deletingConversationIds,
-            pinnedConversationIds = pinnedConversationIds,
-            conversationParents = conversationParents.mapValues { it.value.conversationId },
-            archiveFilter = archiveFilter,
-            selectedDestination = navigator.selectedDestination,
-            mode = navigator.workPlayMode,
-            // The sidebar's Active / Archived / All applies to canvases as to chats.
-            canvases = CanvasLibrary.filter(canvasDocuments, archivedCanvasIds, archiveFilter.toCanvasArchiveFilter()),
-            activeCanvasId = canvasShell.activeSession?.canvasId,
-            archivedCanvasIds = archivedCanvasIds,
-            listMarks = rememberDesktopSidebarListMarks(context, frame),
-        ),
-        actions = DesktopAgentSidebarActions(
-            onArchiveFilterChange = chatController::setArchiveFilter,
-            onArchiveConversation = chatController::setConversationArchived,
-            onModeChange = { navigator.workPlayMode = it },
-            onDestinationSelected = navigator::navigate,
-            onConversationSelected = { context.router.openConversation(ConversationId(it)) },
-            onDeleteConversation = chatController::deleteConversation,
-            deleteBehavior = deleteBehavior,
-            onRenameConversation = { id, title ->
-                chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
-            },
-            onPinConversation = { id, pinned -> chatController.conversationManagement.setPinned(ConversationId(id), pinned) },
-            onForkConversation = chatController.conversationManagement.takeIf { it.supportsBranching }?.let { management ->
-                { id, name -> management.forkConversation(DesktopBranchOrigin(id, focus.selectedAgentId), name) }
-            },
-            onNewChat = { context.openNewChatForFocusedAgent(focus) },
-            onEditAgent = { navigator.editAgentId = focus.selectedAgentId },
-            onOpenCanvas = { context.openCanvas(it) },
-            onNewCanvas = { canvasShell.createNew(focus.selectedAgentId) },
-            onArchiveCanvas = canvasShell.library::setArchived,
-            conversationMarks = remember(chatController) { chatController.conversationManagement.marks.rowActions() },
-            chatOptions = rememberDesktopChatOptionsActions(chatController),
-        ),
+    val setFontScale by rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
+    ShellAgentPanel(
+        state = desktopSidebarPanelState(context.navigator, frame, inputs),
+        actions = desktopSidebarActions(context, frame.focus, deleteBehavior) { setFontScale(it) },
         // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
         agentCard = { DesktopAgentContextCard(context, frame) },
+        modifier = Modifier.width(SIDEBAR_WIDTH).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLowest),
     )
 }
+
+private val SIDEBAR_WIDTH = 231.dp
 
 @Composable
 private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: DesktopShellFrame) {

@@ -358,17 +358,6 @@ internal fun TimeRow(params: TimeRowParams) {
 // --- Shared bits ------------------------------------------------------------
 
 @Composable
-internal fun DefRow(label: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = LettaDimens.Space.sm)) {
-        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        Spacer(Modifier.height(LettaDimens.Space.hair))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(LettaDimens.Space.sm))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)))
-    }
-}
-
-@Composable
 internal fun cadenceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.clip(RoundedCornerShape(LettaDimens.Radius.sm))
