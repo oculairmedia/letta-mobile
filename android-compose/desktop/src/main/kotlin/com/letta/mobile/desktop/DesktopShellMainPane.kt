@@ -18,8 +18,6 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
-import com.letta.mobile.desktop.chat.ChatDetailPaneActions
-import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
@@ -36,16 +34,15 @@ import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
 
-/** What the chat surfaces in the main pane share: the composer's commands and context reading, and the canvas. */
+/** What the shared chat page takes from the shell: the composer's commands and context reading, and the canvas. */
 private data class DesktopShellChatHost(
     val composerCommands: List<ComposerCommand>,
     val contextUsage: ContextWindowUsageState,
     val openConversationCanvas: () -> Unit,
     val agentNamesById: Map<String, String>,
-    val canSubmitApprovals: Boolean,
 )
 
-/** The shared KMP chat page's own inputs: its session port, and the host it shares with the old page. */
+/** The shared KMP chat page's own inputs: its session port, and the shell host. */
 private data class DesktopShellSharedPage(
     val port: DesktopChatSessionPort,
     val host: DesktopShellChatHost,
@@ -57,7 +54,7 @@ internal fun RowScope.DesktopShellMainPane(context: DesktopShellContext, frame: 
     val host = rememberDesktopShellChatHost(context, frame)
     DesktopMainContentPane(
         inputs = desktopMainContentInputs(context, frame, host),
-        actions = desktopMainContentActions(context, frame, host),
+        actions = desktopMainContentActions(context, frame),
         modifier = Modifier.weight(1f).fillMaxHeight(),
     )
     DesktopRenameChatOverlay(context, frame)
@@ -91,7 +88,6 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
     val focus = frame.focus
     val selectedConversationId = frame.chatState.selectedConversationId
     val agentSlashCommands by context.panels.agentSlashCommands
-    val canSubmitApprovals by core.chatController.canSubmitApprovals.collectAsState()
     val showDockedCanvas = context.showDockedCanvasAction()
     val composerCommands = rememberDesktopComposerCommands(
         DesktopComposerCommandsParams(
@@ -121,9 +117,8 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
     return DesktopShellChatHost(
         composerCommands = composerCommands,
         contextUsage = contextUsage,
-        openConversationCanvas = showDockedCanvas ?: { core.canvasShell.openForConversation(frame.conversationCanvasOwner()) },
+        openConversationCanvas = showDockedCanvas,
         agentNamesById = remember(rosterAgents) { rosterAgents.associate { it.id.value to it.name } },
-        canSubmitApprovals = canSubmitApprovals,
     )
 }
 
@@ -167,51 +162,12 @@ private fun desktopMainContentInputs(
         blockApi = panels.httpApis.blockApi,
         secureSettingsStore = core.bootstrap.secureSettingsStore,
         chatScope = core.chatScope,
-        chatDetailState = chatDetailPaneState(context, frame, host),
+        selectedConversationId = frame.chatState.selectedConversationId,
         destinationInputs = destinationContentInputs(context, frame),
-        showBackgroundTasks = navigator.showBackgroundTasks,
         subagentRepository = panels.subagents.repository,
-        activeSubagents = frame.lists.activeSubagents,
         activeCanvasSession = core.canvasShell.activeSession,
-        dockedCanvasId = context.sharedChat.dockedCanvas?.dockedCanvasId,
-        sharedChatPage = desktopSharedChatPage(context, frame, host),
-    )
-}
-
-@Composable
-private fun chatDetailPaneState(
-    context: DesktopShellContext,
-    frame: DesktopShellFrame,
-    host: DesktopShellChatHost,
-): ChatDetailPaneState {
-    val chatController = context.core.chatController
-    val canonicalPresentation by chatController.canonicalPresentation.collectAsState()
-    val canonicalStatus by chatController.canonicalStatus.collectAsState()
-    val submittingApprovals by chatController.submittingApprovals.collectAsState()
-    // letta-mobile folder-settings #2: the selected conversation's working directory.
-    val workingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
-    val workingDirectoryLoading by chatController.workingDirectoryLoading.collectAsState()
-    val focus = frame.focus
-    return ChatDetailPaneState(
-        surface = frame.chatState,
-        canonicalPresentation = canonicalPresentation,
-        canonicalStatus = canonicalStatus,
-        contextUsage = host.contextUsage,
-        isThinking = frame.activity.isThinkingSelected,
-        isStreamingReply = frame.activity.isStreamingReplySelected,
-        modelOptions = frame.lists.modelOptions,
-        commands = host.composerCommands,
-        mentionables = frame.lists.mentionables,
-        composerPlaceholder = WorkPlayLens.composerPlaceholder(
-            context.navigator.workPlayMode,
-            focus.selectedAgentName,
-        ),
-        submittingApprovalRequestIds = submittingApprovals,
-        agentNamesById = host.agentNamesById,
-        agentIdentitiesById = focus.identityByAgentId,
-        workingDirectory = workingDirectory,
-        workingDirectorySupported = chatController.supportsWorkingDirectory,
-        workingDirectoryLoading = workingDirectoryLoading,
+        dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
+        chatPage = desktopSharedChatPage(context, frame, host),
     )
 }
 
@@ -264,11 +220,7 @@ private fun canCreateCron(
     return backendSchedules && agentChosen
 }
 
-private fun desktopMainContentActions(
-    context: DesktopShellContext,
-    frame: DesktopShellFrame,
-    host: DesktopShellChatHost,
-): DesktopMainContentActions {
+private fun desktopMainContentActions(context: DesktopShellContext, frame: DesktopShellFrame): DesktopMainContentActions {
     val chatController = context.core.chatController
     val canvasShell = context.core.canvasShell
     val navigator = context.navigator
@@ -285,34 +237,7 @@ private fun desktopMainContentActions(
                 canvasShell.close()
             }
         },
-        chatDetailActions = desktopChatDetailActions(context, frame, host),
         destinationActions = desktopDestinationActions(context, frame),
-        onShowBackgroundTasks = { navigator.showBackgroundTasks = true },
-    )
-}
-
-private fun desktopChatDetailActions(
-    context: DesktopShellContext,
-    frame: DesktopShellFrame,
-    host: DesktopShellChatHost,
-): ChatDetailPaneActions {
-    val navigator = context.navigator
-    val selectedAgentId = frame.focus.selectedAgentId
-    return createDesktopChatDetailPaneActions(
-        CreateDesktopChatDetailPaneActionsParams(
-            chatController = context.core.chatController,
-            canSubmitApprovals = host.canSubmitApprovals,
-            onA2uiAction = context.onA2uiAction,
-            onAttachImage = context.imageIntake.launchPicker,
-            onOpenCanvas = { host.openConversationCanvas() },
-            onOpenModelPicker = { context.overlays.modelPicker = true },
-            onSetPersona = { navigator.editAgentId = selectedAgentId },
-            onNavigateToChannels = { navigator.selectedDestination = DesktopDestination.Channels },
-            onNavigateToAgents = { navigator.selectedDestination = DesktopDestination.Agents },
-            onOpenAgent = { context.router.openAgent(AgentId(it)) },
-            onEditAgent = { navigator.editAgentId = selectedAgentId },
-            onOpenAgentPane = { context.openAgentPane() },
-        ),
     )
 }
 
@@ -382,14 +307,13 @@ private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShe
     )
 }
 
-/** letta-mobile-bglj6.1: the shared KMP chat page, built only while its preview flag is on. */
+/** letta-mobile-ckmub.3.11: the shared KMP chat page, desktop's only chat. */
 private fun desktopSharedChatPage(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
     host: DesktopShellChatHost,
-): (@Composable (Modifier) -> Unit)? {
-    val port = context.sharedChat.port ?: return null
-    val page = DesktopShellSharedPage(port, host)
+): @Composable (Modifier) -> Unit {
+    val page = DesktopShellSharedPage(context.sharedChat.port, host)
     return { pageModifier -> DesktopShellSharedChatPage(page, context, frame, pageModifier) }
 }
 
@@ -424,8 +348,8 @@ private fun DesktopShellSharedChatPage(
             openCanvas = { page.host.openConversationCanvas() },
             openAgent = { context.router.openAgent(AgentId(it)) },
             openModelPicker = { context.overlays.modelPicker = true },
-            // As on the old page: the companion mascot brings the agent pane
-            // back and leaves any editor; its pencil opens the editor.
+            // The companion mascot brings the agent pane back and leaves any
+            // editor; its pencil opens the editor.
             openAgentPane = { context.openAgentPane() },
             editAgent = { navigator.editAgentId = focus.selectedAgentId },
             agentNamesById = page.host.agentNamesById,
@@ -436,8 +360,8 @@ private fun DesktopShellSharedChatPage(
 }
 
 /**
- * The background-tasks toggle in the shared page's canvas header (the old page draws it over the
- * conversation instead): only while the tasks pane is closed and there is a repository to list.
+ * The background-tasks toggle in the shared page's canvas header: only while the tasks pane is
+ * closed and there is a repository to list.
  */
 private fun backgroundTasksHeaderToggle(context: DesktopShellContext, frame: DesktopShellFrame): (@Composable () -> Unit)? {
     val navigator = context.navigator

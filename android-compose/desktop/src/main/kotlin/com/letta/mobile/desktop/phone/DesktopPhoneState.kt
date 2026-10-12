@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.letta.mobile.desktop.parseSharedChatFlagValue
 
 /*
  * Phone preview (docs/development/phone-preview.md): the real desktop app, or the fixture
@@ -26,8 +25,13 @@ internal fun desktopPhoneModeRequested(
     systemProperty: (String) -> String? = System::getProperty,
     environmentVariable: (String) -> String? = System::getenv,
 ): Boolean =
-    parseSharedChatFlagValue(systemProperty(PHONE_SYSTEM_PROPERTY)) ||
-        parseSharedChatFlagValue(environmentVariable(PHONE_ENV_VARIABLE))
+    parseLaunchFlagValue(systemProperty(PHONE_SYSTEM_PROPERTY)) ||
+        parseLaunchFlagValue(environmentVariable(PHONE_ENV_VARIABLE))
+
+private val TRUTHY_FLAG_VALUES = setOf("1", "true", "yes", "on")
+
+/** True when [raw] spells "on" (1/true/yes/on, any case, surrounding blanks ignored). */
+internal fun parseLaunchFlagValue(raw: String?): Boolean = raw?.trim()?.lowercase() in TRUTHY_FLAG_VALUES
 
 /**
  * A phone's screen in dp, with the system chrome the preview simulates. Values are Android's own

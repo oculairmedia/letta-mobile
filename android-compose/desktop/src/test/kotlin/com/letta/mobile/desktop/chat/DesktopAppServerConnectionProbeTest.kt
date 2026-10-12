@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.appserver.AppServerIdentity
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.desktop.DesktopSuspendResponder
 import com.letta.mobile.desktop.desktopConnectionTestMessage
+import com.letta.mobile.ui.shell.pages.home.connectionFailureHeadline
 import com.letta.mobile.data.controller.reconnect.SuspendEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +23,7 @@ class DesktopAppServerConnectionProbeTest {
             preflightDesktopAppServer("ws://h:1", "bad", DesktopAppServerProbe { _, _ -> AppServerProbeResult.Authentication("HTTP 401") })
         }
         assertTrue(auth.message.orEmpty().startsWith("Authentication failed:"))
-        assertEquals("The server rejected the access token", failureHeadline(com.letta.mobile.data.chat.runtime.ChatScreenStatus.BackendOffline(auth.message), auth.message))
+        assertEquals("The server rejected the access token", connectionFailureHeadline(com.letta.mobile.data.chat.runtime.ChatScreenStatus.BackendOffline(auth.message), auth.message))
 
         assertFailsWith<DesktopAppServerUnusableException> {
             preflightDesktopAppServer("ws://h:1", null, DesktopAppServerProbe { _, _ -> AppServerProbeResult.Incompatible("HTTP 404") })

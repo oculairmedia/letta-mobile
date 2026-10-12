@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.FocusRequester
-import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
@@ -30,13 +29,7 @@ import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.reducedMotionOr
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitMode
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
-import java.io.File
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /** The shell's sidebar layout: its controller, the reduced-motion preference, and the toggle's focus. */
 internal data class DesktopShellLayout(
@@ -81,9 +74,11 @@ internal data class DesktopShellPanels(
     val libraries: DesktopLibraryControllers,
 )
 
-/** Images into the composer: the file picker, and whether a drag is over the window. */
+/**
+ * Images into the composer from the window: drag-and-drop (and whether a drag is over it). The
+ * shared composer's Attach button opens its own picker.
+ */
 internal data class DesktopImageIntake(
-    val launchPicker: () -> Unit,
     val isDragActive: State<Boolean>,
 )
 
@@ -228,18 +223,11 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
     )
 }
 
-/** The composer's image sources: the Attach images picker, and drag-and-drop while the chat shows. */
+/** The window's image source for the composer: drag-and-drop while the chat shows. */
 @Composable
 internal fun rememberDesktopImageIntake(core: DesktopShellCore, navigator: DesktopShellNavigator): DesktopImageIntake {
     val chatController = core.chatController
     val loader = remember { DesktopImageAttachmentLoader() }
-    val pickerLauncher = rememberFilePickerLauncher(
-        type = FileKitType.Image,
-        mode = FileKitMode.Multiple(maxItems = ImageIngressPolicy.MAX_FILES),
-        dialogSettings = FileKitDialogSettings(title = "Attach images"),
-    ) { files ->
-        files.orEmpty().forEach { file -> launchImageAttach(file.file, loader, core) }
-    }
     val isDragActive = DesktopImageIngressEffect(
         DesktopImageIngressConfig(
             enabled = navigator.selectedDestination == DesktopDestination.Conversations,
@@ -249,23 +237,5 @@ internal fun rememberDesktopImageIntake(core: DesktopShellCore, navigator: Deskt
             onError = chatController::showComposerError,
         ),
     )
-    return DesktopImageIntake(
-        launchPicker = { pickerLauncher.launch() },
-        isDragActive = isDragActive,
-    )
-}
-
-private fun launchImageAttach(file: File, loader: DesktopImageAttachmentLoader, core: DesktopShellCore) {
-    val chatController = core.chatController
-    core.chatScope.launch {
-        runCatching {
-            val path = file.toPath()
-            loader.load(path)
-        }.onSuccess(chatController::attachImage)
-            .onFailure { chatController.showComposerError(attachFailureMessage(it)) }
-    }
-}
-
-private fun attachFailureMessage(error: Throwable): String {
-    return error.message ?: error::class.simpleName ?: "Could not attach image"
+    return DesktopImageIntake(isDragActive = isDragActive)
 }

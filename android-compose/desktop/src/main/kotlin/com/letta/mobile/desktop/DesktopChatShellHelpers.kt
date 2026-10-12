@@ -13,7 +13,6 @@ import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
@@ -35,13 +34,10 @@ import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
-import com.letta.mobile.desktop.chat.sendOrBranch
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.onboarding.OnboardingTaskKind
-import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import kotlinx.coroutines.launch
 
 /** Model picker options: display label to route-stable selection token. */
@@ -494,60 +490,6 @@ internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsPara
             ),
         )
     }
-}
-
-internal data class CreateDesktopChatDetailPaneActionsParams(
-    val chatController: DesktopChatController,
-    val canSubmitApprovals: Boolean,
-    val onA2uiAction: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
-    val onAttachImage: () -> Unit,
-    val onOpenCanvas: (() -> Unit)? = null,
-    val onOpenModelPicker: () -> Unit,
-    val onSetPersona: () -> Unit,
-    val onNavigateToChannels: () -> Unit,
-    val onNavigateToAgents: () -> Unit,
-    val onOpenAgent: (String) -> Unit,
-    /** The composer companion mascot taps into the agent pane. */
-    val onOpenAgentPane: () -> Unit = {},
-    val onEditAgent: () -> Unit = {},
-)
-
-internal fun createDesktopChatDetailPaneActions(
-    params: CreateDesktopChatDetailPaneActionsParams,
-): ChatDetailPaneActions {
-    val chatController = params.chatController
-    return ChatDetailPaneActions(
-        onComposerTextChanged = chatController::updateComposerText,
-        onSend = chatController::sendOrBranch,
-        onSubmitApproval = if (params.canSubmitApprovals) {
-            { requestId, toolCallIds, approve, reason ->
-                chatController.submitApproval(ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
-            }
-        } else {
-            null
-        },
-        onA2uiAction = params.onA2uiAction,
-        onAttachImage = params.onAttachImage,
-        onOpenCanvas = params.onOpenCanvas,
-        onRemoveImageAttachment = chatController::removeImageAttachment,
-        onRetryConnection = chatController::retryConnection,
-        onModelSelected = chatController::setConversationModel,
-        onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
-        onOpenModelPicker = params.onOpenModelPicker,
-        onOpenAgentPane = params.onOpenAgentPane,
-        onEditAgent = params.onEditAgent,
-        onOnboardingTask = { kind ->
-            when (kind) {
-                OnboardingTaskKind.SetPersona -> params.onSetPersona()
-                OnboardingTaskKind.ConnectChannel -> params.onNavigateToChannels()
-                OnboardingTaskKind.AddSkills -> params.onNavigateToAgents()
-            }
-        },
-        onOpenAgent = params.onOpenAgent,
-        queue = desktopQueuedSendActions(chatController),
-        queueControls = chatController::canonicalSendQueue,
-        messageMenu = { com.letta.mobile.desktop.chat.desktopMessageMenu(chatController) },
-    )
 }
 
 internal fun handleDesktopShareCanvasToChat(
