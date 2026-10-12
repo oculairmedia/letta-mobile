@@ -17,15 +17,6 @@ internal class ChatApprovalCoordinator(
      */
     private val outbox: suspend (OutboxApproval) -> OutboxSubmitResult? = { null },
 ) {
-    suspend fun submitApproval(
-        agentId: String,
-        activeConversationId: String?,
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ): ChatApprovalResult = submitApproval(agentId, activeConversationId, ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
-
     /** letta-mobile-bzvro.40: [answer] may carry always-allow rule ids, which only an Iroh host applies. */
     suspend fun submitApproval(agentId: String, activeConversationId: String?, answer: ChatApprovalAnswer): ChatApprovalResult {
         if (activeConversationId.isNullOrBlank()) return ChatApprovalResult.MissingActiveConversation

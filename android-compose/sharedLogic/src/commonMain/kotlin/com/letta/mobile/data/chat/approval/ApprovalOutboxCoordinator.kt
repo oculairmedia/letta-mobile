@@ -74,20 +74,21 @@ class ApprovalOutboxCoordinator(
     suspend fun submit(entry: OutboxApproval): OutboxSubmitResult {
         if (!connected.value) return queue(entry)
         if (entry.key in outbox.entries.value.answered) return OutboxSubmitResult.Duplicate
-        val outcome = try {
-            send(entry)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
-            // A failure on a live connection is the caller's error to show; a dropped one queues it.
-            if (connected.value) throw error
-            OutboxSendOutcome.Offline
-        }
-        return when (outcome) {
+        return when (attempt(entry)) {
             OutboxSendOutcome.Accepted -> OutboxSubmitResult.Sent.also { outbox.markAnswered(entry) }
             OutboxSendOutcome.NoLongerPending -> OutboxSubmitResult.NoLongerPending
             OutboxSendOutcome.Offline -> queue(entry)
         }
+    }
+
+    /** One send now. A failure on a live connection is the caller's error to show; a dropped one queues it. */
+    private suspend fun attempt(entry: OutboxApproval): OutboxSendOutcome = try {
+        send(entry)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (@Suppress("TooGenericExceptionCaught") error: Exception) {
+        if (connected.value) throw error
+        OutboxSendOutcome.Offline
     }
 
     /** Sends what is queued now (also called on reconnect). */

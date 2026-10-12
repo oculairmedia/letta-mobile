@@ -26,10 +26,7 @@ class ChatApprovalCoordinatorTest {
         val result = coordinator.submitApproval(
             agentId = "agent-1",
             activeConversationId = null,
-            requestId = "approval-1",
-            toolCallIds = listOf("tool-1"),
-            approve = true,
-            reason = null,
+            answer = ChatApprovalAnswer("approval-1", listOf("tool-1"), approve = true, reason = null),
         )
 
         assertEquals(ChatApprovalResult.MissingActiveConversation, result)
@@ -41,10 +38,7 @@ class ChatApprovalCoordinatorTest {
         val result = coordinator.submitApproval(
             agentId = "",
             activeConversationId = "conv-1",
-            requestId = "approval-1",
-            toolCallIds = listOf("tool-1"),
-            approve = true,
-            reason = null,
+            answer = ChatApprovalAnswer("approval-1", listOf("tool-1"), approve = true, reason = null),
         )
 
         assertEquals(ChatApprovalResult.MissingActiveAgent, result)
@@ -56,10 +50,7 @@ class ChatApprovalCoordinatorTest {
         val result = coordinator.submitApproval(
             agentId = "agent-1",
             activeConversationId = "conv-1",
-            requestId = "approval-1",
-            toolCallIds = listOf("tool-1", "tool-2"),
-            approve = false,
-            reason = "not safe",
+            answer = ChatApprovalAnswer("approval-1", listOf("tool-1", "tool-2"), approve = false, reason = "not safe"),
         )
 
         assertEquals(ChatApprovalResult.Submitted, result)
@@ -84,10 +75,7 @@ class ChatApprovalCoordinatorTest {
         val result = coordinator.submitApproval(
             agentId = "agent-1",
             activeConversationId = "conv-1",
-            requestId = "approval-1",
-            toolCallIds = listOf("tool-1"),
-            approve = true,
-            reason = null,
+            answer = ChatApprovalAnswer("approval-1", listOf("tool-1"), approve = true, reason = null),
         )
 
         assertEquals(ChatApprovalResult.Failed("boom"), result)
@@ -126,10 +114,7 @@ class ChatApprovalCoordinatorTest {
                 coordinator.submitApproval(
                     agentId = "agent-1",
                     activeConversationId = "conv-1",
-                    requestId = "approval-1",
-                    toolCallIds = listOf("tool-1"),
-                    approve = true,
-                    reason = null,
+                    answer = ChatApprovalAnswer("approval-1", listOf("tool-1"), approve = true, reason = null),
                 )
             }
         }
