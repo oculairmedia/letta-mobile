@@ -51,6 +51,7 @@ import com.letta.mobile.data.home.HomeStatTile
 import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.home.sortFleet
 import com.letta.mobile.data.home.statTiles
+import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -222,11 +223,7 @@ private fun HomeStatsStrip(page: HomePageScope) {
                 tiles.forEach { tile -> StatPair(tile, page) }
             }
             IconButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag(HomePageTags.STATS_EXPAND)) {
-                Icon(
-                    imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-                    contentDescription = if (expanded) HIDE_TREND else SHOW_TREND,
-                    modifier = Modifier.size(LettaDimens.Control.iconSm),
-                )
+                DisclosureChevron(expanded = expanded, compact = true, contentDescription = if (expanded) HIDE_TREND else SHOW_TREND)
             }
             StatsMenu(page)
         }
