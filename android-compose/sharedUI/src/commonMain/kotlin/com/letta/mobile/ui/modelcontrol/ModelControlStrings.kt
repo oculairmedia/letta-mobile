@@ -11,6 +11,7 @@ import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
  */
 object ModelControlStrings {
     // Picker (A)
+    const val MODEL = "Model"
     const val SEARCH_MODELS = "Search models"
     const val REFRESH_MODELS = "Refresh Models"
     const val REFRESHING_MODELS = "Refreshing…"
@@ -23,8 +24,6 @@ object ModelControlStrings {
     const val EFFORT = "Effort"
 
     fun noMatch(query: String) = "No models match \"$query\""
-
-    fun groupToggle(title: String, collapsed: Boolean) = if (collapsed) "Show $title models" else "Hide $title models"
 
     fun tierLabel(tier: ReasoningTier): String = when (tier) {
         ReasoningTier.NONE -> "None"
