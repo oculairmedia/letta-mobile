@@ -61,8 +61,6 @@ class SettingsPageTest {
     fun theModeIsLocalRuntimeOrRemoteHostAndNothingElse() = runComposeUiTest {
         page(SettingsPageState(remote))
 
-        onNodeWithTag(SettingsSectionTags.ROW_PREFIX + BackendSettingsTags.MODE).performClick()
-
         onNodeWithTag(option(LettaConfig.Mode.LOCAL)).assertExists()
         onNodeWithTag(option(LettaConfig.Mode.SELF_HOSTED)).assertExists()
         assertEquals(listOf("Remote host", "Local runtime"), LettaConfig.Mode.entries.map { it.settingsLabel })
@@ -75,7 +73,6 @@ class SettingsPageTest {
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).assertExists()
         onNodeWithTag(field(BackendSettingsTags.TOKEN)).assertExists()
 
-        onNodeWithTag(SettingsSectionTags.ROW_PREFIX + BackendSettingsTags.MODE).performClick()
         onNodeWithTag(option(LettaConfig.Mode.LOCAL)).performClick()
 
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).assertDoesNotExist()
@@ -84,10 +81,11 @@ class SettingsPageTest {
     }
 
     @Test
-    fun theLocalRuntimeSavesWithoutAnAddress() = runComposeUiTest {
+    fun theLocalRuntimeSavesWithoutAnAddressOnceChosen() = runComposeUiTest {
         var saved: LettaConfig? = null
-        page(SettingsPageState(local), SettingsPageServices(BackendSettingsActions(onConfigSaved = { saved = it })))
+        page(SettingsPageState(remote), SettingsPageServices(BackendSettingsActions(onConfigSaved = { saved = it })))
 
+        onNodeWithTag(option(LettaConfig.Mode.LOCAL)).performClick()
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).assertDoesNotExist()
         onNodeWithTag(action(BackendSettingsTags.SAVE)).performClick()
 
@@ -152,9 +150,10 @@ class SettingsPageTest {
         page(SettingsPageState(remote), SettingsPageServices(BackendSettingsActions(onConfigSaved = {}, testConnection = tester)))
 
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).performTextInput("ws://10.0.0.2:4500")
-        onNodeWithTag(action(BackendSettingsTags.TEST)).performClick()
+        onNodeWithTag(field(BackendSettingsTags.TEST)).performClick()
 
         onNodeWithText("Connected: letta-code 0.34.8").assertExists()
+        onNodeWithText("Reachable", substring = true).assertExists()
         assertEquals(listOf<Pair<String, String?>>("ws://10.0.0.2:4500" to null), probed)
     }
 
@@ -168,10 +167,11 @@ class SettingsPageTest {
     }
 
     @Test
-    fun theConnectionAndItsFailureShowAboveTheSections() = runComposeUiTest {
+    fun theConnectionAndItsFailureShowInTheBackendStatusRow() = runComposeUiTest {
         page(SettingsPageState(remote, BackendConnectionStatus.Failed("Iroh tickets need the relay")))
 
-        onNodeWithText("Connection failed").assertExists()
+        onNodeWithTag(field(BackendSettingsTags.STATUS)).assertExists()
+        onNodeWithText("Can't reach host").assertExists()
         onNodeWithText("Iroh tickets need the relay").assertExists()
     }
 
@@ -198,7 +198,6 @@ class SettingsPageTest {
         onNodeWithTag(SettingsPageTags.GROUP_PREFIX + SettingsGroup.About.name).assertExists()
         onNodeWithTag(SettingsPageTags.GROUP_PREFIX + SettingsGroup.Chat.name).assertDoesNotExist()
 
-        onNodeWithTag(SettingsSectionTags.ROW_PREFIX + BackendSettingsTags.MODE).performClick()
         onNodeWithTag(option(LettaConfig.Mode.LOCAL)).performClick()
         onNodeWithTag(SettingsSectionTags.SECTION_PREFIX + "only-local").assertExists()
     }
@@ -232,6 +231,20 @@ class SettingsPageTest {
         }
 
         onNodeWithTag(SettingsSectionTags.SECTION_PREFIX + "about").performScrollTo().assertExists()
+    }
+
+    @Test
+    fun theLocalRuntimeShowsItsStatusAndSaveWaitsForAChange() = runComposeUiTest {
+        page(SettingsPageState(local, BackendConnectionStatus.Connected("local")))
+
+        onNodeWithText("Connected").assertExists()
+        onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).assertDoesNotExist()
+        onNodeWithTag(field(BackendSettingsTags.TEST)).assertDoesNotExist()
+        onNodeWithTag(action(BackendSettingsTags.SAVE)).assertIsNotEnabled()
+
+        onNodeWithTag(option(LettaConfig.Mode.SELF_HOSTED)).performClick()
+        onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).performTextInput("ws://10.0.0.2:4500")
+        onNodeWithTag(action(BackendSettingsTags.SAVE)).assertIsEnabled()
     }
 
     private fun option(mode: LettaConfig.Mode) = SettingsSectionTags.OPTION_PREFIX + BackendSettingsTags.MODE + "-" + mode.name

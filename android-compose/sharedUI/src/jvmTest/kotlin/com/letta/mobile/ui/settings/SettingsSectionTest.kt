@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.settings.AppearanceSettings
@@ -142,5 +141,6 @@ class SettingsSectionTest {
         rows = listOf(SettingsRow.Note("health", SettingsStatus(status))),
     )
 
-    private fun toggleIn(rowKey: String) = isToggleable() and hasAnyAncestor(hasTestTag(SettingsSectionTags.ROW_PREFIX + rowKey))
+    /** The row itself is the switch: one toggleable node with the row's tag. */
+    private fun toggleIn(rowKey: String) = isToggleable() and hasTestTag(SettingsSectionTags.ROW_PREFIX + rowKey)
 }
