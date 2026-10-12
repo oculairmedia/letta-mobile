@@ -5,17 +5,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.feature.chat.render.STREAMING_CURSOR
 import com.letta.mobile.feature.chat.render.shouldShowStreamingCursor
 import com.letta.mobile.feature.chat.render.streamingDisplayText
-import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.markdown.MarkdownPaint
@@ -49,17 +44,11 @@ private fun RichMarkdownBody(
     isStreaming: Boolean,
     modifier: Modifier,
 ) {
-    // A row that streamed keeps the streaming renderer through its settle, so the final height
-    // change eases in (StreamingMarkdownText applies its settle animation once isStreaming flips
-    // false); a row that never streamed (hydrated history) takes the settled renderer directly.
-    // SideEffect, not a write during composition: the flip frame itself must not re-render.
-    var hasStreamed by remember { mutableStateOf(false) }
-    SideEffect { if (isStreaming) hasStreamed = true }
-    if (isStreaming || hasStreamed) {
-        StreamedRichMarkdown(text = text, textColor = paint.textColor, isStreaming = isStreaming, modifier = modifier)
-    } else {
-        MarkdownText(text = text, modifier = modifier, textColor = paint.textColor)
-    }
+    // letta-mobile-ckmub.1 (hard cut S4): every row, streamed or hydrated, takes the renderer the
+    // legacy AssistantResponseText used (StreamingMarkdownText, settled when not streaming), so a
+    // plain paragraph draws in the legacy body type rather than MarkdownText's larger paragraph
+    // style, and a row never swaps renderers (and type size) as it settles: no jump on settle.
+    StreamedRichMarkdown(text = text, textColor = paint.textColor, isStreaming = isStreaming, modifier = modifier)
 }
 
 /**

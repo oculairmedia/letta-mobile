@@ -20,11 +20,12 @@ import kotlin.test.assertTrue
 class PageInsetModifierGuardTest {
 
     companion object {
-        /** File name -> why it still pads itself. Containers and the chat surface (slice S4), not pages. */
+        /**
+         * File name -> why it still pads itself. Containers only, not pages. The chat page left this
+         * list in slice S4 (letta-mobile-ckmub.1): ChatSurface renders in the scaffold and its layers
+         * lift by its keyboard inset (ChatSurfaceInsets).
+         */
         val ALLOWLIST: Map<String, String> = mapOf(
-            "ChatComposerPanel.kt" to "chat composer lifts itself over the keyboard until ChatSurface adopts the scaffold (S4)",
-            "DockedChatPanel.kt" to "chat docked over the canvas sizes against the keyboard until ChatSurface adopts the scaffold (S4)",
-            "CanvasBubbleCard.kt" to "chat bubble overlay on the canvas, a floating container, not a page (S4)",
             "LettaPaneDefaults.kt" to "the shared bottom-sheet pane container (S3 LettaHost) pads its own content above the navigation bar",
         )
 

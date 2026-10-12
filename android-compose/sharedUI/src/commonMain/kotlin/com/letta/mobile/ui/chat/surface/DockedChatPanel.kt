@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -26,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -334,7 +331,8 @@ internal fun DockedChatPanel(
     modifier: Modifier = Modifier,
     morph: SurfaceMorph = SurfaceMorph.Docked,
 ) {
-    BoxWithConstraints(modifier.fillMaxSize().imePadding()) {
+    val keyboard = LocalChatKeyboardLift.current
+    BoxWithConstraints(modifier.fillMaxSize().liftedBy(keyboard)) {
         val collapsedWidth = animatedBubbleComposerWidth(state)
         state.collapsedWidthDp = collapsedWidth
         val frame = ChatDockFrame(maxWidth.value, maxHeight.value, DockLimits, state.collapsedHeightDp, collapsedWidth)
@@ -350,7 +348,7 @@ internal fun DockedChatPanel(
         val showPanel = layers.showPanel
         val density = LocalDensity.current
         // The page covers the keyboard's area too: the morph grows into it.
-        val fullHeightDp = maxHeight.value + with(density) { WindowInsets.ime.getBottom(density).toDp().value }
+        val fullHeightDp = maxHeight.value + keyboard.value.value
         val fullWidthDp = maxWidth.value
         val fraction = morph.fraction
         val wrapHeight = layers.wrapHeight

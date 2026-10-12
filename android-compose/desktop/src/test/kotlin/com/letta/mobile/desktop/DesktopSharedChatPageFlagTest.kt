@@ -34,11 +34,12 @@ class DesktopSharedChatPageFlagTest {
     }
 
     @Test
-    fun offByDefaultWithNoOverrideAndNoSavedToggle() {
+    fun onByDefaultWithNoOverrideAndNoSavedToggle() {
+        // letta-mobile-ckmub.1 (S4): the shared page is the default; the toggle opts out for one release.
         val flag = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), noEnvironment())
 
-        assertFalse(flag.enabled.value)
-        assertFalse(flag.persistedEnabled.value)
+        assertTrue(flag.enabled.value)
+        assertTrue(flag.persistedEnabled.value)
         assertFalse(flag.forcedByEnvironment)
     }
 
@@ -53,7 +54,6 @@ class DesktopSharedChatPageFlagTest {
 
         assertTrue(flag.forcedByEnvironment)
         assertTrue(flag.enabled.value)
-        assertFalse(flag.persistedEnabled.value)
     }
 
     @Test
@@ -67,6 +67,16 @@ class DesktopSharedChatPageFlagTest {
         runBlocking { flag.setPersistedEnabled(false) }
 
         assertTrue(flag.enabled.value)
+    }
+
+    @Test
+    fun turningTheToggleOffKeepsTheOldPageAcrossLaunches() {
+        val first = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), noEnvironment())
+
+        runBlocking { first.setPersistedEnabled(false) }
+
+        val reloaded = DesktopSharedChatPageFlag(DesktopSharedChatPageFlagStore(path), noEnvironment())
+        assertFalse(reloaded.enabled.value)
     }
 
     @Test
@@ -86,10 +96,10 @@ class DesktopSharedChatPageFlagTest {
     }
 
     @Test
-    fun corruptFileReadsAsOff() {
+    fun corruptFileReadsAsTheDefault() {
         path.writeText("chat.sharedPage.enabled=maybe\n")
 
-        assertFalse(DesktopSharedChatPageFlagStore(path).load())
+        assertTrue(DesktopSharedChatPageFlagStore(path).load())
     }
 
     private fun noEnvironment() = SharedChatFlagEnvironment(systemProperty = { null }, environmentVariable = { null })

@@ -133,12 +133,6 @@ internal class ChatRowMotion(private val reduced: Boolean) {
         return fadeOut(fastFadeOutSpec) + shrinkVertically(bodyLiftSize(), shrinkTowards = Alignment.Top)
     }
 
-    /** The run's leading label folding sideways (the tool summary slides home), on the same ramp. */
-    fun runLeadFoldExit(): ExitTransition {
-        if (reduced) return ExitTransition.None
-        return fadeOut(fastFadeOutSpec) + shrinkHorizontally(bodyLiftSize(), shrinkTowards = Alignment.Start)
-    }
-
     /**
      * A popup speaking from a point (the Touch canvas's reply, out of its chat head): it grows out
      * of [origin] on the expressive spatial spring as it fades in, so it reads as coming from the

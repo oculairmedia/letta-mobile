@@ -237,7 +237,8 @@ class ChatRowInteractionUiTest {
     }
 
     @Test
-    fun aSettledRunSummaryIsAPlainLabelThatNeverCollapsesTheRun() = runComposeUiTest {
+    fun aSettledRunFoldsThroughItsOwnerFromItsHeader() = runComposeUiTest {
+
         val actions = RecordingChatActions()
         val block = ChatRenderItem.RunBlock(
             runId = "run-1",
@@ -247,8 +248,8 @@ class ChatRowInteractionUiTest {
             ).map { it to GroupPosition.None },
         )
         setContent {
-            // A stale collapsed id from the owner no longer hides the run's steps: the run has no
-            // collapse of its own (letta-mobile-bglj6.1.11).
+            // letta-mobile-ckmub.1 (S4): the legacy fold is back, owned by the page's collapsed run ids.
+
             MaterialTheme {
                 RenderRow(
                     block,
@@ -258,11 +259,12 @@ class ChatRowInteractionUiTest {
             }
         }
 
-        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists().assert(hasClickAction().not())
-        onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
-        runOnIdle { assertEquals(emptyList(), actions.toggledRuns) }
-        onNodeWithText("Looking into it.").assertExists()
+        // Folded, the run shows its last step only.
+        onNodeWithText("Looking into it.").assertDoesNotExist()
         onNodeWithText("All done here.").assertExists()
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists().assert(hasClickAction())
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
+        runOnIdle { assertEquals(listOf("run-1"), actions.toggledRuns) }
     }
 
     @Test

@@ -62,7 +62,7 @@ class FakeSettingsRepository(
     private val chatFontScaleState = MutableStateFlow(1f)
     private val enableProjectsState = MutableStateFlow(true)
     private val hapticsEnabledState = MutableStateFlow(true)
-    private val sharedChatPageEnabledState = MutableStateFlow(false)
+    private val sharedChatPageEnabledState = MutableStateFlow(true)
     private val openChatsOnCanvasState = MutableStateFlow(true)
     private val featureFlagStates = mutableMapOf<FeatureFlag, MutableStateFlow<Boolean>>()
 

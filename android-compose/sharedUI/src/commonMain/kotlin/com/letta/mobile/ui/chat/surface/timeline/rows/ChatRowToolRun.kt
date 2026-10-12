@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,8 +41,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
+import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_command_count
 import com.letta.mobile.sharedui.resources.rows_step_done
@@ -71,6 +74,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -85,9 +89,11 @@ import kotlin.time.Clock
  * disclosure, on a pointer host ([ChatToolDetails.Inline]). Approvals that wait on the user show
  * their controls under the line.
  *
- * letta-mobile-bglj6.1.11: when the line opens its run, the run's plain [title] ("Worked for 1m 7s")
- * leads it, so a run reads as ONE line with ONE chevron. Only the tool part of the line is the
- * disclosure; the title never takes a click.
+ * letta-mobile-ckmub.1 (hard cut S4): the line sits on its own under the run's header, as the
+ * legacy RunBlock draws it (the header is the run's, see [RunBlockRow]). A permission approval the
+ * run waits on is folded into the line's disclosure, as the legacy timeline shows such a run: the
+ * collapsed line by default, the approval card in the sheet or in the in-place disclosure once the
+ * person opens it. A runtime question (AskUserQuestion) still shows its card under the line.
  */
 @Composable
 internal fun ToolRunGroup(
@@ -96,7 +102,6 @@ internal fun ToolRunGroup(
     callbacks: ChatRowCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    val title = calls.title
     val toolCalls = calls.toolCalls
     val approvals = calls.approvals
     if (toolCalls.isEmpty()) return
@@ -106,30 +111,66 @@ internal fun ToolRunGroup(
     val inline = context.toolDetails == ChatToolDetails.Inline
     val summary = remember(toolCalls, approvals) { summarizeToolRun(toolCalls, approvals) }
     val startedAtEpochMs = remember(calls.startedAtTimestamp) { calls.startedAtTimestamp?.let(::parseTimestampEpochMillis) }
+    val split = remember(approvals) { FoldedApprovals.of(approvals) }
     val haptics = LocalHaptics.current
+    FoldedApprovalCue(split.folded)
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            title?.let { RunSummaryLead(it) }
-            ToolRunSummaryRow(
-                line = ToolRunLine(summary, startedAtEpochMs),
-                disclosure = toolRunDisclosure(inline, detailsOpen),
-                onClick = {
-                    haptics.play(LettaHapticCue.SegmentTick)
-                    detailsOpen = if (inline) !detailsOpen else true
-                },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (inline) ToolRunInlineCards(visible = detailsOpen, toolCalls, callbacks)
-        approvals.forEach { ApprovalRequestCard(it, context, callbacks) }
+        ToolRunSummaryRow(
+            line = ToolRunLine(summary, startedAtEpochMs),
+            disclosure = toolRunDisclosure(inline, detailsOpen),
+            onClick = {
+                haptics.play(LettaHapticCue.SegmentTick)
+                detailsOpen = if (inline) !detailsOpen else true
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (inline) ToolRunInlineCards(visible = detailsOpen, ToolRunDetails(toolCalls, split.folded), context, callbacks)
+        split.shown.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
-        ToolRunDetailsSheet(toolCalls, ToolRunLine(summary, startedAtEpochMs), callbacks) { detailsOpen = false }
+        val sheet = ToolRunSheetContent(ToolRunDetails(toolCalls, split.folded), ToolRunLine(summary, startedAtEpochMs))
+        ToolRunDetailsSheet(sheet, context, callbacks) { detailsOpen = false }
     }
 }
+
+/**
+ * A run's approvals, split as the legacy timeline draws them: a runtime question shows under the
+ * line ([shown]); a permission approval folds into the line's disclosure ([folded]).
+ */
+@Immutable
+internal class FoldedApprovals(
+    val shown: ImmutableList<UiApprovalRequest>,
+    val folded: ImmutableList<UiApprovalRequest>,
+) {
+    companion object {
+        fun of(approvals: List<UiApprovalRequest>): FoldedApprovals {
+            val (questions, permissions) = approvals.partition { request ->
+                request.toolCalls.any { RuntimeUserInputTools.requiresUserInput(it.name) }
+            }
+            return FoldedApprovals(questions.toImmutableList(), permissions.toImmutableList())
+        }
+    }
+}
+
+/** The approval cue still plays once per folded request, so a decision the line hides is not missed. */
+@Composable
+private fun FoldedApprovalCue(folded: List<UiApprovalRequest>) {
+    val waiting = folded.filter { it.requiresUserInput() }.map { it.requestId }
+    if (waiting.isEmpty()) return
+    val haptics = LocalHaptics.current
+    LaunchedEffect(waiting) { haptics.play(LettaHapticCue.ApprovalNeeded) }
+}
+
+/** What the line's disclosure opens: the calls in full, and the approvals folded under the line. */
+@Immutable
+private class ToolRunDetails(val toolCalls: ImmutableList<UiToolCall>, val approvals: ImmutableList<UiApprovalRequest>)
+
+/** The touch host's sheet: the line's [details] under a title that says what the line says. */
+@Immutable
+private class ToolRunSheetContent(val details: ToolRunDetails, val heading: ToolRunLine)
 
 /**
  * The calls one summary line folds: every call, the approvals among them, and when the first of
@@ -140,8 +181,6 @@ internal data class ToolRunCalls(
     val toolCalls: ImmutableList<UiToolCall>,
     val approvals: ImmutableList<UiApprovalRequest> = persistentListOf(),
     val startedAtTimestamp: String? = null,
-    /** The run's plain label, when the line opens its run (bglj6.1.11). */
-    val title: RunSummaryTitle? = null,
 )
 
 private fun toolRunDisclosure(inline: Boolean, detailsOpen: Boolean): ToolRunDisclosure {
@@ -152,7 +191,8 @@ private fun toolRunDisclosure(inline: Boolean, detailsOpen: Boolean): ToolRunDis
 @Composable
 private fun ColumnScope.ToolRunInlineCards(
     visible: Boolean,
-    toolCalls: ImmutableList<UiToolCall>,
+    details: ToolRunDetails,
+    context: ChatRowContext,
     callbacks: ChatRowCallbacks,
 ) {
     val reducedMotion = LocalReducedMotion.current
@@ -161,11 +201,13 @@ private fun ColumnScope.ToolRunInlineCards(
         enter = ChatRowMotion(reducedMotion).expansionEnter(),
         exit = ChatRowMotion(reducedMotion).expansionExit(),
     ) {
-        ToolRunCards(
-            toolCalls = toolCalls,
-            callbacks = callbacks,
+        Column(
             modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_INLINE).padding(bottom = LettaDimens.Space.xs),
-        )
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        ) {
+            details.approvals.forEach { ApprovalRequestCard(it, context, callbacks) }
+            ToolRunCards(toolCalls = details.toolCalls, callbacks = callbacks)
+        }
     }
 }
 
@@ -301,11 +343,13 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 /** The run's calls in full, one [ToolCard] each, led by its step status. */
 @Composable
 private fun ToolRunDetailsSheet(
-    toolCalls: ImmutableList<UiToolCall>,
-    heading: ToolRunLine,
+    sheet: ToolRunSheetContent,
+    context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     onDismiss: () -> Unit,
 ) {
+    val details = sheet.details
+    val heading = sheet.heading
     val elapsed by rememberElapsedSeconds(heading.summary.running, heading.startedAtEpochMs)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -324,7 +368,8 @@ private fun ToolRunDetailsSheet(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            ToolRunCards(toolCalls, callbacks)
+            details.approvals.forEach { ApprovalRequestCard(it, context, callbacks) }
+            ToolRunCards(details.toolCalls, callbacks)
         }
     }
 }
