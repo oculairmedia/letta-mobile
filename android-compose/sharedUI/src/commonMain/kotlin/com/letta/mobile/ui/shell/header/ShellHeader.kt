@@ -26,6 +26,8 @@ import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.search.LettaSearchAnchoredField
+import com.letta.mobile.ui.search.LettaSearchSource
+import com.letta.mobile.ui.search.LettaSearchTriggerStyle
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** What the header names: a title (and the agent or context under it), a host's own block, or nothing. */
@@ -168,16 +170,12 @@ private fun HeaderIconButton(icon: ImageVector, contentDescription: String, onCl
 @Composable
 private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
     LettaSearchAnchoredField(
-        query = slot.query,
-        onQueryChange = slot.onQuery,
-        sections = slot.sections,
-        onRowSelected = slot.onRowSelected,
-        onDismiss = slot.onDismiss,
+        source = LettaSearchSource(slot.query, slot.onQuery, slot.sections, slot.onRowSelected, slot.onDismiss),
         modifier = (if (compact) Modifier else Modifier.width(ShellHeaderDefaults.SearchWidth))
             .focusProperties { canFocus = true }
             .testTag(ShellHeaderTags.SEARCH),
         config = slot.config,
-        compact = compact,
+        style = if (compact) LettaSearchTriggerStyle.Icon else LettaSearchTriggerStyle.Field,
         openSignal = slot.openSignal,
     )
 }

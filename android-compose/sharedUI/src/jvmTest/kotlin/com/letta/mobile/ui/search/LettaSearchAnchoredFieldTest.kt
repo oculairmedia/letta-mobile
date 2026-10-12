@@ -45,11 +45,12 @@ class LettaSearchAnchoredFieldTest {
                 var query by remember { mutableStateOf(initialQuery) }
                 Box(Modifier.padding(start = FIELD_INSET, top = FIELD_INSET)) {
                     LettaSearchAnchoredField(
-                        query = query,
-                        onQueryChange = { query = it },
-                        sections = listOf(LettaSearchSection(title = "Agents", rows = listOf(row))),
-                        onRowSelected = {},
-                        onDismiss = {},
+                        source = LettaSearchSource(
+                            query = query,
+                            onQueryChange = { query = it },
+                            sections = listOf(LettaSearchSection(title = "Agents", rows = listOf(row))),
+                            onRowSelected = {},
+                        ),
                         modifier = Modifier.width(FIELD_WIDTH),
                         config = LettaSearchConfig(placeholder = PLACEHOLDER, autoFocus = false, toggle = toggle, showResults = showResults),
                     )
