@@ -25,14 +25,14 @@ data class ConversationModelView(
 ) {
     companion object {
         fun of(choices: ConversationModelChoices, conversationId: String?, agent: Agent?, models: List<LlmModel>): ConversationModelView {
-            val model = ConversationModelSelections.resolve(conversationId?.let(choices::get), agent?.model)
+            val model = ConversationModelSelections.resolve(conversationId?.let(choices.models::get), agent?.model)
             val catalogRow = models.firstOrNull { it.handle == model || it.id == model }
             return ConversationModelView(
                 model = model,
                 label = catalogRow?.displayName?.takeIf { it.isNotBlank() } ?: model,
                 windowTokens = choices.windowTokensFor(conversationId, agent, models),
                 modelWindowTokens = modelCatalogWindowOf(models, model),
-                effort = conversationId?.let(choices::effortOf) ?: catalogRow?.reasoningEffort,
+                effort = conversationId?.let(choices.efforts::get) ?: catalogRow?.reasoningEffort,
             )
         }
     }

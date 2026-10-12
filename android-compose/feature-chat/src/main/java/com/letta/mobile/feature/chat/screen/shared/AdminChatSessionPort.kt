@@ -102,7 +102,7 @@ internal class AdminChatSessionPort(
         AdminChatComposerMapping.ModelInputs(
             agent = agent,
             models = models,
-            conversationOverride = viewModel.conversationId?.value?.let(selections::get),
+            conversationOverride = viewModel.conversationId?.value?.let(selections.models::get),
             effortsFor = viewModel::reasoningEffortsFor,
         ),
     )

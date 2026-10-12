@@ -50,8 +50,8 @@ class ConversationModelSelectionsTest {
 
         assertEquals(OPUS, selections["conv-1"])
         assertEquals(OPUS, selections.effectiveModel("conv-1", agentModel = AGENT_MODEL))
-        assertEquals(1_000_000, selections.choices.value.windowOf("conv-1"))
-        assertEquals("low", selections.choices.value.effortOf("conv-1"))
+        assertEquals(1_000_000, selections.choices.value.windows["conv-1"])
+        assertEquals("low", selections.choices.value.efforts["conv-1"])
     }
 
     @Test
@@ -61,7 +61,7 @@ class ConversationModelSelectionsTest {
 
         assertNull(selections["conv-1"])
         assertEquals(AGENT_MODEL, selections.effectiveModel("conv-1", agentModel = AGENT_MODEL))
-        assertNull(selections.choices.value.windowOf("conv-1"))
+        assertNull(selections.choices.value.windows["conv-1"])
     }
 
     @Test
@@ -74,12 +74,12 @@ class ConversationModelSelectionsTest {
         // window no longer describes the conversation's model.
         selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000)))
         assertEquals(GPT, selections["conv-1"])
-        assertNull(selections.choices.value.windowOf("conv-1"))
+        assertNull(selections.choices.value.windows["conv-1"])
 
         // The host confirms the pick: its record (and window) is the truth again.
         selections.seedFromHost(listOf(hostConversation("conv-1", model = GPT, window = 400_000)))
         assertEquals(GPT, selections["conv-1"])
-        assertEquals(400_000, selections.choices.value.windowOf("conv-1"))
+        assertEquals(400_000, selections.choices.value.windows["conv-1"])
 
         // A later change elsewhere now shows, since no local pick is pending.
         selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000)))
@@ -92,7 +92,7 @@ class ConversationModelSelectionsTest {
         selections.seedFromHost(listOf(hostConversation("conv-1", model = null, window = 64_000)))
 
         assertNull(selections["conv-1"])
-        assertEquals(64_000, selections.choices.value.windowOf("conv-1"))
+        assertEquals(64_000, selections.choices.value.windows["conv-1"])
     }
 
     private fun hostConversation(id: String, model: String?, window: Int? = null, effort: String? = null) = Conversation(

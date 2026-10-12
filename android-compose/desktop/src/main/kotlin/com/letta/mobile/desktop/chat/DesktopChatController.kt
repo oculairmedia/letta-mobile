@@ -17,7 +17,6 @@ import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
@@ -871,26 +870,10 @@ class DesktopChatController(
         }
     }
 
-    /**
-     * letta-mobile-dxz5s: takes each listed conversation's own model and window from the host, so an
-     * override made outside this app shows after a cold start; the open conversation's composer
-     * label follows when its model changed.
-     */
-    private fun seedHostConversationModels(conversations: List<Conversation>) {
-        val selectedId = _state.value.selectedConversationId
-        val before = selectedId?.let(conversationModels::get)
-        conversationModels.seedFromHost(conversations)
-        if (selectedId == null || conversationModels[selectedId] == before) return
-        applyComposerModelLabel(selectedId, _state.value.selectedConversation?.agentId)
-    }
-
     private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
         scope.launch {
-            val agentModel = if (conversationModels[conversationId] == null && !agentId.isNullOrBlank()) {
-                runCatching { agentByIdProvider(setOf(agentId)) }.getOrNull()?.get(agentId)?.model
-            } else {
-                null
-            }
+            val agentLookup = conversationModels[conversationId] == null && !agentId.isNullOrBlank()
+            val agentModel = agentId.takeIf { agentLookup }?.let { id -> runCatching { agentByIdProvider(setOf(id)) }.getOrNull()?.get(id)?.model }
             // letta-mobile-okvyf: read the override AFTER the agent lookup, so a pick
             // made while the lookup was in flight is not overwritten by the agent model.
             val label = conversationModels.effectiveModel(conversationId, agentModel) ?: "Auto"
@@ -1264,7 +1247,7 @@ class DesktopChatController(
 
     private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
-        seedHostConversationModels(conversations)
+        conversationModels.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         // An empty map here silently degrades every conversation label to its
         // raw `agent-<uuid>`, so the failure must not be invisible.
