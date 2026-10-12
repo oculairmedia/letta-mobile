@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.model.ModelSettings
@@ -10,10 +11,12 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.activeBackendIsIroh
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
 import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -35,8 +38,18 @@ internal class AdminChatModelCoordinator(
     private val modelControl: ChatModelControl? = null,
     private val conversationId: () -> String? = { null },
 ) {
-    val conversationSelections: StateFlow<Map<String, String>> =
-        modelControl?.conversationSelections ?: MutableStateFlow(emptyMap())
+    val conversationSelections: StateFlow<ConversationModelChoices> =
+        modelControl?.conversationSelections ?: MutableStateFlow(ConversationModelChoices())
+
+    /**
+     * letta-mobile-dxz5s: the agent's conversations as the host records them, so a model override
+     * made outside this app (CLI, desktop, another phone) shows after a cold start. [conversations]
+     * is only read when there is a model control to seed.
+     */
+    fun followHostModels(conversations: () -> Flow<List<Conversation>>) {
+        val control = modelControl ?: return
+        scope.launch { control.followHostModels(conversations()) }
+    }
 
     private val localRuntimeModelSwitchMetadataKeys: Set<String> = LocalAgentRuntimeMetadata.bindingKeys + setOf(
         LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY,

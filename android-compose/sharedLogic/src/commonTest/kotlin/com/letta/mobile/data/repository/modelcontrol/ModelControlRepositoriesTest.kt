@@ -139,7 +139,7 @@ class ModelControlRepositoriesTest {
 
         repo.updateModel(ConversationModelTarget("agent-1", "conv-1"), ModelHandle("openai/gpt-sol"))
 
-        assertEquals(mapOf("conv-1" to "openai/gpt-sol"), repo.selections.byConversation.value)
+        assertEquals(mapOf("conv-1" to "openai/gpt-sol"), repo.selections.choices.value.models)
         assertEquals("openai/gpt-sol", repo.selections.effectiveModel("conv-1", agentModel = "anthropic/old"))
         assertEquals("anthropic/old", repo.selections.effectiveModel("conv-2", agentModel = "anthropic/old"))
     }

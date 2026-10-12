@@ -399,6 +399,15 @@ object LettaDatabaseMigrations {
         }
     }
 
+    /** letta-mobile-dxz5s: a cached conversation keeps the host's per-conversation model, window and effort. */
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `model` TEXT")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `contextWindowLimit` INTEGER")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `modelEffort` TEXT")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -417,5 +426,6 @@ object LettaDatabaseMigrations {
         MIGRATION_15_16,
         MIGRATION_16_17,
         MIGRATION_17_18,
+        MIGRATION_18_19,
     )
 }

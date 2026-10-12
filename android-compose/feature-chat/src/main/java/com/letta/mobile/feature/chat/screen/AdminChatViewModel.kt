@@ -627,8 +627,8 @@ internal class AdminChatViewModel @Inject constructor(
             .map { agents -> agents.find { it.id == agentId } },
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /** Per-conversation switches leave the agent model unchanged. */
-    val conversationModelSelections: StateFlow<Map<String, String>> by lazy {
+    /** Per-conversation models (host override or this session's switch); they leave the agent model unchanged. */
+    val conversationModelSelections: StateFlow<com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices> by lazy {
         modelCoordinator.conversationSelections
     }
 
@@ -1266,6 +1266,8 @@ internal class AdminChatViewModel @Inject constructor(
         chatSessionInitializer.run()
         publishRunState()
         observeCanvasShareAttachments()
+        // letta-mobile-dxz5s: the host's per-conversation model and window, from cache and refreshes.
+        modelCoordinator.followHostModels { conversationRepository.getConversations(agentId) }
     }
 
     /**

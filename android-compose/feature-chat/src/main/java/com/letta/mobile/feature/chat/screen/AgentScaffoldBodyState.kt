@@ -128,7 +128,7 @@ private fun rememberSelectedConversationModel(viewModel: AdminChatViewModel): St
     val conversationId = viewModel.conversationId?.value
     return remember(activeAgent, selections, conversationId) {
         ConversationModelSelections.resolve(
-            conversationOverride = conversationId?.let(selections::get),
+            conversationOverride = conversationId?.let(selections.models::get),
             agentModel = activeAgent?.model,
         )
     }

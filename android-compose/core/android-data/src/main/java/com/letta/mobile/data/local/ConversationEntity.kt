@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationModelSettings
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -31,6 +32,13 @@ data class ConversationEntity(
     val inContextMessageIdsJson: String = "[]",
     val isolatedBlockIdsJson: String = "[]",
     val cachedAtEpochMs: Long = System.currentTimeMillis(),
+    /**
+     * letta-mobile-dxz5s (v19): the conversation's own model override, its window and effort, so a
+     * cold start shows the host's override before the first refresh instead of the agent's model.
+     */
+    val model: String? = null,
+    val contextWindowLimit: Int? = null,
+    val modelEffort: String? = null,
 ) {
     fun toConversation(): Conversation = Conversation(
         id = ConversationId(id),
@@ -43,6 +51,9 @@ data class ConversationEntity(
         archivedAt = archivedAt,
         inContextMessageIds = decodeStringList(inContextMessageIdsJson),
         isolatedBlockIds = decodeStringList(isolatedBlockIdsJson),
+        model = model,
+        modelSettings = modelEffort?.let { ConversationModelSettings(effort = it) },
+        contextWindowLimit = contextWindowLimit,
     )
 
     companion object {
@@ -61,6 +72,9 @@ data class ConversationEntity(
             inContextMessageIdsJson = encodeStringList(conversation.inContextMessageIds),
             isolatedBlockIdsJson = encodeStringList(conversation.isolatedBlockIds),
             cachedAtEpochMs = cachedAtEpochMs,
+            model = conversation.model,
+            contextWindowLimit = conversation.hostContextWindowLimit,
+            modelEffort = conversation.modelSettings?.effectiveEffort,
         )
 
         fun encodeStringList(values: List<String>): String = json.encodeToString(stringListSerializer, values)

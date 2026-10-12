@@ -5,6 +5,7 @@ import com.letta.mobile.data.context.ContextWindowUsagePolicy
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
@@ -98,12 +99,12 @@ internal class AdminChatSessionPort(
     private fun modelState(
         agent: Agent?,
         models: List<LlmModel>,
-        selections: Map<String, String>,
+        selections: ConversationModelChoices,
     ): ChatModelUiState? = AdminChatComposerMapping.modelUiState(
         AdminChatComposerMapping.ModelInputs(
             agent = agent,
             models = models,
-            conversationOverride = viewModel.conversationId?.value?.let(selections::get),
+            conversationOverride = viewModel.conversationId?.value?.let(selections.models::get),
             effortsFor = viewModel::reasoningEffortsFor,
         ),
     )
