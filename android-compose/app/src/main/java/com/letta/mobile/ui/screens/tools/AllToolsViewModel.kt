@@ -55,7 +55,7 @@ class AllToolsViewModel @Inject constructor(
 
     val uiState: StateFlow<UiState<AllToolsUiState>> = controller.state
         .map { it.toUiState() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(UI_STATE_STOP_TIMEOUT_MS), UiState.Loading)
 
     init {
         controller.start()
@@ -106,6 +106,9 @@ class AllToolsViewModel @Inject constructor(
         controller.close()
     }
 }
+
+/** Keeps the mapped state alive across a configuration change, then lets it stop. */
+private const val UI_STATE_STOP_TIMEOUT_MS = 5_000L
 
 private fun ToolLibraryState.toUiState(): UiState<AllToolsUiState> {
     val message = errorMessage
