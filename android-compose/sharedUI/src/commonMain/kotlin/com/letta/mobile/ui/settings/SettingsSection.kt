@@ -45,8 +45,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsDrafts
-import com.letta.mobile.data.settings.SettingsOption
-import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.ui.components.picker.LettaPicker
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
@@ -68,21 +67,18 @@ object SettingsSectionTags {
     const val PROBLEM_PREFIX = "settings-problem-"
 }
 
+/** A settings card's heading: its key (the test tag), its title and an optional explanation. */
+data class SettingsHeader(val key: String, val title: String, val supporting: String? = null)
+
 /**
  * letta-mobile-ckmub.3.12 (hard cut S10, primitive P9): one settings card. Every Settings row on
- * every platform is drawn by the [SettingsScope] rows inside one of these; a platform describes its
- * own sections as data (SettingsSectionModel) instead of drawing them.
+ * every platform is drawn by the [SettingsScope] rows inside one of these, from the row models in
+ * com.letta.mobile.data.settings; a platform describes its own sections as data instead of drawing.
  */
 @Composable
-fun SettingsSection(
-    key: String,
-    title: String,
-    modifier: Modifier = Modifier,
-    supporting: String? = null,
-    content: @Composable SettingsScope.() -> Unit,
-) {
+fun SettingsSection(header: SettingsHeader, modifier: Modifier = Modifier, content: @Composable SettingsScope.() -> Unit) {
     Card(
-        modifier = modifier.fillMaxWidth().testTag(SettingsSectionTags.SECTION_PREFIX + key),
+        modifier = modifier.fillMaxWidth().testTag(SettingsSectionTags.SECTION_PREFIX + header.key),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -91,8 +87,8 @@ fun SettingsSection(
             modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.xl),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            supporting?.let {
+            Text(header.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            header.supporting?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             SettingsScope.content()
@@ -104,80 +100,75 @@ fun SettingsSection(
 object SettingsScope {
     /** A switch with its title and explanation. */
     @Composable
-    fun ToggleRow(key: String, title: String, checked: Boolean, onChange: (Boolean) -> Unit, supporting: String? = null, enabled: Boolean = true) {
+    fun ToggleRow(row: SettingsRow.Toggle) {
         Row(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            RowText(title, supporting, Modifier.weight(1f))
-            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+            RowText(row.title, row.supporting, Modifier.weight(1f))
+            Switch(checked = row.checked, onCheckedChange = row.onChange, enabled = row.enabled)
         }
     }
 
-    /** The chosen option of [options]; a click opens them in a LettaPicker. */
+    /** The chosen option; a click opens all of them in a LettaPicker. */
     @Composable
-    fun ChoiceRow(
-        key: String,
-        title: String,
-        options: List<SettingsOption>,
-        selected: String,
-        onSelect: (String) -> Unit,
-        supporting: String? = null,
-        enabled: Boolean = true,
-    ) {
+    fun ChoiceRow(row: SettingsRow.Choice) {
         var open by remember { mutableStateOf(false) }
-        val current = options.firstOrNull { it.key == selected }
+        val current = row.options.firstOrNull { it.key == row.selected }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = enabled) { open = true }
+                .clickable(enabled = row.enabled) { open = true }
                 .semantics { role = Role.Button }
-                .testTag(SettingsSectionTags.ROW_PREFIX + key),
+                .testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            RowText(title, supporting ?: current?.description, Modifier.weight(1f))
+            RowText(row.title, row.supporting ?: current?.description, Modifier.weight(1f))
             Text(
                 current?.label.orEmpty(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (row.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon))
         }
         if (open) {
-            ChoicePicker(ChoicePickerModel(key, title, options, selected), onPick = { picked ->
+            ChoicePicker(row, onPick = { picked ->
                 open = false
-                if (picked != selected) onSelect(picked)
+                if (picked != row.selected) row.onSelect(picked)
             }, onDismiss = { open = false })
         }
     }
 
-    /** A text field; [secret] hides it behind a show/hide toggle, [problem] marks it invalid. */
+    /**
+     * A text field showing [value]; edits go to [onValueChange]. A secret row hides its text behind
+     * a show/hide toggle; the row's problem marks it invalid once something is typed.
+     */
     @Composable
-    fun TextFieldRow(key: String, title: String, value: String, onValueChange: (String) -> Unit, options: TextFieldOptions = TextFieldOptions()) {
-        var revealed by rememberSaveable(key) { mutableStateOf(false) }
-        val problem = options.problem?.takeIf { value.isNotBlank() }
+    fun TextFieldRow(row: SettingsRow.Text, value: String, onValueChange: (String) -> Unit) {
+        var revealed by rememberSaveable(row.key) { mutableStateOf(false) }
+        val problem = row.problem?.invoke(value)?.takeIf { value.isNotBlank() }
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            label = { Text(title) },
-            placeholder = options.placeholder?.let { { Text(it) } },
+            label = { Text(row.title) },
+            placeholder = row.placeholder?.let { { Text(it) } },
             isError = problem != null,
             supportingText = if (problem != null) {
-                { Text(problem, modifier = Modifier.testTag(SettingsSectionTags.PROBLEM_PREFIX + key)) }
+                { Text(problem, modifier = Modifier.testTag(SettingsSectionTags.PROBLEM_PREFIX + row.key)) }
             } else {
-                options.supporting?.let { text -> { Text(text) } }
+                row.supporting?.let { text -> { Text(text) } }
             },
             singleLine = true,
-            visualTransformation = if (options.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = if (options.numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-            trailingIcon = if (options.secret) {
+            visualTransformation = if (row.secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = if (row.numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+            trailingIcon = if (row.secret) {
                 { SecretToggle(revealed) { revealed = !revealed } }
             } else {
                 null
             },
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
         )
     }
 
@@ -203,33 +194,33 @@ object SettingsScope {
 
     /** A fact: its label at the start, its value at the end. */
     @Composable
-    fun InfoRow(key: String, title: String, value: String, tone: SettingsTone = SettingsTone.Normal) {
+    fun InfoRow(row: SettingsRow.Info) {
         Row(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = toneColor(tone, MaterialTheme.colorScheme.onSurfaceVariant))
+            Text(row.title, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(row.value, style = MaterialTheme.typography.bodyMedium, color = toneColor(row.tone, MaterialTheme.colorScheme.onSurfaceVariant))
         }
     }
 
     /** A line of explanation or status in its tone's colour. */
     @Composable
-    fun NoteRow(key: String, status: SettingsStatus) {
+    fun NoteRow(row: SettingsRow.Note) {
         Text(
-            status.text,
+            row.status.text,
             style = MaterialTheme.typography.bodySmall,
-            color = toneColor(status.tone, MaterialTheme.colorScheme.onSurfaceVariant),
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            color = toneColor(row.status.tone, MaterialTheme.colorScheme.onSurfaceVariant),
+            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
         )
     }
 
     /** Monospaced text on a well, for a log tail. */
     @Composable
-    fun CodeRow(key: String, text: String) {
+    fun CodeRow(row: SettingsRow.Code) {
         Text(
-            text = text,
+            text = row.text,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -237,36 +228,27 @@ object SettingsScope {
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(LettaDimens.Radius.sm))
                 .padding(LettaDimens.Space.md)
-                .testTag(SettingsSectionTags.ROW_PREFIX + key),
+                .testTag(SettingsSectionTags.ROW_PREFIX + row.key),
         )
     }
 
-    /** A progress bar with an optional label under it; a null [fraction] is indeterminate. */
+    /** A progress bar with an optional label under it; a null fraction is indeterminate. */
     @Composable
-    fun ProgressRow(key: String, fraction: Float?, label: String? = null) {
+    fun ProgressRow(row: SettingsRow.Progress) {
         Column(
-            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + key),
+            modifier = Modifier.fillMaxWidth().testTag(SettingsSectionTags.ROW_PREFIX + row.key),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
+            val fraction = row.fraction
             if (fraction != null) {
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
             } else {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            label?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            row.label?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
-
-/** How a [SettingsScope.TextFieldRow] reads and checks its text. */
-data class TextFieldOptions(
-    val placeholder: String? = null,
-    val supporting: String? = null,
-    val secret: Boolean = false,
-    val numeric: Boolean = false,
-    /** What is wrong with the current text; shown once something is typed. */
-    val problem: String? = null,
-)
 
 /** A button of a [SettingsScope.ActionRow]. */
 data class ActionButton(val key: String, val label: String, val onClick: () -> Unit, val primary: Boolean = false, val enabled: Boolean = true)
@@ -298,30 +280,28 @@ private fun SecretToggle(revealed: Boolean, onToggle: () -> Unit) {
     }
 }
 
-private class ChoicePickerModel(val key: String, val title: String, val options: List<SettingsOption>, val selected: String)
-
 @Composable
-private fun ChoicePicker(model: ChoicePickerModel, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+private fun ChoicePicker(row: SettingsRow.Choice, onPick: (String) -> Unit, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
-    val items = model.options.map { option ->
+    val items = row.options.map { option ->
         PickerItem(
             key = option.key,
             value = option.key,
             title = option.label,
             subtitle = option.description,
-            testTag = SettingsSectionTags.OPTION_PREFIX + model.key + "-" + option.key,
+            testTag = SettingsSectionTags.OPTION_PREFIX + row.key + "-" + option.key,
         )
     }
     LettaPicker(
         spec = LettaPickerSpec(
-            sections = listOf(PickerSection(key = model.key, title = null, items = items)),
+            sections = listOf(PickerSection(key = row.key, title = null, items = items)),
             query = query,
             mode = PickMode.Single,
-            selected = setOf(model.selected),
-            search = if (model.options.size > SEARCHABLE_CHOICE_COUNT) PickerSearch() else null,
+            selected = setOf(row.selected),
+            search = if (row.options.size > SEARCHABLE_CHOICE_COUNT) PickerSearch() else null,
         ),
         callbacks = PickerCallbacks(onQuery = { query = it }, onPick = { onPick(it.value) }, onDismiss = onDismiss),
-        pane = PickerPane(title = model.title),
+        pane = PickerPane(title = row.title),
     )
 }
 

@@ -29,7 +29,6 @@ import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
-import com.letta.mobile.ui.settings.BackendSettingsActions
 import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellNavDrawer
@@ -77,13 +76,7 @@ fun LettaWebApp() {
         chat = chat,
         connection = connection,
         canvas = canvas,
-        settings = BackendSettingsActions(
-            onConfigSaved = { saved ->
-                shell.config = saved
-                settingsStore.saveBackend(saved)
-            },
-            onTokenCleared = { shell.config = shell.config.copy(accessToken = null) },
-        ),
+        settings = webSettingsServices(shell, settingsStore),
     )
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
@@ -118,7 +111,7 @@ private class WebPageInputs(
     val chat: WebChatLoad,
     val connection: BackendConnectionStatus,
     val canvas: WebChatCanvas,
-    val settings: BackendSettingsActions,
+    val settings: SettingsPageServices,
 )
 
 @Composable
@@ -172,11 +165,7 @@ private fun WebPage(shell: WebShellState, page: WebPageInputs, onShowAgents: (()
     val navigation = WebChatPageNavigation(onShowAgents ?: {}, agentNamesById = shell.agents.associate { it.id to it.name })
     val deps = ShellPageDeps(
         chat = ready?.let { ShellPageContent { _, m -> WebSharedChatPage(it.port, page.canvas, navigation, m) } },
-        settings = shellSettingsPage(
-            SettingsPageState(shell.config, page.connection),
-            SettingsPageServices(backend = page.settings),
-            onBack = shell::closeSettings,
-        ),
+        settings = shellSettingsPage(SettingsPageState(shell.config, page.connection), page.settings, onBack = shell::closeSettings),
         fallback = ShellPageContent { _, m -> WebWaitingPage(shell, page, onShowAgents, m) },
     )
     ShellPage(destination = shell.destination, deps = deps, modifier = modifier)

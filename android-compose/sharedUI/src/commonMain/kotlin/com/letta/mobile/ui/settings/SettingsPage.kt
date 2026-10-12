@@ -3,7 +3,6 @@ package com.letta.mobile.ui.settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -113,7 +112,7 @@ fun SettingsPage(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ColumnScope.SettingsGroups(state: SettingsPageState, services: SettingsPageServices) {
+private fun SettingsGroups(state: SettingsPageState, services: SettingsPageServices) {
     var form by remember(state.config) { mutableStateOf(BackendSettingsForm.of(state.config)) }
     val contributions = services.contributions.filter { it.showForMode == null || it.showForMode == form.mode }
     val anchor = remember { BringIntoViewRequester() }
@@ -136,7 +135,7 @@ private fun ColumnScope.SettingsGroups(state: SettingsPageState, services: Setti
                     .testTag(SettingsPageTags.GROUP_PREFIX + group.name),
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
             ) {
-                StandardSection(group, StandardSectionInputs(state, services, form) { form = it }, anchor)
+                StandardSection(group, StandardSectionInputs(state, services, BackendFormState(state.config, form) { form = it }), anchor)
                 groupContributions.forEach { SettingsContributionSection(it) }
             }
         }
@@ -147,8 +146,7 @@ private fun ColumnScope.SettingsGroups(state: SettingsPageState, services: Setti
 private class StandardSectionInputs(
     val state: SettingsPageState,
     val services: SettingsPageServices,
-    val form: BackendSettingsForm,
-    val onFormChange: (BackendSettingsForm) -> Unit,
+    val backend: BackendFormState,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -157,7 +155,7 @@ private fun StandardSection(group: SettingsGroup, inputs: StandardSectionInputs,
     val services = inputs.services
     when (group) {
         SettingsGroup.Backend -> {
-            BackendSettingsSection(inputs.state.config, inputs.form, inputs.onFormChange, services.backend)
+            BackendSettingsSection(inputs.backend, services.backend)
             services.pairing?.let { pairing ->
                 val anchored = inputs.state.section == ShellSettingsSection.Pairing
                 InstallAndPairCard(

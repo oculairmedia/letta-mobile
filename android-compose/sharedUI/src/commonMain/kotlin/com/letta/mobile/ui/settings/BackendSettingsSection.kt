@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.BackendServerUrlCheck
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.SettingsOption
+import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import kotlinx.coroutines.launch
@@ -83,68 +84,70 @@ val LettaConfig.Mode.settingsDescription: String
 /** What the address field suggests for a remote host. */
 const val REMOTE_HOST_PLACEHOLDER = "iroh://<endpoint id>@host:port, iroh://<ticket> or ws://host:port"
 
+/** The Backend form and the saved config it edits; [onFormChange] keeps the form hoisted to the page. */
+class BackendFormState(
+    val config: LettaConfig,
+    val form: BackendSettingsForm,
+    val onFormChange: (BackendSettingsForm) -> Unit,
+)
+
 /**
  * letta-mobile-ckmub.3.12 / ckmub.9: the Backend section every client's Settings page shows, built
  * from the shared rows: the mode (Local runtime or Remote host, nothing else), the remote host's
  * address and access token, and Save. The address is checked as it is typed, so a bare Iroh endpoint
- * id or a malformed ticket is explained here instead of failing to dial. [form] is hoisted to the
+ * id or a malformed ticket is explained here instead of failing to dial. The form is hoisted to the
  * page so the sections that only apply to one mode follow the unsaved choice.
  */
 @Composable
-fun BackendSettingsSection(
-    config: LettaConfig,
-    form: BackendSettingsForm,
-    onFormChange: (BackendSettingsForm) -> Unit,
-    actions: BackendSettingsActions,
-    modifier: Modifier = Modifier,
-) {
+fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActions, modifier: Modifier = Modifier) {
+    val form = state.form
     var testResult by remember(form) { mutableStateOf<SettingsStatus?>(null) }
     val scope = rememberCoroutineScope()
-    val remote = form.mode == LettaConfig.Mode.SELF_HOSTED
-    SettingsSection(key = BackendSettingsTags.SECTION, title = "Backend", modifier = modifier) {
-        config.migrationNotice?.let { NoteRow(BackendSettingsTags.NOTICE, SettingsStatus(it, SettingsTone.Warning)) }
-        ChoiceRow(
-            key = BackendSettingsTags.MODE,
-            title = "Mode",
-            options = LettaConfig.Mode.entries.map { SettingsOption(it.name, it.settingsLabel, it.settingsDescription) },
-            selected = form.mode.name,
-            onSelect = { picked -> onFormChange(form.copy(mode = LettaConfig.Mode.valueOf(picked))) },
-        )
-        if (remote) {
-            TextFieldRow(
-                key = BackendSettingsTags.SERVER_URL,
-                title = "Address",
-                value = form.serverUrl,
-                onValueChange = { onFormChange(form.copy(serverUrl = it)) },
-                options = TextFieldOptions(placeholder = REMOTE_HOST_PLACEHOLDER, problem = form.problem),
-            )
-            TextFieldRow(
-                key = BackendSettingsTags.TOKEN,
-                title = "Access token",
-                value = form.tokenInput,
-                onValueChange = { onFormChange(form.copy(tokenInput = it)) },
-                options = TextFieldOptions(
-                    placeholder = if (config.accessToken != null) "Saved token hidden" else "Optional",
-                    supporting = "Only if the App Server asks for one.",
-                    secret = true,
-                ),
-            )
+    val onTest: (BackendConnectionTester) -> Unit = { tester ->
+        testResult = SettingsStatus("Testing…")
+        scope.launch { testResult = tester.test(form.serverUrl.trim(), form.tokenInput.trim().ifEmpty { null } ?: state.config.accessToken) }
+    }
+    SettingsSection(SettingsHeader(BackendSettingsTags.SECTION, "Backend"), modifier) {
+        state.config.migrationNotice?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.NOTICE, SettingsStatus(it, SettingsTone.Warning))) }
+        ChoiceRow(modeRow(state))
+        if (form.mode == LettaConfig.Mode.SELF_HOSTED) {
+            TextFieldRow(addressRow(form), form.serverUrl) { state.onFormChange(form.copy(serverUrl = it)) }
+            TextFieldRow(tokenRow(state.config), form.tokenInput) { state.onFormChange(form.copy(tokenInput = it)) }
         }
-        ActionRow("backend-actions", backendButtons(config, form, actions, onFormChange) { tester ->
-            testResult = SettingsStatus("Testing…")
-            scope.launch { testResult = tester.test(form.serverUrl.trim(), form.tokenInput.trim().ifEmpty { null } ?: config.accessToken) }
-        })
-        testResult?.let { NoteRow(BackendSettingsTags.TEST_RESULT, it) }
+        ActionRow("backend-actions", backendButtons(state, actions, onTest))
+        testResult?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.TEST_RESULT, it)) }
     }
 }
 
+private fun modeRow(state: BackendFormState) = SettingsRow.Choice(
+    key = BackendSettingsTags.MODE,
+    title = "Mode",
+    options = LettaConfig.Mode.entries.map { SettingsOption(it.name, it.settingsLabel, it.settingsDescription) },
+    selected = state.form.mode.name,
+    onSelect = { picked -> state.onFormChange(state.form.copy(mode = LettaConfig.Mode.valueOf(picked))) },
+)
+
+private fun addressRow(form: BackendSettingsForm) = SettingsRow.Text(
+    key = BackendSettingsTags.SERVER_URL,
+    title = "Address",
+    placeholder = REMOTE_HOST_PLACEHOLDER,
+    problem = { form.problem },
+)
+
+private fun tokenRow(config: LettaConfig) = SettingsRow.Text(
+    key = BackendSettingsTags.TOKEN,
+    title = "Access token",
+    placeholder = if (config.accessToken != null) "Saved token hidden" else "Optional",
+    supporting = "Only if the App Server asks for one.",
+    secret = true,
+)
+
 private fun backendButtons(
-    config: LettaConfig,
-    form: BackendSettingsForm,
+    state: BackendFormState,
     actions: BackendSettingsActions,
-    onFormChange: (BackendSettingsForm) -> Unit,
     onTest: (BackendConnectionTester) -> Unit,
 ): List<ActionButton> = buildList {
+    val form = state.form
     val remote = form.mode == LettaConfig.Mode.SELF_HOSTED
     add(
         ActionButton(
@@ -153,8 +156,8 @@ private fun backendButtons(
             primary = true,
             enabled = form.problem == null,
             onClick = {
-                actions.onConfigSaved(form.applyTo(config))
-                onFormChange(form.copy(tokenInput = ""))
+                actions.onConfigSaved(form.applyTo(state.config))
+                state.onFormChange(form.copy(tokenInput = ""))
             },
         ),
     )
@@ -162,10 +165,10 @@ private fun backendButtons(
     if (remote && tester != null) {
         add(ActionButton(BackendSettingsTags.TEST, "Test connection", onClick = { onTest(tester) }, enabled = form.serverUrl.isNotBlank()))
     }
-    if (remote && config.accessToken != null) {
+    if (remote && state.config.accessToken != null) {
         add(
             ActionButton("backend-clear-token", "Clear token", onClick = {
-                onFormChange(form.copy(tokenInput = ""))
+                state.onFormChange(form.copy(tokenInput = ""))
                 actions.onTokenCleared()
             }),
         )

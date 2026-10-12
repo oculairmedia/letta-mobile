@@ -33,8 +33,8 @@ fun SettingsContributionSection(contribution: SettingsContribution, modifier: Mo
 fun SettingsModelSection(model: SettingsSectionModel, modifier: Modifier = Modifier) {
     val drafts = remember(model.key) { mutableStateMapOf<String, Draft>() }
     val current = SettingsDrafts(model.rows.filterIsInstance<SettingsRow.Text>().associate { it.key to drafts.textOf(it) })
-    SettingsSection(key = model.key, title = model.title, supporting = model.supporting, modifier = modifier) {
-        model.rows.forEach { row -> Row(row, drafts, current) }
+    SettingsSection(SettingsHeader(model.key, model.title, model.supporting), modifier) {
+        model.rows.forEach { row -> Row(row, RowDrafts(drafts, current)) }
     }
     model.confirm?.let { confirm ->
         LettaConfirmPane(
@@ -51,31 +51,22 @@ internal data class Draft(val seed: String, val text: String)
 private fun SnapshotStateMap<String, Draft>.textOf(row: SettingsRow.Text): String =
     if (row.onChange != null) row.value else this[row.key]?.takeIf { it.seed == row.value }?.text ?: row.value
 
+/** The section's uncontrolled drafts and what every text row shows now. */
+private class RowDrafts(val drafts: SnapshotStateMap<String, Draft>, val current: SettingsDrafts)
+
 @Composable
-private fun SettingsScope.Row(row: SettingsRow, drafts: SnapshotStateMap<String, Draft>, current: SettingsDrafts) {
+private fun SettingsScope.Row(row: SettingsRow, drafts: RowDrafts) {
     when (row) {
-        is SettingsRow.Toggle -> ToggleRow(row.key, row.title, row.checked, row.onChange, row.supporting, row.enabled)
-        is SettingsRow.Choice -> ChoiceRow(row.key, row.title, row.options, row.selected, row.onSelect, row.supporting, row.enabled)
-        is SettingsRow.Text -> TextFieldRow(
-            key = row.key,
-            title = row.title,
-            value = current[row.key],
-            onValueChange = { text ->
-                val onChange = row.onChange
-                if (onChange != null) onChange(text) else drafts[row.key] = Draft(row.value, text)
-            },
-            options = TextFieldOptions(
-                placeholder = row.placeholder,
-                supporting = row.supporting,
-                secret = row.secret,
-                numeric = row.numeric,
-                problem = row.problem?.invoke(current[row.key]),
-            ),
-        )
-        is SettingsRow.Actions -> ActionRow(row.key, row.actions.map { it.toButton(current) })
-        is SettingsRow.Info -> InfoRow(row.key, row.title, row.value, row.tone)
-        is SettingsRow.Note -> NoteRow(row.key, row.status)
-        is SettingsRow.Code -> CodeRow(row.key, row.text)
-        is SettingsRow.Progress -> ProgressRow(row.key, row.fraction, row.label)
+        is SettingsRow.Toggle -> ToggleRow(row)
+        is SettingsRow.Choice -> ChoiceRow(row)
+        is SettingsRow.Text -> TextFieldRow(row, drafts.current[row.key]) { text ->
+            val onChange = row.onChange
+            if (onChange != null) onChange(text) else drafts.drafts[row.key] = Draft(row.value, text)
+        }
+        is SettingsRow.Actions -> ActionRow(row.key, row.actions.map { it.toButton(drafts.current) })
+        is SettingsRow.Info -> InfoRow(row)
+        is SettingsRow.Note -> NoteRow(row)
+        is SettingsRow.Code -> CodeRow(row)
+        is SettingsRow.Progress -> ProgressRow(row)
     }
 }

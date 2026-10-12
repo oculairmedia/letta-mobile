@@ -5,7 +5,9 @@ import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.ui.common.UiState
 import io.mockk.every
 import io.mockk.mockk
@@ -47,7 +49,16 @@ class ConfigFeatureFlagTest {
         every { models.catalog } returns MutableStateFlow(emptyList())
         val runtime = mockk<EmbeddedLettaCodeRuntimeStatusProvider>()
         every { runtime.status } returns EmbeddedLettaCodeRuntimeStatus(nativeEnabled = false, assetsEnabled = false, version = "disabled", integrity = "")
-        return ConfigViewModel(SavedStateHandle(), settings, mockk(relaxed = true), runtime, mockk(relaxed = true), models, mockk(relaxed = true), mockk(relaxed = true))
+        return ConfigViewModel(
+            SavedStateHandle(),
+            settings,
+            runtime,
+            mockk(relaxed = true),
+            models,
+            mockk(relaxed = true),
+            mockk(relaxed = true),
+            PermissionModeSettings(InMemorySecureSettingsStore()),
+        )
     }
 
     private fun ConfigViewModel.form(): ConfigUiState = (uiState.value as UiState.Success).data
