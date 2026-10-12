@@ -45,8 +45,8 @@ fun ConversationModelChoices.windowTokensFor(conversationId: String?, agent: Age
     contextWindowTokensOf(
         agent = agent,
         models = models,
-        modelOverride = conversationId?.let(models::get),
-        conversationWindow = conversationId?.let(windows::get),
+        modelOverride = conversationId?.let(this.models::get),
+        conversationWindow = conversationId?.let(this.windows::get),
     )
 
 /**
