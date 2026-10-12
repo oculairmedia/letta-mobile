@@ -20,8 +20,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.BackendConnectionStatus
@@ -114,32 +116,56 @@ fun SettingsPage(
 @Composable
 private fun SettingsGroups(state: SettingsPageState, services: SettingsPageServices) {
     var form by remember(state.config) { mutableStateOf(BackendSettingsForm.of(state.config)) }
-    val contributions = services.contributions.filter { it.showForMode == null || it.showForMode == form.mode }
     val anchor = remember { BringIntoViewRequester() }
-    LaunchedEffect(state.section) { if (state.section != null) anchor.bringIntoView() }
+    // The first frame draws only the Backend form (the first screen of an unconfigured install);
+    // every other section, the pairing card and its QR included, joins on the next frame.
+    val rest by produceState(false) {
+        withFrameNanos { }
+        value = true
+    }
+    LaunchedEffect(state.section, rest) { if (state.section != null && rest) anchor.bringIntoView() }
+    val inputs = StandardSectionInputs(state, services, BackendFormState(state.config, form) { form = it }, rest)
+    val contributions = services.contributions.filter { it.showForMode == null || it.showForMode == form.mode }
     Column(
         modifier = Modifier.widthIn(max = LettaDimens.Pane.contentMaxWidth).fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
     ) {
-        state.connection?.let { connection ->
-            BackendConnectionStatusRow(connection)
-            (connection as? BackendConnectionStatus.Failed)?.let { BackendConnectionFailure(it.message) }
-        }
+        state.connection?.let { ConnectionHeader(it) }
         SettingsGroup.entries.forEach { group ->
             val groupContributions = contributions.filter { it.group == group }
-            if (!services.hasStandardSection(group) && groupContributions.isEmpty()) return@forEach
-            val anchored = state.section?.group == group
-            Column(
-                modifier = Modifier
-                    .then(if (anchored && state.section != ShellSettingsSection.Pairing) Modifier.bringIntoViewRequester(anchor) else Modifier)
-                    .testTag(SettingsPageTags.GROUP_PREFIX + group.name),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
-            ) {
-                StandardSection(group, StandardSectionInputs(state, services, BackendFormState(state.config, form) { form = it }), anchor)
-                groupContributions.forEach { SettingsContributionSection(it) }
+            val shown = group == SettingsGroup.Backend || rest
+            if (shown && (services.hasStandardSection(group) || groupContributions.isNotEmpty())) {
+                SettingsGroupBlock(group, inputs, GroupExtras(groupContributions.takeIf { rest }.orEmpty(), anchor))
             }
         }
     }
+}
+
+/** A group's platform sections and the page's anchor. */
+private class GroupExtras(val contributions: List<SettingsContribution>, val anchor: BringIntoViewRequester)
+
+/** One group: its standard section, then the platform's own sections; the anchored group scrolls into view. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SettingsGroupBlock(group: SettingsGroup, inputs: StandardSectionInputs, extras: GroupExtras) {
+    val section = inputs.state.section
+    // Pairing anchors its own card inside the Backend group.
+    val anchored = section != null && section != ShellSettingsSection.Pairing && section.group == group
+    Column(
+        modifier = Modifier
+            .then(if (anchored) Modifier.bringIntoViewRequester(extras.anchor) else Modifier)
+            .testTag(SettingsPageTags.GROUP_PREFIX + group.name),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
+    ) {
+        StandardSection(group, inputs, extras.anchor)
+        extras.contributions.forEach { SettingsContributionSection(it) }
+    }
+}
+
+@Composable
+private fun ConnectionHeader(connection: BackendConnectionStatus) {
+    BackendConnectionStatusRow(connection)
+    (connection as? BackendConnectionStatus.Failed)?.let { BackendConnectionFailure(it.message) }
 }
 
 /** What the standard section of a group reads. */
@@ -147,6 +173,8 @@ private class StandardSectionInputs(
     val state: SettingsPageState,
     val services: SettingsPageServices,
     val backend: BackendFormState,
+    /** False on the page's first frame, which draws the Backend form alone. */
+    val afterFirstFrame: Boolean,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -156,7 +184,7 @@ private fun StandardSection(group: SettingsGroup, inputs: StandardSectionInputs,
     when (group) {
         SettingsGroup.Backend -> {
             BackendSettingsSection(inputs.backend, services.backend)
-            services.pairing?.let { pairing ->
+            services.pairing?.takeIf { inputs.afterFirstFrame }?.let { pairing ->
                 val anchored = inputs.state.section == ShellSettingsSection.Pairing
                 InstallAndPairCard(
                     pairing,
@@ -175,8 +203,8 @@ private fun StandardSection(group: SettingsGroup, inputs: StandardSectionInputs,
 /** Whether [group] has a standard section here (the Backend one always does). */
 private fun SettingsPageServices.hasStandardSection(group: SettingsGroup): Boolean = when (group) {
     SettingsGroup.Backend -> true
-    SettingsGroup.Appearance -> appearance?.let { it.theme ?: it.themePreset ?: it.dynamicColor ?: it.haptics } != null
-    SettingsGroup.Chat -> chat?.let { it.sharedChatPage ?: it.openChatsOnCanvas ?: it.permissionMode } != null
+    SettingsGroup.Appearance -> appearance?.isEmpty == false
+    SettingsGroup.Chat -> chat?.isEmpty == false
     SettingsGroup.Notifications -> notifications?.attention != null
     SettingsGroup.Providers -> onOpenProviders != null
     SettingsGroup.About, SettingsGroup.Developer -> false

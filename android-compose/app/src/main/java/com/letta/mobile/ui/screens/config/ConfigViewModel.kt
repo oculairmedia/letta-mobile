@@ -17,7 +17,7 @@ import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.AppearanceSettings
 import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.data.settings.SettingValue
-import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.toSettingsStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
@@ -101,6 +101,8 @@ class ConfigViewModel @Inject constructor(
 ) : ViewModel() {
 
     companion object {
+        /** How long a settings value keeps following the form after the page stops watching it. */
+        private const val SETTING_STOP_TIMEOUT_MS = 5_000L
         const val LOCAL_RUNTIME_URL = "local-lettacode://device"
         const val DEFAULT_LOCAL_MODEL_HANDLE = "local/model"
         const val DEFAULT_LOCAL_MODEL_RUNTIME = "litert-lm"
@@ -133,7 +135,7 @@ class ConfigViewModel @Inject constructor(
 
     val backendConfig: StateFlow<LettaConfig> = settingsRepository.activeConfig
         .map { active -> active?.takeUnless { createNew } ?: blankBackend }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.activeConfig.value?.takeUnless { createNew } ?: blankBackend)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), settingsRepository.activeConfig.value?.takeUnless { createNew } ?: blankBackend)
 
     private val blankBackend: LettaConfig
         get() = LettaConfig(id = newBackendId, mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "")
@@ -161,7 +163,7 @@ class ConfigViewModel @Inject constructor(
     private fun <T> setting(default: T, read: (ConfigUiState) -> T, write: (T) -> Unit): SettingValue<T> {
         val current = _uiState
             .map { state -> (state as? UiState.Success)?.data?.let(read) ?: default }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, (_uiState.value as? UiState.Success)?.data?.let(read) ?: default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), (_uiState.value as? UiState.Success)?.data?.let(read) ?: default)
         return SettingValue(current, write)
     }
 
@@ -342,8 +344,9 @@ class ConfigViewModel @Inject constructor(
      * section's Test connection. HTTP only: it never opens a WebSocket, so the live session is not
      * disturbed; an Iroh address cannot be probed and says so.
      */
-    suspend fun testConnection(serverUrl: String, accessToken: String?): SettingsStatus =
+    val connectionTester = BackendConnectionTester { serverUrl, accessToken ->
         appServerConnectionTester.test(serverUrl.trim(), accessToken?.trim()?.ifBlank { null }).toSettingsStatus()
+    }
 
     /**
      * letta-mobile-ckmub.3.12: saves what the shared Backend section [config] holds (mode, address,

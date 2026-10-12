@@ -94,7 +94,7 @@ class ConfigViewModelTest {
         fakeRepository.activeConfigState.value = null
         fakeConnectionTester.next = { AppServerProbeResult.Authentication("HTTP 401") }
 
-        val status = viewModel.testConnection(" wss://appserver.example/ws ", " tkn ")
+        val status = viewModel.connectionTester.test(" wss://appserver.example/ws ", " tkn ")
 
         assertEquals(SettingsTone.Error, status.tone)
         assertEquals(listOf("wss://appserver.example/ws" to "tkn"), fakeConnectionTester.calls)
@@ -105,7 +105,7 @@ class ConfigViewModelTest {
     fun testConnection_okCarriesTheServerIdentity() = runTest {
         fakeConnectionTester.next = { AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1)) }
 
-        val status = viewModel.testConnection("ws://10.0.0.2:4500", null)
+        val status = viewModel.connectionTester.test("ws://10.0.0.2:4500", null)
 
         assertEquals(SettingsStatus("Connected: letta-code 0.33.6 (local backend, protocol 1)", SettingsTone.Positive), status)
     }
@@ -114,7 +114,7 @@ class ConfigViewModelTest {
     fun testConnection_anIrohAddressCannotBeProbed() = runTest {
         fakeConnectionTester.next = { null }
 
-        val status = viewModel.testConnection("iroh://node-ticket", "  ")
+        val status = viewModel.connectionTester.test("iroh://node-ticket", "  ")
 
         assertEquals(SettingsTone.Normal, status.tone)
         assertEquals(listOf<Pair<String, String?>>("iroh://node-ticket" to null), fakeConnectionTester.calls)

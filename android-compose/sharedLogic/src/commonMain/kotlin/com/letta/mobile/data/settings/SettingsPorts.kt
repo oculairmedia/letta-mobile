@@ -26,7 +26,10 @@ class AppearanceSettings(
     /** Null where the OS offers no wallpaper colours (desktop, Android before 12). */
     val dynamicColor: SettingValue<Boolean>? = null,
     val haptics: SettingValue<Boolean>? = null,
-)
+) {
+    /** True when the platform binds none of these, so the page leaves the section out. */
+    val isEmpty: Boolean get() = listOfNotNull(theme, themePreset, dynamicColor, haptics).isEmpty()
+}
 
 /**
  * Chat: the shared chat page switch (kept for one release, letta-mobile-ckmub S4/S9), whether a
@@ -38,7 +41,10 @@ class ChatSettings(
     val sharedChatPageLockedReason: String? = null,
     val openChatsOnCanvas: SettingValue<Boolean>? = null,
     val permissionMode: PermissionModeSettings? = null,
-)
+) {
+    /** True when the platform binds none of these, so the page leaves the section out. */
+    val isEmpty: Boolean get() = listOfNotNull(sharedChatPage, openChatsOnCanvas, permissionMode).isEmpty()
+}
 
 /** Notifications: the app-wide approval notification switch. Platform rows come as contributions. */
 class NotificationSettings(val attention: AttentionPrefsRepository? = null)

@@ -158,7 +158,7 @@ private fun localProviderRows(state: ConfigUiState, vm: ConfigViewModel): List<S
         "provider-base-url",
         "Model server URL",
         state.localProviderBaseUrl,
-        placeholder = "http://192.168.1.10:8082/v1",
+        placeholder = "http(s)://<host>:<port>/v1",
         onChange = vm::updateLocalProviderBaseUrl,
     ),
     SettingsRow.Text("provider-api-key", "Model server API key", state.localProviderApiKey, secret = true, onChange = vm::updateLocalProviderApiKey),

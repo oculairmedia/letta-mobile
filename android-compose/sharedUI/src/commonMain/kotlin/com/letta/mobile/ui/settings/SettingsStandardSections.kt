@@ -29,7 +29,7 @@ import com.letta.mobile.ui.notify.AgentNotificationsStrings
 /** Theme, preset, dynamic colour and haptics; nothing when the platform binds none of them. */
 @Composable
 fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier = Modifier) {
-    if (settings.theme == null && settings.themePreset == null && settings.dynamicColor == null && settings.haptics == null) return
+    if (settings.isEmpty) return
     SettingsSection(SettingsHeader("appearance", "Appearance"), modifier) {
         settings.theme?.let { EnumChoice(it, THEME_CHOICE) }
         settings.dynamicColor?.let { ToggleSetting(it, ToggleText("appearance-dynamic-color", "Dynamic colour", "Use the colours of your wallpaper.")) }
@@ -44,7 +44,7 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier =
 /** The shared chat page switch, canvas-first conversations and the default permission mode. */
 @Composable
 fun ChatSettingsSection(settings: ChatSettings, modifier: Modifier = Modifier) {
-    if (settings.sharedChatPage == null && settings.openChatsOnCanvas == null && settings.permissionMode == null) return
+    if (settings.isEmpty) return
     SettingsSection(SettingsHeader("chat", "Chat"), modifier) {
         settings.sharedChatPage?.let { flag ->
             val locked = settings.sharedChatPageLockedReason

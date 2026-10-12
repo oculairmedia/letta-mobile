@@ -18,7 +18,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
-import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.NotificationSettings
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.platform.BatteryOptimizationHelper
@@ -66,7 +65,7 @@ fun SettingsScreen(
                 viewModel.saveBackend(saved, onSuccess = onSaved, onError = snackbar::dispatch)
             },
             onTokenCleared = { viewModel.clearToken(snackbar::dispatch) },
-            testConnection = BackendConnectionTester(viewModel::testConnection),
+            testConnection = viewModel.connectionTester,
         ),
         appearance = viewModel.appearance,
         chat = viewModel.chat,
