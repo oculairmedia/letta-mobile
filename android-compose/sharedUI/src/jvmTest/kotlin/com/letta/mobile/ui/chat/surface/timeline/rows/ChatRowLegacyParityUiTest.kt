@@ -37,22 +37,20 @@ class ChatRowLegacyParityUiTest {
     private val reply = UiMessage(id = "a", role = "assistant", content = "Fixed it.", timestamp = "2026-10-11T16:00:09Z", runId = "run-1")
 
     @Test
-    fun theRunHeaderCountsToolsAndFailuresOnItsOwnLine() = runComposeUiTest {
+    fun theRunSummaryLineSaysHowManyOfItsToolsFailed() = runComposeUiTest {
+        // letta-mobile-zxk2n.37: one line, "Failed · 1 of 2", instead of a title and two counts.
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = "a")) } }
         awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
-        onNodeWithText("2 tools").assertExists()
-        onNodeWithText("1 failure").assertExists()
-        // The tool line no longer carries the run's title: it is the legacy "2 ran - 1 failed".
-        onNodeWithText("2 ran - 1 failed").assertExists()
+        onNodeWithText("Failed · 1 of 2", useUnmergedTree = true).assertExists()
+        // Folded by default: the tool line ("2 ran - 1 failed") waits under the summary.
+        onNodeWithText("2 ran - 1 failed").assertDoesNotExist()
     }
 
     @Test
-    fun aSettledRunFoldsToItsLastStepFromItsHeader() = runComposeUiTest {
+    fun aSettledRunFoldsToItsProseUnderItsSummaryLine() = runComposeUiTest {
         val actions = RecordingChatActions()
-        // The page owns the fold, as the legacy RunBlock's owner did: a folded run shows its last step.
-        val folded = rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "a")
-        setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), folded, rowCallbacks(actions)) } }
+        setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = "a"), rowCallbacks(actions)) } }
         awaitText("Fixed it.")
         onNodeWithText("2 ran - 1 failed").assertDoesNotExist()
         onNodeWithText("Fixed it.", substring = true).assertExists()
@@ -61,8 +59,27 @@ class ChatRowLegacyParityUiTest {
     }
 
     @Test
-    fun anOlderRunHasNoHeader() = runComposeUiTest {
+    fun anOpenedRunListsItsStepsUnderItsSummaryLine() = runComposeUiTest {
+        // The page's toggle set holds the runs the person opened.
+        val opened = rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "a")
+        setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), opened) } }
+        awaitText("Fixed it.")
+        onNodeWithText("2 ran - 1 failed").assertExists()
+        onNodeWithText("Fixed it.", substring = true).assertExists()
+    }
+
+    @Test
+    fun anOlderRunWithWorkKeepsItsSummaryLine() = runComposeUiTest {
+        // The line is the only way to the folded steps, so it shows on older runs too.
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = null)) } }
+        awaitText("Fixed it.")
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
+    }
+
+    @Test
+    fun anOlderProseOnlyRunHasNoHeader() = runComposeUiTest {
+        val narration = reply.copy(id = "n", content = "Looking.")
+        setContent { MaterialTheme { RenderRow(runOf(narration, reply), rowContext(newestMessageId = null)) } }
         awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertDoesNotExist()
     }

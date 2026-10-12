@@ -110,6 +110,10 @@ internal object ChatRowTestTags {
     const val REASONING_SPINNER = "chat-reasoning-spinner"
     const val RUN_BLOCK = "chat-run-block"
     const val RUN_HEADER = "chat-run-header"
+    /** The run summary line's leading status glyph (check, spinner, warning). */
+    const val RUN_GLYPH = "chat-run-glyph"
+    /** One work step (a reasoning or the tool line) listed under an expanded run's summary. */
+    const val RUN_WORK_STEP = "chat-run-work-step"
     const val APPROVAL_REASON = "chat-approval-reason"
     const val APPROVAL_REJECT_DIALOG = "chat-approval-reject-dialog"
     const val APPROVAL_REJECT_CONFIRM = "chat-approval-reject-confirm"

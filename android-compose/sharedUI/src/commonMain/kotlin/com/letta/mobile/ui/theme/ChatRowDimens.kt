@@ -86,9 +86,6 @@ object ChatRowAlpha {
     /** A run header's title while the run is working. */
     const val workingTitle: Float = 0.88f
 
-    /** A run header's tool count beside its title. */
-    const val runCount: Float = 0.76f
-
     /** The reasoning preview beside "Thought". */
     const val reasoningPreview: Float = 0.8f
 
@@ -103,11 +100,6 @@ object ChatRowAlpha {
 
     /** The newest reply's delivery time, drawn at this layer alpha. */
     const val deliveryTime: Float = 0.5f
-
-    /** The working orb's pulse: dim and bright ends, and its still value under reduced motion. */
-    const val workingOrbDim: Float = 0.44f
-    const val workingOrbBright: Float = 0.92f
-    const val workingOrbResting: Float = 0.72f
 
     /** The faded tails of the thinking row's sweeping gradient. */
     const val thinkingTail: Float = 0.45f
