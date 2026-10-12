@@ -143,7 +143,7 @@ internal class RunBlockPlan(
     val awaitingApproval: Boolean = false,
 ) {
     /** The legacy fold: only a settled run of several messages folds; a stale fold never hides active work. */
-    val foldable: Boolean get() = runId != null && isMultiStep() && !activity.isActive && !awaitingApproval
+    val foldable: Boolean get() = runFolds(RunFoldInputs(runId, messageCount, RunHold(activity.isActive, awaitingApproval)))
 
     val collapsed: Boolean get() = foldable && collapsedByOwner
 
@@ -169,6 +169,23 @@ internal class RunBlockPlan(
         return RunFold(collapsed) { actions.toggleRunCollapsed(ChatRunId(id)) }
     }
 }
+
+/**
+ * letta-mobile-sieej: what holds a run open whatever its owner's fold says: it is working, or one of
+ * its requests waits on the person's approval.
+ */
+@Immutable
+internal class RunHold(val working: Boolean, val awaitingApproval: Boolean) {
+    val held: Boolean get() = working || awaitingApproval
+}
+
+/** What decides whether a run may fold. */
+@Immutable
+internal class RunFoldInputs(val runId: String?, val messageCount: Int, val hold: RunHold)
+
+/** Only a run with an id and several steps folds, and never while something [RunHold] holds it open. */
+internal fun runFolds(inputs: RunFoldInputs): Boolean =
+    inputs.runId != null && inputs.messageCount > 1 && !inputs.hold.held
 
 /** The run's plan, or null when it has nothing to draw. */
 @Composable

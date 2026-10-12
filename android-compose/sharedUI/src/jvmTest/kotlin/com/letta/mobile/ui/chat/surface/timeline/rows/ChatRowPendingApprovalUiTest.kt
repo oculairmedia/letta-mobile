@@ -39,7 +39,7 @@ class ChatRowPendingApprovalUiTest {
     @Test
     fun aRelayedPendingApprovalShowsItsCardExpandedOnATouchHost() = runComposeUiTest {
         val actions = RecordingChatActions()
-        showRun(relayedRun(parked = true), ChatPlatformStyle.Touch, ChatToolDetails.Sheet, actions)
+        showRun(relayedRun(parked = true), RowHost.Phone, actions)
 
         assertCardShownAndActionable(actions)
     }
@@ -47,7 +47,7 @@ class ChatRowPendingApprovalUiTest {
     @Test
     fun aPendingApprovalShowsItsCardExpandedOnADesktopHost() = runComposeUiTest {
         val actions = RecordingChatActions()
-        showRun(relayedRun(parked = true), ChatPlatformStyle.Pointer, ChatToolDetails.Inline, actions)
+        showRun(relayedRun(parked = true), RowHost.Desktop, actions)
 
         assertCardShownAndActionable(actions)
     }
@@ -55,7 +55,7 @@ class ChatRowPendingApprovalUiTest {
     @Test
     fun aPendingApprovalOpensARunTheOwnerHadFolded() = runComposeUiTest {
         // The page's fold (collapsedRunIds) holds the run, yet a pending request keeps it open.
-        showRun(relayedRun(parked = true), ChatPlatformStyle.Touch, ChatToolDetails.Sheet, collapsed = true)
+        showRun(relayedRun(parked = true), RowHost.Phone, collapsed = true)
 
         onNodeWithText("Approval requested").assertIsDisplayed()
         onNodeWithText("Approve").assertIsDisplayed()
@@ -85,7 +85,7 @@ class ChatRowPendingApprovalUiTest {
     @Test
     fun aRuntimeResolvedBashStillReadsAsItsPlainLine() = runComposeUiTest {
         // Approve-all: nothing parked, so no card and no "waiting" header (PR #1805's rule).
-        showRun(relayedRun(parked = false), ChatPlatformStyle.Touch, ChatToolDetails.Sheet)
+        showRun(relayedRun(parked = false), RowHost.Phone)
 
         onNodeWithText("Approval requested").assertDoesNotExist()
         onNodeWithText("Waiting for your approval").assertDoesNotExist()
@@ -112,15 +112,14 @@ class ChatRowPendingApprovalUiTest {
 
     private fun ComposeUiTest.showRun(
         item: ChatRenderItem,
-        style: ChatPlatformStyle,
-        details: ChatToolDetails,
+        host: RowHost,
         actions: RecordingChatActions = RecordingChatActions(),
         collapsed: Boolean = false,
     ) {
         val state = renderState(collapsedRunIds = if (collapsed) setOf(RUN_ID) else emptySet())
         setContent {
-            CompositionLocalProvider(LocalChatPlatformStyle provides style) {
-                MaterialTheme { RenderRow(item, rowContext(itemState = state, toolDetails = details), rowCallbacks(actions)) }
+            CompositionLocalProvider(LocalChatPlatformStyle provides host.style) {
+                MaterialTheme { RenderRow(item, rowContext(itemState = state, toolDetails = host.details), rowCallbacks(actions)) }
             }
         }
     }
@@ -151,6 +150,12 @@ class ChatRowPendingApprovalUiTest {
         val parkedDetails = if (parked) mapOf(CALL_ID to PARKED) else emptyMap()
         val messages = withPendingApprovalDetails(listOf(narration, bash), parkedDetails)
         return ChatRenderItem.RunBlock(runId = RUN_ID, messages = messages.map { it to GroupPosition.None })
+    }
+
+    /** How a host draws the row: the phone (Touch, details in a sheet) or desktop (Pointer, inline). */
+    private enum class RowHost(val style: ChatPlatformStyle, val details: ChatToolDetails) {
+        Phone(ChatPlatformStyle.Touch, ChatToolDetails.Sheet),
+        Desktop(ChatPlatformStyle.Pointer, ChatToolDetails.Inline),
     }
 
     private companion object {
