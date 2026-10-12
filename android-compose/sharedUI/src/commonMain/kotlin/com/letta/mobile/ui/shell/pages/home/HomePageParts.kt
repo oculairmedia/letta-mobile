@@ -57,9 +57,9 @@ import com.letta.mobile.data.home.HomeStatTile
 import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.home.subtitle
-import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Composable
@@ -292,7 +292,7 @@ private fun RecentConversationRow(conversation: FleetRecentConversation, page: H
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        AgentOrb(agentId = conversation.agentId, index = page.orbIndex(conversation.agentId), size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
+        AgentAvatar(agentId = conversation.agentId, name = conversation.agentName, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair)) {
             Text(conversation.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val secondary = if (page.wide) conversation.preview else listOf(conversation.agentName, conversation.preview).filter { it.isNotBlank() }.joinToString(" · ")

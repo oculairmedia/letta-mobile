@@ -62,11 +62,15 @@ object ApprovalRelayModule {
         onStale = { entry -> relay.resolve(ToolCallId(entry.key)) },
     ).coordinator(CoroutineScope(SupervisorJob() + Dispatchers.Default), ApprovalOutbox(SettingsApprovalOutboxStore(store)))
 
+    /** letta-mobile-a4tm7: also folds the host's `permission_mode` pushes, so another client's change moves the chip. */
     @Provides
     @Singleton
+    @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime, like the approval relay client.
     fun provideRelayedPermissionModes(
         settings: PermissionModeSettings,
         rpc: AdminRpcInvoker,
         transport: IChannelTransport,
-    ): RelayedPermissionModes = RelayedPermissionModes(settings.modes, rpc) { transport.hostCapabilities }
+    ): RelayedPermissionModes = RelayedPermissionModes(settings.modes, rpc) { transport.hostCapabilities }.also { modes ->
+        modes.bind(CoroutineScope(SupervisorJob() + Dispatchers.Default), transport.events)
+    }
 }

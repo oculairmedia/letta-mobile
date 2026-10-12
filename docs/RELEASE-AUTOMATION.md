@@ -31,17 +31,17 @@ The staged payload is a base64-encoded JSON object with this exact shape:
 
 ```json
 {
-  "serverUrl": "https://api.letta.com",
+  "serverUrl": "iroh://<endpoint id>@<host>:<port>",
   "accessToken": "token-value",
   "configId": "automation-auth",
-  "mode": "CLOUD"
+  "mode": "SELF_HOSTED"
 }
 ```
 
 - `serverUrl` and `accessToken` are required.
 - `configId` is optional and defaults to `automation-auth`.
-- `mode` is optional; when omitted, the app derives `CLOUD` for
-  `https://api.letta.com` and `SELF_HOSTED` otherwise.
+- `mode` is optional (`SELF_HOSTED`, the remote host, when omitted, or `LOCAL`). A retired
+  `CLOUD` mode is read as a remote host to set up (letta-mobile-ckmub.9: no Letta Cloud backend).
 
 ## Usage
 
@@ -53,7 +53,7 @@ cd android-compose
 ./gradlew :app:installDebug
 
 cd ..
-export AUTOMATION_SERVER_URL="https://api.letta.com"
+export AUTOMATION_SERVER_URL="iroh://<endpoint id>@<host>:<port>"
 export AUTOMATION_ACCESS_TOKEN="<disposable-token>"
 scripts/release/inject-automation-creds.sh
 ```

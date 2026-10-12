@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaDimens
@@ -31,16 +32,21 @@ fun AgentAvatar(
     live: Boolean = mascotAtWork(agentId),
     onClick: (() -> Unit)? = null,
 ) {
+    // Innermost, so a caller's own tag on [modifier] still names the node.
+    val tagged = modifier.testTag(AgentAvatarTestTag)
     MascotAvatar(
         agentId = agentId,
         size = size,
-        modifier = modifier,
+        modifier = tagged,
         cornerRadius = cornerRadius,
         onClick = onClick,
         live = live,
-        fallback = { AgentInitialTile(name, size, cornerRadius, modifier, onClick) },
+        fallback = { AgentInitialTile(name, size, cornerRadius, tagged, onClick) },
     )
 }
+
+/** Every [AgentAvatar] carries this tag, so a test can tell an agent's picture from a generic icon. */
+const val AgentAvatarTestTag: String = "agent-avatar"
 
 /** The letter tile an agent without a mascot gets: its initial on the secondary container. */
 @Composable

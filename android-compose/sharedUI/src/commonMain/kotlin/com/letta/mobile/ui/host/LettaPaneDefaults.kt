@@ -210,11 +210,15 @@ internal class AnchoredPanePositionProvider(private val anchor: PaneAnchor, priv
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val startAligned = anchor == PaneAnchor.BelowStart || anchor == PaneAnchor.AboveStart
+        val startAligned = anchor == PaneAnchor.BelowStart || anchor == PaneAnchor.AboveStart || anchor == PaneAnchor.OverStart
         val leftAligned = startAligned == (layoutDirection == LayoutDirection.Ltr)
         val x = if (leftAligned) anchorBounds.left else anchorBounds.right - popupContentSize.width
         val below = anchor == PaneAnchor.BelowStart || anchor == PaneAnchor.BelowEnd
-        val y = if (below) anchorBounds.bottom + gapPx else anchorBounds.top - gapPx - popupContentSize.height
+        val y = when {
+            anchor == PaneAnchor.OverStart -> anchorBounds.top
+            below -> anchorBounds.bottom + gapPx
+            else -> anchorBounds.top - gapPx - popupContentSize.height
+        }
         return IntOffset(
             x.coerceAtMost(windowSize.width - popupContentSize.width).coerceAtLeast(0),
             y.coerceAtMost(windowSize.height - popupContentSize.height).coerceAtLeast(0),

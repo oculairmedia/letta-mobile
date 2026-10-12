@@ -425,6 +425,8 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.SubagentsUpdated,
     // letta-mobile-bzvro.40: parked-approval snapshots feed the approval store, not the timeline.
     is ServerFrame.PendingApprovalsUpdated,
+    // letta-mobile-a4tm7: permission-mode pushes feed the chip, not the timeline.
+    is ServerFrame.PermissionModeUpdated,
     // letta-mobile-lks7m: conversation pushes route to the conversation lists, not chat content.
     is ServerFrame.ConversationUpdated,
     // letta-mobile-2rkdj: subscribe wrappers don't surface to chat

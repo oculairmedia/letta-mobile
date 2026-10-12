@@ -25,7 +25,7 @@ class SessionCapturedCursorTest {
         val db = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).build()
         val original = LettaConfig(
             id = "same-config",
-            mode = LettaConfig.Mode.CLOUD,
+            mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "https://old.example.test",
             accessToken = "old-token",
         )

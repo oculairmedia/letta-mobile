@@ -14,6 +14,15 @@ package com.letta.mobile.data.model
  *
  * Routing decisions must key on this enum, not on URL string sniffing spread
  * across modules.
+ *
+ * letta-mobile-ckmub.9 — the backend seam. Letta Cloud is not offered for now (no
+ * Settings mode, no cloud URL default, no cloud API-key field), but this enum stays
+ * the one place a new backend family plugs in, so the shared shell never changes for
+ * it. Adding one back means: a [LettaConfig.Mode] value (the Settings page lists
+ * `Mode.entries`), a kind here returned by [backendKind], and a gateway bound for that
+ * kind in the session graph factories (Android `DefaultSessionRepositoryGraphFactory`,
+ * desktop `DesktopAppServerChatGatewayBuilder`, web `WasmAppServerClientGateway`). Nothing in
+ * sharedUI keys on the backend family.
  */
 enum class BackendKind {
     /** On-device embedded runtime — no network transport at all. */
@@ -22,7 +31,10 @@ enum class BackendKind {
     /** Iroh QUIC node (`iroh://…`). Production transport. Never dials the shim. */
     IROH,
 
-    /** Vanilla Letta server / Letta Cloud over plain REST. */
+    /**
+     * A remote host reached over plain HTTP/WebSocket (an App Server's ws:// address, or a legacy
+     * REST server until letta-mobile-ckmub.4 removes that path).
+     */
     REST;
 
     /**

@@ -62,7 +62,7 @@ class RemoteLettaBackendDescriptorsTest {
     fun androidAndDesktopPrefixesStayDistinctWithSharedCapabilities() {
         val config = LettaConfig(
             id = "cfg-1",
-            mode = LettaConfig.Mode.CLOUD,
+            mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "https://api.example.test",
         )
 
@@ -84,7 +84,7 @@ class RemoteLettaBackendDescriptorsTest {
         )
 
         assertEquals("remote-letta:default", descriptor.backendId.value)
-        assertEquals(DEFAULT_REMOTE_LETTA_URL, descriptor.label)
+        assertEquals(DEFAULT_REMOTE_BACKEND_LABEL, descriptor.label)
     }
 }
 

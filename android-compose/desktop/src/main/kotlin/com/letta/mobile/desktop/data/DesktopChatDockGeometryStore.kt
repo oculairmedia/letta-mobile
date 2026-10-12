@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatDockGeometryMath
+import com.letta.mobile.ui.chat.surface.LayoutPrefStorage
+import kotlinx.coroutines.Dispatchers
 import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.AtomicMoveNotSupportedException
@@ -75,6 +77,10 @@ class DesktopChatDockGeometryStore(
             Files.deleteIfExists(tmp)
         }
     }
+
+    /** This file as the shared dock-geometry host's storage, read and written on the IO pool. */
+    fun asLayoutPrefStorage(): LayoutPrefStorage<ChatDockGeometry> =
+        LayoutPrefStorage(load = ::load, save = ::save, io = Dispatchers.IO)
 
     companion object {
         private const val KEY_ANCHOR_X = "chat.dock.anchorX"

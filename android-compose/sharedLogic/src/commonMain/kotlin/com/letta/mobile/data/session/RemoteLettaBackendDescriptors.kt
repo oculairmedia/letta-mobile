@@ -7,7 +7,8 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.RuntimeId
 
-const val DEFAULT_REMOTE_LETTA_URL = "https://api.letta.com"
+/** The label of a remote host with no address yet (letta-mobile-ckmub.9: no Letta Cloud default). */
+const val DEFAULT_REMOTE_BACKEND_LABEL = "Remote host"
 
 /** Android remote descriptor id prefix (`remote-letta:<configId>`). */
 const val ANDROID_REMOTE_LETTA_ID_PREFIX = "remote-letta"
@@ -23,7 +24,7 @@ const val DESKTOP_REMOTE_LETTA_ID_PREFIX = "desktop-remote-letta"
 fun remoteLettaBackendDescriptor(
     config: LettaConfig?,
     idPrefix: String,
-    defaultLabel: String = DEFAULT_REMOTE_LETTA_URL,
+    defaultLabel: String = DEFAULT_REMOTE_BACKEND_LABEL,
 ): BackendDescriptor {
     val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "default"
     val label = config?.serverUrl?.trim()?.takeIf { it.isNotBlank() } ?: defaultLabel

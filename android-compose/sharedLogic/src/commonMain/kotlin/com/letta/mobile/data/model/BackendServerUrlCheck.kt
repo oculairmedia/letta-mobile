@@ -12,7 +12,6 @@ object BackendServerUrlCheck {
         return when (mode) {
             // The local runtime has no network address to check.
             LettaConfig.Mode.LOCAL -> null
-            LettaConfig.Mode.CLOUD -> if (url.isEmpty() || hasNetworkScheme(url)) null else SCHEME_PROBLEM
             LettaConfig.Mode.SELF_HOSTED -> selfHostedProblem(url)
         }
     }

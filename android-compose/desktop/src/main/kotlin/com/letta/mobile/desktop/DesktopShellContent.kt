@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
@@ -31,6 +30,7 @@ import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
 import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
@@ -208,7 +208,7 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     val navigator = context.navigator
     val repository = context.panels.subagents.repository
     if (navigator.showBackgroundTasks && repository != null) {
-        DesktopBackgroundTasksSidePane(
+        BackgroundTasksSidePane(
             subagents = frame.lists.activeSubagents,
             onClose = { navigator.showBackgroundTasks = false },
         )
