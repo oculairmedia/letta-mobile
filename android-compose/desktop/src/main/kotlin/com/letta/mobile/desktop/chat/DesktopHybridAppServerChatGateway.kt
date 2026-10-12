@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -117,6 +119,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
     ChatGatewayExtras by adminGateway,
     ConversationSummaryGateway,
     ConversationForkGateway,
+    ConversationRecompileGateway,
     DesktopApprovalSubmitter,
     DesktopPendingApprovalSource,
     DesktopPermissionModeController,
@@ -461,6 +464,11 @@ class DesktopHybridAppServerChatGateway internal constructor(
             .forkConversation(request)
             .also { agentIdByConversation[it.id] = it.agentId }
 
+    /** letta-mobile-zxk2n.5: `/recompile` goes through the admin gateway (App Server or REST; not Iroh yet). */
+    override suspend fun recompileConversation(request: ConversationRecompileRequest) =
+        adminGateway.requireCapability<ConversationRecompileGateway>("recompile the system prompt")
+            .recompileConversation(request)
+
     override fun close() {
         onClose?.invoke()
         adminGateway.close()
@@ -513,6 +521,7 @@ internal class DesktopRuntimeOwnedChatGateway(
 ) : DesktopChatGateway by delegate,
     ConversationSummaryGateway,
     ConversationForkGateway,
+    ConversationRecompileGateway,
     DesktopApprovalSubmitter,
     DesktopPendingApprovalSource,
     DesktopPermissionModeController,
@@ -574,6 +583,9 @@ internal class DesktopRuntimeOwnedChatGateway(
 
     override suspend fun forkConversation(request: ConversationForkRequest): Conversation =
         delegate.requireCapability<ConversationForkGateway>("fork conversations").forkConversation(request)
+
+    override suspend fun recompileConversation(request: ConversationRecompileRequest) =
+        delegate.requireCapability<ConversationRecompileGateway>("recompile the system prompt").recompileConversation(request)
 
     override fun close() {
         try {
