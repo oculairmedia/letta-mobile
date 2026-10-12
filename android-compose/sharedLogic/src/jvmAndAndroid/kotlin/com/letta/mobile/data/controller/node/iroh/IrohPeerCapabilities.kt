@@ -108,6 +108,10 @@ object IrohPeerCapabilities {
         // letta-mobile-joigh: the context limit is the same model-settings edit (agent or
         // conversation `context_window_limit`, via letta-code's /context-limit).
         method == "conversation.context_limit" -> CONVERSATION_MANAGE
+        // letta-mobile-bzvro.40: reading the mode is a chat read; changing it widens or narrows what the
+        // agent may do on this host without asking, a conversation-management write.
+        method == "permission_mode.get" -> CHAT_READ
+        method == "permission_mode.set" -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
         // lgns8.16: reflection/sleeptime settings control WHEN the agent

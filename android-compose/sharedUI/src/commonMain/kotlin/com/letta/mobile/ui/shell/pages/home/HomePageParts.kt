@@ -107,7 +107,7 @@ private fun HomeSearchField(page: HomePageScope, modifier: Modifier) {
     OutlinedTextField(
         value = query,
         onValueChange = page.actions::updateSearchQuery,
-        placeholder = { Text(SEARCH_PLACEHOLDER) },
+        placeholder = { Text(HomeSearchPlaceholder) },
         leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotEmpty()) {
@@ -312,7 +312,9 @@ internal fun MutedCell(text: String, modifier: Modifier, align: TextAlign = Text
 
 internal const val MUTED_ALPHA = 0.72f
 private const val PAGE_TITLE = "Home"
-private const val SEARCH_PLACEHOLDER = "Search agents, tools, blocks and messages"
+/** What Home searches, for a host field (desktop's header) that searches the page in its place. */
+const val HomeSearchPlaceholder: String = "Search agents, tools, blocks and messages"
+
 private const val CLEAR_SEARCH = "Clear search"
 private const val SEND_LABEL = "Send message"
 private const val RECENT_LABEL = "Recent conversations"

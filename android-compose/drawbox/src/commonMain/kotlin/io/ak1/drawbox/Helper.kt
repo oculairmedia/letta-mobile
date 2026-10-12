@@ -1,5 +1,6 @@
 package io.ak1.drawbox
 
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
@@ -45,40 +46,6 @@ fun createPath(points: List<Offset>) = Path().apply {
 private fun calculateMidpoint(start: Offset, end: Offset) = Offset((start.x + end.x) / 2, (start.y + end.y) / 2)
 
 /**
- * Allocation-free check: do the entries of [current] (in order, excluding those
- * whose id is in [activeIds] or [hiddenIds]) exactly match [reference] by
- * reference identity?
- *
- * Used as the freshness gate for the cached `finalizedLayer` recording in
- * `DrawBox`. The reducer always produces a fresh [Element] instance via
- * `copy(...)` on any mutation, so reference equality is both correct (catches
- * every meaningful change) and cheap (no field comparison).
- *
- * [hiddenIds] is what flips a cache that was recorded *before* the host
- * decided to hide an element. Without including it in the skip set, a Text
- * element about to be edited inline would replay from the cache and ghost
- * underneath the editor.
- *
- * Iterates `current` exactly once, no intermediate list, no boxed iterators.
- */
-internal fun staticRefsMatch(
-    current: List<Element>,
-    activeIds: Set<String>,
-    hiddenIds: Set<String>,
-    reference: List<Element>,
-): Boolean {
-    var refIdx = 0
-    for (idx in 0 until current.size) {
-        val e = current[idx]
-        if (e.id in activeIds || e.id in hiddenIds) continue
-        if (refIdx >= reference.size) return false
-        if (reference[refIdx] !== e) return false
-        refIdx++
-    }
-    return refIdx == reference.size
-}
-
-/**
  * Returns the list sorted by [Element.zIndex], or the original instance when it
  * is already in ascending zIndex order. Insertion via `addElement` keeps the
  * list sorted by construction, so the common case is the O(N) scan with zero
@@ -105,15 +72,30 @@ internal fun List<Element>.sortedByZIndexIfNeeded(): List<Element> {
  * the current element set, [retainOnly] drops the orphans.
  */
 internal class PathCache {
-    private data class Entry(val pointsRef: List<Offset>, val path: Path)
+    /**
+     * Keyed on the stroke's `samples` list. It used to be keyed on `positions`, which is a new list
+     * on every read, so it never hit and every re-record rebuilt every stroke.
+     */
+    internal class Entry(val samplesRef: List<Element.PathSample>, val uniformWidth: Float?) {
+        /** Built on first draw: a variable-width stroke is drawn sample by sample and never needs it. */
+        val path: Path by lazy(LazyThreadSafetyMode.NONE) { createPath(samplesRef.map { it.position }) }
+    }
     private val byId = HashMap<String, Entry>()
 
-    fun pathFor(id: String, points: List<Offset>): Path {
-        val existing = byId[id]
-        if (existing != null && existing.pointsRef === points) return existing.path
-        val fresh = createPath(points)
-        byId[id] = Entry(points, fresh)
-        return fresh
+    /** The stroke's path and, when every sample has one width, that width (null when they vary). */
+    fun strokeFor(stroke: Element.Path): Entry {
+        val existing = byId[stroke.id]
+        if (existing != null && existing.samplesRef === stroke.samples) return existing
+        return entryOf(stroke).also { byId[stroke.id] = it }
+    }
+
+    companion object {
+        fun entryOf(stroke: Element.Path): Entry {
+            val samples = stroke.samples
+            val first = samples.firstOrNull()?.width ?: stroke.strokeWidth
+            val uniform = samples.all { it.width == first }
+            return Entry(samples, if (uniform || samples.size < 2) first else null)
+        }
     }
 
     /**
@@ -142,7 +124,7 @@ internal class PathCache {
  * [bitmapFor] is **synchronous and non-blocking** — it returns whatever is
  * currently in the cache for `id`:
  *
- * - Exact hit (same `bytes` reference, same mip level): returns the cached
+ * - Exact hit (same `bytes` content, same mip level): returns the cached
  *   bitmap.
  * - Mip-level mismatch (resize): returns the stale lower / higher-res
  *   bitmap immediately and kicks off a background decode at the new level.
@@ -170,16 +152,46 @@ internal class PathCache {
  */
 internal class ImageBitmapCache(
     private val scope: CoroutineScope,
+    /** Decoded bytes kept before images not drawn lately are dropped (see [trimToBudget]). */
+    private val budgetBytes: Long = DEFAULT_IMAGE_BUDGET_BYTES,
 ) {
     private data class Entry(
         val gen: Long,
         val bytesRef: ByteArray,
         val mipLevelPx: Int,
         val bitmap: ImageBitmap?,
-    )
+    ) {
+        /** Another array with the same content, seen since; checked by reference from then on. */
+        var alias: ByteArray? = null
+
+        /** The frame this image was last asked for in (see [trimToBudget]). */
+        var lastUse: Long = -1L
+
+        /**
+         * Whether [bytes] are this image. A drawing taken in from elsewhere (another app's change,
+         * parsed afresh) carries new arrays with the same content; comparing by reference alone
+         * re-decoded every image on the board for each such change. Content is compared once per
+         * new array and the array remembered, so the next frame is a reference check.
+         */
+        fun holds(bytes: ByteArray): Boolean {
+            if (bytesRef === bytes || alias === bytes) return true
+            if (bytesRef.size != bytes.size || !bytesRef.contentEquals(bytes)) return false
+            alias = bytes
+            return true
+        }
+
+        fun heldBytes(): Long = bitmap?.let { it.width.toLong() * it.height * BYTES_PER_PIXEL } ?: 0L
+    }
 
     private val byId = mutableStateMapOf<String, Entry>()
     private var nextGen: Long = 0L
+    private var frame = 0L
+
+    /**
+     * Bumped each time a decode lands. A recording made while an image was still a placeholder is
+     * stale once it lands; the static layer records again when this differs from its recording.
+     */
+    val landed = mutableLongStateOf(0L)
 
     /**
      * Returns the current cached bitmap for [id], starting a background
@@ -194,10 +206,8 @@ internal class ImageBitmapCache(
     fun bitmapFor(id: String, bytes: ByteArray, targetDim: Int): ImageBitmap? {
         val mipLevelPx = mipLevelFor(targetDim)
         val existing = byId[id]
-        if (existing != null &&
-            existing.bytesRef === bytes &&
-            existing.mipLevelPx == mipLevelPx
-        ) {
+        existing?.lastUse = frame
+        if (existing != null && existing.mipLevelPx == mipLevelPx && existing.holds(bytes)) {
             return existing.bitmap
         }
 
@@ -213,7 +223,7 @@ internal class ImageBitmapCache(
             bytesRef = bytes,
             mipLevelPx = mipLevelPx,
             bitmap = staleBitmap,
-        )
+        ).also { it.lastUse = frame }
         scope.launch(Dispatchers.Default) {
             val decoded = decodeImageBitmapDownsampled(bytes, mipLevelPx, mipLevelPx)
             // Only land the result if our generation is still current. A
@@ -221,18 +231,37 @@ internal class ImageBitmapCache(
             // new bytes) supersedes us; we drop the result.
             val current = byId[id]
             if (current != null && current.gen == myGen) {
-                byId[id] = current.copy(bitmap = decoded)
+                byId[id] = current.copy(bitmap = decoded).also { it.lastUse = current.lastUse }
+                landed.longValue++
             }
         }
         return staleBitmap
+    }
+
+    /** Starts a frame: images not asked for since are the first to go when over budget. */
+    fun beginFrame() {
+        frame++
+    }
+
+    /**
+     * Drops the decoded bitmaps of images not drawn this frame, least recently drawn first, while
+     * the decoded total is over the budget. With culling an image off screen is not drawn, so a
+     * big board holds only what is on (or was recently on) screen; one scrolled back to is decoded
+     * again.
+     */
+    fun trimToBudget() {
+        var held = byId.values.sumOf { it.heldBytes() }
+        if (held <= budgetBytes) return
+        val idle = byId.entries.filter { it.value.lastUse < frame }.sortedBy { it.value.lastUse }.map { it.key }.iterator()
+        while (held > budgetBytes && idle.hasNext()) held -= byId.remove(idle.next())?.heldBytes() ?: 0L
     }
 
     fun retainOnly(liveIds: Set<String>) {
         if (byId.isEmpty()) return
         // SnapshotStateMap.keys.retainAll exists but does an iteration-time
         // check. Build the drop list first to avoid mutation while iterating.
-        val drop = byId.keys.filter { it !in liveIds }
-        for (id in drop) byId.remove(id)
+        val gone = byId.keys.filter { it !in liveIds }
+        gone.forEach { byId.remove(it) }
     }
 
     fun size(): Int = byId.size
@@ -259,6 +288,12 @@ private const val MIN_MIP_PX: Int = 128
  * source size for typical screenshots.
  */
 private const val MAX_MIP_PX: Int = 2048
+
+/** Decoded image memory a board keeps by default: 64 MB, about four 2048 px bitmaps. */
+internal const val DEFAULT_IMAGE_BUDGET_BYTES: Long = 64L * 1024 * 1024
+
+/** A decoded bitmap is ARGB, four bytes a pixel. */
+private const val BYTES_PER_PIXEL = 4L
 
 /**
  * Per-canvas cache of [TextLayoutResult] entries for [Element.Text]

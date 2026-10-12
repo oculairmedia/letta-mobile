@@ -17,7 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -127,7 +127,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
     // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
     if (inputs.showsBackgroundTasksToggle()) {
         DesktopBackgroundTasksToggle(
-            runningCount = inputs.activeSubagents.count { it.status == SubagentStatus.RUNNING },
+            runningCount = inputs.activeSubagents.visibleRunningCount(),
             onClick = actions.onShowBackgroundTasks,
             modifier = Modifier
                 .align(Alignment.TopEnd)

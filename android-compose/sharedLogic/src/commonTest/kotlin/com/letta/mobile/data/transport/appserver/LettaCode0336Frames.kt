@@ -4,8 +4,9 @@ package com.letta.mobile.data.transport.appserver
  * letta-mobile-bzvro.10 (F10): serialized server frames in the shapes letta-code 0.33.6 emits,
  * written from its open-source protocol types (`src/types/runtime-scope.ts`,
  * `loop-status-protocol.ts`, `queue-update-protocol.ts`, `approval-classification-protocol.ts`,
- * `protocol_v2.ts`, tag v0.33.6). The contract baseline and the desktop
- * runtime are now 0.33.6 as well; these fixtures keep pinning the newest frame shapes (the Android embedded runtime, 0.26.1, never emits them).
+ * `protocol_v2.ts`, tag v0.33.6). The contract baseline and the desktop runtime moved on to
+ * 0.34.8 (see [LettaCode0348Frames]); 0.34 only adds fields, so these 0.33 shapes must keep
+ * decoding (the Android embedded runtime, 0.26.1, never emits them).
  */
 internal object LettaCode0336Frames {
     /** `ConversationRuntimeScope`: `agent_id` may be null for an agent-free conversation. */

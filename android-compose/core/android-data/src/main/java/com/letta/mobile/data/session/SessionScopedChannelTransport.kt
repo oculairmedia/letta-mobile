@@ -305,6 +305,10 @@ class SessionScopedChannelTransport internal constructor(
     override val hasAnyActiveChatTurn: Boolean
         get() = current.hasAnyActiveChatTurn
 
+    // letta-mobile-bzvro.40: the session's host decides the approval relay and the permission-mode chip.
+    override val hostCapabilities: Set<String>
+        get() = current.hostCapabilities
+
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String): Unit =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }
 

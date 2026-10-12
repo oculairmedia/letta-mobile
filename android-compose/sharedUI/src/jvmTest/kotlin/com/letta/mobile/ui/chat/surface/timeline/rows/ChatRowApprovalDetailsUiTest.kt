@@ -3,6 +3,9 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -13,6 +16,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.ApprovalDiffPreview
@@ -164,6 +169,50 @@ class ChatRowApprovalDetailsUiTest {
 
         onNodeWithText("binary file").assertExists()
         onNodeWithText("/repo/big.bin").assertExists()
+    }
+
+    /**
+     * letta-mobile-bzvro.40: over Iroh the phone's row is a plain tool call; the host's relayed
+     * details turn it into the same card desktop-direct draws, answered against the control request.
+     */
+    @Test
+    fun aHostRelayedParkTurnsAPlainToolRowIntoTheFullCard() = runComposeUiTest {
+        val toolRow = message("toolcall-call-edit", "assistant", "").copy(
+            toolCalls = listOf(UiToolCall(name = "Edit", arguments = """{"file_path":"/repo/a.txt"}""", result = null, toolCallId = "call-edit")),
+        )
+        val parked = editApproval(parked = true).approvalRequest!!.details!!
+        val actions = RecordingChatActions()
+        val joined = withPendingApprovalDetails(listOf(toolRow), mapOf("call-edit" to parked)).single()
+        setContent { MaterialTheme { RenderRow(single(joined), rowContext(), rowCallbacks(actions)) } }
+
+        onNodeWithText("Approval requested").assertExists()
+        onNodeWithTag(ChatRowTestTags.APPROVAL_DIFF).assertExists()
+        onNodeWithTag("${ChatRowTestTags.APPROVAL_ALWAYS_ALLOW}-allow-edit-repo").performClick()
+
+        runOnIdle {
+            val decision = actions.approvals.single()
+            assertEquals("perm-call-edit", decision.requestId)
+            assertEquals(listOf("allow-edit-repo"), decision.selectedSuggestionIds)
+        }
+    }
+
+    /** UI motion rule: a card that arrives on a row already on screen grows in; it is not snapped in. */
+    @Test
+    fun aCardArrivingOnAShownRowAnimatesIn() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var row by mutableStateOf(editApproval(parked = false))
+        setContent { MaterialTheme { RenderRow(single(row)) } }
+        mainClock.advanceTimeByFrame()
+
+        row = editApproval(parked = true)
+        mainClock.advanceTimeByFrame()
+        mainClock.advanceTimeByFrame()
+        val midway = onNodeWithTag(ChatRowTestTags.APPROVAL_SLOT).fetchSemanticsNode().size.height
+
+        mainClock.autoAdvance = true
+        waitForIdle()
+        val settled = onNodeWithTag(ChatRowTestTags.APPROVAL_SLOT).fetchSemanticsNode().size.height
+        assertTrue(midway < settled, "mid-animation $midway px, settled $settled px")
     }
 
     private fun editApproval(

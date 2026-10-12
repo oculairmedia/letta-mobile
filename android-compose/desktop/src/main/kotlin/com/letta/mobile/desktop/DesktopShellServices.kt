@@ -14,6 +14,8 @@ import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.notify.AttentionPrefsRepository
+import com.letta.mobile.data.notify.StoredAttentionPrefs
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -62,6 +64,8 @@ internal data class DesktopShellCore(
     val iroh: DesktopIrohLink,
     val chatController: DesktopChatController,
     val localConfig: DesktopLocalConfigState,
+    /** letta-mobile-bzvro.27: per-agent notification mutes, kept in the settings store. */
+    val attentionPrefs: AttentionPrefsRepository,
 )
 
 /** The per-backend panels and libraries behind the shell's destinations. */
@@ -92,6 +96,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
     val layout = rememberDesktopShellLayout(bootstrap.activeConfig.id)
     val chatScope = rememberCoroutineScope()
     val railPrefs = rememberDesktopRailPrefs(bootstrap.secureSettingsStore)
+    val attentionPrefs = remember(bootstrap.secureSettingsStore) { StoredAttentionPrefs(bootstrap.secureSettingsStore) }
     val canvasShell = rememberDesktopCanvasShell(chatScope)
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val iroh = rememberDesktopIrohLink(bootstrap, chatScope)
@@ -117,6 +122,7 @@ internal fun rememberDesktopShellCore(): DesktopShellCore {
         iroh = iroh,
         chatController = chatController,
         localConfig = localConfig,
+        attentionPrefs = attentionPrefs,
     )
 }
 

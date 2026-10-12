@@ -21,6 +21,12 @@ data class AppServerSubagentSnapshot(
     @SerialName("tool_call_id") val toolCallId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
+    /**
+     * letta-mobile-ulcg6: letta-code sends the child's identity as `agent_url`,
+     * never `agent_id`; for a local agent it IS the agent id, for a cloud agent a
+     * chat URL ending in it. See `childAgentId`.
+     */
+    @SerialName("agent_url") val agentUrl: String? = null,
     val description: String? = null,
     @SerialName("subagent_type") val subagentType: String? = null,
     val status: String? = null,
@@ -33,6 +39,12 @@ data class AppServerSubagentSnapshot(
     @SerialName("start_time") val startTime: JsonElement? = null,
     @SerialName("started_at") val startedAt: String? = null,
     val activity: SubagentActivitySnapshot? = null,
+    // letta-mobile-ulcg6 (RC5): native letta-code progress fields.
+    @SerialName("tool_calls") val toolCalls: JsonElement? = null,
+    @SerialName("total_tokens") val totalTokens: Long? = null,
+    @SerialName("duration_ms") val durationMs: Long? = null,
+    val model: String? = null,
+    @SerialName("is_background") val isBackground: Boolean? = null,
 )
 
 /**
@@ -53,19 +65,25 @@ object AppServerSubagentSnapshotAdapter {
         val identity = snapshot.toolCallId?.takeIf { it.isNotBlank() }
             ?: snapshot.subagentId?.takeIf { it.isNotBlank() }
             ?: return null
+        val native = SubagentNativeProgressParser.parse(snapshot.toolCalls)
         return SubagentEntry(
             toolCallId = identity,
             description = snapshot.description.orEmpty(),
             subagentType = snapshot.subagentType.orEmpty(),
             status = normalizeStatus(snapshot.status, snapshot.error),
             taskId = snapshot.taskId,
-            subagentAgentId = snapshot.agentId,
+            subagentAgentId = snapshot.childAgentId(),
             subagentConversationId = snapshot.conversationId,
             parentRunId = snapshot.parentRunId,
             parentAgentId = snapshot.parentAgentId ?: parent.agentId,
             parentConversationId = snapshot.parentConversationId ?: parent.conversationId,
             startedAt = startedAt(snapshot),
-            activity = snapshot.activity?.bounded(),
+            activity = snapshot.activity?.bounded() ?: native.activity,
+            toolCallCount = native.toolCallCount,
+            model = snapshot.model?.takeIf(String::isNotBlank),
+            totalTokens = snapshot.totalTokens,
+            durationMs = snapshot.durationMs,
+            isBackground = snapshot.isBackground,
         )
     }
 
@@ -94,6 +112,7 @@ object AppServerSubagentSnapshotAdapter {
             "subagent_conversation_id",
         ),
         agentId = alias(raw, decoded?.agentId, "agent_id", "agentId", "subagent_agent_id"),
+        agentUrl = alias(raw, decoded?.agentUrl, "agent_url", "agentUrl", "agentURL"),
         description = alias(raw, decoded?.description, "description"),
         subagentType = alias(raw, decoded?.subagentType, "subagent_type", "subagentType"),
         status = alias(raw, decoded?.status, "status"),
@@ -110,7 +129,7 @@ object AppServerSubagentSnapshotAdapter {
         startTime = listOfNotNull(raw["start_time"], raw["started_at_ms"], decoded?.startTime).firstOrNull(),
         startedAt = alias(raw, decoded?.startedAt, "started_at", "startedAt"),
         activity = listOfNotNull(decodeActivity(raw["activity"]), decoded?.activity).firstOrNull(),
-    )
+    ).withNativeAliases(raw, decoded)
 
     private fun hasIdentity(snapshot: AppServerSubagentSnapshot?): Boolean {
         if (snapshot == null) return false

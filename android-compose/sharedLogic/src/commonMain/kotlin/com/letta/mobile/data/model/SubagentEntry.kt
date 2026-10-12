@@ -82,6 +82,22 @@ data class SubagentEntry(
      *  UI (e.g. "stream_timeout"). Set when `status` flips to a terminal failure;
      *  remains null for success/cancelled/no-terminal outcomes. */
     @Transient val failureReason: String? = null,
+    /**
+     * letta-mobile-ulcg6 (RC5): native letta-code progress, carried by hosts
+     * that decode the full `update_subagent_state` snapshot. All optional:
+     * older hosts omit them and older clients ignore them.
+     *  - [toolCallCount]: tool calls the subagent has made so far.
+     *  - [lastActivityAtMs]: when the host last saw the subagent make progress
+     *    (a new tool call or a lifecycle change). The honest "stuck" baseline.
+     *  - [model], [totalTokens], [durationMs]: as reported by letta-code.
+     *  - [isBackground]: dispatched with run_in_background.
+     */
+    @SerialName("toolCallCount") val toolCallCount: Int? = null,
+    @SerialName("lastActivityAtMs") val lastActivityAtMs: Long? = null,
+    val model: String? = null,
+    @SerialName("totalTokens") val totalTokens: Long? = null,
+    @SerialName("durationMs") val durationMs: Long? = null,
+    @SerialName("isBackground") val isBackground: Boolean? = null,
 )
 
 object SubagentStatus {

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +74,9 @@ import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -172,6 +176,33 @@ internal fun ApprovalRequestCard(
         if (decider.submit != null) haptics.play(LettaHapticCue.ApprovalNeeded)
     }
     ApprovalRequestCard(approval, decider)
+}
+
+/**
+ * letta-mobile-bzvro.40: a message's approval card, growing in and out of the row instead of
+ * snapping it taller: an Iroh host's parked request joins a tool row that is already on screen (UI
+ * motion rule: a height change animates, reduced-motion aware). A row composed with its card already
+ * there shows it at once, so scrolling never replays the entrance.
+ */
+@Composable
+internal fun ColumnScope.ApprovalRequestSlot(
+    approval: UiApprovalRequest?,
+    context: ChatRowContext,
+    callbacks: ChatRowCallbacks,
+) {
+    val waiting = approval?.takeIf { it.requiresUserInput() }
+    // The last card drawn, so the exit animation still has its content once the request is answered.
+    var last by remember { mutableStateOf(waiting) }
+    SideEffect { if (waiting != null) last = waiting }
+    val motion = ChatRowMotion(LocalReducedMotion.current)
+    AnimatedVisibility(
+        visible = waiting != null,
+        modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_SLOT),
+        enter = motion.expansionEnter(),
+        exit = motion.expansionExit(),
+    ) {
+        (waiting ?: last)?.let { ApprovalRequestCard(it, context, callbacks) }
+    }
 }
 
 /**

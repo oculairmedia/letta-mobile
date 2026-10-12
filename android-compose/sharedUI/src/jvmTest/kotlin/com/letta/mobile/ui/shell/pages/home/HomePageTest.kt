@@ -81,10 +81,14 @@ class HomePageTest {
     private val navigation = RecordingNavigation()
 
     private fun ComposeUiTest.show(state: HomePageState, width: Dp = WIDE, document: UiGeneratedComponent? = null) {
+        show(state, HomePageOptions(document = document), width)
+    }
+
+    private fun ComposeUiTest.show(state: HomePageState, options: HomePageOptions, width: Dp = WIDE) {
         setContent {
             MaterialTheme {
                 Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = HomePageOptions(document = document))
+                    HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = options)
                 }
             }
         }
@@ -183,6 +187,19 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.ERROR).assertExists()
         onNodeWithText("Backend unreachable").assertExists()
         onNodeWithTag(HomePageTags.SEARCH).assertDoesNotExist()
+    }
+
+    /** Desktop: the header's field searches Home (letta-mobile-xuhmy), so the page draws no field of its own. */
+    @Test
+    fun aHostSearchFieldDrivesTheWidePageWithoutASecondField() = runComposeUiTest {
+        val catalog = HomeSearchCatalog(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
+        val searching = HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "plan", awaitMessages = false)
+        show(searching, HomePageOptions(showSearch = false))
+
+        onNodeWithText("Home").assertExists()
+        onNodeWithTag(HomePageTags.SEARCH).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.SEARCH_RESULTS).assertExists()
+        onNodeWithTag(HomePageTags.searchHit("a-1")).assertExists()
     }
 
     @Test

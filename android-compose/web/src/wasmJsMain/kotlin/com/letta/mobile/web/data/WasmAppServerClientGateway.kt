@@ -1,6 +1,7 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.BackendId
@@ -33,22 +34,22 @@ class WasmAppServerClientGateway(
     private val scope: CoroutineScope,
 ) {
     private val httpClient = HttpClient(Js) { install(WebSockets) }
-    private val mutableState = MutableStateFlow<WebConnectionState>(WebConnectionState.Unconfigured)
+    private val mutableState = MutableStateFlow<BackendConnectionStatus>(BackendConnectionStatus.Unconfigured)
     private var activeSession: WasmAppServerSession? = null
     private var connectionMonitor: Job? = null
     private val requestSessionId = Random.nextLong().toString()
     private var requestSequence = 0
 
-    val state: StateFlow<WebConnectionState> = mutableState.asStateFlow()
+    val state: StateFlow<BackendConnectionStatus> = mutableState.asStateFlow()
 
     suspend fun listAgents(config: LettaConfig): List<AgentItemState> {
         if (config.serverUrl.isBlank()) {
             close()
-            mutableState.value = WebConnectionState.Unconfigured
+            mutableState.value = BackendConnectionStatus.Unconfigured
             return emptyList()
         }
 
-        mutableState.value = WebConnectionState.Connecting
+        mutableState.value = BackendConnectionStatus.Connecting
         return try {
             close()
             val session = connectWasmAppServerSession(config, scope, httpClient, ::nextRequestId)
@@ -77,7 +78,7 @@ class WasmAppServerClientGateway(
                 )
             }
             check(response.success) { response.error ?: "Agent list failed" }
-            mutableState.value = WebConnectionState.Connected(session.label)
+            mutableState.value = BackendConnectionStatus.Connected(session.label)
             monitor(session)
             decodeWebAgents(response.result as? JsonArray ?: JsonArray(emptyList()))
         } catch (cancelled: CancellationException) {
@@ -85,7 +86,7 @@ class WasmAppServerClientGateway(
             throw cancelled
         } catch (error: Throwable) {
             close()
-            mutableState.value = WebConnectionState.Failed(error.message ?: "Connection failed")
+            mutableState.value = BackendConnectionStatus.Failed(error.displayMessage("Connection failed"))
             throw error
         }
     }
@@ -135,8 +136,9 @@ class WasmAppServerClientGateway(
                     ?.failureReason
                     ?.value
                     ?.takeIf { it.isNotBlank() }
+                    ?.let(::cleanBrowserErrorMessage)
                     ?: "Connection closed"
-                mutableState.value = WebConnectionState.Failed(reason)
+                mutableState.value = BackendConnectionStatus.Failed(reason)
             }
         }
     }

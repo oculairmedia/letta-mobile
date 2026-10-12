@@ -63,7 +63,9 @@ class SubagentRegistryPublisher(
     suspend fun replayTo(conversationId: String, viewer: ViewerHandle): Int {
         val everyParent = SubagentConversationKey(agentId = null, conversationId = conversationId)
         val groups = source.pushSnapshot(everyParent, nowMs()).groupBy { it.parentAgentId }
-        val written = groups.values.count { entries -> viewer.writeFrame(frame(REASON_REPLAY, entries)) }
+        val written = groups.count { (agentId, entries) ->
+            viewer.writeFrame(frame(REASON_REPLAY, entries, SubagentConversationKey(agentId, conversationId)))
+        }
         Telemetry.event("SubagentPush", "replay", "conversationId" to conversationId, "frames" to written)
         return written
     }
@@ -77,7 +79,7 @@ class SubagentRegistryPublisher(
     private suspend fun send(key: SubagentConversationKey) {
         val sink = target ?: return
         val entries = source.pushSnapshot(key, nowMs())
-        val delivered = sink.publish(key.conversationId, frame(REASON_REGISTRY, entries))
+        val delivered = sink.publish(key.conversationId, frame(REASON_REGISTRY, entries, key))
         Telemetry.event(
             "SubagentPush",
             "published",
@@ -89,7 +91,13 @@ class SubagentRegistryPublisher(
 
     private fun nowMs(): Long = clock().toEpochMilli()
 
-    internal fun frame(reason: String, entries: List<SubagentEntry>): String {
+    /**
+     * letta-mobile-ulcg6 (RC2): the frame names the (agent, conversation) it
+     * describes, so a client folds it into that scope only. A null agent (an
+     * unattributed group) leaves the agent unnamed and the client falls back
+     * to inferring the scope from the entries.
+     */
+    internal fun frame(reason: String, entries: List<SubagentEntry>, key: SubagentConversationKey): String {
         val at = clock().toString()
         val frame = ServerFrame.SubagentsUpdated(
             id = "subagents-updated-${UUID.randomUUID()}",
@@ -97,6 +105,8 @@ class SubagentRegistryPublisher(
             reason = reason,
             subagentsActive = entries,
             at = at,
+            parentAgentId = key.agentId,
+            parentConversationId = key.conversationId,
         )
         return FRAME_JSON.encodeToString(ServerFrame.SubagentsUpdated.serializer(), frame)
     }

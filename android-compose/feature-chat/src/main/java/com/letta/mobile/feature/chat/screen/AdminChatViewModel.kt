@@ -21,6 +21,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -182,6 +183,8 @@ internal class AdminChatViewModel @Inject constructor(
     private val timelineTransport: com.letta.mobile.data.timeline.TimelineTransport? = null,
     /** letta-mobile-7mys7 (G37): forks record their parent here; null in tests. */
     private val conversationLineage: com.letta.mobile.data.chat.branch.ConversationLineage? = null,
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the permission-mode chip; null leaves both off. */
+    private val approvalRelay: com.letta.mobile.feature.chat.coordination.ChatApprovalRelay? = null,
 ) : ViewModel() {
     /**
      * Folds this screen's runtime events into the app-wide registry through the shared reducer, so
@@ -193,6 +196,9 @@ internal class AdminChatViewModel @Inject constructor(
      * construction, and cached repositories can deliver events before the constructor returns.
      */
     private val runPhases = com.letta.mobile.data.presence.ConversationRunPhasePublisher(runRegistry)
+
+    /** letta-mobile-bzvro.40: the Iroh host's parked approvals and the mode chip (inert without a relay). */
+    private val approvalBinding = com.letta.mobile.feature.chat.coordination.ChatApprovalBinding(approvalRelay, routeArgs.agentId)
 
     /**
      * letta-mobile-bzvro.7: the status line's detail for this screen's conversation, as the shared
@@ -327,7 +333,9 @@ internal class AdminChatViewModel @Inject constructor(
     @Composable
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
-        return state
+        // letta-mobile-bzvro.40: requests the Iroh host parked on the person draw as cards here.
+        val parked by approvalBinding.pendingDetails.collectAsState()
+        return androidx.compose.runtime.remember(state, parked) { state.withPendingApprovalDetails(parked) }
     }
 
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
@@ -547,6 +555,7 @@ internal class AdminChatViewModel @Inject constructor(
         bannerController = chatBannerController,
         agentId = agentId.value,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
+        relay = approvalRelay,
     )
 
     private val adminChatA2uiCoordinator: AdminChatA2uiCoordinator by lazy {
@@ -1079,6 +1088,18 @@ internal class AdminChatViewModel @Inject constructor(
         approve: Boolean,
         reason: String? = null,
     ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason)
+
+    /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
+    fun submitApproval(answer: com.letta.mobile.ui.chat.session.ChatApprovalAnswer) = chatApprovalController.submit(answer)
+
+    /** letta-mobile-bzvro.40: the conversation's permission-mode chip; null while the host offers none. */
+    val permissionMode: Flow<com.letta.mobile.ui.chat.session.ChatPermissionModeUiState?> by lazy(LazyThreadSafetyMode.NONE) {
+        approvalBinding.permissionMode(_uiState.map { conversationId?.value })
+    }
+
+    /** letta-mobile-bzvro.40: asks the host for [mode]; the chip shows it pending until confirmed. */
+    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) =
+        approvalBinding.setPermissionMode(viewModelScope, conversationId?.value, mode)
 
     fun resetMessages() {
         viewModelScope.launch {

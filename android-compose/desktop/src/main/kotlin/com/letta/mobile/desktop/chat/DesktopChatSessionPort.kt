@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -232,11 +233,14 @@ internal class DesktopChatSessionPort(
             .distinctUntilChanged()
             .flatMapLatest { (target, gateway) ->
                 val agentId = target?.first
-                val modes = (gateway as? DesktopPermissionModeController)?.permissionModes
+                val controller = gateway as? DesktopPermissionModeController
+                val modes = controller?.permissionModes
                 if (agentId == null || modes == null) {
                     flowOf(null)
                 } else {
-                    modes.observe(AppServerRuntimeScope(agentId, target.second)).map { it.toUiState() }
+                    val runtime = AppServerRuntimeScope(agentId, target.second)
+                    // letta-mobile-bzvro.40: a relaying host's mode is read (or this client's choice re-sent) on open.
+                    modes.observe(runtime).map { it.toUiState() }.onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
                 }
             }
 

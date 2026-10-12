@@ -173,6 +173,15 @@ data class SubagentChipRecord(
      * ORPHANED, already says why). Older readers ignore the field.
      */
     @SerialName("terminal_reason") val terminalReason: String? = null,
+    /** letta-mobile-ulcg6 (RC5): native progress; see [SubagentProgress]. */
+    val progress: SubagentProgress = SubagentProgress(),
+    /**
+     * letta-mobile-ulcg6 (RC4): when this chip last made progress (first seen,
+     * a new tool call, new activity, or a lifecycle change). Unlike
+     * [lastSeenEpochMs] a repeated identical snapshot does not move it, so it
+     * is the honest baseline for "quiet for a while".
+     */
+    @SerialName("last_activity_epoch_ms") val lastActivityEpochMs: Long? = null,
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
@@ -190,11 +199,54 @@ data class SubagentChipRecord(
         startedAt = startedAt,
         activity = activity,
         terminalAtEpochMs = terminalAtEpochMs,
+        toolCallCount = progress.toolCallCount,
+        lastActivityAtMs = lastActivityEpochMs,
+        model = progress.model,
+        totalTokens = progress.totalTokens,
+        durationMs = progress.durationMs,
+        isBackground = progress.isBackground,
     )
 
     companion object {
         /** letta-mobile-fxoew.3: the host's TTL terminalized an unobserved RUNNING chip. */
         const val TERMINAL_REASON_STALE = "stale"
+    }
+}
+
+/**
+ * letta-mobile-ulcg6 (RC5): letta-code's native per-subagent progress, kept on
+ * the durable chip so pushes and `subagent.list` carry it. Every field is
+ * optional; a producer that does not know a value leaves the stored one.
+ */
+@Serializable
+data class SubagentProgress(
+    @SerialName("tool_call_count") val toolCallCount: Int? = null,
+    val model: String? = null,
+    @SerialName("total_tokens") val totalTokens: Long? = null,
+    @SerialName("duration_ms") val durationMs: Long? = null,
+    @SerialName("is_background") val isBackground: Boolean? = null,
+) {
+    /** [incoming] wins where it knows a value; the tool-call count never goes backwards. */
+    fun mergedWith(incoming: SubagentProgress): SubagentProgress = SubagentProgress(
+        toolCallCount = listOfNotNull(toolCallCount, incoming.toolCallCount).maxOrNull(),
+        model = incoming.model ?: model,
+        totalTokens = incoming.totalTokens ?: totalTokens,
+        durationMs = incoming.durationMs ?: durationMs,
+        isBackground = incoming.isBackground ?: isBackground,
+    )
+
+    /** True when [incoming] shows more work than this record has seen. */
+    fun advancedBy(incoming: SubagentProgress): Boolean =
+        (incoming.toolCallCount ?: 0) > (toolCallCount ?: 0)
+
+    companion object {
+        fun of(entry: SubagentEntry): SubagentProgress = SubagentProgress(
+            toolCallCount = entry.toolCallCount,
+            model = entry.model,
+            totalTokens = entry.totalTokens,
+            durationMs = entry.durationMs,
+            isBackground = entry.isBackground,
+        )
     }
 }
 
@@ -236,6 +288,7 @@ data class SubagentChipObservation(
     val startedAt: String? = null,
     val activity: SubagentActivitySnapshot? = null,
     val generation: Long = 0,
+    val progress: SubagentProgress = SubagentProgress(),
 ) {
     val key: SubagentChipKey get() = SubagentChipKey(conversationId, agentId, toolCallId)
 
@@ -262,6 +315,7 @@ data class SubagentChipObservation(
             startedAt = entry.startedAt,
             activity = entry.activity,
             generation = generation,
+            progress = SubagentProgress.of(entry),
         )
     }
 }

@@ -109,6 +109,8 @@ class AppServerProtocolCompatibilityTest {
             "connect_provider",
             "disconnect_provider",
             "update_model",
+            // letta-code 0.34: durable terminal receipt.
+            "turn_finished_ack",
         )
 
         val INBOUND_TYPES = setOf(
@@ -128,6 +130,7 @@ class AppServerProtocolCompatibilityTest {
             "connect_provider_response",
             "disconnect_provider_response",
             "update_model_response",
+            "turn_finished",
         )
     }
 }

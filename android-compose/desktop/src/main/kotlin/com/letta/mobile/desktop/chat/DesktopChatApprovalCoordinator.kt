@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
+import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.coroutines.CancellationException
@@ -117,8 +118,11 @@ internal class DesktopChatApprovalCoordinator(
     ) {
         // An always-allow targets exactly the call whose card offered the rule, not the first of the row.
         val toolCallId = request.suggestionBinding?.toolCallId ?: request.toolCallIds.firstOrNull()
-        when (gw) {
-            is ApprovalSubmittingGateway -> gw.submitApproval(
+        val alwaysAllow = request.alwaysAllow(SubmissionTarget(gw, agentId, conversationId))
+        when {
+            // letta-mobile-bzvro.40: an Iroh gateway carries the rule to its host, bound to the request the card drew.
+            gw is ApprovalSubmittingGateway && alwaysAllow != null -> gw.submitAlwaysAllow(alwaysAllow)
+            gw is ApprovalSubmittingGateway -> gw.submitApproval(
                 agentId = agentId,
                 conversationId = conversationId,
                 approvalRequestId = request.requestId,
@@ -126,7 +130,7 @@ internal class DesktopChatApprovalCoordinator(
                 approve = request.approve,
                 reason = request.reason,
             )
-            is DesktopApprovalSubmitter -> gw.submitApproval(
+            gw is DesktopApprovalSubmitter -> gw.submitApproval(
                 DesktopApprovalSubmission(
                     agentId = agentId,
                     conversationId = conversationId,
@@ -139,6 +143,13 @@ internal class DesktopChatApprovalCoordinator(
                 ),
             )
         }
+    }
+
+    /** The always-allow [this] asks for, or null for a plain decision. */
+    private fun ApprovalSubmissionRequest.alwaysAllow(target: SubmissionTarget): AlwaysAllowAnswer? {
+        val binding = suggestionBinding ?: return null
+        if (selectedSuggestionIds.isEmpty()) return null
+        return AlwaysAllowAnswer(target.agentId, target.conversationId, binding, selectedSuggestionIds)
     }
 
     fun clearSubmittedApproval(requestId: String) {

@@ -242,6 +242,10 @@ class AppServerTurnEngine(
         runtimeOwned = { key -> leases.peek(key) != null },
         permissionModeFor = { key -> permissionModeProvider(unleasedCommandFor(key)) },
         runtimeScopeFor = { key -> leases.peek(key)?.runtimeScope },
+        parkLeftPending = { key, parked ->
+            approvals.park(key, parked)
+            approvals.record(key, ApprovalRegistry.Gate(parked.toolCallId, parked.approvalId))
+        },
     )
 
     /** letta-mobile-qygvv.3: a lease released without a server terminal aborts its server turn. */

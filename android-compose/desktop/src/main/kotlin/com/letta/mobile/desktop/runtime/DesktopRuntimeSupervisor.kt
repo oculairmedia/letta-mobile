@@ -60,8 +60,33 @@ internal class DesktopRuntimeSupervisor(
         manager.events = this
     }
 
-    /** Starts the child if it is not running (a lease acquire). Blocking. */
-    fun ensureStarted(): String = manager.ensureStarted()
+    /**
+     * Starts the child if it is not running (a lease acquire). Blocking. Refuses while the user
+     * has stopped the runtime ([stopByUser]), so a reconnecting chat cannot bring it back.
+     */
+    fun ensureStarted(): String {
+        if (_health.value.stoppedByUser) throw DesktopRuntimeStoppedException()
+        return manager.ensureStarted()
+    }
+
+    /** The user turned the local runtime off (G05): stop the child and keep it off until [startByUser]. */
+    fun stopByUser() {
+        synchronized(lock) {
+            pendingRestart?.cancel()
+            pendingRestart = null
+            _health.update { it.copy(stoppedByUser = true, restartPending = false) }
+        }
+        scope.launch { manager.close() }
+    }
+
+    /** The user turned the local runtime back on: start it now if anyone wants it, else on next use. */
+    fun startByUser() {
+        synchronized(lock) {
+            policy.reset()
+            _health.update { it.copy(stoppedByUser = false, consecutiveCrashes = 0, gaveUp = false, lastError = null) }
+        }
+        scope.launch { if (!manager.isAlive) restartNow() }
+    }
 
     override fun onStarted(url: String) {
         synchronized(lock) {
@@ -132,7 +157,7 @@ internal class DesktopRuntimeSupervisor(
     }
 
     private fun restartNow() {
-        if (!wanted()) {
+        if (!wanted() || _health.value.stoppedByUser) {
             _health.update { it.copy(restartPending = false) }
             return
         }
@@ -155,7 +180,16 @@ internal class DesktopRuntimeSupervisor(
             pendingRestart = null
             policy.reset()
             stderr.clear()
-            _health.update { it.copy(consecutiveCrashes = 0, gaveUp = false, restartPending = true, recentStderr = emptyList(), lastError = null) }
+            _health.update {
+                it.copy(
+                    consecutiveCrashes = 0,
+                    gaveUp = false,
+                    restartPending = true,
+                    recentStderr = emptyList(),
+                    lastError = null,
+                    stoppedByUser = false,
+                )
+            }
         }
         scope.launch {
             manager.close()

@@ -47,6 +47,9 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.Sync -> SafeRead
             // Capability discovery is idempotent read.
             is AppServerCommand.AppServerInfo -> SafeRead
+            // A terminal receipt is idempotent per (idempotency_key, consumer_id), and the server
+            // keeps replaying the terminal until it lands, so re-sending it is the intended path.
+            is AppServerCommand.TurnFinishedAck -> SafeRead
 
             // AdminRpc: reads are safe; everything else is an ambiguous mutation.
             is AppServerCommand.AdminRpc ->

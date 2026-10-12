@@ -46,9 +46,21 @@ internal class AdminChatSessionPort(
     override val uiState: StateFlow<ChatUiState> = viewModel.uiState
 
     override val composer: StateFlow<ChatComposerUiState> =
-        combine(viewModel.composerState, viewModel.uiState, modelFlow(), contextUsageFlow(), fileMentions) { composer, ui, model, usage, files ->
-            composerSnapshot(composer, ui, model, usage).copy(mentionables = files.toImmutableList())
+        combine(composerWithoutMode(fileMentions), viewModel.permissionMode) { snapshot, permissionMode ->
+            // letta-mobile-bzvro.40: the permission-mode chip, over the Iroh host.
+            snapshot.copy(permissionMode = permissionMode)
         }.stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialComposer())
+
+    private fun composerWithoutMode(fileMentions: Flow<List<Mentionable>>): Flow<ChatComposerUiState> =
+        combine(
+            viewModel.composerState,
+            viewModel.uiState,
+            modelFlow(),
+            contextUsageFlow(),
+            fileMentions,
+        ) { composer, ui, model, usage, files ->
+            composerSnapshot(composer, ui, model, usage).copy(mentionables = files.toImmutableList())
+        }
 
     override val actions: ChatActions = AdminChatActions(viewModel, onOpenBugReport, onOpenConversation)
 
