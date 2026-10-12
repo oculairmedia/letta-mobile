@@ -123,8 +123,7 @@ class ToolDetailViewModelTest {
 
         val state = awaitToolSuccess(viewModel)
         assertEquals("Updated", state.description)
-        assertEquals("def my_tool_v2():
-    return 'updated'", state.sourceCode)
+        assertEquals("def my_tool_v2():\n    return 'updated'", state.sourceCode)
         // letta-mobile-ckmub.4: the schema is no longer generated client-side through the REST server.
         assertTrue(fakeToolApi.calls.none { it.startsWith("generateJsonSchema") })
     }

@@ -126,17 +126,14 @@ class NoLettaRestBackendGateTest {
         )
 
         /**
-         * Known remainders owned by other slices; each is a deletion, never a new client.
-         * - Cloud validator and Cloud defaults: removed with the Cloud mode by letta-mobile-ckmub.9 (PR #1895).
+         * Known remainders; each is a detector or a probe, never a client for a Letta server's data.
+         * - The Cloud-config migration recognises Letta Cloud's hosts to drop their saved key.
          * - Server health dot: a `/v1/health/` reachability probe, to become an App Server probe
-         *   (follow-up filed by ckmub.4).
+         *   (letta-mobile-ckmub.11).
          */
         val ALLOWLIST: List<Pair<String, String>> = listOf(
-            "rest-path" to "core/android-data/src/main/java/com/letta/mobile/data/api/CloudConnectionValidator.kt",
+            "cloud-host" to "sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/LettaConfigMigration.kt",
             "rest-path" to "core/android-data/src/main/java/com/letta/mobile/data/health/ServerHealthRepository.kt",
-            "cloud-host" to "app/src/main/java/com/letta/mobile/ui/screens/config/ConfigViewModel.kt",
-            "cloud-host" to "sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/settings/BackendSettingsCard.kt",
-            "cloud-host" to "sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/session/RemoteLettaBackendDescriptors.kt",
         )
     }
 }

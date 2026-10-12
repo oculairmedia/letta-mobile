@@ -215,11 +215,13 @@ class DesktopSessionGraphAdaptersTest {
 
         assertEquals(ServerHealthState.PROBING, health.states.value["desktop-local"])
         assertEquals(1L, bindings.sessionGraphProvider.current.id)
-        val chatGraph = bindings.chatSessionGraphFactory.create()
+        // letta-mobile-ckmub.4: a chat graph now dials a real App Server (the bundled runtime by
+        // default), which a unit test does not ship; the next repository generation is what it builds.
+        val nextGraph = bindings.sessionGraphFactory.create()
         try {
-            assertEquals(2L, chatGraph.repositories.id)
+            assertEquals(2L, nextGraph.id)
         } finally {
-            chatGraph.close()
+            nextGraph.close()
         }
     }
 

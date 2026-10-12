@@ -676,7 +676,8 @@ class ProjectHomeViewModelTest {
                 ?: throw ApiException(404, "Not found")
         }
 
-        override suspend fun createProject(request: com.letta.mobile.data.api.ProjectCreateRequest): ProjectSummary {
+        override suspend fun createProject(name: String?, filesystemPath: String, gitUrl: String?): ProjectSummary {
+            val request = com.letta.mobile.data.api.ProjectCreateRequest(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl)
             calls.add("createProject:${request.name}:${request.filesystemPath}:${request.gitUrl}")
             if (createShouldFail) throw ApiException(400, "Create failed")
             val created = ProjectSummary(
@@ -692,8 +693,10 @@ class ProjectHomeViewModelTest {
 
         override suspend fun updateProject(
             identifier: String,
-            request: com.letta.mobile.data.api.ProjectUpdateRequest,
+            filesystemPath: String?,
+            gitUrl: String?,
         ): ProjectSummary {
+            val request = com.letta.mobile.data.api.ProjectUpdateRequest(filesystemPath = filesystemPath, gitUrl = gitUrl)
             calls.add("updateProject:$identifier:${request.filesystemPath}:${request.gitUrl}")
             if (updateShouldFail) throw ApiException(400, "Update failed")
             val index = projects.indexOfFirst { it.identifier == identifier }

@@ -186,7 +186,8 @@ class CreateProjectViewModelTest {
             return ProjectCatalog(total = projects.size, projects = projects.toList())
         }
 
-        override suspend fun createProject(request: ProjectCreateRequest): ProjectSummary {
+        override suspend fun createProject(name: String?, filesystemPath: String, gitUrl: String?): ProjectSummary {
+            val request = ProjectCreateRequest(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl)
             calls.add("createProject:${request.name}:${request.filesystemPath}:${request.gitUrl}")
             if (createShouldFail) throw ApiException(400, "Create failed")
             val created = ProjectSummary(

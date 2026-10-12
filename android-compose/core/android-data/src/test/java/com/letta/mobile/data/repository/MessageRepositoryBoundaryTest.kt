@@ -25,9 +25,7 @@ class MessageRepositoryBoundaryTest {
 
         assertEquals(
             setOf(
-                "cancelBatch",
                 "cancelMessage",
-                "createBatch",
                 "fetchConversationInspectorMessages",
                 "fetchLatestConversationInspectorMessages",
                 "fetchMessages",
@@ -38,10 +36,7 @@ class MessageRepositoryBoundaryTest {
                 // a stateless HTTP helper.
                 "fetchOlderMessagesPage",
                 "getMessagesPaged",
-                "listBatchMessages",
-                "listBatches",
                 "resetMessages",
-                "retrieveBatch",
                 "searchMessages",
                 "submitApproval",
             ),

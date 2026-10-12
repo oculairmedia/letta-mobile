@@ -205,7 +205,7 @@ class ScheduleListViewModelTest {
         override suspend fun deleteAgent(id: String) {}
     }
 
-    private class FakeScheduleRepo : ScheduleRepository(FakeScheduleApi()) {
+    private class FakeScheduleRepo : ScheduleRepository() {
         private val schedulesByAgent = mutableMapOf(
             "a1" to mutableListOf(sampleSchedule("s1", "a1")),
             "a2" to mutableListOf(sampleSchedule("s2", "a2")),
