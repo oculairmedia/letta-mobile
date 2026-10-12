@@ -1181,6 +1181,11 @@ internal class AdminChatViewModel @Inject constructor(
         branchOrigin(open)?.let { conversationBranching.rerun(it, message) }
     }
 
+    /** letta-mobile-7mys7: `/fork [name]` from the composer forks all of this conversation and opens the fork. */
+    fun forkConversation(name: String?, open: (agentId: String, conversationId: String) -> Unit) {
+        branchOrigin(open)?.let { conversationBranching.forkConversation(it, name) }
+    }
+
     /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
     private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
         handleComposerTextChanged(pending.draft.text)
