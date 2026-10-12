@@ -449,18 +449,9 @@ private fun desktopSettingsCardColors() = CardDefaults.cardColors(
     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
 )
 
-/**
- * letta-mobile-bglj6.1: the shared KMP chat page, on by default since hard cut S4 (opt-out for one release). When the launch forces it on
- * (system property / env), the switch shows on and is locked, saying why.
- */
+/** The Chat card: where conversations open (the shared chat page is desktop's only chat, ckmub.3.11). */
 @Composable
-internal fun DesktopSharedChatPageSettingsCard(
-    flag: DesktopSharedChatPageFlag = LocalDesktopSharedChatPageFlag.current,
-    openOnCanvas: DesktopOpenChatsOnCanvas = LocalDesktopOpenChatsOnCanvas.current,
-) {
-    val persistedEnabled by flag.persistedEnabled.collectAsState()
-    val sharedPageEnabled by flag.enabled.collectAsState()
-    val scope = rememberCoroutineScope()
+internal fun DesktopChatSettingsCard(openOnCanvas: DesktopOpenChatsOnCanvas = LocalDesktopOpenChatsOnCanvas.current) {
     Card(
         colors = desktopSettingsCardColors(),
         modifier = Modifier.fillMaxWidth(),
@@ -470,36 +461,8 @@ internal fun DesktopSharedChatPageSettingsCard(
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Text("Chat", style = MaterialTheme.typography.titleLarge)
-            SharedChatPageToggleRow(
-                checked = persistedEnabled || flag.forcedByEnvironment,
-                enabled = !flag.forcedByEnvironment,
-                onCheckedChange = { enabled -> scope.launch { flag.setPersistedEnabled(enabled) } },
-            )
-            Text(
-                text = sharedChatPageSupportingText(flag.forcedByEnvironment),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (sharedPageEnabled) {
-                OpenChatsOnCanvasToggle(openOnCanvas)
-            }
+            OpenChatsOnCanvasToggle(openOnCanvas)
         }
-    }
-}
-
-@Composable
-private fun SharedChatPageToggleRow(
-    checked: Boolean,
-    enabled: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Shared chat page", style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -523,11 +486,3 @@ private fun OpenChatsOnCanvasToggle(preference: DesktopOpenChatsOnCanvas) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
-
-private fun sharedChatPageSupportingText(forcedByEnvironment: Boolean): String =
-    if (forcedByEnvironment) {
-        "Turned on for this launch by $SHARED_CHAT_SYSTEM_PROPERTY or $SHARED_CHAT_ENV_VARIABLE."
-    } else {
-        "Renders conversations with the chat page shared with Android. Turn off to use the previous " +
-            "chat page for this release; it is removed in the next one."
-    }

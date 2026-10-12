@@ -12,7 +12,7 @@ import java.util.Properties
 
 /**
  * letta-mobile-bglj6.1: where the person left the docked chat panel over the canvas, across
- * launches. Same pattern as [DesktopSharedChatPageFlagStore]: a non-secret preference in its own
+ * launches. Same pattern as [DesktopOpenChatsOnCanvasStore]: a non-secret preference in its own
  * atomically written properties file. A missing or damaged file reads as the default placement.
  */
 class DesktopChatDockGeometryStore(

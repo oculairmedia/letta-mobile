@@ -194,7 +194,7 @@ internal class DesktopChatSessionPort(
 
     /**
      * The selected conversation's queue, re-resolved whenever the selection or the canonical route
-     * changes (the same trigger `rememberSelectedSendQueue` uses for the old page).
+     * changes.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun selectedSendQueue(): Flow<ConversationSendQueue> = combine(
@@ -392,7 +392,7 @@ internal class DesktopChatActions(
 
     override fun toggleReasoningExpanded(messageId: ChatMessageId) = localTimeline.update { it.toggleReasoning(messageId.value) }
 
-    /** The canonical paged timeline pages itself; the legacy list has no older-history window. */
+    /** The canonical paged timeline pages itself; the in-memory list has no older-history window. */
     override fun loadOlderMessages() = Unit
 
     override fun releaseOlderMessages() = Unit
