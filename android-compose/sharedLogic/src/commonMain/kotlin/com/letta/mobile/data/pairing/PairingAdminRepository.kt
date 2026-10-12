@@ -18,10 +18,18 @@ data class PairInviteRequest(
     val agentIds: Set<String> = emptySet(),
     /** chat (default) | desktop — admin is never offered from the app. */
     val role: String = ROLE_CHAT,
+    /** How long the code stays redeemable; the host caps it (dpv7m.1). */
+    val ttlMs: Long = DEFAULT_TTL_MS,
 ) {
     companion object {
         const val ROLE_CHAT = "chat"
         const val ROLE_DESKTOP = "desktop"
+
+        /** Least-privilege default (dpv7m.5): five minutes, one use. */
+        const val DEFAULT_TTL_MS = 5 * 60 * 1000L
+
+        /** The role behind the inviter's "Allow settings changes" toggle (off by default). */
+        fun roleFor(allowSettingsChanges: Boolean): String = if (allowSettingsChanges) ROLE_DESKTOP else ROLE_CHAT
     }
 }
 
@@ -63,6 +71,7 @@ class PairingAdminRepository(private val rpc: AdminRpcInvoker) {
                 put("name", request.deviceName.ifBlank { "paired-device" })
                 put("role", request.role)
                 put("qr", true)
+                put("ttl_ms", request.ttlMs)
                 if (request.agentIds.isNotEmpty()) put("agent_ids", JsonArray(request.agentIds.sorted().map(::JsonPrimitive)))
             },
         ) as? JsonObject ?: error("pair.invite.create returned no result")

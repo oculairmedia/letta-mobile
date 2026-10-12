@@ -55,8 +55,7 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/mcp/McpServerTools
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt 86 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/messagebatches/MessageBatchMonitorScreen.kt 577 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/models/ModelBrowserScreen.kt 641 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/PairInviteScreen.kt 192 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 255 legacy-pending(ckmub.2)
+android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 145 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/CreateProjectScreen.kt 447 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeScreen.kt 1034 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectIssuesScreen.kt 984 legacy-pending(ckmub.2)
