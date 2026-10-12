@@ -5,9 +5,72 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
 
-/** A captured side as ARGB pixels. */
-internal class Pixels(val width: Int, val height: Int, val argb: IntArray) {
-    operator fun get(x: Int, y: Int): Int = argb[y * width + x]
+/** One ARGB pixel, compared and faded channel by channel. */
+@JvmInline
+internal value class Argb(val packed: Int) {
+    private val channels: List<Int> get() = SHIFTS.map { (packed ushr it) and BYTE }
+
+    /** True when any channel moves by more than [RowParityImages.CHANNEL_TOLERANCE]. */
+    fun differsFrom(other: Argb): Boolean =
+        channels.zip(other.channels).any { (a, b) -> abs(a - b) > RowParityImages.CHANNEL_TOLERANCE }
+
+    /** This pixel as a faint grey, so a diff's red reads against the row's outline. */
+    fun faded(): Argb {
+        val (_, r, g, b) = channels
+        val luma = (r * LUMA_R + g * LUMA_G + b * LUMA_B) / LUMA_SUM
+        val v = (BYTE - (BYTE - luma) * FADE_ALPHA).toInt().coerceIn(0, BYTE)
+        return Argb((BYTE shl ALPHA_SHIFT) or (v shl RED_SHIFT) or (v shl GREEN_SHIFT) or v)
+    }
+
+    companion object {
+        private const val BYTE = 0xFF
+        private const val ALPHA_SHIFT = 24
+        private const val RED_SHIFT = 16
+        private const val GREEN_SHIFT = 8
+        private val SHIFTS = listOf(ALPHA_SHIFT, RED_SHIFT, GREEN_SHIFT, 0)
+        private const val LUMA_R = 3
+        private const val LUMA_G = 6
+        private const val LUMA_B = 1
+        private const val LUMA_SUM = 10
+        private const val FADE_ALPHA = 0.25
+
+        val DIFF_RED = Argb(0xFFFF1744.toInt())
+        val GUTTER = Argb(0xFF7F7F7F.toInt())
+    }
+}
+
+/** A capture's pixel size. */
+internal data class PixelSize(val width: Int, val height: Int) {
+    val area: Int get() = width * height
+
+    fun union(other: PixelSize) = PixelSize(max(width, other.width), max(height, other.height))
+}
+
+/** A captured side as ARGB pixels, row-major. */
+internal class Pixels(val size: PixelSize, val argb: IntArray) {
+    val width: Int get() = size.width
+    val height: Int get() = size.height
+
+    fun at(x: Int, y: Int): Argb = Argb(argb[y * width + x])
+
+    val background: Argb get() = at(0, 0)
+
+    fun rowHasContent(y: Int): Boolean {
+        val bg = background
+        return (0 until width).any { x -> at(x, y).differsFrom(bg) }
+    }
+
+    /** Rows [rows] of this image, full width. */
+    fun rows(rows: IntRange): Pixels =
+        Pixels(PixelSize(width, rows.last - rows.first + 1), argb.copyOfRange(rows.first * width, (rows.last + 1) * width))
+
+    /** This image drawn top-left onto a [target] canvas of its own background. */
+    fun paddedTo(target: PixelSize): Pixels {
+        if (size == target) return this
+        val out = IntArray(target.area) { background.packed }
+        for (y in 0 until height) argb.copyInto(out, y * target.width, y * width, (y + 1) * width)
+        return Pixels(target, out)
+    }
 
     fun toBitmap(): Bitmap = Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888)
 
@@ -15,10 +78,10 @@ internal class Pixels(val width: Int, val height: Int, val argb: IntArray) {
         fun of(bitmap: Bitmap): Pixels {
             val out = IntArray(bitmap.width * bitmap.height)
             bitmap.getPixels(out, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-            return Pixels(bitmap.width, bitmap.height, out)
+            return Pixels(PixelSize(bitmap.width, bitmap.height), out)
         }
 
-        fun filled(width: Int, height: Int, argb: Int) = Pixels(width, height, IntArray(width * height) { argb })
+        fun filled(size: PixelSize, color: Argb) = Pixels(size, IntArray(size.area) { color.packed })
     }
 }
 
@@ -47,44 +110,15 @@ internal object RowParityImages {
     const val CHANNEL_TOLERANCE = 24
     private const val CONTENT_PAD_PX = 8
     private const val GUTTER_PX = 8
-    private const val DIFF_RED = 0xFFFF1744.toInt()
-    private const val GUTTER = 0xFF7F7F7F.toInt()
-    private const val FADE_ALPHA = 0.25
-
-    fun differs(a: Int, b: Int): Boolean =
-        abs(channel(a, 16) - channel(b, 16)) > CHANNEL_TOLERANCE ||
-            abs(channel(a, 8) - channel(b, 8)) > CHANNEL_TOLERANCE ||
-            abs(channel(a, 0) - channel(b, 0)) > CHANNEL_TOLERANCE ||
-            abs(channel(a, 24) - channel(b, 24)) > CHANNEL_TOLERANCE
-
-    private fun channel(argb: Int, shift: Int): Int = (argb ushr shift) and 0xFF
+    private const val PNG_QUALITY = 100
 
     /** [p] cut to the rows that hold content, padded; one background row when there is none. */
     fun cropToContent(p: Pixels): Pixels {
-        val bg = p[0, 0]
-        var top = -1
-        var bottom = -1
-        for (y in 0 until p.height) {
-            val row = y * p.width
-            val hasContent = (0 until p.width).any { x -> differs(p.argb[row + x], bg) }
-            if (hasContent) {
-                if (top < 0) top = y
-                bottom = y
-            }
-        }
-        if (top < 0) return Pixels.filled(p.width, 1, bg)
-        val from = max(0, top - CONTENT_PAD_PX)
-        val to = minOf(p.height - 1, bottom + CONTENT_PAD_PX)
-        val height = to - from + 1
-        return Pixels(p.width, height, p.argb.copyOfRange(from * p.width, (to + 1) * p.width))
-    }
-
-    /** [p] on a [width] x [height] canvas of its background, top-left aligned. */
-    private fun padTo(p: Pixels, width: Int, height: Int): Pixels {
-        if (p.width == width && p.height == height) return p
-        val out = IntArray(width * height) { p[0, 0] }
-        for (y in 0 until p.height) for (x in 0 until p.width) out[y * width + x] = p[x, y]
-        return Pixels(width, height, out)
+        val contentRows = (0 until p.height).filter(p::rowHasContent)
+        if (contentRows.isEmpty()) return Pixels.filled(PixelSize(p.width, 1), p.background)
+        val from = max(0, contentRows.first() - CONTENT_PAD_PX)
+        val to = minOf(p.height - 1, contentRows.last() + CONTENT_PAD_PX)
+        return p.rows(from..to)
     }
 
     class Result(val legacy: Pixels, val shared: Pixels, val diff: Pixels, val summary: ParityDiff)
@@ -92,49 +126,38 @@ internal object RowParityImages {
     fun compare(legacyRaw: Pixels, sharedRaw: Pixels): Result {
         val legacyCrop = cropToContent(legacyRaw)
         val sharedCrop = cropToContent(sharedRaw)
-        val width = max(legacyCrop.width, sharedCrop.width)
-        val height = max(legacyCrop.height, sharedCrop.height)
-        val legacy = padTo(legacyCrop, width, height)
-        val shared = padTo(sharedCrop, width, height)
-        val diff = IntArray(width * height)
+        val size = legacyCrop.size.union(sharedCrop.size)
+        val legacy = legacyCrop.paddedTo(size)
+        val shared = sharedCrop.paddedTo(size)
         var differing = 0L
-        for (i in diff.indices) {
-            if (differs(legacy.argb[i], shared.argb[i])) {
+        val diff = IntArray(size.area) { i ->
+            val before = Argb(legacy.argb[i])
+            if (before.differsFrom(Argb(shared.argb[i]))) {
                 differing++
-                diff[i] = DIFF_RED
+                Argb.DIFF_RED.packed
             } else {
-                diff[i] = faded(legacy.argb[i])
+                before.faded().packed
             }
         }
-        val summary = ParityDiff(legacyCrop.height, sharedCrop.height, differing, diff.size.toLong())
-        return Result(legacy, shared, Pixels(width, height, diff), summary)
-    }
-
-    /** The unchanged pixel as a faint grey, so the red reads against the row's outline. */
-    private fun faded(argb: Int): Int {
-        val luma = (channel(argb, 16) * 3 + channel(argb, 8) * 6 + channel(argb, 0)) / 10
-        val v = (0xFF - (0xFF - luma) * FADE_ALPHA).toInt().coerceIn(0, 0xFF)
-        return (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+        val summary = ParityDiff(legacyCrop.height, sharedCrop.height, differing, size.area.toLong())
+        return Result(legacy, shared, Pixels(size, diff), summary)
     }
 
     /** legacy | shared | diff, separated by grey gutters. */
     fun sideBySide(result: Result): Pixels {
         val panes = listOf(result.legacy, result.shared, result.diff)
-        val width = panes.sumOf { it.width } + GUTTER_PX * (panes.size - 1)
-        val height = panes.maxOf { it.height }
-        val out = IntArray(width * height) { GUTTER }
+        val size = PixelSize(panes.sumOf { it.width } + GUTTER_PX * (panes.size - 1), panes.maxOf { it.height })
+        val out = IntArray(size.area) { Argb.GUTTER.packed }
         var left = 0
         for (pane in panes) {
-            for (y in 0 until pane.height) for (x in 0 until pane.width) out[y * width + left + x] = pane[x, y]
+            for (y in 0 until pane.height) pane.argb.copyInto(out, y * size.width + left, y * pane.width, (y + 1) * pane.width)
             left += pane.width + GUTTER_PX
         }
-        return Pixels(width, height, out)
+        return Pixels(size, out)
     }
 
     fun write(p: Pixels, file: File) {
         file.parentFile?.mkdirs()
         file.outputStream().use { p.toBitmap().compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }
     }
-
-    private const val PNG_QUALITY = 100
 }

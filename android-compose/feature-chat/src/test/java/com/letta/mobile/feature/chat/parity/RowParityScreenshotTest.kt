@@ -111,11 +111,12 @@ class RowParityScreenshotTest {
             }
         }
         val dir = outputDir()
+        val output = ThemeOutput(themeName, dir.resolve(themeName))
         val results = ParityRow.all.map { row ->
             runCatching {
                 val legacy = capture { target = Target(row, Side.LEGACY) }
                 val shared = capture { target = Target(row, Side.SHARED) }
-                record(dir.resolve(themeName), themeName, row, legacy, shared)
+                record(output, row, RowParityImages.compare(legacy, shared))
             }.getOrElse { failure ->
                 ParityResult(themeName, row.id, row.label, null, null, null, "render failed: ${failure::class.simpleName}: ${failure.message?.take(MAX_NOTE)}")
             }
@@ -140,15 +141,20 @@ class RowParityScreenshotTest {
         return Pixels.of(composeRule.onRoot().captureToImage().asAndroidBitmap())
     }
 
-    private fun record(dir: File, theme: String, row: ParityRow, legacy: Pixels, shared: Pixels): ParityResult {
-        val result = RowParityImages.compare(legacy, shared)
-        RowParityImages.write(result.legacy, dir.resolve("${row.id}.legacy.png"))
-        RowParityImages.write(result.shared, dir.resolve("${row.id}.shared.png"))
-        RowParityImages.write(result.diff, dir.resolve("${row.id}.diff.png"))
-        RowParityImages.write(RowParityImages.sideBySide(result), dir.resolve("${row.id}.side-by-side.png"))
+    /** Where one theme's images go, and the theme's name in the report. */
+    private class ThemeOutput(val name: String, val dir: File)
+
+    private fun record(output: ThemeOutput, row: ParityRow, result: RowParityImages.Result): ParityResult {
+        val images = mapOf(
+            "legacy" to result.legacy,
+            "shared" to result.shared,
+            "diff" to result.diff,
+            "side-by-side" to RowParityImages.sideBySide(result),
+        )
+        images.forEach { (kind, pixels) -> RowParityImages.write(pixels, output.dir.resolve("${row.id}.$kind.png")) }
         val density = composeRule.density.density
         return ParityResult(
-            theme = theme,
+            theme = output.name,
             rowId = row.id,
             label = row.label,
             diffPercent = result.summary.percent,

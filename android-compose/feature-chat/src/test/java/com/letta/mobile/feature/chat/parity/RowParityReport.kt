@@ -47,48 +47,53 @@ internal object RowParityReport {
         dir.resolve("results-$theme.tsv").writeText(results.joinToString("\n") { it.toTsv() } + "\n")
     }
 
+    private const val NOT_AVAILABLE = "n/a"
+
+    private val INTRO =
+        "Pixel diff % per row type: each side cropped to its own content, top-aligned, a pixel " +
+            "differs when any channel moves by more than ${RowParityImages.CHANNEL_TOLERANCE}/255. " +
+            "Phone width (412dp, xhdpi). Heights are each side's content height in dp. " +
+            "Images: `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`."
+
     fun rebuild(dir: File, order: List<String>): String {
-        val results = dir.listFiles { f -> f.name.startsWith("results-") && f.name.endsWith(".tsv") }
-            .orEmpty()
-            .flatMap { it.readLines().mapNotNull(ParityResult::parse) }
+        val results = readResults(dir)
         val themes = results.map { it.theme }.distinct().sorted()
         val byRow = results.groupBy { it.rowId }
         val rows = order.filter { it in byRow } + byRow.keys.filterNot { it in order }
-        val markdown = buildString {
-            appendLine("# Legacy vs shared chat row parity (ckmub.1)")
-            appendLine()
-            appendLine(
-                "Pixel diff % per row type: each side cropped to its own content, top-aligned, a pixel " +
-                    "differs when any channel moves by more than ${RowParityImages.CHANNEL_TOLERANCE}/255. " +
-                    "Phone width (412dp, xhdpi). Heights are each side's content height in dp. " +
-                    "Images: `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`.",
-            )
-            appendLine()
-            append("| Row type |")
-            themes.forEach { append(" $it diff % | $it legacy/shared dp |") }
-            appendLine(" Notes |")
-            append("|---|")
-            themes.forEach { _ -> append("---:|---:|") }
-            appendLine("---|")
-            for (rowId in rows) {
-                val perTheme = byRow.getValue(rowId).associateBy { it.theme }
-                val label = perTheme.values.first().label
-                append("| $label (`$rowId`) |")
-                themes.forEach { theme ->
-                    val r = perTheme[theme]
-                    val pct = r?.diffPercent?.let { String.format(Locale.US, "%.2f", it) } ?: "n/a"
-                    val heights = if (r?.legacyHeightDp != null && r.sharedHeightDp != null) {
-                        "${r.legacyHeightDp}/${r.sharedHeightDp}"
-                    } else {
-                        "n/a"
-                    }
-                    append(" $pct | $heights |")
-                }
-                val notes = perTheme.values.map { it.note }.filter { it.isNotBlank() }.distinct().joinToString("; ")
-                appendLine(" $notes |")
-            }
-        }
+        val lines = listOf("# Legacy vs shared chat row parity (ckmub.1)", "", INTRO, "") +
+            header(themes) +
+            rows.map { tableRow(it, byRow.getValue(it), themes) }
+        val markdown = lines.joinToString("\n", postfix = "\n")
         dir.resolve(FILE_NAME).writeText(markdown)
         return markdown
+    }
+
+    private fun readResults(dir: File): List<ParityResult> =
+        dir.listFiles { f -> f.name.startsWith("results-") && f.name.endsWith(".tsv") }
+            .orEmpty()
+            .flatMap { it.readLines().mapNotNull(ParityResult::parse) }
+
+    private fun header(themes: List<String>): List<String> = listOf(
+        "| Row type |" + themes.joinToString("") { " $it diff % | $it legacy/shared dp |" } + " Notes |",
+        "|---|" + themes.joinToString("") { "---:|---:|" } + "---|",
+    )
+
+    private fun tableRow(rowId: String, results: List<ParityResult>, themes: List<String>): String {
+        val perTheme = results.associateBy { it.theme }
+        val cells = themes.joinToString("") { theme -> cells(perTheme[theme]) }
+        val notes = results.map { it.note }.filter { it.isNotBlank() }.distinct().joinToString("; ")
+        return "| ${results.first().label} (`$rowId`) |$cells $notes |"
+    }
+
+    private fun cells(result: ParityResult?): String {
+        val pct = result?.diffPercent?.let { String.format(Locale.US, "%.2f", it) } ?: NOT_AVAILABLE
+        val heights = result?.heights() ?: NOT_AVAILABLE
+        return " $pct | $heights |"
+    }
+
+    private fun ParityResult.heights(): String? {
+        val legacy = legacyHeightDp ?: return null
+        val shared = sharedHeightDp ?: return null
+        return "$legacy/$shared"
     }
 }
