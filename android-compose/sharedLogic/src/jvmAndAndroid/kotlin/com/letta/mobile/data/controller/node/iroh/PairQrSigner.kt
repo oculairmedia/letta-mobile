@@ -42,18 +42,6 @@ fun interface PairQrSigner {
 }
 
 /**
- * letta-mobile-dpv7m.1: the host's QR minting identity for `pair.invite.create`.
- * [nodeIdHex] MUST be the endpoint's real Iroh NodeId (the Ed25519 public key
- * a scanner dials and the QUIC handshake proves); [dialHint] returns the
- * current ticket / `<node>@host:port` for the scannable link (non-secret).
- */
-class PairingQrConfig(
-    val signer: PairQrSigner,
-    val nodeIdHex: String,
-    val dialHint: () -> String? = { null },
-)
-
-/**
  * Inert signer used when the wrapper is not configured to mint QR invites.
  * Returning the empty string lets the handler emit a `qr_invite: null` field
  * (additive, backward-compatible) without surfacing a fake: it is the protocol

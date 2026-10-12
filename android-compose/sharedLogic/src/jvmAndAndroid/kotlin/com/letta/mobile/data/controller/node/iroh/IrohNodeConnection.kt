@@ -370,11 +370,13 @@ class IrohNodeConnection(
      * controls) naming an agent outside the peer's scope is denied before any
      * upstream side effect. Returns the denial frame, or null to proceed.
      */
-    private fun agentScopeViolation(type: String?, obj: JsonObject, requestId: String?): String? {
+    private fun agentScopeViolation(frame: JsonObject): String? {
+        val type = frame["type"]?.jsonPrimitive?.contentOrNull
         if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
-        if (IrohPeerCapabilities.isAgentInScope(agentScope(), AgentScopeGuard.agentIdOf(obj))) return null
+        if (IrohPeerCapabilities.isAgentInScope(agentScope(), AgentScopeGuard.agentIdOf(frame))) return null
         Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" to remoteEndpointId, "type" to type)
-        return """{"type":"error","request_id":"${requestId.orEmpty()}","message":"forbidden","reason":"agent_scope"}"""
+        val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
     }
 
     /** Control-channel admin_rpc: parse + dispatch with scoped auth context. */
@@ -502,7 +504,7 @@ class IrohNodeConnection(
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
             Telemetry.event("IrohNode", "control.frame", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
-            agentScopeViolation(type, obj, requestId)?.let { return it }
+            agentScopeViolation(obj)?.let { return it }
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
                 "runtime_start" -> ifAuthorized(requestId) {

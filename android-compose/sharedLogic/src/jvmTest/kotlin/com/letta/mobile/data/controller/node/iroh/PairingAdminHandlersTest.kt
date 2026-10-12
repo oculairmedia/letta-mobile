@@ -200,26 +200,25 @@ class PairingAdminHandlersTest {
     // -----------------------------------------------------------------
     // letta-mobile-dpv7m.1: scoped invites, scannable link, invite admin.
     // -----------------------------------------------------------------
-    private fun resultOf(response: String) =
-        kotlinx.serialization.json.Json.parseToJsonElement(parseSuccess(response)).jsonObject
+    /** The successful response's `result` object (a property, so the helper adds no string argument). */
+    private val String.result
+        get() = kotlinx.serialization.json.Json.parseToJsonElement(parseSuccess(this)).jsonObject
 
     @Test
     fun inviteDefaultsToTheChatRoleAndHonoursRoleCapabilitiesAndAgents() = runTest {
         val pairing = IrohPairingService(InMemoryPairedPeerStore())
         val r = router(pairing)
-        val default = resultOf(dispatch(r, "pair.invite.create", emptyMap()))
+        val default = dispatch(r, "pair.invite.create", emptyMap()).result
         assertEquals(
             IrohPeerCapabilities.CHAT_ROLE,
             default["capabilities"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content }.toSet(),
         )
         assertTrue(default["agent_ids"] is kotlinx.serialization.json.JsonNull)
 
-        val desktop = resultOf(dispatch(r, "pair.invite.create", mapOf("role" to "desktop")))
+        val desktop = dispatch(r, "pair.invite.create", mapOf("role" to "desktop")).result
         assertEquals(IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE.size, (desktop["capabilities"] as JsonArray).size)
 
-        val scoped = resultOf(
-            dispatch(r, "pair.invite.create", mapOf("capabilities" to listOf("chat.read"), "agent_ids" to listOf("agent-1"))),
-        )
+        val scoped = dispatch(r, "pair.invite.create", mapOf("capabilities" to listOf("chat.read"), "agent_ids" to listOf("agent-1"))).result
         val secret = scoped["invite"]!!.jsonPrimitive.content.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX)
         pairing.redeem(secret, nodeId)
         assertEquals(setOf("chat.read"), pairing.peer(nodeId)!!.capabilities)
@@ -237,7 +236,7 @@ class PairingAdminHandlersTest {
     @Test
     fun requestedTtlIsCapped() = runTest {
         val r = router(IrohPairingService(InMemoryPairedPeerStore(), nowMs = { 0L }))
-        val result = resultOf(dispatch(r, "pair.invite.create", mapOf("ttl_ms" to 365L * 24 * 3_600_000)))
+        val result = dispatch(r, "pair.invite.create", mapOf("ttl_ms" to 365L * 24 * 3_600_000)).result
         assertEquals(IrohPairingService.MAX_TTL_MS, result["expires_at_ms"]!!.jsonPrimitive.content.toLong())
     }
 
@@ -251,7 +250,7 @@ class PairingAdminHandlersTest {
                 PairingQrConfig(FixedSigner("sig"), fixedId) { "$fixedId@203.0.113.7:4501" },
             )
         }
-        val result = resultOf(dispatch(r, "pair.invite.create", mapOf("qr" to true)))
+        val result = dispatch(r, "pair.invite.create", mapOf("qr" to true)).result
         val link = com.letta.mobile.data.pairing.PairLink.parse(result["pair_link"]!!.jsonPrimitive.content)
         assertNotNull(link)
         assertEquals(result["qr_invite"]!!.jsonPrimitive.content, link.qrInvite)
@@ -262,13 +261,13 @@ class PairingAdminHandlersTest {
     fun inviteListNeverExposesSecretsAndRevokeKillsTheInvite() = runTest {
         val pairing = IrohPairingService(InMemoryPairedPeerStore())
         val r = router(pairing)
-        val minted = resultOf(dispatch(r, "pair.invite.create", mapOf("name" to "phone")))
+        val minted = dispatch(r, "pair.invite.create", mapOf("name" to "phone")).result
         val secret = minted["invite"]!!.jsonPrimitive.content
         val listing = dispatch(r, "pair.invite.list", emptyMap())
         assertTrue(minted["invite_id"]!!.jsonPrimitive.content in listing)
         assertTrue(secret.removePrefix("invite:") !in listing, "listing must not contain the secret")
 
-        val revoked = resultOf(dispatch(r, "pair.invite.revoke", mapOf("invite_id" to minted["invite_id"]!!.jsonPrimitive.content)))
+        val revoked = dispatch(r, "pair.invite.revoke", mapOf("invite_id" to minted["invite_id"]!!.jsonPrimitive.content)).result
         assertEquals(true, revoked["revoked"]!!.jsonPrimitive.boolean)
         assertTrue(pairing.redeem(secret.removePrefix("invite:"), nodeId) is IrohPairingService.RedeemResult.Rejected)
     }
