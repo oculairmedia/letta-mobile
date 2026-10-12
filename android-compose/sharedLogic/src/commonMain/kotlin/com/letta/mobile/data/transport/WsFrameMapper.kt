@@ -67,6 +67,8 @@ object WsFrameMapper {
         is ServerFrame.SubagentsUpdated,
         // letta-mobile-bzvro.40: parked-approval snapshots feed the approval store, not the timeline.
         is ServerFrame.PendingApprovalsUpdated,
+        // letta-mobile-a4tm7: permission-mode pushes feed the chip, not the timeline.
+        is ServerFrame.PermissionModeUpdated,
         // letta-mobile-2rkdj: subscribe envelopes are routing-only —
         // SubscribeFrameMessage's inner BridgeFrame is re-routed
         // through the transport's live handler, and

@@ -74,6 +74,12 @@ interface IChannelTransport {
      */
     val hostCapabilities: Set<String> get() = emptySet()
 
+    /**
+     * letta-mobile-a4tm7: the node id (hex) of the Iroh host this transport is connected to, null while
+     * disconnected or for a transport that has no host node.
+     */
+    val hostNodeId: String? get() = null
+
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         error("admin_rpc is not supported by this transport")
 
