@@ -19,9 +19,6 @@ import com.letta.mobile.desktop.DesktopDestination
 /** The phone's reduced-motion preset, or the OS's setting on the desktop. */
 internal fun DesktopPhoneChrome?.reducedMotionOr(system: Boolean): Boolean = this?.state?.reducedMotion ?: system
 
-/** The phone always draws the shared chat page (it is the phone's chat); the desktop follows its flag. */
-internal fun DesktopPhoneChrome?.drawsSharedChat(flagEnabled: Boolean): Boolean = this != null || flagEnabled
-
 /** On the phone the sidebar lives in the drawer, where it is always shown. */
 internal fun DesktopPhoneChrome?.sidebarVisible(desktopVisible: Boolean): Boolean = this != null || desktopVisible
 
@@ -32,8 +29,8 @@ internal fun DesktopPhoneChrome?.agentPaneVisible(sidebarVisible: Boolean): Bool
  * The chat page draws edge to edge with its own floating header; every other destination (and the
  * agent editor) gets the phone's app bar.
  */
-internal fun isBareChatPage(destination: DesktopDestination, hasSharedChatPage: Boolean, editingAgentId: String?): Boolean =
-    destination == DesktopDestination.Conversations && hasSharedChatPage && editingAgentId == null
+internal fun isBareChatPage(destination: DesktopDestination, editingAgentId: String?): Boolean =
+    destination == DesktopDestination.Conversations && editingAgentId == null
 
 /** Reports the shell's width to the desktop layout; a phone's width says nothing about the layout the person saved. */
 @Composable

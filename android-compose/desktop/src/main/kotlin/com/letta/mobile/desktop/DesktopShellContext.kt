@@ -14,14 +14,12 @@ import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopDockedCanvasRouter
 import com.letta.mobile.desktop.chat.rememberDesktopChatSessionPort
-import com.letta.mobile.desktop.phone.LocalDesktopPhone
-import com.letta.mobile.desktop.phone.drawsSharedChat
 
-/** letta-mobile-bglj6.1: the shared KMP chat page's wiring, present only while its preview flag is on. */
+/** The shared KMP chat page's wiring: desktop's only chat (letta-mobile-ckmub.3.11). */
 internal data class DesktopSharedChatWiring(
-    val port: DesktopChatSessionPort?,
-    /** Only while the shared page is on does the conversation's board live in its dock. */
-    val dockedCanvas: DesktopDockedCanvasRouter?,
+    val port: DesktopChatSessionPort,
+    /** The conversation's board lives in the shared page's dock. */
+    val dockedCanvas: DesktopDockedCanvasRouter,
 )
 
 /**
@@ -84,19 +82,9 @@ private fun rememberDesktopSharedChatWiring(
     chatController: DesktopChatController,
     onA2uiAction: (A2uiAction) -> Unit,
 ): DesktopSharedChatWiring {
-    // letta-mobile-bglj6.1: the shared KMP chat page's port, built only while the preview flag is on.
-    val sharedChatEnabled by LocalDesktopSharedChatPageFlag.current.enabled.collectAsState()
-    // The phone preview always draws the shared page: it is the phone's chat.
-    val port = if (LocalDesktopPhone.current.drawsSharedChat(sharedChatEnabled)) {
-        rememberDesktopChatSessionPort(chatController, onA2uiAction)
-    } else {
-        null
-    }
+    val port = rememberDesktopChatSessionPort(chatController, onA2uiAction)
     val dockedCanvasRouter = remember { DesktopDockedCanvasRouter() }
-    return DesktopSharedChatWiring(
-        port = port,
-        dockedCanvas = dockedCanvasRouter.takeIf { port != null },
-    )
+    return DesktopSharedChatWiring(port = port, dockedCanvas = dockedCanvasRouter)
 }
 
 /**
@@ -113,16 +101,16 @@ internal fun DesktopShellContext.openNewChatForFocusedAgent(focus: DesktopAgentF
     router.openNewChat(focus.selectedAgentId?.let(::AgentId))
 }
 
-/** Shows the docked canvas under the chat; null while the shared page (and so the dock) is off. */
-internal fun DesktopShellContext.showDockedCanvasAction(): (() -> Unit)? {
-    val docked = sharedChat.dockedCanvas ?: return null
+/** Shows the docked canvas under the chat. */
+internal fun DesktopShellContext.showDockedCanvasAction(): () -> Unit {
+    val docked = sharedChat.dockedCanvas
     return { showDocked(docked) }
 }
 
 /** A library or search pick: the docked board shows in the dock, any other in the side pane. */
 internal fun DesktopShellContext.openCanvas(id: CanvasId) {
     val docked = sharedChat.dockedCanvas
-    if (docked != null && id == docked.dockedCanvasId) {
+    if (id == docked.dockedCanvasId) {
         showDocked(docked)
     } else {
         core.canvasShell.open(id)

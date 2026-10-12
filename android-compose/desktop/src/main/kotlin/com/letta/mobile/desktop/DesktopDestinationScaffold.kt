@@ -17,7 +17,8 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.skills.Skill
-import com.letta.mobile.desktop.chat.ChatStatePanel
+import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
+import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
@@ -166,7 +167,8 @@ private fun desktopHomePage(
     val home = shellHomePage(inputs.home.state, actions.home, inputs.home.options)
     return ShellPageContent { destination, modifier ->
         if (inputs.chat.connectionState in ConnectionPendingStates) {
-            ChatStatePanel(state = inputs.chat, onRetryConnection = actions.onRetryConnection, modifier = modifier)
+            val connection = inputs.chat.let { HomeConnectionState(it.chatScreenStatus, it.errorMessage, loading = it.isLoading) }
+            HomeConnectionPanel(connection, actions.onRetryConnection, modifier, wordmark = "LETTA DESKTOP")
         } else {
             home.Content(destination, modifier)
         }

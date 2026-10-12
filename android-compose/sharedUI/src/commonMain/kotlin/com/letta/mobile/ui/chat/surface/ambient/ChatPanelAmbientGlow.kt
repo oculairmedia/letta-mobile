@@ -107,8 +107,13 @@ internal fun rememberChatAmbient(state: ChatUiState): ChatAmbient {
     return remember(status, pulse) { ChatAmbient(status, pulse) }
 }
 
+/**
+ * The run's ambient status (Running while [isThinking], Failed while [failed], a Completed bloom
+ * held for the shared decay when a run ends): the docked panel's glow, and the hosts' own
+ * full-page backgrounds (desktop DesktopAmbientChatBackground).
+ */
 @Composable
-internal fun rememberChatAmbientStatus(isThinking: Boolean, failed: Boolean): AmbientMotionStatus {
+fun rememberChatAmbientStatus(isThinking: Boolean, failed: Boolean): AmbientMotionStatus {
     var status by remember { mutableStateOf(AmbientMotionStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
     LaunchedEffect(isThinking, failed) {

@@ -80,24 +80,11 @@ private fun desktopBackendActions(actions: DestinationContentActions) = BackendS
 
 @Composable
 private fun rememberDesktopChatSettings(): ChatSettings {
-    val flag = LocalDesktopSharedChatPageFlag.current
+    // The shared chat page is the desktop's only chat (S11): no shared-page switch here.
     val openOnCanvas = LocalDesktopOpenChatsOnCanvas.current
-    val permissionMode = LocalDesktopPermissionModeSettings.current
     val scope = rememberCoroutineScope()
-    val sharedPageOn by flag.enabled.collectAsState()
-    val sharedPage = remember(flag) { SettingValue(flag.persistedEnabled) { on -> scope.launch { flag.setPersistedEnabled(on) } } }
     val canvasFirst = remember(openOnCanvas) { SettingValue(openOnCanvas.enabled) { on -> scope.launch { openOnCanvas.setEnabled(on) } } }
-    return ChatSettings(
-        sharedChatPage = sharedPage,
-        sharedChatPageLockedReason = if (flag.forcedByEnvironment) {
-            "Turned on for this launch by $SHARED_CHAT_SYSTEM_PROPERTY or $SHARED_CHAT_ENV_VARIABLE."
-        } else {
-            null
-        },
-        // Canvas-first only applies to the shared chat page.
-        openChatsOnCanvas = canvasFirst.takeIf { sharedPageOn },
-        permissionMode = permissionMode,
-    )
+    return ChatSettings(openChatsOnCanvas = canvasFirst, permissionMode = LocalDesktopPermissionModeSettings.current)
 }
 
 @Composable

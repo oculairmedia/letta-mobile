@@ -61,10 +61,12 @@ import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
+import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 
 /*
- * letta-mobile-bglj6.1 (stage 3, desktop): the Conversations destination rendered with the shared
- * KMP chat page instead of ChatDetailPane, behind DesktopSharedChatPageFlag.
+ * letta-mobile-bglj6.1, ckmub.3.11: the Conversations destination is the shared KMP chat page;
+ * this file is its desktop container (port, dock, canvas, ambient background, keyboard).
  */
 
 /**
@@ -154,7 +156,7 @@ internal fun DesktopSharedChatPage(
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
     val displayOptions by port.displayOptions.collectAsState()
-    val ambientStatus = rememberDesktopAmbientStatus(uiState.isRunInFlight, state.errorMessage)
+    val ambientStatus = rememberChatAmbientStatus(isThinking = uiState.isRunInFlight, failed = state.errorMessage != null)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
     state.dockedCanvas?.let { router ->
         DisposableEffect(router, session) {
@@ -221,7 +223,7 @@ private fun rememberDesktopChatAppearance(displayOptions: ChatDisplayOptions): C
 
 /** The ambient glow behind the page, and what the host's [frame] asks of it (the phone's top chrome). */
 @Composable
-private fun rememberDesktopChatPlatform(ambientStatus: DesktopAmbientStatus, frame: ChatPageFrame): ChatSurfacePlatform =
+private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, frame: ChatPageFrame): ChatSurfacePlatform =
     remember(ambientStatus, frame) {
         ChatSurfacePlatform(
             pageBackground = { content ->

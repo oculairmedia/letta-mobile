@@ -31,8 +31,7 @@ With the flag off, `Main.kt` takes the normal path and nothing below applies.
 - **Window.** A Pixel 9 Pro screen (412 x 915 dp) inside a thin device frame, resizable. One phone
   dp is one window dp, scaled down in 0.05 steps only when the monitor is too short. Resizing the
   window resizes the phone in dp, like a resizable emulator; the title shows the current size.
-- **Shell.** The shared chat page always draws (the `LETTA_DESKTOP_SHARED_CHAT` preview flag is
-  implied) in the Touch idiom with Android's appearance: `ChatToolDetails.Sheet`, no shortcut strip.
+- **Shell.** The shared chat page (desktop's only chat since the hard cut) draws in the Touch idiom with Android's appearance: `ChatToolDetails.Sheet`, no shortcut strip.
   It opens canvas-first, edge to edge. The full-screen chat has a floating header (menu, agent name,
   back to the canvas) and passes its height as `topChromeInset`, as `SharedChatPage` does; the
   canvas mode hides the header and keeps the top of the board clear. The desktop's agent rail and
@@ -190,7 +189,7 @@ and prints the table. CI runs it as the advisory `row parity` job and uploads th
 
 Since slice S4 the rows match (each row type at or under 2 % in both themes; the remaining
 error-frame and thinking-row diffs are explained in the report's Notes column) and the shared chat
-page is the default on Android (`Settings > Features > Shared chat page`) and desktop
-(`Settings > Chat > Shared chat page`). Turning the toggle off brings back the legacy chat screen
-for ONE release, as a fallback; slices S9 (Android) and S11 (desktop) delete the legacy page and
-the toggle with it.
+page is the default on Android (`Settings > Features > Shared chat page`). Turning the toggle off
+brings back the legacy chat screen for ONE release, as a fallback; slice S9 deletes the legacy
+Android page and the toggle with it. On desktop, slice S11 already deleted the legacy chat page
+and its toggle: the shared chat page is desktop's only chat.

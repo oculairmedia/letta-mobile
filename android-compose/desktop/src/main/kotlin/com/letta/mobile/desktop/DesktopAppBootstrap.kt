@@ -313,7 +313,7 @@ internal fun CommandPaletteKeyDispatcherEffect(onOpenPalette: () -> Unit) {
     }
 }
 
-private fun commandPaletteKeyDispatcher(onOpenPalette: () -> Unit): java.awt.KeyEventDispatcher =
+internal fun commandPaletteKeyDispatcher(onOpenPalette: () -> Unit): java.awt.KeyEventDispatcher =
     java.awt.KeyEventDispatcher { event ->
         if (isCommandPaletteKey(event)) {
             onOpenPalette()
