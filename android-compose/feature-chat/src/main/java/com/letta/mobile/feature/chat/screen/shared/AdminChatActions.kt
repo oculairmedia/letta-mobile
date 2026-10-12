@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.branch.BranchSlashCommand
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -38,7 +39,22 @@ internal class AdminChatActions(
     // Composer
     override fun updateComposerText(text: String) = forward(viewModel.handleComposerTextChanged(text))
 
-    override fun send() = forward(viewModel.submitComposer(viewModel.composerState.value.inputText))
+    override fun send() {
+        val text = viewModel.composerState.value.inputText
+        if (!runBranchCommand(text)) forward(viewModel.submitComposer(text))
+    }
+
+    /**
+     * letta-mobile-7mys7: letta-code's `/fork [name]` (a terminal command the App Server does not
+     * run) forks this conversation instead of reaching the agent as text. True when it did.
+     */
+    private fun runBranchCommand(text: String): Boolean {
+        val fork = BranchSlashCommand.parse(text) as? BranchSlashCommand.Fork ?: return false
+        val open = onOpenConversation?.takeIf { viewModel.canBranchConversations } ?: return false
+        viewModel.forkConversation(fork.name, open)
+        viewModel.handleComposerTextChanged("")
+        return true
+    }
 
     override fun sendText(text: String) = viewModel.sendMessage(text)
 

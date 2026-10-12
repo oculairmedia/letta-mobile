@@ -23,6 +23,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksSidePane
+import com.letta.mobile.desktop.chat.DesktopBranchOrigin
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.ReportShellWidth
@@ -176,6 +177,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val deleteBehavior by chatController.deleteBehavior.collectAsState()
     val pinnedConversationIds by chatController.conversationManagement.pinnedConversationIds.collectAsState()
+    val conversationParents by chatController.conversationManagement.conversationParents.collectAsState()
     val archiveFilter = frame.lists.archiveFilter
     DesktopAgentSidebar(
         state = DesktopAgentSidebarState(
@@ -188,6 +190,7 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
             thinkingConversationId = frame.activity.thinkingConversationId,
             deletingConversationIds = deletingConversationIds,
             pinnedConversationIds = pinnedConversationIds,
+            conversationParents = conversationParents.mapValues { it.value.conversationId },
             archiveFilter = archiveFilter,
             selectedDestination = navigator.selectedDestination,
             mode = navigator.workPlayMode,
@@ -209,6 +212,9 @@ private fun DesktopShellAgentSidebar(context: DesktopShellContext, frame: Deskto
                 chatController.conversationManagement.rename(ConversationSummaryUpdate(ConversationId(id), ConversationSummary(title)))
             },
             onPinConversation = { id, pinned -> chatController.conversationManagement.setPinned(ConversationId(id), pinned) },
+            onForkConversation = chatController.conversationManagement.takeIf { it.supportsBranching }?.let { management ->
+                { id, name -> management.forkConversation(DesktopBranchOrigin(id, focus.selectedAgentId), name) }
+            },
             onNewChat = { context.openNewChatForFocusedAgent(focus) },
             onEditAgent = { navigator.editAgentId = focus.selectedAgentId },
             onOpenCanvas = { context.openCanvas(it) },

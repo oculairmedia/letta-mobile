@@ -53,6 +53,7 @@ import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.ShellConfirmRequest
 import com.letta.mobile.ui.shell.ShellConversationManageMenu
+import com.letta.mobile.ui.chat.branch.ForkNameDialog
 import com.letta.mobile.ui.shell.ShellConversationMenuActions
 import com.letta.mobile.ui.shell.ShellRowMenuItem
 import com.letta.mobile.ui.shell.ShellRowMenus
@@ -69,6 +70,8 @@ data class ShellConversationRowActions(
     val deleteBehavior: ConversationDeleteBehavior = ConversationDeleteBehavior.Permanent,
     /** letta-mobile-zxk2n.5: settle and marker; null leaves both out of the menu. */
     val marks: ShellConversationMarkActions? = null,
+    /** letta-mobile-7mys7 (G37): fork the chat under the given name (null keeps the backend's title); null hides it. */
+    val onFork: ((name: String?) -> Unit)? = null,
 )
 
 /** The delete confirm dialog's wording: honest about what delete does on this backend. */
@@ -117,6 +120,7 @@ private class ShellConversationRowUi {
     var confirmDelete by mutableStateOf(false)
     var renaming by mutableStateOf(false)
     var pickingMarker by mutableStateOf(false)
+    var forking by mutableStateOf(false)
 }
 
 @Composable
@@ -132,6 +136,7 @@ private fun ShellConversationRowBody(model: ShellConversationRowModel, actions: 
         }
         actions.marks?.let { marks -> ShellMarkerPicker(model, marks, row) }
     }
+    actions.onFork?.let { fork -> ShellForkNaming(row, fork) }
     if (row.confirmDelete) {
         decorations.confirm(
             ShellDeleteConversationCopy.request(model.title, actions.deleteBehavior),
@@ -165,8 +170,22 @@ private fun conversationMenuItems(
                 settled = model.settled,
                 onSettleToggle = marks?.let { { it.onSettle(model.id, !model.settled) } },
                 onMarkerRequest = marks?.let { { row.pickingMarker = true } },
+                onForkRequest = actions.onFork?.let { { row.forking = true } },
             ),
         ),
+    )
+}
+
+/** letta-mobile-7mys7 (G37): "Fork chat…" asks for the fork's name, then forks. */
+@Composable
+private fun ShellForkNaming(row: ShellConversationRowUi, onFork: (name: String?) -> Unit) {
+    if (!row.forking) return
+    ForkNameDialog(
+        onFork = { name ->
+            row.forking = false
+            onFork(name)
+        },
+        onDismiss = { row.forking = false },
     )
 }
 
@@ -235,9 +254,9 @@ private fun ConversationTitleAndPreview(model: ShellConversationRowModel, modifi
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (model.preview.isNotBlank() && model.preview != model.title) {
+        if (model.subtitle.isNotBlank() && model.subtitle != model.title) {
             Text(
-                text = model.preview,
+                text = model.subtitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = PREVIEW_ALPHA),
                 maxLines = 1,

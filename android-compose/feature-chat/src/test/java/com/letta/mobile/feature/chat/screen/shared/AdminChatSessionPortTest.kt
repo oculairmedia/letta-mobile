@@ -172,6 +172,24 @@ class AdminChatSessionPortTest {
     }
 
     @Test
+    fun `slash fork is offered where the page can fork and forks instead of sending`() {
+        // letta-mobile-7mys7: letta-code runs /fork in its terminal only, so the client runs it.
+        val state = ChatComposerState(inputText = "/fork Plan B")
+        val vm = mockViewModel(state)
+        every { vm.canBranchConversations } returns true
+        val actions = AdminChatActions(vm, onOpenBugReport = {}, onOpenConversation = { _, _ -> })
+
+        val commands = AdminChatComposerMapping.composerUiState(composerInputs(state).copy(canFork = true)).commands
+        assertEquals(ChatComposerCommand.Fork, commands.first())
+        assertFalse(AdminChatComposerMapping.composerUiState(composerInputs(state)).commands.contains(ChatComposerCommand.Fork))
+
+        actions.send()
+
+        verify(exactly = 1) { vm.forkConversation("Plan B", any()) }
+        verify(exactly = 0) { vm.submitComposer(any()) }
+    }
+
+    @Test
     fun `model selection maps each reasoning effort choice`() {
         val vm = mockViewModel(ChatComposerState())
         val actions = AdminChatActions(vm, onOpenBugReport = {})

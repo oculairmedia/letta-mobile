@@ -42,6 +42,27 @@ class ShellSidebarMappingTest {
     }
 
     @Test
+    fun aForkSaysWhichConversationItCameFrom() {
+        // letta-mobile-7mys7 (G37)
+        val rows = ShellSidebarMapping.conversationRows(
+            conversations = listOf(summary("a", archived = false), summary("b", archived = false), summary("c", archived = false)),
+            marks = ShellConversationMarks(parentIds = mapOf("b" to "a", "c" to "gone")),
+            timeLabel = { it },
+        )
+        assertEquals(listOf(null, "Title a", ShellSidebarMapping.UNLISTED_PARENT), rows.map { it.forkedFrom })
+        assertEquals("Forked from Title a", rows[1].subtitle)
+        assertEquals(rows[0].preview, rows[0].subtitle)
+    }
+
+    @Test
+    fun theRowMenuOffersForkOnlyWhereTheHostCanFork() {
+        val withFork = com.letta.mobile.ui.shell.ShellConversationManageMenu(onForkRequest = {}).items().map { it.label }
+        val without = com.letta.mobile.ui.shell.ShellConversationManageMenu().items().map { it.label }
+        assertEquals(listOf("Fork chat…"), withFork)
+        assertEquals(emptyList(), without)
+    }
+
+    @Test
     fun conversationRowsCarryTheHostsMarks() {
         val rows = ShellSidebarMapping.conversationRows(
             conversations = listOf(summary("a", archived = false), summary("b", archived = true), summary("c", archived = false)),
