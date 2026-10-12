@@ -244,24 +244,21 @@ class ChatRowInteractionUiTest {
             runId = "run-1",
             messages = listOf(
                 runMessage("a", "Looking into it."),
+                runMessage("t", "").copy(toolCalls = listOf(toolCall(status = "success", result = "hello"))),
                 runMessage("b", "All done here."),
             ).map { it to GroupPosition.None },
         )
         setContent {
-            // letta-mobile-ckmub.1 (S4): the legacy fold is back, owned by the page's collapsed run ids.
-
+            // letta-mobile-zxk2n.37: folded by default; the page's toggle set opens it.
             MaterialTheme {
-                RenderRow(
-                    block,
-                    rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "b"),
-                    rowCallbacks(actions),
-                )
+                RenderRow(block, rowContext(newestMessageId = "b"), rowCallbacks(actions))
             }
         }
 
-        // Folded, the run shows its last step only.
-        onNodeWithText("Looking into it.").assertDoesNotExist()
+        // Folded, the run shows its prose only: its tool line waits under the summary line.
+        onNodeWithText("Looking into it.").assertExists()
         onNodeWithText("All done here.").assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists().assert(hasClickAction())
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
         runOnIdle { assertEquals(listOf("run-1"), actions.toggledRuns) }

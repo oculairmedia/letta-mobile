@@ -1,84 +1,34 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
-import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatRunId
-import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.rows_run_collapse
-import com.letta.mobile.sharedui.resources.rows_run_expand
-import com.letta.mobile.sharedui.resources.rows_run_failure_count
-import com.letta.mobile.sharedui.resources.rows_run_for_duration
-import com.letta.mobile.sharedui.resources.rows_run_state_collapsed
-import com.letta.mobile.sharedui.resources.rows_run_state_expanded
-import com.letta.mobile.sharedui.resources.rows_run_state_working
-import com.letta.mobile.sharedui.resources.rows_run_thought
-import com.letta.mobile.sharedui.resources.rows_run_tool_count
-import com.letta.mobile.sharedui.resources.rows_run_worked
-import com.letta.mobile.sharedui.resources.rows_run_working
-import com.letta.mobile.sharedui.resources.run_status_approval
-import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.haptics.LettaHapticCue
-import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
-import com.letta.mobile.ui.theme.ChatRowType
-import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
-import org.jetbrains.compose.resources.pluralStringResource
-import org.jetbrains.compose.resources.stringResource
 
 /**
  * letta-mobile-bglj6.1: a run of assistant messages sharing a run id, drawn as the Android
@@ -86,12 +36,15 @@ import org.jetbrains.compose.resources.stringResource
  * "Thought" disclosure, every tool call of the run folded into one "Ran 2 commands" summary, and
  * the narration as plain text.
  *
- * letta-mobile-ckmub.1 (hard cut S4): the geometry is the legacy RunBlock's, so the two read the
- * same side by side (RowParityScreenshotTest). The run's header (legacy RunActivityDisclosure:
- * "Worked for 1.2s  2 tools  1 failure") sits on its own line; it shows while the run works and,
- * once it settles, only on the conversation's newest row. Under the header the body lifts up into
- * its floor, working and settled alike, so settling only rewrites the label; a settled run of several
- * steps folds to its last step from the header.
+ * letta-mobile-ckmub.1 (hard cut S4): the geometry is the legacy RunBlock's. The run's header sits on
+ * its own line; under it the body lifts up into its floor, working and settled alike, so settling only
+ * rewrites the label.
+ *
+ * letta-mobile-zxk2n.37: the header is ONE summary line ([RunSummaryLine]: glyph, "Worked · 10.8s ·
+ * 1 tool", one chevron), and a run with work to show (its reasoning, its tool line) is folded by
+ * default, working or settled alike: only its prose shows under the line. Opening the line lists the
+ * work steps indented under it, each with its own disclosure. A request waiting on the person holds
+ * the run open (letta-mobile-sieej).
  */
 @Composable
 internal fun RunBlockRow(
@@ -127,25 +80,34 @@ private class RunRowScope(val context: ChatRowContext, val callbacks: ChatRowCal
 @Immutable
 internal class RunBlockPlan(
     val activity: RunActivityProjection,
-    /** Working, or settled on the conversation's newest row. */
-    val headerVisible: Boolean,
+    /** Working, settled on the conversation's newest row, or waiting on the person. */
+    val headerPinned: Boolean,
     /** The run's messages the chat options leave on screen (zxk2n.5: hidden reasoning leaves no gap). */
     val visible: List<UiMessage>,
     val runId: String?,
     val messageCount: Int,
-    /** The page's fold for this run (its collapsed run ids), honoured only while [foldable]. */
-    val collapsedByOwner: Boolean,
+    /**
+     * letta-mobile-zxk2n.37: the person flipped this run's fold from its default (the page's
+     * collapsedRunIds, a plain toggle set on every owner): a foldable run is folded by default, so a
+     * run in the set is the one the person opened.
+     */
+    val toggledByOwner: Boolean,
     /**
      * letta-mobile-sieej: a request of the run waits on the person. The run then never folds and its
      * header shows ("Waiting for your approval"), so the card under its tool line cannot be missed;
-     * only once it is answered does the run settle back into its legacy "Worked" summary.
+     * only once it is answered does the run fold back into its summary line.
      */
     val awaitingApproval: Boolean = false,
 ) {
-    /** The legacy fold: only a settled run of several messages folds; a stale fold never hides active work. */
-    val foldable: Boolean get() = runFolds(RunFoldInputs(runId, messageCount, RunHold(activity.isActive, awaitingApproval)))
+    /** A run folds when it has work to tuck under its summary line and nothing holds it open. */
+    val foldable: Boolean
+        get() = runFolds(RunFoldInputs(runId, hasWorkSteps = loneMessage == null && visible.any { it.isRunWorkMessage() }, awaitingApproval))
 
-    val collapsed: Boolean get() = foldable && collapsedByOwner
+    /** Folded by default; the person's toggle opens it. */
+    val collapsed: Boolean get() = foldable && !toggledByOwner
+
+    /** A run that folds always shows its summary line: the line is the only way to its steps. */
+    val headerVisible: Boolean get() = headerPinned || foldable
 
     /** One message that is not a bare tool call draws as its own row under the header. */
     val loneMessage: UiMessage?
@@ -157,11 +119,9 @@ internal class RunBlockPlan(
      */
     val body: RunBodyState get() = RunBodyState(visible, collapsed, lifted = headerVisible)
 
-    /** The header; a run that folds once settled keeps the fold's floor while it works. */
+    /** The header; a run that folds keeps the fold's floor, working and settled alike. */
     fun header(actions: ChatActions): RunHeaderState =
-        RunHeaderState(activity, headerVisible, tall = isMultiStep(), fold = foldOf(actions), awaitingApproval = awaitingApproval)
-
-    private fun isMultiStep(): Boolean = messageCount > 1
+        RunHeaderState(activity, headerVisible, tall = messageCount > 1 || foldable, fold = foldOf(actions), awaitingApproval = awaitingApproval)
 
     private fun foldOf(actions: ChatActions): RunFold? {
         val id = runId ?: return null
@@ -170,26 +130,18 @@ internal class RunBlockPlan(
     }
 }
 
-/**
- * letta-mobile-sieej: what holds a run open whatever its owner's fold says: it is working, or one of
- * its requests waits on the person's approval.
- */
-@Immutable
-internal class RunHold(val working: Boolean, val awaitingApproval: Boolean) {
-    fun isHeld(): Boolean {
-        if (working) return true
-        return awaitingApproval
-    }
-}
-
 /** What decides whether a run may fold. */
 @Immutable
-internal class RunFoldInputs(val runId: String?, val messageCount: Int, val hold: RunHold)
+internal class RunFoldInputs(val runId: String?, val hasWorkSteps: Boolean, val awaitingApproval: Boolean)
 
-/** Only a run with an id and several steps folds, and never while something [RunHold] holds it open. */
+/**
+ * Only a run with an id and work steps (reasoning, tool calls) folds, and never while one of its
+ * requests waits on the person (letta-mobile-sieej). Working does not hold it open: the summary line
+ * says "Working…", and a run folded the same way working and settled keeps its shape as it settles.
+ */
 internal fun runFolds(inputs: RunFoldInputs): Boolean {
-    if (inputs.runId == null || inputs.messageCount < 2) return false
-    return !inputs.hold.isHeld()
+    if (inputs.runId == null || !inputs.hasWorkSteps) return false
+    return !inputs.awaitingApproval
 }
 
 /** The run's plan, or null when it has nothing to draw. */
@@ -203,11 +155,11 @@ private fun rememberRunBlockPlan(messages: ImmutableList<UiMessage>, context: Ch
     val awaitingApproval = remember(messages) { messages.hasWaitingApproval() }
     return RunBlockPlan(
         activity = activity,
-        headerVisible = activity.isActive || context.isNewest || awaitingApproval,
+        headerPinned = activity.isActive || context.isNewest || awaitingApproval,
         visible = visible,
         runId = runId,
         messageCount = messages.size,
-        collapsedByOwner = runId != null && runId in context.itemState.collapsedRunIds,
+        toggledByOwner = runId != null && runId in context.itemState.collapsedRunIds,
         awaitingApproval = awaitingApproval,
     )
 }
@@ -215,18 +167,19 @@ private fun rememberRunBlockPlan(messages: ImmutableList<UiMessage>, context: Ch
 /** What a run's body shows: its steps, folded or not, and whether it lifts under the header. */
 @Immutable
 internal class RunBodyState(val messages: List<UiMessage>, val collapsed: Boolean, val lifted: Boolean)
-/** The run's header and whether it shows; [fold] when a settled run of several steps can fold. */
+
+/** The run's header and whether it shows; [fold] when the run can fold. */
 @Immutable
 internal data class RunHeaderState(
     val activity: RunActivityProjection,
     val visible: Boolean,
     val tall: Boolean = false,
     val fold: RunFold? = null,
-    /** letta-mobile-sieej: the run waits on the person's approval; the title says so. */
+    /** letta-mobile-sieej: the run waits on the person's approval; the line says so. */
     val awaitingApproval: Boolean = false,
 )
 
-/** A settled run's fold: whether it is folded, and the header's toggle. */
+/** A run's fold: whether it is folded, and the summary line's toggle. */
 @Immutable
 internal class RunFold(val collapsed: Boolean, val toggle: () -> Unit)
 
@@ -237,10 +190,7 @@ private fun isRunStreaming(messages: List<UiMessage>, context: ChatRowContext): 
     return messages.any { it.id == id || it.clientMessageId == id }
 }
 
-/**
- * The run's header (legacy RunActivityDisclosure): the working orb, the title, the tool and
- * failure counts and, when the run folds, its chevron. Expands in and folds out as it shows.
- */
+/** The run's summary line. Expands in and folds out as it shows. */
 @Composable
 private fun RunHeader(state: RunHeaderState) {
     val reducedMotion = LocalReducedMotion.current
@@ -251,115 +201,14 @@ private fun RunHeader(state: RunHeaderState) {
         exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
         label = "runHeader",
     ) {
-        RunHeaderRow(state)
-    }
-}
-
-@Composable
-private fun RunHeaderRow(state: RunHeaderState) {
-    val activity = state.activity
-    val fold = state.fold
-    val tall = state.tall
-    val description = runHeaderStateDescription(activity, fold)
-    val toggleLabel = fold?.let { stringResource(if (it.collapsed) Res.string.rows_run_expand else Res.string.rows_run_collapse) }
-    val haptics = LocalHaptics.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.RUN_HEADER)
-            .heightIn(min = if (tall) ChatRowSpacing.runHeaderToggleMinHeight else ChatRowSpacing.runHeaderMinHeight)
-            .semantics(mergeDescendants = true) { description?.let { stateDescription = it } }
-            .then(
-                if (fold != null) {
-                    Modifier.clickable(onClickLabel = toggleLabel) {
-                        haptics.play(LettaHapticCue.SegmentTick)
-                        fold.toggle()
-                    }
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = ChatRowSpacing.runHeaderHorizontal, vertical = ChatRowSpacing.runHeaderVertical),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        // Docked over the canvas the panel's ambient glow is the working cue, not the orb.
-        val reducedMotion = LocalReducedMotion.current
-        AnimatedVisibility(
-            visible = activity.isActive && LocalChatWorkingCueAnimated.current,
-            enter = ChatRowMotion(reducedMotion).horizontalEnter(),
-            exit = ChatRowMotion(reducedMotion).horizontalExit(),
-            label = "runWorkingOrb",
-        ) {
-            WorkingOrb()
-        }
-        val title = if (state.awaitingApproval) stringResource(Res.string.run_status_approval) else runActivityTitle(activity)
-        val titleColor = if (state.awaitingApproval) MaterialTheme.colorScheme.secondary else runTitleColor(activity)
-        RunSummaryTitleText(title, titleColor, reducedMotion)
-        RunHeaderCounts(activity)
-        if (fold != null) {
-            Spacer(Modifier.weight(1f))
-            DisclosureChevron(expanded = !fold.collapsed)
-        }
-    }
-}
-
-@Composable
-private fun runHeaderStateDescription(activity: RunActivityProjection, fold: RunFold?): String? = when {
-    activity.isActive -> stringResource(Res.string.rows_run_state_working)
-    fold == null -> null
-    fold.collapsed -> stringResource(Res.string.rows_run_state_collapsed)
-    else -> stringResource(Res.string.rows_run_state_expanded)
-}
-
-/** "2 tools" (muted) and "1 failure" (error tint) beside the title, as the legacy header counts them. */
-@Composable
-private fun RunHeaderCounts(activity: RunActivityProjection) {
-    if (activity.toolCount > 0) {
-        Text(
-            text = pluralStringResource(Res.plurals.rows_run_tool_count, activity.toolCount, activity.toolCount),
-            style = ChatRowType.runHeaderCount,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.runCount),
-            maxLines = 1,
-        )
-    }
-    if (activity.failureCount > 0) {
-        Text(
-            text = pluralStringResource(Res.plurals.rows_run_failure_count, activity.failureCount, activity.failureCount),
-            style = ChatRowType.runHeaderCount,
-            color = MaterialTheme.colorScheme.error,
-            maxLines = 1,
-        )
-    }
-}
-
-/**
- * letta-mobile-bglj6.1.19: "Working" cross-fades to "Thought for 2s" as the run settles (legacy
- * RunBlockMotion RunHeaderLabel: the terminal swap, 120 ms in over 90 ms out) instead of swapping
- * the text in one frame. Keyed on the copy, so only a change of words plays it.
- */
-@Composable
-private fun RunSummaryTitleText(title: String, color: Color, reducedMotion: Boolean) {
-    AnimatedContent(
-        targetState = title,
-        transitionSpec = { ChatRowMotion(reducedMotion).terminalSwap() },
-        contentAlignment = Alignment.CenterStart,
-        label = "runSummaryTitle",
-    ) { shown ->
-        Text(
-            text = shown,
-            style = ChatRowType.runHeaderTitle,
-            color = color,
-            maxLines = 1,
-            softWrap = false,
-        )
+        RunSummaryLine(state)
     }
 }
 
 /**
  * The run's steps under its header. A settled run's body lifts [ChatRowSpacing.settledRunBodyLift]
  * up under the header's floor, easing (legacy jqiu3: by layout, so the lifted distance leaves no
- * band below); folded, only the run's last non-reasoning step shows.
+ * band below).
  */
 @Composable
 private fun RunBody(body: RunBodyState, row: RunRowScope) {
@@ -370,24 +219,9 @@ private fun RunBody(body: RunBodyState, row: RunRowScope) {
         label = "runBodyLift",
     )
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
-        AnimatedContent(
-            targetState = body.collapsed,
-            transitionSpec = {
-                val motion = ChatRowMotion(reducedMotion)
-                (fadeIn(motion.contentSize()) togetherWith fadeOut(motion.contentSize()))
-                    .using(SizeTransform(clip = true) { _, _ -> motion.contentSize() })
-            },
-            label = "runBodyFold",
-        ) { folded ->
-            val shown = if (folded) listOfNotNull(collapsedPreview(body.messages)) else body.messages
-            RunSteps(remember(shown) { compactRunSteps(shown) }, folded, row)
-        }
+        RunSteps(remember(body.messages) { compactRunSteps(body.messages) }, body, row)
     }
 }
-
-/** The step a folded run keeps: its newest non-reasoning message (legacy selectCollapsedPreview). */
-private fun collapsedPreview(messages: List<UiMessage>): UiMessage? =
-    messages.lastOrNull { !it.isReasoning } ?: messages.lastOrNull()
 
 /** Draws the content [distance] higher and reports it [distance] shorter (legacy pullUp). */
 private fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable, constraints ->
@@ -396,22 +230,48 @@ private fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable,
     layout(placeable.width, placeable.height - shift) { placeable.place(0, -shift) }
 }
 
-/** The run's steps, each on the legacy row beat above it (RenderChatMessage's item padding). */
+/**
+ * The run's steps, each on the legacy row beat above it (RenderChatMessage's item padding). Prose
+ * always shows; a work step shows only while the run is open, indented under its summary line, and
+ * grows in and folds away (snapping under reduced motion) as the line toggles, so the prose around
+ * it never jumps.
+ */
 @Composable
-private fun RunSteps(steps: List<RunStep>, folded: Boolean, row: RunRowScope) {
-
+private fun RunSteps(steps: List<RunStep>, body: RunBodyState, row: RunRowScope) {
     Column(modifier = Modifier.fillMaxWidth()) {
         steps.forEachIndexed { index, step ->
             key(step.key) {
-                val positioned = PositionedRunStep(step, stepPosition(index, steps.size, folded))
-                RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
+                val positioned = PositionedRunStep(step, stepPosition(index, steps.size))
+                if (step.isWork()) {
+                    RunWorkStep(positioned, body, row)
+                } else {
+                    RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
+                }
             }
         }
     }
 }
 
-private fun stepPosition(index: Int, count: Int, folded: Boolean): GroupPosition = when {
-    folded || count == 1 -> GroupPosition.None
+@Composable
+private fun RunWorkStep(positioned: PositionedRunStep, body: RunBodyState, row: RunRowScope) {
+    val motion = ChatRowMotion(LocalReducedMotion.current)
+    AnimatedVisibility(
+        visible = !body.collapsed,
+        enter = motion.expansionEnter(),
+        exit = motion.expansionExit(),
+        label = "runWorkStep",
+    ) {
+        val indent = if (body.lifted) ChatRowSpacing.runStepIndent else 0.dp
+        RunStepRow(
+            positioned,
+            row,
+            Modifier.testTag(ChatRowTestTags.RUN_WORK_STEP).padding(start = indent, top = positioned.top()),
+        )
+    }
+}
+
+private fun stepPosition(index: Int, count: Int): GroupPosition = when {
+    count == 1 -> GroupPosition.None
     index == 0 -> GroupPosition.First
     index == count - 1 -> GroupPosition.Last
     else -> GroupPosition.Middle
@@ -453,6 +313,15 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
 }
 
 private const val RUN_BODY_LIFT_MILLIS = 220
+
+/** Work the summary line stands for (a reasoning, the tool line), as opposed to the run's prose. */
+internal fun RunStep.isWork(): Boolean = when (this) {
+    is RunStep.ToolCalls -> true
+    is RunStep.Message -> message.isReasoning
+}
+
+/** A message the summary line folds away: a reasoning, or one carrying the run's tool calls. */
+private fun UiMessage.isRunWorkMessage(): Boolean = isReasoning || isPlainAssistantStep()
 
 /** A step of a run, in chat order. */
 @Immutable
@@ -540,54 +409,3 @@ private fun UiMessage.hasProseAndToolCalls(): Boolean = isPlainAssistantStep() &
 
 /** Prose, or a canvas card: what keeps a tool-calling message a step of its own. */
 private fun UiMessage.hasStepOfItsOwn(): Boolean = content.isNotBlank() || artifacts.isNotEmpty()
-
-@Composable
-private fun runTitleColor(activity: RunActivityProjection): Color {
-    return if (activity.isActive) {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.workingTitle)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-@Composable
-private fun runActivityTitle(activity: RunActivityProjection): String {
-    val duration = activity.durationMs?.let { formatRunDuration(it) }
-    return when (activity.state) {
-        RunActivityState.Working -> stringResource(Res.string.rows_run_working)
-        RunActivityState.Thought -> duration?.let { stringResource(Res.string.rows_run_for_duration, stringResource(Res.string.rows_run_thought), it) }
-            ?: stringResource(Res.string.rows_run_thought)
-        RunActivityState.Worked -> duration?.let { stringResource(Res.string.rows_run_for_duration, stringResource(Res.string.rows_run_worked), it) }
-            ?: stringResource(Res.string.rows_run_worked)
-    }
-}
-
-/**
- * The working cue: one small tertiary orb pulsing its alpha in a fixed box, so a streaming run
- * never moves the header. Decorative: the header's state description carries "working".
- */
-@Composable
-private fun WorkingOrb() {
-    val reducedMotion = LocalReducedMotion.current
-    val alpha: State<Float> = if (reducedMotion) {
-        remember { mutableFloatStateOf(ChatRowAlpha.workingOrbResting) }
-    } else {
-        rememberInfiniteTransition(label = "runWorkingOrb").animateFloat(
-            initialValue = ChatRowAlpha.workingOrbDim,
-            targetValue = ChatRowAlpha.workingOrbBright,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = WORKING_ORB_PULSE_MILLIS, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "runWorkingOrbAlpha",
-        )
-    }
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Space.sm)
-            .graphicsLayer { this.alpha = alpha.value }
-            .background(MaterialTheme.colorScheme.tertiary, CircleShape),
-    )
-}
-
-private const val WORKING_ORB_PULSE_MILLIS = 1_400

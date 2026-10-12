@@ -45,7 +45,7 @@
     <string name="rows_reasoning_state_collapsed">Reasoning collapsed</string>
     <string name="rows_reasoning_state_expanded">Reasoning expanded</string>
     <string name="rows_reasoning_state_working">Reasoning in progress</string>
-    <string name="rows_run_working">Working</string>
+    <string name="rows_run_working">Working…</string>
     <string name="rows_run_thought">Thought</string>
     <string name="rows_run_worked">Worked</string>
     <string name="rows_run_for_duration">%1$s for %2$s</string>
@@ -65,15 +65,14 @@
     <string name="rows_tool_run_failed">%1$d ran - %2$d failed</string>
     <string name="rows_tool_run_running">Running %1$s - %2$s - %3$s</string>
     <string name="rows_tool_run_approval">Approval needed - %1$s</string>
-    <!-- The run header's counts beside its title (legacy RunActivityDisclosure) -->
+    <!-- The run summary line: "Worked · 10.8s · 1 tool", "Failed · 1 of 3" (parts joined pairwise by rows_run_summary_join) -->
     <plurals name="rows_run_tool_count">
         <item quantity="one">%1$d tool</item>
         <item quantity="other">%1$d tools</item>
     </plurals>
-    <plurals name="rows_run_failure_count">
-        <item quantity="one">%1$d failure</item>
-        <item quantity="other">%1$d failures</item>
-    </plurals>
+    <string name="rows_run_summary_join">%1$s · %2$s</string>
+    <string name="rows_run_failed">Failed</string>
+    <string name="rows_run_failed_of">%1$d of %2$d</string>
     <string name="rows_run_expand">Expand agent work</string>
     <string name="rows_run_collapse">Collapse agent work</string>
     <string name="rows_run_state_collapsed">Agent work collapsed</string>
