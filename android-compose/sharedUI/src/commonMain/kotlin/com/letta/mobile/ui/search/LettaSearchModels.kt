@@ -25,11 +25,12 @@ sealed interface LettaSearchLeading {
     data object None : LettaSearchLeading
 
     /**
-     * An agent orb. [agentId] lets the host draw the live mascot when one is
-     * registered; [orbIndex] is the gradient fallback.
+     * The owning agent, drawn as `AgentAvatar` (the mascot when it has one, else the initial tile of
+     * [name]; the row's label when [name] is null). [orbIndex] is the host's per-agent style slot,
+     * kept for hosts that still carry one; the avatar does not draw it.
      */
     @Immutable
-    data class Orb(val orbIndex: Int, val agentId: String? = null) : LettaSearchLeading
+    data class Orb(val orbIndex: Int, val agentId: String? = null, val name: String? = null) : LettaSearchLeading
 
     @Immutable
     data class Icon(val image: ImageVector) : LettaSearchLeading

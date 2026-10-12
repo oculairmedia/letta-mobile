@@ -39,9 +39,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
@@ -133,13 +135,14 @@ private fun PinnedTile(item: HomePinnedItem, page: HomePageScope, dragging: Bool
     }
 }
 
-private class TileContent(val icon: ImageVector, val headline: String?, val label: String, val onClick: () -> Unit)
+/** A tile's picture is its [icon], or the pinned [agent]'s [AgentAvatar] when it stands for an agent. */
+private class TileContent(val icon: ImageVector, val headline: String?, val label: String, val agent: HomeAgentRef? = null, val onClick: () -> Unit)
 
 private fun HomePinnedItem.tileContent(page: HomePageScope): TileContent = when (this) {
     is HomePinnedItem.Shortcut -> TileContent(shortcut.icon, page.state.shortcutInfo(shortcut), shortcut.label) {
         page.navigation.onOpenShortcut(shortcut)
     }
-    is HomePinnedItem.Agent -> TileContent(LettaIcons.Agent, agent.name, PINNED_AGENT_LABEL) {
+    is HomePinnedItem.Agent -> TileContent(LettaIcons.Agent, agent.name, PINNED_AGENT_LABEL, agent = agent) {
         page.navigation.onOpenAgent(agent.id)
     }
 }
@@ -151,7 +154,12 @@ private fun TileBody(tile: TileContent) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(tile.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+        val agent = tile.agent
+        if (agent != null) {
+            AgentAvatar(agentId = agent.id, name = agent.name, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)
+        } else {
+            Icon(tile.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))
+        }
         Spacer(Modifier.height(LettaDimens.Space.xs))
         tile.headline?.let {
             Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)

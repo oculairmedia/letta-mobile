@@ -36,7 +36,7 @@ internal fun TerminalSignInDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(LettaIcons.Terminal, contentDescription = null) },
+        icon = { Icon(provider.logoOrNull() ?: LettaIcons.Terminal, contentDescription = null) },
         title = { Text(ModelControlStrings.connectTitle(provider.displayName)) },
         text = {
             Column(
