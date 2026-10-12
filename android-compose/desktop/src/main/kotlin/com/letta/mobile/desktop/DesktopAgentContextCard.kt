@@ -40,7 +40,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
     val graph = core.sessionGraph.value
     val chatController = core.chatController
     val dataBindings = core.bootstrap.dataBindings
-    val deps = remember(graph, dataBindings) {
+    val deps = remember(graph, dataBindings, core.attentionPrefs) {
         AgentContextCardDeps(
             readings = graph.contextTokenReadings,
             breakdown = ContextBreakdownLoader(graph.agentRepository),
@@ -53,6 +53,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
                 recentModels = chatController.conversationManagement.recentModels,
             ).pickerSource(),
             contextLimit = ContextLimitController(desktopContextLimitRepository(dataBindings.modelControlRpc)),
+            attention = core.attentionPrefs,
         )
     }
     val models by graph.modelRepository.llmModels.collectAsState()

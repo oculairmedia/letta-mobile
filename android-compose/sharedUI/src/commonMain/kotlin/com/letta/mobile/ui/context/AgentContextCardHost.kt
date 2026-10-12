@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -48,6 +49,8 @@ import com.letta.mobile.data.context.limit.ContextLimitController
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.context.overviewFor
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.notify.AttentionPrefsRepository
+import com.letta.mobile.ui.notify.AgentNotificationsSection
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerController
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
@@ -68,6 +71,8 @@ class AgentContextCardDeps(
     val pickerSource: ModelPickerSource?,
     /** letta-mobile-joigh: the context-limit change; null when the host has no route to letta-code's `/context-limit`. */
     val contextLimit: ContextLimitController? = null,
+    /** letta-mobile-bzvro.27: the agent's notification mute; null when the host posts no notifications. */
+    val attention: AttentionPrefsRepository? = null,
 )
 
 /** The conversation the card describes, and its model as the host resolves it. */
@@ -151,6 +156,10 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
                     onApplied = { deps.breakdown?.load(requests.breakdown, force = true) },
                 )
                 AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact, limit)
+                deps.attention?.let { prefs ->
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    AgentNotificationsSection(prefs, focus.agentId)
+                }
             }
         }
     }

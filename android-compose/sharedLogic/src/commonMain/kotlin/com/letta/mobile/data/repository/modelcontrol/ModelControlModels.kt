@@ -64,10 +64,12 @@ data class ConnectableProvider(
     val requiresApiKey: Boolean,
     val authMethods: List<ProviderAuthMethod>,
     val connections: List<ProviderConnection>,
+    /** `oauth_provider_id`: which subscription login an OAuth row takes (`xai`, `openai-codex`, ...). */
+    val oauthProviderId: String? = null,
 ) {
     val isConnected: Boolean get() = connections.isNotEmpty()
 
-    /** OAuth rows need a device/browser login flow the apps do not run yet. */
+    /** Rows connected through a form; OAuth rows go through a sign-in flow instead. */
     val canConnectFromApp: Boolean get() = !isOauth && authMethods.isNotEmpty()
 }
 

@@ -58,6 +58,9 @@ open class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
+    /** See [LocalBackendAgentReader.hiddenAgentIds] (letta-mobile-fxoew.9). */
+    open fun hiddenAgentIds(): Set<String>? = agentReader.hiddenAgentIds()
+
     /**
      * Checks whether an agent JSON record or directory exists under baseDir/agents.
      *

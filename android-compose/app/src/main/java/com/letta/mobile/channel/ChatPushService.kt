@@ -118,6 +118,7 @@ class ChatPushService : LifecycleService() {
         }
         installListener()
         warmupSubscribers()
+        scope.launch { deps.approvalAttention.watch() }
         Telemetry.event(
             "ChatPushService", "created",
             "foregrounded" to foregrounded.toString(),
