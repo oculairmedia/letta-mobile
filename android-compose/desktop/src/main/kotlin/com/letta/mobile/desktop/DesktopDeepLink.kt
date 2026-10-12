@@ -44,44 +44,38 @@ internal fun parseDesktopDeepLink(uri: URI): DesktopDeepLinkDestination? {
     }
 }
 
+/** Where each kind of deep link goes; grouped so the routing functions stay small. */
+internal class DesktopDeepLinkHandlers(
+    val onDestinationSelected: (DesktopDestination) -> Unit,
+    val onConversationSelected: (String) -> Unit,
+    val onAgentSelected: (String) -> Unit,
+    /** letta-mobile-dpv7m.3: a scan-to-pair link; it carries a one-time secret. */
+    val onPairLink: (String) -> Unit = {},
+)
+
 @Composable
 internal fun DesktopDeepLinkEffect(
     deepLinks: StateFlow<DesktopDeepLinkRequest?>,
-    onDestinationSelected: (DesktopDestination) -> Unit,
-    onConversationSelected: (String) -> Unit,
-    onAgentSelected: (String) -> Unit,
-    onPairLink: (String) -> Unit = {},
+    handlers: DesktopDeepLinkHandlers,
 ) {
     val pendingDeepLink by deepLinks.collectAsState()
     LaunchedEffect(pendingDeepLink) {
-        handleDesktopDeepLink(
-            destination = pendingDeepLink?.uri?.let(::parseDesktopDeepLink),
-            onDestinationSelected = onDestinationSelected,
-            onConversationSelected = onConversationSelected,
-            onAgentSelected = onAgentSelected,
-            onPairLink = onPairLink,
-        )
+        handleDesktopDeepLink(pendingDeepLink?.uri?.let(::parseDesktopDeepLink), handlers)
     }
 }
 
-private fun handleDesktopDeepLink(
-    destination: DesktopDeepLinkDestination?,
-    onDestinationSelected: (DesktopDestination) -> Unit,
-    onConversationSelected: (String) -> Unit,
-    onAgentSelected: (String) -> Unit,
-    onPairLink: (String) -> Unit,
-) {
+private fun handleDesktopDeepLink(destination: DesktopDeepLinkDestination?, handlers: DesktopDeepLinkHandlers) {
     when (destination) {
-        DesktopDeepLinkDestination.Settings -> onDestinationSelected(DesktopDestination.Settings)
-        DesktopDeepLinkDestination.Conversations -> onDestinationSelected(DesktopDestination.Conversations)
+        DesktopDeepLinkDestination.Settings -> handlers.onDestinationSelected(DesktopDestination.Settings)
+        DesktopDeepLinkDestination.Conversations -> handlers.onDestinationSelected(DesktopDestination.Conversations)
         is DesktopDeepLinkDestination.Conversation -> {
-            onConversationSelected(destination.id)
-            onDestinationSelected(DesktopDestination.Conversations)
+            handlers.onConversationSelected(destination.id)
+            handlers.onDestinationSelected(DesktopDestination.Conversations)
         }
-        is DesktopDeepLinkDestination.Agent -> onAgentSelected(destination.id)
+        is DesktopDeepLinkDestination.Agent -> handlers.onAgentSelected(destination.id)
         is DesktopDeepLinkDestination.Pair -> {
-            onPairLink(destination.link)
-            onDestinationSelected(DesktopDestination.Settings)
+            handlers.onPairLink(destination.link)
+            handlers.onDestinationSelected(DesktopDestination.Settings)
         }
         null -> Unit
     }

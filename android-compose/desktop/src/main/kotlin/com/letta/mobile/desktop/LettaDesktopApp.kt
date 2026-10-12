@@ -108,10 +108,12 @@ private fun DesktopDeepLinkRouting(
     var pendingAgentId by remember { mutableStateOf<String?>(null) }
     DesktopDeepLinkEffect(
         deepLinks = deepLinks,
-        onDestinationSelected = actions.onDestinationSelected,
-        onConversationSelected = { pendingConversationId = it },
-        onAgentSelected = { pendingAgentId = it },
-        onPairLink = actions.onPairLink,
+        handlers = DesktopDeepLinkHandlers(
+            onDestinationSelected = actions.onDestinationSelected,
+            onConversationSelected = { pendingConversationId = it },
+            onAgentSelected = { pendingAgentId = it },
+            onPairLink = actions.onPairLink,
+        ),
     )
     LaunchedEffect(pendingConversationId, chatState.conversations) {
         val target = pendingConversationId ?: return@LaunchedEffect
