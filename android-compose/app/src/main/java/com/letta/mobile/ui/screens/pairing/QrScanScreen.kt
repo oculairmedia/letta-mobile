@@ -12,14 +12,12 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -42,62 +41,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
-import com.letta.mobile.data.controller.node.iroh.PairQrEnvelope
+import com.letta.mobile.data.pairing.PairingState
+import com.letta.mobile.ui.pairing.PairCodeEntry
+import com.letta.mobile.ui.pairing.PairingStatusCard
+import com.letta.mobile.ui.pairing.PairingStrings
 import com.letta.mobile.ui.icons.LettaIcons
 import java.util.concurrent.Executors
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
- * Client-mode QR scanner screen (letta-mobile-g2d2i). Requests CAMERA at
- * runtime, previews the feed via CameraX, decodes frames via
- * [QrScanAnalyzer], and validates each decoded string via
- * [PairingQrDecoder] (wrapped by [QrScanViewModel]).
- *
- * [onValidScan] fires once with the validated envelope; the caller owns what
- * happens next (dialing the node, per the trust-model doc comment in
- * [PairingQrDecoder] — that dial is NOT implemented by this screen).
+ * Scan-to-pair on the phone (letta-mobile-g2d2i, completed by dpv7m.2).
+ * CameraX + [QrScanAnalyzer] supply the scanned text; the shared
+ * [com.letta.mobile.data.pairing.PairingFlow] (via [PairingViewModel]) parses,
+ * dials the host, redeems the one-time invite, saves the host and makes it
+ * active. [onPaired] then opens chat. A paste field is the fallback when the
+ * camera is unavailable; [initialLink] is a pairing link opened from outside
+ * the app (deep link).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrScanScreen(
-    onValidScan: (PairQrEnvelope.Decoded) -> Unit,
+    onPaired: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: QrScanViewModel = hiltViewModel(),
+    initialLink: String? = null,
+    viewModel: PairingViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED,
-        )
-    }
-    var permissionDenied by remember { mutableStateOf(false) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        hasCameraPermission = granted
-        permissionDenied = !granted
-    }
-    LaunchedEffect(Unit) {
-        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    LaunchedEffect(uiState.status) {
-        val decoded = uiState.decoded
-        if (uiState.status == ScanStatus.VALID && decoded != null) {
-            onValidScan(decoded)
-        }
-    }
+    val camera = rememberCameraPermission()
+    val pairingState by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(initialLink) { initialLink?.let(viewModel::submit) }
 
     Scaffold(
         modifier = modifier,
@@ -119,23 +97,82 @@ fun QrScanScreen(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                hasCameraPermission -> {
-                    CameraPreview(onDecoded = viewModel::onQrDecoded)
-                    ScanStatusOverlay(uiState = uiState, onScanAgain = viewModel::resetToScanning)
-                }
-                permissionDenied -> PermissionDeniedContent(
-                    onOpenSettings = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                .setData(Uri.fromParts("package", context.packageName, null)),
-                        )
-                    },
-                    onRetryPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                )
+                camera.granted -> CameraPreview(onDecoded = viewModel::submit)
+                camera.denied -> PermissionDeniedContent(onOpenSettings = camera.openSettings, onRetryPermission = camera.request)
                 else -> CircularProgressIndicator()
             }
+            ScanBottomSheet(
+                state = pairingState,
+                onSubmit = viewModel::submit,
+                onScanAgain = viewModel::reset,
+                onOpenChat = onPaired,
+            )
         }
     }
+}
+
+/** Shared status card over the preview, plus the paste fallback while idle. */
+@Composable
+private fun ScanBottomSheet(
+    state: PairingState,
+    onSubmit: (String) -> Unit,
+    onScanAgain: () -> Unit,
+    onOpenChat: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(LettaDimens.Space.lg),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        if (state is PairingState.Idle) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Column(
+                    modifier = Modifier.padding(LettaDimens.Space.lg),
+                    verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+                ) {
+                    Text(PairingStrings.SCAN_HINT, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PairCodeEntry(onSubmit = onSubmit)
+                }
+            }
+        } else {
+            PairingStatusCard(state = state, onScanAgain = onScanAgain, onOpenChat = onOpenChat)
+        }
+    }
+}
+
+/** Camera permission state for the scanner, requested once on entry. */
+private class CameraPermission(
+    val granted: Boolean,
+    val denied: Boolean,
+    val request: () -> Unit,
+    val openSettings: () -> Unit,
+)
+
+@Composable
+private fun rememberCameraPermission(): CameraPermission {
+    val context = LocalContext.current
+    var granted by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    var denied by remember { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+        denied = !ok
+    }
+    LaunchedEffect(Unit) {
+        if (!granted) launcher.launch(Manifest.permission.CAMERA)
+    }
+    return CameraPermission(
+        granted = granted,
+        denied = denied,
+        request = { launcher.launch(Manifest.permission.CAMERA) },
+        openSettings = {
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(Uri.fromParts("package", context.packageName, null)),
+            )
+        },
+    )
 }
 
 @Composable
@@ -180,47 +217,6 @@ private fun CameraPreview(onDecoded: (String) -> Unit) {
             previewView
         },
     )
-}
-
-@Composable
-private fun ScanStatusOverlay(uiState: ScanUiState, onScanAgain: () -> Unit) {
-    val status = uiState.status
-    if (status == ScanStatus.SCANNING) return
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(LettaDimens.Space.xl),
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        Column(
-            modifier = Modifier
-                .background(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                    shape = RoundedCornerShape(LettaDimens.Radius.lg),
-                )
-                .padding(LettaDimens.Space.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-        ) {
-            when (status) {
-                ScanStatus.VALID -> Text(
-                    text = "Pairing code recognized. Connecting…",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                ScanStatus.INVALID -> {
-                    Text(
-                        text = uiState.errorMessage ?: "This QR code could not be used.",
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                    )
-                    Button(onClick = onScanAgain) {
-                        Text(stringResource(R.string.pairing_scan_again))
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

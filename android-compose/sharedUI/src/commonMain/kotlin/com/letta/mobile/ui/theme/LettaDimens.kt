@@ -163,6 +163,9 @@ object LettaDimens {
         val modalWidth: Dp = 520.dp
         val modalMaxHeight: Dp = 600.dp
 
+        /** A pairing QR code (letta-mobile-dpv7m): big enough to scan across a desk, no bigger. */
+        val qrCodeMaxWidth: Dp = 320.dp
+
         /** A settings page's left navigation column on wide windows. */
         val navWidth: Dp = 220.dp
 

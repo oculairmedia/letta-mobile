@@ -31,6 +31,10 @@ sealed interface AppServerInboundFrame {
          * Absent/null means baseline framing only.
          */
         val capabilities: List<String>? = null,
+        /** letta-mobile-dpv7m: true when this auth bound (or found) a paired NodeId via an invite. */
+        val paired: Boolean? = null,
+        /** letta-mobile-dpv7m: the NodeId was already paired; the presented invite was left unused. */
+        @SerialName("already_paired") val alreadyPaired: Boolean? = null,
     ) : AppServerInboundFrame {
         @Transient
         override val type: String = "auth_response"
