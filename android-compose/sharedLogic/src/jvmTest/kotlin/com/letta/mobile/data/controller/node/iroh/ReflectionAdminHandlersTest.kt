@@ -34,6 +34,15 @@ class ReflectionAdminHandlersTest {
             )
         }
 
+        var commandOutput: String = "Started a reflection pass for this conversation."
+        var commandSuccess: Boolean = true
+        val commands = mutableListOf<AppServerCommand.ExecuteCommand>()
+
+        override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand): AppServerInboundFrame.ExecuteCommandResponse {
+            commands += command
+            return AppServerInboundFrame.ExecuteCommandResponse(command.requestId, commandSuccess, output = commandOutput)
+        }
+
         override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse {
             calls += "set:${command.settings}"
             return AppServerInboundFrame.SetReflectionSettingsResponse(
@@ -78,10 +87,10 @@ class ReflectionAdminHandlersTest {
     @Test
     fun withoutNativeClientReflectionFailsClearlyNotViaShim() = runTest {
         val r = router(client = null)
-        listOf("reflection.get", "reflection.set").forEach { method ->
+        listOf("reflection.get", "reflection.set", "reflection.run").forEach { method ->
             val response = dispatch(r, method, mapOf("agent_id" to "a", "conversation_id" to "c", "trigger" to "step_count", "step_count" to "1"))
             assertTrue(response.contains("\"success\":false"), method)
-            assertTrue(response.contains("native App Server client"), "$method: $response")
+            assertTrue(response.contains("capability_unavailable") && response.contains("native App Server client"), "$method: $response")
         }
     }
 
@@ -93,8 +102,55 @@ class ReflectionAdminHandlersTest {
     }
 
     @Test
+    fun aMissingConversationIsTheAgentsDefault() = runTest {
+        val client = FakeReflectionClient()
+        dispatch(router(client), "reflection.get", mapOf("agent_id" to "a-1"))
+        assertTrue("get:a-1/default" in client.calls)
+    }
+
+    @Test
+    fun setPassesMergeFieldsOnlyWhenSentAndValidatesThem() = runTest {
+        val client = FakeReflectionClient()
+        val r = router(client)
+        dispatch(r, "reflection.set", mapOf("agent_id" to "a", "trigger" to "compaction-event", "step_count" to "25"))
+        assertTrue(client.calls.last().let { !it.contains("merge") }, client.calls.last())
+        dispatch(
+            r, "reflection.set",
+            mapOf("agent_id" to "a", "trigger" to "step-count", "step_count" to "9", "merge" to "explicit", "merge_instructions" to "short", "scope" to "global"),
+        )
+        assertTrue(client.calls.last().contains("\"merge\":\"explicit\"") && client.calls.last().contains("\"merge_instructions\":\"short\""), client.calls.last())
+        val badMerge = dispatch(r, "reflection.set", mapOf("agent_id" to "a", "trigger" to "off", "step_count" to "1", "merge" to "sometimes"))
+        assertTrue(badMerge.contains("invalid_merge"), badMerge)
+        val badTrigger = dispatch(r, "reflection.set", mapOf("agent_id" to "a", "trigger" to "on-idle", "step_count" to "1"))
+        assertTrue(badTrigger.contains("invalid_trigger"), badTrigger)
+        val badScope = dispatch(r, "reflection.set", mapOf("agent_id" to "a", "trigger" to "off", "step_count" to "1", "scope" to "machine"))
+        assertTrue(badScope.contains("invalid_scope"), badScope)
+    }
+
+    @Test
+    fun runStartsLettaCodesDreamWithTheInstruction() = runTest {
+        val client = FakeReflectionClient()
+        val response = dispatch(router(client), "reflection.run", mapOf("agent_id" to "a-1", "conversation_id" to "c-1", "instruction" to "tools"))
+        assertTrue(response.contains("\"success\":true") && response.contains("Started"), response)
+        val command = client.commands.single()
+        assertEquals("dream", command.commandId)
+        assertEquals("-- tools", command.args)
+        assertEquals("c-1", command.runtime?.conversationId)
+    }
+
+    @Test
+    fun runOnARuntimeWithoutDreamIsCapabilityUnavailable() = runTest {
+        val client = FakeReflectionClient().apply {
+            commandSuccess = false
+            commandOutput = "Unknown command: dream"
+        }
+        val response = dispatch(router(client), "reflection.run", mapOf("agent_id" to "a-1"))
+        assertTrue(response.contains("capability_unavailable: this App Server has no /dream"), response)
+    }
+
+    @Test
     fun bothMethodsRegistered() {
-        assertEquals(setOf("reflection.get", "reflection.set"), ReflectionAdminHandlers.methods)
+        assertEquals(setOf("reflection.get", "reflection.set", "reflection.run"), ReflectionAdminHandlers.methods)
         val r = router(FakeReflectionClient())
         assertTrue(ReflectionAdminHandlers.methods.all { it in r.registeredMethods })
     }

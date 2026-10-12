@@ -271,6 +271,9 @@ fun DrawBox(
     // frame has the correct geometry. The 0.5px drift gate in both the
     // dispatch and the reducer ensures fixed-point convergence in one step.
     LaunchedEffect(state.elements, textMeasurer) {
+        // Every drifted height goes in one intent: one per text was a pass over the whole drawing
+        // each, quadratic on a board with many text blocks.
+        val drifted = HashMap<String, Float>()
         state.elements.forEach { el ->
             if (el !is Element.Text) return@forEach
             val layout = textCache.layoutFor(
@@ -283,10 +286,9 @@ fun DrawBox(
                 measurer = textMeasurer,
             )
             val measured = layout.size.height.toFloat()
-            if (kotlin.math.abs(measured - el.measuredHeight) > 0.5f) {
-                onIntent(Intent.SyncTextMeasuredHeight(el.id, measured))
-            }
+            if (kotlin.math.abs(measured - el.measuredHeight) > 0.5f) drifted[el.id] = measured
         }
+        if (drifted.isNotEmpty()) onIntent(Intent.SyncTextMeasuredHeights(drifted))
     }
 
     // Drag-in-progress signal lifted out of the gesture coroutine so the render

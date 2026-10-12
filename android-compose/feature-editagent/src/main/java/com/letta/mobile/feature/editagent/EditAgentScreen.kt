@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,10 +63,13 @@ internal object EditAgentTestTags {
 fun EditAgentScreen(
     onNavigateBack: () -> Unit,
 ) {
-    EditAgentScreenContent(
-        onNavigateBack = onNavigateBack,
-        viewModel = hiltViewModel(),
-    )
+    val dreaming: EditAgentDreamingViewModel = hiltViewModel()
+    CompositionLocalProvider(LocalEditAgentDreamingEntry provides { EditAgentDreamingEntry(dreaming) }) {
+        EditAgentScreenContent(
+            onNavigateBack = onNavigateBack,
+            viewModel = hiltViewModel(),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

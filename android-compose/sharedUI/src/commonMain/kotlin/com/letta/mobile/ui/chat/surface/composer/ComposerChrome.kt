@@ -24,6 +24,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Folder
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.data.workspace.directory.WorktreePaths
+import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_dismiss_error
 import com.letta.mobile.sharedui.resources.composer_hint
@@ -31,6 +33,7 @@ import com.letta.mobile.sharedui.resources.composer_working_directory
 import com.letta.mobile.sharedui.resources.composer_working_directory_change
 import com.letta.mobile.sharedui.resources.composer_working_directory_loading
 import com.letta.mobile.sharedui.resources.composer_working_directory_unknown
+import com.letta.mobile.sharedui.resources.composer_worktree_badge
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import com.letta.mobile.ui.icons.LettaIcons
@@ -41,8 +44,8 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The coding agent's working directory, with a picker to change it. Lifted from desktop's
- * DesktopWorkingDirectoryRow; picking goes through the host (a native folder dialog), which
- * reports the choice back via ChatActions.changeWorkingDirectory.
+ * DesktopWorkingDirectoryRow; picking goes through the host (the shared working-directory
+ * picker), which reports the choice back via ChatActions.changeWorkingDirectory.
  */
 @Composable
 internal fun ComposerWorkingDirectoryRow(
@@ -80,6 +83,8 @@ internal fun ComposerWorkingDirectoryRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        // letta-mobile-zxk2n.6: the "in worktree" banner, from the path letta-code put the worktree at.
+        WorktreePaths.locate(devicePathOrNull(path))?.let { worktree -> ComposerWorktreeBadge(worktree.name) }
         if (onPick != null) {
             Text(
                 text = stringResource(Res.string.composer_working_directory_change),
@@ -88,6 +93,30 @@ internal fun ComposerWorkingDirectoryRow(
             )
         }
     }
+}
+
+/** The worktree the working directory is in, as a small tonal label beside the path. */
+@Composable
+private fun ComposerWorktreeBadge(name: String) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        modifier = Modifier.testTag(ComposerWorktreeTags.BADGE),
+    ) {
+        Text(
+            text = stringResource(Res.string.composer_worktree_badge, name),
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
+        )
+    }
+}
+
+/** Test tags of the working-directory row's worktree badge. */
+object ComposerWorktreeTags {
+    const val BADGE = "composer-worktree-badge"
 }
 
 /** A composer error (attachment refused, send blocked) shown inline above the prompt. */

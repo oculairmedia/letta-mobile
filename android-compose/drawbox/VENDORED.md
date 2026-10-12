@@ -168,3 +168,12 @@ it is keyed on `samples` and caches the uniform-width check too. `ImageBitmapCac
 bytes with the same content as a hit (a drawing parsed afresh re-decoded every image) and drops
 the bitmaps of images not drawn lately once decoded images pass 64 MB. Hit testing skips a stroke
 whose box is out of reach and no longer sorts a drawing already in order. Tests: `RenderIndexTest`.
+
+### 13. A change from elsewhere keeps what it did not change (letta-mobile-24zur.2)
+
+`importExternal` keeps the board's own instance of every element equal to the incoming one (and the
+board's list when nothing differs), so a one-element change from another app no longer looks like
+a whole new drawing to the renderer's caches. `exportJsonInBackground` serialises the immutable
+state on `Dispatchers.Default`. Text heights drifted after a load or import are reconciled in one
+`Intent.SyncTextMeasuredHeights` instead of one intent (a full pass over the drawing) per text
+block, which was quadratic. Tests: `DrawBoxControllerTest`.

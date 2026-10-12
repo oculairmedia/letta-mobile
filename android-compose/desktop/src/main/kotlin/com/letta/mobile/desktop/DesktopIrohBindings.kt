@@ -278,6 +278,8 @@ private fun buildDesktopChatController(
                         scope = runtime.chatScope,
                         transport = transport,
                         registry = runtime.dataBindings.permissionModeSettings.modes,
+                        // letta-mobile-bzvro.14: answers made offline survive a restart.
+                        outboxStore = com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore(bindings.secureSettingsStore),
                     ),
                 )
             }

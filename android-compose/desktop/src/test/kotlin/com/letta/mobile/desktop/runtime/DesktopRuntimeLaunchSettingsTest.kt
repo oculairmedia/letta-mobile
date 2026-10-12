@@ -20,6 +20,7 @@ class DesktopRuntimeLaunchSettingsTest {
         root.deleteRecursively()
         DesktopRuntimeLaunchPreference.instanceId = null
         DesktopRuntimeLaunchPreference.workingDirectory = null
+        DesktopRuntimeLaunchPreference.allowWindowsAutoReflection = false
     }
 
     private fun environmentFor(gigabytes: Long?, inherited: String? = null): Map<String, String> =
@@ -86,6 +87,30 @@ class DesktopRuntimeLaunchSettingsTest {
         documents.mkdirs()
         assertEquals(documents, resolveDesktopRuntimeWorkingDirectory(null, home, temp))
         assertEquals(temp, resolveDesktopRuntimeWorkingDirectory(null, null, temp))
+    }
+
+    @Test
+    fun `automatic dreams on windows are off until the user allows them`() {
+        // letta-mobile-iczm7: letta-code skips automatic reflection on win32 without this switch.
+        assertNull(environmentFor(16)[WINDOWS_AUTO_REFLECTION_ENV])
+        val allowed = desktopRuntimeLaunchContext(
+            DesktopRuntimeLaunchInputs(totalMemoryBytes = null, instanceId = "install-1", workingDirectory = root, allowWindowsAutoReflection = true),
+        ).environment
+        assertEquals("1", allowed[WINDOWS_AUTO_REFLECTION_ENV])
+
+        val store = InMemoryStore()
+        assertEquals(false, DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store))
+        DesktopRuntimeLaunchSettings.saveWindowsAutoReflection(store, allowed = true)
+        assertEquals(true, DesktopRuntimeLaunchSettings.readWindowsAutoReflection(store))
+        assertEquals(true, DesktopRuntimeLaunchPreference.allowWindowsAutoReflection)
+    }
+
+    @Test
+    fun `only windows without the switch blocks automatic dreams`() {
+        assertEquals(true, windowsBlocksAutoReflection("Windows 11", emptyMap()))
+        assertEquals(false, windowsBlocksAutoReflection("Windows 11", mapOf(WINDOWS_AUTO_REFLECTION_ENV to "1")))
+        assertEquals(false, windowsBlocksAutoReflection("Linux", emptyMap()))
+        assertEquals(false, windowsBlocksAutoReflection("Mac OS X", emptyMap()))
     }
 
     @Test

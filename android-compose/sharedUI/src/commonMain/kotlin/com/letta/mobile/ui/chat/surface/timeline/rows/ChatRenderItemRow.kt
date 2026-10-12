@@ -79,6 +79,9 @@ internal fun ChatImageViewer(
 internal object ChatRowTestTags {
     /** letta-mobile-bzvro.9: the contextual action under a run error. */
     const val ERROR_ACTION = "run-error-action"
+
+    /** letta-mobile-7mys7: "Fork from here" beside a reply's Copy. */
+    const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
     const val TOOL_FAILURE_BADGE = "tool-failure-badge"
@@ -113,6 +116,11 @@ internal object ChatRowTestTags {
     const val APPROVAL_TOOL_CALL = "chat-approval-tool-call"
     const val APPROVAL_REQUESTING_INPUT = "chat-approval-requesting-input"
     const val APPROVAL_SLOT = "chat-approval-slot"
+    const val APPROVAL_STEP_HEADER = "chat-approval-step-header"
+    const val APPROVAL_STEP_COUNTER = "chat-approval-step-counter"
+    const val APPROVAL_STEP_BACK = "chat-approval-step-back"
+    const val APPROVAL_STEP_NEXT = "chat-approval-step-next"
+    const val APPROVAL_QUEUED = "chat-approval-queued"
     const val APPROVAL_BLOCKED_PATH = "chat-approval-blocked-path"
     const val APPROVAL_DIFF = "chat-approval-diff"
     const val APPROVAL_DIFF_SHOW_ALL = "chat-approval-diff-show-all"

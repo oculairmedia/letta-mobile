@@ -4,4 +4,7 @@
     <string name="message_actions_open">Show message actions</string>
     <string name="message_action_select_text">Select text</string>
     <string name="message_action_send_again">Send again</string>
+    <string name="message_action_rerun">Rerun in a new branch</string>
+    <string name="message_action_edit_and_resend">Edit and resend</string>
+    <string name="message_action_fork">Fork from here</string>
 </resources>

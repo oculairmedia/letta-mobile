@@ -129,6 +129,9 @@ class DesktopChatController(
      * structured AskUserQuestion card can disable its buttons while submitting.
      */
     val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
+
+    /** letta-mobile-bzvro.14: requests answered offline, waiting in the gateway's outbox. */
+    val queuedApprovals: StateFlow<Set<String>> = approvalCoordinator.queuedApprovals
     val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
         approvalCoordinator.pendingApprovalDetails
 
@@ -838,6 +841,7 @@ class DesktopChatController(
     private inner class ListHost : DesktopConversationListHost {
         override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
         override val pins = conversationPrefs.pins
+        override val lineage = conversationPrefs.lineage
         override val isClosed: Boolean get() = closed
 
         override fun origin(): DesktopBranchOrigin? = _state.value.selectedConversation?.let {
@@ -847,7 +851,7 @@ class DesktopChatController(
         override suspend fun openBranch(branch: DesktopOpenedBranch) {
             if (closed) return
             reloadConversationsAndSelect(preferConversationId = branch.conversation.id.value)
-            branch.draft?.let(::updateComposerText)
+            applyBranchDraft(branch)
         }
 
         override fun showError(message: String) {

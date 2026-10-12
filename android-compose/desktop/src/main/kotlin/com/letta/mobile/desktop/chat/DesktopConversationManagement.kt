@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.branch.BranchState
+import com.letta.mobile.data.chat.branch.ConversationParent
 import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
@@ -71,6 +73,10 @@ internal class DesktopConversationManagement(
     val pinnedConversationIds: StateFlow<Set<String>> =
         prefs.pins?.pinned ?: MutableStateFlow(emptySet<String>()).asStateFlow()
 
+    /** letta-mobile-7mys7: each fork's source conversation id, for the sidebar's "Forked from …". */
+    val conversationParents: StateFlow<Map<String, ConversationParent>> =
+        prefs.lineage?.parents ?: MutableStateFlow(emptyMap<String, ConversationParent>()).asStateFlow()
+
     /** Models switched to most recently (newest first), for the picker's "Recent" group. */
     val recentModels: StateFlow<List<String>> =
         prefs.recentModels?.recent ?: MutableStateFlow(emptyList<String>()).asStateFlow()
@@ -117,11 +123,27 @@ internal class DesktopConversationManagement(
         withContext(Dispatchers.IO) { recents.record(model) }
     }
 
-    fun forkFrom(message: UiMessage, view: DesktopBranchView) {
-        if (!host.isClosed) brancher.forkFrom(message, view)
+    fun forkFrom(message: UiMessage, view: DesktopBranchView, name: String? = null) {
+        if (!host.isClosed) brancher.forkFrom(message, view, name)
     }
 
     fun editAndResend(message: UiMessage, view: DesktopBranchView) {
         if (!host.isClosed) brancher.editAndResend(message, view)
     }
+
+    /** letta-mobile-7mys7: forks before the prompt and sends it again there; the original keeps its answer. */
+    fun rerun(message: UiMessage, view: DesktopBranchView) {
+        if (!host.isClosed) brancher.rerun(message, view)
+    }
+
+    /** letta-mobile-7mys7 (G37): forks all of [origin] (the sidebar's "Fork chat…"), named [name] when given. */
+    fun forkConversation(origin: DesktopBranchOrigin, name: String? = null) {
+        if (!host.isClosed) brancher.forkConversation(origin, name)
+    }
+
+    /** Whether a fork can be named on this backend. */
+    val canNameForks: Boolean get() = brancher.canName
+
+    /** The fork, edit or rerun in flight, or the last failure. */
+    val branchState: StateFlow<BranchState> get() = brancher.state
 }

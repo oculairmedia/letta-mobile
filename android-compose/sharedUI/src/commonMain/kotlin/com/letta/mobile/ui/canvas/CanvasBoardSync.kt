@@ -219,13 +219,28 @@ private fun CanvasBoard.importExternalScene(scene: ExternalScene, importStarted:
     // placed on a desktop opened a phone's keyboard.
     kept.knownTextIds = CanvasTextElements.ids(controller.state.value.elements)
     ui.lastDrawing = scene.cleanJson
+    controller.state.value.let { ui.importedDrawing = it.elements to it.bgColor }
 }
 
+/**
+ * Saves the drawing once it has been still for [AUTOSAVE_DEBOUNCE_MS]. The drawing is taken as it
+ * is (an immutable state) and serialised off the main thread; at a few thousand elements that is
+ * a hundred milliseconds or more, which on the main thread was a dropped frame after every edit.
+ *
+ * A drawing that is exactly what a change from elsewhere left is not saved: the session already
+ * holds it. Saving it only diffed the whole scene against itself and recorded an undo step that
+ * undid nothing (the import had already emptied DrawBox's own history).
+ */
 private suspend fun CanvasBoard.autosave() {
     if (!ui.initialLoadDone || session == null) return
     delay(AUTOSAVE_DEBOUNCE_MS)
+    val drawing = controller.state.value
+    if (ui.importedDrawing?.let { (elements, background) -> elements === drawing.elements && background == drawing.bgColor } == true) {
+        ui.lastSavedElements = drawing.elements
+        return
+    }
     ui.isAutosaving = true
-    controller.exportJson()
+    controller.exportJsonInBackground()
 }
 
 /**
@@ -325,9 +340,13 @@ private suspend fun CanvasBoard.onJsonExported(json: String) {
     CanvasWorkspaceSupport.computeJsonExportStatus(json, wasAutosaving)?.let { ui.statusMessage = it }
     val s = session ?: return
     if (s.sceneJsonOrEmpty() == json) return
-    ui.lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(json)
-    withContext(Dispatchers.Default) { s.applyLocalScene(json) }
-    ui.lastDrawing = CanvasOpProjector.stripMetadataForDrawBox(s.sceneJsonOrEmpty())
+    // Each strip is a full parse and print of the scene: done off the main thread.
+    ui.lastDrawing = withContext(Dispatchers.Default) { CanvasOpProjector.stripMetadataForDrawBox(json) }
+    val saved = withContext(Dispatchers.Default) {
+        s.applyLocalScene(json)
+        CanvasOpProjector.stripMetadataForDrawBox(s.sceneJsonOrEmpty())
+    }
+    ui.lastDrawing = saved
     recordDrawingStep()
 }
 

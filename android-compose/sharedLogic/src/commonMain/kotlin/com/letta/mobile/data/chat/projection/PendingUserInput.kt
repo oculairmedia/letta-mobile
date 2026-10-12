@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableSet
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.runtime.RuntimeUserInputTools
@@ -78,6 +79,10 @@ fun ChatUiState.withPendingApprovalDetails(details: Map<String, PendingApprovalD
     if (joined === messages) return this
     return copy(messages = joined.toImmutableList(), messageListChange = ChatMessageListChange.Full)
 }
+
+/** letta-mobile-bzvro.14: [this] marking [queued] approvals as waiting in the outbox; the same state when unchanged. */
+fun ChatUiState.withQueuedApprovals(queued: Set<String>): ChatUiState =
+    if (queued == queuedApprovalRequestIds) this else copy(queuedApprovalRequestIds = queued.toImmutableSet())
 
 private fun UiMessage.joinedWith(details: Map<String, PendingApprovalDetails>): UiMessage {
     val request = approvalRequest ?: return withParkedToolCall(details)
