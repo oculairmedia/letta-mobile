@@ -266,8 +266,8 @@ private fun rememberDesktopShellLists(
         archiveFilter = archiveFilter,
         agentConversations = agentConversations,
         archivedAgentConversations = archivedAgentConversations,
-        mentionables = remember(focus.railAgents, memoryState, fileMentions) {
-            buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity)) + fileMentions
+        mentionables = remember(focus.railAgents, focus.selectedAgentId, memoryState, fileMentions) {
+            buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity, focus.selectedAgentId)) + fileMentions
         },
         paletteItems = remember(conversations, focus.railAgents, workPlayMode) {
             buildPaletteItems(conversations, focus.railAgents, workPlayMode)
