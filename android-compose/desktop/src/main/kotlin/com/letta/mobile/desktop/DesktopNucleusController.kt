@@ -387,13 +387,6 @@ internal class DesktopNucleusController(
         }
     }
 
-    /** letta-mobile-iczm7: a dream the user opted into hearing about has finished. */
-    fun notifyDreamFinished(toast: DreamToast, onActivated: () -> Unit) {
-        scope.launch(Dispatchers.IO) {
-            notification(title = toast.title, message = toast.message, onActivated = onActivated).send()
-        }
-    }
-
     fun notifyFailure(message: String, onActivated: () -> Unit) {
         scope.launch(Dispatchers.IO) {
             notification(

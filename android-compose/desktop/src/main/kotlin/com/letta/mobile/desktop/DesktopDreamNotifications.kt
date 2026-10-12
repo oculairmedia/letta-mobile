@@ -8,6 +8,9 @@ import com.letta.mobile.data.dreaming.DreamFinished
 import com.letta.mobile.data.dreaming.DreamNotifyPrefs
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.ui.dreaming.DreamingStrings
+import dev.nucleusframework.notification.common.notification
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** letta-mobile-iczm7: one "dream finished" notification's text. */
 internal data class DreamToast(val title: String, val message: String) {
@@ -23,24 +26,26 @@ internal data class DreamToast(val title: String, val message: String) {
     }
 }
 
-/** Where finished-dream notifications go: the native notifier, agent names, and what a click does. */
+/** Where finished-dream notifications go: agent names for the title, and what a click does. */
 internal class DreamNotificationSink(
-    val controller: DesktopNucleusController,
     val agentName: (String) -> String?,
     val onActivate: () -> Unit,
 )
 
 /**
  * letta-mobile-iczm7: a native notification when a dream finishes, for agents whose owner opted in
- * on the Dreaming surface. It watches the registry entries the desktop already follows (the
- * selected conversation's), so a dream in a conversation that is not open is not seen.
+ * on the Dreaming surface (the notifier itself is set up by [DesktopNucleusController]). It watches
+ * the registry entries the desktop already follows (the selected conversation's), so a dream in a
+ * conversation that is not open is not seen.
  */
 @Composable
 internal fun DreamFinishedNotificationsEffect(entries: List<SubagentEntry>, prefs: DreamNotifyPrefs, sink: DreamNotificationSink) {
     val tracker = remember { DreamFinishTracker() }
     LaunchedEffect(entries) {
-        tracker.update(entries).filter { prefs.isEnabled(it.agentId) }.forEach { finished ->
-            sink.controller.notifyDreamFinished(DreamToast.of(finished, sink.agentName(finished.agentId)), sink.onActivate)
+        val toasts = tracker.update(entries).filter { prefs.isEnabled(it.agentId) }.map { DreamToast.of(it, sink.agentName(it.agentId)) }
+        if (toasts.isEmpty()) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            toasts.forEach { toast -> notification(title = toast.title, message = toast.message, onActivated = sink.onActivate).send() }
         }
     }
 }
