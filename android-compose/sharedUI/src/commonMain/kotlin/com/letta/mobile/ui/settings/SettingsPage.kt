@@ -3,10 +3,8 @@ package com.letta.mobile.ui.settings
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -91,11 +89,8 @@ fun SettingsPage(
         modifier = modifier.testTag(SettingsPageTags.PAGE),
         containerColor = MaterialTheme.colorScheme.background,
         header = {
-            // The header's drag lane fills the height it is given; size it to its own content (a
-            // title and a back arrow, nothing subcomposed) so it never takes the page.
             ShellHeader(
                 title = HeaderTitle.Text("Settings"),
-                modifier = Modifier.height(IntrinsicSize.Min),
                 controls = HeaderControls(nav = onBack?.let { HeaderNav.Back(it) } ?: HeaderNav.None),
             )
         },
