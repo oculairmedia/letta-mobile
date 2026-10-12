@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.ui.chat.subagents.SubagentRosterPane
-import com.letta.mobile.ui.chat.subagents.SubagentRosterPaneTags
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksTags
 import com.letta.mobile.ui.context.AgentContextCardActions
 import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
@@ -132,8 +132,8 @@ class InspectorPaneTest {
     @Test
     fun theBackgroundTasksRosterIsAnInspector() = runComposeUiTest {
         var open by mutableStateOf(true)
-        setContent { Frame(WIDE, LettaHost.Pointer) { if (open) SubagentRosterPane(subagents = emptyList<SubagentEntry>(), onClose = { open = false }) } }
-        onNode(hasTestTag(SubagentRosterPaneTags.PANE) and hasAnyAncestor(hasTestTag(InspectorTags.DOCKED))).assertExists()
+        setContent { Frame(WIDE, LettaHost.Pointer) { if (open) BackgroundTasksSidePane(subagents = emptyList<SubagentEntry>(), onClose = { open = false }) } }
+        onNode(hasTestTag(BackgroundTasksTags.PANEL) and hasAnyAncestor(hasTestTag(InspectorTags.DOCKED))).assertExists()
         onNodeWithText("Background tasks").assertExists()
         onNodeWithContentDescription("Close").performClick()
         waitForIdle()

@@ -29,7 +29,7 @@ import com.letta.mobile.desktop.plugin.view.DesktopPluginBindings
 import com.letta.mobile.desktop.plugin.view.ProvideDesktopPluginViews
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
-import com.letta.mobile.ui.chat.subagents.SubagentRosterPane
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.host.InspectorFrame
 import com.letta.mobile.ui.host.OverlayHostRoot
 import com.letta.mobile.ui.host.OverlayWhile
@@ -212,7 +212,7 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     val navigator = context.navigator
     if (!navigator.showBackgroundTasks || context.panels.subagents.repository == null) return
     // The roster opens in the window's inspector (docked beside the main pane when wide).
-    SubagentRosterPane(frame.lists.activeSubagents, onClose = { navigator.showBackgroundTasks = false })
+    BackgroundTasksSidePane(frame.lists.activeSubagents, onClose = { navigator.showBackgroundTasks = false })
 }
 
 @Composable

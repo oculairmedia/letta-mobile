@@ -25,8 +25,15 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.ServerFrameSerializer
+import java.time.Instant
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 
 /**
  * letta-mobile-bzvro.40: the permission-mode chip of an Iroh client against a host's real admin_rpc
@@ -34,6 +41,7 @@ import kotlinx.coroutines.test.runTest
  * host's controller faked. Proves the chip moves only on the host's confirmation, that another
  * client's change is adopted on open, and that a peer without conversation.manage cannot change it.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PermissionModeRelayRoundTripTest {
     private val runtime = AppServerRuntimeScope("agent-1", "conv-1")
 
@@ -100,10 +108,75 @@ class PermissionModeRelayRoundTripTest {
         assertNull(PermissionModeRpc.modeOf(response.result))
     }
 
-    private fun router(controller: AppServerController) = AdminRpcRouter().also { PermissionModeAdminHandlers.register(it, controller) }
+    /** One connection viewing a conversation: what the host wrote to it, decoded as the client does. */
+    private class Viewer(val conversationId: String) {
+        val raw = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val frames = MutableSharedFlow<ServerFrame>(replay = 16)
 
-    private fun CoroutineScope.relayed(controller: ModeController, capabilities: Set<String>): RelayedPermissionModes {
-        val call = hostCall(router(controller), capabilities)
+        fun write(frame: String) {
+            raw += frame
+            frames.tryEmit(Json { ignoreUnknownKeys = true }.decodeFromString(ServerFrameSerializer, frame))
+        }
+    }
+
+    /** letta-mobile-a4tm7: the endpoint's fan-out, as `viewersFor(conversationId)` does it. */
+    private fun PermissionModePublisher.over(viewers: List<Viewer>) = also { publisher ->
+        publisher.attach { conversationId, frame ->
+            viewers.filter { it.conversationId == conversationId }.onEach { it.write(frame) }.size
+        }
+    }
+
+    @Test
+    fun aConfirmedChangeIsPushedOnceToEachViewerAndMovesTheOtherClientsChip() = runTest {
+        val controller = ModeController(initial = AppServerPermissionMode.Unrestricted)
+        val phone = Viewer("conv-1")
+        val desktop = Viewer("conv-1")
+        val elsewhere = Viewer("conv-2")
+        val publisher = PermissionModePublisher(backgroundScope) { Instant.EPOCH }.over(listOf(phone, desktop, elsewhere))
+        val caps = setOf(IrohPeerCapabilities.CONVERSATION_MANAGE, IrohPeerCapabilities.CHAT_READ)
+        val phoneModes = relayed(controller, caps, publisher).also { it.bind(backgroundScope, phone.frames) }
+        val desktopModes = relayed(controller, caps, publisher).also { it.bind(backgroundScope, desktop.frames) }
+        phoneModes.sync(runtime)
+        desktopModes.sync(runtime)
+
+        assertTrue(phoneModes.set(runtime, Standard))
+        runCurrent()
+
+        assertEquals(Standard, desktopModes.observe(runtime).first().mode, "the desktop's chip follows without reopening")
+        assertEquals(Standard, phoneModes.observe(runtime).first().mode)
+        assertEquals(1, desktop.raw.size)
+        assertEquals(1, phone.raw.size, "the sender gets the push once, beside its own confirmed result")
+        assertEquals(0, elsewhere.raw.size, "only the conversation's viewers")
+        assertEquals(listOf(runtime to Standard), controller.changes, "the push is never sent back to the host")
+        val push = Json { ignoreUnknownKeys = true }.decodeFromString(ServerFrameSerializer, desktop.raw.single())
+        assertTrue(push is ServerFrame.PermissionModeUpdated)
+        assertEquals(listOf("agent-1", "conv-1", "standard"), listOf(push.agentId, push.conversationId, push.mode))
+        assertEquals(Instant.EPOCH.toString(), push.at)
+    }
+
+    @Test
+    fun anUnconfirmedChangeIsNotPushed() = runTest {
+        val controller = ModeController(initial = AppServerPermissionMode.Unrestricted, confirm = false)
+        val desktop = Viewer("conv-1")
+        val publisher = PermissionModePublisher(backgroundScope) { Instant.EPOCH }.over(listOf(desktop))
+        val phoneModes = relayed(controller, setOf(IrohPeerCapabilities.CONVERSATION_MANAGE, IrohPeerCapabilities.CHAT_READ), publisher)
+        phoneModes.sync(runtime)
+
+        assertFalse(phoneModes.set(runtime, Standard))
+        runCurrent()
+
+        assertEquals(emptyList(), desktop.raw.toList())
+    }
+
+    private fun router(controller: AppServerController, publisher: PermissionModePublisher? = null) =
+        AdminRpcRouter().also { PermissionModeAdminHandlers.register(it, controller, publisher) }
+
+    private fun CoroutineScope.relayed(
+        controller: ModeController,
+        capabilities: Set<String>,
+        publisher: PermissionModePublisher? = null,
+    ): RelayedPermissionModes {
+        val call = hostCall(router(controller, publisher), capabilities)
         val rpc = AdminRpcInvoker { method, params ->
             val response = call(method, params)
             if (!response.success) throw ModelControlException(response.error ?: "$method failed")
@@ -141,7 +214,10 @@ class PermissionModeRelayRoundTripTest {
     }
 
     /** The host's controller: confirms every change, as an App Server echoing `update_device_status` does. */
-    private class ModeController(initial: AppServerPermissionMode? = null) : AppServerController by FakeAppServerController() {
+    private class ModeController(
+        initial: AppServerPermissionMode? = null,
+        private val confirm: Boolean = true,
+    ) : AppServerController by FakeAppServerController() {
         private var mode: AppServerPermissionMode? = initial
         val changes = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
 
@@ -149,8 +225,8 @@ class PermissionModeRelayRoundTripTest {
 
         override suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
             changes += runtime to mode
-            this.mode = mode
-            return true
+            if (confirm) this.mode = mode
+            return confirm
         }
     }
 

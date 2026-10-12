@@ -29,7 +29,7 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
-import com.letta.mobile.ui.chat.subagents.SubagentRosterToggle
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
@@ -369,9 +369,10 @@ private fun backgroundTasksHeaderToggle(context: DesktopShellContext, frame: Des
     if (navigator.showBackgroundTasks || context.panels.subagents.repository == null) return null
     val activeSubagents = frame.lists.activeSubagents
     return {
-        SubagentRosterToggle(
+        BackgroundTasksToggle(
             runningCount = activeSubagents.visibleRunningCount(),
             onClick = { navigator.showBackgroundTasks = true },
+            inBar = true,
         )
     }
 }
