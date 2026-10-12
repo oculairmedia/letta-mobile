@@ -17,7 +17,8 @@ import kotlinx.coroutines.test.runTest
 
 /**
  * letta-mobile-bzvro.15 / .16 (F15, F16) on desktop: the fork opens in place with the source's
- * working directory and pin, an edit refills the composer, and the original is never written.
+ * working directory and pin, an edit refills the composer, a rerun sends the prompt again in the
+ * fork (letta-mobile-7mys7), and the original is never written.
  */
 class DesktopConversationBrancherTest {
     private val timeline = listOf(
@@ -54,6 +55,19 @@ class DesktopConversationBrancherTest {
     }
 
     @Test
+    fun aRerunForksBeforeThePromptAndSendsItThere() = runTest(UnconfinedTestDispatcher()) {
+        val gateway = ForkingGateway()
+        val host = RecordingHost(gateway)
+
+        DesktopConversationBrancher(this, host).rerun(timeline[2], DesktopBranchView(timeline, hasOlderMessages = false))
+
+        assertEquals(listOf(ConversationForkRequest("conv-1", "agent-0", "m2")), gateway.forks)
+        val opened = host.branches.single()
+        assertEquals("typo hree", opened.draft?.text)
+        assertTrue(opened.sendNow, "a rerun sends the prompt into the fork")
+    }
+
+    @Test
     fun aBackendThatCannotForkSaysSoAndOffersNoActions() = runTest(UnconfinedTestDispatcher()) {
         val host = RecordingHost(FakeDesktopChatGateway())
         val brancher = DesktopConversationBrancher(this, host)
@@ -86,12 +100,14 @@ class DesktopConversationBrancherTest {
     private class RecordingHost(override val gateway: DesktopChatGateway) : DesktopBranchHost {
         override val pins = PinnedConversations(DesktopInMemorySecureSettingsStore())
         val opened = mutableListOf<Pair<String, String?>>()
+        val branches = mutableListOf<DesktopOpenedBranch>()
         val errors = mutableListOf<String>()
 
         override fun origin() = DesktopBranchOrigin("conv-1", "agent-0")
 
         override suspend fun openBranch(branch: DesktopOpenedBranch) {
-            opened += branch.conversation.id.value to branch.draft
+            opened += branch.conversation.id.value to branch.draft?.text
+            branches += branch
         }
 
         override fun showError(message: String) {

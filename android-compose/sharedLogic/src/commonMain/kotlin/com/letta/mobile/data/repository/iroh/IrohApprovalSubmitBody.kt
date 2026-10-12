@@ -1,11 +1,15 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.chat.approval.OutboxApproval
+import com.letta.mobile.data.chat.approval.OutboxTarget
+import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalSubmission
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.runtime.ApprovalBinding
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -34,6 +38,29 @@ internal object IrohApprovalSubmitBody {
     fun alwaysAllow(binding: ApprovalBinding, suggestionIds: List<String>): ApprovalCreate =
         decision(binding.approvalId, binding.toolCallId, approve = true, reason = null)
             .copy(selectedPermissionSuggestionIds = suggestionIds)
+
+    /** letta-mobile-bzvro.14: an outbox entry as the host takes it (an always-allow when it carries rule ids). */
+    fun paramsFor(entry: OutboxApproval): JsonObject {
+        val approval = if (entry.selectedSuggestionIds.isEmpty()) {
+            decision(entry.requestId, entry.toolCallIds.firstOrNull(), entry.approve, entry.reason)
+        } else {
+            alwaysAllow(ApprovalBinding(entry.key, entry.requestId), entry.selectedSuggestionIds)
+        }
+        return params(entry.agentId, entry.conversationId, approval)
+    }
+
+    /** letta-mobile-bzvro.14: an always-allow as an outbox entry, keyed by the call it answers. */
+    fun outboxEntry(answer: AlwaysAllowAnswer): OutboxApproval = OutboxApproval.of(
+        OutboxTarget(answer.agentId, answer.conversationId),
+        ChatApprovalAnswer(
+            requestId = answer.binding.approvalId,
+            toolCallIds = listOf(answer.binding.toolCallId),
+            approve = true,
+            reason = null,
+            selectedSuggestionIds = answer.suggestionIds,
+            suggestionBinding = answer.binding,
+        ),
+    )
 
     fun params(agentId: String, conversationId: String, approval: ApprovalCreate): JsonObject {
         val payload = MessageCreateRequest(

@@ -94,6 +94,8 @@ class IrohPeerCapabilitiesTest {
         // silently unusable for every non-admin peer.
         assertEquals(IrohPeerCapabilities.MEMORY_READ, IrohPeerCapabilities.forAdminMethod("reflection.get"))
         assertEquals(IrohPeerCapabilities.MEMORY_WRITE, IrohPeerCapabilities.forAdminMethod("reflection.set"))
+        // letta-mobile-iczm7: starting a dream changes memory, like a settings change.
+        assertEquals(IrohPeerCapabilities.MEMORY_WRITE, IrohPeerCapabilities.forAdminMethod("reflection.run"))
         assertTrue(
             IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("reflection.get")),
             "a standard device must be able to READ reflection settings (dreaming not silently denied)",

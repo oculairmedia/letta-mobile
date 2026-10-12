@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import android.util.Log
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.chat.branch.BranchUnavailableException
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
@@ -307,6 +308,10 @@ open class ConversationRepository(
         }
     }
 
+    /** The embedded runtime (letta-code 0.26.1) has no `conversation_fork`; every other backend forks. */
+    override fun canForkConversations(): Boolean =
+        localConversationSource == null || !AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
+
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         forkConversation(id, agentId, throughMessageId = null)
 
@@ -316,6 +321,9 @@ open class ConversationRepository(
      */
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation {
         val request = ConversationForkRequest(id.value, agentId.value, throughMessageId)
+        // letta-mobile-7mys7: the embedded runtime (letta-code 0.26.1) has no conversation_fork, and
+        // its conversations are not on any REST host, so it must not fall through to `/fork`.
+        if (!canForkConversations()) throw BranchUnavailableException(LOCAL_RUNTIME_CANNOT_FORK)
         val irohSource = irohConversationListSource
         val conversation = if (irohSource?.shouldUseIroh() == true) {
             irohSource.forkConversation(request)
@@ -368,5 +376,7 @@ open class ConversationRepository(
 
     private companion object {
         const val TAG = "ConversationRepository"
+        const val LOCAL_RUNTIME_CANNOT_FORK =
+            "The on-device runtime can't fork conversations; connect to a desktop or server host to fork."
     }
 }

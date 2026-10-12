@@ -18,6 +18,7 @@ on:
     paths:
       - "android-compose/**"
       - "scripts/ci/**"
+      - "scripts/tests/platform-ui-gate-test.sh"
       - "AGENTS.md"
       - ".github/workflows/agents-policy.yml"
   workflow_dispatch:
@@ -79,4 +80,52 @@ jobs:
             echo '```'
             echo
             echo "_Exit code is always 0 for findings; this job uses \`continue-on-error: true\`._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # letta-mobile-ckmub.7 (hard cut S0): ratchet on platform UI files. New
+  # @Composable files under desktop/, app/, feature-*/, designsystem/, web/
+  # must be allowlisted; allowlisted legacy files may not grow. ADVISORY until
+  # slice S20 adds --enforce and makes this a required context.
+  platform-ui-gate:
+    name: Platform UI gate (advisory ratchet)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Self-test platform UI gate
+        run: bash scripts/tests/platform-ui-gate-test.sh
+
+      - name: Run platform UI gate
+        env:
+          # A "Platform-UI-Reason: <why>" line here downgrades errors to warnings.
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/platform-ui
+          # Advisory (S0): no --enforce, so findings never fail the step.
+          bash scripts/ci/platform-ui-gate.sh --diff-base "$BASE_SHA" \
+            | tee /tmp/platform-ui/findings.txt
+          grep -E '^(ERROR|WARN)\|' /tmp/platform-ui/findings.txt \
+            | while IFS='|' read -r sev rule path msg; do
+                echo "::warning file=${path},title=${rule} (${sev}, advisory)::${msg}"
+              done || true
+
+      - name: Publish platform UI findings to job summary
+        if: always()
+        run: |
+          {
+            echo "## Platform UI gate (advisory ratchet, ckmub.7)"
+            echo
+            echo "All UI is shared (sharedUI); platform modules are containers. See AGENTS.md."
+            echo
+            echo '```'
+            cat /tmp/platform-ui/findings.txt 2>/dev/null || echo "(no output)"
+            echo '```'
+            echo
+            echo "_Advisory: \`continue-on-error: true\`, no \`--enforce\`. Override with a \`Platform-UI-Reason:\` line in the PR body._"
           } >> "$GITHUB_STEP_SUMMARY"

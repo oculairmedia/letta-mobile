@@ -50,6 +50,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     val pinnedAgentIds by drawer.pinnedAgentIds.collectAsStateWithLifecycle()
     val agentActivity by drawer.agentActivity.collectAsStateWithLifecycle()
     val pinnedConversationIds by drawer.pinnedConversationIds.collectAsStateWithLifecycle()
+    val conversationParents by drawer.conversationParents.collectAsStateWithLifecycle()
     val settledConversationIds by drawer.settledConversationIds.collectAsStateWithLifecycle()
     val conversationMarkers by drawer.conversationMarkers.collectAsStateWithLifecycle()
     val chatOptions = rememberAndroidChatOptionsState(state, drawer)
@@ -81,6 +82,7 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
         openConversationId = state.conversationId,
         archiveFilter = archiveFilter,
         pinnedConversationIds = pinnedConversationIds,
+        conversationParents = conversationParents,
         settledConversationIds = settledConversationIds,
         conversationMarkers = conversationMarkers,
         chatOptions = chatOptions,

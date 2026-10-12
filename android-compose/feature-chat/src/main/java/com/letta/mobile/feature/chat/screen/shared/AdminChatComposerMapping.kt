@@ -32,6 +32,8 @@ internal object AdminChatComposerMapping {
         val model: ChatModelUiState?,
         /** The streamed context reading; the placeholder state while there is none yet. */
         val contextUsage: ContextWindowUsageState,
+        /** letta-mobile-7mys7: the page can fork, so the palette offers /fork. */
+        val canFork: Boolean = false,
     )
 
     /** What the ViewModel knows about the conversation's model at one instant. */
@@ -52,11 +54,16 @@ internal object AdminChatComposerMapping {
         canQueueWhileStreaming = inputs.canQueueWhileStreaming,
         maxAttachments = inputs.maxAttachments,
         attachmentLimits = inputs.attachmentLimits,
-        commands = inputs.composer.slashCommands.map(ChatComposerCommand::fromSlashCommand).toImmutableList(),
+        commands = composerCommands(inputs),
         model = inputs.model,
         contextUsage = inputs.contextUsage,
         workingDirectory = null,
     )
+
+    /** The server's slash commands, plus the client-run /fork where the page can fork. */
+    private fun composerCommands(inputs: ComposerInputs) =
+        (listOfNotNull(ChatComposerCommand.Fork.takeIf { inputs.canFork }) +
+            inputs.composer.slashCommands.map(ChatComposerCommand::fromSlashCommand)).toImmutableList()
 
     fun modelUiState(inputs: ModelInputs): ChatModelUiState? {
         val handle = ConversationModelSelections.resolve(

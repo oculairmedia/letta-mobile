@@ -71,6 +71,17 @@ data class ChatComposerCommand(
     val removable: Boolean = false,
 ) {
     companion object {
+        /**
+         * letta-mobile-7mys7: letta-code's `/fork [name]`, which the client runs itself
+         * ([com.letta.mobile.data.chat.branch.BranchSlashCommand]); offered where the owner can fork.
+         */
+        val Fork = ChatComposerCommand(
+            id = com.letta.mobile.data.chat.branch.BranchSlashCommand.FORK,
+            label = com.letta.mobile.data.chat.branch.BranchSlashCommand.FORK,
+            description = "Fork this chat (/fork [name])",
+            fillsComposer = true,
+        )
+
         fun fromSlashCommand(command: SlashCommand): ChatComposerCommand =
             ChatComposerCommand(
                 id = command.command,

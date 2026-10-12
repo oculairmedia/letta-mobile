@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.feature.chat.screen.messageactions.LocalMessageBranchActions
+import com.letta.mobile.feature.chat.screen.messageactions.rememberMessageBranchActions
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
@@ -163,6 +165,7 @@ internal fun ChatScreen(
             if (committedFontScale != null) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalChatPagingPresentation provides pagingPresentation,
+                    LocalMessageBranchActions provides rememberMessageBranchActions(viewModel, onOpenConversation),
                 ) {
                     ChatScreenLayout(
                     params = ChatScreenLayoutParams(

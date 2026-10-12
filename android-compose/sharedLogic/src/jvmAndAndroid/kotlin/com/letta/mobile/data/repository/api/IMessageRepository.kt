@@ -139,3 +139,14 @@ data class MessageApprovalAnswer(
     val conversationId: String? = null,
     val selectedSuggestionIds: List<String> = emptyList(),
 )
+
+/** letta-mobile-bzvro.14: an answer the offline outbox replays, as the repository sends it. */
+fun com.letta.mobile.data.chat.approval.OutboxApproval.toMessageAnswer() = MessageApprovalAnswer(
+    agentId = AgentId(agentId),
+    approvalRequestId = requestId,
+    toolCallIds = toolCallIds,
+    approve = approve,
+    reason = reason,
+    conversationId = conversationId,
+    selectedSuggestionIds = selectedSuggestionIds,
+)

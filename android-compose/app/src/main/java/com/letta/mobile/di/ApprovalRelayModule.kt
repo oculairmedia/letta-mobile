@@ -1,11 +1,18 @@
 package com.letta.mobile.di
 
+import com.letta.mobile.data.chat.approval.ApprovalOutbox
+import com.letta.mobile.data.chat.approval.ApprovalOutboxChannel
+import com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator
+import com.letta.mobile.data.chat.approval.SettingsApprovalOutboxStore
+import com.letta.mobile.data.repository.api.IMessageRepository
+import com.letta.mobile.data.repository.api.toMessageAnswer
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.runtime.ApprovalRelayClient
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.runtime.RelayedPermissionModes
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.runtime.ToolCallId
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,6 +42,25 @@ object ApprovalRelayModule {
         ApprovalRelayClient().also { client ->
             client.bind(CoroutineScope(SupervisorJob() + Dispatchers.Default), transport.events)
         }
+
+    /**
+     * letta-mobile-bzvro.14: approvals answered while the Iroh link is down wait here (persisted) and
+     * are replayed after the reconnect, once per tool call.
+     */
+    @Provides
+    @Singleton
+    @Suppress("NoDetachedCoroutineLifecycle") // Process lifetime: a queued answer must outlive any screen.
+    fun provideApprovalOutbox(
+        transport: IChannelTransport,
+        store: SecureSettingsStore,
+        relay: ApprovalRelayClient,
+        messages: IMessageRepository,
+    ): ApprovalOutboxCoordinator = ApprovalOutboxChannel(
+        transport = transport,
+        pending = relay.pending,
+        send = { entry -> messages.submitApproval(entry.toMessageAnswer()) },
+        onStale = { entry -> relay.resolve(ToolCallId(entry.key)) },
+    ).coordinator(CoroutineScope(SupervisorJob() + Dispatchers.Default), ApprovalOutbox(SettingsApprovalOutboxStore(store)))
 
     @Provides
     @Singleton
