@@ -8,6 +8,12 @@ import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import com.letta.mobile.desktop.runtime.desktopRuntimeHeapMb
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayPriority
+import com.letta.mobile.ui.host.OverlayResponse
+import com.letta.mobile.ui.host.OverlayTone
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,9 +139,31 @@ internal class DesktopLocalRuntimeController(
     }
 }
 
-/** The runtime is down, restarting, or switched off: the chat says so and offers the fix. */
+/** The runtime is down, restarting, or switched off: the window says so and offers the fix. */
 internal val RuntimeHealth.needsChatBanner: Boolean
     get() = restartPending || needsForceRestart || stoppedByUser
+
+/**
+ * letta-mobile-ckmub.3.15 (S13): the bundled runtime's notice in the window's overlay queue while it
+ * is down (F03): "restarting" during backoff, Restart once automatic restarts gave up, Start when
+ * the person stopped it. Null while the runtime is healthy.
+ */
+internal fun RuntimeHealth.runtimeBanner(): Overlay.Banner? {
+    if (!needsChatBanner) return null
+    val action = when {
+        stoppedByUser -> OverlayAction("Start", DesktopLocalRuntimeHost::startByUser)
+        needsForceRestart -> OverlayAction("Restart", DesktopLocalRuntimeHost::forceRestart)
+        else -> null
+    }
+    return Overlay.Banner(
+        message = "Local runtime: ",
+        key = LOCAL_RUNTIME_BANNER_KEY,
+        presentation = OverlayPresentation(OverlayPriority.High, durationMillis = null, tone = OverlayTone.Error),
+        response = OverlayResponse(action),
+    )
+}
+
+private const val LOCAL_RUNTIME_BANNER_KEY = "desktop-local-runtime"
 
 /** The git line of the runtime card (G07). */
 internal fun DesktopGitStatus.describe(): String = when (this) {

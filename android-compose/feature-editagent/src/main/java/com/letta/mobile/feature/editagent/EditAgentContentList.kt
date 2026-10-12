@@ -422,15 +422,6 @@ private fun CardGroupScope.addLlmLimitAndToggleItems(
             )
         },
     )
-    item(
-        headlineContent = { Text(stringResource(R.string.common_enable_sleeptime)) },
-        trailingContent = {
-            Switch(
-                checked = state.enableSleeptime,
-                onCheckedChange = callbacks.onEnableSleeptimeChange,
-            )
-        },
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

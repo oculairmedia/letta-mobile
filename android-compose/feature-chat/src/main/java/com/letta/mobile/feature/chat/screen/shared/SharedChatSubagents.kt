@@ -1,11 +1,8 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -32,12 +29,12 @@ import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
 import com.letta.mobile.ui.chat.subagents.SubagentRosterList
-import com.letta.mobile.ui.components.FloatingBanner
+import com.letta.mobile.ui.host.LocalOverlayHost
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayPresentation
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** letta-mobile-bglj6.1: where the shared page's subagent affordances read from. */
@@ -174,31 +171,22 @@ private fun ActiveSubagent.sheetTarget() = SubagentTodoSheetTarget(
 )
 
 /**
- * The floating banner over the top of the page (canvas or full screen), shown for a few seconds
- * when a ring's subagent conversation cannot be opened yet.
+ * letta-mobile-ckmub.3.15 (S13): the banner at the top of the window, shown for a few seconds when
+ * a ring's subagent conversation cannot be opened yet, through the window's overlay queue.
  */
 @Composable
 internal fun SharedChatSubagentBanner(state: SharedChatSubagentSheetState) {
+    val overlays = LocalOverlayHost.current
     val message = state.bannerMessage
-    LaunchedEffect(message) {
-        if (message.isNotBlank()) {
-            delay(SUBAGENT_BANNER_MILLIS.milliseconds)
-            state.bannerMessage = ""
-        }
-    }
-    Box(Modifier.fillMaxSize()) {
-        FloatingBanner(
-            visible = message.isNotBlank(),
-            text = message,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(LettaDimens.Space.lg),
-        )
+    LaunchedEffect(message, overlays) {
+        if (message.isBlank()) return@LaunchedEffect
+        overlays?.show(Overlay.Banner(message, key = SUBAGENT_BANNER_KEY, presentation = OverlayPresentation(durationMillis = SUBAGENT_BANNER_MILLIS)))
+        state.bannerMessage = ""
     }
 }
 
-private const val SUBAGENT_BANNER_MILLIS = 2_600
+private const val SUBAGENT_BANNER_MILLIS = 2_600L
+private const val SUBAGENT_BANNER_KEY = "subagent-conversation-unavailable"
 
 /** The open todo sheet, if any, with the shared subagent roster under it. */
 @Composable

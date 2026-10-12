@@ -31,7 +31,7 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.subagents.projectSubagentRoster
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
-import com.letta.mobile.ui.components.LettaSidePane
+import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.time.Clock
@@ -74,10 +74,14 @@ fun BackgroundTasksPanel(
     }
 }
 
-/** The panel in a resizable side pane, which draws the title and close. */
+/**
+ * The panel in the window's inspector (letta-mobile-ckmub.3.15, S13): docked on the right of a
+ * wide window's [com.letta.mobile.ui.host.InspectorFrame], a sheet when compact. The inspector
+ * draws the title and close.
+ */
 @Composable
 fun BackgroundTasksSidePane(subagents: List<SubagentEntry>, onClose: () -> Unit) {
-    LettaSidePane(title = BACKGROUND_TASKS_TITLE, onClose = onClose, initialWidth = SIDE_PANE_WIDTH) {
+    InspectorPane(title = BACKGROUND_TASKS_TITLE, onClose = onClose, width = SIDE_PANE_WIDTH) {
         BackgroundTasksPanel(subagents = subagents)
     }
 }

@@ -17,7 +17,8 @@ object DreamingStrings {
     const val AUTOMATIC = "Dream automatically"
     const val WHEN = "When"
     const val REVIEW = "Agent reviews changes first"
-    const val REVIEW_HINT = "A second background run checks and revises the changes before they reach memory. Uses more tokens."
+    const val REVIEW_HINT = "A second background run on the agent's own model checks and revises the changes " +
+        "before they reach memory, roughly doubling what each dream costs."
     const val REVIEW_INSTRUCTIONS = "Review instructions (optional)"
     const val SAVE = "Save"
     const val SAVED_FOR = "Applies to"

@@ -83,6 +83,7 @@ class ChatRowRunSettleGlitchTest {
             }
         }
 
+        awaitText("All done here.")
         val activeHeight = awaitStableRunHeight()
 
         // Settle, then draw ONE frame: nothing animated can have advanced.
@@ -106,6 +107,7 @@ class ChatRowRunSettleGlitchTest {
                 }
             }
         }
+        awaitText("All done here.")
         val settledFromCold = awaitStableRunHeight()
 
         val activeState = renderState(isStreaming = true)
@@ -116,6 +118,7 @@ class ChatRowRunSettleGlitchTest {
                 }
             }
         }
+        awaitText("All done here.")
         val activeHeight = awaitStableRunHeight()
 
         // Cold (history scroll, never streamed) or settled live, the row is one shape.
@@ -123,9 +126,10 @@ class ChatRowRunSettleGlitchTest {
     }
 
     /**
-     * The streaming reveal runs on the wall clock, not this test clock, so a streaming row's
-     * height measures deterministically only once its reveal has stopped growing (this race is
-     * what flaked both cases across CI and local runs in both directions). Advances frames
+     * The streaming reveal runs on the wall clock, not this test clock, and the reply's markdown is
+     * parsed off the UI thread, so a row's height measures deterministically only once its text has
+     * landed ([awaitText], called first) and its reveal has stopped growing (these races are what
+     * flaked both cases across CI and local runs in both directions). Advances frames
      * until the height is unchanged [STABLE_FRAMES] times, then reads it. A settled row has no
      * reveal and converges immediately.
      */

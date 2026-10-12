@@ -65,6 +65,8 @@ private fun SettingsScope.Row(row: SettingsRow, drafts: RowDrafts) {
         }
         is SettingsRow.Actions -> ActionRow(row.key, row.actions.map { it.toButton(drafts.current) })
         is SettingsRow.Info -> InfoRow(row)
+        is SettingsRow.Status -> StatusRow(row)
+        is SettingsRow.Link -> LinkRow(row)
         is SettingsRow.Note -> NoteRow(row)
         is SettingsRow.Code -> CodeRow(row)
         is SettingsRow.Progress -> ProgressRow(row)
