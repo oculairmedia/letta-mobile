@@ -80,6 +80,7 @@ class IrohAdminRpcChatGateway(
     ConversationForkGateway,
     ApprovalSubmittingGateway,
     com.letta.mobile.data.chat.runtime.PendingApprovalSource,
+    com.letta.mobile.data.chat.runtime.ApprovalQueueSource,
     com.letta.mobile.data.chat.runtime.PermissionModeGateway,
     AutoCloseable,
     ConnectionStatusGateway {
@@ -99,19 +100,49 @@ class IrohAdminRpcChatGateway(
         toolCallId: String?,
         approve: Boolean,
         reason: String?,
-    ) {
-        postApproval(IrohApprovalSubmitBody.params(agentId, conversationId, IrohApprovalSubmitBody.decision(approvalRequestId, toolCallId, approve, reason)))
-        toolCallId?.let { approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(it)) }
-    }
+    ) = deliver(
+        com.letta.mobile.data.chat.approval.OutboxApproval.of(
+            com.letta.mobile.data.chat.approval.OutboxTarget(agentId, conversationId),
+            com.letta.mobile.ui.chat.session.ChatApprovalAnswer(approvalRequestId, listOfNotNull(toolCallId), approve, reason),
+        ),
+    )
 
     /** letta-mobile-bzvro.40: only a host that relays approvals applies the rule ids. */
     override suspend fun submitAlwaysAllow(answer: com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer) {
         if (com.letta.mobile.data.runtime.ApprovalRelay.CAPABILITY !in transport.hostCapabilities) {
             throw UnsupportedOperationException("this host cannot persist always-allow rules")
         }
-        postApproval(IrohApprovalSubmitBody.params(answer.agentId, answer.conversationId, IrohApprovalSubmitBody.alwaysAllow(answer.binding, answer.suggestionIds)))
-        approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(answer.binding.toolCallId))
+        deliver(IrohApprovalSubmitBody.outboxEntry(answer))
     }
+
+    /**
+     * letta-mobile-bzvro.14: through the offline outbox when there is one (sent now while connected,
+     * queued until the reconnect otherwise), else straight to the host.
+     */
+    private suspend fun deliver(entry: com.letta.mobile.data.chat.approval.OutboxApproval) {
+        val outbox = approvalOutbox ?: return post(entry)
+        if (outbox.submit(entry) == com.letta.mobile.data.chat.approval.OutboxSubmitResult.NoLongerPending) {
+            error("approval_rejected: this approval is no longer pending")
+        }
+    }
+
+    private suspend fun post(entry: com.letta.mobile.data.chat.approval.OutboxApproval) {
+        postApproval(IrohApprovalSubmitBody.paramsFor(entry))
+        approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(entry.key))
+    }
+
+    /** letta-mobile-bzvro.14: answers made while the link is down, replayed after the reconnect. */
+    private val approvalOutbox: com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator? = approvalControls?.let { controls ->
+        com.letta.mobile.data.chat.approval.ApprovalOutboxChannel(
+            transport = transport,
+            pending = controls.relay.pending,
+            send = ::post,
+            onStale = { controls.relay.resolve(com.letta.mobile.runtime.ToolCallId(it.key)) },
+        ).coordinator(controls.scope, com.letta.mobile.data.chat.approval.ApprovalOutbox(controls.outboxStore))
+    }
+
+    override val queuedApprovalRequestIds: kotlinx.coroutines.flow.StateFlow<Set<String>>
+        get() = approvalOutbox?.queuedRequestIds ?: noQueuedApprovals
 
     private suspend fun postApproval(params: JsonObject) {
         val agentId = (params["agent_id"] as? JsonPrimitive)?.content.orEmpty()
@@ -122,6 +153,8 @@ class IrohAdminRpcChatGateway(
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc approval.submit failed")
     }
+
+    private val noQueuedApprovals: kotlinx.coroutines.flow.StateFlow<Set<String>> = kotlinx.coroutines.flow.MutableStateFlow(emptySet())
 
     private val noPendingApprovals: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
         kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
@@ -142,6 +175,7 @@ class IrohAdminRpcChatGateway(
     }
 
     override fun close() {
+        approvalOutbox?.close()
         approvalControls?.close()
     }
 

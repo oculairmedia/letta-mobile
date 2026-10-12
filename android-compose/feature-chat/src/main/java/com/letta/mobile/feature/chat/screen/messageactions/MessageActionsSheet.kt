@@ -41,6 +41,8 @@ internal data class MessageActionsSheetActions(
     val onDismiss: () -> Unit,
     val onCopy: () -> Unit,
     val onSendAgain: () -> Unit,
+    /** letta-mobile-7mys7: the branch actions; null when the screen cannot branch. */
+    val branch: MessageBranchActions? = null,
 )
 
 @Composable
@@ -72,6 +74,7 @@ internal fun MessageActionsSheet(
                 .heightIn(max = actionListMaxHeight)
                 .verticalScroll(rememberScrollState()),
         ) {
+            BranchActionItems(state, actions)
             if (state.availability.canSendAgain) {
                 ActionSheetItem(
                     text = stringResource(R.string.message_action_send_again),
@@ -109,6 +112,29 @@ internal fun MessageActionsSheet(
         MessageTextSelectionDialog(
             text = state.copyText,
             onDismiss = { showTextSelection = false },
+        )
+    }
+}
+
+/** letta-mobile-7mys7: Edit and resend, Rerun and Fork from here, above the sheet's other actions. */
+@Composable
+private fun BranchActionItems(state: MessageActionsSheetState, actions: MessageActionsSheetActions) {
+    val branch = actions.branch ?: return
+    val items = listOf(
+        Triple(state.availability.canEdit, R.string.message_action_edit_and_resend, LettaIcons.Edit) to branch.onEditAndResend,
+        Triple(state.availability.canRerun, R.string.message_action_rerun, LettaIcons.Refresh) to branch.onRerun,
+        Triple(state.availability.canFork, R.string.message_action_fork, LettaIcons.ForkRight) to branch.onFork,
+    )
+    for ((item, onClick) in items) {
+        val (available, label, icon) = item
+        if (!available) continue
+        ActionSheetItem(
+            text = stringResource(label),
+            icon = icon,
+            onClick = {
+                actions.onDismiss()
+                onClick(state.message)
+            },
         )
     }
 }

@@ -59,13 +59,28 @@ class MessageActionPolicyTest {
     }
 
     @Test
-    fun `a prompt with images is not edited because the composer would drop them`() {
-        val message = message(role = "user").copy(
+    fun `a prompt with images is edited and rerun with them unless only a pointer was kept`() {
+        val support = BranchActionSupport(fork = true, edit = true, rerun = true)
+        val withImage = message(role = "user").copy(
             attachments = listOf(UiImageAttachment(base64 = "image", mediaType = "image/png")),
         )
-        val actions = availability(message, branching = BranchActionSupport(fork = true, edit = true))
-        assertFalse(actions.canEdit)
-        assertTrue(actions.canFork)
+        val pointerOnly = message(role = "user").copy(
+            attachments = listOf(UiImageAttachment(base64 = "", mediaType = "image/png", storedByteSize = 4)),
+        )
+
+        assertTrue(availability(withImage, branching = support).canEdit)
+        assertTrue(availability(withImage, branching = support).canRerun)
+        assertFalse(availability(pointerOnly, branching = support).canEdit)
+        assertFalse(availability(pointerOnly, branching = support).canRerun)
+        assertTrue(availability(pointerOnly, branching = support).canFork)
+    }
+
+    @Test
+    fun `rerun is offered on prompts only and only when the owner can rerun in a fork`() {
+        val support = BranchActionSupport(fork = true, edit = true, rerun = true)
+        assertTrue(availability(message(role = "user"), branching = support).canRerun)
+        assertFalse(availability(message(role = "assistant"), branching = support).canRerun)
+        assertFalse(availability(message(role = "user"), branching = support.copy(rerun = false)).canRerun)
     }
 
     private fun availability(

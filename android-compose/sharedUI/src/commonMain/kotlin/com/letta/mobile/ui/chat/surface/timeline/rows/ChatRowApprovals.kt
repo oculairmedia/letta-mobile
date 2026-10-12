@@ -105,49 +105,65 @@ internal class ApprovalDecider(
 }
 
 /**
- * The decider for [approval]: submitting while it is the owner's [activeApprovalRequestId], and
- * deciding through [actions] only when the owner takes approvals ([approvalsEnabled]).
+ * Who answers approvals and which requests are already answered. [busyRequestIds] holds every
+ * request with an answer on its way: in flight, queued while offline (letta-mobile-bzvro.14), or
+ * held in a submitted batch; [answer] is where a decision goes (the owner's actions, or the stepper
+ * while several requests are stepped through).
  */
+@Immutable
+internal class ApprovalOwner(
+    val busyRequestIds: Set<String>,
+    val approvalsEnabled: Boolean,
+    val answer: (ChatApprovalAnswer) -> Unit,
+) {
+    companion object {
+        fun of(activeApprovalRequestId: String?, approvalsEnabled: Boolean, actions: ChatActions) =
+            ApprovalOwner(setOfNotNull(activeApprovalRequestId), approvalsEnabled, actions::submitApproval)
+    }
+}
+
+/** The decider for [approval]: submitting while [owner] holds an answer for it, deciding through [owner]. */
 @Composable
-internal fun rememberApprovalDecider(
-    approval: UiApprovalRequest,
-    activeApprovalRequestId: String?,
-    approvalsEnabled: Boolean,
-    actions: ChatActions,
-): ApprovalDecider {
-    val isSubmitting = activeApprovalRequestId == approval.requestId
-    return remember(approval.requestId, approval.details?.binding, isSubmitting, approvalsEnabled, actions) {
+internal fun rememberApprovalDecider(approval: UiApprovalRequest, owner: ApprovalOwner): ApprovalDecider {
+    val isSubmitting = approval.requestId in owner.busyRequestIds
+    return remember(approval.requestId, approval.details?.binding, isSubmitting, owner.approvalsEnabled, owner.answer) {
+        val answer = owner.answer.takeIf { owner.approvalsEnabled }
         ApprovalDecider(
             requestId = approval.requestId,
             isSubmitting = isSubmitting,
-            submit = if (approvalsEnabled) {
-                // Bound to the call the card is drawn for: a request with parallel calls is answered one
-                // gate at a time, and the card redraws for the next once this one resolves.
+            // Bound to the call the card is drawn for: a request with parallel calls is answered one
+            // gate at a time, and the card redraws for the next once this one resolves.
+            submit = answer?.let { send ->
                 { ids, approve, reason ->
-                    actions.submitApproval(
-                        ChatApprovalAnswer(approval.requestId, ids, approve, reason, suggestionBinding = approval.details?.binding),
-                    )
+                    send(ChatApprovalAnswer(approval.requestId, ids, approve, reason, suggestionBinding = approval.details?.binding))
                 }
-            } else {
-                null
             },
-            submitAlwaysAllow = if (approvalsEnabled) {
-                { details, suggestionId ->
-                    actions.submitApproval(
-                        ChatApprovalAnswer(
-                            requestId = approval.requestId,
-                            toolCallIds = approval.toolCalls.map { it.toolCallId },
-                            approve = true,
-                            reason = null,
-                            selectedSuggestionIds = listOf(suggestionId),
-                            suggestionBinding = details.binding,
-                        ),
-                    )
-                }
-            } else {
-                null
+            submitAlwaysAllow = answer?.let { send ->
+                { details, suggestionId -> send(approval.alwaysAllow(details, suggestionId)) }
             },
         )
+    }
+}
+
+private fun UiApprovalRequest.alwaysAllow(details: PendingApprovalDetails, suggestionId: String) = ChatApprovalAnswer(
+    requestId = requestId,
+    toolCallIds = toolCalls.map { it.toolCallId },
+    approve = true,
+    reason = null,
+    selectedSuggestionIds = listOf(suggestionId),
+    suggestionBinding = details.binding,
+)
+
+/** The row's owner: its actions, or the page's stepper while it steps through several requests. */
+@Composable
+private fun rememberRowApprovalOwner(context: ChatRowContext, callbacks: ChatRowCallbacks): ApprovalOwner {
+    val stepper = LocalApprovalStepper.current
+    val steps = stepper?.steps
+    val itemState = context.itemState
+    return remember(itemState.activeApprovalRequestId, itemState.queuedApprovalRequestIds, steps, context.capabilities.approvals, callbacks.actions) {
+        val busy = setOfNotNull(itemState.activeApprovalRequestId) + itemState.queuedApprovalRequestIds + steps?.submitted.orEmpty()
+        val answer: (ChatApprovalAnswer) -> Unit = if (stepper != null && steps?.stepping == true) stepper::decide else callbacks.actions::submitApproval
+        ApprovalOwner(busy, context.capabilities.approvals, answer)
     }
 }
 
@@ -164,25 +180,37 @@ internal fun ApprovalRequestCard(
     callbacks: ChatRowCallbacks,
 ) {
     if (!approval.requiresUserInput()) return
-    val decider = rememberApprovalDecider(
-        approval = approval,
-        activeApprovalRequestId = context.itemState.activeApprovalRequestId,
-        approvalsEnabled = context.capabilities.approvals,
-        actions = callbacks.actions,
-    )
+    val decider = rememberApprovalDecider(approval, rememberRowApprovalOwner(context, callbacks))
     // The moment a decision lands on the person: one attention cue per request.
     val haptics = LocalHaptics.current
     LaunchedEffect(approval.requestId) {
         if (decider.submit != null) haptics.play(LettaHapticCue.ApprovalNeeded)
     }
-    ApprovalRequestCard(approval, decider)
+    // The step header and the queued note sit above the card, never under it.
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
+        ApprovalStepAndQueue(approval, context)
+        ApprovalRequestCard(approval, decider)
+    }
+}
+
+/**
+ * letta-mobile-bzvro.14: over the card, "Approval 2 of 3" while several requests are stepped
+ * through, and a note when the answer is queued until the connection is back.
+ */
+@Composable
+private fun ApprovalStepAndQueue(approval: UiApprovalRequest, context: ChatRowContext) {
+    val stepper = LocalApprovalStepper.current
+    val steps = stepper?.steps?.takeIf { it.stepping && it.currentRequestId == approval.requestId }
+    if (stepper != null && steps != null) ApprovalStepHeader(steps, stepper::back, stepper::forward)
+    if (approval.requestId in context.itemState.queuedApprovalRequestIds) ApprovalQueuedNote()
 }
 
 /**
  * letta-mobile-bzvro.40: a message's approval card, growing in and out of the row instead of
  * snapping it taller: an Iroh host's parked request joins a tool row that is already on screen (UI
  * motion rule: a height change animates, reduced-motion aware). A row composed with its card already
- * there shows it at once, so scrolling never replays the entrance.
+ * there shows it at once, so scrolling never replays the entrance. letta-mobile-bzvro.14: while the
+ * page steps through several requests, only the current step's card is drawn.
  */
 @Composable
 internal fun ColumnScope.ApprovalRequestSlot(
@@ -190,7 +218,8 @@ internal fun ColumnScope.ApprovalRequestSlot(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
 ) {
-    val waiting = approval?.takeIf { it.requiresUserInput() }
+    val stepper = LocalApprovalStepper.current
+    val waiting = approval?.takeIf { it.requiresUserInput() && stepper?.shows(it.requestId) != false }
     // The last card drawn, so the exit animation still has its content once the request is answered.
     var last by remember { mutableStateOf(waiting) }
     SideEffect { if (waiting != null) last = waiting }

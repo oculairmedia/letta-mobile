@@ -54,6 +54,8 @@ internal data class DesktopChatTimelineInputs(
     val submittingApprovals: Set<String> = emptySet(),
     /** letta-mobile-bzvro.11/.12: what each parked control request offered, by tool call id. */
     val approvalDetails: Map<String, PendingApprovalDetails> = emptyMap(),
+    /** letta-mobile-bzvro.14: requests answered offline, waiting for the connection. */
+    val queuedApprovals: Set<String> = emptySet(),
 )
 
 /**
@@ -87,6 +89,7 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
             inputs.cancellingConversationId == surface.selectedConversationId,
         sendQueue = inputs.sendQueue,
         activeApprovalRequestId = submittingApprovalOnScreen(inputs.submittingApprovals, messages),
+        queuedApprovalRequestIds = inputs.queuedApprovals.toImmutableSet(),
     )
 }
 

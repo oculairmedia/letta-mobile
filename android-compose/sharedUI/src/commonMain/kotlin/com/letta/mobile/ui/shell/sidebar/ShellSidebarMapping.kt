@@ -13,6 +13,8 @@ data class ShellConversationMarks(
     val deletingIds: Set<String> = emptySet(),
     /** letta-mobile-bzvro.17: pinned conversations, listed first. */
     val pinnedIds: Set<String> = emptySet(),
+    /** letta-mobile-7mys7 (G37): each fork's source conversation id (ConversationLineage), for "Forked from …". */
+    val parentIds: Map<String, String> = emptyMap(),
     /** letta-mobile-zxk2n.5: settled conversations, listed after the active ones. */
     val settledIds: Set<String> = emptySet(),
     /** letta-mobile-zxk2n.5: each marked conversation's emoji. */
@@ -35,6 +37,7 @@ object ShellSidebarMapping {
         marks: ShellConversationMarks,
         timeLabel: (String) -> String,
     ): List<ShellConversationRowModel> {
+        val titles = conversations.associate { it.id to it.displayTitle() }
         val ordered = ConversationListOrder.arrange(conversations, ConversationListGroups(marks.pinnedIds, marks.settledIds)) { it.id }
         return ordered.map { conversation ->
             ShellConversationRowModel(
@@ -49,9 +52,13 @@ object ShellSidebarMapping {
                 pinned = conversation.id in marks.pinnedIds,
                 settled = conversation.id in marks.settledIds,
                 marker = marks.markers[conversation.id],
+                forkedFrom = marks.parentIds[conversation.id]?.let { parent -> titles[parent] ?: UNLISTED_PARENT },
             )
         }
     }
+
+    /** A fork whose source is not in the list (archived, another agent's, or gone). */
+    const val UNLISTED_PARENT = "an earlier chat"
 
     /** The preview line under a title: trimmed, and blank for the loading placeholder. */
     fun cleanPreview(raw: String): String =

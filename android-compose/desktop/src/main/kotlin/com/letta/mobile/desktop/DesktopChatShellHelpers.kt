@@ -35,6 +35,7 @@ import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
+import com.letta.mobile.desktop.chat.sendOrBranch
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
@@ -371,6 +372,14 @@ internal fun desktopClientCommand(
 internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
     val onNavigate = params.onNavigate
     ClientSlashCommand.entries.forEach { add(desktopClientCommand(it, params)) }
+    // letta-mobile-7mys7: letta-code's /fork [name], run by the client (the App Server does not).
+    if (params.chatController.conversationManagement.supportsBranching) {
+        add(
+            ComposerCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) {
+                params.chatController.updateComposerText("/fork ")
+            },
+        )
+    }
     add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
     add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
     add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
@@ -509,7 +518,7 @@ internal fun createDesktopChatDetailPaneActions(
     val chatController = params.chatController
     return ChatDetailPaneActions(
         onComposerTextChanged = chatController::updateComposerText,
-        onSend = chatController::send,
+        onSend = chatController::sendOrBranch,
         onSubmitApproval = if (params.canSubmitApprovals) {
             { requestId, toolCallIds, approve, reason ->
                 chatController.submitApproval(ChatApprovalAnswer(requestId, toolCallIds, approve, reason))
@@ -537,6 +546,7 @@ internal fun createDesktopChatDetailPaneActions(
         onOpenAgent = params.onOpenAgent,
         queue = desktopQueuedSendActions(chatController),
         queueControls = chatController::canonicalSendQueue,
+        messageMenu = { com.letta.mobile.desktop.chat.desktopMessageMenu(chatController) },
     )
 }
 
