@@ -222,6 +222,22 @@ class ChatDockGeometryMathTest {
         assertEquals(ChatDockGeometry(anchorX = 0.5f, anchorY = 1f, widthDp = null, heightDp = null), repaired)
     }
 
+    @Test
+    fun aCollapsedWidthNarrowsTheBarAboutItsAnchorAndNeverLeavesTheArea() {
+        val collapsed = ChatDockGeometryMath.collapse(ChatDockGeometry.Default)
+        val narrow = ChatDockGeometryMath.rect(collapsed, frame().copy(collapsedWidthDp = 640f))
+        assertEquals(640f, narrow.width, EPS)
+        // Centred: the same space either side of it.
+        assertEquals(1200f - narrow.right, narrow.left, EPS)
+        val wide = ChatDockGeometryMath.rect(collapsed, frame().copy(collapsedWidthDp = 5000f))
+        assertEquals(1200f - 2 * limits.marginDp, wide.width, EPS)
+        assertInside(wide, frame())
+        // The open panel keeps its own width.
+        assertEquals(760f, ChatDockGeometryMath.rect(ChatDockGeometry.Default, frame().copy(collapsedWidthDp = 640f)).width, EPS)
+        // Without one the bar is as wide as the panel, as before.
+        assertEquals(760f, ChatDockGeometryMath.rect(collapsed, frame()).width, EPS)
+    }
+
     private companion object {
         const val EPS = 0.01f
     }

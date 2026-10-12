@@ -697,6 +697,9 @@ data class ApprovalCreate(
     // admin_rpc and plain-HTTP transports deliver the answer instead of the Iroh
     // path re-decoding it from a `reason` sentinel and the HTTP path dropping it.
     @SerialName("updated_input") val updatedInput: JsonObject? = null,
+    // letta-mobile-bzvro.40: the always-allow rule ids chosen with an approval. Only an Iroh host reads
+    // them (ApprovalAdminHandlers -> selected_permission_suggestion_ids on the App Server's decision).
+    @SerialName("selected_permission_suggestion_ids") val selectedPermissionSuggestionIds: List<String>? = null,
 )
 
 @Serializable

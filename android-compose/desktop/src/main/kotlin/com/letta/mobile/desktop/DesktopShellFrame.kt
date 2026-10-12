@@ -313,6 +313,8 @@ internal fun rememberDesktopHomeInputs(context: DesktopShellContext, frame: Desk
     return DesktopHomeInputs(
         state = state,
         options = HomePageOptions(
+            // The header's search field searches Home while it shows (letta-mobile-xuhmy).
+            showSearch = false,
             orbIndexByAgentId = homeOrbIndexes,
             composerPlaceholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
         ),

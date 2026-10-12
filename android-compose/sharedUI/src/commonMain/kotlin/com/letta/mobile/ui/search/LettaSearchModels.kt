@@ -155,6 +155,12 @@ data class LettaSearchConfig(
      * palette and Home both list hundreds of rows.
      */
     val lazyResults: Boolean = true,
+    /**
+     * Whether the anchored field opens a results panel under it. False when the page behind the
+     * field is itself the result surface (desktop's header searching Home): the field then opens
+     * alone, with no scopes, toggle or rows.
+     */
+    val showResults: Boolean = true,
     val emptyText: (String) -> String = { query ->
         if (query.isBlank()) "Nothing to show" else "No results for \"$query\""
     },

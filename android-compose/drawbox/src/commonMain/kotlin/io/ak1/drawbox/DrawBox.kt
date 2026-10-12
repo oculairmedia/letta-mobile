@@ -230,9 +230,8 @@ fun DrawBox(
     val pickToleranceNow by rememberUpdatedState(pickTolerance)
     // Two-layer split:
     //   - finalizedLayer: cached display list of "static" elements (everything not
-    //     currently being mutated). Re-recorded only when the static set OR the
-    //     viewport changes — so a 500-element scene replays for free during an
-    //     active drag, since nothing changes outside the one element being drawn.
+    //     currently being mutated) near the view; see StaticLayer. A pan replays it
+    //     shifted, and a change re-records it only when it paints near the view.
     //   - captureLayer: one-shot recording used only when bitmap export is
     //     requested. Records the full scene at world-space, dispatches the
     //     resulting ImageBitmap, then sits idle. Keeps the per-frame fast path
@@ -296,12 +295,10 @@ fun DrawBox(
     // since they don't change any element's geometry.
     var dragInProgress by remember { mutableStateOf(false) }
 
-    // Snapshot of (viewport, static element refs) at the last finalizedLayer
-    // record. We use REFERENCE equality on element entries — the reducer always
-    // produces new instances via `copy(...)` on mutation, so any change to a
-    // static element is detected without scanning fields.
-    var lastRecordedVp by remember { mutableStateOf<Viewport?>(null) }
-    var lastRecordedStaticRefs by remember { mutableStateOf<List<Element>>(emptyList()) }
+    // Where each element paints, and a grid over it for culling; and the recording of the
+    // unchanging elements around the view. Both are plain holders written by the draw pass.
+    val renderIndex = remember { RenderIndex() }
+    val staticLayer = remember(finalizedLayer) { StaticLayer(finalizedLayer) }
 
     // Bitmap capture is request/serve: the controller's invokeBitmap call sets
     // this; the next draw pass records the full scene into captureLayer and
@@ -901,7 +898,7 @@ fun DrawBox(
                     Mode.PAN -> emptySet()
                     // The eraser removes elements from the static set on each
                     // tick. Surviving elements are unchanged, so leave activeIds
-                    // empty and let staticRefsMatch handle the cache rebuild
+                    // empty and let the render index report the removals
                     // when the element list shrinks.
                     Mode.ERASER -> emptySet()
                     // Text insertion is single-step (tap → InsertText with an
@@ -920,46 +917,29 @@ fun DrawBox(
             // layer would otherwise keep replaying the text under the editor.
             val activeIds: Set<String> = if (hiddenTextElementIds.isEmpty()) draggedIds else draggedIds + hiddenTextElementIds
 
-            // Freshness check on the cached layer. Walks orderedElements once,
-            // comparing non-active and non-hidden entries against
-            // lastRecordedStaticRefs by reference (allocation-free). Hidden
-            // ids are skipped so a freshly-hidden element invalidates the
-            // cache instead of replaying from a recording made before it was
-            // hidden (otherwise the inline editor would ghost over the
-            // still-cached text).
-            val cacheFresh = lastRecordedVp == vp &&
-                staticRefsMatch(
-                    orderedElements,
-                    activeIds,
-                    hiddenElementIds,
-                    lastRecordedStaticRefs,
-                )
-
-            if (!cacheFresh) {
-                // Re-record at screen-space (transform baked in). This means
-                // pan/zoom invalidates the cache — explicitly accepted trade-off:
-                // the win is during active drawing, where the viewport is stable
-                // but elements churn. Pan/zoom optimization is a follow-up.
-                finalizedLayer.record {
-                    withTransform({
-                        translate(vp.offset.x, vp.offset.y)
-                        scale(vp.scale, vp.scale, pivot = Offset.Zero)
-                    }) {
-                        orderedElements.forEach { el ->
-                            if (el.id !in activeIds && el.id !in hiddenElementIds) {
-                                renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
-                            }
-                        }
+            // The cached static layer (see StaticLayer): only elements painting near the view are
+            // recorded, a pan within its margin replays it shifted, and a change re-records it only
+            // when it paints into the recorded region. Elements drawn live (active) or hidden under
+            // an editor are left out of it; a change to that set records it again, so a freshly
+            // hidden text does not ghost from the recording under its editor.
+            renderIndex.update(orderedElements)
+            imageCache.beginFrame()
+            val changes = renderIndex.takeDirty()
+            val layerKey = StaticLayer.Key(
+                scale = vp.scale,
+                canvas = IntSize(kotlin.math.ceil(size.width).toInt(), kotlin.math.ceil(size.height).toInt()),
+                excluded = if (hiddenElementIds.isEmpty()) activeIds else activeIds + hiddenElementIds,
+                // Read here, in the draw pass, so a decode landing redraws and records the image in.
+                images = imageCache.landed.longValue,
+            )
+            with(staticLayer) {
+                if (!isFresh(vp, layerKey, changes)) {
+                    record(vp, layerKey, renderIndex) { el ->
+                        renderElement(el, pathCache, imageCache, textCache, textMeasurer, vp.scale, shapeTextFor(el))
                     }
                 }
-                lastRecordedVp = vp
-                lastRecordedStaticRefs = orderedElements
-                    .filter { it.id !in activeIds && it.id !in hiddenElementIds }
+                replay(vp)
             }
-
-            // Play the cached static layer. No transform — it was baked in at
-            // record time and the layer replays in screen-space.
-            drawLayer(finalizedLayer)
 
             // Draw the active element(s) + selection chrome live, through the
             // same world→screen transform.
@@ -1037,6 +1017,7 @@ fun DrawBox(
                 imageCache.retainOnly(liveIds)
                 textCache.retainOnly(liveIds)
             }
+            imageCache.trimToBudget()
         }
         overlay()
     }
@@ -1623,6 +1604,7 @@ private fun DrawScope.renderElement(
     viewportScale: Float = 1f,
     shapeText: ShapeTextPaint,
 ) {
+    DrawBoxRenderStats.elementsDrawn++
     if (element.rotation == 0f) {
         renderElementContent(element, pathCache, imageCache, textCache, textMeasurer, viewportScale, shapeText)
     } else {
@@ -1647,15 +1629,13 @@ private fun DrawScope.renderElementContent(
             // Uniform-width fast path when every sample carries the same width
             // (mouse / capacitive touch / programmatic insertion). One drawPath
             // call with cached geometry — keeps the existing perf characteristics
-            // and respects DASHED / DOTTED stroke styles.
-            val firstWidth = samples.firstOrNull()?.width ?: element.strokeWidth
-            val uniform = samples.all { it.width == firstWidth }
-            if (uniform || samples.size < 2) {
-                val positions = element.positions
-                val path = pathCache?.pathFor(element.id, positions)
-                    ?: createPath(positions)
+            // and respects DASHED / DOTTED stroke styles. The path and the width
+            // check are cached per stroke (PathCache), not redone per record.
+            val stroke = pathCache?.strokeFor(element) ?: PathCache.entryOf(element)
+            val firstWidth = stroke.uniformWidth
+            if (firstWidth != null) {
                 drawPath(
-                    path,
+                    stroke.path,
                     color = element.strokeColor,
                     alpha = element.alpha,
                     style = Stroke(

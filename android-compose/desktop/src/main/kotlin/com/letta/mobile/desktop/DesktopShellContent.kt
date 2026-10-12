@@ -231,7 +231,6 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
     if (navigator.showBackgroundTasks && repository != null) {
         DesktopBackgroundTasksSidePane(
             subagents = frame.lists.activeSubagents,
-            onFetchTodos = { toolCallId -> repository.todos(toolCallId).getOrDefault(emptyList()) },
             onClose = { navigator.showBackgroundTasks = false },
         )
     }

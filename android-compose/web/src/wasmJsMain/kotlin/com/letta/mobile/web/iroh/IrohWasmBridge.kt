@@ -2,6 +2,8 @@
 
 package com.letta.mobile.web.iroh
 
+import com.letta.mobile.web.data.displayMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.await
 
 internal class IrohWasmBridge private constructor(
@@ -24,8 +26,18 @@ internal class IrohWasmBridge private constructor(
     }
 
     companion object {
-        suspend fun connect(ticket: String): IrohWasmBridge {
-            val id = callConnect(ticket).await().toInt()
+        /**
+         * Dials [endpointUrl] (`iroh://<endpoint id>`). A rejection from the JS side (a JS `Error`)
+         * comes back as an [IllegalStateException] with a readable message, never the raw JS value.
+         */
+        suspend fun connect(endpointUrl: String): IrohWasmBridge {
+            val id = try {
+                callConnect(endpointUrl).await().toInt()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                throw IllegalStateException("Could not connect over Iroh: ${failure.displayMessage("unknown error")}", failure)
+            }
             return IrohWasmBridge(id)
         }
     }

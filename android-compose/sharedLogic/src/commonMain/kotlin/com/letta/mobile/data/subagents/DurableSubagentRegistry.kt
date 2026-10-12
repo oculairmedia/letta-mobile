@@ -220,6 +220,8 @@ class DurableSubagentRegistry(
             firstSeenEpochMs = now,
             lastSeenEpochMs = now,
             terminalAtEpochMs = if (observation.state.isTerminal) now else null,
+            progress = observation.progress,
+            lastActivityEpochMs = now,
         )
         entries[observation.key] = record
         enforceCapacityLocked()
@@ -236,22 +238,65 @@ class DurableSubagentRegistry(
     private fun SubagentChipRecord.mergedWith(
         observation: SubagentChipObservation,
         now: Long,
-    ): SubagentChipRecord = copy(
-        state = observation.state,
-        source = observation.source,
-        description = description.ifEmpty { observation.description },
-        subagentType = subagentType.ifEmpty { observation.subagentType },
-        taskId = taskId ?: observation.taskId,
-        subagentAgentId = subagentAgentId ?: observation.subagentAgentId,
-        subagentConversationId = subagentConversationId ?: observation.subagentConversationId,
-        parentRunId = parentRunId ?: observation.parentRunId,
-        startedAt = startedAt ?: observation.startedAt,
-        activity = newerActivity(activity, observation.activity, generation, observation.generation),
-        generation = maxOf(generation, observation.generation),
-        lastSeenEpochMs = now,
-        terminalAtEpochMs = terminalAtEpochMs
-            ?: now.takeIf { observation.state.isTerminal },
-    )
+    ): SubagentChipRecord {
+        val firstTerminalAt = terminalAtEpochMs ?: now.takeIf { observation.state.isTerminal }
+        val activityAt = if (madeProgress(observation)) now else lastActivityEpochMs ?: lastSeenEpochMs
+        return backfilledFrom(observation).copy(
+            state = observation.state,
+            source = observation.source,
+            activity = newerActivity(activity, observation.activity, generation, observation.generation),
+            generation = maxOf(generation, observation.generation),
+            lastSeenEpochMs = now,
+            terminalAtEpochMs = firstTerminalAt,
+            progress = progress.mergedWith(observation.progress),
+            lastActivityEpochMs = activityAt,
+        )
+    }
+
+    /** Provenance only fills gaps: a populated value is never replaced. */
+    private fun SubagentChipRecord.backfilledFrom(observation: SubagentChipObservation): SubagentChipRecord {
+        val ids = childIds().backfilledFrom(observation.childIds())
+        return copy(
+            description = description.ifEmpty { observation.description },
+            subagentType = subagentType.ifEmpty { observation.subagentType },
+            taskId = ids.taskId,
+            subagentAgentId = ids.agentId,
+            subagentConversationId = ids.conversationId,
+            parentRunId = ids.parentRunId,
+            startedAt = ids.startedAt,
+        )
+    }
+
+    private fun SubagentChipRecord.childIds() =
+        SubagentChildIds(taskId, subagentAgentId, subagentConversationId, parentRunId, startedAt)
+
+    private fun SubagentChipObservation.childIds() =
+        SubagentChildIds(taskId, subagentAgentId, subagentConversationId, parentRunId, startedAt)
+
+    /** The child's identifiers, backfilled together. */
+    private data class SubagentChildIds(
+        val taskId: String?,
+        val agentId: String?,
+        val conversationId: String?,
+        val parentRunId: String?,
+        val startedAt: String?,
+    ) {
+        fun backfilledFrom(other: SubagentChildIds): SubagentChildIds {
+            val values = listOf(taskId, agentId, conversationId, parentRunId, startedAt)
+                .zip(listOf(other.taskId, other.agentId, other.conversationId, other.parentRunId, other.startedAt))
+                .map { (mine, theirs) -> mine ?: theirs }
+            return SubagentChildIds(values[0], values[1], values[2], values[3], values[4])
+        }
+    }
+
+    /**
+     * letta-mobile-ulcg6 (RC4): a re-delivered identical snapshot is not
+     * progress. A new tool call, new activity lines or a lifecycle change is.
+     */
+    private fun SubagentChipRecord.madeProgress(observation: SubagentChipObservation): Boolean =
+        observation.state != state ||
+            progress.advancedBy(observation.progress) ||
+            (observation.activity != null && observation.activity.lines != activity?.lines)
 
     private fun newerActivity(
         current: com.letta.mobile.data.model.SubagentActivitySnapshot?,

@@ -8,6 +8,7 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
 import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsActions
+import com.letta.mobile.ui.chat.surface.recents.RecentInteractionsContent
 
 /*
  * letta-mobile-y5q9z: the page's side of the canvas bubble. The bubble's card shows what the docked
@@ -33,7 +34,7 @@ internal fun rememberTouchBubble(frame: ChatSurfaceFrame, state: CanvasBubbleSta
         state = state,
         exchange = { modifier -> DockedReplyCard(dockedReplyParams(frame), modifier) },
         composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) },
-        recents = recents?.let { BubbleRecents(state, it, recentsHop(frame, it, state::closeRecents)) },
+        recents = recents?.let { frame.bubbleRecents(state, it) },
         onStop = if (busy) frame.port.actions::stopRun else null,
     )
 }
@@ -58,19 +59,27 @@ internal fun rememberDockedRecents(frame: ChatSurfaceFrame): BubbleRecents? {
     val state = rememberCanvasBubbleState(expanded = true)
     ObserveBubbleConversation(frame, state)
     val recents = frame.recents ?: return null
-    return BubbleRecents(state, recents, recentsHop(frame, recents, state::closeRecents))
+    return frame.bubbleRecents(state, recents)
 }
 
 /**
  * The "+"'s recent interactions: the state that opens them (on the docked panel only
- * [CanvasBubbleState.recentsOpen] matters), the rows and what a pick does.
+ * [CanvasBubbleState.recentsOpen] matters), the rows with the agent they picture, and what a pick does.
  */
 @Immutable
 internal class BubbleRecents(
     val state: CanvasBubbleState,
-    val recents: ChatRecentInteractions,
+    val content: RecentInteractionsContent,
     val hop: RecentInteractionsActions,
 )
+
+/** [recents] for this page's agent: its rows picture the agent ([com.letta.mobile.ui.mascot.AgentAvatar]). */
+private fun ChatSurfaceFrame.bubbleRecents(state: CanvasBubbleState, recents: ChatRecentInteractions): BubbleRecents =
+    BubbleRecents(
+        state = state,
+        content = RecentInteractionsContent(uiState.agentId, uiState.agentName, recents.conversations),
+        hop = recentsHop(this, recents, state::closeRecents),
+    )
 
 /**
  * What picking a recent interaction does: the current conversation just closes the list; another one
