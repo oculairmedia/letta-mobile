@@ -553,13 +553,13 @@ class ConversationsViewModelTest {
 
     private fun remoteConfig(): LettaConfig = LettaConfig(
         id = "remote",
-        mode = LettaConfig.Mode.CLOUD,
+        mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl = "https://api.letta.example",
     )
 
     private fun remoteConfigOther(): LettaConfig = LettaConfig(
         id = "remote",
-        mode = LettaConfig.Mode.CLOUD,
+        mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl = "https://api.letta.other",
     )
 

@@ -54,13 +54,13 @@ import com.letta.mobile.ui.theme.LettaDimens
  *
  * Contract:
  *   - Tap a row: switch active backend, dismiss the sheet.
- *   - Tap the edit pencil: dismiss + navigate to [ConfigScreen] for the
+ *   - Tap the edit pencil: dismiss + navigate to [SettingsScreen] for the
  *     selected backend. The current MVP makes the row active first because
  *     [ConfigViewModel] always loads the active config; once the screen
  *     supports a configId arg, the side-effect can be dropped.
  *   - Long-press a row: open an inline delete-confirm dialog.
  *   - Tap "+ Add server": dismiss + navigate to a fresh
- *     [ConfigScreen] in create-new mode (`ConfigRoute(createNew = true)`).
+ *     [SettingsScreen] in create-new mode (`ConfigRoute(createNew = true)`).
  *
  * The full-screen `ConfigListScreen` remains reachable from Settings →
  * Configs for power users who want a list view with finer-grained controls.
@@ -285,7 +285,6 @@ private fun BackendSwitcherRow(
             ) {
                 Icon(
                     imageVector = when (config.mode) {
-                        ServerMode.CLOUD -> LettaIcons.Cloud
                         ServerMode.SELF_HOSTED -> LettaIcons.Storage
                         ServerMode.LOCAL -> LettaIcons.Psychology
                     },
@@ -300,7 +299,6 @@ private fun BackendSwitcherRow(
             ) {
                 Text(
                     text = when (config.mode) {
-                        ServerMode.CLOUD -> stringResource(R.string.common_letta_cloud)
                         ServerMode.SELF_HOSTED -> config.url.removePrefix("https://").removePrefix("http://")
                         ServerMode.LOCAL -> stringResource(R.string.common_local_kotlin_runtime)
                     },
@@ -371,7 +369,7 @@ private fun BackendSwitcherRowPreview() {
                 config = previewServerConfig(
                     PreviewServerConfig(
                         id = "config-2",
-                        mode = ServerMode.CLOUD,
+                        mode = ServerMode.LOCAL,
                         url = "https://example.test/local",
                         isActive = false,
                         health = ServerHealthState.OFFLINE,

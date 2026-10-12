@@ -23,12 +23,13 @@ import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
-import com.letta.mobile.desktop.chat.rememberDesktopChatDockGeometry
+import com.letta.mobile.desktop.data.DesktopChatDockGeometryStore
 import com.letta.mobile.desktop.data.DesktopSessionGraph
 import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.reducedMotionOr
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
+import com.letta.mobile.ui.chat.surface.rememberChatDockGeometry
 import kotlinx.coroutines.CoroutineScope
 
 /** The shell's sidebar layout: its controller, the reduced-motion preference, and the toggle's focus. */
@@ -213,7 +214,7 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
         skillsPanel = skillsPanel,
         agentSlashCommands = agentSlashCommands,
         subagents = subagents,
-        chatDockGeometry = rememberDesktopChatDockGeometry(),
+        chatDockGeometry = rememberChatDockGeometry(remember { DesktopChatDockGeometryStore().asLayoutPrefStorage() }),
         libraries = rememberDesktopLibraryControllers(
             sessionGraphId = sessionGraph.id,
             sessionGraphProvider = core.bootstrap.dataBindings.sessionGraphProvider,

@@ -160,6 +160,17 @@ class IrohNodeEndpoint(
     }
 
     /**
+     * letta-mobile-a4tm7: wires [publisher] to this endpoint. Its `permission_mode` frames go to the
+     * connections viewing the frame's conversation; a viewer that joins later reads the mode itself
+     * (`permission_mode.get`), so nothing is replayed.
+     */
+    fun attachPermissionModePublisher(publisher: PermissionModePublisher) {
+        publisher.attach { conversationId, frame ->
+            connectionRegistry.viewersFor(conversationId).count { it.writeFrame(frame) }
+        }
+    }
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */
