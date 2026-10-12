@@ -81,9 +81,9 @@ class ProviderIconTest {
         setContent {
             MaterialTheme(colorScheme = lightColorScheme()) {
                 Row {
-                    ProviderIcon("openai")
-                    ProviderIcon("my-box", connected = true, aliases = listOf("lmstudio"))
-                    ProviderIcon("letta", label = "Letta")
+                    ProviderIcon(ProviderIdentity("openai"))
+                    ProviderIcon(ProviderIdentity("my-box", aliases = listOf("lmstudio")), connected = true)
+                    ProviderIcon(ProviderIdentity("letta", label = "Letta"))
                 }
             }
         }

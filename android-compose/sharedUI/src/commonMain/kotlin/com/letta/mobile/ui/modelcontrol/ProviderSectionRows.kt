@@ -31,6 +31,7 @@ import com.letta.mobile.data.repository.modelcontrol.connectMethod
 import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.providers.icons.ProviderIcon
+import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Rows of [ProviderManagementPane]: the provider card header, its action strip, and one model. */
@@ -77,10 +78,8 @@ internal fun ProviderHeaderRow(section: ProviderSection, expanded: Boolean, inAp
 @Composable
 private fun ProviderMark(section: ProviderSection) {
     ProviderIcon(
-        providerId = section.key,
+        provider = ProviderIdentity(section.key, section.displayName, section.provider?.brandIds().orEmpty() + section.displayName),
         connected = section.isConnected,
-        label = section.displayName,
-        aliases = section.provider?.brandIds().orEmpty() + section.displayName,
     )
 }
 

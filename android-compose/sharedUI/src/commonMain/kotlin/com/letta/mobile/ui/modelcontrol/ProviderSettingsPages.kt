@@ -33,6 +33,7 @@ import com.letta.mobile.data.repository.modelcontrol.connectMethodOn
 import com.letta.mobile.data.repository.modelcontrol.connectedBaseUrl
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.providers.icons.ProviderIcon
+import com.letta.mobile.ui.providers.icons.ProviderIdentity
 import com.letta.mobile.ui.theme.LettaDimens
 
 private val pagePadding = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)
@@ -242,12 +243,7 @@ private fun CardSurface(
 /** The provider's logo tile, or its initial where the app has no logo for it. */
 @Composable
 private fun CardMark(provider: ConnectableProvider) {
-    ProviderIcon(
-        providerId = provider.id,
-        connected = provider.isConnected,
-        label = provider.displayName,
-        aliases = provider.brandIds(),
-    )
+    ProviderIcon(provider = ProviderIdentity(provider.id, provider.displayName, provider.brandIds()), connected = provider.isConnected)
 }
 
 @Composable
