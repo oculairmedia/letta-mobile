@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -40,7 +41,8 @@ import androidx.compose.ui.unit.dp
  *
  * The page's [containerColor] draws edge to edge, behind the status and navigation bars (Android runs
  * every Activity with `enableEdgeToEdge()`); the insets are split across the slots:
- * - [header] sits below the status bar / cutout (top and sides);
+ * - [header] sits below the status bar / cutout (top and sides) at its own height: it is measured
+ *   without a height bound, so it never takes the content's space;
  * - [bottomBar] (composer, actions) sits above the navigation bar and, when [imeAware], the keyboard;
  * - [content] receives the remaining insets as [PaddingValues] — the top when there is no header, the
  *   bottom when there is no bottom bar, and the sides — and applies them as padding or as a list's
@@ -83,7 +85,13 @@ fun LettaPageScaffold(
     ) {
         Column(Modifier.fillMaxSize()) {
             if (header != null) {
-                Box(Modifier.fillMaxWidth().padding(split.header)) { header() }
+                // The header wraps its own height: it is measured without the page's height, so a
+                // header that fills the height it is offered (ShellHeader's free-width lane does, to
+                // span desktop's title bar) collapses to its content instead of taking the whole page
+                // and leaving the content slot nothing (letta-mobile-kg4vy).
+                Box(Modifier.fillMaxWidth().padding(split.header).wrapContentHeight(Alignment.Top, unbounded = true)) {
+                    header()
+                }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 content(split.content)

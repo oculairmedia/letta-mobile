@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.shell.sidebar
 
+import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
@@ -21,8 +25,54 @@ data class ShellConversationMarks(
     val markers: Map<String, String> = emptyMap(),
 )
 
+/**
+ * letta-mobile-ckmub.3.10: what a host knows about its sidebar, in platform-neutral terms. The host
+ * has already scoped [conversations] to the agent and the filter, and [canvases] to the filter;
+ * [archivedConversations] are every archived chat (the Archived chats dialog).
+ */
+data class ShellSidebarInput(
+    val agent: ShellPanelAgent,
+    val mode: WorkPlayMode = WorkPlayMode.Work,
+    val home: Boolean = false,
+    val selectedSection: LensDestination? = null,
+    val settingsSelected: Boolean = false,
+    val archiveFilter: ShellArchiveFilter = ShellArchiveFilter.Active,
+    val conversations: List<ChatConversationSummary> = emptyList(),
+    val archivedConversations: List<ChatConversationSummary> = emptyList(),
+    val marks: ShellConversationMarks = ShellConversationMarks(),
+    val chatOptions: ShellChatOptionsState? = null,
+    val canvases: List<CanvasDocument> = emptyList(),
+    val activeCanvasId: CanvasId? = null,
+    val archivedCanvasIds: Set<CanvasId> = emptySet(),
+)
+
 /** Pure mapping from the platform-neutral conversation summaries to the panel's rows. */
 object ShellSidebarMapping {
+    /** The agent panel a host's [input] draws, its times relative to [now]. */
+    fun panelState(input: ShellSidebarInput, now: Instant): ShellAgentPanelState {
+        val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
+        return ShellAgentPanelState(
+            agent = input.agent,
+            mode = input.mode,
+            home = input.home,
+            selectedSection = input.selectedSection,
+            settingsSelected = input.settingsSelected,
+            archiveFilter = input.archiveFilter,
+            conversations = conversationRows(input.conversations, input.marks, timeLabel),
+            archivedConversations = conversationRows(input.archivedConversations, input.marks, timeLabel),
+            chatOptions = input.chatOptions,
+            canvases = input.canvases.map { canvas ->
+                ShellCanvasRowModel(
+                    id = canvas.id,
+                    title = canvas.title,
+                    timeLabel = ShellRelativeTime.compact(Instant.fromEpochMilliseconds(canvas.updatedAtEpochMs), now),
+                    selected = canvas.id == input.activeCanvasId,
+                    archived = canvas.id in input.archivedCanvasIds,
+                )
+            },
+        )
+    }
+
     /** The placeholder preview a conversation carries before its messages load; never shown. */
     private const val LOADING_PREVIEW = "Loaded from backend"
 
