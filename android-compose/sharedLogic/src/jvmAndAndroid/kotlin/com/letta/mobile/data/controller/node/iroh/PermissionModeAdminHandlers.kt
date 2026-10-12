@@ -24,20 +24,26 @@ import kotlinx.serialization.json.JsonObject
 internal object PermissionModeAdminHandlers {
     val methods: Set<String> = PermissionModeRpc.methods
 
-    fun register(router: AdminRpcRouter, controller: AppServerController?) {
+    /** [publisher] (letta-mobile-a4tm7) pushes each confirmed change to the conversation's viewers; null pushes nothing. */
+    fun register(router: AdminRpcRouter, controller: AppServerController?, publisher: PermissionModePublisher? = null) {
         if (controller == null) {
             CapabilityUnavailable.register(router, methods, "App Server controller")
             return
         }
         router.register(PermissionModeRpc.GET) { params -> get(controller, runtimeOf(params)) }
-        router.register(PermissionModeRpc.SET) { params -> set(controller, runtimeOf(params), modeOf(params)) }
+        router.register(PermissionModeRpc.SET) { params -> set(controller, runtimeOf(params), modeOf(params), publisher) }
         router.featureCapabilities += PermissionModeRpc.CAPABILITY
     }
 
     internal suspend fun get(controller: AppServerController, runtime: AppServerRuntimeScope): JsonElement =
         PermissionModeRpc.result(controller.permissionModeOf(runtime))
 
-    internal suspend fun set(controller: AppServerController, runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): JsonElement {
+    internal suspend fun set(
+        controller: AppServerController,
+        runtime: AppServerRuntimeScope,
+        mode: AppServerPermissionMode,
+        publisher: PermissionModePublisher? = null,
+    ): JsonElement {
         val confirmed = try {
             controller.changePermissionMode(runtime, mode)
         } catch (cancelled: CancellationException) {
@@ -49,7 +55,10 @@ internal object PermissionModeAdminHandlers {
             adminError("permission_mode_failed: the host could not reach the App Server")
         }
         Telemetry.event("IrohNode", "permission_mode.set", "mode" to PermissionModeRpc.wire(mode), "confirmed" to confirmed)
-        return PermissionModeRpc.result(controller.permissionModeOf(runtime) ?: mode.takeIf { confirmed }, confirmed)
+        val now = controller.permissionModeOf(runtime) ?: mode.takeIf { confirmed }
+        // letta-mobile-a4tm7: the other clients' chips follow only what the App Server confirmed.
+        if (confirmed && now != null) publisher?.publish(runtime, now)
+        return PermissionModeRpc.result(now, confirmed)
     }
 
     private fun runtimeOf(params: JsonObject?): AppServerRuntimeScope = AppServerRuntimeScope(

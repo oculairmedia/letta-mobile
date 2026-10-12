@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,8 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.CronTask
+import com.letta.mobile.data.schedules.HistorySummary
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
+import com.letta.mobile.data.schedules.ScheduleDef
 import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.SchedulesPageModel
@@ -38,6 +42,7 @@ import com.letta.mobile.ui.schedules.ScheduleRailState
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
@@ -69,81 +74,149 @@ fun SchedulesPage(
     val defs = remember(state.crons, state.library.schedules, state.focusedAgentId, clock.zone) {
         SchedulesPageModel.defs(state.crons, state.library.schedules, state.focusedAgentId, clock)
     }
-    val today = remember(clock) { clock.now.toLocalDateTime(clock.zone).date }
-    var view by rememberSaveable { mutableStateOf(options.initialView) }
-    var rail by remember { mutableStateOf<ScheduleRailState>(ScheduleRailState.Overview) }
-    var selectedDate by remember(today) { mutableStateOf(today) }
-    var weekStart by remember(today) { mutableStateOf(ScheduleProjection.mondayOf(today)) }
-    var creating by remember { mutableStateOf(false) }
-    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    val ui = rememberSchedulesPageUi(clock, options.initialView)
     val defsById = remember(defs) { defs.associateBy { it.id } }
     val railParams = ScheduleRailParams(
-        rail = rail,
+        rail = ui.rail,
         defs = defs,
         defsById = defsById,
         history = remember(defs, clock) { ScheduleProjection.history(defs, clock.now, clock.zone) },
         now = clock.now,
         zone = clock.zone,
-        onSelectSchedule = { rail = ScheduleRailState.Detail(it) },
-        onBackToOverview = { rail = ScheduleRailState.Overview },
-        onDelete = { pendingDelete = it },
+        onSelectSchedule = { ui.rail = ScheduleRailState.Detail(it) },
+        onBackToOverview = { ui.rail = ScheduleRailState.Overview },
+        onDelete = { ui.pendingDelete = it },
         onTogglePause = actions.onTogglePause,
     )
-    val body = SchedulesBody(
+    SchedulesPageLayout(
+        ui = ui,
+        header = ui.headerParams(state.canCreate, options),
+        body = ui.body(state, defs, clock, railParams.history, actions.onRefresh),
+        railParams = railParams,
+        onSelectAgent = actions.onSelectAgent,
+        modifier = modifier,
+    )
+    SchedulesPageDialogs(ui, state, actions, clock, defsById)
+}
+
+/** The page state that outlives a day change: the view (saveable), the rail and the open form / confirm. */
+private class SchedulesPageStates(
+    val view: MutableState<SchedulesView>,
+    val rail: MutableState<ScheduleRailState>,
+    val creating: MutableState<Boolean>,
+    val pendingDelete: MutableState<String?>,
+)
+
+/** The page's own UI state: the view, the rail, the dates in view and the open form / confirm. */
+@Stable
+private class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate) {
+    var view by states.view
+    var rail by states.rail
+    var creating by states.creating
+    var pendingDelete by states.pendingDelete
+    var selectedDate by mutableStateOf(today)
+    var weekStart by mutableStateOf(ScheduleProjection.mondayOf(today))
+
+    /** Week / Agenda / Rules keep the overview docked; Timeline and History go full width until a pick. */
+    val showsDockedRail: Boolean get() = rail !is ScheduleRailState.Overview || view.docksOverview
+
+    fun headerParams(canCreate: Boolean, options: SchedulesPageOptions) = SchedulesHeaderParams(
+        view = view,
+        onView = { view = it },
+        rangeLabel = SchedulesPageModel.weekRangeLabel(weekStart),
+        onShiftWeek = { weeks -> weekStart = weekStart.plus(weeks * DAYS_PER_WEEK, DateTimeUnit.DAY) },
+        onNew = { creating = true }.takeIf { canCreate },
+        options = options,
+    )
+
+    fun body(
+        state: SchedulesPageState,
+        defs: List<ScheduleDef>,
+        clock: ScheduleClock,
+        history: HistorySummary,
+        onRefresh: () -> Unit,
+    ) = SchedulesBody(
         state = state,
         defs = defs,
         view = view,
         clock = clock,
         dates = SchedulesDates(today = today, selected = selectedDate, weekStart = weekStart),
         selectedId = (rail as? ScheduleRailState.Detail)?.scheduleId,
-        history = railParams.history,
-        onRefresh = actions.onRefresh,
+        history = history,
+        onRefresh = onRefresh,
         onSelectDate = { selectedDate = it },
         onSelectRun = { rail = ScheduleRailState.Run(it) },
         onSelectSchedule = { rail = ScheduleRailState.Detail(it) },
     )
+}
+
+/** The view survives configuration changes; the dates follow today; the rail and dialogs persist. */
+@Composable
+private fun rememberSchedulesPageUi(clock: ScheduleClock, initialView: SchedulesView): SchedulesPageUi {
+    val view = rememberSaveable { mutableStateOf(initialView) }
+    val states = remember {
+        SchedulesPageStates(
+            view = view,
+            rail = mutableStateOf(ScheduleRailState.Overview),
+            creating = mutableStateOf(false),
+            pendingDelete = mutableStateOf(null),
+        )
+    }
+    val today = remember(clock) { clock.now.toLocalDateTime(clock.zone).date }
+    return remember(today) { SchedulesPageUi(states, today) }
+}
+
+@Composable
+private fun SchedulesPageLayout(
+    ui: SchedulesPageUi,
+    header: SchedulesHeaderParams,
+    body: SchedulesBody,
+    railParams: ScheduleRailParams,
+    onSelectAgent: (String) -> Unit,
+    modifier: Modifier,
+) {
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(SchedulesPageTags.PAGE)) {
         val wide = maxWidth >= LettaDimens.Pane.wideBreakpoint
         Column(Modifier.fillMaxSize()) {
-            SchedulesHeader(
-                SchedulesHeaderParams(
-                    view = view,
-                    onView = { view = it },
-                    rangeLabel = SchedulesPageModel.weekRangeLabel(weekStart),
-                    onShiftWeek = { weeks -> weekStart = weekStart.plus(weeks * DAYS_PER_WEEK, DateTimeUnit.DAY) },
-                    onNew = { creating = true }.takeIf { state.canCreate },
-                    options = options,
-                ),
-            )
-            SchedulesAgentChips(state, actions.onSelectAgent)
+            SchedulesHeader(header)
+            SchedulesAgentChips(body.state, onSelectAgent)
             if (wide) {
                 Row(Modifier.fillMaxSize()) {
                     SchedulesMainContent(body, Modifier.weight(1f).fillMaxHeight())
-                    // Week / Agenda / Rules keep the overview docked; Timeline and History go full
-                    // width until a schedule or run is picked.
-                    if (rail !is ScheduleRailState.Overview || view.docksOverview) ScheduleRail(railParams)
+                    if (ui.showsDockedRail) ScheduleRail(railParams)
                 }
             } else {
                 SchedulesMainContent(body, Modifier.fillMaxSize())
             }
         }
-        if (!wide && rail !is ScheduleRailState.Overview) {
-            LettaPane(LettaPaneKind.Sheet, onDismiss = { rail = ScheduleRailState.Overview }, testTag = SchedulesPageTags.DETAIL_SHEET) {
+        if (!wide && ui.rail !is ScheduleRailState.Overview) {
+            LettaPane(LettaPaneKind.Sheet, onDismiss = { ui.rail = ScheduleRailState.Overview }, testTag = SchedulesPageTags.DETAIL_SHEET) {
                 ScheduleRail(railParams, Modifier.fillMaxWidth().height(DetailSheetHeight))
             }
         }
     }
-    if (creating) {
+}
+
+/** The New-schedule form and the delete confirmation, when open. */
+@Composable
+private fun SchedulesPageDialogs(
+    ui: SchedulesPageUi,
+    state: SchedulesPageState,
+    actions: SchedulesPageActions,
+    clock: ScheduleClock,
+    defsById: Map<String, ScheduleDef>,
+) {
+    if (ui.creating) {
         ScheduleFormPane(
             clock = clock,
-            onDismiss = { creating = false },
+            onDismiss = { ui.creating = false },
             onSubmit = { draft ->
                 draft.toRequest(state.targetAgentId, clock.zone)?.let(actions.onCreate)
-                creating = false
+                ui.creating = false
             },
         )
     }
-    pendingDelete?.let { id ->
+    ui.pendingDelete?.let { id ->
         LettaConfirmPane(
             request = LettaConfirmRequest(
                 title = "Delete schedule",
@@ -152,10 +225,10 @@ fun SchedulesPage(
             ),
             onConfirm = {
                 actions.onDelete(id)
-                pendingDelete = null
-                rail = ScheduleRailState.Overview
+                ui.pendingDelete = null
+                ui.rail = ScheduleRailState.Overview
             },
-            onDismiss = { pendingDelete = null },
+            onDismiss = { ui.pendingDelete = null },
         )
     }
 }

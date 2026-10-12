@@ -309,6 +309,10 @@ class SessionScopedChannelTransport internal constructor(
     override val hostCapabilities: Set<String>
         get() = current.hostCapabilities
 
+    // letta-mobile-a4tm7: the chip names the host whose runtime it governs.
+    override val hostNodeId: String?
+        get() = current.hostNodeId
+
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String): Unit =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }
 
