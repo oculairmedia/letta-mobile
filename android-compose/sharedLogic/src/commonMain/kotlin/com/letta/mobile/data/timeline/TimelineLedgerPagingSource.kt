@@ -11,7 +11,23 @@ class TimelineLedgerPagingSource(
     private val ownAgentId: String? = selection.scope.agentId,
     private val settledProjectionAdapter: TimelineSettledProjectionAdapter = DefaultTimelineSettledProjectionAdapter,
 ) : PagingSource<TimelinePageKey, TimelineSettledRecord>() {
-    private val revision = engine.publication.value.durableRevision
+    /** The durable revision this source reads; any later one makes it obsolete. */
+    internal val revision = engine.publication.value.durableRevision
+
+    /**
+     * Invalidates this source only when it was built for a revision before [durableRevision].
+     *
+     * A source that loads after a revision lands returns [LoadResult.Invalid] and Paging replaces it
+     * itself, so by the time the revision collector reaches that revision the active source may
+     * already be its replacement, built at that revision. Invalidating that one too spent two
+     * generations on one revision and redrew the list twice (CI: 9 generations for 7 revisions).
+     */
+    internal fun invalidateIfBehind(durableRevision: Long): Boolean {
+        if (revision >= durableRevision) return false
+        invalidate()
+        return true
+    }
+
     override fun getRefreshKey(state: PagingState<TimelinePageKey, TimelineSettledRecord>): TimelinePageKey? =
         state.anchorPosition?.let { state.closestItemToPosition(it)?.key } ?: selection.anchor
 

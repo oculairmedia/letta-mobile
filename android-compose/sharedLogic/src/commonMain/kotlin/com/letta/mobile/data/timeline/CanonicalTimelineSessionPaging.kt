@@ -48,13 +48,13 @@ fun CanonicalTimelineSession.paging(
         }.collectIndexed { index, current ->
             if (current.selection !== selection) {
                 pump.cancel()
-            } else if (index > 0) {
-                // Every replaced generation redraws the list; a capture names what moved it.
+            } else if (index > 0 && active.value?.invalidateIfBehind(current.durableRevision) == true) {
+                // A source that already replaced itself for this revision is current and is left
+                // alone. Every replaced generation redraws the list; a capture names what moved it.
                 Telemetry.event(
                     "TimelinePaging", "generation.replaced",
                     "revision" to current.durableRevision, level = Telemetry.Level.DEBUG,
                 )
-                active.value?.invalidate()
             }
         }
     }
