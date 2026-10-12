@@ -176,7 +176,10 @@ internal class RunBlockPlan(
  */
 @Immutable
 internal class RunHold(val working: Boolean, val awaitingApproval: Boolean) {
-    val held: Boolean get() = working || awaitingApproval
+    fun isHeld(): Boolean {
+        if (working) return true
+        return awaitingApproval
+    }
 }
 
 /** What decides whether a run may fold. */
@@ -184,8 +187,10 @@ internal class RunHold(val working: Boolean, val awaitingApproval: Boolean) {
 internal class RunFoldInputs(val runId: String?, val messageCount: Int, val hold: RunHold)
 
 /** Only a run with an id and several steps folds, and never while something [RunHold] holds it open. */
-internal fun runFolds(inputs: RunFoldInputs): Boolean =
-    inputs.runId != null && inputs.messageCount > 1 && !inputs.hold.held
+internal fun runFolds(inputs: RunFoldInputs): Boolean {
+    if (inputs.runId == null || inputs.messageCount < 2) return false
+    return !inputs.hold.isHeld()
+}
 
 /** The run's plan, or null when it has nothing to draw. */
 @Composable
