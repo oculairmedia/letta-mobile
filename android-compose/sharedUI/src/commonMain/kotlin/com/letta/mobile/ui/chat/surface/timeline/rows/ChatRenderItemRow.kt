@@ -37,7 +37,7 @@ internal fun ChatRenderItemRow(
                 is ChatRenderItem.Single -> {
                     val inRun = item.stableRunId != null || item.stableRunKey != null
                     if (inRun) {
-                        RunBlockRow(listOf(item.message), context, callbacks)
+                        RunBlockRow(listOf(item.message), context, callbacks, item.groupPosition)
                     } else {
                         ChatMessageRow(item.message, context, callbacks, item.groupPosition)
                     }

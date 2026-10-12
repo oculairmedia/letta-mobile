@@ -93,7 +93,7 @@ private fun AssistantMessageColumn(
     ) {
         if (touchStyle() && showsSpeakerHeader(message, position)) SpeakerHeader(message, context)
         message.agentMessageProvenance?.let { ProvenanceLabel(message, callbacks) }
-        AssistantPrimaryContent(message, context, callbacks, onFork = menu.fork)
+        AssistantPrimaryContent(message, context, callbacks, onFork = menu.fork, position = position)
         MessageMenuPopup(menu)
         MessageImages(message, callbacks)
         val toolCalls = message.toolCalls.orEmpty()
@@ -120,12 +120,23 @@ private fun AssistantPrimaryContent(
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     onFork: (() -> Unit)? = null,
+    position: GroupPosition = GroupPosition.None,
 ) {
     val notification = message.subagentNotification
     when {
         notification != null -> SubagentNotificationCard(notification, callbacks.openSubagent)
         message.content.isBlank() -> Unit
-        message.isError -> ErrorBubble(message.content) { RunErrorActionButton(message.content, context, callbacks) }
+        message.isError -> ErrorBubble(
+            text = message.content,
+            // Only the first of a speaker's group carries the role label, as on the legacy bubble.
+            labelled = position == GroupPosition.First || position == GroupPosition.None,
+            // The newest settled error carries its time inside the bubble, as the legacy bubble does.
+            deliveryTimestamp = message.timestamp.takeIf { message.id == context.newestMessageId && !context.isStreaming(message) },
+        ) {
+            // Only the newest error offers its action: Retry re-sends the newest prompt, which is
+            // the failed one only while nothing came after it (letta-mobile-ckmub.1, S4).
+            if (message.id == context.newestMessageId) RunErrorActionButton(message.content, context, callbacks)
+        }
         else -> AgentText(
             AgentTextParams(
                 text = message.content,
@@ -189,7 +200,7 @@ private fun SpeakerHeader(message: UiMessage, context: ChatRowContext) {
 
 /** A server error frame: the error-container bubble with its "Error" label (bubbleStyle isError). */
 @Composable
-private fun ErrorBubble(text: String, action: @Composable () -> Unit = {}) {
+private fun ErrorBubble(text: String, labelled: Boolean = true, deliveryTimestamp: String? = null, action: @Composable () -> Unit = {}) {
     Surface(
         shape = ChatBubbleShapes.agent(),
         color = MaterialTheme.colorScheme.errorContainer,
@@ -199,10 +210,11 @@ private fun ErrorBubble(text: String, action: @Composable () -> Unit = {}) {
             modifier = Modifier.padding(horizontal = ChatRowSpacing.bubblePaddingHorizontal, vertical = ChatRowSpacing.bubblePaddingVertical),
             verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
         ) {
-            Text(text = stringResource(Res.string.rows_role_error), style = ChatRowType.roleLabel)
+            if (labelled) Text(text = stringResource(Res.string.rows_role_error), style = ChatRowType.roleLabel)
             SelectionContainer {
                 SharedMarkdownText(text = text, textColor = MaterialTheme.colorScheme.onErrorContainer)
             }
+            deliveryTimestamp?.let { DeliveryTime(it) }
             action()
         }
     }

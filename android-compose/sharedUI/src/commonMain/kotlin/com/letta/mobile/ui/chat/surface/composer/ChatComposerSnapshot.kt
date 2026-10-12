@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -10,6 +11,7 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
+import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
@@ -51,5 +53,16 @@ fun ChatComposerSnapshot(content: ComposerSnapshotContent, modifier: Modifier = 
             ),
             modifier = modifier,
         )
+    }
+}
+
+/**
+ * letta-mobile-ckmub.1 (S4): the Touch composer's thinking token on its own, as the page draws it
+ * over the bar when the agent has no mascot. For the row parity harness and previews.
+ */
+@Composable
+fun ComposerThinkingSnapshot(state: ChatUiState, modifier: Modifier = Modifier) {
+    CompositionLocalProvider(LocalChatPlatformStyle provides ChatPlatformStyle.Touch) {
+        Box(modifier) { ComposerThinkingStatus(state) }
     }
 }

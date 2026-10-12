@@ -86,6 +86,9 @@ object ChatRowAlpha {
     /** A run header's title while the run is working. */
     const val workingTitle: Float = 0.88f
 
+    /** A run header's tool count beside its title. */
+    const val runCount: Float = 0.76f
+
     /** The reasoning preview beside "Thought". */
     const val reasoningPreview: Float = 0.8f
 

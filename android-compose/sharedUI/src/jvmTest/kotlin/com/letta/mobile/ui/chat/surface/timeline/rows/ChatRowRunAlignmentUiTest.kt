@@ -27,14 +27,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-bglj6.1: a settled run's summary ("Worked for 9s") and its tool summary ("Ran 2
- * commands") start at the timeline's gutter, flush with the agent's prose, as the Android rows do.
+ * letta-mobile-bglj6.1: a settled run's tool summary ("Ran 2 commands") starts at the timeline's
+ * gutter, flush with the agent's prose, as the Android rows do.
  *
- * letta-mobile-bglj6.1.11: a run is ONE line with ONE chevron: the run's label leads its tool
- * summary's line and never takes a click (on a touch host or a pointer one); the chevron ends at
- * the run's right edge, at phone and desktop widths alike.
- */
-class ChatRowRunAlignmentUiTest {
+ * letta-mobile-ckmub.1 (hard cut S4): the run's header is the legacy RunActivityDisclosure again: its
+ * own line above the steps, its label inset by the legacy xs, and, once a run of several steps
+ * settles, the fold that collapses the run to its last step. A one-message run's header is a plain
+ * label. The tool summary keeps the run's one tool chevron, ending at the run's right edge.
+ */class ChatRowRunAlignmentUiTest {
     private fun call(id: String) = UiToolCall(name = "shell", arguments = "ls", result = "ok", status = "success", toolCallId = id)
 
     private val run = ChatRenderItem.RunBlock(
@@ -68,51 +68,52 @@ class ChatRowRunAlignmentUiTest {
         onAllNodesWithTag(ChatRowTestTags.AGENT_TEXT).fetchSemanticsNodes().first().boundsInRoot.left
 
     @Test
-    fun theRunHeaderAndToolSummaryAreFlushWithTheProse() = runComposeUiTest {
+    fun theRunHeaderSitsOnItsOwnLineWithTheLegacyInset() = runComposeUiTest {
         show(run, newest = "b", details = ChatToolDetails.Sheet)
         val prose = proseLeft()
-        val header = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
-        assertTrue(abs(header - prose) < TOLERANCE_PX, "the run header is inset: $header vs the prose at $prose")
+        val row = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
+        val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
+        assertTrue(abs(row.left - prose) < TOLERANCE_PX, "the run header row is inset:  vs the prose at ")
+        assertTrue(label.left > prose + TOLERANCE_PX, "the header's label lost the legacy inset:  vs ")
+        assertTrue(tools.top >= label.bottom - TOLERANCE_PX, "the tool summary is not below the header:  vs ")
     }
 
     @Test
-    fun aRunWithToolsIsOneLineWithOneChevronOnEveryHost() {
+    fun aRunWithToolsHasOneToolChevronOnEveryHost() {
         for (details in ChatToolDetails.entries) {
             for (width in WIDTHS_DP) {
                 runComposeUiTest {
                     show(run, newest = "b", details = details, widthDp = width)
                     assertEquals(1, onAllNodesWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNodes().size, "$details @ $width")
                     assertEquals(1, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")
-                    val header = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
                     val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
                     val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
-                    // One line: the label sits inside the tool summary's own band, before it.
-                    assertTrue(header.center.y in tools.top..tools.bottom, "the label is its own line: $header vs $tools ($details @ $width)")
-                    assertTrue(header.right <= tools.left + TOLERANCE_PX, "the label overlaps the summary: $header vs $tools")
-                    // The one chevron ends at the run's right edge.
+                    // The chevron ends at the run's right edge; the line starts at the prose's gutter.
                     assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the chevron is inset: ${tools.right} vs ${block.right}")
-                    assertTrue(abs(header.left - proseLeft()) < TOLERANCE_PX, "the label is inset ($details @ $width)")
+                    assertTrue(abs(tools.left - proseLeft()) < TOLERANCE_PX, "the tool summary is inset ($details @ $width)")
                 }
             }
         }
     }
 
     @Test
-    fun theTouchRunSummaryIsNotClickable() = runComposeUiTest {
+    fun aSettledRunOfSeveralStepsFoldsFromItsHeader() = runComposeUiTest {
         show(run, newest = "b", details = ChatToolDetails.Sheet)
-        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction().not())
-        onNodeWithText("Worked", substring = true, useUnmergedTree = true).assert(hasClickAction().not())
+        onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
     }
 
     @Test
-    fun aRunWithoutToolsHasAPlainLabelFlushWithItsProse() = runComposeUiTest {
-        show(proseRun, newest = "q", details = ChatToolDetails.Sheet)
+    fun aOneMessageRunHasAPlainLabel() = runComposeUiTest {
+        val lone = ChatRenderItem.Single(
+            UiMessage(id = "s", role = "assistant", content = "All done here.", timestamp = "2026-07-19T12:00:04Z", runId = "run-3"),
+            GroupPosition.None,
+            stableRunId = "run-3",
+        )
+        show(lone, newest = "s", details = ChatToolDetails.Sheet)
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction().not())
         assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
-        val header = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
-        assertTrue(abs(header.left - proseLeft()) < TOLERANCE_PX, "the label is inset: ${header.left} vs ${proseLeft()}")
     }
-
     @Test
     fun anOlderRunDropsItsLabelAndKeepsItsToolSummaryFlush() = runComposeUiTest {
         // Not the newest row (the row context carries no newest id): the settled run reads as its steps alone.

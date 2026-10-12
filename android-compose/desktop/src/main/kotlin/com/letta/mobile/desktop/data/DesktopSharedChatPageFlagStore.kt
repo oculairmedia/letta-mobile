@@ -23,7 +23,8 @@ class DesktopSharedChatPageFlagStore(
     fun load(): Boolean = readProperties()
         ?.getProperty(SHARED_CHAT_PAGE_KEY)
         ?.toBooleanStrictOrNull()
-        ?: false
+        // letta-mobile-ckmub.1 (S4): on by default; the toggle keeps the old page for one release.
+        ?: true
 
     @Synchronized
     fun save(enabled: Boolean) {

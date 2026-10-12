@@ -1,12 +1,14 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
+import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 
 /**
  * letta-mobile-bglj6.1: the shared timeline on its own (no composer, no page frame), drawn from
@@ -20,13 +22,16 @@ fun ChatTimelineSnapshot(
     modifier: Modifier = Modifier,
     appearance: ChatSurfaceAppearance = ChatSurfaceAppearance(),
 ) {
-    ChatTimeline(
-        state = state,
-        pagedTimeline = null,
-        actions = actions,
-        capabilities = ChatSurfaceCapabilities.Default,
-        host = ChatSurfaceHost(),
-        appearance = appearance,
-        modifier = modifier,
-    )
+    // The idiom the page provides, so a Touch snapshot draws what a phone does (ckmub.1).
+    CompositionLocalProvider(LocalChatPlatformStyle provides appearance.platformStyle) {
+        ChatTimeline(
+            state = state,
+            pagedTimeline = null,
+            actions = actions,
+            capabilities = ChatSurfaceCapabilities.Default,
+            host = ChatSurfaceHost(),
+            appearance = appearance,
+            modifier = modifier,
+        )
+    }
 }

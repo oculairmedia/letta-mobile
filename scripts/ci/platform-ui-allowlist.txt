@@ -310,7 +310,7 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/ChatCanvasSlot.kt 31 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatHaptics.kt 59 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatPage.kt 437 legacy-pending(ckmub.2)
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatRichMarkdown.kt 101 legacy-pending(ckmub.2)
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatRichMarkdown.kt 91 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatSubagents.kt 158 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/shared/SharedChatWorkspaceFiles.kt 78 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent/ActiveSubagentBar.kt 602 legacy-pending(ckmub.2)
