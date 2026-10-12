@@ -165,7 +165,11 @@ internal class IrohDialer(
                 capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
             ),
         )
-        if (!auth.success && token.isNotBlank()) {
+        // letta-mobile-dpv7m.2: a denied auth is terminal even without a token. A
+        // paired device sends a blank token and authenticates by NodeId; if the
+        // host says no (never paired, or revoked) the session must surface
+        // AuthFailed instead of carrying on "connected" into per-call denials.
+        if (!auth.success) {
             throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
         }
         Telemetry.event(
