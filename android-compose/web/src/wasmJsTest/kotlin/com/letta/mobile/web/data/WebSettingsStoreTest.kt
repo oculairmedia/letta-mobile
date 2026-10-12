@@ -1,6 +1,7 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LettaConfigMigration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,15 +14,26 @@ class WebSettingsStoreTest {
     fun theBackendAddressSurvivesAReloadButTheTokenDoesNot() {
         val slot = MemorySlot()
         WebSettingsStore(slot).saveBackend(
-            LettaConfig(id = "default", mode = LettaConfig.Mode.CLOUD, serverUrl = "wss://example.test/ws", accessToken = "secret"),
+            LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "wss://example.test/ws", accessToken = "secret"),
         )
 
         val config = WebSettingsStore(slot).load().config
 
         assertEquals("wss://example.test/ws", config.serverUrl)
-        assertEquals(LettaConfig.Mode.CLOUD, config.mode)
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, config.mode)
         assertNull(config.accessToken)
         assertFalse(slot.document?.json.orEmpty().contains("secret"))
+    }
+
+    @Test
+    fun aStoredLettaCloudBackendReadsAsARemoteHostToSetUp() {
+        val slot = MemorySlot(WebSettingsDocument("""{"backend.server_url":"https://api.letta.com","backend.mode":"CLOUD"}"""))
+
+        val config = WebSettingsStore(slot).load().config
+
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, config.mode)
+        assertEquals("", config.serverUrl)
+        assertEquals(LettaConfigMigration.CLOUD_NOTICE, config.migrationNotice)
     }
 
     @Test

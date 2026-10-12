@@ -197,7 +197,7 @@ class BackendConfigPolicyTest {
         val configStore = FakeBackendConfigStore(
             LettaConfig(
                 id = "config-1",
-                mode = LettaConfig.Mode.CLOUD,
+                mode = LettaConfig.Mode.SELF_HOSTED,
                 serverUrl = "https://api.letta.com",
                 accessToken = "old",
             ),

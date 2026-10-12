@@ -66,7 +66,7 @@ class SettingsRepositoryTest {
     fun `saveConfig adds new config and sets as active`() = runTest {
         val config = LettaConfig(
             id = "c1",
-            mode = LettaConfig.Mode.CLOUD,
+            mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "https://api.letta.com",
             accessToken = "test-token"
         )
@@ -79,7 +79,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `saveConfig updates existing config`() = runTest {
-        val config = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://old.com")
+        val config = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://old.com")
         repository.saveConfig(config)
 
         val updated = config.copy(serverUrl = "https://new.com")
@@ -124,7 +124,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setActiveConfigId changes active config`() = runTest {
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
         val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
         repository.saveConfig(c1)
         repository.saveConfig(c2)
@@ -140,7 +140,7 @@ class SettingsRepositoryTest {
             repository.activeConfigChanges.collect { emissions.send(it) }
         }
 
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
         val c1Updated = c1.copy(accessToken = "rotated-token")
         val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
 
@@ -165,14 +165,14 @@ class SettingsRepositoryTest {
             repository.activeConfigChanges.collect { emissions.send(it) }
         }
 
-        val cloud = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com")
-        repository.saveConfig(cloud)
+        val remote = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://remote.example.test")
+        repository.saveConfig(remote)
         assertEquals("c1", emissions.receive().id)
 
-        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://device"))
+        repository.saveConfig(remote.copy(mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://device"))
         assertEquals("c1", emissions.receive().id)
 
-        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com"))
+        repository.saveConfig(remote.copy(mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://remote.example.test"))
         assertEquals("c1", emissions.receive().id)
     }
 
@@ -204,7 +204,7 @@ class SettingsRepositoryTest {
             },
         )
 
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
         val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
 
         scopedRepository.saveConfig(c1)
@@ -235,7 +235,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `setActiveConfigId with nonexistent id does nothing`() = runTest {
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
         repository.saveConfig(c1)
 
         repository.setActiveConfigId("nonexistent")
@@ -244,8 +244,8 @@ class SettingsRepositoryTest {
 
     @Test
     fun `deleteConfig removes config`() = runTest {
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
-        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://two.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://two.com")
         repository.saveConfig(c1)
         repository.saveConfig(c2)
 
@@ -257,7 +257,7 @@ class SettingsRepositoryTest {
 
     @Test
     fun `deleteConfig clears active if deleted was active`() = runTest {
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
         repository.saveConfig(c1)
         assertEquals("c1", repository.activeConfig.value?.id)
 
@@ -268,8 +268,8 @@ class SettingsRepositoryTest {
 
     @Test
     fun `deleteConfig switches active to first remaining`() = runTest {
-        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
-        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://two.com")
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://two.com")
         repository.saveConfig(c1)
         repository.saveConfig(c2)
         repository.setActiveConfigId("c2")
