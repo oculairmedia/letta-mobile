@@ -112,6 +112,15 @@
                     android:scheme="letta"
                     android:host="agent" />
             </intent-filter>
+            <!-- letta-mobile-dpv7m.3: scan-to-pair links from the camera or another app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="meridian" />
+                <data android:scheme="letta" />
+                <data android:host="pair" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -11,6 +11,8 @@ data class DesktopBootstrapState(
     val featureReadiness: List<DesktopFeatureReadiness>,
     /** letta-mobile-w4q4p: the connected host's provider and model control (picker, Models sheet, Providers). */
     val modelControl: com.letta.mobile.data.repository.modelcontrol.ModelControlSession? = null,
+    /** letta-mobile-dpv7m.3: admin_rpc to the connected host, for minting pairing invites. */
+    val pairingRpc: com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker? = null,
 )
 
 data class DesktopFeatureReadiness(
@@ -73,6 +75,7 @@ fun defaultDesktopBootstrapState(
 ) = DesktopBootstrapState(
     config = config,
     modelControl = dataBindings.modelControl,
+    pairingRpc = dataBindings.modelControlRpc,
     sessionGraphId = dataBindings.sessionGraphProvider.current.id,
     featureReadiness = listOf(
         DesktopFeatureReadiness(

@@ -213,6 +213,8 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
         nucleus = nucleusState,
         localRuntimeProvider = core.localConfig.providerState,
         localBackendDirectory = core.localConfig.directoryState,
+        pairingAgents = focus.rosterAgents.map { com.letta.mobile.ui.pairing.AgentChoice(it.id.value, it.name) },
+        pendingPairLink = context.navigator.pendingPairLink,
         localRuntime = core.localConfig.runtime,
     )
 }
@@ -319,6 +321,8 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
         nucleus = destinationNucleusActions(core.nucleusController, context.shell.window),
         localRuntimeProvider = core.localConfig.providerActions,
         localBackendDirectory = core.localConfig.directoryActions,
+        onOpenChat = { context.navigator.selectedDestination = DesktopDestination.Conversations },
+        onPairLinkConsumed = { context.navigator.pendingPairLink = null },
     )
 }
 

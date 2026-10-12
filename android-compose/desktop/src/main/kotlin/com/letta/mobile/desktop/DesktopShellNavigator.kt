@@ -47,6 +47,12 @@ internal class DesktopShellNavigator(
 
     var showBackgroundTasks: Boolean by mutableStateOf(false)
 
+    /**
+     * letta-mobile-dpv7m.3: a `meridian://pair` link opened from outside the app,
+     * waiting for the Settings pairing card. Memory only: it carries a one-time secret.
+     */
+    var pendingPairLink: String? by mutableStateOf<String?>(null)
+
     /** Work | Play presentation lens over the same agents/memory/conversations. */
     var workPlayMode: WorkPlayMode by mutableStateOf(WorkPlayMode.Work)
 

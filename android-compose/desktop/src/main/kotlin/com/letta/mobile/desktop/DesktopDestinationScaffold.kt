@@ -124,6 +124,10 @@ internal data class DestinationContentInputs(
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
     val localRuntime: DesktopLocalRuntimeController,
+    /** letta-mobile-dpv7m.3: agents the "Pair a device" panel can share. */
+    val pairingAgents: List<com.letta.mobile.ui.pairing.AgentChoice> = emptyList(),
+    /** letta-mobile-dpv7m.3: a deep-linked pairing link waiting to be redeemed. */
+    val pendingPairLink: String? = null,
 )
 
 internal data class DestinationNucleusActions(
@@ -153,6 +157,9 @@ internal data class DestinationContentActions(
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
+    /** letta-mobile-dpv7m.3: open chat once this desktop paired with a host. */
+    val onOpenChat: () -> Unit = {},
+    val onPairLinkConsumed: () -> Unit = {},
 )
 
 private data class DestinationSettingsActions(
@@ -163,6 +170,8 @@ private data class DestinationSettingsActions(
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
+    val onOpenChat: () -> Unit = {},
+    val onPairLinkConsumed: () -> Unit = {},
 )
 
 private data class ScrollableDestinationInputs(
@@ -173,6 +182,8 @@ private data class ScrollableDestinationInputs(
     val localBackendDirectory: DesktopLocalBackendDirectoryState,
     val localRuntime: DesktopLocalRuntimeController,
     val railRecencyDays: Int,
+    val pairingAgents: List<com.letta.mobile.ui.pairing.AgentChoice> = emptyList(),
+    val pendingPairLink: String? = null,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -241,6 +252,8 @@ internal fun DestinationContent(
                 localRuntimeProvider = inputs.localRuntimeProvider,
                 localBackendDirectory = inputs.localBackendDirectory,
                 localRuntime = inputs.localRuntime,
+                pairingAgents = inputs.pairingAgents,
+                pendingPairLink = inputs.pendingPairLink,
             ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
@@ -250,6 +263,8 @@ internal fun DestinationContent(
                 nucleus = actions.nucleus,
                 localRuntimeProvider = actions.localRuntimeProvider,
                 localBackendDirectory = actions.localBackendDirectory,
+                onOpenChat = actions.onOpenChat,
+                onPairLinkConsumed = actions.onPairLinkConsumed,
             ),
             modifier = modifier,
         )
@@ -411,6 +426,18 @@ private fun LazyListScope.scrollableDestinationItems(
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
                     onIrohIdentityReset = settings.onIrohIdentityReset,
+                )
+            }
+            item {
+                com.letta.mobile.desktop.qr.DesktopPairingCard(
+                    com.letta.mobile.desktop.qr.DesktopPairingBindings(
+                        rpc = inputs.state.pairingRpc,
+                        agents = inputs.pairingAgents,
+                        onConfigSaved = settings.onConfigSaved,
+                        onOpenChat = settings.onOpenChat,
+                        pendingLink = inputs.pendingPairLink,
+                        onPendingLinkConsumed = settings.onPairLinkConsumed,
+                    ),
                 )
             }
             item {

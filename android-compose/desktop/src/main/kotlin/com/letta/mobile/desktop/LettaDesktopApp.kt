@@ -80,6 +80,7 @@ private fun DesktopShellRoutingEffects(
                 context.core.chatController.selectConversation(conversationId)
             },
             onOpenAgent = { context.router.openAgent(AgentId(it)) },
+            onPairLink = { navigator.pendingPairLink = it },
         ),
     )
 }
@@ -88,6 +89,7 @@ private data class DesktopDeepLinkRoutingActions(
     val onDestinationSelected: (DesktopDestination) -> Unit,
     val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
+    val onPairLink: (String) -> Unit,
 )
 
 /**
@@ -109,6 +111,7 @@ private fun DesktopDeepLinkRouting(
         onDestinationSelected = actions.onDestinationSelected,
         onConversationSelected = { pendingConversationId = it },
         onAgentSelected = { pendingAgentId = it },
+        onPairLink = actions.onPairLink,
     )
     LaunchedEffect(pendingConversationId, chatState.conversations) {
         val target = pendingConversationId ?: return@LaunchedEffect
