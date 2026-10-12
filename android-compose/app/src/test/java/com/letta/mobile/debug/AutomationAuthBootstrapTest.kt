@@ -4,7 +4,7 @@ import android.content.Context
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.ui.screens.config.ConfigViewModel
+import com.letta.mobile.data.model.LettaConfigMigration
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -47,17 +47,34 @@ class AutomationAuthBootstrapTest {
     fun importPendingConfig_promotesPayloadIntoSettingsRepositoryAndClearsStagingPref() = runBlocking {
         stagePayload(
             """
-            {"serverUrl":"${ConfigViewModel.DEFAULT_CLOUD_URL}","accessToken":"test-token"}
+            {"serverUrl":"wss://demo.letta.internal/ws","accessToken":"test-token"}
             """.trimIndent(),
         )
 
         AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
 
         assertEquals("automation-auth", activeConfig?.id)
-        assertEquals(LettaConfig.Mode.CLOUD, activeConfig?.mode)
-        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, activeConfig?.serverUrl)
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, activeConfig?.mode)
+        assertEquals("wss://demo.letta.internal/ws", activeConfig?.serverUrl)
         assertEquals("test-token", activeConfig?.accessToken)
         assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
+    }
+
+    @Test
+    fun importPendingConfig_aRetiredCloudPayloadBecomesARemoteHostToSetUp() = runBlocking {
+        // letta-mobile-ckmub.9: no Letta Cloud backend; the migration drops its address and key.
+        stagePayload(
+            """
+            {"serverUrl":"https://api.letta.com","accessToken":"cloud-key","mode":"CLOUD"}
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
+
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, activeConfig?.mode)
+        assertEquals("", activeConfig?.serverUrl)
+        assertNull(activeConfig?.accessToken)
+        assertEquals(LettaConfigMigration.CLOUD_NOTICE, activeConfig?.migrationNotice)
     }
 
     @Test
@@ -65,8 +82,8 @@ class AutomationAuthBootstrapTest {
         recordConfig(
             LettaConfig(
                 id = "existing",
-                mode = LettaConfig.Mode.CLOUD,
-                serverUrl = ConfigViewModel.DEFAULT_CLOUD_URL,
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "https://stale.example",
                 accessToken = "stale-token",
             )
         )

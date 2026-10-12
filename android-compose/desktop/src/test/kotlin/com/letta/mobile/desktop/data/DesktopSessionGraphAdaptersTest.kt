@@ -222,22 +222,37 @@ class DesktopSessionGraphAdaptersTest {
         configStore.save(
             LettaConfig(
                 id = "desktop-test",
-                mode = LettaConfig.Mode.CLOUD,
-                serverUrl = "https://api.letta.com",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "https://remote.example.test",
                 accessToken = "secret-token",
             ),
         )
 
         val loaded = configStore.load()
         assertEquals("desktop-test", loaded.id)
-        assertEquals(LettaConfig.Mode.CLOUD, loaded.mode)
-        assertEquals("https://api.letta.com", loaded.serverUrl)
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, loaded.mode)
+        assertEquals("https://remote.example.test", loaded.serverUrl)
         assertEquals("secret-token", loaded.accessToken)
-        assertEquals(listOf("https://api.letta.com"), configStore.recentBackends())
+        assertEquals(listOf("https://remote.example.test"), configStore.recentBackends())
 
         configStore.save(loaded.copy(accessToken = ""))
 
         assertNull(configStore.load().accessToken)
+    }
+
+    @Test
+    fun aSavedLettaCloudBackendLoadsAsARemoteHostWithANotice() {
+        val settingsStore = DesktopInMemorySecureSettingsStore()
+        settingsStore.putString("letta.config.id", "desktop-cloud")
+        settingsStore.putString("letta.config.mode", "CLOUD")
+        settingsStore.putString("letta.config.serverUrl", "https://api.letta.com")
+        settingsStore.putString("letta.config.accessToken", "cloud-key")
+
+        val loaded = DesktopLettaConfigStore(settingsStore).load()
+
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, loaded.mode)
+        assertNull(loaded.accessToken)
+        assertEquals(com.letta.mobile.data.model.LettaConfigMigration.CLOUD_NOTICE, loaded.migrationNotice)
     }
 
     @Test
@@ -249,14 +264,14 @@ class DesktopSessionGraphAdaptersTest {
         backendStore.saveActiveConfig(
             LettaConfig(
                 id = "",
-                mode = LettaConfig.Mode.CLOUD,
-                serverUrl = " https://api.letta.com ",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = " https://remote.example.test ",
                 accessToken = " first ",
             ),
         )
 
-        assertEquals(desktopConfigIdFor("https://api.letta.com"), backendStore.loadActiveConfig()?.id)
-        assertEquals("https://api.letta.com", backendStore.loadActiveConfig()?.serverUrl)
+        assertEquals(desktopConfigIdFor("https://remote.example.test"), backendStore.loadActiveConfig()?.id)
+        assertEquals("https://remote.example.test", backendStore.loadActiveConfig()?.serverUrl)
         assertEquals("first", tokenStore.loadToken())
 
         tokenStore.saveToken(" second ")

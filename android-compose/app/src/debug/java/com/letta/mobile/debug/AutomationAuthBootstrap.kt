@@ -5,6 +5,7 @@ import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LettaConfigMigration
 import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
@@ -99,22 +100,20 @@ object AutomationAuthBootstrap {
         }
 
         fun toLettaConfig(): LettaConfig {
-            val resolvedMode = when (mode?.trim()?.uppercase()) {
-                LettaConfig.Mode.CLOUD.name -> LettaConfig.Mode.CLOUD
-                LettaConfig.Mode.SELF_HOSTED.name -> LettaConfig.Mode.SELF_HOSTED
-                LettaConfig.Mode.LOCAL.name -> LettaConfig.Mode.LOCAL
-                null, "" -> if (serverUrl == ConfigViewModel.DEFAULT_CLOUD_URL) {
-                    LettaConfig.Mode.CLOUD
-                } else {
-                    LettaConfig.Mode.SELF_HOSTED
-                }
-                else -> throw IllegalArgumentException("Unsupported automation mode: $mode")
+            // letta-mobile-ckmub.9: a retired CLOUD mode reads as Remote host (LettaConfigMigration).
+            val resolvedMode = if (mode.isNullOrBlank()) {
+                LettaConfig.Mode.SELF_HOSTED
+            } else {
+                LettaConfigMigration.modeOf(mode) ?: throw IllegalArgumentException("Unsupported automation mode: $mode")
             }
-            return LettaConfig(
-                id = configId,
-                mode = resolvedMode,
-                serverUrl = serverUrl,
-                accessToken = if (resolvedMode == LettaConfig.Mode.LOCAL) null else accessToken,
+            return LettaConfigMigration.migrate(
+                mode,
+                LettaConfig(
+                    id = configId,
+                    mode = resolvedMode,
+                    serverUrl = serverUrl,
+                    accessToken = if (resolvedMode == LettaConfig.Mode.LOCAL) null else accessToken,
+                ),
             )
         }
 

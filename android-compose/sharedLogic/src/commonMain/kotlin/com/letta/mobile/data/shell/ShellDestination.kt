@@ -96,8 +96,11 @@ enum class ShellPageKind { Home, Chat, Canvas, Memory, Schedules, Channels, Skil
 /** Where the Skills page opens. */
 enum class ShellSkillsSection { Skills, Tools }
 
-/** A Settings anchor. A pairing link opened from outside lands on [Pairing]; its secret never rides the route. */
-enum class ShellSettingsSection { Pairing }
+/**
+ * A Settings anchor. A pairing link opened from outside lands on [Pairing]; its secret never rides
+ * the route. [About] is the diagnostics section (the desktop's Overview opens it, letta-mobile-ckmub.3.12).
+ */
+enum class ShellSettingsSection { Pairing, About }
 
 /** The Skills page section of this destination: its anchor on Skills, else the default. */
 val ShellDestination.skillsSection: ShellSkillsSection

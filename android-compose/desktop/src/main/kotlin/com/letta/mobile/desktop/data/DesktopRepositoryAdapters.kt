@@ -35,7 +35,7 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAgentRepository
 import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
-import com.letta.mobile.data.session.DEFAULT_REMOTE_LETTA_URL
+import com.letta.mobile.data.session.DEFAULT_REMOTE_BACKEND_LABEL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
 import com.letta.mobile.data.session.SessionBackendBinding
@@ -313,5 +313,5 @@ fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =
     remoteLettaBackendDescriptor(
         config = config,
         idPrefix = DESKTOP_REMOTE_LETTA_ID_PREFIX,
-        defaultLabel = DEFAULT_REMOTE_LETTA_URL,
+        defaultLabel = DEFAULT_REMOTE_BACKEND_LABEL,
     )

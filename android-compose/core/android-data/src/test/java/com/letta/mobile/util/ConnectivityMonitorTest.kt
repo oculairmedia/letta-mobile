@@ -93,7 +93,7 @@ class ConnectivityMonitorTest {
             settingsRepository.saveConfig(
                 LettaConfig(
                     id = "cfg-1",
-                    mode = LettaConfig.Mode.CLOUD,
+                    mode = LettaConfig.Mode.SELF_HOSTED,
                     serverUrl = "https://example.com",
                     accessToken = "token"
                 )
