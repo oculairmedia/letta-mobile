@@ -31,7 +31,7 @@ class CanvasSharedDocumentTest {
 
         val store = InMemoryCanvasDocumentStore()
         val log = InMemoryCanvasOpLog()
-        val doc = openCanvasDocument(canvasId, store, log, create = { created }, clock = { 7L })
+        val doc = openCanvasDocument(created, store, log, CanvasDocumentOptions(clock = { 7L }))
         ops.forEach { doc.apply(it) }
 
         assertEquals(session.document.value, doc.snapshot.value)
@@ -45,7 +45,7 @@ class CanvasSharedDocumentTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(canvasId = canvasId, acl = acl))
         assertFailsWith<UnauthorizedCanvasMutationException> { session.applyLocal(intruder) }
 
-        val doc = openCanvasDocument(canvasId, InMemoryCanvasDocumentStore(), InMemoryCanvasOpLog(), create = { session.document.value!! })
+        val doc = openCanvasDocument(session.document.value!!, InMemoryCanvasDocumentStore(), InMemoryCanvasOpLog())
         assertEquals(listOf(intruder), doc.apply(intruder).denied)
     }
 
@@ -53,9 +53,8 @@ class CanvasSharedDocumentTest {
     fun aBoardsHistoryIsBoundedByArchiveAndContinue() = runTest {
         val archive = InMemoryOpArchive<CanvasId, CanvasOp, CanvasDocument>()
         val doc = openCanvasDocument(
-            canvasId, InMemoryCanvasDocumentStore(), InMemoryCanvasOpLog(),
-            create = { CanvasDocument(id = canvasId, title = "Board", acl = acl) },
-            budget = HistoryBudget(maxOps = 2), archive = archive,
+            CanvasDocument(id = canvasId, title = "Board", acl = acl), InMemoryCanvasDocumentStore(), InMemoryCanvasOpLog(),
+            CanvasDocumentOptions(budget = HistoryBudget(maxOps = 2), archive = archive),
         )
         ops.forEach { doc.apply(it) }
 

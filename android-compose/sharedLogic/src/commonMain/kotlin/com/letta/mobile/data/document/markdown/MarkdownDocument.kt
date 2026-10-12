@@ -1,16 +1,16 @@
 package com.letta.mobile.data.document.markdown
 
 import com.letta.mobile.data.document.DocumentAcl
+import com.letta.mobile.data.document.DocumentBackend
 import com.letta.mobile.data.document.DocumentOp
-import com.letta.mobile.data.document.DocumentOpOrder
 import com.letta.mobile.data.document.DocumentReducer
 import com.letta.mobile.data.document.DocumentSnapshot
 import com.letta.mobile.data.document.DocumentStore
-import com.letta.mobile.data.document.HistoryBudget
-import com.letta.mobile.data.document.OpArchive
 import com.letta.mobile.data.document.OpLog
+import com.letta.mobile.data.document.OpStamp
 import com.letta.mobile.data.document.PrincipalAcl
 import com.letta.mobile.data.document.SharedDocument
+import com.letta.mobile.data.document.SharedDocumentOptions
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -26,17 +26,6 @@ data class MarkdownDocId(val value: String) {
     companion object {
         /** The Agent Tray of [agentId]: one per agent, the same id on every app. */
         fun agentTray(agentId: String): MarkdownDocId = MarkdownDocId("tray-agent-$agentId")
-    }
-}
-
-/** When a field was last written, by which op: compared in [DocumentOpOrder] for last-writer-wins. */
-@Serializable
-data class OpStamp(val lamport: Long, val actorId: String, val opId: String) {
-    fun isOlderThan(op: DocumentOp): Boolean =
-        DocumentOpOrder.compare(lamport, actorId, opId, op.lamport, op.actorId, op.opId) < 0
-
-    companion object {
-        fun of(op: DocumentOp): OpStamp = OpStamp(op.lamport, op.actorId, op.opId)
     }
 }
 
@@ -83,11 +72,12 @@ object MarkdownReducer : DocumentReducer<MarkdownOp, MarkdownDocument> {
         ops.fold(snapshot) { doc, op -> applyOp(doc, op) }.copy(revision = snapshot.revision + 1, updatedAtEpochMs = nowEpochMs)
 
     private fun applyOp(doc: MarkdownDocument, op: MarkdownOp): MarkdownDocument = when (op) {
-        is MarkdownOp.SetMarkdown ->
-            if (doc.markdownStamp?.isOlderThan(op) == false) doc else doc.copy(markdown = op.markdown, markdownStamp = OpStamp.of(op))
-        is MarkdownOp.SetTitle ->
-            if (doc.titleStamp?.isOlderThan(op) == false) doc else doc.copy(title = op.title, titleStamp = OpStamp.of(op))
+        is MarkdownOp.SetMarkdown -> if (wins(doc.markdownStamp, op)) doc.copy(markdown = op.markdown, markdownStamp = OpStamp.of(op)) else doc
+        is MarkdownOp.SetTitle -> if (wins(doc.titleStamp, op)) doc.copy(title = op.title, titleStamp = OpStamp.of(op)) else doc
     }
+
+    /** Whether [op] is the newer writer of a field last written at [stamp] (never written: always). */
+    private fun wins(stamp: OpStamp?, op: MarkdownOp): Boolean = stamp?.isOlderThan(op) ?: true
 
     override fun sizeOf(op: MarkdownOp): Long = json.encodeToString(MarkdownOp.serializer(), op).length.toLong()
 
@@ -100,26 +90,13 @@ object MarkdownReducer : DocumentReducer<MarkdownOp, MarkdownDocument> {
 /** A [MarkdownDocument] opened as a [SharedDocument]. */
 typealias SharedMarkdownDocument = SharedDocument<MarkdownDocId, MarkdownOp, MarkdownDocument>
 
-/** Opens Markdown document [id] over [store] and [opLog], creating it empty (titled [title]) when absent. */
-@Suppress("LongParameterList")
+/** How a Markdown document's history is bounded and reported. */
+typealias MarkdownDocumentOptions = SharedDocumentOptions<MarkdownDocId, MarkdownOp, MarkdownDocument>
+
+/** Opens Markdown document `seed.id` over [store] and [opLog], starting from [seed] when the store has none. */
 suspend fun openMarkdownDocument(
-    id: MarkdownDocId,
+    seed: MarkdownDocument,
     store: DocumentStore<MarkdownDocId, MarkdownDocument>,
     opLog: OpLog<MarkdownDocId, MarkdownOp>,
-    title: String = "",
-    agentId: String? = null,
-    acl: PrincipalAcl? = null,
-    budget: HistoryBudget = HistoryBudget(),
-    archive: OpArchive<MarkdownDocId, MarkdownOp, MarkdownDocument>? = null,
-    clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
-): SharedMarkdownDocument = SharedDocument.open(
-    id = id,
-    create = { MarkdownDocument(id = id, title = title, agentId = agentId, acl = acl, updatedAtEpochMs = clock()) },
-    reducer = MarkdownReducer,
-    store = store,
-    opLog = opLog,
-    budget = budget,
-    archive = archive,
-    clock = clock,
-    tag = "MarkdownDocument",
-)
+    options: MarkdownDocumentOptions = MarkdownDocumentOptions(tag = "MarkdownDocument"),
+): SharedMarkdownDocument = SharedDocument.open(seed, DocumentBackend(MarkdownReducer, store, opLog), options)

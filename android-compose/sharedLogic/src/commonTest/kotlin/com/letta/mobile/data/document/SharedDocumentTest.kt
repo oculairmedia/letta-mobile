@@ -2,6 +2,7 @@ package com.letta.mobile.data.document
 
 import com.letta.mobile.data.document.markdown.MarkdownDocId
 import com.letta.mobile.data.document.markdown.MarkdownDocument
+import com.letta.mobile.data.document.markdown.MarkdownDocumentOptions
 import com.letta.mobile.data.document.markdown.MarkdownOp
 import com.letta.mobile.data.document.markdown.openMarkdownDocument
 import kotlinx.coroutines.flow.first
@@ -29,7 +30,12 @@ class SharedDocumentTest {
         budget: HistoryBudget = HistoryBudget(),
         archive: OpArchive<MarkdownDocId, MarkdownOp, MarkdownDocument>? = null,
         acl: PrincipalAcl? = null,
-    ) = openMarkdownDocument(id, store, log, title = "Tray", agentId = "agent-1", acl = acl, budget = budget, archive = archive, clock = clock)
+    ) = openMarkdownDocument(
+        MarkdownDocument(id, title = "Tray", agentId = "agent-1", acl = acl),
+        store,
+        log,
+        MarkdownDocumentOptions(budget = budget, archive = archive, clock = clock),
+    )
 
     @Test
     fun appliedOpsAreLoggedFoldedAndPersistedAsOneRevision() = runTest {

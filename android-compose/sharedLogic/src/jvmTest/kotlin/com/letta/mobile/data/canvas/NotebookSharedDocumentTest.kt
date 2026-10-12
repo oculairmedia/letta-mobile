@@ -64,8 +64,7 @@ class NotebookSharedDocumentTest {
         val documentPath = Files.createTempDirectory("shared-doc-primitive-")
         NotebookLocalStore(documentPath, "canvas-peer").use { notebooks ->
             val doc = openCanvasDocument(
-                canvasId, NotebookCanvasDocumentStore(notebooks), InMemoryCanvasOpLog(),
-                create = { created }, clock = { 7L },
+                created, NotebookCanvasDocumentStore(notebooks), InMemoryCanvasOpLog(), CanvasDocumentOptions(clock = { 7L }),
             )
             ops.forEach { doc.apply(it) }
             assertEquals(emptyList(), doc.storageFaults.value.map { it.message })

@@ -1,7 +1,5 @@
 package com.letta.mobile.data.canvas
 
-import com.letta.mobile.data.document.DocumentOpOrder
-
 /**
  * The one total order on canvas ops: (lamport, actorId, opId).
  *
@@ -22,7 +20,11 @@ object CanvasOpOrder : Comparator<CanvasOp> {
         lamportB: Long,
         actorB: String,
         opIdB: String,
-    ): Int = DocumentOpOrder.compare(lamportA, actorA, opIdA, lamportB, actorB, opIdB)
+    ): Int = when {
+        lamportA != lamportB -> lamportA.compareTo(lamportB)
+        actorA != actorB -> actorA.compareTo(actorB)
+        else -> opIdA.compareTo(opIdB)
+    }
 }
 
 /**

@@ -1,10 +1,10 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentAcl
+import com.letta.mobile.data.document.DocumentBackend
 import com.letta.mobile.data.document.DocumentReducer
-import com.letta.mobile.data.document.HistoryBudget
-import com.letta.mobile.data.document.OpArchive
 import com.letta.mobile.data.document.SharedDocument
+import com.letta.mobile.data.document.SharedDocumentOptions
 import kotlinx.serialization.json.Json
 
 /**
@@ -32,32 +32,21 @@ object CanvasDocumentReducer : DocumentReducer<CanvasOp, CanvasDocument> {
 /** A board opened as a [SharedDocument]. */
 typealias SharedCanvasDocument = SharedDocument<CanvasId, CanvasOp, CanvasDocument>
 
+/** How a board's history is bounded and reported; tagged for canvas telemetry by default. */
+typealias CanvasDocumentOptions = SharedDocumentOptions<CanvasId, CanvasOp, CanvasDocument>
+
 /**
- * Opens board [canvasId] as a [SharedDocument] over the canvas's own stores - in the apps, the
+ * Opens board `seed.id` as a [SharedDocument] over the canvas's own stores - in the apps, the
  * Automerge notebook repository ([NotebookCanvasDocumentStore]) and the canvas op log - so the
- * persistence format is the one every board already has. [create] makes the board when the store
- * has none.
+ * persistence format is the one every board already has. [seed] is the board when the store has
+ * none.
  *
  * The open board's [CanvasSession] still writes through those stores directly; folding its write
- * path into the primitive is a follow-up that waits on the notebook write-path work landing.
+ * path into the primitive is the follow-up letta-mobile-ckmub.6.2.
  */
-@Suppress("LongParameterList")
 suspend fun openCanvasDocument(
-    canvasId: CanvasId,
+    seed: CanvasDocument,
     store: CanvasDocumentStore,
     opLog: CanvasOpLog,
-    create: () -> CanvasDocument = { CanvasDocument(id = canvasId, title = "Canvas") },
-    budget: HistoryBudget = HistoryBudget(),
-    archive: OpArchive<CanvasId, CanvasOp, CanvasDocument>? = null,
-    clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
-): SharedCanvasDocument = SharedDocument.open(
-    id = canvasId,
-    create = create,
-    reducer = CanvasDocumentReducer,
-    store = store,
-    opLog = opLog,
-    budget = budget,
-    archive = archive,
-    clock = clock,
-    tag = "CanvasDocument",
-)
+    options: CanvasDocumentOptions = CanvasDocumentOptions(tag = "CanvasDocument"),
+): SharedCanvasDocument = SharedDocument.open(seed, DocumentBackend(CanvasDocumentReducer, store, opLog), options)
