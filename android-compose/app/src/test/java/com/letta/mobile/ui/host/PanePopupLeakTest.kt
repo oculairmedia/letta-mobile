@@ -27,7 +27,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.search.LettaSearchAnchoredField
+import com.letta.mobile.ui.search.LettaSearchAnchor
 import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.search.LettaSearchSource
+import com.letta.mobile.ui.search.LettaSearchTriggerStyle
 import com.letta.mobile.ui.search.LettaSearchSection
 import com.letta.mobile.ui.search.SearchTriggerTestTag
 import com.letta.mobile.ui.shell.ShellLongPressMenu
@@ -64,12 +67,8 @@ class PanePopupLeakTest {
         var query by remember { mutableStateOf("") }
         Column {
             LettaSearchAnchoredField(
-                query = query,
-                onQueryChange = { query = it },
-                sections = rows,
-                onRowSelected = {},
-                onDismiss = {},
-                compact = true,
+                source = LettaSearchSource(query = query, onQueryChange = { query = it }, sections = rows, onRowSelected = {}),
+                anchor = LettaSearchAnchor(style = LettaSearchTriggerStyle.Icon),
             )
             ShellLongPressMenu(listOf(LettaMenuItem("Open") { nav.navigate("other") })) {
                 Box(Modifier.testTag(ROW)) { Text("Row") }
