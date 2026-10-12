@@ -3,7 +3,9 @@ package com.letta.mobile.debug
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +29,7 @@ import com.letta.mobile.avatar.core.AvatarDirector
 import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.rive.RiveAvatarRuntime
 import com.letta.mobile.avatar.rive.RiveAvatarSurface
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -51,9 +54,13 @@ class MascotDebugActivity : ComponentActivity() {
         // The Compose worker calls JNI immediately; initialize Rive before composition.
         // Keep this lazy and debug-only rather than adding native work to app startup.
         app.rive.runtime.kotlin.core.Rive.init(applicationContext)
+        // Every Activity runs edge to edge; the shared page frame owns the insets (letta-mobile-ckmub.2.1).
+        enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) { MascotBench() }
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    LettaPageScaffold { insets -> Box(Modifier.padding(insets)) { MascotBench() } }
+                }
             }
         }
     }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -30,6 +29,7 @@ import com.letta.mobile.ui.memory.MemoryPage
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPage
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
@@ -66,9 +66,9 @@ fun MemoryOverviewScreen(
     val agentId = state.parity.memory.selectedAgentId
     LaunchedEffect(agentId) { filesViewModel.selectAgent(agentId) }
 
-    Scaffold(
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
+        header = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_memory_title)) },
                 navigationIcon = {

@@ -1,11 +1,9 @@
 package com.letta.mobile.ui.screens.skills
 
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -28,12 +26,13 @@ import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /**
  * Android host for the shared [SkillsPage] (letta-mobile-zxk2n.32): top bar, back and the create
  * tool dialog only. The Skills route opens it on Skills; the standalone Tools route on Tools.
- * Scaffold's padding carries the system bars, so the page sits inside them edge to edge.
+ * The shared page frame owns the system bars and keyboard, so the page sits inside them edge to edge.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,9 +48,9 @@ fun SkillsScreen(
     val actions = remember(skillsViewModel, toolsViewModel, navigation) {
         skillsPageActions(skillsViewModel, toolsViewModel, navigation) { showCreateDialog = true }
     }
-    Scaffold(
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
+        header = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_skills_title)) },
                 navigationIcon = {
@@ -67,7 +66,7 @@ fun SkillsScreen(
             state = skillsPageState(catalog, tools),
             actions = actions,
             options = SkillsPageOptions(showTitle = false, touch = true, initialSection = initialSection),
-            modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
+            modifier = Modifier.padding(paddingValues),
         )
     }
     if (showCreateDialog) {

@@ -1,12 +1,8 @@
 package com.letta.mobile.ui.navigation
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +28,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -66,31 +61,13 @@ fun AdaptiveScaffold(
         }
     } else {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentDestination = navBackStackEntry?.destination
-        // Screens that lay themselves out edge to edge, drawing behind the system bars and insetting
-        // only their own controls: the chat, and the canvas (its board and the note opened full
-        // screen). Padding them here boxed the board in between two bars of scaffold colour.
-        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination) ||
-            currentDestination?.hasRoute(CanvasRoute::class) == true
+        val insetPolicy = navBackStackEntry?.destination.insetPolicy()
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.surface,
         ) { innerPadding ->
-            val layoutDirection = LocalLayoutDirection.current
-            Box(
-                modifier = Modifier
-                    .padding(
-                        top = if (isChatDestination) 0.dp else innerPadding.calculateTopPadding(),
-                        bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
-                        start = innerPadding.calculateStartPadding(layoutDirection),
-                        end = innerPadding.calculateEndPadding(layoutDirection)
-                    )
-                    .then(
-                        if (isChatDestination) Modifier
-                        else Modifier.consumeWindowInsets(innerPadding)
-                    ),
-            ) {
+            Box(modifier = insetPolicy.frame(innerPadding, LocalLayoutDirection.current)) {
                 content()
             }
         }
@@ -184,7 +161,7 @@ private fun NavController.popToExistingTopLevel(destination: TopLevelDestination
         TopLevelDestination.ADMIN -> popBackStack<AdminRoute>(inclusive = false)
     }
 
-private fun TopLevelDestination.isSelected(currentDestination: NavDestination?): Boolean {
+internal fun TopLevelDestination.isSelected(currentDestination: NavDestination?): Boolean {
     if (currentDestination == null) return false
     val routeClasses: List<KClass<*>> = when (this) {
         TopLevelDestination.HOME -> listOf(HomeRoute::class, ProjectsRoute::class)
