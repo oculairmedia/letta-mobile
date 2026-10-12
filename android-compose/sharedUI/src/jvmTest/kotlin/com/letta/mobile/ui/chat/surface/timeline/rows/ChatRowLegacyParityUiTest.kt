@@ -40,6 +40,7 @@ class ChatRowLegacyParityUiTest {
     fun theRunSummaryLineSaysHowManyOfItsToolsFailed() = runComposeUiTest {
         // letta-mobile-zxk2n.37: one line, "Failed · 1 of 2", instead of a title and two counts.
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = "a")) } }
+        awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
         onNodeWithText("Failed · 1 of 2", useUnmergedTree = true).assertExists()
         // Folded by default: the tool line ("2 ran - 1 failed") waits under the summary.
@@ -50,6 +51,7 @@ class ChatRowLegacyParityUiTest {
     fun aSettledRunFoldsToItsProseUnderItsSummaryLine() = runComposeUiTest {
         val actions = RecordingChatActions()
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = "a"), rowCallbacks(actions)) } }
+        awaitText("Fixed it.")
         onNodeWithText("2 ran - 1 failed").assertDoesNotExist()
         onNodeWithText("Fixed it.", substring = true).assertExists()
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
@@ -61,6 +63,7 @@ class ChatRowLegacyParityUiTest {
         // The page's toggle set holds the runs the person opened.
         val opened = rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "a")
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), opened) } }
+        awaitText("Fixed it.")
         onNodeWithText("2 ran - 1 failed").assertExists()
         onNodeWithText("Fixed it.", substring = true).assertExists()
     }
@@ -69,6 +72,7 @@ class ChatRowLegacyParityUiTest {
     fun anOlderRunWithWorkKeepsItsSummaryLine() = runComposeUiTest {
         // The line is the only way to the folded steps, so it shows on older runs too.
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = null)) } }
+        awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
     }
 
@@ -76,6 +80,7 @@ class ChatRowLegacyParityUiTest {
     fun anOlderProseOnlyRunHasNoHeader() = runComposeUiTest {
         val narration = reply.copy(id = "n", content = "Looking.")
         setContent { MaterialTheme { RenderRow(runOf(narration, reply), rowContext(newestMessageId = null)) } }
+        awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertDoesNotExist()
     }
 
@@ -114,6 +119,7 @@ class ChatRowLegacyParityUiTest {
     fun anErrorLabelsItselfOnlyAtTheHeadOfItsGroup() = runComposeUiTest {
         val error = UiMessage(id = "e", role = "assistant", content = "Run failed.", timestamp = "2026-10-11T16:05:00Z", isError = true)
         setContent { MaterialTheme { ChatMessageRow(error, rowContext(), rowCallbacks(), GroupPosition.Last) } }
+        awaitText("Run failed.")
         onNodeWithText("Error").assertDoesNotExist()
         onNodeWithText("Run failed.", substring = true).assertExists()
     }
@@ -122,6 +128,7 @@ class ChatRowLegacyParityUiTest {
     fun theHeadOfAGroupKeepsTheErrorLabel() = runComposeUiTest {
         val error = UiMessage(id = "e", role = "assistant", content = "Run failed.", timestamp = "2026-10-11T16:05:00Z", isError = true)
         setContent { MaterialTheme { ChatMessageRow(error, rowContext(), rowCallbacks(), GroupPosition.None) } }
+        awaitText("Run failed.")
         onNodeWithText("Error").assertExists()
     }
 }

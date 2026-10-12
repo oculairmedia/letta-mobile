@@ -176,13 +176,11 @@ private fun DesktopShellQuickQueryBridge(context: DesktopShellContext, frame: De
 private fun DesktopShellFocusedAgentLoaders(context: DesktopShellContext, frame: DesktopShellFrame) {
     val selectedDestination = context.navigator.selectedDestination
     val selectedAgentId = frame.focus.selectedAgentId
-    val skillsPanel = context.panels.skillsPanel
+    val skills = context.panels.skills
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
-    LaunchedEffect(selectedDestination, skillsPanel, selectedAgentId) {
-        if (selectedDestination == DesktopDestination.Agents) {
-            skillsPanel.reload(selectedAgentId?.let(::DesktopAgentId))
-        }
+    LaunchedEffect(selectedDestination, skills, selectedAgentId) {
+        if (selectedDestination == DesktopDestination.Agents) skills.reload(selectedAgentId)
     }
     val slashCommandApi = context.panels.httpApis.slashCommandApi
     val agentSlashCommands = context.panels.agentSlashCommands

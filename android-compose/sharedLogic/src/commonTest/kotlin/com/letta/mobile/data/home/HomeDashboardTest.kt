@@ -105,6 +105,11 @@ class HomeDashboardTest {
         )
         assertEquals("—", loading.last().value)
         assertEquals(listOf(0, 1), loading[2].series)
+        assertEquals(
+            listOf(HomeShortcut.AGENTS, HomeShortcut.CONVERSATIONS, HomeShortcut.AGENTS, HomeShortcut.RUNS, HomeShortcut.TOOLS, HomeShortcut.BLOCKS, HomeShortcut.USAGE),
+            loading.map { it.shortcut },
+            "every figure opens the page it summarises",
+        )
 
         val usage = HomeUsageSummary(totalTokens = 4_800, averageTokensPerHour = 200, sampledSteps = 3, modelUsage = listOf(ModelTokenUsage("openai/gpt-5", 4_000, 83)))
         val settled = HomePageState(fleet = fleet, stats = HomeStats(loading = false, toolCount = 1_204, usage = usage)).statTiles()

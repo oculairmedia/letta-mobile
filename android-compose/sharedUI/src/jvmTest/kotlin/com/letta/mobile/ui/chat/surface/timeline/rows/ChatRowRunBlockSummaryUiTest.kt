@@ -73,6 +73,7 @@ class ChatRowRunBlockSummaryUiTest {
     fun aFoldedRunBlockIsOneSummaryLineWithOneChevronAndNoStepRows() = runComposeUiTest {
         val actions = RecordingChatActions()
         show(run, opened = false, actions)
+        awaitText("Fixed it.")
 
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assert(hasClickAction())
         onNodeWithText("Worked · ", substring = true, useUnmergedTree = true).assertExists()
@@ -92,6 +93,7 @@ class ChatRowRunBlockSummaryUiTest {
     @Test
     fun anOpenedRunBlockListsItsStepsUnderTheLine() = runComposeUiTest {
         show(run, opened = true)
+        awaitText("Fixed it.")
 
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
         onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertExists()
@@ -119,6 +121,7 @@ class ChatRowRunBlockSummaryUiTest {
             ),
         )
         show(parked, opened = false)
+        awaitText("Approval requested")
 
         onNodeWithText("Waiting for your approval", useUnmergedTree = true).assertExists()
         onNodeWithText("Approval requested").assertExists()
@@ -150,6 +153,7 @@ class ChatRowRunBlockSummaryUiTest {
                 }
             }
         }
+        awaitText("Fixed it.")
         val folded = awaitStableHeight()
         opened = true
         mainClock.advanceTimeByFrame()
@@ -171,6 +175,7 @@ class ChatRowRunBlockSummaryUiTest {
                 }
             }
         }
+        awaitText("Fixed it.")
         val before = awaitStableHeight()
         shown = run.copy(messages = run.messages.map { (message, position) -> message.copy() to position })
         mainClock.advanceTimeByFrame()
