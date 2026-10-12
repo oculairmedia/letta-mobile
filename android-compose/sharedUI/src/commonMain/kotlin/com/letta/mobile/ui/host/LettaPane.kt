@@ -55,7 +55,9 @@ fun LettaPane(
 
 /**
  * A menu anchored to the composable it is declared inside, through the host's menu container.
- * Unlike [LettaPane] it takes [expanded], so the container can animate the menu out.
+ * Unlike [LettaPane] it takes [expanded], so the container can animate the menu out. While the
+ * page that owns it is stopped there is no menu at all: it closes when the page stops, and a
+ * stopped page's paused frame clock would hold the exit animation, and the menu's window, open.
  */
 @Composable
 fun LettaMenu(
@@ -66,6 +68,7 @@ fun LettaMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (expanded) DismissWhenOwnerStops(onDismiss)
+    if (!ownerIsStarted()) return
     LocalLettaHost.current.menu(expanded, PaneSpec(onDismiss = onDismiss, anchor = anchor, modifier = modifier), content)
 }
 

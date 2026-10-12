@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.host
 
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -53,6 +54,7 @@ class PanePopupLeakTest {
             NavHost(nav, startDestination = "home") {
                 composable("home") { HomePage() }
                 composable("other") { Text("Other") }
+                composable("detail") { HomePage() }
             }
         }
     }
@@ -89,15 +91,29 @@ class PanePopupLeakTest {
     @Test
     fun searchPaneClosesOnBack() {
         compose.setContent { App() }
-        compose.runOnUiThread { nav.navigate("other") }
+        compose.onNodeWithTag(SearchTriggerTestTag).performClick()
         compose.waitForIdle()
-        compose.runOnUiThread { nav.popBackStack() }
+        // Back reaches the focused window first, which is the pane's own.
+        val pane = popupWindows().single().first
+        compose.runOnUiThread {
+            pane.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK))
+            pane.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK))
+        }
+        compose.waitForIdle()
+        assertEquals("popup windows after back: ${describe()}", 0, popupWindows().size)
+    }
+
+    @Test
+    fun searchPaneClosesWhenItsPageIsPopped() {
+        compose.setContent { App() }
+        compose.runOnUiThread { nav.navigate("detail") }
         compose.waitForIdle()
         compose.onNodeWithTag(SearchTriggerTestTag).performClick()
         compose.waitForIdle()
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        assertEquals(1, popupWindows().size)
+        compose.runOnUiThread { nav.popBackStack() }
         compose.waitForIdle()
-        assertEquals("popup windows after back: ${describe()}", 0, popupWindows().size)
+        assertEquals("popup windows after popping the page: ${describe()}", 0, popupWindows().size)
     }
 
     @Test

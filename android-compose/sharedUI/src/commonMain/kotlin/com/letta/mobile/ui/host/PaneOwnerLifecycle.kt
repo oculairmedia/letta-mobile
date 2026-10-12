@@ -14,3 +14,12 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 internal expect fun DismissWhenOwnerStops(onDismiss: () -> Unit)
+
+/**
+ * Whether the page that composes this is started (on screen). A stopped Android page's frame clock
+ * is paused, so a menu that closes then never finishes its exit animation and its window stays
+ * attached until the page returns: a stopped page's menu leaves at once instead. Always true on
+ * desktop and web.
+ */
+@Composable
+internal expect fun ownerIsStarted(): Boolean
