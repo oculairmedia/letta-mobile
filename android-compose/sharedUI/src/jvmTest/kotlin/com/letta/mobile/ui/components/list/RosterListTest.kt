@@ -51,10 +51,10 @@ class RosterListTest {
 
     @Test
     fun pinnedFirstSplitsAPinnedGroupAndDropsItWhenEmpty() {
-        val sections = RosterSections.pinnedFirst("fruit", listOf(banana, apple, cherry), isPinned = Fruit::pinned, title = "Fruit")
+        val sections = RosterSections.pinnedFirst(RosterSection("fruit", listOf(banana, apple, cherry), title = "Fruit"), Fruit::pinned)
         assertEquals(listOf("fruit-pinned", "fruit"), sections.map { it.key })
         assertEquals(listOf(listOf(apple), listOf(banana, cherry)), sections.map { it.items })
-        assertEquals(listOf("fruit"), RosterSections.pinnedFirst("fruit", listOf(banana), Fruit::pinned).map { it.key })
+        assertEquals(listOf("fruit"), RosterSections.pinnedFirst(RosterSection("fruit", listOf(banana)), Fruit::pinned).map { it.key })
     }
 
     @Test
@@ -93,8 +93,8 @@ class RosterListTest {
         onNodeWithText("FRUIT").assertExists()
         onNodeWithText("VEGETABLES").assertExists()
         onNodeWithText("No vegetables").assertExists()
-        onNodeWithTag(row("fruit", banana)).assertIsSelected()
-        onNodeWithTag(row("fruit", apple)).assertIsNotSelected()
+        onNodeWithTag(row("fruit", banana).value).assertIsSelected()
+        onNodeWithTag(row("fruit", apple).value).assertIsNotSelected()
     }
 
     @Test
@@ -110,7 +110,7 @@ class RosterListTest {
                 empty = { Text("Nothing yet") },
             )
         }
-        onNodeWithTag(RosterListTags.loading(RosterListTags.LIST)).assertExists()
+        onNodeWithTag(RosterListTags.LIST.loading).assertExists()
         loading = false
         waitForIdle()
         onNodeWithText("Nothing yet").assertExists()
@@ -130,7 +130,7 @@ class RosterListTest {
                 actions = RosterActions(reorder = RosterReorder { item, to -> events += "move:${item.id}:$to" }),
             )
         }
-        val list = onNodeWithTag(RosterListTags.LIST)
+        val list = onNodeWithTag(RosterListTags.LIST.value)
         list.requestFocus()
         list.performKeyInput {
             pressKey(Key.DirectionDown)
@@ -163,8 +163,8 @@ class RosterListTest {
         val rowTag = row("fruit", banana)
         // Pointer: the quick action is a hover button, not a menu entry, and no swipe.
         onNodeWithText("menu:Eat").assertDoesNotExist()
-        onNodeWithTag(rowTag).performMouseInput { moveTo(center) }
-        onNodeWithTag(RosterListTags.quick(rowTag, "Eat")).performClick()
+        onNodeWithTag(rowTag.value).performMouseInput { moveTo(center) }
+        onNodeWithTag(rowTag.quick("Eat")).performClick()
         onNodeWithText("menu:Peel").performClick()
         assertEquals(listOf("eat:banana", "peel:banana"), events)
     }
@@ -184,7 +184,7 @@ class RosterListTest {
             }
         }
         // Across the row itself (the stand-in menu's buttons sit under it).
-        onNodeWithTag(row("fruit", banana)).performTouchInput {
+        onNodeWithTag(row("fruit", banana).value).performTouchInput {
             swipe(start = Offset(width - 2f, ROW_Y), end = Offset(2f, ROW_Y))
         }
         onNodeWithText("menu:Eat").performClick()
@@ -210,7 +210,7 @@ class RosterListTest {
         runOnIdle { assertEquals(listOf("apple" to "Green apple"), renames) }
         onNodeWithTag(RosterListTags.RENAME_FIELD).assertDoesNotExist()
 
-        val list = onNodeWithTag(RosterListTags.LIST)
+        val list = onNodeWithTag(RosterListTags.LIST.value)
         list.requestFocus()
         list.performKeyInput {
             pressKey(Key.DirectionDown)
@@ -222,7 +222,7 @@ class RosterListTest {
         onNodeWithText("Banana").assertExists()
     }
 
-    private fun row(section: String, fruit: Fruit) = RosterListTags.row(RosterListTags.LIST, RosterLayout.rowKey(section, fruit.id))
+    private fun row(section: String, fruit: Fruit) = RosterListTags.LIST.row(RosterLayout.rowKey(section, fruit.id))
 
     /** A stand-in host: the row menu's entries as plain buttons under the row. */
     private fun menuAsButtons(input: LettaInput) = LettaHost(

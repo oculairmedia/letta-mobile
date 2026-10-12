@@ -30,6 +30,7 @@ import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -105,7 +106,7 @@ fun ColumnScope.ShellAgentLibrary(groups: List<AgentRailGroup>, entries: List<Sh
             key = ShellRailEntry::key,
             selection = RosterSelection(isSelected = ShellRailEntry::selected, onSelect = { actions.onAgentSelected(it.agentId) }),
             actions = RosterActions(menu = { entry, _ -> ShellRowMenus.agent(entry, actions) }),
-            options = RosterOptions(testTag = ShellAgentLibraryTags.LIST),
+            options = RosterOptions(testTag = RosterListTag(ShellAgentLibraryTags.LIST)),
             empty = { LettaEmptyHint("No agents match \"$needle\"", Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) },
         ),
         modifier = Modifier.weight(1f).fillMaxWidth().railScrollFades(roster.lazy),

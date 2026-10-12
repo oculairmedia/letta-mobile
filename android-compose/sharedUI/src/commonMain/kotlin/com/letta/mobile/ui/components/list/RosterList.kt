@@ -69,7 +69,7 @@ fun <T> RosterList(
             .onFocusChanged { focused = it.hasFocus }
             .onPreviewKeyEvent(roster::onKey)
             .focusable()
-            .testTag(spec.options.testTag),
+            .testTag(spec.options.testTag.value),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         if (layout.isEmpty && (spec.options.loading || spec.empty != null)) {
@@ -198,13 +198,13 @@ private fun <T> RosterItem(
     val host = LocalLettaHost.current
     val touch = host.input == LettaInput.Touch
     val menu = roster.menu(line, rowState, touch)
-    val tag = RosterListTags.row(roster.options.testTag, line.key)
+    val tag = roster.options.testTag.row(line.key)
     Box(
         Modifier
             .hoverable(interaction)
             .cursorRing(highlighted && roster.focused)
             .semantics { selected = rowState.selected }
-            .testTag(tag),
+            .testTag(tag.value),
     ) {
         val content: @Composable () -> Unit = {
             RosterGestures(RosterGestureSpec(tag, touch, hovered, roster.actions.swipe(line.item), roster.actions.quick(line.item))) {
@@ -223,9 +223,9 @@ private fun Modifier.cursorRing(show: Boolean): Modifier =
 private const val CURSOR_ALPHA = 0.6f
 
 @Composable
-private fun <T> RosterHeader(section: RosterSection<T>, listTag: String) {
+private fun <T> RosterHeader(section: RosterSection<T>, listTag: RosterListTag) {
     Row(
-        modifier = Modifier.fillMaxWidth().testTag(RosterListTags.header(listTag, section.key)),
+        modifier = Modifier.fillMaxWidth().testTag(listTag.header(section.key)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LettaSectionLabel(section.title.orEmpty(), Modifier.weight(1f))
@@ -236,9 +236,9 @@ private fun <T> RosterHeader(section: RosterSection<T>, listTag: String) {
 @Composable
 private fun RosterEmptyState(options: RosterOptions, empty: (@Composable () -> Unit)?) {
     if (options.loading) {
-        LinearProgressIndicator(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm).testTag(RosterListTags.loading(options.testTag)))
+        LinearProgressIndicator(Modifier.fillMaxWidth().padding(LettaDimens.Space.sm).testTag(options.testTag.loading))
     } else {
-        Box(Modifier.fillMaxWidth().testTag(RosterListTags.empty(options.testTag))) { empty?.invoke() }
+        Box(Modifier.fillMaxWidth().testTag(options.testTag.empty)) { empty?.invoke() }
     }
 }
 

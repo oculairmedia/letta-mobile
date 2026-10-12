@@ -107,7 +107,7 @@ fun RosterRenameField(request: RosterRenameRequest, modifier: Modifier = Modifie
 /** What a row's gestures need: its tag, the input, whether it is hovered, its swipe and quick actions. */
 @Immutable
 internal class RosterGestureSpec(
-    val tag: String,
+    val tag: RosterRowTag,
     val touch: Boolean,
     val hovered: Boolean,
     val swipe: RosterAction?,
@@ -126,13 +126,13 @@ internal fun RosterGestures(spec: RosterGestureSpec, content: @Composable () -> 
 }
 
 @Composable
-private fun SwipeRow(action: RosterAction, tag: String, content: @Composable () -> Unit) {
+private fun SwipeRow(action: RosterAction, tag: RosterRowTag, content: @Composable () -> Unit) {
     var offset by remember { mutableFloatStateOf(0f) }
     // The action is rebuilt on each composition; the gesture must not restart with it.
     val current by rememberUpdatedState(action)
     val threshold = with(LocalDensity.current) { SWIPE_THRESHOLD.toPx() }
     Box {
-        if (offset < 0f) SwipeBackdrop(action, Modifier.matchParentSize().testTag(RosterListTags.swipeBackdrop(tag)))
+        if (offset < 0f) SwipeBackdrop(action, Modifier.matchParentSize().testTag(tag.swipeBackdrop))
         Box(
             Modifier
                 .offset { IntOffset(offset.roundToInt(), 0) }
@@ -185,10 +185,10 @@ private fun HoverActions(spec: RosterGestureSpec, content: @Composable () -> Uni
 }
 
 @Composable
-private fun QuickActionButton(action: RosterAction, tag: String) {
+private fun QuickActionButton(action: RosterAction, tag: RosterRowTag) {
     IconButton(
         onClick = action.onClick,
-        modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(RosterListTags.quick(tag, action.label)),
+        modifier = Modifier.size(LettaDimens.Control.iconButton).testTag(tag.quick(action.label)),
     ) {
         val icon = action.icon
         if (icon != null) {

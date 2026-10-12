@@ -45,6 +45,7 @@ import com.letta.mobile.data.schedules.ScheduleReliability
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterRowSlots
@@ -125,7 +126,7 @@ fun ScheduleOverviewRail(params: ScheduleRailParams) {
                 sections = sections,
                 key = ScheduleDef::id,
                 selection = RosterSelection(isSelected = { it.id == nextId }, onSelect = { params.onSelectSchedule(it.id) }),
-                options = RosterOptions(testTag = ScheduleRailTags.ACTIVE_LIST),
+                options = RosterOptions(testTag = RosterListTag(ScheduleRailTags.ACTIVE_LIST)),
             ),
             modifier = Modifier.weight(1f).fillMaxWidth(),
         ) { def, row ->

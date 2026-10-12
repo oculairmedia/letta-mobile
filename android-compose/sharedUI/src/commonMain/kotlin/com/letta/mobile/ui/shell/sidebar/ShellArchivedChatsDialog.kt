@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterListRow
 import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterSection
@@ -42,7 +43,7 @@ fun ShellArchivedChatsDialog(
                     sections = sections,
                     key = ShellConversationRowModel::id,
                     selection = RosterSelection(onSelect = { onOpen(it.id) }),
-                    options = RosterOptions(testTag = ARCHIVED_LIST_TAG),
+                    options = RosterOptions(testTag = RosterListTag(ARCHIVED_LIST_TAG)),
                     empty = { LettaEmptyHint("No archived chats") },
                 ),
                 modifier = Modifier.heightIn(max = LettaDimens.Pane.modalMaxHeight),

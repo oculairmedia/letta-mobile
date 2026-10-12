@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import kotlin.jvm.JvmInline
 import com.letta.mobile.ui.components.LettaMenuItem
 
 /**
@@ -32,20 +33,13 @@ object RosterSections {
     const val PINNED_TITLE = "Pinned"
 
     /**
-     * [items] as a pinned group under [pinnedTitle] (left out when nothing is pinned), then the
-     * rest under [title]. Each group keeps the order it had in [items].
+     * [section] split in two: its pinned items as a group under [PINNED_TITLE] (left out when
+     * nothing is pinned), then the rest as [section]. Each group keeps its order.
      */
-    fun <T> pinnedFirst(
-        key: String,
-        items: List<T>,
-        isPinned: (T) -> Boolean,
-        title: String? = null,
-        pinnedTitle: String = PINNED_TITLE,
-        emptyHint: String? = null,
-    ): List<RosterSection<T>> {
-        val (pinned, rest) = items.partition(isPinned)
-        val pinnedSection = RosterSection("$key-pinned", pinned, title = pinnedTitle).takeIf { pinned.isNotEmpty() }
-        return listOfNotNull(pinnedSection, RosterSection(key, rest, title = title, emptyHint = emptyHint))
+    fun <T> pinnedFirst(section: RosterSection<T>, isPinned: (T) -> Boolean): List<RosterSection<T>> {
+        val (pinned, rest) = section.items.partition(isPinned)
+        val pinnedSection = RosterSection("${section.key}-pinned", pinned, title = PINNED_TITLE).takeIf { pinned.isNotEmpty() }
+        return listOfNotNull(pinnedSection, section.copy(items = rest))
     }
 }
 
@@ -137,7 +131,7 @@ class RosterRenameRequest(
 data class RosterOptions(
     /** Shows a progress bar while every section is still empty. */
     val loading: Boolean = false,
-    val testTag: String = RosterListTags.LIST,
+    val testTag: RosterListTag = RosterListTags.LIST,
 )
 
 /** What one row is when its content draws: selection, the keyboard cursor, hover, and its click. */
@@ -176,18 +170,29 @@ fun rememberRosterListState(): RosterListState {
     return remember(lazy) { RosterListState(lazy) }
 }
 
-/** Test tags; a list's rows, headers and states are tagged under its [RosterOptions.testTag]. */
+/** Test tags of a roster: its root, and the default rename field. */
 object RosterListTags {
-    const val LIST = "roster-list"
+    val LIST = RosterListTag("roster-list")
     const val RENAME_FIELD = "roster-rename"
+}
 
-    fun row(list: String, key: String) = "$list-row-$key"
-    fun header(list: String, section: String) = "$list-section-$section"
-    fun empty(list: String) = "$list-empty"
-    fun loading(list: String) = "$list-loading"
-    /** A hover button of the row tagged [rowTag]. */
-    fun quick(rowTag: String, label: String) = "$rowTag-quick-$label"
+/** A roster's root test tag; its rows, headers and states are tagged under it. */
+@JvmInline
+value class RosterListTag(val value: String) {
+    val empty: String get() = "$value-empty"
+    val loading: String get() = "$value-loading"
 
-    /** The swipe action shown behind the row tagged [rowTag]. */
-    fun swipeBackdrop(rowTag: String) = "$rowTag-swipe"
+    fun row(rowKey: String): RosterRowTag = RosterRowTag("$value-row-$rowKey")
+
+    fun header(sectionKey: String): String = "$value-section-$sectionKey"
+}
+
+/** One row's test tag, and the tags of the parts it draws. */
+@JvmInline
+value class RosterRowTag(val value: String) {
+    /** The swipe action shown behind the row. */
+    val swipeBackdrop: String get() = "$value-swipe"
+
+    /** A hover button of the row. */
+    fun quick(label: String): String = "$value-quick-$label"
 }

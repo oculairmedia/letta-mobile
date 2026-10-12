@@ -15,6 +15,7 @@ import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListTag
 import com.letta.mobile.ui.components.list.RosterOptions
 import com.letta.mobile.ui.components.list.RosterRename
 import com.letta.mobile.ui.components.list.RosterRowState
@@ -73,7 +74,7 @@ internal fun ColumnScope.ShellPanelLibrary(state: ShellAgentPanelState, actions:
                 menu = { item, row -> panelItemMenu(item, row, actions, ui) },
                 rename = actions.onRenameConversation?.let(::chatRename),
             ),
-            options = RosterOptions(testTag = ShellAgentPanelTags.LIBRARY),
+            options = RosterOptions(testTag = RosterListTag(ShellAgentPanelTags.LIBRARY)),
         ),
         modifier = Modifier.fillMaxWidth().weight(1f),
     ) { item, row -> ShellPanelItemRow(item, row, actions, ui) }
