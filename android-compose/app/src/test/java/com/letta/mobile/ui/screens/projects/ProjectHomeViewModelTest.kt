@@ -1,8 +1,9 @@
 package com.letta.mobile.ui.screens.projects
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
@@ -11,7 +12,6 @@ import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -654,7 +654,7 @@ class ProjectHomeViewModelTest {
         return ProjectHomeViewModel(repository, settingsRepository, viewModelScope)
     }
 
-    private class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {
+    private class FakeProjectApi : ProjectRemoteSource by noAppServerRoute<ProjectRemoteSource>() {
         var projects = mutableListOf<ProjectSummary>()
         var shouldFail = false
         var createShouldFail = false

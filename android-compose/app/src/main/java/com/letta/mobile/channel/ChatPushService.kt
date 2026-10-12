@@ -18,7 +18,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
 import ca.oculair.meridian.R
-import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -93,7 +92,8 @@ class ChatPushService : LifecycleService() {
     private var installedIngestedListener: IngestedMessageListener? = null
 
     private val timelineRepository get() = deps.timelineRepository
-    private val conversationApi get() = deps.conversationApi
+    private val conversationRepository get() = deps.conversationRepository
+    private val allConversationsRepository get() = deps.allConversationsRepository
     private val agentRepository get() = deps.agentRepository
     private val notificationDeliveryCoordinator get() = deps.notificationDeliveryCoordinator
     private val channelNotificationPublisher get() = deps.channelNotificationPublisher
@@ -246,7 +246,7 @@ class ChatPushService : LifecycleService() {
                 )
                 val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
-                    val conv = conversationApi.getConversation(ConversationId(conversationId))
+                    val conv = conversationRepository.getConversation(ConversationId(conversationId))
                     conv.agentId.value to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
@@ -323,11 +323,10 @@ class ChatPushService : LifecycleService() {
                     "currentConversationId" to (currentConversationId ?: "<none>"),
                     "activeLoopCountBefore" to timelineRepository.cachedLoopCount(),
                 )
-                val recentConversations = conversationApi.listConversations(
-                    limit = MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    order = "desc",
-                    orderBy = "last_message_at",
-                )
+                allConversationsRepository.refreshIfStale(WARMUP_LIST_MAX_AGE_MS)
+                val recentConversations = allConversationsRepository.conversations.value
+                    .sortedByDescending { it.lastMessageAt.orEmpty() }
+                    .take(MAX_BACKGROUND_PERSISTENT_STREAMS)
                 val warmupConversationIds = buildList {
                     currentConversationId?.let { add(it) }
                     recentConversations.forEach { conversation ->
@@ -407,6 +406,9 @@ class ChatPushService : LifecycleService() {
          * starved.
          */
         private const val MAX_BACKGROUND_PERSISTENT_STREAMS = 3
+
+        /** How old the conversation list may be before warmup reads it again. */
+        private const val WARMUP_LIST_MAX_AGE_MS = 60_000L
 
         private enum class WarmupResult { Success, Failure }
 

@@ -1,14 +1,14 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.BlockApi
+import com.letta.mobile.data.repository.api.BlockRemoteSource
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
-import io.mockk.mockk
 
-class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
+open class FakeBlockApi : BlockRemoteSource by noAppServerRoute<BlockRemoteSource>() {
     var blocks = mutableMapOf<String, MutableList<Block>>()
     var allBlocks = mutableListOf<Block>()
     var shouldFail = false

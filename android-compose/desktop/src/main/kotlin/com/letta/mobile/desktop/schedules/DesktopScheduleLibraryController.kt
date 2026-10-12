@@ -3,7 +3,6 @@ package com.letta.mobile.desktop.schedules
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
-import com.letta.mobile.data.repository.http.LettaHttpAdminRepositoryException
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
@@ -72,8 +71,8 @@ class DesktopScheduleLibraryController(
         delegate.close()
     }
 
-    private fun Throwable.isScheduleAdminUnavailable(): Boolean =
-        this is LettaHttpAdminRepositoryException && code in setOf(404, 405, 501)
+    /** A backend without a schedule route (letta-mobile-ckmub.4: only Iroh hosts relay schedules today). */
+    private fun Throwable.isScheduleAdminUnavailable(): Boolean = this is DesktopRepositoryUnavailableException
 
     private fun Throwable.toDesktopScheduleMessage(fallback: String): String =
         when (this) {

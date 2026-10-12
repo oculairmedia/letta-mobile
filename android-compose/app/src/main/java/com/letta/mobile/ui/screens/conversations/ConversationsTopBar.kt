@@ -100,16 +100,10 @@ private fun ConversationsOverflowMenu(
 private fun conversationsOverflowMenuItems(navigation: ConversationsNavigation): List<ConversationsOverflowMenuItem> {
     return listOf(
         ConversationsOverflowMenuItem(R.string.screen_nav_templates, LettaIcons.Dashboard) { navigation.onNavigateToTemplates() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_archives, LettaIcons.Storage) { navigation.onNavigateToArchives() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_folders, LettaIcons.ManageSearch) { navigation.onNavigateToFolders() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_groups, LettaIcons.ForkRight) { navigation.onNavigateToGroups() },
         ConversationsOverflowMenuItem(R.string.screen_nav_providers, LettaIcons.Cloud) { navigation.onNavigateToProviders() },
         ConversationsOverflowMenuItem(R.string.screen_nav_blocks, LettaIcons.Storage) { navigation.onNavigateToBlocks() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_identities, LettaIcons.AccountCircle) { navigation.onNavigateToIdentities() },
         ConversationsOverflowMenuItem(R.string.screen_nav_schedules, LettaIcons.AccessTime) { navigation.onNavigateToSchedules() },
         ConversationsOverflowMenuItem(R.string.screen_nav_runs, LettaIcons.ChatOutline) { navigation.onNavigateToRuns() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_jobs, LettaIcons.AccessTime) { navigation.onNavigateToJobs() },
-        ConversationsOverflowMenuItem(R.string.screen_nav_message_batches, LettaIcons.ChatOutline) { navigation.onNavigateToMessageBatches() },
         ConversationsOverflowMenuItem(R.string.screen_nav_mcp_servers, LettaIcons.Cloud) { navigation.onNavigateToMcp() },
         ConversationsOverflowMenuItem(R.string.screen_projects_title, LettaIcons.Apps) { navigation.onNavigateToProjects() },
         ConversationsOverflowMenuItem(R.string.screen_about_title, LettaIcons.Info) { navigation.onNavigateToAbout() },

@@ -117,7 +117,7 @@ class AllConversationsRepositoryTest {
         fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
         val localConversation = TestData.conversation(id = "local-conv-agent-1", agentId = "agent-1")
         val localRepository = AllConversationsRepository(
-            conversationApi = fakeApi,
+            remote = fakeApi,
             conversationDao = null,
             localConversationSource = FakeLocalRuntimeConversationSource {
                 listOf(localConversation)
@@ -142,7 +142,7 @@ class AllConversationsRepositoryTest {
     fun `refresh uses remote api when active config is not local`() = runTest {
         fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
         val repositoryWithLocal = AllConversationsRepository(
-            conversationApi = fakeApi,
+            remote = fakeApi,
             conversationDao = null,
             localConversationSource = FakeLocalRuntimeConversationSource {
                 throw AssertionError("local source must not be used for remote configs")
@@ -182,7 +182,7 @@ class AllConversationsRepositoryTest {
             ),
         )
         val pagedRepository = AllConversationsRepository(
-            conversationApi = armedConversationApi(),
+            remote = armedConversationApi(),
             conversationDao = null,
             repositoryScope = this,
             settingsRepository = settings,
@@ -232,7 +232,7 @@ class AllConversationsRepositoryTest {
             initialActiveConfig = LettaConfig(id = "iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://EndpointTicket"),
         )
         val pushed = AllConversationsRepository(
-            conversationApi = armedConversationApi(),
+            remote = armedConversationApi(),
             conversationDao = null,
             repositoryScope = backgroundScope,
             settingsRepository = settings,

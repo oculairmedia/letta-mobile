@@ -1,9 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
-import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
-import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.http.LettaHttpChatGateway
 import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -16,12 +13,10 @@ import dev.nucleusframework.nativessl.NativeTrustManager
 
 typealias DesktopChatGateway = ChatGateway
 
-internal interface DesktopAdminChatGateway : ChatGateway, ChatGatewayExtras, AutoCloseable
-
 /**
  * Optional capability a [DesktopChatGateway] may implement to answer / dismiss a
- * parked runtime approval (e.g. AskUserQuestion). Only the App Server-backed
- * gateway supports it; HTTP-only / demo gateways don't, so callers detect it via
+ * parked runtime approval (e.g. AskUserQuestion). The App Server gateway
+ * supports it; Iroh and test gateways may not, so callers detect it via
  * `gateway as? DesktopApprovalSubmitter`. See letta-mobile-vilsn.8.
  */
 interface DesktopApprovalSubmitter {
@@ -32,7 +27,7 @@ interface DesktopApprovalSubmitter {
  * letta-mobile-lgns8.19: optional capability a [DesktopChatGateway] may implement
  * to REALLY abort an in-flight server turn (App Server `abort_message`), so the
  * bottom-bar stop tears the run down server-side instead of merely cancelling
- * the local collect job. HTTP-only / demo gateways don't implement it, so callers
+ * the local collect job. Iroh and test gateways may not implement it, so callers
  * detect it via `gateway as? DesktopTurnAborter` and fall back to a local clear.
  */
 interface DesktopTurnAborter {
@@ -51,7 +46,7 @@ interface DesktopTurnAborter {
  * folder the bundled local runtime's tools (bash, file edits, git) actually
  * operate in. Only the App Server-backed gateway supports it (the runtime
  * genuinely tracks this per agent+conversation, see `get_cwd_map` /
- * `runtime_start.cwd`); HTTP-only / demo gateways don't, so callers detect it
+ * `runtime_start.cwd`); test gateways may not, so callers detect it
  * via `gateway as? DesktopWorkingDirectoryController`.
  */
 interface DesktopWorkingDirectoryController {
@@ -100,16 +95,11 @@ data class DesktopApprovalSubmission(
 )
 
 /**
- * Desktop binding for the shared [LettaHttpChatGateway]. The platform-neutral
- * conversations/messages/streaming HTTP logic lives in commonMain; the desktop
- * module supplies only the JVM Ktor CIO engine (letta-mobile-mqzkc).
+ * The desktop's Ktor client for reaching an App Server: the WebSocket transport
+ * ([DesktopAppServerChatGatewayBuilder]) and the `/app-server-info` probe. It never
+ * talks to a Letta REST server (letta-mobile-ckmub.4 removed that backend).
  */
-class DesktopLettaHttpChatGateway(
-    config: LettaConfig,
-    httpClient: HttpClient = createDesktopLettaHttpClient(),
-) : LettaHttpChatGateway(config = config, httpClient = httpClient), DesktopAdminChatGateway
-
-fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
+fun createDesktopAppServerHttpClient(): HttpClient = HttpClient(CIO) {
     engine {
         https {
             trustManager = NativeTrustManager.trustManager
@@ -118,10 +108,9 @@ fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(desktopChatJson)
     }
-    // This client also backs the desktop App Server WebSocket transport
-    // (DesktopAppServerChatGatewayBuilder.buildWebSocketTransport), which
-    // calls httpClient.webSocket(...) — that requires the plugin, and
-    // letta-mobile-lgns8.21.7 requires the inbound frame ceiling with it.
+    // The App Server WebSocket transport calls httpClient.webSocket(...), which
+    // requires the plugin; letta-mobile-lgns8.21.7 requires the inbound frame
+    // ceiling with it.
     install(WebSockets) { applyAppServerDefaults() }
     install(HttpTimeout) {
         connectTimeoutMillis = 15_000
@@ -134,7 +123,7 @@ internal val desktopChatJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
     encodeDefaults = false
-    // The Letta API returns explicit nulls for several non-nullable fields that
+    // App Server payloads carry explicit nulls for several non-nullable fields that
     // have defaults (e.g. agent.metadata). Coerce null -> default so agent /
     // conversation deserialization doesn't fail and agent names hydrate.
     coerceInputValues = true

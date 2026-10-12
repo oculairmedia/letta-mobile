@@ -12,13 +12,8 @@ import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
-import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
-import com.letta.mobile.data.repository.api.IFolderRepository
-import com.letta.mobile.data.repository.api.IGroupRepository
-import com.letta.mobile.data.repository.api.IIdentityRepository
-import com.letta.mobile.data.repository.api.IJobRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IPassageRepository
@@ -50,6 +45,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
+import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
@@ -73,17 +69,12 @@ class DesktopSessionGraph internal constructor(
     override val channelTransport: IChannelTransport,
     override val conversationRepository: IConversationRepository,
     override val cronRepository: ICronRepository,
-    override val archiveRepository: IArchiveRepository,
-    override val folderRepository: IFolderRepository,
-    override val groupRepository: IGroupRepository,
-    override val identityRepository: IIdentityRepository,
     override val mcpServerRepository: IMcpServerRepository,
     override val modelRepository: IModelRepository,
     override val passageRepository: IPassageRepository,
     override val projectRepository: IProjectRepository,
     override val projectWorkRepository: IProjectWorkRepository,
     override val runRepository: IRunRepository,
-    override val jobRepository: IJobRepository,
     override val providerRepository: IProviderRepository,
     override val scheduleRepository: IScheduleRepository,
     override val selfTodoRepository: ISelfTodoRepository,
@@ -140,17 +131,12 @@ class DesktopSessionGraphFactory(
             channelTransport = channelTransport,
             conversationRepository = adapters.conversationRepository,
             cronRepository = adapters.cronRepository,
-            archiveRepository = adapters.archiveRepository,
-            folderRepository = adapters.folderRepository,
-            groupRepository = adapters.groupRepository,
-            identityRepository = adapters.identityRepository,
             mcpServerRepository = adapters.mcpServerRepository,
             modelRepository = adapters.modelRepository,
             passageRepository = adapters.passageRepository,
             projectRepository = adapters.projectRepository,
             projectWorkRepository = adapters.projectWorkRepository,
             runRepository = adapters.runRepository,
-            jobRepository = adapters.jobRepository,
             providerRepository = adapters.providerRepository,
             scheduleRepository = adapters.scheduleRepository,
             selfTodoRepository = adapters.selfTodoRepository,
@@ -220,14 +206,18 @@ class DesktopRepositoryAdapters(
     private val binding = config.sessionBackendBinding(
         forceIroh = IrohChannelTransport.shouldUseIroh(config?.serverUrl),
     )
-    private val localMode = binding == SessionBackendBinding.LocalRuntime
     private val irohMode = binding == SessionBackendBinding.Iroh
-    private val localRepositories = if (localMode) {
-        buildDesktopLocalRepositories()
-    } else {
-        null
+
+    // letta-mobile-ckmub.4: every non-Iroh backend is an App Server this window dials directly (the
+    // bundled runtime or a remote ws:// host); its agents and memory are read over that session.
+    private val appServerRepositories = when {
+        binding == SessionBackendBinding.LocalRuntime ->
+            buildDesktopAppServerRepositories(DesktopLocalAppServerClientRegistry.shared)
+        !irohMode && !config?.serverUrl.isNullOrBlank() ->
+            buildDesktopAppServerRepositories(DesktopLocalAppServerClientRegistry.direct)
+        // No backend configured yet: nothing to read from.
+        else -> null
     }
-    private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
     private val transportBoundJob = SupervisorJob()
     private val transportBoundScope = CoroutineScope(transportBoundJob + Dispatchers.Default)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
@@ -259,30 +249,21 @@ class DesktopRepositoryAdapters(
         includeAll = true,
     )
 
-    val closeables: List<AutoCloseable> = listOfNotNull(
-        adminRepositories,
+    val closeables: List<AutoCloseable> = listOf(
         AutoCloseable {
             boundSubagentRepository.close()
             transportBoundJob.cancel()
         },
     )
 
-    val agentRepository: IAgentRepository = localRepositories?.agentRepository
-        ?: selectIrohOrHttp(irohAgentRepository, adminRepositories)
-    val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
-        ?: selectIrohOrHttp(irohRepositories?.blockRepository, adminRepositories)
-    val archiveRepository: IArchiveRepository =
-        irohAdminReads?.archiveRepository ?: unavailableRepository()
+    val agentRepository: IAgentRepository = appServerRepositories?.agentRepository
+        ?: irohAgentRepository
+        ?: unavailableRepository()
+    val blockRepository: IAgentBlockRepository = appServerRepositories?.blockRepository
+        ?: irohRepositories?.blockRepository
+        ?: unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = boundCronRepository
-    val folderRepository: IFolderRepository =
-        irohAdminReads?.folderRepository ?: unavailableRepository()
-    val groupRepository: IGroupRepository =
-        irohAdminReads?.groupRepository ?: unavailableRepository()
-    val identityRepository: IIdentityRepository =
-        irohAdminReads?.identityRepository ?: unavailableRepository()
-    val jobRepository: IJobRepository =
-        irohAdminReads?.jobRepository ?: unavailableRepository()
     val mcpServerRepository: IMcpServerRepository =
         irohAdminReads?.mcpServerRepository ?: unavailableRepository()
     val modelRepository: IModelRepository =
@@ -295,17 +276,11 @@ class DesktopRepositoryAdapters(
         irohAdminReads?.providerRepository ?: unavailableRepository()
     val runRepository: IRunRepository =
         irohAdminReads?.runRepository ?: unavailableRepository()
-    val scheduleRepository: IScheduleRepository = selectIrohOrHttp(
-        irohRepositories?.scheduleRepository,
-        adminRepositories,
-    )
+    val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailableRepository()
     val selfTodoRepository: ISelfTodoRepository = boundSelfTodoRepository
     val stepRepository: IStepRepository = unavailableRepository()
     val subagentRepository: ISubagentRepository = boundSubagentRepository
-    val toolRepository: IToolRepository = selectIrohOrHttp(
-        irohRepositories?.toolRepository,
-        adminRepositories,
-    )
+    val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailableRepository()
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
 }
 

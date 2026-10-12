@@ -9,40 +9,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Desktop insertion contract for a future App Server-backed chat path.
+ * Builds the desktop's App Server chat gateway for a backend address.
  *
- * This is intentionally disabled by default. The existing REST/SSE desktop
- * gateway remains authoritative for normal desktop chat until a shared
- * App Server gateway can satisfy the same chat contract.
+ * letta-mobile-ckmub.4: this is the desktop's one backend seam. Every config (the bundled local
+ * runtime or a remote App Server over ws:// / iroh://) is served by [DesktopAppServerChatGateway];
+ * there is no Letta REST gateway. A future backend family (e.g. a cloud backend) plugs in as another
+ * factory chosen from the config's `BackendKind` in [DesktopAppServerChatGateways.createDefault],
+ * without touching the shared shell.
  */
 fun interface DesktopAppServerChatGatewayFactory {
     suspend fun create(
         lettaConfig: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig,
-    ): DesktopChatGateway
+    ): DesktopAppServerChatGateway
 }
 
+/**
+ * Where the App Server is. [serverUrl] is a developer override (`-Dletta.desktop.appServerChat.url`
+ * or `LETTA_DESKTOP_APP_SERVER_URL`); without it the bundled runtime's address (LOCAL) or the
+ * config's Remote host address is used.
+ */
 data class DesktopAppServerRuntimeConfig(
-    val enabled: Boolean = false,
     val serverUrl: String? = null,
 ) {
     companion object {
-        const val ENABLED_PROPERTY = "letta.desktop.appServerChat.enabled"
-        const val ENABLED_ENV = "LETTA_DESKTOP_APP_SERVER_CHAT"
         const val SERVER_URL_PROPERTY = "letta.desktop.appServerChat.url"
         const val SERVER_URL_ENV = "LETTA_DESKTOP_APP_SERVER_URL"
 
         fun fromProcess(): DesktopAppServerRuntimeConfig =
-            DesktopAppServerRuntimeConfig(
-                enabled = readEnabledFlag(),
-                serverUrl = readServerUrl(),
-            )
-
-        private fun readEnabledFlag(): Boolean {
-            val raw = System.getProperty(ENABLED_PROPERTY) ?: System.getenv(ENABLED_ENV)
-            val normalized = raw?.trim()?.lowercase() ?: return false
-            return normalized in setOf("1", "true", "yes", "on")
-        }
+            DesktopAppServerRuntimeConfig(serverUrl = readServerUrl())
 
         private fun readServerUrl(): String? {
             val raw = System.getProperty(SERVER_URL_PROPERTY) ?: System.getenv(SERVER_URL_ENV)
@@ -51,72 +46,53 @@ data class DesktopAppServerRuntimeConfig(
     }
 }
 
-class DesktopAppServerClientUnavailableException :
-    IllegalStateException(
-        "Desktop App Server chat is enabled, but no shared App Server gateway is linked. " +
-            "Disable ${DesktopAppServerRuntimeConfig.ENABLED_PROPERTY} or provide a " +
-            "DesktopAppServerChatGatewayFactory backed by the shared App Server client.",
-    )
-
 internal object DesktopAppServerChatGateways {
     suspend fun createDefault(
         config: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
-        appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultFactory(),
+        appServerGatewayFactory: DesktopAppServerChatGatewayFactory = defaultFactory(),
         localRuntime: DesktopLocalRuntimeLifecycle = DesktopLocalRuntimeHost,
     ): DesktopChatGateway {
         val (resolvedConfig, lease) = resolveRuntime(config, appServerConfig, localRuntime)
         return try {
-            val gateway = createGateway(config, resolvedConfig, appServerGatewayFactory)
-            lease?.let { DesktopRuntimeOwnedChatGateway(gateway, it) } ?: gateway
+            val gateway = appServerGatewayFactory.create(config, resolvedConfig)
+            lease?.let(gateway::owningRuntime) ?: gateway
         } catch (error: Throwable) {
             lease?.close()
             throw error
         }
     }
 
+    /**
+     * LOCAL (with no override) starts the bundled runtime and dials it; any other config dials its
+     * own address. Mode is authoritative: a LOCAL config's leftover remote address is never used
+     * (letta-mobile-9v9nu).
+     */
     private suspend fun resolveRuntime(
         config: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig,
         localRuntime: DesktopLocalRuntimeLifecycle,
     ): Pair<DesktopAppServerRuntimeConfig, DesktopLocalRuntimeLease?> {
-        if (config.mode == LettaConfig.Mode.LOCAL && appServerConfig.serverUrl == null) {
+        appServerConfig.serverUrl?.let { return appServerConfig to null }
+        if (config.mode == LettaConfig.Mode.LOCAL) {
             val lease = withContext(Dispatchers.IO) { localRuntime.acquire() }
-            return DesktopAppServerRuntimeConfig(enabled = true, serverUrl = lease.serverUrl) to lease
+            return DesktopAppServerRuntimeConfig(serverUrl = lease.serverUrl) to lease
         }
-        return appServerConfig to null
+        return DesktopAppServerRuntimeConfig(serverUrl = config.serverUrl.trim().takeIf { it.isNotBlank() }) to null
     }
 
-    private suspend fun createGateway(
-        config: LettaConfig,
-        appServerConfig: DesktopAppServerRuntimeConfig,
-        appServerGatewayFactory: DesktopAppServerChatGatewayFactory?,
-    ): DesktopChatGateway {
-        if (!appServerConfig.enabled) {
-            return DesktopLettaHttpChatGateway(config)
-        }
-        return appServerGatewayFactory?.create(config, appServerConfig)
-            ?: throw DesktopAppServerClientUnavailableException()
-    }
-
-    fun defaultFactory(permissionModeSettings: PermissionModeSettings? = null): DesktopAppServerChatGatewayFactory? {
-        return try {
-            DesktopAppServerChatGatewayBuilder(permissionModeSettings = permissionModeSettings)
-        } catch (_: Throwable) {
-            null
-        }
-    }
+    fun defaultFactory(permissionModeSettings: PermissionModeSettings? = null): DesktopAppServerChatGatewayFactory =
+        DesktopAppServerChatGatewayBuilder(permissionModeSettings = permissionModeSettings)
 }
 
 internal suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
-    appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),
+    appServerGatewayFactory: DesktopAppServerChatGatewayFactory = defaultDesktopAppServerGatewayFactory(),
     localRuntime: DesktopLocalRuntimeLifecycle = DesktopLocalRuntimeHost,
 ): DesktopChatGateway = DesktopAppServerChatGateways.createDefault(config, appServerConfig, appServerGatewayFactory, localRuntime)
 
 internal fun defaultDesktopAppServerGatewayFactory(
     permissionModeSettings: PermissionModeSettings? = null,
-): DesktopAppServerChatGatewayFactory? =
+): DesktopAppServerChatGatewayFactory =
     DesktopAppServerChatGateways.defaultFactory(permissionModeSettings)
-

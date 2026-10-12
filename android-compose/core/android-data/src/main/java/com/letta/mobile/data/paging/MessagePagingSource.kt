@@ -2,14 +2,14 @@ package com.letta.mobile.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.MessageRemoteSource
 
 class MessagePagingSource(
-    private val messageApi: MessageApi,
+    private val remote: MessageRemoteSource,
     private val agentId: AgentId?,
     private val conversationId: ConversationId?
 ) : PagingSource<String, AppMessage>() {
@@ -25,7 +25,7 @@ class MessagePagingSource(
             // Always use the agent messages endpoint — it returns tool_call_message
             // types needed for resolving tool names. Use conversation_id to filter.
             val lettaMessages = if (agentId != null) {
-                messageApi.listMessages(
+                remote.listMessages(
                     agentId = agentId,
                     limit = params.loadSize,
                     before = null,

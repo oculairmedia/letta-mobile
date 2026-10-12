@@ -17,7 +17,7 @@ package com.letta.mobile.data.transport.appserver
  * and starts its own subscriber from there. Foreground UI getOrCreate
  * remains on-demand and is not evicted by this budget.
  *
- * OkHttp dispatcher is tuned in [com.letta.mobile.data.api.LettaApiClient]
+ * OkHttp dispatcher is tuned in the removed `LettaApiClient`
  * with `maxRequestsPerHost = 16`, leaving headroom for these background
  * streams plus foreground sends/fetches. Do not raise [MAX_WARM_STREAMS]
  * without telemetry showing foreground requests are not starved.

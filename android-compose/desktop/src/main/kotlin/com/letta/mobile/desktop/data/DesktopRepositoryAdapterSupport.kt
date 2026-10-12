@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.data
 
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -39,19 +38,6 @@ internal fun buildIrohRepositories(
         toolRepository = IrohToolRepository(irohAgentDirectoryProvider),
     )
 }
-
-internal fun buildHttpAdminRepositories(
-    config: LettaConfig?,
-    irohMode: Boolean,
-): DesktopLettaHttpAdminRepositories? =
-    config
-        ?.takeIf { it.serverUrl.isNotBlank() && !irohMode }
-        ?.let(::DesktopLettaHttpAdminRepositories)
-
-internal inline fun <reified T : Any> selectIrohOrHttp(
-    iroh: T?,
-    http: T?,
-): T = iroh ?: http ?: unavailableRepository()
 
 internal inline fun <reified T : Any> unavailableRepository(): T {
     val contract = T::class.java

@@ -2,7 +2,7 @@ package com.letta.mobile.ui.screens.schedules
 
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
@@ -13,8 +13,6 @@ import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeScheduleApi
-import com.letta.mobile.data.schedules.CronTask
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,7 +39,6 @@ class ScheduleListViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeAgentRepo: FakeAgentRepo
     private lateinit var fakeScheduleRepo: FakeScheduleRepo
-    private lateinit var fakeScheduleApi: FakeScheduleApi
     private lateinit var viewModel: ScheduleListViewModel
 
     @Before
@@ -49,11 +46,7 @@ class ScheduleListViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeAgentRepo = FakeAgentRepo()
         fakeScheduleRepo = FakeScheduleRepo()
-        // Cron route unavailable by default: the "unavailable" tests below
-        // exercise the case where BOTH the native schedule route and the
-        // /v1/crons fallback are missing.
-        fakeScheduleApi = FakeScheduleApi()
-        viewModel = ScheduleListViewModel(SavedStateHandle(), fakeAgentRepo, fakeScheduleRepo, fakeScheduleApi)
+        viewModel = ScheduleListViewModel(SavedStateHandle(), fakeAgentRepo, fakeScheduleRepo)
     }
 
     @After
@@ -79,7 +72,6 @@ class ScheduleListViewModelTest {
             SavedStateHandle(mapOf("agentId" to "a2")),
             fakeAgentRepo,
             fakeScheduleRepo,
-            fakeScheduleApi,
         )
 
         val state = vm.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
@@ -136,7 +128,7 @@ class ScheduleListViewModelTest {
 
     @Test
     fun `loadData shows unavailable state when schedule routes are missing`() = runTest {
-        fakeScheduleRepo.error = ApiException(404, "Not found")
+        fakeScheduleRepo.error = NoAppServerRouteException("schedule.list")
 
         viewModel.loadData()
 
@@ -149,29 +141,13 @@ class ScheduleListViewModelTest {
     @Test
     fun `selectAgent shows unavailable state when schedule routes are missing`() = runTest {
         awaitSuccessState()
-        fakeScheduleRepo.error = ApiException(404, "Not found")
+        fakeScheduleRepo.error = NoAppServerRouteException("schedule.list")
 
         viewModel.selectAgent("a2")
 
         val state = awaitSuccessState()
         assertEquals("a2", state.selectedAgentId)
         assertEquals(false, state.scheduleAdminAvailable)
-    }
-
-    @Test
-    fun `loadData falls back to cron list when native route missing and cron route available`() = runTest {
-        fakeScheduleRepo.error = ApiException(404, "Not found")
-        fakeScheduleApi.cronRouteAvailable = true
-        fakeScheduleApi.crons = mutableListOf(
-            CronTask(id = "c1", agentId = "a1", name = "Daily", cron = "0 9 * * *", recurring = true),
-        )
-
-        viewModel.loadData()
-
-        val state = awaitSuccessState()
-        assertEquals(true, state.cronMode)
-        assertEquals(true, state.scheduleAdminAvailable)
-        assertEquals(listOf("c1"), state.crons.map { it.id })
     }
 
     @Test

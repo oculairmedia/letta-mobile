@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.PmAgentMetadata
-import com.letta.mobile.data.api.ProjectAgentApi
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
@@ -174,7 +173,6 @@ data class ProjectHomeUiState(
 class ProjectHomeViewModel private constructor(
     private val projectRepository: IProjectRepository,
     private val settingsRepository: ISettingsRepository,
-    private val projectAgentApi: ProjectAgentApi? = null,
     private val vibesyncEventStreamRepository: IVibesyncEventStreamRepository? = null,
     private val externalScope: CoroutineScope? = null,
 ) : ViewModel() {
@@ -183,12 +181,10 @@ class ProjectHomeViewModel private constructor(
     constructor(
         projectRepository: IProjectRepository,
         settingsRepository: ISettingsRepository,
-        projectAgentApi: ProjectAgentApi? = null,
         vibesyncEventStreamRepository: IVibesyncEventStreamRepository? = null,
     ) : this(
         projectRepository = projectRepository,
         settingsRepository = settingsRepository,
-        projectAgentApi = projectAgentApi,
         vibesyncEventStreamRepository = vibesyncEventStreamRepository,
         externalScope = null,
     )
@@ -200,7 +196,6 @@ class ProjectHomeViewModel private constructor(
     ) : this(
         projectRepository = projectRepository,
         settingsRepository = settingsRepository,
-        projectAgentApi = null,
         vibesyncEventStreamRepository = null,
         externalScope = coroutineScope,
     )
@@ -321,15 +316,8 @@ class ProjectHomeViewModel private constructor(
                 .onSuccess { status -> updateSuccess { it.copy(beadsRemoteStatusByProject = it.beadsRemoteStatusByProject + (project.identifier to status)) } }
                 .onFailure { android.util.Log.i("ProjectHomeVM", "Beads remote status unavailable", it) }
         }
-        launchScope.launch {
-            val agentApi = projectAgentApi ?: return@launch
-            runCatching { agentApi.lookup(project.name) }
-                .onSuccess { agent -> updateSuccess { current ->
-                    if (agent == null) current.copy(pmAgentByProject = current.pmAgentByProject - project.identifier)
-                    else current.copy(pmAgentByProject = current.pmAgentByProject + (project.identifier to agent))
-                } }
-                .onFailure { error -> android.util.Log.i("ProjectHomeVM", "PM agent lookup unavailable", error) }
-        }
+        // letta-mobile-ckmub.4: the PM agent lookup (`/api/agents/lookup`) went with the Letta REST
+        // client; no App Server or Iroh route answers it yet, so pmAgentByProject stays empty.
     }
 
     fun startProvisionBeadsRemote() = updateSuccess { it.copy(showProvisionBeadsRemoteDialog = true) }

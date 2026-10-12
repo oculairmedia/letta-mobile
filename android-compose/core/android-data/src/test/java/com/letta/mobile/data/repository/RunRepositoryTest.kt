@@ -1,6 +1,6 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -75,8 +75,8 @@ class RunRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `refreshRuns in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+    @Test(expected = NoAppServerRouteException::class)
+    fun `refreshRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
         val settings = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
                 id = "test",
@@ -87,7 +87,7 @@ class RunRepositoryTest {
         )
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = RunRepository(apiThatThrows)
@@ -127,7 +127,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -166,7 +166,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -175,11 +175,11 @@ class RunRepositoryTest {
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `getRecentRuns in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+    @Test(expected = NoAppServerRouteException::class)
+    fun `getRecentRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = RunRepository(apiThatThrows)
@@ -212,7 +212,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun retrieveRun(runId: String): Run {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -270,7 +270,7 @@ class RunRepositoryTest {
                 limit: Int?,
                 order: String?,
             ): List<Step> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)

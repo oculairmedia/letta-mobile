@@ -3,32 +3,42 @@ package com.letta.mobile.data.repository
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.paging.MessagePagingSource
+import com.letta.mobile.data.repository.api.MessageRemoteSource
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Android binding for [CachedMessageRepository]: HTTP [MessageApi] + optional Iroh seams.
+ * Android binding for [CachedMessageRepository]: messages over an Iroh host's `admin_rpc`.
+ *
+ * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
+ * route (the Letta REST backend was removed).
  *
  * Phase 5p — fetch / approval / inspector / batch orchestration live in sharedLogic;
  * [getMessagesPaged] stays here because [MessagePagingSource] is Android-bound.
  */
 @Singleton
-class MessageRepository @Inject constructor(
-    private val messageApi: MessageApi,
+class MessageRepository(
+    private val remote: MessageRemoteSource,
     irohApprovalSource: IrohAdminRpcApprovalSource? = null,
     irohTimelineTransport: IrohAdminRpcTimelineTransport? = null,
 ) : CachedMessageRepository(
-    remote = messageApi,
+    remote = remote,
     irohTimelineSource = irohTimelineTransport?.let(::IrohAdminRpcMessageTimelineSource),
     irohApprovalSource = irohApprovalSource,
 ) {
+    @Inject
+    constructor(
+        irohApprovalSource: IrohAdminRpcApprovalSource?,
+        irohTimelineTransport: IrohAdminRpcTimelineTransport?,
+    ) : this(noAppServerRoute(), irohApprovalSource, irohTimelineTransport)
+
     companion object {
         const val INITIAL_FETCH_LIMIT: Int = CachedMessageRepository.INITIAL_FETCH_LIMIT
         const val OLDER_MESSAGES_PAGE_SIZE: Int = CachedMessageRepository.OLDER_MESSAGES_PAGE_SIZE
@@ -44,7 +54,7 @@ class MessageRepository @Inject constructor(
                 enablePlaceholders = false,
                 initialLoadSize = MessagePagingSource.PAGE_SIZE,
             ),
-            pagingSourceFactory = { MessagePagingSource(messageApi, agentId, conversationId) },
+            pagingSourceFactory = { MessagePagingSource(remote, agentId, conversationId) },
         ).flow
     }
 }

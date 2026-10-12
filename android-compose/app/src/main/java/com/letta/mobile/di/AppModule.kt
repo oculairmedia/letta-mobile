@@ -25,7 +25,6 @@ import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.SlashCommandRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
-import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IBugReportRepository
@@ -35,10 +34,6 @@ import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
-import com.letta.mobile.data.repository.api.IFolderRepository
-import com.letta.mobile.data.repository.api.IGroupRepository
-import com.letta.mobile.data.repository.api.IIdentityRepository
-import com.letta.mobile.data.repository.api.IJobRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
@@ -54,14 +49,9 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.session.SessionScopedAllConversationsRepository
-import com.letta.mobile.data.session.SessionScopedArchiveRepository
 import com.letta.mobile.data.session.SessionScopedChannelTransport
 import com.letta.mobile.data.session.SessionScopedConversationRepository
 import com.letta.mobile.data.session.SessionScopedCronRepository
-import com.letta.mobile.data.session.SessionScopedFolderRepository
-import com.letta.mobile.data.session.SessionScopedGroupRepository
-import com.letta.mobile.data.session.SessionScopedIdentityRepository
-import com.letta.mobile.data.session.SessionScopedJobRepository
 import com.letta.mobile.data.session.SessionScopedMcpServerRepository
 import com.letta.mobile.data.session.SessionScopedModelRepository
 import com.letta.mobile.data.session.SessionScopedPassageRepository
@@ -75,11 +65,8 @@ import com.letta.mobile.data.session.SessionScopedSelfTodoRepository
 import com.letta.mobile.data.session.SessionScopedSubagentRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
-import com.letta.mobile.data.timeline.IrohRoutingTimelineTransport
-import com.letta.mobile.data.timeline.MessageApiTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -230,8 +217,7 @@ abstract class AppModule {
         )
 
         // letta-mobile-71orq: older-message pagination (scroll up for history)
-        // must route over message.list admin_rpc in iroh:// mode; the raw HTTP
-        // MessageApi.fetchRecentMessages hard-fails at the purity choke-point.
+        // routes over message.list admin_rpc in iroh:// mode.
         @Provides
         @Singleton
         fun provideIrohAdminRpcTimelineTransport(
@@ -258,19 +244,18 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideCanonicalTimelineTransport(
-            messageApi: MessageApi,
             local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
             remote: IrohAdminRpcTimelineTransport,
-            settingsRepository: ISettingsRepository,
         ): com.letta.mobile.data.timeline.TimelineTransport =
-            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
-                local = local,
-                remote = IrohRoutingTimelineTransport(
-                    settingsRepository = settingsRepository,
-                    http = MessageApiTimelineTransport(messageApi),
-                    iroh = remote,
-                ),
-            )
+            // letta-mobile-ckmub.4: on-device conversations read the embedded runtime; every other
+            // conversation is an Iroh host's. There is no HTTP timeline any more.
+            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(local = local, remote = remote)
+
+        /** letta-mobile-ckmub.4: the backend seam; the App Server is the only backend for now. */
+        @Provides
+        @Singleton
+        fun provideSessionRemoteSources(): com.letta.mobile.data.session.SessionRemoteSources =
+            com.letta.mobile.data.session.SessionRemoteSources.None
 
         @Provides
         @Singleton
@@ -390,27 +375,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindArchiveRepository(impl: SessionScopedArchiveRepository): IArchiveRepository
-
-    @Binds
-    @Singleton
     abstract fun bindBugReportRepository(impl: BugReportRepository): IBugReportRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindFolderRepository(impl: SessionScopedFolderRepository): IFolderRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindGroupRepository(impl: SessionScopedGroupRepository): IGroupRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindIdentityRepository(impl: SessionScopedIdentityRepository): IIdentityRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindJobRepository(impl: SessionScopedJobRepository): IJobRepository
 
     @Binds
     @Singleton

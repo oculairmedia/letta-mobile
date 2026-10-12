@@ -1,7 +1,8 @@
 package com.letta.mobile.data.repository
 
 import android.util.Log
-import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
 import com.letta.mobile.data.chat.branch.BranchUnavailableException
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.local.ConversationDao
@@ -37,7 +38,7 @@ import dagger.Lazy
 // (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
 // @Provides methods returning framework types like Provider.)
 open class ConversationRepository(
-    private val conversationApi: ConversationApi,
+    private val remote: ConversationCrudRemoteSource = noAppServerRoute(),
     private val agentRepository: IAgentRepository,
     private val conversationDao: Lazy<ConversationDao>,
     repositoryScope: CoroutineScope,
@@ -140,7 +141,7 @@ open class ConversationRepository(
         val conversations = if (irohSource?.shouldUseIroh() == true) {
             irohSource.listConversations(agentId = agentId)
         } else {
-            conversationApi.listConversations(
+            remote.listConversations(
                 agentId = agentId,
                 limit = null,
                 after = null,
@@ -189,7 +190,7 @@ open class ConversationRepository(
             val fetched = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.getConversation(id)
             } else {
-                conversationApi.getConversation(id)
+                remote.getConversation(id)
             }
             fetched.also { conversation -> upsertCachedConversation(conversation) }
         } catch (cancelled: CancellationException) {
@@ -208,7 +209,7 @@ open class ConversationRepository(
                 irohSource.createConversation(agentId, summary)
             else -> {
                 val params = ConversationCreateParams(agentId = agentId, summary = summary)
-                conversationApi.createConversation(params)
+                remote.createConversation(params)
             }
         }
         upsertCachedConversation(conversation, markAgentFresh = true)
@@ -225,7 +226,7 @@ open class ConversationRepository(
             if (irohSource?.shouldUseIroh() == true) {
                 irohSource.deleteConversation(id)
             } else {
-                conversationApi.deleteConversation(id)
+                remote.deleteConversation(id)
             }
         } catch (e: Exception) {
             writeAgentConversations(agentId, snapshot, System.currentTimeMillis())
@@ -247,7 +248,7 @@ open class ConversationRepository(
             val updated = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.updateConversation(id, summary)
             } else {
-                conversationApi.updateConversation(id, ConversationUpdateParams(summary = summary))
+                remote.updateConversation(id, ConversationUpdateParams(summary = summary))
             }
             writeAgentConversations(
                 agentId = agentId,
@@ -277,7 +278,7 @@ open class ConversationRepository(
             val updated = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.setConversationArchived(id, archived)
             } else {
-                conversationApi.updateConversation(id, ConversationUpdateParams(archived = archived))
+                remote.updateConversation(id, ConversationUpdateParams(archived = archived))
             }
             if (conversationIndex >= 0) {
                 writeAgentConversations(
@@ -293,18 +294,18 @@ open class ConversationRepository(
     }
 
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
-        conversationApi.cancelConversation(id, agentId)
+        remote.cancelConversation(id, agentId)
     }
 
     override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
         return if (agentId != null && !dryRun) {
             var result = ""
             agentRepository.checkpointAndRestoreConfig(agentId) {
-                result = conversationApi.recompileConversation(id, dryRun, agentId)
+                result = remote.recompileConversation(id, dryRun, agentId)
             }
             result
         } else {
-            conversationApi.recompileConversation(id, dryRun, agentId)
+            remote.recompileConversation(id, dryRun, agentId)
         }
     }
 
@@ -328,7 +329,7 @@ open class ConversationRepository(
         val conversation = if (irohSource?.shouldUseIroh() == true) {
             irohSource.forkConversation(request)
         } else {
-            conversationApi.forkConversation(request)
+            remote.forkConversation(request)
         }
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation

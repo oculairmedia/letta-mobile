@@ -23,7 +23,7 @@ class MessagePagingSourceTest {
     fun setup() {
         messageApi = FakeMessageApi()
         pagingSource = MessagePagingSource(
-            messageApi = messageApi,
+            remote = messageApi,
             agentId = AgentId("agent-123"),
             conversationId = ConversationId("conv-456")
         )

@@ -2,23 +2,23 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.schedules.CronApi
-import com.letta.mobile.data.commands.SlashCommandApi
 import com.letta.mobile.data.commands.SlashCommandsApi
 import com.letta.mobile.data.skills.SkillsApi
-import com.letta.mobile.data.skills.SkillApi
-import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import com.letta.mobile.desktop.commands.DesktopIrohSlashCommandApi
 import com.letta.mobile.desktop.memory.DesktopBlockApi
-import com.letta.mobile.desktop.memory.DesktopHttpBlockApi
 import com.letta.mobile.desktop.memory.DesktopIrohBlockApi
 import com.letta.mobile.desktop.skills.DesktopIrohSkillsApi
 
 /**
- * HTTP-only management APIs — an iroh:// backend has no HTTP base URL, so
- * their panels degrade to empty instead of dialing iroh:// as HTTP.
+ * The management APIs behind the desktop's memory, cron, skills and slash-command panels.
+ *
+ * letta-mobile-ckmub.4: these used to fall back to a Letta REST server for non-Iroh backends. That
+ * backend is gone, so today they are served over an Iroh host's `admin_rpc` relay only; on the
+ * bundled runtime or a direct App Server they are null and the panels say so. The App Server
+ * equivalents (`cron_*`, `skill_enable`/`skill_disable`, `execute_command`, memory files) are wired
+ * by the shared pages (ckmub S14 / S17). The name is kept until those pages replace the panels.
  */
 internal class DesktopHttpApis(
     val blockApi: DesktopBlockApi?,
@@ -27,38 +27,13 @@ internal class DesktopHttpApis(
     val slashCommandApi: SlashCommandsApi?,
 )
 
-private data class DesktopApiBackend(
-    val irohMode: Boolean,
-    val irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-    val httpConfig: LettaConfig?,
-)
-
-private fun <T> createDesktopBackendApi(
-    backend: DesktopApiBackend,
-    irohFactory: (IrohAdminRpcAgentDirectory) -> T,
-    httpFactory: (LettaConfig) -> T,
-): T? = when {
-    backend.irohMode -> backend.irohAgentDirectory?.let(irohFactory)
-    else -> backend.httpConfig?.let(httpFactory)
-}
-
-private fun createDesktopHttpApis(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
-    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-): DesktopHttpApis {
-    val httpConfig = activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }
-    val backend = DesktopApiBackend(irohMode, irohAgentDirectory, httpConfig)
-    val httpClient = createDesktopLettaHttpClient()
-    return DesktopHttpApis(
-        blockApi = createDesktopBackendApi(backend, ::DesktopIrohBlockApi, ::DesktopHttpBlockApi),
-        cronApi = httpConfig?.let { CronApi(it, httpClient) },
-        skillApi = createDesktopBackendApi(backend, ::DesktopIrohSkillsApi) { SkillApi(it, httpClient) },
-        slashCommandApi = createDesktopBackendApi(backend, ::DesktopIrohSlashCommandApi) {
-            SlashCommandApi(it, httpClient)
-        },
+private fun createDesktopHttpApis(irohAgentDirectory: IrohAdminRpcAgentDirectory?): DesktopHttpApis =
+    DesktopHttpApis(
+        blockApi = irohAgentDirectory?.let(::DesktopIrohBlockApi),
+        cronApi = null,
+        skillApi = irohAgentDirectory?.let(::DesktopIrohSkillsApi),
+        slashCommandApi = irohAgentDirectory?.let(::DesktopIrohSlashCommandApi),
     )
-}
 
 internal fun loadArchivedConversationIds(store: com.letta.mobile.data.storage.SecureSettingsStore): Set<String> =
     store.getString(ARCHIVED_CONVERSATION_IDS_KEY)
@@ -77,10 +52,9 @@ internal fun persistArchivedConversationIds(
 
 @Composable
 internal fun rememberDesktopHttpApis(
-    activeConfig: LettaConfig,
     irohMode: Boolean,
     irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-): DesktopHttpApis =
-    remember(activeConfig, irohMode, irohAgentDirectory) {
-        createDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
-    }
+): DesktopHttpApis {
+    val directory = irohAgentDirectory.takeIf { irohMode }
+    return remember(directory) { createDesktopHttpApis(directory) }
+}

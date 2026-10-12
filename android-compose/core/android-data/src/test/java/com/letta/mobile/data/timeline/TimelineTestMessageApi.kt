@@ -1,6 +1,6 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.testutil.TestMessageSource
 import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
@@ -8,7 +8,6 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.writeStringUtf8
-import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -154,7 +153,7 @@ internal class RecordingConversationCursorStore : ConversationCursorStore {
         TimelineCursorPairView(records.toList())
 }
 
-internal open class TimelineTestMessageApi : MessageApi(mockk(relaxed = true)) {
+internal open class TimelineTestMessageApi : TestMessageSource() {
     final override suspend fun listConversationMessages(
         conversationId: ConversationId,
         limit: Int?,
@@ -238,7 +237,7 @@ internal class AlwaysIdleApi : TimelineTestMessageApi() {
 }
 
 /**
- * Fake api for the gqz3 regression test. The real `MessageApi.streamConversation`
+ * Fake api for the gqz3 regression test. The real `TestMessageSource.streamConversation`
  * classifies EXPIRED bodies into `NoActiveRunException` (letta-mobile-t8q7) so
  * this fake mirrors that contract: first call throws `NoActiveRunException`,
  * subsequent calls idle. Before t8q7 the fake threw `ApiException` and the
@@ -254,7 +253,7 @@ internal class ExpiredThenIdleApi : TimelineTestMessageApi() {
 }
 
 /**
- * Fake [MessageApi] that simulates:
+ * Fake [TestMessageSource] that simulates:
  * - a stored message list (returned by listMessages)
  * - a programmable stream (returned by sendConversationMessage as a real SSE byte channel)
  *

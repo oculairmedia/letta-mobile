@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
  *
  * The mobile Iroh path ([DefaultAppServerController.submitApproval]) and the
  * desktop gateway
- * ([com.letta.mobile.desktop.chat.DesktopHybridAppServerChatGateway.submitApproval])
+ * ([com.letta.mobile.desktop.chat.DesktopAppServerChatGateway.submitApproval])
  * both turn a (approve, updatedInput, message) triple into an
  * [AppServerApprovalResponseDecision]. Extracting the selection here keeps that
  * shaping in one place and drops both call sites below CodeScene's complexity

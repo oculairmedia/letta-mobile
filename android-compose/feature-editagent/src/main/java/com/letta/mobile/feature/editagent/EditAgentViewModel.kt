@@ -258,7 +258,6 @@ internal class EditAgentViewModel @Inject constructor(
 
     fun updateContextWindow(value: Int) = state.updateField { copy(contextWindow = value.coerceAtLeast(0)) }
 
-    fun updateEnableSleeptime(value: Boolean) = state.updateField { copy(enableSleeptime = value) }
 
     fun updateSummarizationPrompt(value: String) = state.updateField { copy(summarizationPrompt = value) }
 

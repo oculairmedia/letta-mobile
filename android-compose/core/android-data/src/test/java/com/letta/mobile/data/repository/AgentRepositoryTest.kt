@@ -71,7 +71,7 @@ class AgentRepositoryTest {
     }
 
     private fun localRepository(source: FakeLocalAgentSource): AgentRepository = AgentRepository(
-        agentApi = fakeApi,
+        remote = fakeApi,
         agentDao = fakeDao,
         localAgentSource = source,
         settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
@@ -134,7 +134,7 @@ class AgentRepositoryTest {
             }
         }
         val irohRepo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -382,7 +382,7 @@ class AgentRepositoryTest {
             fakeApi.agents.add(TestData.agent(id = "a$index", name = "Agent $index"))
         }
         val repo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             repositoryScope = backgroundScope,
             transport = transport,
@@ -410,7 +410,7 @@ class AgentRepositoryTest {
     fun `agent_updated for ephemeral letta-code subagent skips per-agent GET`() = runTest {
         val transport = FakeChannelTransport()
         val repo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             repositoryScope = backgroundScope,
             transport = transport,
@@ -435,7 +435,7 @@ class AgentRepositoryTest {
         fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Persistent"))
         val transport = FakeChannelTransport()
         val repo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             repositoryScope = backgroundScope,
             transport = transport,
@@ -477,7 +477,7 @@ class AgentRepositoryTest {
     fun `getAgent suppresses per-agent GET when bulk refresh is fresh`() = runTest {
         fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Fresh"))
         val repo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             repositoryScope = backgroundScope,
         )
@@ -498,7 +498,7 @@ class AgentRepositoryTest {
     fun `getAgent still fetches remote when bulk cache is stale`() = runTest {
         fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Cached"))
         val repo = AgentRepository(
-            agentApi = fakeApi,
+            remote = fakeApi,
             agentDao = fakeDao,
             repositoryScope = backgroundScope,
         )
@@ -548,11 +548,11 @@ class AgentRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
-    fun `createAgent in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+    @Test(expected = com.letta.mobile.data.backend.NoAppServerRouteException::class)
+    fun `createAgent in iroh mode without source throws NoAppServerRouteException`() = runTest {
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
@@ -590,7 +590,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun countAgents(): Int {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = AgentRepository(
@@ -629,7 +629,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
             override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> = emptyList()
         }
@@ -653,7 +653,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun deleteAgent(id: AgentId) {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)

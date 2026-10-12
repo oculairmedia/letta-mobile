@@ -1,18 +1,18 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
-import io.mockk.mockk
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
+open class FakeConversationApi : ConversationCrudRemoteSource by noAppServerRoute<ConversationCrudRemoteSource>() {
     var conversations = mutableListOf<Conversation>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

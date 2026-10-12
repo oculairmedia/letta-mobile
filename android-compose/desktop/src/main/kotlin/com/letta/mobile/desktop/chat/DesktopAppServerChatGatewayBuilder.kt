@@ -44,9 +44,9 @@ import kotlinx.coroutines.withContext
  *
  * Wires the controller stack (transport -> client -> turn engine) for either an
  * iroh:// backend (QUIC, peer to the Android path) or a WebSocket App Server,
- * authenticates the iroh session, and returns a hybrid gateway that routes
- * send/stream through the controller. LOCAL admin reads/writes share that same
- * child-owned protocol session; remote backends retain their HTTP admin path.
+ * authenticates the iroh session, and returns the [DesktopAppServerChatGateway] that routes
+ * send/stream through the controller. Admin reads/writes share that same protocol session for
+ * every backend (letta-mobile-ckmub.4: there is no HTTP admin path).
  *
  * Desktop does not use Hilt; callers inject this builder (or a test fake of
  * [DesktopAppServerChatGatewayFactory]) instead of constructing the stack inline.
@@ -74,11 +74,11 @@ class DesktopAppServerChatGatewayBuilder(
     override suspend fun create(
         lettaConfig: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig,
-    ): DesktopChatGateway = withContext(Dispatchers.IO) {
+    ): DesktopAppServerChatGateway = withContext(Dispatchers.IO) {
         val serverUrl = appServerConfig.serverUrl
             ?: throw IllegalArgumentException(
-                "App Server URL is required when ${DesktopAppServerRuntimeConfig.ENABLED_PROPERTY} is enabled. " +
-                    "Set ${DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY} or " +
+                "An App Server address (ws://, wss:// or iroh://) is required. Set the Remote host address in " +
+                    "Settings, or ${DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY} / " +
                     "${DesktopAppServerRuntimeConfig.SERVER_URL_ENV}.",
             )
 
@@ -130,11 +130,9 @@ class DesktopAppServerChatGatewayBuilder(
                     permissionModes = permissionModes.takeUnless { isIroh },
                 ),
             )
-            val adminGateway = adminGatewayFor(lettaConfig, client)
-            DesktopHybridAppServerChatGateway(
+            DesktopAppServerChatGateway(
                 turnEngine = turnEngine,
                 client = client,
-                adminGateway = adminGateway,
                 transportResources = transportResources,
                 permissionModes = permissionModes.takeUnless { isIroh },
                 onClose = {
@@ -175,13 +173,6 @@ class DesktopAppServerChatGatewayBuilder(
 
     private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
         if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
-
-    private fun adminGatewayFor(lettaConfig: LettaConfig, client: DefaultAppServerClient): DesktopAdminChatGateway =
-        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-            DesktopLocalBackendAdminGateway(appServerClient = client)
-        } else {
-            DesktopLettaHttpChatGateway(config = lettaConfig, httpClient = createDesktopLettaHttpClient())
-        }
 
     /**
      * iroh://<ticket> — bind a local iroh endpoint, dial the backend over QUIC,
@@ -224,7 +215,7 @@ class DesktopAppServerChatGatewayBuilder(
         lettaConfig: LettaConfig,
     ): Pair<AppServerTransport, DesktopTransportResources> {
         val endpoint = AppServerEndpoint.fromWebSocketUrl(url = serverUrl, bearerToken = lettaConfig.accessToken)
-        val httpClient = createDesktopLettaHttpClient()
+        val httpClient = createDesktopAppServerHttpClient()
         val transport = KtorAppServerWebSocketTransport(
             httpClient = httpClient,
             baseUrl = endpoint.address,

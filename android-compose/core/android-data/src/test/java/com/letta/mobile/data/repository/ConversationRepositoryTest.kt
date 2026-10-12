@@ -3,7 +3,7 @@ package com.letta.mobile.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
@@ -295,7 +295,7 @@ class ConversationRepositoryTest {
             override suspend fun updateConversation(
                 conversationId: com.letta.mobile.data.model.ConversationId,
                 params: com.letta.mobile.data.model.ConversationUpdateParams,
-            ): Conversation = throw IrohAdminApiUnavailableException("iroh://test-node")
+            ): Conversation = throw NoAppServerRouteException("iroh://test-node")
         }
         httpThatThrows.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Original"))
         repository = ConversationRepository(

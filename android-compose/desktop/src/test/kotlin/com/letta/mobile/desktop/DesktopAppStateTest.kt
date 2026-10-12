@@ -7,11 +7,11 @@ import kotlin.test.assertTrue
 
 class DesktopAppStateTest {
     @Test
-    fun defaultBootstrapTargetsSelfHostedLocalEndpoint() {
+    fun defaultBootstrapTargetsTheBundledRuntime() {
         val state = defaultDesktopBootstrapState()
 
-        assertEquals(LettaConfig.Mode.SELF_HOSTED, state.config.mode)
-        assertEquals("http://localhost:8283", state.config.serverUrl)
+        assertEquals(LettaConfig.Mode.LOCAL, state.config.mode)
+        assertEquals("", state.config.serverUrl)
     }
 
     @Test

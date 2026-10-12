@@ -1,12 +1,8 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProjectIssueClaimRequest
-import com.letta.mobile.data.api.ProjectIssueMutationHeaders
-import com.letta.mobile.data.api.ProjectIssueNoteRequest
-import com.letta.mobile.data.api.ProjectIssueReasonRequest
-import com.letta.mobile.data.api.ProjectIssueStatusRequest
-import com.letta.mobile.data.api.ProjectWorkApi
+import com.letta.mobile.data.repository.api.ProjectWorkRemoteSource
 import com.letta.mobile.data.model.IssueAnalyticsResponse
 import com.letta.mobile.data.model.IssueAnalyticsSummary
 import com.letta.mobile.data.model.ProjectIssueAnalyticsParams
@@ -18,15 +14,14 @@ import com.letta.mobile.data.model.ProjectIssueMutationResponse
 import com.letta.mobile.data.model.ProjectIssuePage
 import com.letta.mobile.data.model.ProjectIssueSummary
 import com.letta.mobile.data.model.ProjectReadyWorkResponse
-import io.mockk.mockk
 
-class FakeProjectWorkApi : ProjectWorkApi(mockk(relaxed = true)) {
+open class FakeProjectWorkApi : ProjectWorkRemoteSource by noAppServerRoute<ProjectWorkRemoteSource>() {
     val readyWork = mutableMapOf<String, List<ProjectIssueSummary>>()
     val issues = mutableMapOf<String, List<ProjectIssueSummary>>()
     val issueAnalytics = mutableMapOf<String, IssueAnalyticsResponse>()
     val issueDetails = mutableMapOf<String, ProjectIssueDetail>()
     val calls = mutableListOf<String>()
-    val mutationHeaders = mutableListOf<ProjectIssueMutationHeaders>()
+    val mutationHeaders = mutableListOf<MutationHeaders>()
     var shouldFail = false
 
     override suspend fun getReadyWork(projectId: String, limit: Int?, cursor: String?): ProjectReadyWorkResponse {
@@ -87,62 +82,71 @@ class FakeProjectWorkApi : ProjectWorkApi(mockk(relaxed = true)) {
 
     override suspend fun claimIssue(
         issueId: String,
-        request: ProjectIssueClaimRequest,
-        headers: ProjectIssueMutationHeaders,
+        assignee: String,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
-        calls.add("claimIssue:$issueId:${request.assignee}")
-        mutationHeaders.add(headers)
-        return mutation(issueId, action = "claim") { it.copy(assignee = request.assignee) }
+        calls.add("claimIssue:$issueId:$assignee")
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
+        return mutation(issueId, action = "claim") { it.copy(assignee = assignee) }
     }
 
     override suspend fun unclaimIssue(
         issueId: String,
-        headers: ProjectIssueMutationHeaders,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
         calls.add("unclaimIssue:$issueId")
-        mutationHeaders.add(headers)
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
         return mutation(issueId, action = "unclaim") { it.copy(assignee = null) }
     }
 
     override suspend fun updateIssueStatus(
         issueId: String,
-        request: ProjectIssueStatusRequest,
-        headers: ProjectIssueMutationHeaders,
+        status: String,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
-        calls.add("updateIssueStatus:$issueId:${request.status}")
-        mutationHeaders.add(headers)
-        return mutation(issueId, action = "status") { it.copy(status = request.status) }
+        calls.add("updateIssueStatus:$issueId:$status")
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
+        return mutation(issueId, action = "status") { it.copy(status = status) }
     }
 
     override suspend fun addIssueNote(
         issueId: String,
-        request: ProjectIssueNoteRequest,
-        headers: ProjectIssueMutationHeaders,
+        note: String,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
-        calls.add("addIssueNote:$issueId:${request.text}")
-        mutationHeaders.add(headers)
+        calls.add("addIssueNote:$issueId:$note")
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
         return mutation(issueId, action = "note") { it }
     }
 
     override suspend fun closeIssue(
         issueId: String,
-        request: ProjectIssueReasonRequest,
-        headers: ProjectIssueMutationHeaders,
+        reason: String,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
-        calls.add("closeIssue:$issueId:${request.reason}")
-        mutationHeaders.add(headers)
+        calls.add("closeIssue:$issueId:$reason")
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
         return mutation(issueId, action = "close") { it.copy(status = "closed", ready = false) }
     }
 
     override suspend fun reopenIssue(
         issueId: String,
-        request: ProjectIssueReasonRequest,
-        headers: ProjectIssueMutationHeaders,
+        reason: String,
+        ifMatch: String,
+        idempotencyKey: String,
     ): ProjectIssueMutationResponse {
-        calls.add("reopenIssue:$issueId:${request.reason}")
-        mutationHeaders.add(headers)
+        calls.add("reopenIssue:$issueId:$reason")
+        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
         return mutation(issueId, action = "reopen") { it.copy(status = "open") }
     }
+
+    /** The optimistic-concurrency headers a mutation carried. */
+    data class MutationHeaders(val ifMatch: String, val idempotencyKey: String)
 
     private fun mutation(
         issueId: String,

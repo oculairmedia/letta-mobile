@@ -20,9 +20,9 @@ import kotlinx.serialization.json.put
  * letta-mobile-71orq: after P4 purity (letta-mobile-qfa81) the LettaApiClient
  * choke-point hard-fails any raw HTTP admin call in iroh:// mode instead of
  * silently falling back to a stale HTTP config. [AgentRepository.getAgent]
- * previously always called the raw HTTP [com.letta.mobile.data.api.AgentApi],
+ * previously always called the raw HTTP `AgentApi` (removed in letta-mobile-ckmub.4),
  * so opening a conversation over iroh:// threw
- * [com.letta.mobile.data.api.IrohAdminApiUnavailableException] before any
+ * `IrohAdminApiUnavailableException` before any
  * stream and the whole chat screen errored out.
  *
  * The server-side handlers already exist (AgentAdminHandlers registers

@@ -6,6 +6,8 @@ import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.appserver.AppServerAgentBlockRepository
+import com.letta.mobile.data.repository.appserver.AppServerAgentRepository
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository
@@ -48,8 +50,13 @@ class DesktopSessionGraphAdaptersTest {
         assertFalse(graph.isClosed)
     }
 
+    /**
+     * letta-mobile-ckmub.4: no backend binds a Letta REST repository any more. The bundled runtime
+     * reads agents and memory over its App Server session; schedules and tools have no direct App
+     * Server route yet, so they are the unavailable repository rather than a REST fallback.
+     */
     @Test
-    fun localModeKeepsHttpScheduleAndToolRepositories() {
+    fun localModeReadsAgentsAndMemoryOverTheAppServer() {
         val adapters = DesktopRepositoryAdapters(
             LettaConfig(
                 id = "desktop-local",
@@ -58,34 +65,36 @@ class DesktopSessionGraphAdaptersTest {
             ),
         )
 
-        assertIs<DesktopLettaHttpAdminRepositories>(adapters.scheduleRepository)
-        assertIs<DesktopLettaHttpAdminRepositories>(adapters.toolRepository)
+        assertIs<AppServerAgentRepository>(adapters.agentRepository)
+        assertIs<AppServerAgentBlockRepository>(adapters.blockRepository)
+        assertUnavailable(adapters.scheduleRepository)
+        assertUnavailable(adapters.toolRepository)
     }
 
     /**
-     * Regression test for the memory graph's "blocks" section going dark on
-     * remote (non-LOCAL, non-Iroh) backends: [DesktopRepositoryAdapters]
-     * bound `agentRepository`/`scheduleRepository`/`toolRepository` through
-     * [selectIrohOrHttp] but left `blockRepository` hard-wired to
-     * `unavailableRepository()` for every mode except LOCAL, even though
-     * both the Iroh bundle and the HTTP admin repositories already implement
-     * [com.letta.mobile.data.repository.api.IAgentBlockRepository]. That
-     * made `MemoryParityController`'s "blocks" section throw
-     * `DesktopRepositoryUnavailableException` for every self-hosted/cloud
-     * backend, degrading the memory graph even though a working repository
-     * was available.
+     * A remote host reached directly (ws://) is an App Server too: the memory graph's "blocks"
+     * section reads over that session instead of going dark or falling back to REST.
      */
     @Test
-    fun selfHostedModeBindsBlockRepositoryThroughHttpAdmin() {
+    fun remoteAppServerBindsAgentsAndBlocksOverTheAppServer() {
         val adapters = DesktopRepositoryAdapters(
             LettaConfig(
                 id = "desktop-self-hosted",
                 mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "http://localhost:8283",
+                serverUrl = "ws://localhost:4500",
             ),
         )
 
-        assertIs<DesktopLettaHttpAdminRepositories>(adapters.blockRepository)
+        assertIs<AppServerAgentRepository>(adapters.agentRepository)
+        assertIs<AppServerAgentBlockRepository>(adapters.blockRepository)
+        assertUnavailable(adapters.scheduleRepository)
+    }
+
+    private fun assertUnavailable(repository: Any) {
+        assertTrue(
+            java.lang.reflect.Proxy.isProxyClass(repository::class.java),
+            "expected the unavailable repository, got $repository",
+        )
     }
 
     @Test
@@ -138,7 +147,7 @@ class DesktopSessionGraphAdaptersTest {
         assertIs<com.letta.mobile.data.repository.SelfTodoRepository>(adapters.selfTodoRepository)
         assertIs<com.letta.mobile.data.repository.SubagentRepository>(adapters.subagentRepository)
 
-        val adminError = runCatching { adapters.folderRepository.refreshFolders() }.exceptionOrNull()
+        val adminError = runCatching { adapters.providerRepository.refreshProviders() }.exceptionOrNull()
         assertFalse(
             adminError is DesktopRepositoryUnavailableException,
             "Iroh admin reads should be bound, not unavailable proxies",
@@ -147,7 +156,7 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     @Test
-    fun selfHostedHttpModeKeepsAdminReadsUnavailableWithoutHttpImpl() = runTest {
+    fun remoteAppServerKeepsAdminReadsWithoutARouteUnavailable() = runTest {
         val adapters = DesktopRepositoryAdapters(
             LettaConfig(
                 id = "desktop-self-hosted",
@@ -158,9 +167,9 @@ class DesktopSessionGraphAdaptersTest {
 
         assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
         val error = assertFailsWith<DesktopRepositoryUnavailableException> {
-            adapters.folderRepository.countFolders()
+            adapters.passageRepository.searchArchival("agent-1", "query")
         }
-        assertTrue(error.message.orEmpty().contains("IFolderRepository"))
+        assertTrue(error.message.orEmpty().contains("IPassageRepository"))
     }
 
     @Test

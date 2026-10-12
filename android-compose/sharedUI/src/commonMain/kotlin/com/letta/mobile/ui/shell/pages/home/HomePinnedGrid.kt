@@ -216,13 +216,9 @@ internal val HomeShortcut.icon: ImageVector
         HomeShortcut.TOOLS -> LettaIcons.Tool
         HomeShortcut.BLOCKS -> LettaIcons.ViewModule
         HomeShortcut.TEMPLATES -> LettaIcons.Dashboard
-        HomeShortcut.ARCHIVES -> LettaIcons.Storage
-        HomeShortcut.FOLDERS -> LettaIcons.ManageSearch
-        HomeShortcut.GROUPS -> LettaIcons.ForkRight
         HomeShortcut.PROVIDERS, HomeShortcut.MCP_SERVERS -> LettaIcons.Cloud
-        HomeShortcut.IDENTITIES -> LettaIcons.AccountCircle
-        HomeShortcut.SCHEDULES, HomeShortcut.JOBS -> LettaIcons.AccessTime
-        HomeShortcut.RUNS, HomeShortcut.MESSAGE_BATCHES -> LettaIcons.ChatOutline
+        HomeShortcut.SCHEDULES -> LettaIcons.AccessTime
+        HomeShortcut.RUNS -> LettaIcons.ChatOutline
         HomeShortcut.BOT_SETTINGS -> LettaIcons.Agent
         HomeShortcut.PROJECTS -> LettaIcons.Apps
         HomeShortcut.MODELS -> LettaIcons.Sparkles

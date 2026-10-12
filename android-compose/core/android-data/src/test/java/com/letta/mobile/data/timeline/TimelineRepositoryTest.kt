@@ -1,11 +1,10 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.testutil.TestMessageSource
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteReadChannel
-import io.mockk.mockk
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -244,7 +243,7 @@ private class RepositoryRecordingConversationCursorStore : ConversationCursorSto
     }
 }
 
-private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
+private class CancellableStreamApi : TestMessageSource() {
     private val activeStreams = ConcurrentHashMap<String, AtomicInteger>()
     private val closedStreams = ConcurrentHashMap<String, AtomicInteger>()
     val listMessageThreads = ConcurrentHashMap<String, String>()

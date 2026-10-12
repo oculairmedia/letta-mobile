@@ -1,6 +1,6 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockId
@@ -96,7 +96,7 @@ class BlockRepositoryTest {
             }
         }
         val irohRepository = BlockRepository(
-            blockApi = fakeApi,
+            remote = fakeApi,
             irohBlockSource = IrohAdminRpcBlockSource(transport, irohSettings()),
         )
 
@@ -162,8 +162,8 @@ class BlockRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `retrieveBlock in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+    @Test(expected = NoAppServerRouteException::class)
+    fun `retrieveBlock in iroh mode without source throws NoAppServerRouteException`() = runTest {
         // RED: repository has no irohBlockSource yet, so raw API call throws
         val settings = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
@@ -175,7 +175,7 @@ class BlockRepositoryTest {
         )
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun retrieveBlock(blockId: String): Block {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = BlockRepository(apiThatThrows)
@@ -208,7 +208,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun retrieveBlock(blockId: String): Block {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         // GREEN: wired repository routes via irohSource instead of raw API
@@ -244,7 +244,7 @@ class BlockRepositoryTest {
                 clearDescription: Boolean,
                 clearLimit: Boolean,
             ): Block {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)
@@ -273,7 +273,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun createBlock(params: BlockCreateParams): Block {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)
@@ -296,7 +296,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun deleteBlock(blockId: String) {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)
@@ -327,7 +327,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)
@@ -370,7 +370,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun listBlocks(agentId: String): List<Block> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)
@@ -396,7 +396,7 @@ class BlockRepositoryTest {
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
             override suspend fun listBlocks(agentId: String): List<Block> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = BlockRepository(apiThatThrows, irohSource)

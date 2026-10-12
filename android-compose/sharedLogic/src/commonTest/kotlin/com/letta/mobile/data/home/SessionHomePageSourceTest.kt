@@ -20,13 +20,8 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
-import com.letta.mobile.data.repository.api.IFolderRepository
-import com.letta.mobile.data.repository.api.IGroupRepository
-import com.letta.mobile.data.repository.api.IIdentityRepository
-import com.letta.mobile.data.repository.api.IJobRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IPassageRepository
@@ -152,7 +147,7 @@ class SessionHomePageSourceTest {
         )
     }
 
-    /** Stand-in for LettaApiClient's IrohAdminApiUnavailableException (Android-only). */
+    /** Stand-in for the Android repositories' no-route failure (NoAppServerRouteException). */
     private class IrohGuardException : IllegalStateException(
         "Admin API call attempted while the active backend is an Iroh endpoint (iroh://node). This route has no admin_rpc path",
     )
@@ -192,16 +187,11 @@ class SessionHomePageSourceTest {
         override val agentRepository: IAgentRepository = FakeAgents()
         override val conversationRepository: IConversationRepository get() = unused()
         override val cronRepository: ICronRepository get() = unused()
-        override val archiveRepository: IArchiveRepository get() = unused()
-        override val folderRepository: IFolderRepository get() = unused()
-        override val groupRepository: IGroupRepository get() = unused()
-        override val identityRepository: IIdentityRepository get() = unused()
         override val mcpServerRepository: IMcpServerRepository get() = unused()
         override val modelRepository: IModelRepository get() = unused()
         override val passageRepository: IPassageRepository get() = unused()
         override val projectRepository: IProjectRepository get() = unused()
         override val projectWorkRepository: IProjectWorkRepository get() = unused()
-        override val jobRepository: IJobRepository get() = unused()
         override val providerRepository: IProviderRepository get() = unused()
         override val scheduleRepository: IScheduleRepository get() = unused()
         override val selfTodoRepository: ISelfTodoRepository get() = unused()

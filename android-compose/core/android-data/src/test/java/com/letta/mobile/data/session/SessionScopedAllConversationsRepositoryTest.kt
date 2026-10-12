@@ -1,6 +1,5 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -8,12 +7,7 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeFolderApi
-import com.letta.mobile.testutil.FakeGroupApi
-import com.letta.mobile.testutil.FakeIdentityApi
-import com.letta.mobile.testutil.FakeJobApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi

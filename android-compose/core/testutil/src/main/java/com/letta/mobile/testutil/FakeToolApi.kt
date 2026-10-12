@@ -1,19 +1,18 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolSchemaGenerateParams
 import com.letta.mobile.data.model.ToolUpdateParams
-import io.mockk.mockk
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
-class FakeToolApi : ToolApi(mockk(relaxed = true)) {
+open class FakeToolApi : ToolRemoteSource {
     var tools = mutableListOf<Tool>()
     var agentTools = mutableMapOf<String, MutableList<Tool>>()
     var shouldFail = false

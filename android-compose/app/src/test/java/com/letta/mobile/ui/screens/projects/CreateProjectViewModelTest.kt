@@ -1,13 +1,13 @@
 package com.letta.mobile.ui.screens.projects
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.api.ProjectCreateRequest
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.ProjectRepository
-import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -176,7 +176,7 @@ class CreateProjectViewModelTest {
         viewModel.advanceOrSubmit()
     }
 
-    private class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {
+    private class FakeProjectApi : ProjectRemoteSource by noAppServerRoute<ProjectRemoteSource>() {
         val projects = mutableListOf<ProjectSummary>()
         var createShouldFail = false
         val calls = mutableListOf<String>()

@@ -1,6 +1,5 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -23,12 +22,7 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeFolderApi
-import com.letta.mobile.testutil.FakeGroupApi
-import com.letta.mobile.testutil.FakeIdentityApi
-import com.letta.mobile.testutil.FakeJobApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi
@@ -160,8 +154,6 @@ class SessionManagerTest {
         assertTrue(firstGraph.scope.coroutineContext.job.isCancelled)
         assertTrue(!secondGraph.scope.coroutineContext.job.isCancelled)
     }
-
-    private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
     private fun localRuntimeOptions(
         vararg providers: LocalRuntimeProvider = arrayOf(localRuntimeProvider()),

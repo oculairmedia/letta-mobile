@@ -1,15 +1,15 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import app.cash.turbine.test
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.PassageApi
+import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -72,7 +72,7 @@ class PassageRepositoryTest {
             }
         }
         val irohRepository = PassageRepository(
-            passageApi = fakeApi,
+            remote = fakeApi,
             irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
         )
 
@@ -114,11 +114,11 @@ class PassageRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
-    fun `refreshPassages in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+    @Test(expected = com.letta.mobile.data.backend.NoAppServerRouteException::class)
+    fun `refreshPassages in iroh mode without source throws NoAppServerRouteException`() = runTest {
         val apiThatThrows = object : FakePassageApi() {
             override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = PassageRepository(apiThatThrows)
@@ -151,7 +151,7 @@ class PassageRepositoryTest {
         val irohSource = IrohAdminRpcPassageSource(transport, settings)
         val apiThatThrows = object : FakePassageApi() {
             override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = PassageRepository(apiThatThrows, irohSource)
@@ -163,7 +163,7 @@ class PassageRepositoryTest {
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    private class FakePassageApi : PassageApi(mockk(relaxed = true)) {
+    private open class FakePassageApi : PassageRemoteSource by noAppServerRoute<PassageRemoteSource>() {
         private val passagesByAgent = mutableMapOf<String, MutableList<Passage>>()
         var shouldFail = false
         val calls = mutableListOf<String>()

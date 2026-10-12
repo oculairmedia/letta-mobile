@@ -1,14 +1,13 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ScheduleApi
+import com.letta.mobile.data.repository.api.ScheduleRemoteSource
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.schedules.CronTask
-import io.mockk.mockk
 
-class FakeScheduleApi : ScheduleApi(mockk(relaxed = true)) {
+open class FakeScheduleApi : ScheduleRemoteSource {
     var schedules = mutableMapOf<String, MutableList<ScheduledMessage>>()
     var shouldFail = false
     val calls = mutableListOf<String>()

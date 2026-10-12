@@ -1,7 +1,7 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.StepApi
+import com.letta.mobile.data.repository.api.StepRemoteSource
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ProviderTrace
@@ -9,10 +9,9 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepFeedbackUpdateParams
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.StepMetrics
-import io.mockk.mockk
 import kotlinx.serialization.json.JsonPrimitive
 
-class FakeStepApi : StepApi(mockk(relaxed = true)) {
+open class FakeStepApi : StepRemoteSource {
     var steps = mutableListOf<Step>()
     var stepMessages = mutableMapOf<String, List<LettaMessage>>()
     var stepMetrics = mutableMapOf<String, StepMetrics>()

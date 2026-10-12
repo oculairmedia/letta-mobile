@@ -194,7 +194,7 @@ private fun rememberShellChatController(
 internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: DesktopChatSurfaceState): DesktopShellPanels {
     val chatScope = core.chatScope
     val sessionGraph = core.sessionGraph.value
-    val httpApis = rememberDesktopHttpApis(core.bootstrap.activeConfig, core.iroh.transport != null, core.iroh.agentDirectory)
+    val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory)
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
     val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
     val agentSlashCommands = remember(httpApis.slashCommandApi) {
