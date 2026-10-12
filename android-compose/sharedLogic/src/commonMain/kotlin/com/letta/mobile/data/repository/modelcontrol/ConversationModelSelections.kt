@@ -1,11 +1,7 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 import com.letta.mobile.data.model.Conversation
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * letta-mobile-okvyf / letta-mobile-dxz5s: each conversation's model.
@@ -23,19 +19,16 @@ import kotlinx.coroutines.flow.asStateFlow
  * the agent's.
  */
 class ConversationModelSelections {
-    private val lock = SynchronizedObject()
     private val ledger = ConversationModelLedger()
-    private val _choices = MutableStateFlow(ConversationModelChoices())
 
     /** Every conversation's model, window and effort. */
-    val choices: StateFlow<ConversationModelChoices> = _choices.asStateFlow()
+    val choices: StateFlow<ConversationModelChoices> = ledger.choices
 
-    operator fun get(conversationId: String): String? = _choices.value.models[conversationId]
+    operator fun get(conversationId: String): String? = choices.value.models[conversationId]
 
     /** Records [model] as this session's pick for [conversationId]; a blank model clears the pick. */
     fun record(conversationId: String, model: String?) {
-        if (conversationId.isBlank()) return
-        update { ledger.pick(ConversationPick(conversationId, model)) }
+        if (conversationId.isNotBlank()) ledger.pick(ConversationPick(conversationId, model))
     }
 
     /**
@@ -43,26 +36,19 @@ class ConversationModelSelections {
      * [previous], unless a newer pick has replaced [model] meanwhile: an
      * earlier failure must not undo it. True when it restored.
      */
-    fun rollback(conversationId: String, model: String, previous: String?): Boolean = update {
-        val current = ledger.pickOf(conversationId) == model
-        if (current) ledger.pick(ConversationPick(conversationId, previous))
-        current
-    }
+    fun rollback(conversationId: String, model: String, previous: String?): Boolean =
+        ledger.replace(failed = ConversationPick(conversationId, model), previous = ConversationPick(conversationId, previous))
 
     /**
      * Takes the host's word for each of [conversations]: its model override (none means it runs its
      * agent's model) and the window and effort the host records for it. A pick made this session
      * stays in force until the host reports that same model.
      */
-    fun seedFromHost(conversations: Iterable<Conversation>) = update { ledger.report(conversations) }
+    fun seedFromHost(conversations: Iterable<Conversation>) = ledger.report(conversations)
 
     /** The model to show as selected for [conversationId] when its agent runs [agentModel]. */
     fun effectiveModel(conversationId: String?, agentModel: String?): String? =
         resolve(conversationOverride = conversationId?.let(::get), agentModel = agentModel)
-
-    private inline fun <T> update(change: () -> T): T = synchronized(lock) {
-        change().also { _choices.value = ledger.choices() }
-    }
 
     companion object {
         /** A conversation's own pick wins over its agent's model; blanks count as unset. */

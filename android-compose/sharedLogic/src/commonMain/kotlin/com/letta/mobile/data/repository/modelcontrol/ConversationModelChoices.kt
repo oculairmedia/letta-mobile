@@ -1,8 +1,13 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 import com.letta.mobile.data.model.Conversation
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 
 /**
@@ -32,21 +37,27 @@ internal data class ConversationPick(val conversationId: String, val model: Stri
 
 /**
  * The two sources of [ConversationModelChoices]: this session's picks and the host's records.
- * Not thread-safe; [ConversationModelSelections] serialises access.
+ * Every change is applied under one lock and published to [choices] before the lock is released.
  */
 internal class ConversationModelLedger {
+    private val lock = SynchronizedObject()
     private var picks: Map<String, String> = emptyMap()
     private var reports: Map<String, HostReport> = emptyMap()
+    private val _choices = MutableStateFlow(ConversationModelChoices())
 
-    fun pickOf(conversationId: String): String? = picks[conversationId]
+    val choices: StateFlow<ConversationModelChoices> = _choices.asStateFlow()
 
-    fun pick(change: ConversationPick) {
-        val model = change.model?.takeIf { it.isNotBlank() }
-        picks = if (model == null) picks - change.conversationId else picks + (change.conversationId to model)
+    fun pick(change: ConversationPick) = update { set(change) }
+
+    /** Restores [previous] in place of [failed], unless a newer pick replaced [failed] meanwhile. True when it restored. */
+    fun replace(failed: ConversationPick, previous: ConversationPick): Boolean = update {
+        val current = picks[failed.conversationId] == failed.model
+        if (current) set(previous)
+        current
     }
 
     /** Takes each record as the host's word; a pick the host now reports is confirmed and dropped. */
-    fun report(conversations: Iterable<Conversation>) {
+    fun report(conversations: Iterable<Conversation>) = update {
         conversations.forEach { conversation ->
             val id = conversation.id.value.takeIf { it.isNotBlank() } ?: return@forEach
             val reported = HostReport.of(conversation)
@@ -55,8 +66,17 @@ internal class ConversationModelLedger {
         }
     }
 
+    private fun set(change: ConversationPick) {
+        val model = change.model?.takeIf { it.isNotBlank() }
+        picks = if (model == null) picks - change.conversationId else picks + (change.conversationId to model)
+    }
+
+    private inline fun <T> update(change: () -> T): T = synchronized(lock) {
+        change().also { _choices.value = merged() }
+    }
+
     /** The host's window and effort count only while they describe the model in force. */
-    fun choices(): ConversationModelChoices {
+    private fun merged(): ConversationModelChoices {
         val models = HashMap<String, String>()
         val windows = HashMap<String, Int>()
         val efforts = HashMap<String, String>()
