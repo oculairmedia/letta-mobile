@@ -69,35 +69,55 @@ fun SchedulesPage(
 ) {
     val clock = options.fixedClock ?: rememberTickingClock()
     FocusedAgentSelection(state, actions)
+    val data = rememberSchedulesData(state, clock)
+    val ui = rememberSchedulesPageUi(clock, options.initialView)
+    SchedulesPageLayout(
+        ui = ui,
+        parts = SchedulesPageParts(
+            header = ui.headerParams(state.canCreate, options),
+            body = ui.body(state, data, actions.onRefresh),
+            rail = ui.railParams(data, actions.onTogglePause),
+            onSelectAgent = actions.onSelectAgent,
+        ),
+        modifier = modifier,
+    )
+    SchedulesPageDialogs(ui, SchedulesDialogContext(state, actions, data))
+}
+
+/** The schedules projected for this frame: every def, a lookup by id, the clock and the run history. */
+private class SchedulesData(
+    val defs: List<ScheduleDef>,
+    val defsById: Map<String, ScheduleDef>,
+    val clock: ScheduleClock,
+    val history: HistorySummary,
+)
+
+@Composable
+private fun rememberSchedulesData(state: SchedulesPageState, clock: ScheduleClock): SchedulesData {
     // `now` is intentionally not a key: one-shot crons resolve to a single instant when projected,
     // and re-resolving every tick would jump a just-fired one-shot a year ahead.
     val defs = remember(state.crons, state.library.schedules, state.focusedAgentId, clock.zone) {
         SchedulesPageModel.defs(state.crons, state.library.schedules, state.focusedAgentId, clock)
     }
-    val ui = rememberSchedulesPageUi(clock, options.initialView)
     val defsById = remember(defs) { defs.associateBy { it.id } }
-    val railParams = ScheduleRailParams(
-        rail = ui.rail,
-        defs = defs,
-        defsById = defsById,
-        history = remember(defs, clock) { ScheduleProjection.history(defs, clock.now, clock.zone) },
-        now = clock.now,
-        zone = clock.zone,
-        onSelectSchedule = { ui.rail = ScheduleRailState.Detail(it) },
-        onBackToOverview = { ui.rail = ScheduleRailState.Overview },
-        onDelete = { ui.pendingDelete = it },
-        onTogglePause = actions.onTogglePause,
-    )
-    SchedulesPageLayout(
-        ui = ui,
-        header = ui.headerParams(state.canCreate, options),
-        body = ui.body(state, defs, clock, railParams.history, actions.onRefresh),
-        railParams = railParams,
-        onSelectAgent = actions.onSelectAgent,
-        modifier = modifier,
-    )
-    SchedulesPageDialogs(ui, state, actions, clock, defsById)
+    val history = remember(defs, clock) { ScheduleProjection.history(defs, clock.now, clock.zone) }
+    return SchedulesData(defs, defsById, clock, history)
 }
+
+/** What the layout places: the header, the main content, the rail and the agent chips' callback. */
+private class SchedulesPageParts(
+    val header: SchedulesHeaderParams,
+    val body: SchedulesBody,
+    val rail: ScheduleRailParams,
+    val onSelectAgent: (String) -> Unit,
+)
+
+/** What the form and the delete confirmation read and report. */
+private class SchedulesDialogContext(
+    val state: SchedulesPageState,
+    val actions: SchedulesPageActions,
+    val data: SchedulesData,
+)
 
 /** The page state that outlives a day change: the view (saveable), the rail and the open form / confirm. */
 private class SchedulesPageStates(
@@ -129,20 +149,27 @@ private class SchedulesPageUi(states: SchedulesPageStates, val today: LocalDate)
         options = options,
     )
 
-    fun body(
-        state: SchedulesPageState,
-        defs: List<ScheduleDef>,
-        clock: ScheduleClock,
-        history: HistorySummary,
-        onRefresh: () -> Unit,
-    ) = SchedulesBody(
+    fun railParams(data: SchedulesData, onTogglePause: ((String, Boolean) -> Unit)?) = ScheduleRailParams(
+        rail = rail,
+        defs = data.defs,
+        defsById = data.defsById,
+        history = data.history,
+        now = data.clock.now,
+        zone = data.clock.zone,
+        onSelectSchedule = { rail = ScheduleRailState.Detail(it) },
+        onBackToOverview = { rail = ScheduleRailState.Overview },
+        onDelete = { pendingDelete = it },
+        onTogglePause = onTogglePause,
+    )
+
+    fun body(state: SchedulesPageState, data: SchedulesData, onRefresh: () -> Unit) = SchedulesBody(
         state = state,
-        defs = defs,
+        defs = data.defs,
         view = view,
-        clock = clock,
+        clock = data.clock,
         dates = SchedulesDates(today = today, selected = selectedDate, weekStart = weekStart),
         selectedId = (rail as? ScheduleRailState.Detail)?.scheduleId,
-        history = history,
+        history = data.history,
         onRefresh = onRefresh,
         onSelectDate = { selectedDate = it },
         onSelectRun = { rail = ScheduleRailState.Run(it) },
@@ -167,23 +194,17 @@ private fun rememberSchedulesPageUi(clock: ScheduleClock, initialView: Schedules
 }
 
 @Composable
-private fun SchedulesPageLayout(
-    ui: SchedulesPageUi,
-    header: SchedulesHeaderParams,
-    body: SchedulesBody,
-    railParams: ScheduleRailParams,
-    onSelectAgent: (String) -> Unit,
-    modifier: Modifier,
-) {
+private fun SchedulesPageLayout(ui: SchedulesPageUi, parts: SchedulesPageParts, modifier: Modifier) {
+    val body = parts.body
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(SchedulesPageTags.PAGE)) {
         val wide = maxWidth >= LettaDimens.Pane.wideBreakpoint
         Column(Modifier.fillMaxSize()) {
-            SchedulesHeader(header)
-            SchedulesAgentChips(body.state, onSelectAgent)
+            SchedulesHeader(parts.header)
+            SchedulesAgentChips(body.state, parts.onSelectAgent)
             if (wide) {
                 Row(Modifier.fillMaxSize()) {
                     SchedulesMainContent(body, Modifier.weight(1f).fillMaxHeight())
-                    if (ui.showsDockedRail) ScheduleRail(railParams)
+                    if (ui.showsDockedRail) ScheduleRail(parts.rail)
                 }
             } else {
                 SchedulesMainContent(body, Modifier.fillMaxSize())
@@ -191,7 +212,7 @@ private fun SchedulesPageLayout(
         }
         if (!wide && ui.rail !is ScheduleRailState.Overview) {
             LettaPane(LettaPaneKind.Sheet, onDismiss = { ui.rail = ScheduleRailState.Overview }, testTag = SchedulesPageTags.DETAIL_SHEET) {
-                ScheduleRail(railParams, Modifier.fillMaxWidth().height(DetailSheetHeight))
+                ScheduleRail(parts.rail, Modifier.fillMaxWidth().height(DetailSheetHeight))
             }
         }
     }
@@ -199,19 +220,15 @@ private fun SchedulesPageLayout(
 
 /** The New-schedule form and the delete confirmation, when open. */
 @Composable
-private fun SchedulesPageDialogs(
-    ui: SchedulesPageUi,
-    state: SchedulesPageState,
-    actions: SchedulesPageActions,
-    clock: ScheduleClock,
-    defsById: Map<String, ScheduleDef>,
-) {
+private fun SchedulesPageDialogs(ui: SchedulesPageUi, context: SchedulesDialogContext) {
+    val actions = context.actions
+    val clock = context.data.clock
     if (ui.creating) {
         ScheduleFormPane(
             clock = clock,
             onDismiss = { ui.creating = false },
             onSubmit = { draft ->
-                draft.toRequest(state.targetAgentId, clock.zone)?.let(actions.onCreate)
+                draft.toRequest(context.state.targetAgentId, clock.zone)?.let(actions.onCreate)
                 ui.creating = false
             },
         )
@@ -220,7 +237,7 @@ private fun SchedulesPageDialogs(
         LettaConfirmPane(
             request = LettaConfirmRequest(
                 title = "Delete schedule",
-                message = "Delete “${defsById[id]?.name ?: id}”? It will stop running.",
+                message = "Delete “${context.data.defsById[id]?.name ?: id}”? It will stop running.",
                 confirmLabel = "Delete",
             ),
             onConfirm = {
