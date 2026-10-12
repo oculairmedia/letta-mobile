@@ -88,12 +88,13 @@ data class ScheduleRailParams(
 
 /**
  * letta-mobile-ckmub.3.10 (hard cut S7): the schedules page's right rail, shared. The overview's
- * active schedules are a [RosterList]; a schedule or a run opens its detail in place.
+ * active schedules are a [RosterList]; a schedule or a run opens its detail in place. [modifier]
+ * sizes it: a docked rail by default, the full width of a sheet on a phone.
  */
 @Composable
-fun ScheduleRail(params: ScheduleRailParams) {
+fun ScheduleRail(params: ScheduleRailParams, modifier: Modifier = Modifier.width(ScheduleRailWidth).fillMaxHeight()) {
     Box(
-        Modifier.width(ScheduleRailWidth).fillMaxHeight()
+        modifier
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
             .background(MaterialTheme.colorScheme.surface)
             .padding(LettaDimens.Space.xl),

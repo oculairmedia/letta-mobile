@@ -44,7 +44,8 @@ import com.letta.mobile.ui.theme.LettaDimens
  * and the host's navigation go out through [callbacks] and presentation choices come in through
  * [options]. At or above [LettaDimens.Pane.wideBreakpoint] the page is one scrolling column with the
  * composer up top and the full fleet table; below it the composer docks at the bottom like a phone
- * chat bar and the fleet collapses to compact rows with sort chips.
+ * chat bar and the page leads with running work and recent conversations, then an agent avatar row
+ * and a one-line stats strip ([homeCompactDashboard], letta-mobile-zxk2n.34).
  *
  * [HomePageOptions.document] is the Letta Code mod seam: a recognised A2UI document replaces the
  * native page.
@@ -139,6 +140,9 @@ internal class HomePageScope(
         get() = options.showTitle || options.showSearch
 
     fun orbIndex(agentId: String?): Int = agentId?.let { options.orbIndexByAgentId[it] } ?: 0
+
+    /** This host can open [shortcut]'s page, so a "See all" or a figure may link there. */
+    fun offers(shortcut: HomeShortcut): Boolean = shortcut in state.availableShortcuts
 }
 
 @Composable
@@ -167,7 +171,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
             contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
         ) {
             if (page.hasCompactHeader) item { HomeHeader(page) }
-            if (page.state.search.isActive) homeSearchResults(page) else homeDashboard(page)
+            if (page.state.search.isActive) homeSearchResults(page) else homeCompactDashboard(page)
         }
         if (!page.state.search.isActive) {
             HomeComposer(page, Modifier.padding(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.sm))
@@ -175,7 +179,7 @@ private fun CompactHomeLayout(page: HomePageScope) {
     }
 }
 
-/** Pins first (what the user chose), then the counters, then what the fleet has been doing. */
+/** Wide: pins first (what the user chose), then the counters, then what the fleet has been doing. */
 private fun LazyListScope.homeDashboard(page: HomePageScope) {
     homePinnedSection(page)
     item { HomeStatTiles(page) }

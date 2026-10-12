@@ -184,4 +184,31 @@ class MathSplitterTest {
         // Whitespace-anchored fence → no match.
         assertEquals(false, containsLikelyInlineMath("leading \$ x \$ trail"))
     }
+
+    // letta-mobile-qvkmg: the screenshot bug — shell command substitution paired into TeX math.
+    @Test
+    fun `shell command substitution never renders as inline math`() {
+        val shell = "; T=\$(grep -E '/(test|jvmTest|commonTest)/' /tmp/f.txt); A=\$(cat /tmp/f.txt)"
+        assertEquals(false, containsLikelyInlineMath(shell))
+        assertEquals(listOf<MathSegment>(MathSegment.Text(shell)), splitInlineMathSegments(shell))
+        assertEquals(null, mathSegmentsToRender(shell))
+    }
+
+    @Test
+    fun `parameter expansion never renders as inline math`() {
+        assertEquals(null, mathSegmentsToRender("cp \${SRC}/a \${DST}/b"))
+        assertEquals(false, containsLikelyInlineMath("echo \$(date) and \$x\$ later"))
+    }
+
+    @Test
+    fun `display math still renders alongside the strict inline rule`() {
+        val segs = mathSegmentsToRender("Energy: \$\$E=mc^2\$\$")
+        assertEquals(listOf("E=mc^2"), segs?.filterIsInstance<MathSegment.Math>()?.map { it.content })
+    }
+
+    @Test
+    fun `plain prose inline math still renders`() {
+        val segs = splitInlineMathSegments("where \$x^2\$ grows")
+        assertEquals(listOf("x^2"), segs.filterIsInstance<MathSegment.Math>().map { it.content })
+    }
 }

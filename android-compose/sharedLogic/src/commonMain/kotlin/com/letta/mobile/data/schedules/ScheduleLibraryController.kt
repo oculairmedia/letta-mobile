@@ -171,28 +171,20 @@ class ScheduleLibraryController(
                 // If a prior load already proved the native schedule route is
                 // unavailable on this backend, skip the doomed native round-trip
                 // and go straight to the cron-backed source.
+                val target = ScheduleLibraryState(agents = agents, selectedAgentId = selectedAgentId)
                 if (nativeScheduleRouteUnavailable) {
-                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
+                    publishCronFallbackOrUnavailable(target)
                     return@launch
                 }
                 val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
-                stateFlow.value = ScheduleLibraryState(
-                    agents = agents,
-                    selectedAgentId = selectedAgentId,
-                    schedules = schedules,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
+                stateFlow.value = target.withSchedules(schedules)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    val agents = loadedAgents
-                    val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                    val selectedAgentId = loadedAgents.resolveSelection(stateFlow.value.selectedAgentId)
                     latchNativeUnavailableIfCronBacked()
-                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
+                    publishCronFallbackOrUnavailable(ScheduleLibraryState(agents = loadedAgents, selectedAgentId = selectedAgentId))
                 } else {
                     stateFlow.update {
                         it.copy(
@@ -209,37 +201,22 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             val current = stateFlow.value
+            val target = current.copy(selectedAgentId = agentId)
             // If a prior load already proved the native schedule route is
             // unavailable on this backend, skip the doomed native round-trip
             // and go straight to the cron-backed source.
             if (nativeScheduleRouteUnavailable) {
-                publishCronFallbackOrUnavailable(
-                    agents = current.agents,
-                    selectedAgentId = agentId,
-                    base = current.copy(selectedAgentId = agentId),
-                )
+                publishCronFallbackOrUnavailable(target)
                 return@launch
             }
             try {
-                val schedules = loadSchedulesForAgent(agentId)
-                stateFlow.value = current.copy(
-                    selectedAgentId = agentId,
-                    schedules = schedules,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
+                stateFlow.value = target.withSchedules(loadSchedulesForAgent(agentId))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
                     latchNativeUnavailableIfCronBacked()
-                    publishCronFallbackOrUnavailable(
-                        agents = current.agents,
-                        selectedAgentId = agentId,
-                        base = current.copy(selectedAgentId = agentId),
-                    )
+                    publishCronFallbackOrUnavailable(target)
                 } else {
                     stateFlow.value = current.copy(
                         isLoading = false,
@@ -257,26 +234,12 @@ class ScheduleLibraryController(
             try {
                 scheduleRepository.createSchedule(agentId, params)
                 val schedules = scheduleRepository.getSchedules(agentId).first()
-                stateFlow.value = current.copy(
-                    selectedAgentId = agentId,
-                    schedules = schedules,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
+                stateFlow.value = current.copy(selectedAgentId = agentId).withSchedules(schedules)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    stateFlow.value = current.copy(
-                        selectedAgentId = agentId,
-                        schedules = emptyList(),
-                        scheduleAdminAvailable = false,
-                        scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
-                        isLoading = false,
-                        errorMessage = null,
-                    )
+                    stateFlow.value = current.copy(selectedAgentId = agentId).adminUnavailable()
                 } else {
                     stateFlow.value = current.copy(
                         isLoading = false,
@@ -287,6 +250,15 @@ class ScheduleLibraryController(
         }
     }
 
+    /**
+     * Creates the Schedules page's recurring schedule through the native schedule route, for the
+     * request's agent or, when it names none, the selected one. No agent: nothing to create.
+     */
+    fun createRecurringSchedule(request: ScheduleCreateRequest) {
+        val agentId = request.agentId ?: stateFlow.value.selectedAgentId ?: return
+        createSchedule(agentId, request.toCreateParams())
+    }
+
     fun deleteSchedule(scheduledMessageId: String) {
         mutationJob?.cancel()
         mutationJob = scope.launch {
@@ -294,25 +266,12 @@ class ScheduleLibraryController(
             val agentId = current.selectedAgentId ?: return@launch
             try {
                 scheduleRepository.deleteSchedule(agentId, scheduledMessageId)
-                val schedules = scheduleRepository.getSchedules(agentId).first()
-                stateFlow.value = current.copy(
-                    schedules = schedules,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
+                stateFlow.value = current.withSchedules(scheduleRepository.getSchedules(agentId).first())
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    stateFlow.value = current.copy(
-                        schedules = emptyList(),
-                        scheduleAdminAvailable = false,
-                        scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
-                        isLoading = false,
-                        errorMessage = null,
-                    )
+                    stateFlow.value = current.adminUnavailable()
                 } else {
                     stateFlow.value = current.copy(
                         isLoading = false,
@@ -354,47 +313,16 @@ class ScheduleLibraryController(
      * Only if the cron route is ALSO unavailable do we fall back to the
      * unavailable state. Parity with the desktop schedules surface.
      */
-    private suspend fun publishCronFallbackOrUnavailable(
-        agents: List<AgentSummary>,
-        selectedAgentId: String?,
-        base: ScheduleLibraryState? = null,
-    ) {
-        val source = cronSource
-        if (source != null) {
-            val crons = runCatching { source.listCrons(selectedAgentId) }.getOrNull()
-            if (crons != null) {
-                val resolved = base ?: ScheduleLibraryState()
-                stateFlow.value = resolved.copy(
-                    agents = agents,
-                    selectedAgentId = selectedAgentId,
-                    schedules = emptyList(),
-                    crons = crons,
-                    cronMode = true,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
-                return
-            }
+    private suspend fun publishCronFallbackOrUnavailable(target: ScheduleLibraryState) {
+        val crons = cronSource?.let { source -> runCatching { source.listCrons(target.selectedAgentId) }.getOrNull() }
+        stateFlow.value = if (crons != null) {
+            target.withSchedules(emptyList()).copy(crons = crons, cronMode = true)
+        } else {
+            ScheduleLibraryState(
+                agents = target.agents,
+                selectedAgentId = target.agents.resolveSelection(target.selectedAgentId),
+            ).adminUnavailable()
         }
-        publishUnavailableState(agents, selectedAgentId)
-    }
-
-    private fun publishUnavailableState(
-        fallbackAgents: List<AgentSummary>,
-        requestedAgentId: String?,
-    ) {
-        val selectedAgentId = fallbackAgents.resolveSelection(requestedAgentId)
-        stateFlow.value = ScheduleLibraryState(
-            agents = fallbackAgents,
-            selectedAgentId = selectedAgentId,
-            schedules = emptyList(),
-            scheduleAdminAvailable = false,
-            scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
-            isLoading = false,
-            errorMessage = null,
-        )
     }
 
     private fun List<AgentSummary>.resolveSelection(requestedAgentId: String?): String? =
@@ -406,6 +334,26 @@ class ScheduleLibraryController(
 }
 
 const val SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE = "Schedule admin isn't available on this Letta server."
+
+/** A loaded state: these schedules, admin available, no error. */
+private fun ScheduleLibraryState.withSchedules(schedules: List<ScheduledMessage>): ScheduleLibraryState =
+    copy(
+        schedules = schedules,
+        scheduleAdminAvailable = true,
+        scheduleAdminMessage = null,
+        isLoading = false,
+        errorMessage = null,
+    )
+
+/** The native schedule route is unavailable (and no cron fallback answered). */
+private fun ScheduleLibraryState.adminUnavailable(): ScheduleLibraryState =
+    copy(
+        schedules = emptyList(),
+        scheduleAdminAvailable = false,
+        scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
+        isLoading = false,
+        errorMessage = null,
+    )
 
 /**
  * Cron-backed schedule source. Implemented on each platform over the
