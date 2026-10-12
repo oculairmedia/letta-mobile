@@ -17,16 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -36,11 +33,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.host.InspectorPane
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -179,7 +176,6 @@ fun subagentTodoSheetStateFrom(result: Result<List<SubagentTodo>>): SubagentTodo
  *  - Reduced-motion: the state [Crossfade] is collapsed to an instant swap
  *    (zero-duration tween) and the in-progress row icon does not animate.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubagentTodoSheet(
     description: String,
@@ -194,13 +190,22 @@ fun SubagentTodoSheet(
     // one's todos - the phone's view of the shared roster the desktop pane shows.
     roster: (@Composable () -> Unit)? = null,
 ) {
-    val sheetState = rememberModalBottomSheetState()
     val reducedMotion = rememberReducedMotionEnabled()
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
+    // letta-mobile-ckmub.3.15 (S13): the window's inspector, docked when wide and a sheet when
+    // compact; it draws the description as its title, with "view conversation" beside close.
+    InspectorPane(
+        title = description.ifBlank { "Subagent" },
+        onClose = onDismiss,
         modifier = modifier,
+        actions = {
+            if (onViewConversation != null) {
+                ViewConversationButton(
+                    description = description,
+                    onClick = onViewConversation,
+                )
+            }
+        },
     ) {
         Column(
             modifier = Modifier
@@ -212,27 +217,6 @@ fun SubagentTodoSheet(
                 ),
             verticalArrangement = Arrangement.spacedBy(LettaSpacing.MD),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
-            ) {
-                Text(
-                    text = description.ifBlank { "Subagent" },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (onViewConversation != null) {
-                    ViewConversationButton(
-                        description = description,
-                        onClick = onViewConversation,
-                    )
-                }
-            }
-
             Crossfade(
                 targetState = state,
                 animationSpec = tween(durationMillis = if (reducedMotion) 0 else 200),

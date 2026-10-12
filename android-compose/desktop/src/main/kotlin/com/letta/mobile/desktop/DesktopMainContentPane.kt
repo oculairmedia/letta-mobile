@@ -6,9 +6,7 @@ import com.letta.mobile.desktop.phone.PhoneAwareContent
 import com.letta.mobile.desktop.phone.isBareChatPage
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -91,22 +89,12 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
 /** letta-mobile-ckmub.3.4: the desktop maps its route to a shared destination; ShellPage draws its page. */
 @Composable
 private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
-    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> DesktopChatContainer(inputs.chatPage, modifier) }
+    // The bundled runtime's crash notice is a window banner (DesktopShellWindowContent), not part of the page.
+    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> inputs.chatPage(modifier) }
     val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, chat)
     ShellPage(destination = inputs.pageDestination, deps = deps, modifier = Modifier.fillMaxSize())
 }
 
-/**
- * The desktop chat container: the bundled runtime's crash banner (F03) over the shared chat page.
- * The page draws the background-tasks toggle in its canvas header.
- */
-@Composable
-private fun DesktopChatContainer(chatPage: @Composable (Modifier) -> Unit, modifier: Modifier) {
-    Column(modifier) {
-        DesktopLocalRuntimeBanner()
-        chatPage(Modifier.weight(1f).fillMaxWidth())
-    }
-}
 
 @Composable
 private fun EditAgentSidePane(agentId: String, inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {

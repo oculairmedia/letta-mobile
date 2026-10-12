@@ -102,17 +102,19 @@ class LettaPaneTest {
         assertEquals(listOf("dismiss", "confirm"), outcomes)
     }
 
+    // letta-mobile-ckmub.3.15 (S13): the card's detail is an InspectorPane; with no inspector frame
+    // (a phone page) it is the host's modal. Docked in a frame: InspectorPaneTest.
     @Test
-    fun theAgentContextSheetIsAPopoverOnPointer() = assertContextSheetOpensAs(LettaHost.Pointer, "popover")
+    fun theAgentContextDetailIsADialogOnPointerWithoutAFrame() = assertContextSheetOpensAs(LettaHost.Pointer, "dialog")
 
     @Test
-    fun theAgentContextSheetIsABottomSheetOnTouch() = assertContextSheetOpensAs(LettaHost.Touch, "sheet")
+    fun theAgentContextDetailIsABottomSheetOnTouchWithoutAFrame() = assertContextSheetOpensAs(LettaHost.Touch, "sheet")
 
     /** Opens the migrated agent context card under [host] with recording containers. */
     private fun assertContextSheetOpensAs(host: LettaHost, expected: String) = runComposeUiTest {
         val opened = mutableListOf<String>()
         fun recorder(kind: String): PaneContainer = { spec, content -> opened += kind; Column { Text(spec.testTag.orEmpty()); content() } }
-        val recording = host.copy(sheet = recorder("sheet"), popover = recorder("popover"))
+        val recording = host.copy(sheet = recorder("sheet"), popover = recorder("popover"), dialog = recorder("dialog"))
         setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }
         onNodeWithTag(AgentContextTags.CARD).performClick()
         waitForIdle()
