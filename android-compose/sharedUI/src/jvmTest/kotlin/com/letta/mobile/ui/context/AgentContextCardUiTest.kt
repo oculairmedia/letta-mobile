@@ -118,7 +118,7 @@ class AgentContextCardUiTest {
     }
 }
 
-/** The card under the desktop pointer host: its sheet opens as a popover under the card. */
+/** The card under the desktop pointer host, with no inspector frame: its detail opens as the host's dialog. */
 @Composable
 private fun PointerCard(deps: AgentContextCardDeps, actions: AgentContextCardActions, focus: AgentContextFocus) {
     MaterialTheme {

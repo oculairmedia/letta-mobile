@@ -12,9 +12,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +52,11 @@ import com.letta.mobile.ui.chat.session.A2uiSnackbarId
 import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -110,43 +112,40 @@ private fun DismissibleA2uiSurface(surfaceId: String, onDismiss: (String) -> Uni
 }
 
 /**
- * Shows each A2UI action outcome once, then reports it shown. A retryable failure offers its retry,
- * which resubmits the action (Android's A2UI snackbar).
+ * Queues each A2UI action outcome once on the window's [OverlayHost], then reports it shown. A
+ * retryable failure offers its retry, which resubmits the action (Android's A2UI snackbar).
  */
 @Composable
 internal fun A2uiSnackbarEffect(
     snackbar: A2uiActionSnackbarUi?,
-    hostState: SnackbarHostState,
+    overlays: OverlayHost,
     actions: ChatActions,
 ) {
     val currentActions by rememberUpdatedState(actions)
-    LaunchedEffect(snackbar?.id) {
+    LaunchedEffect(snackbar?.id, overlays) {
         val shown = snackbar ?: return@LaunchedEffect
-        val result = hostState.showSnackbar(
-            message = shown.message,
-            actionLabel = shown.actionLabel,
-            duration = shown.duration.toMaterial(),
-        )
-        currentActions.markA2uiSnackbarShown(A2uiSnackbarId(shown.id))
         val retry: A2uiAction? = shown.retryAction
-        if (result == SnackbarResult.ActionPerformed && retry != null) currentActions.submitA2uiAction(retry)
+        val action = shown.actionLabel?.let { label -> OverlayAction(label) { retry?.let(currentActions::submitA2uiAction) } }
+        overlays.show(Overlay.Snackbar(shown.message, presentation = shown.duration.toPresentation(), response = OverlayResponse(action)))
+        currentActions.markA2uiSnackbarShown(A2uiSnackbarId(shown.id))
     }
 }
 
-/** A transient chat error: shown once, then cleared with the owner. */
+/** A transient chat error: queued once on the window's [OverlayHost], then cleared with the owner. */
 @Composable
-internal fun ErrorSnackbarEffect(error: String?, hostState: SnackbarHostState, actions: ChatActions) {
+internal fun ErrorSnackbarEffect(error: String?, overlays: OverlayHost, actions: ChatActions) {
     val currentActions by rememberUpdatedState(actions)
-    LaunchedEffect(error) {
+    LaunchedEffect(error, overlays) {
         val message = error ?: return@LaunchedEffect
-        hostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
+        overlays.show(Overlay.Snackbar(message))
         currentActions.clearError()
     }
 }
 
-private fun ChatSnackbarDuration.toMaterial(): SnackbarDuration = when (this) {
-    ChatSnackbarDuration.Short -> SnackbarDuration.Short
-    ChatSnackbarDuration.Indefinite -> SnackbarDuration.Indefinite
+/** One that waits for its action can still be put away. */
+private fun ChatSnackbarDuration.toPresentation(): OverlayPresentation = when (this) {
+    ChatSnackbarDuration.Short -> OverlayPresentation.Short
+    ChatSnackbarDuration.Indefinite -> OverlayPresentation.Sticky
 }
 
 /**
