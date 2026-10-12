@@ -23,7 +23,16 @@ data class AgentPresence(
     val error: Boolean = false,
     /** The tool in flight while [activity] is WORKING/DELEGATING, for surfaces that name it. */
     val toolName: String? = null,
+    /**
+     * letta-mobile-iczm7: a background dream (reflection) or memory-upkeep run is in flight for
+     * this agent. It is not a turn, so it never changes [activity]; an otherwise idle agent dozes.
+     */
+    val dreaming: Boolean = false,
 ) {
+    /** Nothing in the foreground and a dream in the background: the mascot sleeps it off. */
+    val dozing: Boolean
+        get() = dreaming && activity == AgentActivityKind.IDLE && !awaitingApproval && !userTyping && !error
+
     companion object {
         val IDLE = AgentPresence()
     }
