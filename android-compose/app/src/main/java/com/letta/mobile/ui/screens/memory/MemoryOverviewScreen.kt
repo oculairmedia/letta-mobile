@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -26,6 +25,7 @@ import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
 import com.letta.mobile.ui.shell.pages.memory.rememberMemoryWorkspaceView
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.shell.shellMemoryPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
@@ -69,9 +69,9 @@ fun MemoryOverviewScreen(
         filesOptions = AndroidMemfsPageOptions,
     )
 
-    Scaffold(
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
+        header = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_memory_title)) },
                 navigationIcon = {

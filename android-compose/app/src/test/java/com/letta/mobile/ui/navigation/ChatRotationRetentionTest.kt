@@ -146,7 +146,7 @@ class ChatRotationRetentionTest {
         restoration.setContent {
             AdaptiveScaffoldLayout(
                 expanded = expanded,
-                edgeToEdge = true,
+                insetPolicy = DestinationInsetPolicy.SelfVertical,
                 navigationRail = { Box {} },
             ) {
                 AppHostWithTimeline { listState = it }

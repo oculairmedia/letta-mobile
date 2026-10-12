@@ -9,7 +9,7 @@ android-compose/app/src/main/java/com/letta/mobile/ui/components/TagDrillInDialo
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/AndroidMascotHost.kt 281 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/MascotIdentitySync.kt 33 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/ProvideMascotShell.kt 42 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AdaptiveScaffold.kt 223 legacy-pending(ckmub.2)
+android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AdaptiveScaffold.kt 234 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AppNavGraph.kt 353 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/ConversationsGraph.kt 265 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/ProjectsGraphSupport.kt 115 legacy-pending(ckmub.2)

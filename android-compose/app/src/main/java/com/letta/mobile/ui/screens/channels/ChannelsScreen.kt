@@ -1,11 +1,9 @@
 package com.letta.mobile.ui.screens.channels
 
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -20,6 +18,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.shell.shellChannelsPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
@@ -37,9 +36,9 @@ fun ChannelsScreen(
     viewModel: ChannelsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    Scaffold(
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
+        header = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_channels_title)) },
                 navigationIcon = {
@@ -54,7 +53,7 @@ fun ChannelsScreen(
         ShellPage(
             destination = ShellDestination.Channels,
             deps = ShellPageDeps(channels = shellChannelsPage(state, viewModel.actions, AndroidChannelsPageOptions)),
-            modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
+            modifier = Modifier.padding(paddingValues),
         )
     }
 }

@@ -1,13 +1,10 @@
 package com.letta.mobile.ui.screens.dashboard
 
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -26,6 +23,7 @@ import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.shell.shellHomePage
 import kotlinx.coroutines.launch
 
@@ -132,13 +130,12 @@ fun HomeScreen(
             }
         },
     ) {
-        Scaffold(
-            modifier = Modifier
-                .systemBarsPadding()
-                .imePadding()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+        // Edge to edge: the shared page frame owns the system-bar and keyboard insets
+        // (letta-mobile-ckmub.2.1); the app bar's colour runs up behind the status bar.
+        LettaPageScaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-            topBar = {
+            header = {
                 HomeScreenTopBar(
                     params = HomeScreenTopBarParams(
                         title = title,
