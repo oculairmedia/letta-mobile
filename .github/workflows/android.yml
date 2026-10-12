@@ -254,6 +254,58 @@ jobs:
             echo "Config: \`android-compose/detekt.yml\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  row-parity:
+    # letta-mobile-ckmub.1 (hard cut S1): legacy Android chat rows vs the shared
+    # sharedUI rows, rendered from one fixture timeline at phone width, light and
+    # dark. Produces paired PNGs, diff images and a row type -> pixel diff % table
+    # as an artifact and in the step summary. Advisory until the S4 row fixes land:
+    # continue-on-error, and the task itself fails only when nothing renders.
+    name: row parity (advisory)
+    needs: [test]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # The required test job is the sole PR cache writer.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Render legacy vs shared chat rows
+        run: ./gradlew :feature-chat:rowParityReport
+
+      - name: Publish row parity summary
+        if: always()
+        run: |
+          report=feature-chat/build/outputs/roborazzi/row-parity/report.md
+          {
+            echo "## Chat row parity (advisory)"
+            echo
+            if [ -f "$report" ]; then cat "$report"; else echo "No report was written."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload row parity images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: row-parity-${{ github.run_id }}
+          path: android-compose/feature-chat/build/outputs/roborazzi/row-parity/**
+          if-no-files-found: warn
+          retention-days: 14
+
   shared-multiplatform:
     # Gates the KMP common code that Android, desktop (Windows), and future
     # platforms all consume. The `test` job only runs JVM/Android unit tests,

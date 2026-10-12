@@ -177,3 +177,13 @@ sharedUI's `jvmTest`, desktop's `test` and desktop's `phonePlayground` source se
 
 Behaviour the fixture port does not cover (approvals, A2UI actions, commands) belongs in
 `FixtureChatSessionPort`; keep it server-free.
+
+## Checking shared rows against the legacy Android rows
+
+The hard cut (letta-mobile-ckmub) deletes the legacy feature-chat rows only once the shared rows
+match them. `./gradlew --no-daemon :feature-chat:rowParityReport` renders every row type (user,
+assistant, reasoning, tool call/return, run block, approval, error, queued, thinking with and
+without the mascot seat) both ways from one fixture timeline (`feature-chat/src/test/.../parity/`),
+at phone width in light and dark. It writes `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`
+and `report.md` (row type -> pixel diff %) to `feature-chat/build/outputs/roborazzi/row-parity/`
+and prints the table. CI runs it as the advisory `row parity` job and uploads the folder.
