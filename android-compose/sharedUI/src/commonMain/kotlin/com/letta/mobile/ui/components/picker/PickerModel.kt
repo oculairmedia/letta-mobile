@@ -170,8 +170,11 @@ object PickerKeys {
     const val NONE = -1
 
     /** A palette starts on its top row (Enter runs it); a typed query highlights the best match. */
-    fun initial(mode: PickMode, query: String, rowCount: Int): Int =
-        if (rowCount > 0 && (mode == PickMode.Command || query.isNotBlank())) 0 else NONE
+    fun initial(mode: PickMode, query: String, rowCount: Int): Int {
+        if (rowCount <= 0) return NONE
+        val startsOnTop = mode == PickMode.Command || query.isNotBlank()
+        return if (startsOnTop) 0 else NONE
+    }
 
     /** One step up or down, stopping at the ends rather than wrapping. */
     fun move(current: Int, delta: Int, rowCount: Int): Int {
