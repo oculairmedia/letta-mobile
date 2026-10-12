@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LettaConfigMigration
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -202,16 +203,21 @@ class DesktopLettaConfigStore(
         return migrated
     }
 
-    private fun readRawConfig(fallback: LettaConfig): LettaConfig = LettaConfig(
-        id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
-        mode = settingsStore.getString(KEY_MODE)
-            ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
-            ?: fallback.mode,
-        serverUrl = settingsStore.getString(KEY_SERVER_URL).orEmpty(),
-        accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
-        parkedServerUrl = settingsStore.getString(KEY_PARKED_SERVER_URL)?.takeIf { it.isNotBlank() },
-        parkedAccessToken = settingsStore.getString(KEY_PARKED_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
-    )
+    // letta-mobile-ckmub.9: a stored Letta Cloud mode reads as a Remote host to set up (LettaConfigMigration).
+    private fun readRawConfig(fallback: LettaConfig): LettaConfig {
+        val storedMode = settingsStore.getString(KEY_MODE)
+        return LettaConfigMigration.migrate(
+            storedMode,
+            LettaConfig(
+                id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
+                mode = LettaConfigMigration.modeOf(storedMode) ?: fallback.mode,
+                serverUrl = settingsStore.getString(KEY_SERVER_URL).orEmpty(),
+                accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+                parkedServerUrl = settingsStore.getString(KEY_PARKED_SERVER_URL)?.takeIf { it.isNotBlank() },
+                parkedAccessToken = settingsStore.getString(KEY_PARKED_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+            ),
+        )
+    }
 
     private fun applyFallbackUrl(restored: LettaConfig, fallback: LettaConfig): LettaConfig =
         if (restored.mode == LettaConfig.Mode.LOCAL) {

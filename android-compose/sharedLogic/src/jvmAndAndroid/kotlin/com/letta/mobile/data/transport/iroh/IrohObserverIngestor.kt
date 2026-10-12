@@ -162,7 +162,7 @@ internal class IrohObserverIngestor(
             DEVICE_PUSH_JSON.decodeFromJsonElement(com.letta.mobile.data.transport.ServerFrameSerializer, received.raw)
         }.getOrNull()?.takeIf {
             it is ServerFrame.AgentUpdated || it is ServerFrame.ConversationUpdated || it is ServerFrame.SubagentsUpdated ||
-                it is ServerFrame.PendingApprovalsUpdated
+                it is ServerFrame.PendingApprovalsUpdated || it is ServerFrame.PermissionModeUpdated
         }
         if (frame == null) {
             Telemetry.event("IrohObserver", "${unknown.type}.undecodable", level = Telemetry.Level.WARN)
@@ -549,6 +549,8 @@ internal class IrohObserverIngestor(
             AGENT_UPDATED_TYPE, CONVERSATION_UPDATED_TYPE, SUBAGENTS_UPDATED_TYPE,
             // letta-mobile-bzvro.40: the host's parked-approval snapshots.
             com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
+            // letta-mobile-a4tm7: another client changed a conversation's permission mode.
+            com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
         )
 
         /** Mirrors ControllerSubagentRegistrySource.PUSH_CAPABILITY on the host (not imported across layers). */

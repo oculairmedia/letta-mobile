@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.controller.reconnect.summary
+import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.toSettingsStatus
 import com.letta.mobile.data.transport.appserver.AppServerProbe
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -45,15 +47,17 @@ internal suspend fun preflightDesktopAppServer(
     if (result.isTerminal) throw DesktopAppServerUnusableException(result)
 }
 
-/** The Settings card's "Test connection" state. */
+/** What Settings' "Test connection" found. */
 internal sealed interface DesktopConnectionTestState {
-    data object Idle : DesktopConnectionTestState
-
-    data object Running : DesktopConnectionTestState
-
     data class Finished(val result: AppServerProbeResult) : DesktopConnectionTestState
 
     data class NotSupported(val reason: String) : DesktopConnectionTestState
+}
+
+/** The line the shared Backend section shows under Test connection (letta-mobile-ckmub.3.12). */
+internal fun DesktopConnectionTestState.toSettingsStatus(): SettingsStatus = when (this) {
+    is DesktopConnectionTestState.NotSupported -> SettingsStatus(reason)
+    is DesktopConnectionTestState.Finished -> result.toSettingsStatus()
 }
 
 internal suspend fun runDesktopConnectionTest(

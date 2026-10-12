@@ -3,16 +3,17 @@ package com.letta.mobile.ui.navigation
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.letta.mobile.ui.screens.config.ConfigDestinations
 import com.letta.mobile.ui.screens.config.ConfigListScreen
-import com.letta.mobile.ui.screens.config.ConfigScreen
+import com.letta.mobile.ui.screens.config.SettingsDestinations
+import com.letta.mobile.ui.screens.config.SettingsScreen
 import com.letta.mobile.ui.screens.config.VibesyncDebugScreen
 
 fun NavGraphBuilder.configGraph(
     navController: NavHostController,
 ) {
+    // letta-mobile-ckmub.3.12: the shared Settings page (ShellPage's Settings destination).
     composable<ConfigRoute> {
-        ConfigScreen(
+        SettingsScreen(
             onNavigateBack = {
                 if (navController.previousBackStackEntry != null) {
                     navController.popBackStack()
@@ -22,10 +23,8 @@ fun NavGraphBuilder.configGraph(
                     }
                 }
             },
-            onNavigateToConfigList = {
-                navController.navigate(ConfigListRoute)
-            },
-            destinations = ConfigDestinations(
+            destinations = SettingsDestinations(
+                onConfigList = { navController.navigate(ConfigListRoute) },
                 onSystemAccess = { navController.navigate(SystemAccessRoute) },
                 onVibesyncDebug = { navController.navigate(VibesyncDebugRoute) },
                 onCanvasDebug = { navController.navigate(CanvasDebugRoute) },

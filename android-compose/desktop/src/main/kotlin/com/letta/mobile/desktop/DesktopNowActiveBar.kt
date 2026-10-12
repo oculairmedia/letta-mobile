@@ -1,79 +1,24 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.StopCircle
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.chat.runtime.NowActiveStatus
 import com.letta.mobile.data.chat.runtime.nowActiveStatus
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.ui.mascot.AgentAvatar
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.shell.nowactive.NowActiveBarActions
+import com.letta.mobile.ui.shell.nowactive.NowActiveBarState
 
-@Immutable
-internal data class NowActiveBarState(
-    val conversationTitle: String,
-    val agentName: String,
-    val orbIndex: Int,
-    val agentId: String? = null,
-    val status: NowActiveStatus,
-    /** Agent working in a conversation OTHER than the active one, if any. */
-    val backgroundWorkAgentName: String?,
-)
-
-@Immutable
-internal data class NowActiveBarActions(
-    /** Bring the active conversation on screen (identity block click). */
-    val onOpenConversation: () -> Unit,
-    /** Jump to the conversation doing background work (chip click). */
-    val onJumpToBackgroundWork: () -> Unit,
-    /** Interrupt the pinned conversation's in-flight run (stop button). */
-    val onStopRun: () -> Unit = {},
-)
-
-private val NowActiveStatus.label: String
-    get() = when (this) {
-        NowActiveStatus.Idle -> ""
-        NowActiveStatus.Thinking -> "thinking…"
-        NowActiveStatus.Streaming -> "responding…"
-        NowActiveStatus.Stopping -> "stopping…"
-        NowActiveStatus.Error -> "needs attention"
-    }
-
+/**
+ * Binding only (letta-mobile-ckmub.3.14): the shared now-active identity and run controls
+ * (`ui/shell/nowactive/NowActiveBar.kt`) draw in the window header; this file maps the desktop
+ * chat controller's activity state onto them.
+ */
 @Immutable
 internal data class NowActiveBarHostState(
     val thinkingConversationId: String?,
     val isStreamingReplySelected: Boolean,
-    val avatarStyleByAgentId: Map<String, Int>,
-    val fallbackOrbIndex: Int,
 )
 
 @Immutable
@@ -121,8 +66,6 @@ internal fun deriveNowActiveBarPin(
             conversationTitle = barConversation.title,
             agentName = barConversation.agentName,
             agentId = barConversation.agentId,
-            orbIndex = barConversation.agentId?.let { host.avatarStyleByAgentId[it] }
-                ?: host.fallbackOrbIndex,
             status = nowActiveStatus(
                 isThinking = host.thinkingConversationId == barConversation.id,
                 isStreaming = if (barIsSelected) {
@@ -147,16 +90,10 @@ internal data class DesktopHeaderIdentity(
     val actions: NowActiveBarActions,
 )
 
-private val NoopNowActiveBarActions = NowActiveBarActions(
-    onOpenConversation = {},
-    onJumpToBackgroundWork = {},
-)
-
 /**
- * State provider (no UI of its own): derives the pinned conversation and
- * live status from controller state, same as before, but now returns a
- * value instead of rendering the footer bar — the header chrome (see
- * [DesktopJewelWindow]) is the one place that renders it, letta-mobile-3arhe.1.
+ * State provider (no UI of its own): derives the pinned conversation and live status from
+ * controller state; the header chrome (see [DesktopJewelWindow]) renders it with the shared
+ * now-active composables, letta-mobile-3arhe.1.
  */
 @Composable
 internal fun DesktopNowActiveBarHost(
@@ -172,7 +109,7 @@ internal fun DesktopNowActiveBarHost(
     // stop button stays available as the local force-clear escape hatch.
     val cancellingId by chatController.cancellingConversationId.collectAsState()
     val pin = deriveNowActiveBarPin(lastPromptedId, streamingId, cancellingId, chatState, host)
-        ?: return DesktopHeaderIdentity(state = null, actions = NoopNowActiveBarActions)
+        ?: return DesktopHeaderIdentity(state = null, actions = NowActiveBarActions.None)
     return DesktopHeaderIdentity(
         state = pin.state,
         actions = NowActiveBarActions(
@@ -185,170 +122,4 @@ internal fun DesktopNowActiveBarHost(
             onStopRun = { actions.onStopRun(pin.conversationId) },
         ),
     )
-}
-
-/**
- * Leading identity block for the desktop window chrome: agent orb, then
- * conversation title stacked over agent name (+ live status), matching the
- * layout previously used by the footer now-playing bar. Clicking anywhere on
- * the block brings the pinned conversation on screen.
- */
-@Composable
-internal fun DesktopHeaderIdentityBlock(
-    state: NowActiveBarState,
-    actions: NowActiveBarActions,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(LettaDimens.Radius.sm))
-            .clickable(onClick = actions.onOpenConversation)
-            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-    ) {
-        AgentAvatar(agentId = state.agentId, name = state.agentName, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)
-        Column {
-            Text(
-                text = state.conversationTitle,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            ) {
-                Text(
-                    text = state.agentName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (state.status != NowActiveStatus.Idle) {
-                    StatusDot(state.status)
-                    Text(
-                        text = state.status.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (state.status == NowActiveStatus.Error) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Trailing controls that used to sit at the end of the footer bar: the
- * background-work chip and the stop-run button (only while a run is live).
- * Rendered to the left of the native window
- * controls so they never collide with minimize/maximize/close.
- */
-@Composable
-internal fun DesktopHeaderTrailingControls(
-    state: NowActiveBarState,
-    actions: NowActiveBarActions,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-    ) {
-        state.backgroundWorkAgentName?.let { name ->
-            BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
-        }
-        if (state.status == NowActiveStatus.Thinking ||
-            state.status == NowActiveStatus.Streaming ||
-            state.status == NowActiveStatus.Stopping
-        ) {
-            StopRunButton(stopping = state.status == NowActiveStatus.Stopping, onClick = actions.onStopRun)
-        }
-    }
-}
-
-@Composable
-private fun StopRunButton(stopping: Boolean, onClick: () -> Unit) {
-    BarIconButton(
-        icon = Icons.Outlined.StopCircle,
-        description = if (stopping) "Stopping run — click again to force stop" else "Stop run",
-        tint = MaterialTheme.colorScheme.error,
-        onClick = onClick,
-    )
-}
-
-@Composable
-private fun BarIconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    description: String,
-    tint: androidx.compose.ui.graphics.Color,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Control.iconButton)
-            .clip(CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = tint,
-            modifier = Modifier.size(LettaDimens.Control.icon),
-        )
-    }
-}
-
-@Composable
-private fun StatusDot(status: NowActiveStatus) {
-    val transition = rememberInfiniteTransition(label = "nowActiveDot")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(650), RepeatMode.Reverse),
-        label = "nowActiveDotAlpha",
-    )
-    val color = if (status == NowActiveStatus.Error) {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    Box(
-        modifier = Modifier
-            .size(LettaDimens.Space.sm)
-            .background(color.copy(alpha = alpha), CircleShape),
-    )
-}
-
-@Composable
-private fun BackgroundWorkChip(agentName: String, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-        ) {
-            StatusDot(NowActiveStatus.Thinking)
-            Text(
-                text = "$agentName is working",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-    }
 }

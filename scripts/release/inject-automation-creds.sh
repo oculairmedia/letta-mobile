@@ -18,7 +18,7 @@ print_usage() {
   printf 'Usage: AUTOMATION_SERVER_URL=... AUTOMATION_ACCESS_TOKEN=... %s\n' "$0"
   printf 'Optional env: AUTOMATION_CONFIG_ID, AUTOMATION_MODE, AUTOMATION_GATEWAY_ENABLED, AUTOMATION_GATEWAY_URL, AUTOMATION_GATEWAY_API_KEY, ANDROID_SERIAL, APP_PACKAGE, APP_COMPONENT\n'
   printf 'Payload JSON contract:\n'
-  printf '%s\n' '{"serverUrl":"https://api.letta.com","accessToken":"token-value","configId":"automation-auth","mode":"CLOUD"}'
+  printf '%s\n' '{"serverUrl":"iroh://<endpoint id>@<host>:<port>","accessToken":"token-value","configId":"automation-auth","mode":"SELF_HOSTED"}'
 }
 
 if [[ "${1:-}" == "--help" ]]; then

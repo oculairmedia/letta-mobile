@@ -582,11 +582,11 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   (`native/mermaid_renderer`), whose `Cargo.toml` requires **`edition2024`** → Rust/Cargo **≥ 1.85**.
   A current stable toolchain is provisioned via rustup (`rustup default stable`); if a fresh VM only
   has an older default (e.g. 1.83), run `rustup toolchain install stable && rustup default stable`.
-- To connect to a backend: in the running app click **Settings** → set **Server URL**, pick a
-  **Mode** (Cloud / Self-hosted / Local runtime), and paste an **Access token** if required, then
-  **Save**. With no token, `https://api.letta.com` returns HTTP 401 (expected). The client makes a
-  real HTTP call to `<url>/v1/…` on save, so an unconfigured/unreachable server shows
-  "Connection refused" / "Couldn't load this view".
+- To connect to a backend: in the running app click **Settings** → pick a **Mode** (Local runtime /
+  Remote host; there is no Letta Cloud mode, letta-mobile-ckmub.9), enter the remote host's
+  **Address** (`iroh://…` or `ws://…`) and an **Access token** if the App Server asks for one, then
+  **Save**. **Test connection** probes a ws/http address without opening a session; an unreachable
+  server shows "Connection refused" / "Couldn't load this view".
 - An `iroh://<nodeId>@<host>:<port>` ticket in the Server URL field switches the client to the
   Iroh QUIC P2P transport automatically (scheme-detected — Mode does not matter); admin/agent
   traffic then flows over QUIC instead of HTTP.

@@ -260,7 +260,9 @@ internal class DesktopChatSessionPort(
                 } else {
                     val runtime = AppServerRuntimeScope(agentId, target.second)
                     // letta-mobile-bzvro.40: a relaying host's mode is read (or this client's choice re-sent) on open.
-                    modes.observe(runtime).map { it.toUiState() }.onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
+                    // letta-mobile-a4tm7: the chip names the runtime it governs (an Iroh host, or this desktop's own).
+                    modes.observe(runtime).map { it.toUiState(runtime = controller?.permissionModeRuntime) }
+                        .onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
                 }
             }
 

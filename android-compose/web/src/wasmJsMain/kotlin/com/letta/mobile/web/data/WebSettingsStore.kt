@@ -1,6 +1,7 @@
 package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LettaConfigMigration
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -48,10 +49,12 @@ data class WebSavedSettings(
     val serverUrl: String = "",
     val mode: LettaConfig.Mode = LettaConfig.Mode.SELF_HOSTED,
     val openChatsOnCanvas: Boolean = true,
+    /** letta-mobile-ckmub.9: set when the stored settings were migrated on read (a retired Cloud mode). */
+    val migrationNotice: String? = null,
 ) {
     /** The backend config these settings describe, without a token. */
     val config: LettaConfig
-        get() = LettaConfig(id = CONFIG_ID, mode = mode, serverUrl = serverUrl, accessToken = null)
+        get() = LettaConfig(id = CONFIG_ID, mode = mode, serverUrl = serverUrl, accessToken = null, migrationNotice = migrationNotice)
 
     private companion object {
         const val CONFIG_ID = "default"
@@ -66,7 +69,7 @@ class WebSettingsStore(private val slot: WebSettingsSlot = LocalStorageSettingsS
     fun save(settings: WebSavedSettings) = slot.write(encode(settings))
 
     /** Keeps the backend address and mode of [config]; its token is dropped. */
-    fun saveBackend(config: LettaConfig) = save(load().copy(serverUrl = config.serverUrl, mode = config.mode))
+    fun saveBackend(config: LettaConfig) = save(load().copy(serverUrl = config.serverUrl, mode = config.mode, migrationNotice = null))
 
     private fun encode(settings: WebSavedSettings) = WebSettingsDocument(
         buildJsonObject {
@@ -79,11 +82,20 @@ class WebSettingsStore(private val slot: WebSettingsSlot = LocalStorageSettingsS
     private fun decode(document: WebSettingsDocument): WebSavedSettings? {
         val fields = runCatching { Json.parseToJsonElement(document.json) as? JsonObject }.getOrNull() ?: return null
         val defaults = WebSavedSettings()
+        val storedMode = fields[KEY_MODE]?.jsonPrimitive?.contentOrNull
+        val backend = LettaConfigMigration.migrate(
+            storedMode,
+            LettaConfig(
+                id = "",
+                mode = LettaConfigMigration.modeOf(storedMode) ?: defaults.mode,
+                serverUrl = fields[KEY_SERVER_URL]?.jsonPrimitive?.contentOrNull ?: defaults.serverUrl,
+            ),
+        )
         return WebSavedSettings(
-            serverUrl = fields[KEY_SERVER_URL]?.jsonPrimitive?.contentOrNull ?: defaults.serverUrl,
-            mode = fields[KEY_MODE]?.jsonPrimitive?.contentOrNull
-                ?.let { name -> LettaConfig.Mode.entries.firstOrNull { it.name == name } } ?: defaults.mode,
+            serverUrl = backend.serverUrl,
+            mode = backend.mode,
             openChatsOnCanvas = fields[KEY_OPEN_ON_CANVAS]?.jsonPrimitive?.booleanOrNull ?: defaults.openChatsOnCanvas,
+            migrationNotice = backend.migrationNotice,
         )
     }
 

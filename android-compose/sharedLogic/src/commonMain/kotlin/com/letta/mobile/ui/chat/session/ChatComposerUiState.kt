@@ -136,12 +136,17 @@ data class ChatPermissionModeUiState(
     val notSaved: Boolean = false,
     val unavailableReason: String? = null,
     val options: ImmutableList<AppServerPermissionMode> = AppServerPermissionMode.entries.toImmutableList(),
+    /** letta-mobile-a4tm7: the runtime this chip governs (named on the chip); null names none. */
+    val runtime: com.letta.mobile.data.runtime.PermissionModeRuntime? = null,
 ) {
     val canChange: Boolean get() = unavailableReason == null && pending == null
 }
 
 /** The chip's state for a runtime's [PermissionModeState]; [unavailableReason] locks it. */
-fun PermissionModeState.toUiState(unavailableReason: String? = null): ChatPermissionModeUiState =
+fun PermissionModeState.toUiState(
+    unavailableReason: String? = null,
+    runtime: com.letta.mobile.data.runtime.PermissionModeRuntime? = null,
+): ChatPermissionModeUiState =
     ChatPermissionModeUiState(
         selected = mode,
         pending = pending,
@@ -149,4 +154,5 @@ fun PermissionModeState.toUiState(unavailableReason: String? = null): ChatPermis
         appliesOnStart = appliesOnStart,
         notSaved = notSaved,
         unavailableReason = unavailableReason,
+        runtime = runtime,
     )

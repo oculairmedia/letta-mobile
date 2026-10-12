@@ -132,8 +132,6 @@ private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopSh
         host = NowActiveBarHostState(
             thinkingConversationId = frame.activity.thinkingConversationId,
             isStreamingReplySelected = frame.activity.isStreamingReplySelected,
-            avatarStyleByAgentId = frame.focus.avatarStyleByAgentId,
-            fallbackOrbIndex = frame.focus.selectedAgentOrbIndex,
         ),
         actions = NowActiveBarHostActions(
             onOpenConversation = { context.router.openConversation(ConversationId(it)) },
