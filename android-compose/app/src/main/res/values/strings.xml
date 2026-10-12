@@ -8,7 +8,6 @@
     <string name="common_tools">Tools</string>
     <string name="common_none">None</string>
 
-    <string name="screen_home_search_placeholder">Search</string>
     <string name="screen_home_search_messages_section">Messages</string>
     <string name="screen_home_search_no_results">No results found</string>
     <string name="screen_nav_bot_settings">Bot Settings</string>

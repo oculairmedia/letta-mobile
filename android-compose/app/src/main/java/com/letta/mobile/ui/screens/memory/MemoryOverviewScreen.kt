@@ -3,10 +3,6 @@ package com.letta.mobile.ui.screens.memory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -17,10 +13,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.pages.memfs.MemfsPageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceView
@@ -72,14 +71,9 @@ fun MemoryOverviewScreen(
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.screen_memory_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = LettaTopBarDefaults.topAppBarColors(),
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_memory_title)),
+                controls = HeaderControls(nav = HeaderNav.Back(onBack, stringResource(R.string.action_back))),
             )
         },
     ) { paddingValues ->
