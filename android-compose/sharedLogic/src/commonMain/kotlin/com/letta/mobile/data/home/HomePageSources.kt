@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
@@ -135,7 +136,7 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
             .filter { run -> run.createdAt?.let(::parseConversationInstant)?.let { it in window } == true }
         val steps = recent.chunked(USAGE_STEPS_CONCURRENCY).flatMap { batch ->
             coroutineScope {
-                batch.map { run -> async { attempt { runs.getRunSteps(run.id) }.getOrDefault(emptyList()) } }.awaitAll()
+                batch.map { run -> async { attempt { runs.getRunSteps(RunId(run.id)) }.getOrDefault(emptyList()) } }.awaitAll()
             }
         }
         return HomeUsageCalculator.calculate(steps.flatten())

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LettaMessage
@@ -156,25 +157,25 @@ internal class IrohPassageRepository(
 ) : IPassageRepository {
     private val cache = AgentPassageCache()
 
-    override fun getPassages(agentId: String): StateFlow<List<Passage>> = cache.observe(AgentId(agentId))
+    override fun getPassages(agentId: AgentId): StateFlow<List<Passage>> = cache.observe(agentId)
 
-    override suspend fun refreshPassages(agentId: String) {
-        val passages = source.listPassages(agentId)
-        cache.update(AgentId(agentId)) { passages }
+    override suspend fun refreshPassages(agentId: AgentId) {
+        val passages = source.listPassages(agentId.value)
+        cache.update(agentId) { passages }
     }
 
-    override suspend fun createPassage(agentId: String, text: String): Passage {
-        val passage = source.createPassage(agentId, text)
-        cache.update(AgentId(agentId)) { it + passage }
+    override suspend fun createPassage(agentId: AgentId, text: String): Passage {
+        val passage = source.createPassage(agentId.value, text)
+        cache.update(agentId) { it + passage }
         return passage
     }
 
-    override suspend fun deletePassage(agentId: String, passageId: String) {
-        source.deletePassage(agentId, passageId)
-        cache.update(AgentId(agentId)) { current -> current.filterNot { it.id == passageId } }
+    override suspend fun deletePassage(agentId: AgentId, passageId: String) {
+        source.deletePassage(agentId.value, passageId)
+        cache.update(agentId) { current -> current.filterNot { it.id == passageId } }
     }
 
-    override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
+    override suspend fun searchArchival(agentId: AgentId, query: String): List<Passage> =
         unsupported("passage.searchArchival($agentId)")
 }
 
@@ -250,22 +251,22 @@ internal class IrohRunRepository(
             ),
         )
 
-    override suspend fun getRun(runId: String): Run = source.getRun(runId)
+    override suspend fun getRun(runId: RunId): Run = source.getRun(runId.value)
 
-    override suspend fun getRunMessages(runId: String): List<LettaMessage> =
+    override suspend fun getRunMessages(runId: RunId): List<LettaMessage> =
         unsupported("run.getMessages($runId)")
 
-    override suspend fun getRunUsage(runId: String): UsageStatistics =
+    override suspend fun getRunUsage(runId: RunId): UsageStatistics =
         unsupported("run.getUsage($runId)")
 
-    override suspend fun getRunMetrics(runId: String): RunMetrics =
+    override suspend fun getRunMetrics(runId: RunId): RunMetrics =
         unsupported("run.getMetrics($runId)")
 
-    override suspend fun getRunSteps(runId: String): List<Step> = source.getRunSteps(runId)
+    override suspend fun getRunSteps(runId: RunId): List<Step> = source.getRunSteps(runId.value)
 
     override suspend fun cancelRun(run: Run): Run = unsupported("run.cancel(${run.id})")
 
-    override suspend fun deleteRun(runId: String) = unsupported("run.delete($runId)")
+    override suspend fun deleteRun(runId: RunId) = unsupported("run.delete($runId)")
 
     override fun upsertRun(run: Run) {
         _runs.update { current ->

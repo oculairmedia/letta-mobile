@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.api
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -20,12 +21,12 @@ interface IRunRepository {
 
     suspend fun refreshRuns(params: RunListParams = RunListParams())
     suspend fun getRecentRuns(limit: Int = 100): List<Run>
-    suspend fun getRun(runId: String): Run
-    suspend fun getRunMessages(runId: String): List<LettaMessage>
-    suspend fun getRunUsage(runId: String): UsageStatistics
-    suspend fun getRunMetrics(runId: String): RunMetrics
-    suspend fun getRunSteps(runId: String): List<Step>
+    suspend fun getRun(runId: RunId): Run
+    suspend fun getRunMessages(runId: RunId): List<LettaMessage>
+    suspend fun getRunUsage(runId: RunId): UsageStatistics
+    suspend fun getRunMetrics(runId: RunId): RunMetrics
+    suspend fun getRunSteps(runId: RunId): List<Step>
     suspend fun cancelRun(run: Run): Run
-    suspend fun deleteRun(runId: String)
+    suspend fun deleteRun(runId: RunId)
     fun upsertRun(run: Run)
 }

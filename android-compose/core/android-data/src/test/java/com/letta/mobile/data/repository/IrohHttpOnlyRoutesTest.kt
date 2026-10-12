@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Step
@@ -198,13 +199,13 @@ class IrohHttpOnlyRoutesTest {
         assertFalse(repository.supportsRunDetail)
         repository.refreshRuns()
         assertEquals(listOf("r1"), repository.runs.value.map { it.id })
-        assertEquals(listOf("s1"), repository.getRunSteps("r1").map { it.id })
+        assertEquals(listOf("s1"), repository.getRunSteps(RunId("r1")).map { it.id })
 
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunMessages("r1") } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunUsage("r1") } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunMetrics("r1") } }
+        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunMessages(RunId("r1")) } }
+        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunUsage(RunId("r1")) } }
+        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.getRunMetrics(RunId("r1")) } }
         assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.cancelRun(runs.first()) } }
-        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.deleteRun("r1") } }
+        assertThrows(UnsupportedOperationException::class.java) { runBlockingUnit { repository.deleteRun(RunId("r1")) } }
 
         assertEquals(listOf("run.list", "step.list"), transport.adminRpcCalls.map { it.method })
         assertTrue("no HTTP under iroh://: ${fakeApi.calls}", fakeApi.calls.isEmpty())
@@ -224,7 +225,7 @@ class IrohHttpOnlyRoutesTest {
         val repository = RunRepository(fakeApi, IrohAdminRpcRunSource(FakeChannelTransport(), httpSettings))
 
         assertTrue(repository.supportsRunDetail)
-        repository.getRunMessages("r1")
+        repository.getRunMessages(RunId("r1"))
         assertTrue(fakeApi.calls.contains("listRunMessages:r1"))
     }
 

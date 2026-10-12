@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.repository.api.IPassageRepository
 import javax.inject.Inject
@@ -37,8 +38,8 @@ class SessionScopedPassageRepository internal constructor(
     )
 
     private val cacheLock = Any()
-    private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
-    private val passageJobsByAgent = mutableMapOf<String, Job>()
+    private val passageFlowsByAgent = mutableMapOf<AgentId, MutableStateFlow<List<Passage>>>()
+    private val passageJobsByAgent = mutableMapOf<AgentId, Job>()
 
     init {
         sessionManager.currentGraph
@@ -49,7 +50,7 @@ class SessionScopedPassageRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    override fun getPassages(agentId: String): StateFlow<List<Passage>> = synchronized(cacheLock) {
+    override fun getPassages(agentId: AgentId): StateFlow<List<Passage>> = synchronized(cacheLock) {
         val flow = passageFlowsByAgent.getOrPut(agentId) {
             MutableStateFlow(sessionManager.current.passageRepository.getPassages(agentId).value)
         }
@@ -62,19 +63,19 @@ class SessionScopedPassageRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun refreshPassages(agentId: String): Unit = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
+    override suspend fun refreshPassages(agentId: AgentId): Unit = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
 
     override suspend fun clearForBackendSwitch() {
         clearTrackedFlows()
         sessionManager.current.passageRepository.clearForBackendSwitch()
     }
 
-    override suspend fun createPassage(agentId: String, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }
+    override suspend fun createPassage(agentId: AgentId, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }
 
-    override suspend fun deletePassage(agentId: String, passageId: String): Unit =
+    override suspend fun deletePassage(agentId: AgentId, passageId: String): Unit =
         sessionManager.withCurrentSession { it.passageRepository.deletePassage(agentId, passageId) }
 
-    override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
+    override suspend fun searchArchival(agentId: AgentId, query: String): List<Passage> =
         sessionManager.withCurrentSession { it.passageRepository.searchArchival(agentId, query) }
 
     fun close() { proxyScope.cancel() }

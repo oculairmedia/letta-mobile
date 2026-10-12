@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.archival
 
+import com.letta.mobile.data.model.AgentId
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,9 +33,11 @@ class ArchivalViewModel @Inject constructor(
     private val passageRepository: IPassageRepository,
 ) : ViewModel() {
 
-    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
-        "Missing agentId in ArchivalViewModel navigation arguments"
-    }
+    private val agentId = AgentId(
+        requireNotNull(savedStateHandle.get<String>("agentId")) {
+            "Missing agentId in ArchivalViewModel navigation arguments"
+        },
+    )
 
     private val _uiState = MutableStateFlow<UiState<ArchivalUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ArchivalUiState>> = _uiState.asStateFlow()

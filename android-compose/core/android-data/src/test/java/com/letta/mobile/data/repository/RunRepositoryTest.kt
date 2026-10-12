@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
@@ -44,7 +45,7 @@ class RunRepositoryTest {
     fun `getRun returns correct run`() = runTest {
         val testRun = Run(id = "r1", agentId = "a1", status = "completed")
         fakeApi.runs.add(testRun)
-        val result = repository.getRun("r1")
+        val result = repository.getRun(RunId("r1"))
         assertEquals("r1", result.id)
         assertEquals("a1", result.agentId)
     }
@@ -68,7 +69,7 @@ class RunRepositoryTest {
             status = "completed",
         )
         fakeApi.runSteps["r1"] = listOf(testStep)
-        val result = repository.getRunSteps("r1")
+        val result = repository.getRunSteps(RunId("r1"))
         assertEquals(1, result.size)
         assertEquals("s1", result[0].id)
     }
@@ -222,7 +223,7 @@ class RunRepositoryTest {
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
-        val result = repo.getRun("r1")
+        val result = repo.getRun(RunId("r1"))
         assertEquals("r1", result.id)
         assertEquals(1, transport.adminRpcCalls.size)
     }
@@ -280,7 +281,7 @@ class RunRepositoryTest {
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
-        val result = repo.getRunSteps("r1")
+        val result = repo.getRunSteps(RunId("r1"))
         assertEquals(1, result.size)
         assertEquals("s1", result[0].id)
         assertEquals(1, transport.adminRpcCalls.size)

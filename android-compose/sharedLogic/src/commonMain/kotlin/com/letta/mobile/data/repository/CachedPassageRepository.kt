@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
 import com.letta.mobile.data.repository.api.IPassageRepository
@@ -17,21 +18,21 @@ open class CachedPassageRepository(
     private val remote: PassageRemoteSource,
     private val irohPassageSource: PassageIrohSource? = null,
 ) : IPassageRepository, BackendScopedCache {
-    private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
-    private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
+    private val _passages = MutableStateFlow<Map<AgentId, List<Passage>>>(emptyMap())
+    private val passageFlowsByAgent = mutableMapOf<AgentId, MutableStateFlow<List<Passage>>>()
 
-    override fun getPassages(agentId: String): StateFlow<List<Passage>> {
+    override fun getPassages(agentId: AgentId): StateFlow<List<Passage>> {
         return passageFlowsByAgent
             .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
             .asStateFlow()
     }
 
-    override suspend fun refreshPassages(agentId: String) {
+    override suspend fun refreshPassages(agentId: AgentId) {
         val irohSource = irohPassageSource
         val passages = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.listPassages(agentId)
+            irohSource.listPassages(agentId.value)
         } else {
-            remote.listPassages(agentId, limit = 100)
+            remote.listPassages(agentId.value, limit = 100)
         }
         replaceCachedPassages(agentId, passages)
     }
@@ -42,25 +43,25 @@ open class CachedPassageRepository(
         passageFlowsByAgent.clear()
     }
 
-    override suspend fun createPassage(agentId: String, text: String): Passage {
+    override suspend fun createPassage(agentId: AgentId, text: String): Passage {
         val irohSource = irohPassageSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            val passage = irohSource.createPassage(agentId, text)
+            val passage = irohSource.createPassage(agentId.value, text)
             appendCachedPassage(agentId, passage)
             return passage
         }
-        val passage = remote.createPassage(agentId, PassageCreateParams(text = text))
+        val passage = remote.createPassage(agentId.value, PassageCreateParams(text = text))
         appendCachedPassage(agentId, passage)
         runCatchingCancellable { refreshPassages(agentId) }
         return passage
     }
 
-    override suspend fun deletePassage(agentId: String, passageId: String) {
+    override suspend fun deletePassage(agentId: AgentId, passageId: String) {
         val irohSource = irohPassageSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deletePassage(agentId, passageId)
+            irohSource.deletePassage(agentId.value, passageId)
         } else {
-            remote.deletePassage(agentId, passageId)
+            remote.deletePassage(agentId.value, passageId)
         }
         replaceCachedPassages(
             agentId = agentId,
@@ -68,15 +69,15 @@ open class CachedPassageRepository(
         )
     }
 
-    override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
-        return remote.searchArchival(agentId, query, limit = 50)
+    override suspend fun searchArchival(agentId: AgentId, query: String): List<Passage> {
+        return remote.searchArchival(agentId.value, query, limit = 50)
     }
 
-    private fun appendCachedPassage(agentId: String, passage: Passage) {
+    private fun appendCachedPassage(agentId: AgentId, passage: Passage) {
         replaceCachedPassages(agentId, _passages.value[agentId].orEmpty() + passage)
     }
 
-    private fun replaceCachedPassages(agentId: String, passages: List<Passage>) {
+    private fun replaceCachedPassages(agentId: AgentId, passages: List<Passage>) {
         _passages.update { current -> current + (agentId to passages) }
         passageFlowsByAgent[agentId]?.value = passages
     }

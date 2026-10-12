@@ -151,7 +151,7 @@ class DesktopSessionGraphAdaptersTest {
 
         assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
         val error = assertFailsWith<DesktopRepositoryUnavailableException> {
-            adapters.passageRepository.searchArchival("agent-1", "query")
+            adapters.passageRepository.searchArchival(AgentId("agent-1"), "query")
         }
         assertTrue(error.message.orEmpty().contains("IPassageRepository"))
     }

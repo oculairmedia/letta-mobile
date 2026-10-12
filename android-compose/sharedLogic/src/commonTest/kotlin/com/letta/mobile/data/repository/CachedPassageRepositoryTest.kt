@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
@@ -18,10 +19,10 @@ class CachedPassageRepositoryTest {
         val remote = FakePassageRemoteSource()
         val repository = CachedPassageRepository(remote)
 
-        repository.getPassages("agent-1").test {
+        repository.getPassages(AgentId("agent-1")).test {
             assertEquals(emptyList(), awaitItem())
 
-            val created = repository.createPassage("agent-1", "Committed passage")
+            val created = repository.createPassage(AgentId("agent-1"), "Committed passage")
 
             assertEquals("Committed passage", created.text)
             assertEquals(listOf(created), awaitItem())

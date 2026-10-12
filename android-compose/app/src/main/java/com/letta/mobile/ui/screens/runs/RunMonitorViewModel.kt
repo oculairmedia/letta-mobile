@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.runs
 
+import com.letta.mobile.runtime.RunId
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.LettaMessage
@@ -129,13 +130,14 @@ class RunMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             runCatchingCancellable {
-                val run = runRepository.getRun(runId)
-                val detail = fetchRunDetail(runId)
+                val id = RunId(runId)
+                val run = runRepository.getRun(id)
+                val detail = fetchRunDetail(id)
                 val messages = detail.messages
                 val usage = detail.usage
                 val metrics = detail.metrics
                 val detailAvailable = detail.available
-                val steps = runRepository.getRunSteps(runId)
+                val steps = runRepository.getRunSteps(id)
                 _uiState.value = UiState.Success(
                     current.copy(
                         selectedRun = run,
@@ -158,7 +160,7 @@ class RunMonitorViewModel @Inject constructor(
     }
 
     /** Messages/usage/metrics where the backend serves them; empty (never an HTTP call) under iroh://. */
-    private suspend fun fetchRunDetail(runId: String): RunDetail {
+    private suspend fun fetchRunDetail(runId: RunId): RunDetail {
         if (!runRepository.supportsRunDetail) return RunDetail(available = false)
         return RunDetail(
             available = true,
@@ -251,7 +253,7 @@ class RunMonitorViewModel @Inject constructor(
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             runCatchingCancellable {
-                runRepository.deleteRun(runId)
+                runRepository.deleteRun(RunId(runId))
                 _uiState.value = UiState.Success(
                     current.copy(
                         runs = current.runs.filterNot { it.id == runId }.toImmutableList(),

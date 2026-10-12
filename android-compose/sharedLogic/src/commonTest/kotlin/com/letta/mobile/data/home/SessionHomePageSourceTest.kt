@@ -1,5 +1,6 @@
 package com.letta.mobile.data.home
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -223,13 +224,13 @@ class SessionHomePageSourceTest {
         override val runs: StateFlow<List<Run>> = MutableStateFlow(emptyList())
         override suspend fun refreshRuns(params: RunListParams) = Unit
         override suspend fun getRecentRuns(limit: Int): List<Run> = failure?.let { throw it } ?: emptyList()
-        override suspend fun getRun(runId: String): Run = error("unused")
-        override suspend fun getRunMessages(runId: String): List<LettaMessage> = emptyList()
-        override suspend fun getRunUsage(runId: String): UsageStatistics = error("unused")
-        override suspend fun getRunMetrics(runId: String): RunMetrics = error("unused")
-        override suspend fun getRunSteps(runId: String): List<Step> = emptyList()
+        override suspend fun getRun(runId: RunId): Run = error("unused")
+        override suspend fun getRunMessages(runId: RunId): List<LettaMessage> = emptyList()
+        override suspend fun getRunUsage(runId: RunId): UsageStatistics = error("unused")
+        override suspend fun getRunMetrics(runId: RunId): RunMetrics = error("unused")
+        override suspend fun getRunSteps(runId: RunId): List<Step> = emptyList()
         override suspend fun cancelRun(run: Run): Run = run
-        override suspend fun deleteRun(runId: String) = Unit
+        override suspend fun deleteRun(runId: RunId) = Unit
         override fun upsertRun(run: Run) = Unit
     }
 
