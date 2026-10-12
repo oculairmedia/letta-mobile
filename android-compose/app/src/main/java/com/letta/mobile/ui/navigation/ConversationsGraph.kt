@@ -1,11 +1,11 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -103,7 +103,7 @@ private fun ConversationsDetailHost(
     val start = remember { chatRoute(detail.agentId, detail.conversationId, detail.agentName) }
     LaunchedEffect(detail) {
         val current = detailNav.currentBackStackEntry?.toRoute<AgentChatRoute>()
-        if (current != null && (current.agentId != detail.agentId || current.conversationId != detail.conversationId)) {
+        if (current != null && !current.shows(detail)) {
             detailNav.navigate(chatRoute(detail.agentId, detail.conversationId, detail.agentName)) { popUpTo(0) { inclusive = true } }
         }
     }
@@ -131,77 +131,54 @@ private fun ConversationsDetailHost(
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-private fun NavGraphBuilder.agentListDestination(navController: NavHostController) {
-    composable<AgentListRoute>(
+
+/** Whether this chat route already shows [detail]'s conversation. */
+private fun AgentChatRoute.shows(detail: ConversationsDetail): Boolean =
+    agentId == detail.agentId && conversationId == detail.conversationId
+
+/** What one agent-list destination opens with: the create dialog, or text shared into the app. */
+private data class AgentListEntry(val openCreate: Boolean = false, val sharedText: String? = null)
+
+private fun NavGraphBuilder.agentListDestination(navController: NavHostController) =
+    agentListComposable<AgentListRoute>(navController) { AgentListEntry(openCreate = it.toRoute<AgentListRoute>().openCreate) }
+
+/** The share sheet's target: the same agent list, opened to pick who the shared text goes to. */
+private fun NavGraphBuilder.shareToAgentDestination(navController: NavHostController) =
+    agentListComposable<ShareToAgentRoute>(navController) { AgentListEntry(sharedText = it.toRoute<ShareToAgentRoute>().sharedText) }
+
+/** One agent-list destination of route [T]; [entryOf] reads what it opens with from its back stack entry. */
+private inline fun <reified T : Any> NavGraphBuilder.agentListComposable(
+    navController: NavHostController,
+    crossinline entryOf: (NavBackStackEntry) -> AgentListEntry,
+) {
+    composable<T>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) { backStackEntry ->
-        val route = backStackEntry.toRoute<AgentListRoute>()
-        AgentListSharedTransitionHost {
-            AgentListScreen(
-                navigation = AgentListScreenNavigation(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToAgent = { agentId, agentName, conversationId ->
-                        navController.navigate(
-                            AgentChatRoute(
-                                agentId = agentId,
-                                agentName = agentName,
-                                conversationId = conversationId,
-                                freshRouteKey = conversationId?.let { System.currentTimeMillis() },
-                            )
-                        )
-                    },
-                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
-                    openCreateOnStart = route.openCreate,
-                ),
-            )
+        val entry = entryOf(backStackEntry)
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+            AgentListScreen(navigation = agentListNavigation(navController, entry))
         }
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-private fun NavGraphBuilder.shareToAgentDestination(navController: NavHostController) {
-    composable<ShareToAgentRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) { backStackEntry ->
-        val route = backStackEntry.toRoute<ShareToAgentRoute>()
-        AgentListSharedTransitionHost {
-            AgentListScreen(
-                navigation = AgentListScreenNavigation(
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToAgent = { agentId, agentName, conversationId ->
-                        navController.navigate(
-                            AgentChatRoute(
-                                agentId = agentId,
-                                agentName = agentName,
-                                conversationId = conversationId,
-                                freshRouteKey = conversationId?.let { System.currentTimeMillis() },
-                                initialMessage = route.sharedText,
-                            ),
-                        ) {
-                            popUpTo<ShareToAgentRoute> { inclusive = true }
-                        }
-                    },
-                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
-                    shareContentPreview = route.sharedText,
-                ),
-            )
-        }
-    }
-}
-
-/** Provides [LocalAnimatedVisibilityScope] to the two [AgentListScreen] destinations. */
-@Composable
-private fun AnimatedContentScope.AgentListSharedTransitionHost(content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-        content()
-    }
-}
+private fun agentListNavigation(navController: NavHostController, entry: AgentListEntry) = AgentListScreenNavigation(
+    onNavigateBack = { navController.popBackStack() },
+    onNavigateToAgent = { agentId, agentName, conversationId ->
+        val route = AgentChatRoute(
+            agentId = agentId,
+            agentName = agentName,
+            conversationId = conversationId,
+            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
+            initialMessage = entry.sharedText,
+        )
+        // A share hands its text to the chat once: the picker leaves the back stack.
+        navController.navigate(route) { if (entry.sharedText != null) popUpTo<ShareToAgentRoute> { inclusive = true } }
+    },
+    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+    shareContentPreview = entry.sharedText,
+    openCreateOnStart = entry.openCreate,
+)

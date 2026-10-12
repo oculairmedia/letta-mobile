@@ -15,6 +15,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
@@ -25,7 +29,11 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.search.LettaSearchAnchor
 import com.letta.mobile.ui.search.LettaSearchAnchoredField
+import com.letta.mobile.ui.search.LettaSearchSource
+import com.letta.mobile.ui.search.LettaSearchTriggerStyle
+import com.letta.mobile.ui.search.SearchTriggerTestTag
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** What the header names: a title (and the agent or context under it), a host's own block, or nothing. */
@@ -84,6 +92,7 @@ fun ShellHeader(
     controls: HeaderControls = HeaderControls(),
 ) {
     val touch = LocalLettaHost.current.input == LettaInput.Touch
+    val mode = rememberHeaderSearchMode(search, touch)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -91,15 +100,61 @@ fun ShellHeader(
             .testTag(ShellHeaderTags.HEADER),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HeaderNavSlot(controls.nav)
-        HeaderTitleSlot(title)
-        if (title !is HeaderTitle.Custom || !title.fill) {
-            // The free width: on desktop this is the window's drag lane.
-            Box(Modifier.weight(1f).fillMaxHeight())
+        val bar = mode.openBar
+        if (bar != null) {
+            ShellHeaderSearchBar(bar, onClose = mode::close)
+        } else {
+            HeaderContent(title, controls) { HeaderSearchAffordance(search, mode, touch) }
         }
-        if (search != null) SearchSlotField(search, compact = touch)
-        controls.actions.forEach { action -> HeaderActionSlot(action) }
     }
+}
+
+/**
+ * Whether the header is a search bar right now. Only a phone searching the page behind it (Home,
+ * whose config shows no results of its own) searches in place: the header itself becomes the bar.
+ */
+private class HeaderSearchMode(val inPlace: SearchSlot?, private val searching: MutableState<Boolean>) {
+    val openBar: SearchSlot? get() = inPlace?.takeIf { searching.value }
+
+    fun open() {
+        searching.value = true
+    }
+
+    fun close() {
+        searching.value = false
+    }
+}
+
+@Composable
+private fun rememberHeaderSearchMode(search: SearchSlot?, touch: Boolean): HeaderSearchMode {
+    val searching = remember { mutableStateOf(false) }
+    val mode = HeaderSearchMode(search?.takeIf { touch && !it.config.showResults }, searching)
+    val signal = mode.inPlace?.openSignal ?: 0
+    LaunchedEffect(signal) { if (signal > 0) mode.open() }
+    return mode
+}
+
+/** The search control at rest: the in-place bar's icon, or the anchored field (a pointer field or a phone icon). */
+@Composable
+private fun HeaderSearchAffordance(search: SearchSlot?, mode: HeaderSearchMode, touch: Boolean) {
+    val inPlace = mode.inPlace
+    when {
+        inPlace != null -> HeaderIconButton(LettaIcons.Search, inPlace.config.placeholder, mode::open, SearchTriggerTestTag)
+        search != null -> SearchSlotField(search, compact = touch)
+    }
+}
+
+/** The header at rest: nav, title, the free width, the search affordance, then the actions. */
+@Composable
+private fun RowScope.HeaderContent(title: HeaderTitle, controls: HeaderControls, searchAffordance: @Composable () -> Unit) {
+    HeaderNavSlot(controls.nav)
+    HeaderTitleSlot(title)
+    if (title !is HeaderTitle.Custom || !title.fill) {
+        // The free width: on desktop this is the window's drag lane.
+        Box(Modifier.weight(1f).fillMaxHeight())
+    }
+    searchAffordance()
+    controls.actions.forEach { action -> HeaderActionSlot(action) }
 }
 
 @Composable
@@ -168,17 +223,15 @@ private fun HeaderIconButton(icon: ImageVector, contentDescription: String, onCl
 @Composable
 private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
     LettaSearchAnchoredField(
-        query = slot.query,
-        onQueryChange = slot.onQuery,
-        sections = slot.sections,
-        onRowSelected = slot.onRowSelected,
-        onDismiss = slot.onDismiss,
+        source = LettaSearchSource(slot.query, slot.onQuery, slot.sections, slot.onRowSelected, slot.onDismiss),
         modifier = (if (compact) Modifier else Modifier.width(ShellHeaderDefaults.SearchWidth))
             .focusProperties { canFocus = true }
             .testTag(ShellHeaderTags.SEARCH),
         config = slot.config,
-        compact = compact,
-        openSignal = slot.openSignal,
+        anchor = LettaSearchAnchor(
+            style = if (compact) LettaSearchTriggerStyle.Icon else LettaSearchTriggerStyle.Field,
+            openSignal = slot.openSignal,
+        ),
     )
 }
 
@@ -197,4 +250,9 @@ object ShellHeaderTags {
     const val NAV = "shell-header-nav"
     const val TITLE = "shell-header-title"
     const val SEARCH = "shell-header-search"
+
+    /** A phone header in search mode: the full-width bar that replaces the title. */
+    const val SEARCH_BAR = "shell-header-search-bar"
+    const val SEARCH_CLOSE = "shell-header-search-close"
+    const val SEARCH_CLEAR = "shell-header-search-clear"
 }

@@ -44,6 +44,7 @@ data class ProviderFormActions(
 fun ProviderConnectDialog(form: ProviderConnectForm, busy: Boolean, actions: ProviderFormActions) {
     AlertDialog(
         onDismissRequest = actions.onDismiss,
+        icon = form.provider.logoOrNull()?.let { logo -> { Icon(logo, contentDescription = null) } },
         title = { Text("Connect ${form.provider.displayName}") },
         text = { ProviderFormBody(form, actions.onChange) },
         confirmButton = {

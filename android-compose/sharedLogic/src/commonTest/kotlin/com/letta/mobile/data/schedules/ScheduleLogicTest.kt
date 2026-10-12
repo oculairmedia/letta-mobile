@@ -329,4 +329,57 @@ class ScheduleLogicTest {
         assertEquals("340ms", ScheduleFormat.duration(340))
         assertEquals("1h 5m", ScheduleFormat.duration(3_900_000))
     }
+    // --- Schedules page (letta-mobile-ckmub.3.16) ---------------------------
+
+    @Test
+    fun formDraftRoundTripsThroughTheCronBuilder() {
+        val cadence = CronBuilderState(CronCadence.Weekly, minute = 30, hour = 8, daysOfWeek = setOf(1, 3, 5))
+        val draft = ScheduleFormDraft(name = "  Standup ", prompt = " Post the standup ", cadence = cadence)
+        val request = assertNotNull(draft.toRequest(agentId = "a1", zone = utc))
+        assertEquals(ScheduleCreateRequest("a1", "Standup", "Post the standup", "30 8 * * 1,3,5", "UTC"), request)
+        assertEquals(cadence, CronBuilder.fromExpression(request.cron))
+    }
+
+    @Test
+    fun anIncompleteFormDraftSubmitsNothing() {
+        assertNull(ScheduleFormDraft(name = "", prompt = "p").toRequest("a1", utc))
+        assertNull(ScheduleFormDraft(name = "n", prompt = " ").toRequest("a1", utc))
+        assertNull(ScheduleFormDraft("n", "p", CronBuilderState(CronCadence.Weekly, daysOfWeek = emptySet())).toRequest("a1", utc))
+        assertFalse(ScheduleFormDraft().isComplete)
+    }
+
+    @Test
+    fun pageDefsScopeCronsToTheFocusedAgentAndDropDuplicateNativeIds() {
+        val crons = listOf(
+            CronTask(id = "c1", agentId = "a1", cron = "0 9 * * *", recurring = true, name = "Mine"),
+            CronTask(id = "c2", agentId = "a2", cron = "0 9 * * *", recurring = true, name = "Theirs"),
+            CronTask(id = "c3", agentId = null, cron = "0 9 * * *", recurring = true, name = "Everyone"),
+        )
+        val native = listOf(
+            ScheduledMessage(
+                id = "c1",
+                agentId = "a1",
+                message = SchedulePayload(messages = listOf(ScheduleMessage(content = "dup", role = "user"))),
+                schedule = ScheduleDefinition(type = "recurring", cronExpression = "0 10 * * *"),
+            ),
+            ScheduledMessage(
+                id = "n1",
+                agentId = "a1",
+                message = SchedulePayload(messages = listOf(ScheduleMessage(content = "native", role = "user"))),
+                schedule = ScheduleDefinition(type = "recurring", cronExpression = "0 10 * * *"),
+            ),
+        )
+        val defs = SchedulesPageModel.defs(crons, native, focusedAgentId = "a1", clock = ScheduleClock(now, utc))
+        assertEquals(listOf("c1", "c3", "n1"), defs.map { it.id })
+        assertEquals(listOf("c1", "c2", "c3", "n1"), SchedulesPageModel.defs(crons, native, null, ScheduleClock(now, utc)).map { it.id })
+    }
+
+    @Test
+    fun weekRangeLabelSpansMonthsAndYears() {
+        assertEquals("June 22 – 28, 2026", SchedulesPageModel.weekRangeLabel(kotlinx.datetime.LocalDate(2026, 6, 22)))
+        assertEquals("June 29 – July 5, 2026", SchedulesPageModel.weekRangeLabel(kotlinx.datetime.LocalDate(2026, 6, 29)))
+        assertEquals("December 28 – January 3, 2027", SchedulesPageModel.weekRangeLabel(kotlinx.datetime.LocalDate(2026, 12, 28)))
+        assertTrue(SchedulesView.Week.hasRange)
+        assertFalse(SchedulesView.Rules.hasRange)
+    }
 }

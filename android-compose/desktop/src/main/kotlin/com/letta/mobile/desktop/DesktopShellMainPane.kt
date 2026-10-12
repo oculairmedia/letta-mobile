@@ -19,7 +19,6 @@ import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ComposerCommand
-import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
@@ -29,7 +28,9 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.home.DesktopHome
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.data.schedules.ScheduleLibraryState
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
@@ -175,7 +176,7 @@ private fun desktopMainContentInputs(
 private fun destinationContentInputs(context: DesktopShellContext, frame: DesktopShellFrame): DestinationContentInputs {
     val core = context.core
     val panels = context.panels
-    val skillsPanel = panels.skillsPanel
+    val skillsCatalog by panels.skills.state.collectAsState()
     val libraries = frame.libraries
     val focus = frame.focus
     val nucleusState by core.nucleusController.state.collectAsState()
@@ -185,22 +186,15 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
         home = rememberDesktopHomeInputs(context, frame),
         chat = frame.chatState,
         memoryState = libraries.memory,
-        schedule = DestinationScheduleInputs(
-            scheduleLibraryState = libraries.schedules,
+        schedule = SchedulesPageState(
+            library = libraries.schedules,
             crons = panels.cronPanel.crons,
             focusedAgentId = focus.selectedAgentId,
-            canCreateCron = canCreateCron(context, libraries.schedules, focus),
+            canCreate = canCreateCron(context, libraries.schedules, focus),
         ),
         channels = libraries.channels,
         toolLibraryState = libraries.tools,
-        skills = DestinationSkillsInputs(
-            skills = skillsPanel.all,
-            installedSkillNames = skillsPanel.installedNames,
-            skillsLoading = skillsPanel.loading,
-            skillsError = skillsPanel.error,
-            canManageSkills = skillsPanel.available && focus.selectedAgentId != null,
-            focusedAgentName = focus.selectedAgentName,
-        ),
+        skills = DestinationSkillsInputs(catalog = skillsCatalog, focusedAgentName = focus.selectedAgentName),
         nucleus = nucleusState,
         localRuntimeProvider = core.localConfig.providerState,
         localBackendDirectory = core.localConfig.directoryState,
@@ -212,7 +206,7 @@ private fun destinationContentInputs(context: DesktopShellContext, frame: Deskto
 /** A schedule can be created when the backend takes them (cron API or Iroh) and an agent is chosen. */
 private fun canCreateCron(
     context: DesktopShellContext,
-    scheduleState: DesktopScheduleLibraryState,
+    scheduleState: ScheduleLibraryState,
     focus: DesktopAgentFocus,
 ): Boolean {
     val backendSchedules = context.panels.cronPanel.available || context.core.iroh.transport != null
@@ -270,11 +264,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
             onClearTags = controllers.tools::clearTags,
             onLoadMore = controllers.tools::loadMore,
         ),
-        skills = destinationSkillsActions(
-            skillsPanel = panels.skillsPanel,
-            chatScope = core.chatScope,
-            selectedAgentId = selectedAgentId,
-        ),
+        skills = destinationSkillsActions(skills = panels.skills, selectedAgentId = selectedAgentId),
         onConfigSaved = { bootstrap.applyConfig(it) },
         onTokenCleared = { bootstrap.applyConfig(bootstrap.activeConfig.copy(accessToken = null)) },
         onIrohIdentityReset = { context.overlays.irohResetConfirm = true },
@@ -369,7 +359,7 @@ private fun backgroundTasksHeaderToggle(context: DesktopShellContext, frame: Des
     if (navigator.showBackgroundTasks || context.panels.subagents.repository == null) return null
     val activeSubagents = frame.lists.activeSubagents
     return {
-        DesktopBackgroundTasksToggle(
+        BackgroundTasksToggle(
             runningCount = activeSubagents.visibleRunningCount(),
             onClick = { navigator.showBackgroundTasks = true },
             inBar = true,

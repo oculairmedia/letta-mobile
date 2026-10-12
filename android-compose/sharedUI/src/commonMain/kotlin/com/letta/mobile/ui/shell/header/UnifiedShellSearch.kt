@@ -105,7 +105,7 @@ object UnifiedShellSearch {
                     // Scoped to one agent, every row would repeat the agent name you already gave.
                     sublabel = conversation.agentName.takeIf { scopedAgentId == null },
                     meta = relativeAgeLabel(conversation.updatedAtLabel),
-                    leading = orbFor(conversation.agentId),
+                    leading = orbFor(conversation.agentId, conversation.agentName),
                 )
             }
 
@@ -117,7 +117,7 @@ object UnifiedShellSearch {
                     id = rowId(UnifiedSearchKind.Agents, agent.id.value),
                     label = agent.name,
                     sublabel = agent.description?.takeIf { it.isNotBlank() } ?: agent.model,
-                    leading = orbFor(agent.id.value),
+                    leading = orbFor(agent.id.value, agent.name),
                 )
             }
 
@@ -135,9 +135,12 @@ object UnifiedShellSearch {
                 )
             }
 
-        /** The agent's orb, as the rail draws it; a row with no owning agent gets none. */
-        private fun orbFor(agentId: String?): LettaSearchLeading = agentId
-            ?.let { LettaSearchLeading.Orb(orbIndex = sources.avatarStyleByAgentId[it] ?: 0, agentId = it) }
+        /** The owning agent's avatar (mascot or initial tile); a row with no owning agent gets none. */
+        private fun orbFor(agentId: String?, agentName: String? = null): LettaSearchLeading = agentId
+            ?.let { id ->
+                val name = agentName?.takeIf { it.isNotBlank() } ?: sources.agents.firstOrNull { it.id.value == id }?.name
+                LettaSearchLeading.Orb(orbIndex = sources.avatarStyleByAgentId[id] ?: 0, agentId = id, name = name)
+            }
             ?: LettaSearchLeading.None
     }
 

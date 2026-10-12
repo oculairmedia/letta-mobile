@@ -23,10 +23,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.letta.mobile.data.chat.projection.parseTimestampEpochMillis
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.run_status_approval
 import com.letta.mobile.sharedui.resources.timeline_running_tool
 import com.letta.mobile.sharedui.resources.timeline_thinking
 import com.letta.mobile.sharedui.resources.timeline_thinking_elapsed
 import com.letta.mobile.ui.chat.surface.timeline.rows.formatElapsedClock
+import com.letta.mobile.ui.chat.surface.timeline.rows.hasWaitingApproval
 import com.letta.mobile.ui.chat.surface.timeline.rows.rememberElapsedSeconds
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -42,6 +44,8 @@ import org.jetbrains.compose.resources.stringResource
 internal data class ActiveRunActivity(
     val runningToolName: String?,
     val startedAtEpochMs: Long?,
+    /** letta-mobile-sieej: a request of the run waits on the person: the token says so, not "Thinking…". */
+    val awaitingApproval: Boolean = false,
 )
 
 internal fun activeRunActivity(messages: List<UiMessage>): ActiveRunActivity {
@@ -52,6 +56,7 @@ internal fun activeRunActivity(messages: List<UiMessage>): ActiveRunActivity {
             .lastOrNull { it.status.isNullOrBlank() || it.status.equals(RUNNING_STATUS, ignoreCase = true) }
             ?.name,
         startedAtEpochMs = run.firstNotNullOfOrNull { parseTimestampEpochMillis(it.timestamp) },
+        awaitingApproval = run.hasWaitingApproval(),
     )
 }
 
@@ -69,7 +74,8 @@ internal fun ThinkingStatusText(
 ) {
     val activity = remember(messages) { activeRunActivity(messages) }
     val elapsed by rememberElapsedSeconds(active = true, startedAtEpochMs = activity.startedAtEpochMs)
-    val phase = activity.runningToolName?.let { stringResource(Res.string.timeline_running_tool, it) }
+    val phase = stringResource(Res.string.run_status_approval).takeIf { activity.awaitingApproval }
+        ?: activity.runningToolName?.let { stringResource(Res.string.timeline_running_tool, it) }
         ?: delayMessage?.takeIf { it.isNotBlank() }
         ?: stringResource(Res.string.timeline_thinking)
     val sweep = rememberThinkingSweep()

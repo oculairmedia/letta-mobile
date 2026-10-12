@@ -32,6 +32,7 @@ class DestinationInsetPolicyTest {
             composable<AdminRoute> {}
             composable<ChannelsRoute> {}
             composable<MemoryRoute> {}
+            composable<SchedulesRoute> {}
             composable<SkillsRoute> {}
             composable<AllToolsRoute> {}
             composable<ConversationsRoute> {}
@@ -46,7 +47,7 @@ class DestinationInsetPolicyTest {
     @Test
     fun sharedPagesOwnTheirInsets() {
         listOf(
-            "AdminRoute", "ChannelsRoute", "MemoryRoute", "SkillsRoute", "AllToolsRoute",
+            "AdminRoute", "ChannelsRoute", "MemoryRoute", "SchedulesRoute", "SkillsRoute", "AllToolsRoute",
             // letta-mobile-ckmub.2.4: the shared conversations and agents pages.
             "ConversationsRoute", "AgentListRoute", "ShareToAgentRoute",
         ).forEach {

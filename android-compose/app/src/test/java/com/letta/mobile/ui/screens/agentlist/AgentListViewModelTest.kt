@@ -481,24 +481,15 @@ class AgentListViewModelTest {
     }
 
     @Test
-    fun `empty local runtime mode exposes create action`() = runTest {
+    fun `empty local runtime mode settles and its create action opens the create dialog`() = runTest {
         clearMocks(agentRepository, answers = false, recordedCalls = true)
         activeConfigFlow.value = localConfig()
         every { agentRepository.agents } returns MutableStateFlow(emptyList())
-
         viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.agents.isEmpty())
         assertFalse(viewModel.uiState.value.isLoading)
         assertFalse(viewModel.uiState.value.isHydrating)
-    }
-
-    @Test
-    fun `empty local create action opens shared create dialog`() = runTest {
-        clearMocks(agentRepository, answers = false, recordedCalls = true)
-        activeConfigFlow.value = localConfig()
-        every { agentRepository.agents } returns MutableStateFlow(emptyList())
-        viewModel = newViewModel()
 
         viewModel.showCreateDialog()
 

@@ -8,7 +8,13 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Standar
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Unrestricted
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.ServerFrame
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -19,6 +25,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** letta-mobile-bzvro.40: the permission-mode chip over an Iroh host's `permission_mode.*` relay. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class RelayedPermissionModesTest {
     private val runtime = AppServerRuntimeScope("agent-1", "conv-1")
 
@@ -105,6 +112,63 @@ class RelayedPermissionModesTest {
 
         assertFalse(modes.supported)
         assertEquals(emptyList(), host.calls)
+    }
+
+    private fun push(mode: String, conversationId: String = "conv-1") =
+        ServerFrame.PermissionModeUpdated(agentId = "agent-1", conversationId = conversationId, mode = mode)
+
+    @Test
+    fun `a host push moves the chip without asking the host again`() = runTest {
+        val host = FakeHost(hostMode = Unrestricted)
+        val modes = modes(host)
+        modes.sync(runtime)
+        val frames = MutableSharedFlow<ServerFrame>(replay = 8)
+        modes.bind(backgroundScope, frames)
+
+        frames.emit(push("acceptEdits"))
+        frames.emit(push("strict", conversationId = "conv-other"))
+        frames.emit(push("yolo"))
+        runCurrent()
+
+        assertEquals(AcceptEdits, modes.observe(runtime).first().mode, "another client's change is adopted; an unknown mode is ignored")
+        assertEquals(AppServerPermissionMode.Strict, modes.observe(AppServerRuntimeScope("agent-1", "conv-other")).first().mode)
+        assertEquals(listOf(PermissionModeRpc.GET), host.calls.map { it.first }, "a push is never echoed back to the host")
+    }
+
+    @Test
+    fun `a push does not clobber a change this client still has in flight`() = runTest {
+        val answer = CompletableDeferred<Unit>()
+        val calls = mutableListOf<String>()
+        var hostMode: AppServerPermissionMode = Unrestricted
+        val rpc = AdminRpcInvoker { method, params ->
+            calls += method
+            if (method == PermissionModeRpc.SET) {
+                answer.await()
+                hostMode = PermissionModeRpc.modeOf(params) ?: error("set without a mode")
+                PermissionModeRpc.result(hostMode, confirmed = true)
+            } else {
+                PermissionModeRpc.result(hostMode)
+            }
+        }
+        val modes = RelayedPermissionModes(PermissionModeSettings(MapSettingsStore()).modes, rpc) { setOf(PermissionModeRpc.CAPABILITY) }
+        modes.sync(runtime)
+        val frames = MutableSharedFlow<ServerFrame>(replay = 8)
+        modes.bind(backgroundScope, frames)
+
+        val setting = async { modes.set(runtime, AppServerPermissionMode.Strict) }
+        runCurrent()
+        // Another client loosened it on the host meanwhile.
+        frames.emit(push("acceptEdits"))
+        runCurrent()
+
+        val during = modes.observe(runtime).first()
+        assertEquals(AppServerPermissionMode.Strict, during.pending, "this client's change is still the one shown")
+        assertEquals(AppServerPermissionMode.Strict, modes.modes.modeFor(runtime), "and the stricter mode is enforced meanwhile")
+
+        answer.complete(Unit)
+        assertTrue(setting.await())
+        assertEquals(AppServerPermissionMode.Strict, modes.observe(runtime).first().mode)
+        assertEquals(listOf(PermissionModeRpc.GET, PermissionModeRpc.SET), calls, "nothing was re-sent because of the push")
     }
 
     @Test

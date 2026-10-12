@@ -63,6 +63,7 @@ import com.letta.mobile.sharedui.resources.rows_run_thought
 import com.letta.mobile.sharedui.resources.rows_run_tool_count
 import com.letta.mobile.sharedui.resources.rows_run_worked
 import com.letta.mobile.sharedui.resources.rows_run_working
+import com.letta.mobile.sharedui.resources.run_status_approval
 import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DisclosureChevron
@@ -134,9 +135,15 @@ internal class RunBlockPlan(
     val messageCount: Int,
     /** The page's fold for this run (its collapsed run ids), honoured only while [foldable]. */
     val collapsedByOwner: Boolean,
+    /**
+     * letta-mobile-sieej: a request of the run waits on the person. The run then never folds and its
+     * header shows ("Waiting for your approval"), so the card under its tool line cannot be missed;
+     * only once it is answered does the run settle back into its legacy "Worked" summary.
+     */
+    val awaitingApproval: Boolean = false,
 ) {
     /** The legacy fold: only a settled run of several messages folds; a stale fold never hides active work. */
-    val foldable: Boolean get() = runId != null && isMultiStep() && !activity.isActive
+    val foldable: Boolean get() = runFolds(RunFoldInputs(runId, messageCount, RunHold(activity.isActive, awaitingApproval)))
 
     val collapsed: Boolean get() = foldable && collapsedByOwner
 
@@ -152,7 +159,7 @@ internal class RunBlockPlan(
 
     /** The header; a run that folds once settled keeps the fold's floor while it works. */
     fun header(actions: ChatActions): RunHeaderState =
-        RunHeaderState(activity, headerVisible, tall = isMultiStep(), fold = foldOf(actions))
+        RunHeaderState(activity, headerVisible, tall = isMultiStep(), fold = foldOf(actions), awaitingApproval = awaitingApproval)
 
     private fun isMultiStep(): Boolean = messageCount > 1
 
@@ -163,6 +170,28 @@ internal class RunBlockPlan(
     }
 }
 
+/**
+ * letta-mobile-sieej: what holds a run open whatever its owner's fold says: it is working, or one of
+ * its requests waits on the person's approval.
+ */
+@Immutable
+internal class RunHold(val working: Boolean, val awaitingApproval: Boolean) {
+    fun isHeld(): Boolean {
+        if (working) return true
+        return awaitingApproval
+    }
+}
+
+/** What decides whether a run may fold. */
+@Immutable
+internal class RunFoldInputs(val runId: String?, val messageCount: Int, val hold: RunHold)
+
+/** Only a run with an id and several steps folds, and never while something [RunHold] holds it open. */
+internal fun runFolds(inputs: RunFoldInputs): Boolean {
+    if (inputs.runId == null || inputs.messageCount < 2) return false
+    return !inputs.hold.isHeld()
+}
+
 /** The run's plan, or null when it has nothing to draw. */
 @Composable
 private fun rememberRunBlockPlan(messages: ImmutableList<UiMessage>, context: ChatRowContext): RunBlockPlan? {
@@ -171,13 +200,15 @@ private fun rememberRunBlockPlan(messages: ImmutableList<UiMessage>, context: Ch
     val activity = remember(messages, active) { projectRunActivity(messages, active) } ?: return null
     val visible = remember(messages, context.displayOptions) { context.displayOptions.visible(messages) }
     val runId = messages.first().runId
+    val awaitingApproval = remember(messages) { messages.hasWaitingApproval() }
     return RunBlockPlan(
         activity = activity,
-        headerVisible = activity.isActive || context.isNewest,
+        headerVisible = activity.isActive || context.isNewest || awaitingApproval,
         visible = visible,
         runId = runId,
         messageCount = messages.size,
         collapsedByOwner = runId != null && runId in context.itemState.collapsedRunIds,
+        awaitingApproval = awaitingApproval,
     )
 }
 
@@ -191,6 +222,8 @@ internal data class RunHeaderState(
     val visible: Boolean,
     val tall: Boolean = false,
     val fold: RunFold? = null,
+    /** letta-mobile-sieej: the run waits on the person's approval; the title says so. */
+    val awaitingApproval: Boolean = false,
 )
 
 /** A settled run's fold: whether it is folded, and the header's toggle. */
@@ -218,12 +251,15 @@ private fun RunHeader(state: RunHeaderState) {
         exit = ChatRowMotion(reducedMotion).runLabelFoldExit(),
         label = "runHeader",
     ) {
-        RunHeaderRow(state.activity, state.fold, state.tall)
+        RunHeaderRow(state)
     }
 }
 
 @Composable
-private fun RunHeaderRow(activity: RunActivityProjection, fold: RunFold?, tall: Boolean) {
+private fun RunHeaderRow(state: RunHeaderState) {
+    val activity = state.activity
+    val fold = state.fold
+    val tall = state.tall
     val description = runHeaderStateDescription(activity, fold)
     val toggleLabel = fold?.let { stringResource(if (it.collapsed) Res.string.rows_run_expand else Res.string.rows_run_collapse) }
     val haptics = LocalHaptics.current
@@ -257,7 +293,9 @@ private fun RunHeaderRow(activity: RunActivityProjection, fold: RunFold?, tall: 
         ) {
             WorkingOrb()
         }
-        RunSummaryTitleText(runActivityTitle(activity), runTitleColor(activity), reducedMotion)
+        val title = if (state.awaitingApproval) stringResource(Res.string.run_status_approval) else runActivityTitle(activity)
+        val titleColor = if (state.awaitingApproval) MaterialTheme.colorScheme.secondary else runTitleColor(activity)
+        RunSummaryTitleText(title, titleColor, reducedMotion)
         RunHeaderCounts(activity)
         if (fold != null) {
             Spacer(Modifier.weight(1f))

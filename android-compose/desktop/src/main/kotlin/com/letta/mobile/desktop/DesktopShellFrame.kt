@@ -30,7 +30,7 @@ import com.letta.mobile.data.home.FleetOverviewParams
 import com.letta.mobile.data.home.buildFleetOverview
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.desktop.home.toFleetConversation
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
@@ -67,7 +67,7 @@ internal data class DesktopShellActivity(
 /** The library controllers' current states, behind the sidebar destinations. */
 internal data class DesktopLibraryStates(
     val memory: MemoryPageState,
-    val schedules: DesktopScheduleLibraryState,
+    val schedules: ScheduleLibraryState,
     val channels: ChannelsPageState,
     val tools: DesktopToolLibraryState,
 )

@@ -1,8 +1,5 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -12,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
@@ -21,7 +17,6 @@ import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.ui.shell.palette.QuickQueryActions
 import com.letta.mobile.ui.shell.palette.QuickQueryPanel
-import com.letta.mobile.ui.theme.LettaDimens
 import dev.nucleusframework.core.runtime.Platform
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
@@ -209,7 +204,5 @@ private fun QuickQueryBinding(coordinator: DesktopQuickQueryCoordinator) {
             onClose = coordinator::close,
         )
     }
-    Box(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm), contentAlignment = Alignment.TopCenter) {
-        QuickQueryPanel(items = items, ambientContext = sanitized, actions = bound)
-    }
+    QuickQueryPanel(items = items, ambientContext = sanitized, actions = bound)
 }

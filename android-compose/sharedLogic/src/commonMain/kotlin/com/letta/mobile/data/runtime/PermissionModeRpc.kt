@@ -53,4 +53,22 @@ object PermissionModeRpc {
 
     /** The wire name of [mode], as `runtime_start` and `change_device_state` spell it. */
     fun wire(mode: AppServerPermissionMode): String = mode.wireValue()
+
+    /**
+     * letta-mobile-a4tm7: the host's push after a CONFIRMED `set`, to every viewer of the conversation,
+     * so a change made on one client reaches the chips of the others without reopening the chat:
+     * `permission_mode {agent_id, conversation_id, mode, at}`.
+     */
+    const val FRAME_TYPE: String = "permission_mode"
+
+    fun encodeFrame(agentId: String, conversationId: String, mode: AppServerPermissionMode, at: String): JsonObject = buildJsonObject {
+        put("v", 1)
+        put("type", FRAME_TYPE)
+        put("id", "permission-mode-$conversationId-$at")
+        put("ts", at)
+        put(AGENT_ID, agentId)
+        put(CONVERSATION_ID, conversationId)
+        put(MODE, mode.wireValue())
+        put("at", at)
+    }
 }
