@@ -81,6 +81,8 @@ data class ShellConversationManageMenu(
     val pinned: Boolean = false,
     val onRenameRequest: (() -> Unit)? = null,
     val onPinToggle: (() -> Unit)? = null,
+    /** letta-mobile-7mys7 (G37): fork the chat, asking for the fork's name first. */
+    val onForkRequest: (() -> Unit)? = null,
     val settled: Boolean = false,
     val onSettleToggle: (() -> Unit)? = null,
     val onMarkerRequest: (() -> Unit)? = null,
@@ -88,6 +90,7 @@ data class ShellConversationManageMenu(
     fun items(): List<ShellRowMenuItem> = listOfNotNull(
         onRenameRequest?.let { ShellRowMenuItem("Rename chat", it) },
         onPinToggle?.let { ShellRowMenuItem(if (pinned) "Unpin chat" else "Pin chat", it) },
+        onForkRequest?.let { ShellRowMenuItem("Fork chat…", it) },
         onMarkerRequest?.let { ShellRowMenuItem("Set marker…", it) },
         onSettleToggle?.let { ShellRowMenuItem(if (settled) "Move to active" else "Settle chat", it) },
     )

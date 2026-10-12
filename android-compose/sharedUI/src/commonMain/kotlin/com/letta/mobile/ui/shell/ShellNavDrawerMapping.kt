@@ -51,6 +51,8 @@ data class ShellNavDrawerInput(
     val conversationMarkers: Map<String, String> = emptyMap(),
     /** letta-mobile-zxk2n.5: the Chat options dialog's state; null leaves it out of the agent menu. */
     val chatOptions: ShellChatOptionsState? = null,
+    /** letta-mobile-7mys7: each fork's source conversation, so its row reads "Forked from …". */
+    val conversationParents: Map<String, String> = emptyMap(),
     /** Canvases are shared across agents, so these are all of them. */
     val canvases: List<CanvasDocument> = emptyList(),
     val archivedCanvasIds: Set<CanvasId> = emptySet(),
@@ -79,6 +81,7 @@ object ShellNavDrawerMapping {
             pinnedIds = input.pinnedConversationIds,
             settledIds = input.settledConversationIds,
             markers = input.conversationMarkers,
+            parentIds = input.conversationParents,
         )
         val timeLabel = { raw: String -> ShellRelativeTime.compact(raw, now) }
         val panel = ShellAgentPanelState(

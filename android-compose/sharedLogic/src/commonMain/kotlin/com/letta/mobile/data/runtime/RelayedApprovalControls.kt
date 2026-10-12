@@ -106,9 +106,13 @@ class RelayedPermissionModes(
  * [close], that folds the host's `pending_approvals` snapshots.
  */
 class IrohApprovalControls(
-    scope: CoroutineScope,
+    /** Owns the relay fold and the outbox's reconnect watch; [close] ends what this created. */
+    val scope: CoroutineScope,
     private val transport: IChannelTransport,
     registry: PermissionModeRegistry,
+    /** letta-mobile-bzvro.14: where answers made offline wait (durable on a real host). */
+    val outboxStore: com.letta.mobile.data.chat.approval.ApprovalOutboxStore =
+        com.letta.mobile.data.chat.approval.InMemoryApprovalOutboxStore(),
 ) : AutoCloseable {
     val relay: ApprovalRelayClient = ApprovalRelayClient()
     val modes: RelayedPermissionModes = RelayedPermissionModes(

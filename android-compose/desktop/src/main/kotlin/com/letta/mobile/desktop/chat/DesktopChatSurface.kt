@@ -119,6 +119,8 @@ internal data class ChatDetailPaneActions(
     val queue: com.letta.mobile.ui.chat.QueuedSendActions = com.letta.mobile.ui.chat.QueuedSendActions(),
     /** letta-mobile-1n5py: the send queue serving the selected conversation (canonical route only). */
     val queueControls: () -> com.letta.mobile.data.chat.send.ChatSendQueueControls? = { null },
+    /** letta-mobile-7mys7: the message cards' fork / edit / rerun menu, read when the thread draws. */
+    val messageMenu: () -> DesktopMessageMenuBinding? = { null },
 )
 
 /**
@@ -218,7 +220,9 @@ private fun ChatDetailBody(
         val transport = com.letta.mobile.ui.mascot.LocalMascotTransport.current
         val companionPresent = surface.selectedConversation?.agentId
             ?.let { transport.activeStage(it) == com.letta.mobile.ui.mascot.MascotStage.COMPOSER_COMPANION } ?: false
-        ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
+        CompositionLocalProvider(LocalDesktopMessageMenu provides actions.messageMenu()) {
+            ChatDetailContent(surface, state, actions, showThinkingRow = companion == null, modifier = Modifier.weight(1f))
+        }
         com.letta.mobile.ui.chat.QueuedSendsPanel(
             queue = com.letta.mobile.desktop.rememberSelectedSendQueue(
                 actions.queueControls,

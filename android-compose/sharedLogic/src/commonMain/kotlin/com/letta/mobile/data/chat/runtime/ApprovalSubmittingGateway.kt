@@ -45,6 +45,14 @@ data class AlwaysAllowAnswer(
 )
 
 /**
+ * letta-mobile-bzvro.14: a gateway that queues answers made while its connection is down (the
+ * offline outbox) and says which requests are waiting, so their cards show it.
+ */
+interface ApprovalQueueSource {
+    val queuedApprovalRequestIds: kotlinx.coroutines.flow.StateFlow<Set<String>>
+}
+
+/**
  * letta-mobile-bzvro.11/.12/.40: a gateway that can say what each parked `can_use_tool` request
  * offered (always-allow rules, blocked path, diffs), by tool call id: one that runs the App Server
  * turn engine itself, or an Iroh gateway fed by its host's `pending_approvals` relay.

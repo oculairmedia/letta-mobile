@@ -1,21 +1,26 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator
+import com.letta.mobile.data.chat.approval.OutboxApproval
+import com.letta.mobile.data.chat.approval.OutboxNotice
+import com.letta.mobile.data.chat.approval.OutboxSubmitResult
 import com.letta.mobile.data.runtime.ApprovalRelayClient
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.RelayedPermissionModes
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.toUiState
 import javax.inject.Inject
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
-import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -30,6 +35,8 @@ class ChatApprovalRelay @Inject constructor(
     private val client: ApprovalRelayClient,
     private val modes: RelayedPermissionModes,
     private val transport: IChannelTransport,
+    /** letta-mobile-bzvro.14: answers made while the link is down, replayed after the reconnect. */
+    val outbox: ApprovalOutboxCoordinator,
 ) {
     val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> get() = client.pending
 
@@ -65,6 +72,19 @@ class ChatApprovalRelay @Inject constructor(
  */
 internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, private val agentId: String) {
     val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: MutableStateFlow(emptyMap())
+
+    /** letta-mobile-bzvro.14: the requests answered offline and waiting. */
+    val queuedRequestIds: StateFlow<Set<String>> = relay?.outbox?.queuedRequestIds ?: MutableStateFlow(emptySet())
+
+    /** letta-mobile-bzvro.14: what the person is told once queued answers are sent or dropped. */
+    val outboxNotices: Flow<OutboxNotice> = relay?.outbox?.notices ?: emptyFlow()
+
+    /**
+     * letta-mobile-bzvro.14: [entry] through the outbox (sent now, or queued while the link is down);
+     * null when this screen has none, or its backend is not a channel transport (HTTP sends directly).
+     */
+    suspend fun deliver(entry: OutboxApproval, overChannel: Boolean): OutboxSubmitResult? =
+        relay?.outbox?.takeIf { overChannel }?.submit(entry)
 
     /** The chip for whichever conversation [conversationIds] names now. */
     @OptIn(ExperimentalCoroutinesApi::class)

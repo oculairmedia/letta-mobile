@@ -22,6 +22,8 @@ internal data class DesktopAgentSidebarState(
     val deletingConversationIds: Set<String> = emptySet(),
     /** letta-mobile-bzvro.17: pinned conversations, listed first. */
     val pinnedConversationIds: Set<String> = emptySet(),
+    /** letta-mobile-7mys7: each fork's source conversation (ConversationLineage). */
+    val conversationParents: Map<String, String> = emptyMap(),
     /** letta-mobile-zxk2n.5: the list's client marks (settled last, markers before titles). */
     val listMarks: DesktopSidebarListMarks = DesktopSidebarListMarks(),
     val archiveFilter: ConversationArchiveFilter,
@@ -46,6 +48,8 @@ internal data class DesktopAgentSidebarActions(
     /** letta-mobile-bzvro.17: rename (persists the conversation's summary) and pin. */
     val onRenameConversation: (id: String, title: String) -> Unit = { _, _ -> },
     val onPinConversation: (id: String, pinned: Boolean) -> Unit = { _, _ -> },
+    /** letta-mobile-7mys7 (G37): fork a conversation, named or not; null when the backend cannot fork. */
+    val onForkConversation: ((id: String, name: String?) -> Unit)? = null,
     val onNewChat: () -> Unit,
     val onEditAgent: () -> Unit,
     val onOpenCanvas: (com.letta.mobile.data.canvas.CanvasId) -> Unit = {},

@@ -117,10 +117,16 @@ internal class DesktopChatSessionPort(
         controller.canSubmitApprovals,
         controller.canonicalPresentation,
         controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
-        controller.state.map { controller.conversationManagement.supportsBranching }.distinctUntilChanged(),
+        controller.state.map { branchFacts() }.distinctUntilChanged(),
     ) { approvals, canonical, workingDirectory, branching ->
         desktopCapabilities(
-            DesktopCapabilityFacts(approvals, paged = canonical != null, workingDirectory = workingDirectory, branching = branching),
+            DesktopCapabilityFacts(
+                approvals,
+                paged = canonical != null,
+                workingDirectory = workingDirectory,
+                branching = branching.first,
+                namedForks = branching.second,
+            ),
         )
     }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities())
@@ -131,8 +137,13 @@ internal class DesktopChatSessionPort(
             paged = controller.canonicalPresentation.value != null,
             workingDirectory = controller.supportsWorkingDirectory,
             branching = controller.conversationManagement.supportsBranching,
+            namedForks = controller.conversationManagement.canNameForks,
         ),
     )
+
+    /** letta-mobile-7mys7: whether the gateway can fork, and whether it can name a fork. */
+    private fun branchFacts(): Pair<Boolean, Boolean> =
+        controller.conversationManagement.let { it.supportsBranching to it.canNameForks }
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
 
@@ -144,6 +155,7 @@ internal class DesktopChatSessionPort(
         local = localTimeline.value,
         submittingApprovals = controller.submittingApprovals.value,
         approvalDetails = controller.pendingApprovalDetails.value,
+        queuedApprovals = controller.queuedApprovals.value,
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
@@ -151,15 +163,34 @@ internal class DesktopChatSessionPort(
         controller.replyPresence,
         controller.cancellingConversationId,
         selectedSendQueue(),
-        combine(localTimeline, controller.submittingApprovals, controller.pendingApprovalDetails, ::Triple),
-    ) { surface, presence, cancelling, queue, (local, submitting, details) ->
-        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, submitting, details)
+        approvalInputs(),
+    ) { surface, presence, cancelling, queue, (local, approvals) ->
+        DesktopChatTimelineInputs(
+            surface, presence, cancelling, queue, local,
+            submittingApprovals = approvals.submitting,
+            approvalDetails = approvals.details,
+            queuedApprovals = approvals.queued,
+        )
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
         if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
             localTimeline.update { it.copy(acknowledgedError = null) }
         }
     }
+
+    /** What the cards draw about answers: in flight, parked details, queued offline. */
+    private class ApprovalInputs(
+        val submitting: Set<String>,
+        val details: Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>,
+        val queued: Set<String>,
+    )
+
+    private fun approvalInputs(): Flow<Pair<DesktopChatLocalTimelineState, ApprovalInputs>> = combine(
+        localTimeline,
+        controller.submittingApprovals,
+        controller.pendingApprovalDetails,
+        controller.queuedApprovals,
+    ) { local, submitting, details, queued -> local to ApprovalInputs(submitting, details, queued) }
 
     /**
      * The selected conversation's queue, re-resolved whenever the selection or the canonical route
@@ -258,13 +289,17 @@ internal data class DesktopCapabilityFacts(
     val paged: Boolean,
     /** The active gateway can change a conversation's working directory. */
     val workingDirectory: Boolean,
-    /** letta-mobile-bzvro.15/.16: the active gateway can fork (fork, edit and resend). */
+    /** letta-mobile-bzvro.15/.16, 7mys7: the active gateway can fork (fork, edit and resend, rerun). */
     val branching: Boolean = false,
+    /** letta-mobile-7mys7: the active gateway can retitle, so a fork can be named as it is made. */
+    val namedForks: Boolean = false,
 )
 
 internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCapabilities(
     fork = facts.branching,
     editAndResend = facts.branching,
+    rerunInFork = facts.branching,
+    nameForks = facts.branching && facts.namedForks,
     attachImages = true,
     rerun = false,
     approvals = facts.approvals,
@@ -299,7 +334,7 @@ internal class DesktopChatActions(
 
     override fun updateComposerText(text: String) = controller.updateComposerText(text)
 
-    override fun send() = controller.send()
+    override fun send() = controller.sendOrBranch()
 
     /** A draft-free send: the user's draft and staged images stay exactly as they are. */
     override fun sendText(text: String) = controller.sendText(text)
@@ -326,9 +361,12 @@ internal class DesktopChatActions(
 
     override fun rerun(message: UiMessage) = Unit
 
-    override fun forkFromMessage(message: UiMessage) = controller.conversationManagement.forkFrom(message, branchView())
+    override fun forkFromMessage(message: UiMessage, name: String?) =
+        controller.conversationManagement.forkFrom(message, branchView(), name)
 
     override fun editAndResend(message: UiMessage) = controller.conversationManagement.editAndResend(message, branchView())
+
+    override fun rerunInFork(message: UiMessage) = controller.conversationManagement.rerun(message, branchView())
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.

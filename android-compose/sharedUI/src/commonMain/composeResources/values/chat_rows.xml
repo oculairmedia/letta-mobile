@@ -13,6 +13,14 @@
     <string name="rows_send_again">Send again</string>
     <string name="rows_edit_and_resend">Edit and resend</string>
     <string name="rows_fork_from_here">Fork from here</string>
+    <!-- letta-mobile-7mys7: rerun in a fork, and the fork naming dialog. -->
+    <string name="rows_rerun">Rerun in a new branch</string>
+    <string name="rows_fork_more_actions">More actions</string>
+    <string name="fork_dialog_title">Fork conversation</string>
+    <string name="fork_dialog_body">The fork keeps the conversation up to this message. The original is not changed.</string>
+    <string name="fork_dialog_name">Name (optional)</string>
+    <string name="fork_dialog_confirm">Fork</string>
+    <string name="fork_dialog_cancel">Cancel</string>
     <string name="rows_not_sent">Not sent</string>
     <string name="rows_expand_prompt">Expand prompt</string>
     <string name="rows_collapse_prompt">Collapse prompt</string>
@@ -118,6 +126,10 @@
     <string name="rows_approved">Approved</string>
     <string name="rows_rejected">Rejected</string>
     <string name="rows_approval_response">Approval response</string>
+    <string name="rows_approval_step">Approval %1$d of %2$d</string>
+    <string name="rows_approval_step_back">Previous approval</string>
+    <string name="rows_approval_step_next">Next approval</string>
+    <string name="rows_approval_queued">Offline. Your answer is saved and sends when you reconnect.</string>
     <plurals name="rows_tool_decisions">
         <item quantity="one">%1$d tool decision</item>
         <item quantity="other">%1$d tool decisions</item>

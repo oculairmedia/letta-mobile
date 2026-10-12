@@ -7,6 +7,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.contentOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -121,8 +122,16 @@ class ConversationApi @Inject constructor(
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
-        return response.body()
+        // letta-mobile-7mys7: upstream may answer a fork with its id only (letta-code's local
+        // backend does), so a body without the agent is read back by id.
+        val body = response.body<kotlinx.serialization.json.JsonObject>()
+        val forkedId = (body["id"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+            ?: throw ApiException(response.status.value, "fork returned no conversation id")
+        if (!body.containsKey("agent_id")) return getConversation(ConversationId(forkedId))
+        return forkJson.decodeFromJsonElement(Conversation.serializer(), body)
     }
+
+    private val forkJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     suspend fun forkConversation(conversationId: String, agentId: String? = null): Conversation =
         forkConversation(ConversationId(conversationId), agentId?.let(::AgentId))
