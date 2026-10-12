@@ -25,6 +25,7 @@ object ComposerTestTags {
     const val PERMISSION_MODE_POPOVER = "composer-permission-mode-popover"
     const val PERMISSION_MODE_OPTION = "composer-permission-mode-option-"
     const val PERMISSION_MODE_NOTE = "composer-permission-mode-note"
+    const val PERMISSION_MODE_RUNTIME = "composer-permission-mode-runtime"
 
     /** letta-mobile-bglj6.1.9: the Touch bar and its parts. */
     const val TOUCH_BAR = "composer-touch-bar"

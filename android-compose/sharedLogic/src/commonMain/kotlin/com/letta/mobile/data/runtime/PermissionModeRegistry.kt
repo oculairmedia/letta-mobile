@@ -77,6 +77,26 @@ data class PermissionModeState(
     val failed: Boolean get() = unconfirmed != null
 }
 
+/**
+ * letta-mobile-a4tm7: the runtime a permission-mode chip governs. Two clients' chips only mirror
+ * each other when both name the same [Host]; [Local] (this device's bundled App Server) is its own.
+ */
+@Immutable
+sealed interface PermissionModeRuntime {
+    /** An Iroh host's runtime; [nodeId] is the host's node id (hex), null when not known yet. */
+    data class Host(val nodeId: String?) : PermissionModeRuntime {
+        /** The first characters of [nodeId], enough to tell hosts apart on a chip. */
+        val shortId: String? get() = nodeId?.takeIf { it.isNotBlank() }?.take(SHORT_ID_CHARS)
+    }
+
+    /** This device's own (bundled or embedded) App Server. */
+    data object Local : PermissionModeRuntime
+
+    companion object {
+        const val SHORT_ID_CHARS: Int = 8
+    }
+}
+
 /** How a requested mode change ended. */
 enum class ModeChangeResult {
     /** The server echoed the mode (`update_device_status`). */
