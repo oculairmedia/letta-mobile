@@ -35,7 +35,7 @@ import com.letta.mobile.data.chat.runtime.NowActiveStatus
 import com.letta.mobile.data.chat.runtime.nowActiveStatus
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 @Immutable
@@ -207,7 +207,7 @@ internal fun DesktopHeaderIdentityBlock(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        AgentOrb(agentId = state.agentId, index = state.orbIndex, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)
+        AgentAvatar(agentId = state.agentId, name = state.agentName, size = LettaDimens.Orb.md, cornerRadius = LettaDimens.Radius.sm)
         Column {
             Text(
                 text = state.conversationTitle,

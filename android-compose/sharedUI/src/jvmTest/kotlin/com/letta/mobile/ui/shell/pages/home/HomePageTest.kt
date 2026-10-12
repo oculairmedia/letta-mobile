@@ -14,8 +14,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
@@ -25,6 +27,7 @@ import com.letta.mobile.data.home.FleetOverview
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.FleetSummary
+import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageReducer
 import com.letta.mobile.data.home.HomePageState
@@ -36,6 +39,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.ui.mascot.AgentAvatarTestTag
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -201,6 +205,30 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.SEARCH_RESULTS).assertExists()
         onNodeWithTag(HomePageTags.searchHit("a-1")).assertExists()
     }
+
+    /** letta-mobile-zxk2n.28: an agent on Home is pictured by AgentAvatar, never the generic robot icon. */
+    @Test
+    fun agentSearchHitsArePicturedByTheirAgentAvatar() = runComposeUiTest {
+        val catalog = HomeSearchCatalog(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
+        show(HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "plan", awaitMessages = false))
+        avatarInside(HomePageTags.searchHit("a-1")).assertExists()
+        // No mascot is registered in tests, so the avatar is the agent's initial tile.
+        onNode(hasText("P") and hasAnyAncestor(hasTestTag(HomePageTags.searchHit("a-1"))), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun fleetRecentAndPinnedAgentRowsUseTheAgentAvatar() = runComposeUiTest {
+        val pinned = HomePinnedItem.Agent(HomeAgentRef("a-1", "Scout"))
+        val state = HomePageReducer.withPersistedAgentNames(baseState(pins = listOf(HomePinnedItem.agentKey("a-1"))), mapOf("a-1" to "Scout"))
+        show(state)
+        avatarInside(HomePageTags.pin(pinned)).assertExists()
+        avatarInside(HomePageTags.recent(recent)).assertExists()
+        scrollTo(HomePageTags.agentRow(scout))
+        avatarInside(HomePageTags.agentRow(scout)).assertExists()
+    }
+
+    private fun ComposeUiTest.avatarInside(tag: String) =
+        onNode(hasTestTag(AgentAvatarTestTag) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true)
 
     @Test
     fun aSearchWithNothingFoundSaysSo() = runComposeUiTest {

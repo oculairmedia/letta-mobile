@@ -7,6 +7,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,8 +43,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -56,7 +62,7 @@ import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneAnchor
 import com.letta.mobile.ui.host.PaneSize
-import com.letta.mobile.ui.chat.AgentOrb
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -321,14 +327,16 @@ private fun LettaSearchField(
     }
 }
 
+/** The scope buttons; they wrap rather than clip when the pane is only as wide as the header field. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LettaSearchScopeRow(config: LettaSearchConfig) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
     ) {
         config.scopes.forEach { scope ->
             val selected = scope.id == config.selectedScopeId
@@ -448,11 +456,11 @@ private fun LettaSearchRecentsStrip(
                 verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             ) {
                 when (val leading = row.leading) {
-                    is LettaSearchLeading.Orb -> AgentOrb(
-                        index = leading.orbIndex,
+                    is LettaSearchLeading.Orb -> AgentAvatar(
+                        agentId = leading.agentId,
+                        name = leading.name ?: row.label,
                         size = LettaDimens.Orb.lg,
                         cornerRadius = LettaDimens.Radius.md,
-                        agentId = leading.agentId,
                     )
                     else -> Box(modifier = Modifier.size(LettaDimens.Orb.lg))
                 }
@@ -500,7 +508,7 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            LettaSearchRowLeading(row.leading)
+            LettaSearchRowLeading(row.leading, row.label)
             Column(modifier = Modifier.weight(WEIGHT_FILL)) {
                 Text(
                     text = row.label,
@@ -531,17 +539,12 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
 }
 
 /**
- * The orb case draws the real [AgentOrb], so a result row shows the agent's
- * live mascot exactly as the rail, the sidebar and the chat header do. That is
- * the whole point of one search component: an agent looks like itself
- * everywhere, not like a grey square in search and a mascot elsewhere.
- *
- * `AgentOrb` degrades on its own when no mascot host or identity is registered
- * (it falls back to the gradient), so this costs nothing in surfaces or tests
- * that do not provide one.
+ * The agent case draws [AgentAvatar], the one way an agent is pictured, so a
+ * result row shows the agent's mascot exactly as the chat header and agent
+ * lists do, and its initial tile when it has none (letta-mobile-zxk2n.28).
  */
 @Composable
-private fun LettaSearchRowLeading(leading: LettaSearchLeading) {
+private fun LettaSearchRowLeading(leading: LettaSearchLeading, label: String) {
     when (leading) {
         is LettaSearchLeading.None -> Unit
         is LettaSearchLeading.Icon -> Icon(
@@ -550,11 +553,11 @@ private fun LettaSearchRowLeading(leading: LettaSearchLeading) {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(LettaDimens.Control.icon),
         )
-        is LettaSearchLeading.Orb -> AgentOrb(
-            index = leading.orbIndex,
+        is LettaSearchLeading.Orb -> AgentAvatar(
+            agentId = leading.agentId,
+            name = leading.name ?: label,
             size = LettaDimens.Orb.sm,
             cornerRadius = LettaDimens.Radius.md,
-            agentId = leading.agentId,
         )
     }
 }
@@ -677,9 +680,18 @@ fun LettaSearchPopover(
  * will never receive a keystroke. A popover composes in its own focusable
  * layer, outside that focus scope, so the field inside one focuses normally.
  *
- * The trigger mirrors the live query, so it still reads as one control. With
- * [compact] (a phone's header) the trigger is a search icon instead of a
- * field-shaped box; the pane it opens is the same.
+ * The pane OVERLAYS the field-shaped trigger ([PaneAnchor.OverStart], at the
+ * trigger's own width): its input sits exactly where the trigger was and the
+ * scopes, filter and results hang directly beneath it, so the window shows ONE
+ * search input, never the trigger's copy of the query above a second field
+ * (letta-mobile-06whj; #1606 had this, S6's move to [LettaPane] lost it). The
+ * trigger draws nothing while the pane covers it. Escape (the pane's own key
+ * handling) or a click outside closes the pane and the trigger shows the live
+ * query again.
+ *
+ * With [compact] (a phone's header) the trigger is a search icon instead of a
+ * field-shaped box, so there is nothing to overlay: the pane opens below it,
+ * and its field is still the only one.
  *
  * It is the same [LettaSearchScaffold] as every other expression.
  */
@@ -697,21 +709,25 @@ fun LettaSearchAnchoredField(
     openSignal: Int = 0,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var triggerWidth by remember { mutableStateOf(Dp.Unspecified) }
+    val density = LocalDensity.current
     LaunchedEffect(openSignal) { if (openSignal > 0) expanded = true }
-    Box(modifier = modifier) {
+    Box(modifier = modifier.onSizeChanged { triggerWidth = with(density) { it.width.toDp() } }) {
         if (compact) {
             LettaSearchIconTrigger(active = query.isNotBlank(), label = config.placeholder, onClick = { expanded = true })
         } else {
-            LettaSearchTrigger(query = query, placeholder = config.placeholder, onClick = { expanded = true })
+            LettaSearchTrigger(query = query, placeholder = config.placeholder, covered = expanded, onClick = { expanded = true })
         }
         if (expanded) {
+            // The pane takes the field's place and width; a compact icon has no field to cover.
+            val overlay = !compact && triggerWidth != Dp.Unspecified
             LettaPane(
-                kind = LettaPaneKind.Popover(PaneAnchor.BelowStart),
+                kind = LettaPaneKind.Popover(if (overlay) PaneAnchor.OverStart else PaneAnchor.BelowStart),
                 onDismiss = {
                     expanded = false
                     onDismiss()
                 },
-                size = PaneSize(maxHeight = AnchoredPanelMaxPaneHeight),
+                size = PaneSize(width = if (overlay) triggerWidth else Dp.Unspecified, maxHeight = AnchoredPanelMaxPaneHeight),
                 testTag = SearchPanelTestTag,
             ) {
                 LettaSearchScaffold(
@@ -722,7 +738,11 @@ fun LettaSearchAnchoredField(
                         expanded = false
                         onRowSelected(row)
                     },
-                    modifier = Modifier.widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth),
+                    modifier = if (overlay) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier.widthIn(min = AnchoredPanelMinWidth, max = AnchoredPanelMaxWidth)
+                    },
                     config = config.copy(
                         autoFocus = true,
                         maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
@@ -746,17 +766,23 @@ private fun LettaSearchIconTrigger(active: Boolean, label: String, onClick: () -
     }
 }
 
-/** The header's stand-in for the field: shows the live query, opens the real one. */
+/**
+ * The header's stand-in for the field: shows the live query, opens the real one. While [covered]
+ * (the pane's field sits on top of it) it keeps its size but draws and says nothing, so the query
+ * is on screen once.
+ */
 @Composable
 private fun LettaSearchTrigger(
     query: String,
     placeholder: String,
+    covered: Boolean,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(SearchTriggerTestTag)
+            .alpha(if (covered) 0f else 1f)
             .clip(RoundedCornerShape(LettaDimens.Radius.sm))
             .clickable(onClick = onClick)
             .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm),
@@ -770,7 +796,7 @@ private fun LettaSearchTrigger(
             modifier = Modifier.size(LettaDimens.Control.iconSm),
         )
         Text(
-            text = query.ifBlank { placeholder },
+            text = if (covered) "" else query.ifBlank { placeholder },
             style = MaterialTheme.typography.bodyMedium,
             color = if (query.isBlank()) {
                 MaterialTheme.colorScheme.onSurfaceVariant

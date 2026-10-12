@@ -20,8 +20,12 @@ import com.letta.mobile.ui.shell.ShellLongPressMenu
  */
 enum class LettaInput { Touch, Pointer }
 
-/** Where an anchored pane opens relative to the composable it is declared inside. */
-enum class PaneAnchor { BelowStart, BelowEnd, AboveStart, AboveEnd }
+/**
+ * Where an anchored pane opens relative to the composable it is declared inside. [OverStart] covers
+ * it from its top-start corner: a field that grows into its own results (the header search) draws
+ * its input exactly where the field was, so the window never shows the field twice.
+ */
+enum class PaneAnchor { BelowStart, BelowEnd, AboveStart, AboveEnd, OverStart }
 
 /**
  * What a surface asks for. The concrete kinds name a container; [Adaptive] and [Modal] are intents
