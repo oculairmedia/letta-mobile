@@ -23,23 +23,26 @@ import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.screens.tools.AllToolsViewModel
 import com.letta.mobile.ui.screens.tools.CreateToolDialog
-import com.letta.mobile.ui.shell.pages.skills.SkillsPage
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
-import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
+import com.letta.mobile.ui.shell.shellSkillsPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /**
- * Android host for the shared [SkillsPage] (letta-mobile-zxk2n.32): top bar, back and the create
- * tool dialog only. The Skills route opens it on Skills; the standalone Tools route on Tools.
+ * Android host for the shared Skills page (letta-mobile-zxk2n.32): top bar, back and the create
+ * tool dialog only; the page is the shared ShellPage for [destination] (letta-mobile-ckmub.3.4).
+ * The Skills route opens it on Skills; the standalone Tools route on its Tools anchor.
  * Scaffold's padding carries the system bars, so the page sits inside them edge to edge.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(
     navigation: SkillsScreenNavigation,
-    initialSection: SkillsPageSection = SkillsPageSection.Skills,
+    destination: ShellDestination.Skills = ShellDestination.Skills(),
     skillsViewModel: SkillsViewModel = hiltViewModel(),
     toolsViewModel: AllToolsViewModel = hiltViewModel(),
 ) {
@@ -63,10 +66,10 @@ fun SkillsScreen(
             )
         },
     ) { paddingValues ->
-        SkillsPage(
-            state = skillsPageState(catalog, tools),
-            actions = actions,
-            options = SkillsPageOptions(showTitle = false, touch = true, initialSection = initialSection),
+        val page = shellSkillsPage(skillsPageState(catalog, tools), actions, SkillsPageOptions(showTitle = false, touch = true))
+        ShellPage(
+            destination = destination,
+            deps = ShellPageDeps(skills = page),
             modifier = Modifier.padding(paddingValues).consumeWindowInsets(paddingValues),
         )
     }

@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.pairing.PairLink
+import com.letta.mobile.data.shell.ShellDeepLink
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellLink
+import com.letta.mobile.data.shell.ShellSettingsSection
 import java.net.URI
 
 /**
@@ -12,55 +15,41 @@ internal data class DesktopDeepLinkRequest(val sequence: Long, val uri: URI) {
     override fun toString(): String = "DesktopDeepLinkRequest(sequence=$sequence, ${uri.scheme}://${uri.host})"
 }
 
-internal sealed interface DesktopDeepLinkDestination {
-    data object Conversations : DesktopDeepLinkDestination
-    data object Settings : DesktopDeepLinkDestination
-    data class Conversation(val id: String) : DesktopDeepLinkDestination
-    data class Agent(val id: String) : DesktopDeepLinkDestination
-
-    /** letta-mobile-dpv7m.3: a scan-to-pair link (`meridian://pair?qr=…&dial=…`). */
-    data class Pair(val link: String) : DesktopDeepLinkDestination {
-        override fun toString(): String = "Pair(<redacted>)"
-    }
-}
-
-internal fun parseDesktopDeepLink(uri: URI): DesktopDeepLinkDestination? {
-    if (!uri.scheme.equals("meridian", ignoreCase = true)) return null
-    if (PairLink.isPairLink(uri.toString())) return DesktopDeepLinkDestination.Pair(uri.toString())
-    // Opaque activations like `meridian:settings` have no host or path;
-    // treat them as unroutable instead of crashing the deep-link effect.
-    val id = uri.path?.trim('/')?.takeIf(String::isNotBlank)
-    return when (uri.host?.lowercase()) {
-        "conversations" -> DesktopDeepLinkDestination.Conversations
-        "settings" -> DesktopDeepLinkDestination.Settings
-        "conversation" -> id?.let(DesktopDeepLinkDestination::Conversation)
-        "agent" -> id?.let(DesktopDeepLinkDestination::Agent)
-        else -> null
-    }
-}
+/** letta-mobile-ckmub.3.4: `meridian://` links are parsed by the shared [ShellDeepLink]. */
+internal fun parseDesktopDeepLink(uri: URI): ShellLink? = ShellDeepLink.parse(uri.toString())
 
 /** Where each kind of deep link goes; grouped so the routing functions stay small. */
 internal class DesktopDeepLinkHandlers(
-    val onDestinationSelected: (DesktopDestination) -> Unit,
+    val onDestinationSelected: (ShellDestination) -> Unit,
+    /** A conversation link; selected once the conversation list has it. */
     val onConversationSelected: (String) -> Unit,
+    /** An agent link; opened once the first conversation load settled. */
     val onAgentSelected: (String) -> Unit,
     /** letta-mobile-dpv7m.3: a scan-to-pair link; it carries a one-time secret. */
     val onPairLink: (String) -> Unit = {},
 )
 
-internal fun handleDesktopDeepLink(destination: DesktopDeepLinkDestination?, handlers: DesktopDeepLinkHandlers) {
-    when (destination) {
-        DesktopDeepLinkDestination.Settings -> handlers.onDestinationSelected(DesktopDestination.Settings)
-        DesktopDeepLinkDestination.Conversations -> handlers.onDestinationSelected(DesktopDestination.Conversations)
-        is DesktopDeepLinkDestination.Conversation -> {
-            handlers.onConversationSelected(destination.id)
-            handlers.onDestinationSelected(DesktopDestination.Conversations)
+internal fun handleDesktopDeepLink(link: ShellLink?, handlers: DesktopDeepLinkHandlers) {
+    when (link) {
+        is ShellLink.Pair -> {
+            handlers.onPairLink(link.link)
+            handlers.onDestinationSelected(ShellDestination.Settings(ShellSettingsSection.Pairing))
         }
-        is DesktopDeepLinkDestination.Agent -> handlers.onAgentSelected(destination.id)
-        is DesktopDeepLinkDestination.Pair -> {
-            handlers.onPairLink(destination.link)
-            handlers.onDestinationSelected(DesktopDestination.Settings)
-        }
+        is ShellLink.Open -> openDeepLinkDestination(link.destination, handlers)
         null -> Unit
+    }
+}
+
+private fun openDeepLinkDestination(destination: ShellDestination, handlers: DesktopDeepLinkHandlers) {
+    val chat = destination as? ShellDestination.Chat
+    val conversationId = chat?.conversationId
+    val agentId = chat?.agentId
+    when {
+        conversationId != null -> {
+            handlers.onConversationSelected(conversationId)
+            handlers.onDestinationSelected(destination)
+        }
+        agentId != null -> handlers.onAgentSelected(agentId)
+        else -> handlers.onDestinationSelected(destination)
     }
 }
