@@ -20,7 +20,14 @@ class PeerCommandsTest {
     @Test
     fun inviteOmitsBlankNameAndNullTtl() {
         val minimal = PeerParams.invite(name = null, ttlMs = null)
-        assertTrue(minimal.isEmpty(), "no name/ttl → empty params")
+        // dpv7m.1: only the scannable-form request remains; the host defaults the grant to chat.
+        assertEquals(setOf("qr"), minimal.keys, "no name/ttl/grant → only qr")
+
+        val scoped = PeerParams.invite(name = null, ttlMs = null, grant = InviteGrant(role = "chat", agents = "agent-1"))
+        assertEquals("chat", scoped["role"]?.jsonPrimitive?.content)
+        assertEquals("agent-1", scoped["agent_ids"]?.jsonPrimitive?.content)
+        assertEquals("invite-1", PeerParams.inviteId("invite-1")["invite_id"]?.jsonPrimitive?.content)
+        assertTrue(PeerParams.setAgents("n", null)["agent_ids"] is kotlinx.serialization.json.JsonNull)
 
         val blank = PeerParams.invite(name = "  ", ttlMs = null)
         assertFalse(blank.containsKey("name"), "blank name is dropped")

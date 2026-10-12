@@ -24,11 +24,10 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
-import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
-import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
+import com.letta.mobile.data.controller.node.iroh.PairingQrConfig
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
@@ -111,18 +110,6 @@ class AppServerServeIrohCommand : CliktCommand(
             "missing. Keeps the NodeID stable across restarts.",
     )
 
-    private val authToken by option(
-        "--auth-token",
-        envvar = "LETTA_IROH_AUTH_TOKEN",
-        help = "Optional bearer/invite token clients must present before runtime, input, sync, or admin_rpc.",
-    )
-
-    private val allowedPeerIds by option(
-        "--allowed-peer-ids",
-        envvar = "LETTA_IROH_ALLOWED_PEER_IDS",
-        help = "Optional comma-separated allowlist of remote EndpointIds (64 hex chars).",
-    ).default("")
-
     private val notebookDir by option(
         "--notebook-dir",
         envvar = "LETTA_NOTEBOOK_DIR",
@@ -178,14 +165,6 @@ class AppServerServeIrohCommand : CliktCommand(
         help = "Per-agent agent-tools-mode, as agentId=mode pairs separated by commas; overrides --agent-tools-mode.",
     )
 
-    private val pairingStoreFile by option(
-        "--pairing-store-file",
-        envvar = "LETTA_IROH_PAIRING_STORE",
-        help = "Path to the paired-peer JSON store (d6e8g.5). When set, paired NodeIds " +
-            "authenticate without a token and one-time invites can be minted via " +
-            "pair.invite.create; redeem with an 'invite:<secret>' auth token.",
-    )
-
     private val subagentRegistryFile by option(
         "--subagent-registry-file",
         envvar = "LETTA_SUBAGENT_REGISTRY_STORE",
@@ -193,13 +172,6 @@ class AppServerServeIrohCommand : CliktCommand(
             "chips survive a controller restart and are reconciled against live state on the " +
             "next authoritative subagent snapshot (orphans become terminal, never spinners).",
     )
-
-    private val allowInsecureAnonymousIroh by option(
-        "--allow-insecure-anonymous-iroh",
-        help = "TEST/DEV ONLY: run the Iroh endpoint with NO authentication. Every peer that " +
-            "can dial the ticket gets full runtime and admin access. Prohibited for release " +
-            "or long-running service use; a warning is printed on every start.",
-    ).flag(default = false)
 
     private val ownAppServer by option(
         "--own-app-server",
@@ -336,6 +308,8 @@ class AppServerServeIrohCommand : CliktCommand(
     /** letta-mobile-jna0o.4: the local `meridian/tools/1` endpoint; off unless --agent-tools-mode cli. */
     private val meridianTools by MeridianToolsOptions()
 
+    private val access by IrohAccessOptions()
+
     private val lettaCommand by option(
         "--letta-command",
         envvar = "LETTA_COMMAND",
@@ -366,10 +340,7 @@ class AppServerServeIrohCommand : CliktCommand(
             val identityRows = com.letta.mobile.data.controller.node.iroh.LateBoundConversationRows()
             val turnIdentity = newTurnIdentityLedger(identityRows)
 
-            val pairingService = pairingStoreFile?.let { storePath ->
-                println("[iroh-app-server] Pairing enabled (store: $storePath)")
-                IrohPairingService(FilePairedPeerStore(java.nio.file.Path.of(storePath)))
-            }
+            val pairingService = access.pairingService(::println)
 
             println("[iroh-app-server] Starting Iroh endpoint...")
             
@@ -408,6 +379,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 endpoint = endpoint,
                 admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
                 scope = scope,
+                pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
             )
 
             printChannelsHostBanner()
@@ -543,6 +515,7 @@ class AppServerServeIrohCommand : CliktCommand(
         endpoint: IrohNodeEndpoint,
         admin: AdminContext,
         scope: CoroutineScope,
+        pairingQr: PairingQrConfig?,
     ) {
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
@@ -562,6 +535,7 @@ class AppServerServeIrohCommand : CliktCommand(
             conversationChanges = conversationChanges,
             modelExposureFile = resolvedModelExposureFile(),
             turnIdentity = admin.turnIdentity,
+            pairingQr = pairingQr,
             subagentPublisher = { source ->
                 com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher(scope, source)
                     .also { subagentPublisher = it }
@@ -632,13 +606,7 @@ class AppServerServeIrohCommand : CliktCommand(
      * via the loudly named test/dev-only flag. Extracted from [run] to keep it
      * within complexity bounds.
      */
-    private fun resolveAuthPolicy() = when (
-        val resolution = IrohAuthPolicy.resolve(
-            authToken = authToken,
-            allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
-            allowInsecureAnonymous = allowInsecureAnonymousIroh,
-        )
-    ) {
+    private fun resolveAuthPolicy() = when (val resolution = access.resolvePolicy()) {
         is IrohAuthPolicyResolution.Secure -> resolution.policy
         is IrohAuthPolicyResolution.InsecureAccepted -> {
             System.err.println("[iroh-app-server] ${resolution.warning}")

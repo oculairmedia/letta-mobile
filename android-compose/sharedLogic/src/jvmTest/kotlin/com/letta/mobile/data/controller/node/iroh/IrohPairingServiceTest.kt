@@ -132,8 +132,8 @@ class IrohPairingServiceTest {
         val renamed = pairing.rename(nodeId, "emmanuel-laptop")
         assertEquals("emmanuel-laptop", renamed?.name)
         assertEquals("emmanuel-laptop", pairing.peer(nodeId)?.name)
-        // NodeId binding + default capabilities preserved by a rename.
-        assertEquals(IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE, pairing.peer(nodeId)?.capabilities)
+        // NodeId binding + the invite's default (chat) grant preserved by a rename.
+        assertEquals(IrohPeerCapabilities.CHAT_ROLE, pairing.peer(nodeId)?.capabilities)
 
         val recapped = pairing.setCapabilities(nodeId, setOf(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.ADMIN_FULL))
         assertEquals(setOf(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.ADMIN_FULL), recapped?.capabilities)
@@ -185,19 +185,19 @@ class IrohPairingServiceTest {
 
     @Test
     fun aPairedPeerStaysPairedEvenWhenItReplaysItsConsumedInvite() {
-        // Invariant the handleAuth stale-invite fall-through relies on (d6e8g.7):
+        // Invariant the handleAuth stale-invite path relies on (d6e8g.7):
         // a device that paired but still carries the now-consumed invite in its
-        // token field re-presents it on reconnect. Redemption is Rejected, but
-        // isPaired stays true — so auth can fall through to NodeId instead of
-        // locking the device out.
+        // token field re-presents it on reconnect. Redemption reports
+        // AlreadyPaired (dpv7m.1) and isPaired stays true — so auth uses the
+        // NodeId binding instead of locking the device out.
         val (pairing, _) = service()
         val nodeId = "8".repeat(64)
         val invite = pairing.createInvite("pixel")
         assertIs<IrohPairingService.RedeemResult.Paired>(pairing.redeem(invite.secret, nodeId))
         assertTrue(pairing.isPaired(nodeId))
 
-        val replay = assertIs<IrohPairingService.RedeemResult.Rejected>(pairing.redeem(invite.secret, nodeId))
-        assertEquals("invalid", replay.reason)
+        val replay = assertIs<IrohPairingService.RedeemResult.AlreadyPaired>(pairing.redeem(invite.secret, nodeId))
+        assertEquals(nodeId, replay.peer.nodeId)
         assertTrue(pairing.isPaired(nodeId), "a consumed-invite replay must not un-pair the device")
     }
 

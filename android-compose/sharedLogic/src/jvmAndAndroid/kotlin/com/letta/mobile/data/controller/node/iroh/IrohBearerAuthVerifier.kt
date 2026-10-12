@@ -32,10 +32,17 @@ class IrohBearerAuthVerifier(
     private val lock = Any()
 
     fun verify(remoteEndpointId: String, providedToken: String?): Outcome {
-        val expected = policy.requiredBearerToken
-            ?: return Outcome.Authenticated
-
         if (isRateLimited(remoteEndpointId)) return Outcome.RateLimited
+        // letta-mobile-dpv7m.1: no bootstrap credential configured means NO
+        // bearer path, not an open door. Only a policy that pre-authenticates
+        // this exact peer (anonymous test mode, static allowlist) passes;
+        // everyone else must be paired or redeem an invite.
+        val expected = policy.requiredBearerToken
+            ?: return if (policy.preAuthenticates(remoteEndpointId)) {
+                Outcome.Authenticated
+            } else {
+                deny(remoteEndpointId, "pairing_required")
+            }
 
         val matches = providedToken != null &&
             MessageDigest.isEqual(
@@ -45,16 +52,21 @@ class IrohBearerAuthVerifier(
         return if (matches) {
             Outcome.Authenticated
         } else {
-            recordFailure(remoteEndpointId)
-            if (isRateLimited(remoteEndpointId)) {
-                Outcome.RateLimited
-            } else {
-                Outcome.Denied(if (providedToken.isNullOrBlank()) "missing_token" else "invalid_token")
-            }
+            deny(remoteEndpointId, if (providedToken.isNullOrBlank()) "missing_token" else "invalid_token")
         }
     }
 
-    private fun isRateLimited(remoteEndpointId: String): Boolean = synchronized(lock) {
+    /**
+     * Count a failed credential attempt that did not go through [verify] — an
+     * invalid/expired invite redemption (dpv7m.1) — against the same per-NodeId
+     * budget, so invite guessing is rate limited exactly like bearer guessing.
+     */
+    fun deny(remoteEndpointId: String, reason: String): Outcome {
+        recordFailure(remoteEndpointId)
+        return if (isRateLimited(remoteEndpointId)) Outcome.RateLimited else Outcome.Denied(reason)
+    }
+
+    fun isRateLimited(remoteEndpointId: String): Boolean = synchronized(lock) {
         val cutoff = nowMs() - lockoutWindowMs
         val failures = failureTimestamps[remoteEndpointId] ?: return false
         while (failures.isNotEmpty() && failures.first() < cutoff) failures.removeFirst()

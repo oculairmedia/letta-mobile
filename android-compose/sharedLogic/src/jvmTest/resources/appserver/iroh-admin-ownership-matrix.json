@@ -1599,6 +1599,48 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "pair.invite.list",
+      "handler": "PairingAdminHandlers.kt",
+      "current_backend": "PairingInviteStore (controller-local, dpv7m.1)",
+      "owner": "controller_native",
+      "public_contract": "Unredeemed invite listing (non-secret ids, expiry, grant only)",
+      "authorization_class": "admin_read",
+      "data_store": "controller_memory",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "pair.invite.revoke",
+      "handler": "PairingAdminHandlers.kt",
+      "current_backend": "PairingInviteStore (controller-local, dpv7m.1)",
+      "owner": "controller_native",
+      "public_contract": "Revoke an unredeemed invite by non-secret id",
+      "authorization_class": "admin_write",
+      "data_store": "controller_memory",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "pair.peer.set_agents",
+      "handler": "PairingAdminHandlers.kt",
+      "current_backend": "PairedPeerStore (controller-local, dpv7m.1)",
+      "owner": "controller_native",
+      "public_contract": "PairedPeerStore agent re-scope (null = every agent)",
+      "authorization_class": "admin_write",
+      "data_store": "controller_memory",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "pair.peer.list",
       "handler": "PairingAdminHandlers.kt",
       "current_backend": "PairedPeerStore (controller-local, d6e8g.5)",

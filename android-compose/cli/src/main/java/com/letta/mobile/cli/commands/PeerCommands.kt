@@ -3,6 +3,7 @@ package com.letta.mobile.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -17,11 +18,11 @@ import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import java.util.UUID
 import kotlin.system.exitProcess
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -47,10 +48,29 @@ class PeerCommand : CliktCommand(name = "peer") {
 }
 
 /** Builds the admin_rpc params for a peer subcommand; pure for testability. */
+/** dpv7m.1: what a minted invite grants (role or explicit capabilities, optional agent scope). */
+internal data class InviteGrant(
+    val role: String? = null,
+    val capabilities: String? = null,
+    val agents: String? = null,
+)
+
 internal object PeerParams {
-    fun invite(name: String?, ttlMs: Long?): JsonObject = buildJsonObject {
+    fun invite(name: String?, ttlMs: Long?, grant: InviteGrant = InviteGrant()): JsonObject = buildJsonObject {
         name?.takeIf { it.isNotBlank() }?.let { put("name", it) }
         ttlMs?.let { put("ttl_ms", it) }
+        grant.role?.takeIf { it.isNotBlank() }?.let { put("role", it) }
+        grant.capabilities?.takeIf { it.isNotBlank() }?.let { put("capabilities", it) }
+        grant.agents?.takeIf { it.isNotBlank() }?.let { put("agent_ids", it) }
+        // dpv7m.1: always ask for the scannable form; old hosts ignore the flag.
+        put("qr", true)
+    }
+
+    fun inviteId(inviteId: String): JsonObject = buildJsonObject { put("invite_id", inviteId) }
+
+    fun setAgents(nodeId: String, agents: List<String>?): JsonObject = buildJsonObject {
+        put("node_id", nodeId)
+        put("agent_ids", agents?.let { list -> JsonArray(list.map { JsonPrimitive(it) }) } ?: kotlinx.serialization.json.JsonNull)
     }
 
     fun nodeId(nodeId: String): JsonObject = buildJsonObject { put("node_id", nodeId) }
@@ -84,13 +104,13 @@ internal class IrohAdminDialer(
     private val token: String?,
     private val timeoutMs: Long,
 ) {
-    suspend fun <T> use(block: suspend (AppServerClient) -> T): T {
-        // The transport's reader coroutines live in their OWN scope, not the
-        // caller's: on teardown the connection tears down with ConnectionLost,
-        // and if those readers shared the runBlocking scope that benign error
-        // would clobber an already-delivered result. We cancel this scope in
-        // finally so teardown never propagates past the returned value.
-        val transportScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    suspend fun <T> use(block: suspend (AppServerClient) -> T): T = supervisorScope {
+        // The transport's reader coroutines are children of this SUPERVISOR
+        // scope, not of the caller's: on teardown the connection ends with
+        // ConnectionLost, and a supervised reader failing cannot clobber an
+        // already-delivered result. They are cancelled in finally so teardown
+        // never outlives the returned value.
+        val transportScope = this + Dispatchers.Default
         val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
         try {
             // Bring the endpoint online so its native driver/reactor stays alive
@@ -111,9 +131,9 @@ internal class IrohAdminDialer(
                 ),
             )
             if (!auth.success) error("Iroh auth failed: ${auth.error ?: "denied"}")
-            return block(client)
+            block(client)
         } finally {
-            runCatching { transportScope.cancel() }
+            coroutineContext.cancelChildren()
             runCatching { endpoint.close() }
         }
     }
@@ -154,12 +174,42 @@ abstract class PeerAdminSubcommand(name: String, private val helpText: String) :
     }
 }
 
-class PeerInviteCommand : PeerAdminSubcommand("invite", "Mint a one-time pairing invite for a new device.") {
+class PeerInviteCommand : PeerAdminSubcommand(
+    "invite",
+    "Mint a one-time pairing invite for a new device (default grant: chat, no admin). " +
+        "The response's pair_link is the scannable QR value; it contains the secret.",
+) {
     private val name by option("--name", help = "Suggested device label.")
-    private val ttlMs by option("--ttl-ms", help = "Invite lifetime (ms).")
+    private val ttlMs by option("--ttl-ms", help = "Invite lifetime (ms; default 5 min, capped at 1 h).")
+    private val role by option("--role", help = "chat (default) | desktop | vibesync | admin.")
+    private val capabilities by option("--capabilities", help = "Explicit comma-separated capabilities (overrides --role).")
+    private val agents by option("--agents", help = "Comma-separated agent ids the device may use (default: all).")
 
     override fun method() = "pair.invite.create"
-    override fun params() = PeerParams.invite(name, ttlMs?.toLongOrNull())
+    override fun params() = PeerParams.invite(name, ttlMs?.toLongOrNull(), InviteGrant(role, capabilities, agents))
+}
+
+class PeerInviteListCommand : PeerAdminSubcommand("invite-list", "List unredeemed invites (ids and expiry only, no secrets).") {
+    override fun method() = "pair.invite.list"
+}
+
+class PeerInviteRevokeCommand : PeerAdminSubcommand("invite-revoke", "Revoke an unredeemed invite by its id.") {
+    private val inviteId by option("--invite-id", help = "Invite id from invite/invite-list.").required()
+
+    override fun method() = "pair.invite.revoke"
+    override fun params() = PeerParams.inviteId(inviteId)
+}
+
+class PeerSetAgentsCommand : PeerAdminSubcommand("set-agents", "Limit a paired device to some agents (or --all).") {
+    private val nodeId by option("--node-id", help = "Device NodeId (64 hex).").required()
+    private val agents by option("--agents", help = "Comma-separated agent ids.")
+    private val all by option("--all", help = "Lift the agent scope (every agent).").flag(default = false)
+
+    override fun method() = "pair.peer.set_agents"
+    override fun params() = PeerParams.setAgents(
+        nodeId,
+        if (all) null else agents.orEmpty().split(",").map { it.trim() }.filter { it.isNotEmpty() },
+    )
 }
 
 class PeerListCommand : PeerAdminSubcommand("list", "List all paired devices.") {

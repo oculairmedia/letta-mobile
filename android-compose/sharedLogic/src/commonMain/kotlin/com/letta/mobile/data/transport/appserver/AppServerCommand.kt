@@ -21,7 +21,12 @@ sealed interface AppServerCommand {
          * must never emit capability-gated encodings to such peers.
          */
         val capabilities: List<String>? = null,
-    ) : AppServerCommand
+        /** letta-mobile-dpv7m.2: label the host records when this auth redeems a pairing invite. */
+        @SerialName("peer_name") val peerName: String? = null,
+    ) : AppServerCommand {
+        /** The token may be a bearer or a one-time invite secret: never print it. */
+        override fun toString(): String = "Auth(requestId=$requestId, <redacted>, capabilities=$capabilities)"
+    }
 
     @Serializable
     @SerialName("runtime_start")

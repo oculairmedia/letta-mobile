@@ -172,14 +172,16 @@ class IrohPeerCapabilitiesTest {
     }
 
     @Test
-    fun pairedPeersDefaultToTheDesktopRoleAndPersistExplicitGrants() {
+    fun scannedInvitesDefaultToTheChatRoleAndPersistExplicitGrants() {
         val store = InMemoryPairedPeerStore()
         val pairing = IrohPairingService(store)
         val invite = pairing.createInvite("desk")
         pairing.redeem(invite.secret, "a".repeat(64))
 
         val peer = checkNotNull(pairing.peer("a".repeat(64)))
-        assertEquals(IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE, peer.capabilities)
+        // dpv7m.1: a scanned invite grants chat only — never admin, no memory/tools writes.
+        assertEquals(IrohPeerCapabilities.CHAT_ROLE, peer.capabilities)
+        assertTrue(IrohPeerCapabilities.ADMIN_FULL !in peer.capabilities)
 
         store.save(peer.copy(capabilities = peer.capabilities + IrohPeerCapabilities.ADMIN_FULL))
         assertTrue(

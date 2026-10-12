@@ -67,8 +67,9 @@ class PairingAdminHandlersTest {
     fun managementMethodsRegistered() {
         assertEquals(
             setOf(
-                "pair.invite.create", "pair.peer.list", "pair.peer.get",
-                "pair.peer.rename", "pair.peer.set_capabilities", "pair.peer.revoke",
+                "pair.invite.create", "pair.invite.list", "pair.invite.revoke",
+                "pair.peer.list", "pair.peer.get", "pair.peer.rename",
+                "pair.peer.set_capabilities", "pair.peer.set_agents", "pair.peer.revoke",
             ),
             PairingAdminHandlers.methods,
         )
@@ -194,6 +195,102 @@ class PairingAdminHandlersTest {
         // The handler's safety check: missing node id / signer collapses to
         // the no-signer path. Field is omitted entirely (not `null`).
         assertTrue(!parsed.contains("\"qr_invite\""), parsed)
+    }
+
+    // -----------------------------------------------------------------
+    // letta-mobile-dpv7m.1: scoped invites, scannable link, invite admin.
+    // -----------------------------------------------------------------
+    /** The successful response's `result` object (a property, so the helper adds no string argument). */
+    private val String.result
+        get() = kotlinx.serialization.json.Json.parseToJsonElement(parseSuccess(this)).jsonObject
+
+    @Test
+    fun inviteDefaultsToTheChatRoleAndHonoursRoleCapabilitiesAndAgents() = runTest {
+        val pairing = IrohPairingService(InMemoryPairedPeerStore())
+        val r = router(pairing)
+        val default = dispatch(r, "pair.invite.create", emptyMap()).result
+        assertEquals(
+            IrohPeerCapabilities.CHAT_ROLE,
+            default["capabilities"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content }.toSet(),
+        )
+        assertTrue(default["agent_ids"] is kotlinx.serialization.json.JsonNull)
+
+        val desktop = dispatch(r, "pair.invite.create", mapOf("role" to "desktop")).result
+        assertEquals(IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE.size, (desktop["capabilities"] as JsonArray).size)
+
+        val scoped = dispatch(r, "pair.invite.create", mapOf("capabilities" to listOf("chat.read"), "agent_ids" to listOf("agent-1"))).result
+        val secret = scoped["invite"]!!.jsonPrimitive.content.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX)
+        pairing.redeem(secret, nodeId)
+        assertEquals(setOf("chat.read"), pairing.peer(nodeId)!!.capabilities)
+        assertEquals(setOf("agent-1"), pairing.peer(nodeId)!!.agentIds)
+    }
+
+    @Test
+    fun unknownRoleOrCapabilityAndEmptyAgentListAreRefused() = runTest {
+        val r = router(IrohPairingService(InMemoryPairedPeerStore()))
+        assertTrue(dispatch(r, "pair.invite.create", mapOf("role" to "root")).contains("unknown role"))
+        assertTrue(dispatch(r, "pair.invite.create", mapOf("capabilities" to listOf("sudo"))).contains("unknown capabilities"))
+        assertTrue(dispatch(r, "pair.invite.create", mapOf("agent_ids" to "")).contains("\"success\":false"))
+    }
+
+    @Test
+    fun requestedTtlIsCapped() = runTest {
+        val r = router(IrohPairingService(InMemoryPairedPeerStore(), nowMs = { 0L }))
+        val result = dispatch(r, "pair.invite.create", mapOf("ttl_ms" to 365L * 24 * 3_600_000)).result
+        assertEquals(IrohPairingService.MAX_TTL_MS, result["expires_at_ms"]!!.jsonPrimitive.content.toLong())
+    }
+
+    @Test
+    fun qrInviteCarriesAScannablePairLinkWithTheDialHint() = runTest {
+        val fixedId = "abcd1234".repeat(8)
+        val r = AdminRpcRouter().also {
+            PairingAdminHandlers.register(
+                it,
+                IrohPairingService(InMemoryPairedPeerStore()),
+                PairingQrConfig(FixedSigner("sig"), fixedId) { "$fixedId@203.0.113.7:4501" },
+            )
+        }
+        val result = dispatch(r, "pair.invite.create", mapOf("qr" to true)).result
+        val link = com.letta.mobile.data.pairing.PairLink.parse(result["pair_link"]!!.jsonPrimitive.content)
+        assertNotNull(link)
+        assertEquals(result["qr_invite"]!!.jsonPrimitive.content, link.qrInvite)
+        assertEquals("$fixedId@203.0.113.7:4501", link.dial)
+    }
+
+    @Test
+    fun inviteListNeverExposesSecretsAndRevokeKillsTheInvite() = runTest {
+        val pairing = IrohPairingService(InMemoryPairedPeerStore())
+        val r = router(pairing)
+        val minted = dispatch(r, "pair.invite.create", mapOf("name" to "phone")).result
+        val secret = minted["invite"]!!.jsonPrimitive.content
+        val listing = dispatch(r, "pair.invite.list", emptyMap())
+        assertTrue(minted["invite_id"]!!.jsonPrimitive.content in listing)
+        assertTrue(secret.removePrefix("invite:") !in listing, "listing must not contain the secret")
+
+        val revoked = dispatch(r, "pair.invite.revoke", mapOf("invite_id" to minted["invite_id"]!!.jsonPrimitive.content)).result
+        assertEquals(true, revoked["revoked"]!!.jsonPrimitive.boolean)
+        assertTrue(pairing.redeem(secret.removePrefix("invite:"), nodeId) is IrohPairingService.RedeemResult.Rejected)
+    }
+
+    @Test
+    fun setAgentsScopesAndUnscopesAPairedPeer() = runTest {
+        val pairing = pairedService()
+        val r = router(pairing)
+        dispatch(r, "pair.peer.set_agents", mapOf("node_id" to nodeId, "agent_ids" to listOf("agent-1")))
+        assertEquals(setOf("agent-1"), pairing.peer(nodeId)!!.agentIds)
+        val lifted = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "t",
+                method = "pair.peer.set_agents",
+                params = buildJsonObject {
+                    put("node_id", nodeId)
+                    put("agent_ids", kotlinx.serialization.json.JsonNull)
+                },
+                context = AdminRpcRequestContext.Authenticated,
+            ),
+        )
+        parseSuccess(lifted)
+        assertNull(pairing.peer(nodeId)!!.agentIds)
     }
 
     private fun parseSuccess(response: String): String {
