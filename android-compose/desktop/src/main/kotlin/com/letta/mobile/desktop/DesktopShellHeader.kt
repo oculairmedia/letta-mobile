@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
@@ -14,21 +15,25 @@ import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.home.HomeShellSearch
+import com.letta.mobile.data.home.HomeShellSearchState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.ui.search.LettaSearchConfig
 import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.search.LettaSearchSection
 import com.letta.mobile.ui.search.LettaSearchToggle
+import com.letta.mobile.ui.shell.pages.home.HomeSearchPlaceholder
 
 /**
  * Header unified search: one query across conversations, agents and canvases. "Filter to this
  * agent" starts ON, which is the constrained behaviour the tab picker had; unticking it widens
- * the search to everything.
+ * the search to everything. The query itself lives in [HomeShellSearch], which hands it to the
+ * Home page while Home is showing (letta-mobile-xuhmy).
  */
 @Stable
 internal class DesktopHeaderSearchState {
-    var query: String by mutableStateOf("")
     var scopeId: String by mutableStateOf(DesktopUnifiedSearch.ALL)
     var filterToAgent: Boolean by mutableStateOf(true)
 }
@@ -49,6 +54,7 @@ internal fun DesktopShellHeaderChrome(
     val router = context.router
     val layout = context.core.layout
     val search = remember { DesktopHeaderSearchState() }
+    val homeSearch = rememberHomeShellSearch(context)
     val headerIdentity = desktopShellHeaderIdentity(context, frame)
     val headerChrome = DesktopHeaderChromeState(
         identity = headerIdentity.state,
@@ -67,7 +73,7 @@ internal fun DesktopShellHeaderChrome(
         // Browser-style "+" and picker on the strip: a new chat with the focused agent, and
         // that agent's conversations and canvases, most recent first, behind a search field.
         onNewConversationTab = { context.openNewChatForFocusedAgent(frame.focus) },
-        search = desktopHeaderSearch(context, frame, search),
+        search = desktopHeaderSearch(context, frame, HeaderSearchHolders(search, homeSearch)),
     )
     SideEffect { onHeaderChromeChange(headerChrome) }
 }
@@ -124,17 +130,57 @@ private fun desktopSidebarOverflow(context: DesktopShellContext, frame: DesktopS
     )
 }
 
+/** The header field's two halves: the unified search's scope/toggle and the Home-aware query. */
+private class HeaderSearchHolders(val filters: DesktopHeaderSearchState, val query: HomeShellSearch)
+
+/**
+ * The header query's router to the Home page, told which page is showing: on Home the header
+ * searches the Home view instead of drawing its own dropdown (letta-mobile-xuhmy).
+ */
+@Composable
+private fun rememberHomeShellSearch(context: DesktopShellContext): HomeShellSearch {
+    val home = context.panels.libraries.home
+    val homeSearch = remember(home) { HomeShellSearch(home) }
+    val onHome = context.navigator.selectedDestination == DesktopDestination.Home
+    LaunchedEffect(homeSearch, onHome) { homeSearch.setOnHome(onHome) }
+    return homeSearch
+}
+
 @Composable
 private fun desktopHeaderSearch(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    search: DesktopHeaderSearchState,
+    holders: HeaderSearchHolders,
 ): DesktopHeaderSearch {
+    val homeSearch = holders.query
+    val queryState by homeSearch.state.collectAsState()
+    val sections = rememberUnifiedSearchSections(context, frame, holders.filters, queryState)
+    return DesktopHeaderSearch(
+        query = queryState.query,
+        onQueryChange = homeSearch::updateQuery,
+        sections = sections,
+        onRowSelected = { row ->
+            homeSearch.resultOpened()
+            context.openSearchRow(row)
+        },
+        onDismiss = homeSearch::dismiss,
+        config = headerSearchConfig(holders.filters, showsShellResults = queryState.showsShellResults),
+    )
+}
+
+/** The unified dropdown's rows; none on Home, where the page itself shows the matches. */
+@Composable
+private fun rememberUnifiedSearchSections(
+    context: DesktopShellContext,
+    frame: DesktopShellFrame,
+    search: DesktopHeaderSearchState,
+    queryState: HomeShellSearchState,
+): List<LettaSearchSection> {
     val canvasDocuments by context.core.canvasShell.library.documents.collectAsState()
     val focus = frame.focus
     val conversations = frame.chatState.conversations
-    val sections = remember(
-        search.query,
+    return remember(
+        queryState,
         search.scopeId,
         search.filterToAgent,
         conversations,
@@ -143,28 +189,21 @@ private fun desktopHeaderSearch(
         focus.selectedAgentId,
         focus.avatarStyleByAgentId,
     ) {
-        DesktopUnifiedSearch.sections(
-            query = search.query,
-            conversations = conversations,
-            agents = focus.rosterAgents,
-            canvases = canvasDocuments,
-            avatarStyleByAgentId = focus.avatarStyleByAgentId,
-            agentId = focus.selectedAgentId,
-            filterToAgent = search.filterToAgent,
-            scopeId = search.scopeId,
-        )
+        if (!queryState.showsShellResults) {
+            emptyList()
+        } else {
+            DesktopUnifiedSearch.sections(
+                query = queryState.query,
+                conversations = conversations,
+                agents = focus.rosterAgents,
+                canvases = canvasDocuments,
+                avatarStyleByAgentId = focus.avatarStyleByAgentId,
+                agentId = focus.selectedAgentId,
+                filterToAgent = search.filterToAgent,
+                scopeId = search.scopeId,
+            )
+        }
     }
-    return DesktopHeaderSearch(
-        query = search.query,
-        onQueryChange = { search.query = it },
-        sections = sections,
-        onRowSelected = { row ->
-            search.query = ""
-            context.openSearchRow(row)
-        },
-        onDismiss = { search.query = "" },
-        config = headerSearchConfig(search),
-    )
 }
 
 private fun DesktopShellContext.openSearchRow(row: LettaSearchRow) {
@@ -176,8 +215,8 @@ private fun DesktopShellContext.openSearchRow(row: LettaSearchRow) {
     }
 }
 
-private fun headerSearchConfig(search: DesktopHeaderSearchState): LettaSearchConfig {
-    return LettaSearchConfig(
+private fun headerSearchConfig(search: DesktopHeaderSearchState, showsShellResults: Boolean): LettaSearchConfig {
+    val unified = LettaSearchConfig(
         placeholder = "Search agents, conversations, canvases",
         // The header field is always present; stealing focus on
         // every recomposition would fight the composer for the caret.
@@ -191,4 +230,13 @@ private fun headerSearchConfig(search: DesktopHeaderSearchState): LettaSearchCon
             onCheckedChange = { search.filterToAgent = it },
         ),
     )
+    // On Home the field searches the page: Home's own wording, and no scopes or agent filter,
+    // which only shape the unified dropdown.
+    return if (showsShellResults) unified else HomeHeaderSearchConfig
 }
+
+private val HomeHeaderSearchConfig = LettaSearchConfig(
+    placeholder = HomeSearchPlaceholder,
+    autoFocus = false,
+    showResults = false,
+)

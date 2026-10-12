@@ -46,6 +46,10 @@ data class ProviderManagementActions(
     val form: ProviderFormActions,
     val onConfirmDisconnect: () -> Unit,
     val onDismissDisconnect: () -> Unit,
+    /** In-app subscription sign-in (letta-mobile-zxk2n.3); offered only when [canSignIn]. */
+    val onSignIn: (ConnectableProvider) -> Unit = {},
+    val signIn: ProviderSignInActions = ProviderSignInActions.NONE,
+    val canSignIn: Boolean = false,
 ) {
     companion object {
         /** The one binding both hosts use; a user refresh bypasses the host's model cache. */
@@ -65,6 +69,9 @@ data class ProviderManagementActions(
             ),
             onConfirmDisconnect = controller::confirmDisconnect,
             onDismissDisconnect = controller::dismissDisconnect,
+            onSignIn = controller::openSignIn,
+            signIn = ProviderSignInActions.bind(controller.signIn),
+            canSignIn = controller.signIn != null,
         )
     }
 }
@@ -104,6 +111,7 @@ fun ProviderManagementPane(
         }
     }
     state.form?.let { ProviderConnectDialog(it, busy = state.busy, actions = actions.form) }
+    ProviderSignInDialog(state.oauth, actions.signIn)
     state.pendingDisconnect?.let { provider ->
         DisconnectConfirmDialog(provider, onConfirm = actions.onConfirmDisconnect, onDismiss = actions.onDismissDisconnect)
     }
@@ -183,7 +191,7 @@ private fun LazyListScope.providerSection(
 ) {
     val section = visible.section
     item("provider-${section.key}") {
-        ProviderHeaderRow(section, expanded = expanded, onClick = { actions.onToggleExpanded(section.key) })
+        ProviderHeaderRow(section, expanded = expanded, inAppSignIn = actions.canSignIn, onClick = { actions.onToggleExpanded(section.key) })
     }
     if (!expanded) return
     item("actions-${section.key}") { ProviderActionsRow(section, busy = busy, actions = actions) }

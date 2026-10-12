@@ -141,7 +141,7 @@ fun ChatSurface(
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
         pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     }
-    val snackbars = rememberChatSurfaceSnackbars(uiState, port.actions)
+    val snackbars = rememberChatSurfaceSnackbars(uiState, port)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
     ReleaseImagesOnConversationChange(conversationId)
@@ -707,7 +707,8 @@ private fun DockedA2uiStack(frame: ChatSurfaceFrame) {
 private fun ComposerPanel(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     ChatComposerPanel(
         inputs = ComposerInputs(
-            composer = frame.composer,
+            // letta-mobile-zxk2n.5: "Token usage" off hides the composer's context meter.
+            composer = if (frame.appearance.displayOptions.showTokenUsage) frame.composer else frame.composer.copy(contextUsage = null),
             uiState = frame.uiState,
             actions = rememberSendFlightActions(frame.port.actions, frame.composer.text),
             capabilities = frame.capabilities,

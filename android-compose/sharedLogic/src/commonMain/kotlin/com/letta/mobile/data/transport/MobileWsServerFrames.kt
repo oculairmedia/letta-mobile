@@ -648,6 +648,12 @@ sealed interface ServerFrame {
      * state (§13.4). Carries the changed [subagent], a fresh
      * [subagentsActive] snapshot so the bar reduces by replacement, and
      * an informational [reason] (e.g. `started`, `completed`, `failed`).
+     *
+     * letta-mobile-ulcg6 (RC2): the host registry pushes one frame per parent
+     * (agent, conversation). [parentAgentId] / [parentConversationId] name
+     * that scope so the client folds the snapshot into that conversation only;
+     * without them an empty push for conversation B looked like every chip of
+     * conversation A had vanished. Both are null on older hosts.
      */
     @Serializable
     data class SubagentsUpdated(
@@ -659,6 +665,8 @@ sealed interface ServerFrame {
         val subagent: SubagentEntry? = null,
         @SerialName("subagents_active") val subagentsActive: List<SubagentEntry> = emptyList(),
         val at: String = "",
+        @SerialName("parent_agent_id") val parentAgentId: String? = null,
+        @SerialName("parent_conversation_id") val parentConversationId: String? = null,
     ) : ServerFrame
 
     /**

@@ -34,6 +34,11 @@ internal class LocalBackendAgentReader(
      */
     fun countAgents(): Int? = runCatching { readAgentRecords().size }.getOrNull()
 
+    /** letta-mobile-fxoew.9: ids of hidden (subagent) agents; null when the store cannot be read. */
+    fun hiddenAgentIds(): Set<String>? = runCatching {
+        readAgentRecords().filter { it.obj.isHiddenAgentRecord() }.mapTo(HashSet()) { it.id }
+    }.getOrNull()
+
     fun listAgentsProjected(limit: Int?, offset: Int?): JsonArray? = runCatching {
         val records = readAgentRecords().sortedByDescending { it.mtimeMs }
         val from = (offset ?: 0).coerceAtLeast(0)

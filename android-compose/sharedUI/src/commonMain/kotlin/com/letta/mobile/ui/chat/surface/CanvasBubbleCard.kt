@@ -229,7 +229,7 @@ private fun BubbleCardBody(bubble: TouchBubble, look: CardLook, modifier: Modifi
         val shown = if (showRecents) recents else null
         if (shown != null) {
             RecentInteractionsList(
-                rows = shown.recents.conversations,
+                content = shown.content,
                 actions = shown.hop,
                 maxHeight = ChatHeadDimens.cardRecentsMaxHeight,
                 modifier = Modifier.padding(bottom = LettaDimens.Space.sm),

@@ -1,6 +1,7 @@
 package com.letta.mobile
 
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -30,6 +31,7 @@ class MainActivityDependencies @Inject constructor(
     private val lazyAgentRepository: Lazy<IAgentRepository>,
     private val lazySecureSettingsStore: Lazy<SecureSettingsStore>,
     private val lazyConversationRunRegistry: Lazy<ConversationRunRegistry>,
+    private val lazyAttentionPrefs: Lazy<AttentionPrefsRepository>,
 ) {
     val settingsRepository: ISettingsRepository get() = lazySettingsRepository.get()
 
@@ -39,4 +41,7 @@ class MainActivityDependencies @Inject constructor(
     val secureSettingsStore: SecureSettingsStore get() = lazySecureSettingsStore.get()
 
     val conversationRunRegistry: ConversationRunRegistry get() = lazyConversationRunRegistry.get()
+
+    /** letta-mobile-bzvro.27: per-agent notification mutes, for the drawer card's switch. */
+    val attentionPrefs: AttentionPrefsRepository get() = lazyAttentionPrefs.get()
 }

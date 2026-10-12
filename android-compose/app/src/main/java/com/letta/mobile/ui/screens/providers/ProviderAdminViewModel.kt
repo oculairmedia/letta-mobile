@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
+import com.letta.mobile.data.repository.modelcontrol.defaultProviderOAuthHttp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -20,7 +21,8 @@ class ProviderAdminViewModel @Inject constructor(
     providers: ProviderConnectionRepository,
     catalog: ModelCatalogRepository,
 ) : ViewModel() {
-    val controller = ProviderManagementController(viewModelScope, providers, catalog)
+    /** letta-mobile-zxk2n.3: subscription accounts sign in from the app over the shared sign-in client. */
+    val controller = ProviderManagementController(viewModelScope, providers, catalog, defaultProviderOAuthHttp())
 
     init {
         controller.refresh()

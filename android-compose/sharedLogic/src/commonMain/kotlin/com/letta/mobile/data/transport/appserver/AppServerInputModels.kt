@@ -22,6 +22,8 @@ sealed interface AppServerInputPayload {
         @SerialName("image_failure_mode") val imageFailureMode: String? = null,
         /** Keep interactive tools (questions, plan mode) out of this turn, e.g. for headless input. */
         @SerialName("exclude_interactive_tools") val excludeInteractiveTools: Boolean? = null,
+        /** letta-code 0.34+: see [AppServerClientPreferences]. Null inherits the conversation's. */
+        @SerialName("client_preferences") val clientPreferences: AppServerClientPreferences? = null,
     ) : AppServerInputPayload
 
     @Serializable
@@ -31,7 +33,49 @@ sealed interface AppServerInputPayload {
         val decision: AppServerApprovalResponseDecision? = null,
         val error: String? = null,
     ) : AppServerInputPayload
+
+    /**
+     * Continues a teleported conversation on this host (`InputTeleportContinuePayload`,
+     * `teleport-protocol.ts`). [continuation] stays raw: it carries upstream approval bodies.
+     */
+    @Serializable
+    @SerialName("teleport_continue")
+    data class TeleportContinue(
+        @SerialName("teleport_id") val teleportId: String,
+        val source: AppServerTeleportSource,
+        val continuation: JsonObject? = null,
+        /** letta-code 0.34+: see [AppServerClientPreferences]. Null inherits the conversation's. */
+        @SerialName("client_preferences") val clientPreferences: AppServerClientPreferences? = null,
+    ) : AppServerInputPayload
 }
+
+@Serializable
+data class AppServerTeleportSource(
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("connection_name") val connectionName: String,
+)
+
+/**
+ * letta-code 0.34+ `ClientPreferences` (`client-preferences.ts`): client choices the server
+ * remembers per conversation. On `create_message` / `teleport_continue`, omitting the field
+ * inherits the stored snapshot, sending it replaces the snapshot, and an empty object (both
+ * fields null) clears it. `exclude_interactive_tools` still wins over [toolset].
+ */
+@Serializable
+data class AppServerClientPreferences(
+    val toolset: AppServerToolsetPreference? = null,
+) {
+    companion object {
+        /** `{}`: clears the conversation's remembered preferences. */
+        val CLEAR: AppServerClientPreferences = AppServerClientPreferences()
+    }
+}
+
+/** `ClientPreferences.toolset`: the tool names a conversation offers. */
+@Serializable
+data class AppServerToolsetPreference(
+    val include: List<String>,
+)
 
 @Serializable
 data class AppServerInputMessage(

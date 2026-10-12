@@ -18,6 +18,10 @@ internal interface DesktopRuntimeProcess : DesktopRuntimeProcessHandle {
     val stderr: BufferedReader
     val descendants: List<DesktopRuntimeProcessHandle>
     val exitCodeOrNull: Int?
+
+    /** The OS pid, when the platform exposes it (recorded for orphan reaping). */
+    val pid: Long? get() = null
+
     fun waitFor(timeoutMs: Long): Boolean
 
     /** Calls [callback] once, on some thread, when the process ends (exit code when known). */
@@ -55,6 +59,10 @@ internal interface DesktopRuntimeEvents {
 /** The child died or stayed silent before announcing its listen URL. */
 internal class DesktopRuntimeStartException(message: String, val exitCode: Int?) : IllegalStateException(message)
 
+/** The user stopped the local runtime; it stays off until they start it again (G05). */
+internal class DesktopRuntimeStoppedException :
+    IllegalStateException("The local runtime is stopped. Start it from Settings or the chat banner.")
+
 internal class DesktopLocalRuntimeManager(
     private val installationProvider: () -> DesktopLettaCodeInstallation?,
     private val backendDirectory: () -> File,
@@ -63,6 +71,7 @@ internal class DesktopLocalRuntimeManager(
     private val readyTimeoutMs: Long = 30_000L,
     private val stopTimeoutMs: Long = 5_000L,
     private val launchContext: () -> DesktopRuntimeLaunchContext = { DesktopRuntimeLaunchContext() },
+    private val spawnLog: DesktopRuntimeSpawnLog? = null,
 ) : AutoCloseable {
     private var child: DesktopRuntimeProcess? = null
     private var childUrl: String? = null
@@ -81,6 +90,10 @@ internal class DesktopLocalRuntimeManager(
         if (existing?.isAlive == true) return checkNotNull(childUrl)
         close()
         val process = launchChild()
+        process.pid?.let { pid ->
+            spawnLog?.onSpawned(pid)
+            process.onExit { spawnLog?.onEnded(pid) }
+        }
         val stoppedByUs = AtomicBoolean(false)
         child = process
         childStoppedByUs = stoppedByUs

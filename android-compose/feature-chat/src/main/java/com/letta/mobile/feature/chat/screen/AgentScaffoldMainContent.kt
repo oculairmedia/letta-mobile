@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
@@ -132,6 +133,23 @@ private fun AgentScaffoldSearchResultsPane(
 
 @Composable
 private fun AgentScaffoldChatScreenPane(
+    state: AgentScaffoldRuntimeState,
+    chatModifier: Modifier,
+    contentTopPadding: androidx.compose.ui.unit.Dp,
+    onHeaderHiddenChange: (Boolean) -> Unit,
+) {
+    val params = state.params
+    // letta-mobile-zxk2n.5: the client-local `/` commands the shared page offers, and `/rename`'s dialog.
+    val rename = rememberRenameDialogState()
+    val clientCommands = rememberAndroidClientCommands(state, onRename = { rename.open = true })
+    if (rename.open) AndroidRenameChatDialog(state, onDismiss = { rename.open = false })
+    CompositionLocalProvider(LocalAndroidClientCommands provides clientCommands) {
+        AgentScaffoldChatScreen(state, chatModifier, contentTopPadding, onHeaderHiddenChange)
+    }
+}
+
+@Composable
+private fun AgentScaffoldChatScreen(
     state: AgentScaffoldRuntimeState,
     chatModifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,

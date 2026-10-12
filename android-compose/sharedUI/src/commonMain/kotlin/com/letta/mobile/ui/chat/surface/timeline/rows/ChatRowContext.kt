@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
@@ -36,6 +37,8 @@ internal data class ChatRowContext(
     val newestMessageId: String? = null,
     /** Where a tool summary line shows its calls: in place (desktop) or in a sheet (Android). */
     val toolDetails: ChatToolDetails = ChatToolDetails.Inline,
+    /** letta-mobile-zxk2n.5: rows these options hide draw nothing (reasoning, compactions, usage). */
+    val displayOptions: ChatDisplayOptions = ChatDisplayOptions.Default,
 ) {
     /** True on the row holding the conversation's newest message. */
     val isNewest: Boolean get() = newestMessageId != null

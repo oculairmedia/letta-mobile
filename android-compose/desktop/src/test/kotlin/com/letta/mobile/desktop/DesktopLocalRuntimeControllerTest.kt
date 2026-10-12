@@ -2,6 +2,8 @@ package com.letta.mobile.desktop
 
 import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.desktop.runtime.DesktopGitPlatform
+import com.letta.mobile.desktop.runtime.DesktopGitStatus
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import kotlin.io.path.createTempDirectory
@@ -28,10 +30,25 @@ class DesktopLocalRuntimeControllerTest {
 
     private class FakeBindings : DesktopLocalRuntimeBindings {
         override val health: StateFlow<RuntimeHealth> = MutableStateFlow(RuntimeHealth())
+        override val git: StateFlow<DesktopGitStatus> = MutableStateFlow(DesktopGitStatus.Unknown)
         var forceRestarts = 0
+        val toggles = mutableListOf<String>()
+        var gitChecks = 0
 
         override fun forceRestart() {
             forceRestarts += 1
+        }
+
+        override fun stop() {
+            toggles += "stop"
+        }
+
+        override fun start() {
+            toggles += "start"
+        }
+
+        override fun recheckGit() {
+            gitChecks += 1
         }
 
         override fun currentLaunchState(store: SecureSettingsStore) = DesktopRuntimeLaunchState(
@@ -88,7 +105,37 @@ class DesktopLocalRuntimeControllerTest {
     }
 
     @Test
+    fun theRunningSwitchStopsAndStartsTheRuntime() = runTest {
+        val bindings = FakeBindings()
+        val controller = controller(bindings) {}
+        controller.setRunning(false)
+        controller.setRunning(true)
+
+        assertEquals(listOf("stop", "start"), bindings.toggles)
+    }
+
+    @Test
+    fun checkAgainProbesForGit() = runTest(StandardTestDispatcher()) {
+        val bindings = FakeBindings()
+        controller(bindings) {}.recheckGit()
+        advanceUntilIdle()
+
+        assertEquals(1, bindings.gitChecks)
+    }
+
+    @Test
+    fun gitDescriptionsPointAtTheFix() {
+        assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.WINDOWS).describe().contains("Git for Windows"))
+        assertTrue(DesktopGitStatus.Missing(DesktopGitPlatform.MAC).describe().contains("xcode-select --install"))
+        assertTrue(
+            DesktopGitStatus.Available(java.io.File("C:/Git/cmd"), onInheritedPath = false).describe()
+                .contains("added to the runtime's PATH"),
+        )
+    }
+
+    @Test
     fun healthDescriptionsSayWhatTheUserCanDo() {
+        assertTrue(RuntimeHealth(stoppedByUser = true, active = false).describe().startsWith("Stopped."))
         assertTrue(RuntimeHealth(gaveUp = true, consecutiveCrashes = 5).describe().contains("Automatic restart is off"))
         assertTrue(RuntimeHealth(restartPending = true, lastExitCode = 1).describe().startsWith("Crashed (exit 1)"))
         assertEquals("Running.", RuntimeHealth(active = true).describe())

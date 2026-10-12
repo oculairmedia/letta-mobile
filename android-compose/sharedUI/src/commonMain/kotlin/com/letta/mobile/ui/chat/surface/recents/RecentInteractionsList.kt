@@ -2,7 +2,6 @@ package com.letta.mobile.ui.chat.surface.recents
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,7 +39,8 @@ import com.letta.mobile.sharedui.resources.chat_surface_recents_row
 import com.letta.mobile.sharedui.resources.chat_surface_recents_row_archived
 import com.letta.mobile.sharedui.resources.chat_surface_recents_row_current
 import com.letta.mobile.sharedui.resources.chat_surface_recents_title
-import com.letta.mobile.ui.chat.AgentSphere
+import com.letta.mobile.ui.mascot.AgentAvatar
+import com.letta.mobile.ui.mascot.mascotAtWork
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.sidebar.ShellConversationRowModel
 import com.letta.mobile.ui.theme.ChatHeadDimens
@@ -58,13 +60,21 @@ internal class RecentInteractionsActions(
     val newThread: () -> Unit,
 )
 
+/** The agent the recent interactions are with, which every row pictures, and those rows. */
+@Immutable
+internal class RecentInteractionsContent(
+    val agentId: String?,
+    val agentName: String,
+    val rows: List<ShellConversationRowModel>,
+)
+
 /**
  * The list itself. It scrolls past [maxHeight]; with nothing to list it says so under the "New
  * thread" action, which is always there.
  */
 @Composable
 internal fun RecentInteractionsList(
-    rows: List<ShellConversationRowModel>,
+    content: RecentInteractionsContent,
     actions: RecentInteractionsActions,
     maxHeight: Dp,
     modifier: Modifier = Modifier,
@@ -74,11 +84,13 @@ internal fun RecentInteractionsList(
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         RecentsHeader(onNewThread = actions.newThread)
-        if (rows.isEmpty()) {
+        if (content.rows.isEmpty()) {
             RecentsEmpty()
         } else {
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
-                items(rows, key = { it.id }) { row -> RecentInteractionRow(row) { actions.openConversation(row.id) } }
+                items(content.rows, key = { it.id }) { row ->
+                    RecentInteractionRow(row, avatar = { RecentRowAvatar(content, row) }) { actions.openConversation(row.id) }
+                }
             }
         }
     }
@@ -123,11 +135,27 @@ private fun RecentsEmpty() {
 }
 
 /**
+ * The agent in a row, as everywhere else ([AgentAvatar]): its mascot when it has one, else its
+ * initial. Only the current conversation's moves while the agent works, so the list is not a wall
+ * of moving scenes; the rest hold still. Decorative: the row says what it is.
+ */
+@Composable
+private fun RecentRowAvatar(content: RecentInteractionsContent, row: ShellConversationRowModel) {
+    AgentAvatar(
+        agentId = content.agentId,
+        name = content.agentName,
+        size = ChatHeadDimens.recentsAvatar,
+        modifier = Modifier.clearAndSetSemantics { testTag = recentRowAvatarTag(row.id) },
+        live = row.selected && mascotAtWork(content.agentId),
+    )
+}
+
+/**
  * One conversation: the agent's avatar, its title and how long ago it moved. The current one is
  * bold and selected; an archived one is muted. One announcement for the whole row.
  */
 @Composable
-private fun RecentInteractionRow(row: ShellConversationRowModel, onOpen: () -> Unit) {
+private fun RecentInteractionRow(row: ShellConversationRowModel, avatar: @Composable () -> Unit, onOpen: () -> Unit) {
     val label = recentRowLabel(row)
     Row(
         modifier = Modifier
@@ -135,7 +163,8 @@ private fun RecentInteractionRow(row: ShellConversationRowModel, onOpen: () -> U
             .heightIn(min = ChatHeadDimens.recentsRowMinHeight)
             .testTag(recentRowTag(row.id))
             .clickable(role = Role.Button, onClick = onOpen)
-            .clearAndSetSemantics {
+            // Merged rather than cleared, so the avatar's tag stays findable; the texts add nothing to the label.
+            .semantics(mergeDescendants = true) {
                 contentDescription = label
                 selected = row.selected
                 role = Role.Button
@@ -146,10 +175,10 @@ private fun RecentInteractionRow(row: ShellConversationRowModel, onOpen: () -> U
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
     ) {
-        Box { AgentSphere(size = ChatHeadDimens.recentsAvatar) }
+        avatar()
         Text(
             row.title,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).clearAndSetSemantics {},
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (row.selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (row.archived) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
@@ -158,6 +187,7 @@ private fun RecentInteractionRow(row: ShellConversationRowModel, onOpen: () -> U
         )
         Text(
             row.timeLabel,
+            modifier = Modifier.clearAndSetSemantics {},
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -173,7 +203,10 @@ private fun recentRowLabel(row: ShellConversationRowModel): String = when {
 
 internal fun recentRowTag(id: String): String = "$RECENTS_ROW_TAG_PREFIX$id"
 
+internal fun recentRowAvatarTag(id: String): String = "$RECENTS_ROW_AVATAR_TAG_PREFIX$id"
+
 internal const val RECENTS_LIST_TAG = "chat-recents-list"
 internal const val RECENTS_NEW_THREAD_TAG = "chat-recents-new-thread"
 internal const val RECENTS_EMPTY_TAG = "chat-recents-empty"
 internal const val RECENTS_ROW_TAG_PREFIX = "chat-recents-row-"
+internal const val RECENTS_ROW_AVATAR_TAG_PREFIX = "chat-recents-avatar-"

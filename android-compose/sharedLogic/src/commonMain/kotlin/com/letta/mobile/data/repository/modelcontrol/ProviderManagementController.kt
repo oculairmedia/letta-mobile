@@ -40,8 +40,12 @@ data class ProviderManagementState(
     val expanded: Set<String> = emptySet(),
     val form: ProviderConnectForm? = null,
     val pendingDisconnect: ConnectableProvider? = null,
-    /** A subscription provider whose terminal sign-in steps are showing. */
+    /** A subscription provider whose terminal sign-in steps are showing (no in-app sign-in for it). */
     val signIn: ConnectableProvider? = null,
+    /** The in-app subscription sign-in (letta-mobile-zxk2n.3); Idle when none is open. */
+    val oauth: ProviderSignInState = ProviderSignInState.Idle,
+    /** True when this client can run subscription sign-ins itself; otherwise they take the terminal steps. */
+    val inAppSignIn: Boolean = false,
 ) {
     val totalModels: Int get() = sections.sumOf { it.models.size }
     val shownModels: Int get() = sections.sumOf { it.exposedCount }
@@ -83,19 +87,30 @@ data class ProviderManagementState(
  * Presenter of the Providers & Models pane (letta-mobile-w4q4p.6): one state
  * composed from the provider and catalog repositories. Hosts own [scope]
  * (Android: viewModelScope; desktop: a composition scope).
+ *
+ * With [oauthHttp] (letta-mobile-zxk2n.3) subscription rows the app knows
+ * sign in from the app; without it, or for rows it does not know, they show
+ * the host-terminal steps.
  */
 class ProviderManagementController(
     private val scope: CoroutineScope,
     private val providers: ProviderConnectionRepository,
     private val catalog: ModelCatalogRepository,
+    oauthHttp: ProviderOAuthHttp? = null,
 ) {
-    private val _state = MutableStateFlow(ProviderManagementState())
+    /** The in-app sign-in, when this host can run one. */
+    val signIn: ProviderSignInController? = oauthHttp?.let { ProviderSignInController(scope, it, providers, catalog) }
+
+    private val _state = MutableStateFlow(ProviderManagementState(inAppSignIn = signIn != null))
     val state: StateFlow<ProviderManagementState> = _state.asStateFlow()
 
     init {
         scope.launch {
             combine(providers.providers, catalog.models) { p, m -> ProviderCatalogComposer.compose(p, m) }
                 .collect { sections -> _state.update { it.copy(sections = sections) } }
+        }
+        signIn?.let { flow ->
+            scope.launch { flow.state.collect { oauth -> _state.update { it.copy(oauth = oauth) } } }
         }
     }
 
@@ -138,8 +153,15 @@ class ProviderManagementController(
     fun openEdit(provider: ConnectableProvider) =
         _state.update { it.copy(form = providerEditForm(provider), error = null) }
 
-    /** Subscription providers connect from the host's terminal; this shows how. */
-    fun openSignIn(provider: ConnectableProvider) = _state.update { it.copy(signIn = provider, error = null, message = null) }
+    /**
+     * Connects a subscription provider: in the app when it can run the
+     * provider's sign-in, otherwise the host-terminal steps.
+     */
+    fun openSignIn(provider: ConnectableProvider) {
+        _state.update { it.copy(error = null, message = null) }
+        val flow = signIn?.takeIf { it.supports(provider) }
+        if (flow != null) flow.start(provider) else _state.update { it.copy(signIn = provider) }
+    }
 
     fun dismissSignIn() = _state.update { it.copy(signIn = null) }
 
