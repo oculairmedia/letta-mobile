@@ -77,7 +77,7 @@ class RunRepositoryTest {
 
     @Test
     fun `refreshRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+        val failure = runCatching {
             val settings = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
                     id = "test",
@@ -93,7 +93,8 @@ class RunRepositoryTest {
             }
             val repo = RunRepository(apiThatThrows)
             repo.refreshRuns(RunListParams())
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test
@@ -179,7 +180,7 @@ class RunRepositoryTest {
 
     @Test
     fun `getRecentRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+        val failure = runCatching {
             val apiThatThrows = object : FakeRunApi() {
                 override suspend fun listRuns(params: RunListParams): List<Run> {
                     throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
@@ -187,7 +188,8 @@ class RunRepositoryTest {
             }
             val repo = RunRepository(apiThatThrows)
             repo.getRecentRuns(limit = 5)
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test

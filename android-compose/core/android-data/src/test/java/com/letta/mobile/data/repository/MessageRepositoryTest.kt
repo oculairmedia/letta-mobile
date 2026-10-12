@@ -153,11 +153,12 @@ class MessageRepositoryTest {
 
     @Test
     fun `fetchOlderMessages propagates api failures for explicit pagination`() = runTest {
-        kotlin.test.assertFailsWith<ApiException> {
+        val failure = runCatching {
             fakeApi.shouldFail = true
 
             repository.fetchOlderMessages("agent-1", "conv-1", "before-1")
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected ApiException, got $failure", failure is ApiException)
     }
 
     @Test

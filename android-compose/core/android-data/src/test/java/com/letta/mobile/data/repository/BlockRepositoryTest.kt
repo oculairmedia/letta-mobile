@@ -123,10 +123,11 @@ class BlockRepositoryTest {
 
     @Test
     fun `updateAgentBlock throws on API failure`() = runTest {
-        kotlin.test.assertFailsWith<com.letta.mobile.data.api.ApiException> {
+        val failure = runCatching {
             fakeApi.shouldFail = true
             repository.updateAgentBlock("a1", "persona", BlockUpdateParams(value = "value"))
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected ApiException, got $failure", failure is com.letta.mobile.data.api.ApiException)
     }
 
     @Test
@@ -158,17 +159,18 @@ class BlockRepositoryTest {
 
     @Test
     fun `listAllBlocks throws on API failure`() = runTest {
-        kotlin.test.assertFailsWith<com.letta.mobile.data.api.ApiException> {
+        val failure = runCatching {
             fakeApi.shouldFail = true
             repository.listAllBlocks()
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected ApiException, got $failure", failure is com.letta.mobile.data.api.ApiException)
     }
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
     @Test
     fun `retrieveBlock in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+        val failure = runCatching {
             // RED: repository has no irohBlockSource yet, so raw API call throws
             val settings = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -185,7 +187,8 @@ class BlockRepositoryTest {
             }
             val repo = BlockRepository(apiThatThrows)
             repo.retrieveBlock("b1")
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test

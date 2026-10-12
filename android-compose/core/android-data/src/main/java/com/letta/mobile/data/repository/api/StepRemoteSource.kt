@@ -14,24 +14,22 @@ import com.letta.mobile.data.model.StepMetrics
  * Every call fails unless overridden.
  */
 interface StepRemoteSource {
-    suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> = noRoute("listSteps")
+    suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> = noRoute()
 
-    suspend fun retrieveStep(stepId: String): Step = noRoute("retrieveStep")
+    suspend fun retrieveStep(stepId: StepId): Step = noRoute()
 
-    suspend fun retrieveStepMetrics(stepId: String): StepMetrics = noRoute("retrieveStepMetrics")
+    suspend fun retrieveStepMetrics(stepId: StepId): StepMetrics = noRoute()
 
-    suspend fun retrieveStepTrace(stepId: String): ProviderTrace? = noRoute("retrieveStepTrace")
+    suspend fun retrieveStepTrace(stepId: StepId): ProviderTrace? = noRoute()
 
-    suspend fun listStepMessages(
-        stepId: String,
-        before: String? = null,
-        after: String? = null,
-        limit: Int? = null,
-        order: String? = null,
-    ): List<LettaMessage> = noRoute("listStepMessages")
+    /** The step's messages, oldest first. */
+    suspend fun listStepMessages(stepId: StepId): List<LettaMessage> = noRoute()
 
-    suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step = noRoute("updateStepFeedback")
+    suspend fun updateStepFeedback(stepId: StepId, params: StepFeedbackUpdateParams): Step = noRoute()
 }
 
-private fun noRoute(operation: String): Nothing =
-    throw NoAppServerRouteException("StepRemoteSource.$operation")
+/** A run step's id. */
+@JvmInline
+value class StepId(val value: String)
+
+private fun noRoute(): Nothing = throw NoAppServerRouteException("StepRemoteSource")

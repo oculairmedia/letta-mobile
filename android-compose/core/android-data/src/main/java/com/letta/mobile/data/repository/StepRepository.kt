@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.StepFeedbackUpdateParams
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.StepMetrics
 import com.letta.mobile.data.repository.api.IStepRepository
+import com.letta.mobile.data.repository.api.StepId
 import com.letta.mobile.data.repository.api.StepRemoteSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,27 +42,27 @@ class StepRepository(
 
     override suspend fun getStep(stepId: String): Step {
         requireStepQueries("step.get($stepId)")
-        return requireRemote().retrieveStep(stepId)
+        return requireRemote().retrieveStep(StepId(stepId))
     }
 
     override suspend fun getStepMetrics(stepId: String): StepMetrics {
         requireStepQueries("step.metrics($stepId)")
-        return requireRemote().retrieveStepMetrics(stepId)
+        return requireRemote().retrieveStepMetrics(StepId(stepId))
     }
 
     override suspend fun getStepTrace(stepId: String): ProviderTrace? {
         requireStepQueries("step.trace($stepId)")
-        return requireRemote().retrieveStepTrace(stepId)
+        return requireRemote().retrieveStepTrace(StepId(stepId))
     }
 
     override suspend fun getStepMessages(stepId: String): List<LettaMessage> {
         requireStepQueries("step.messages($stepId)")
-        return requireRemote().listStepMessages(stepId = stepId, order = "asc")
+        return requireRemote().listStepMessages(StepId(stepId))
     }
 
     override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
         requireStepQueries("step.feedback($stepId)")
-        val step = requireRemote().updateStepFeedback(stepId, params)
+        val step = requireRemote().updateStepFeedback(StepId(stepId), params)
         upsertStep(step)
         return step
     }

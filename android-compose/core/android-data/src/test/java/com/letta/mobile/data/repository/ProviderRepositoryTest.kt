@@ -45,7 +45,7 @@ class ProviderRepositoryTest {
 
     @Test
     fun `refreshProviders in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+        val failure = runCatching {
             val settings = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
                     id = "test",
@@ -61,7 +61,8 @@ class ProviderRepositoryTest {
             }
             val repo = ProviderRepository(apiThatThrows)
             repo.refreshProviders(name = null, providerType = null)
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test

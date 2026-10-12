@@ -92,7 +92,7 @@ open class ToolRepository(
      */
     override suspend fun getTool(toolId: String): Tool {
         val irohSource = irohToolSource
-        if (irohSource == null || !irohSource.shouldUseIroh()) return remote.getTool(toolId)
+        if (irohSource == null || !irohSource.shouldUseIroh()) return remote.getTool(ToolId(toolId))
         // tool.get first so a tool changed/deleted since the catalog loaded is not served stale;
         // the cached catalog is only the fallback for hosts without tool.get.
         return irohGetOrNull(irohSource, toolId)
@@ -130,7 +130,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.attachTool(agentId, toolId)
         } else {
-            remote.attachTool(agentId.value, toolId.value)
+            remote.attachTool(agentId, toolId)
         }
         val tool = _tools.value.find { it.id == toolId }
         if (tool != null) {
@@ -146,7 +146,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.detachTool(agentId, toolId)
         } else {
-            remote.detachTool(agentId.value, toolId.value)
+            remote.detachTool(agentId, toolId)
         }
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     val existing = get(agentId.value) ?: emptyList()
@@ -173,7 +173,7 @@ open class ToolRepository(
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.updateTool(toolId, params)
         } else {
-            remote.updateTool(toolId.value, params)
+            remote.updateTool(toolId, params)
         }
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
@@ -191,7 +191,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteTool(toolId)
         } else {
-            remote.deleteTool(toolId.value)
+            remote.deleteTool(toolId)
         }
         _tools.update { current -> current.filterNot { it.id == toolId } }
         _toolsByAgent.update { current ->

@@ -311,7 +311,7 @@ class ToolRepositoryTest {
         }
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
-            override suspend fun updateTool(toolId: String, params: com.letta.mobile.data.model.ToolUpdateParams): com.letta.mobile.data.model.Tool {
+            override suspend fun updateTool(toolId: com.letta.mobile.data.model.ToolId, params: com.letta.mobile.data.model.ToolUpdateParams): com.letta.mobile.data.model.Tool {
                 throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
@@ -334,7 +334,7 @@ class ToolRepositoryTest {
         }
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
-            override suspend fun deleteTool(toolId: String) {
+            override suspend fun deleteTool(toolId: com.letta.mobile.data.model.ToolId) {
                 throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }

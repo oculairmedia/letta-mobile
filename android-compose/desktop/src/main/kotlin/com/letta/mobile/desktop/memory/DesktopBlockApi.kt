@@ -29,21 +29,6 @@ interface DesktopBlockApi : AutoCloseable {
     suspend fun deleteBlockById(blockId: BlockId)
     suspend fun createAndAttachBlock(params: BlockCreateAttachParams): Block
 
-    /** Compatibility wrappers for existing string-based call sites. */
-    suspend fun getBlockById(blockId: String): Block = getBlockById(BlockId(blockId))
-    suspend fun updateBlockById(blockId: String, value: String, limit: Int? = null): Block =
-        updateBlockById(BlockId(blockId), BlockValueUpdate(value = value, limit = limit))
-    suspend fun deleteBlockById(blockId: String) = deleteBlockById(BlockId(blockId))
-    suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int? = null): Block =
-        createAndAttachBlock(
-            BlockCreateAttachParams(
-                agentId = AgentId(agentId),
-                label = label,
-                value = value,
-                limit = limit,
-            ),
-        )
-
     override fun close() = Unit
 }
 

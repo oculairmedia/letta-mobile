@@ -33,6 +33,7 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
@@ -136,12 +137,7 @@ class SessionGraphAssembler @Inject constructor(
         request: SessionGraphAssembleRequest,
         agentRepository: AgentRepository,
     ): ConversationRepos {
-        val irohConversationListSource = request.settingsRepository?.let {
-            IrohAdminRpcConversationListSource(
-                channelTransport = request.channelTransport,
-                settingsRepository = it,
-            )
-        }
+        val irohConversationListSource = request.irohSource(::IrohAdminRpcConversationListSource)
         return ConversationRepos(
             allConversations = AllConversationsRepository(
                 remote = remoteSources.conversations,
@@ -167,79 +163,25 @@ class SessionGraphAssembler @Inject constructor(
         )
     }
 
-    private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories {
-        val ops = createOpsAdminRepositories(request)
-        val catalog = createCatalogAdminRepositories(request)
-        return AdminRepositories(
-            mcpServer = catalog.mcpServer,
-            model = catalog.model,
-            passage = ops.passage,
-            project = catalog.project,
-            run = ops.run,
-            provider = ops.provider,
-            tool = ops.tool,
-        )
-    }
-
-    private fun createCatalogAdminRepositories(
-        request: SessionGraphAssembleRequest,
-    ): CatalogAdminRepositories {
-        val transport = request.channelTransport
-        val settings = request.settingsRepository
-        return CatalogAdminRepositories(
-            mcpServer = McpServerRepository(
-                remote = remoteSources.mcpServers,
-                irohMcpSource = settings?.let {
-                    IrohAdminRpcMcpSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
+    private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories =
+        AdminRepositories(
+            mcpServer = McpServerRepository(remoteSources.mcpServers, request.irohSource(::IrohAdminRpcMcpSource)),
             model = ModelRepository(
                 remote = remoteSources.models,
                 localModelSource = localModelSource,
-                settingsRepository = settings,
-                irohModelSource = settings?.let {
-                    IrohAdminRpcModelSource(channelTransport = transport, settingsRepository = it)
-                },
+                settingsRepository = request.settingsRepository,
+                irohModelSource = request.irohSource(::IrohAdminRpcModelSource),
             ),
-            project = ProjectRepository(
-                remote = remoteSources.projects,
-                irohProjectSource = settings?.let {
-                    IrohAdminRpcProjectSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
+            passage = PassageRepository(remoteSources.passages, request.irohSource(::IrohAdminRpcPassageSource)),
+            project = ProjectRepository(remoteSources.projects, request.irohSource(::IrohAdminRpcProjectSource)),
+            run = RunRepository(remoteSources.runs, request.irohSource(::IrohAdminRpcRunSource)),
+            provider = ProviderRepository(remoteSources.providers, request.irohSource(::IrohAdminRpcProviderSource)),
+            tool = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
         )
-    }
 
-    private fun createOpsAdminRepositories(request: SessionGraphAssembleRequest): OpsAdminRepositories {
-        val transport = request.channelTransport
-        val settings = request.settingsRepository
-        return OpsAdminRepositories(
-            passage = PassageRepository(
-                remote = remoteSources.passages,
-                irohPassageSource = settings?.let {
-                    IrohAdminRpcPassageSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
-            run = RunRepository(
-                remote = remoteSources.runs,
-                irohRunSource = settings?.let {
-                    IrohAdminRpcRunSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
-            provider = ProviderRepository(
-                remote = remoteSources.providers,
-                irohProviderSource = settings?.let {
-                    IrohAdminRpcProviderSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
-            tool = ToolRepository(
-                remote = remoteSources.tools,
-                irohToolSource = settings?.let {
-                    IrohAdminRpcToolSource(channelTransport = transport, settingsRepository = it)
-                },
-            ),
-        )
-    }
+    /** An Iroh admin_rpc source over this graph's transport, when the graph has settings to scope it. */
+    private fun <T> SessionGraphAssembleRequest.irohSource(source: (IChannelTransport, ISettingsRepository) -> T): T? =
+        settingsRepository?.let { source(channelTransport, it) }
 
     private fun createScheduleRepository(
         useIroh: Boolean,
@@ -257,19 +199,6 @@ class SessionGraphAssembler @Inject constructor(
     private data class ConversationRepos(
         val allConversations: AllConversationsRepository,
         val conversation: ConversationRepository,
-    )
-
-    private data class CatalogAdminRepositories(
-        val mcpServer: McpServerRepository,
-        val model: ModelRepository,
-        val project: ProjectRepository,
-    )
-
-    private data class OpsAdminRepositories(
-        val passage: PassageRepository,
-        val run: RunRepository,
-        val provider: ProviderRepository,
-        val tool: ToolRepository,
     )
 
     private data class AdminRepositories(

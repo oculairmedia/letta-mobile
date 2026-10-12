@@ -52,42 +52,24 @@ class DesktopSessionGraphAdaptersTest {
 
     /**
      * letta-mobile-ckmub.4: no backend binds a Letta REST repository any more. The bundled runtime
-     * reads agents and memory over its App Server session; schedules and tools have no direct App
-     * Server route yet, so they are the unavailable repository rather than a REST fallback.
+     * and a remote host reached directly (ws://) are both App Servers: agents and memory are read
+     * over that session; schedules and tools have no direct App Server route yet, so they are the
+     * unavailable repository rather than a REST fallback.
      */
     @Test
-    fun localModeReadsAgentsAndMemoryOverTheAppServer() {
-        val adapters = DesktopRepositoryAdapters(
-            LettaConfig(
-                id = "desktop-local",
-                mode = LettaConfig.Mode.LOCAL,
-                serverUrl = "http://127.0.0.1:8283",
-            ),
+    fun appServerBackendsReadAgentsAndMemoryOverTheAppServer() {
+        val backends = listOf(
+            LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = ""),
+            LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500"),
         )
+        for (config in backends) {
+            val adapters = DesktopRepositoryAdapters(config)
 
-        assertIs<AppServerAgentRepository>(adapters.agentRepository)
-        assertIs<AppServerAgentBlockRepository>(adapters.blockRepository)
-        assertUnavailable(adapters.scheduleRepository)
-        assertUnavailable(adapters.toolRepository)
-    }
-
-    /**
-     * A remote host reached directly (ws://) is an App Server too: the memory graph's "blocks"
-     * section reads over that session instead of going dark or falling back to REST.
-     */
-    @Test
-    fun remoteAppServerBindsAgentsAndBlocksOverTheAppServer() {
-        val adapters = DesktopRepositoryAdapters(
-            LettaConfig(
-                id = "desktop-self-hosted",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "ws://localhost:4500",
-            ),
-        )
-
-        assertIs<AppServerAgentRepository>(adapters.agentRepository)
-        assertIs<AppServerAgentBlockRepository>(adapters.blockRepository)
-        assertUnavailable(adapters.scheduleRepository)
+            assertIs<AppServerAgentRepository>(adapters.agentRepository, config.id)
+            assertIs<AppServerAgentBlockRepository>(adapters.blockRepository, config.id)
+            assertUnavailable(adapters.scheduleRepository)
+            assertUnavailable(adapters.toolRepository)
+        }
     }
 
     private fun assertUnavailable(repository: Any) {

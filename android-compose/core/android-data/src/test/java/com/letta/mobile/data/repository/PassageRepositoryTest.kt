@@ -116,7 +116,7 @@ class PassageRepositoryTest {
 
     @Test
     fun `refreshPassages in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<com.letta.mobile.data.backend.NoAppServerRouteException> {
+        val failure = runCatching {
             val apiThatThrows = object : FakePassageApi() {
                 override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
                     throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
@@ -124,7 +124,8 @@ class PassageRepositoryTest {
             }
             val repo = PassageRepository(apiThatThrows)
             repo.refreshPassages("a1")
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
     }
 
     @Test

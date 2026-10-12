@@ -165,7 +165,8 @@ internal class IrohPassageRepository(
         }
 
     override suspend fun refreshPassages(agentId: String) {
-        replaceCached(agentId, source.listPassages(agentId))
+        val passages = source.listPassages(agentId)
+        mutateCached(agentId) { passages }
     }
 
     override suspend fun createPassage(agentId: String, text: String): Passage {
@@ -181,10 +182,6 @@ internal class IrohPassageRepository(
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
         unsupported("passage.searchArchival($agentId)")
-
-    private fun replaceCached(agentId: String, passages: List<Passage>) {
-        mutateCached(agentId) { passages }
-    }
 
     private fun mutateCached(agentId: String, transform: (List<Passage>) -> List<Passage>) {
         synchronized(cacheLock) {

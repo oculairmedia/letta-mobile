@@ -85,64 +85,64 @@ open class FakeProjectWorkApi : ProjectWorkRemoteSource by noAppServerRoute<Proj
         assignee: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueMutationResponse {
-        calls.add("claimIssue:$issueId:$assignee")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "claim") { it.copy(assignee = assignee) }
-    }
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("claimIssue:$issueId:$assignee", MutationHeaders(ifMatch, idempotencyKey), issueId, "claim"),
+    ) { it.copy(assignee = assignee) }
 
     override suspend fun unclaimIssue(
         issueId: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueMutationResponse {
-        calls.add("unclaimIssue:$issueId")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "unclaim") { it.copy(assignee = null) }
-    }
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("unclaimIssue:$issueId", MutationHeaders(ifMatch, idempotencyKey), issueId, "unclaim"),
+    ) { it.copy(assignee = null) }
 
     override suspend fun updateIssueStatus(
         issueId: String,
         status: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueMutationResponse {
-        calls.add("updateIssueStatus:$issueId:$status")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "status") { it.copy(status = status) }
-    }
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("updateIssueStatus:$issueId:$status", MutationHeaders(ifMatch, idempotencyKey), issueId, "status"),
+    ) { it.copy(status = status) }
 
     override suspend fun addIssueNote(
         issueId: String,
         note: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueMutationResponse {
-        calls.add("addIssueNote:$issueId:$note")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "note") { it }
-    }
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("addIssueNote:$issueId:$note", MutationHeaders(ifMatch, idempotencyKey), issueId, "note"),
+    ) { it }
 
     override suspend fun closeIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueMutationResponse {
-        calls.add("closeIssue:$issueId:$reason")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "close") { it.copy(status = "closed", ready = false) }
-    }
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("closeIssue:$issueId:$reason", MutationHeaders(ifMatch, idempotencyKey), issueId, "close"),
+    ) { it.copy(status = "closed", ready = false) }
 
     override suspend fun reopenIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
         idempotencyKey: String,
+    ): ProjectIssueMutationResponse = recordMutation(
+        MutationCall("reopenIssue:$issueId:$reason", MutationHeaders(ifMatch, idempotencyKey), issueId, "reopen"),
+    ) { it.copy(status = "open") }
+
+    /** One recorded issue mutation: what was called, with which headers, on which issue. */
+    data class MutationCall(val call: String, val headers: MutationHeaders, val issueId: String, val action: String)
+
+    private fun recordMutation(
+        mutation: MutationCall,
+        transform: (ProjectIssueSummary) -> ProjectIssueSummary,
     ): ProjectIssueMutationResponse {
-        calls.add("reopenIssue:$issueId:$reason")
-        mutationHeaders.add(MutationHeaders(ifMatch, idempotencyKey))
-        return mutation(issueId, action = "reopen") { it.copy(status = "open") }
+        calls.add(mutation.call)
+        mutationHeaders.add(mutation.headers)
+        return mutation(mutation.issueId, action = mutation.action, transform = transform)
     }
 
     /** The optimistic-concurrency headers a mutation carried. */

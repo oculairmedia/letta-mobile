@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.repository.api.StepId
 import com.letta.mobile.data.repository.api.StepRemoteSource
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
@@ -25,44 +26,44 @@ open class FakeStepApi : StepRemoteSource {
         return steps.filter { step -> params.agentId == null || step.agentId == params.agentId }
     }
 
-    override suspend fun retrieveStep(stepId: String): Step {
-        calls.add("retrieveStep:$stepId")
+    override suspend fun retrieveStep(stepId: StepId): Step {
+        calls.add("retrieveStep:${stepId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        return steps.firstOrNull { it.id == stepId } ?: sampleStep(stepId)
+        return steps.firstOrNull { it.id == stepId.value } ?: sampleStep(stepId.value)
     }
 
-    override suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
-        calls.add("retrieveStepMetrics:$stepId")
+    override suspend fun retrieveStepMetrics(stepId: StepId): StepMetrics {
+        calls.add("retrieveStepMetrics:${stepId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        return stepMetrics[stepId] ?: StepMetrics(id = stepId, stepStartNs = 100L, llmRequestNs = 250L, stepNs = 500L)
+        return stepMetrics[stepId.value] ?: StepMetrics(id = stepId.value, stepStartNs = 100L, llmRequestNs = 250L, stepNs = 500L)
     }
 
-    override suspend fun retrieveStepTrace(stepId: String): ProviderTrace {
-        calls.add("retrieveStepTrace:$stepId")
+    override suspend fun retrieveStepTrace(stepId: StepId): ProviderTrace {
+        calls.add("retrieveStepTrace:${stepId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        return stepTraces[stepId] ?: ProviderTrace(
+        return stepTraces[stepId.value] ?: ProviderTrace(
             id = "provider_trace-1",
-            stepId = stepId,
+            stepId = stepId.value,
             createdAt = "2026-04-10T12:00:00Z",
             requestJson = mapOf("model" to JsonPrimitive("gpt-4")),
             responseJson = mapOf("finish_reason" to JsonPrimitive("stop")),
         )
     }
 
-    override suspend fun listStepMessages(stepId: String, before: String?, after: String?, limit: Int?, order: String?): List<LettaMessage> {
-        calls.add("listStepMessages:$stepId")
+    override suspend fun listStepMessages(stepId: StepId): List<LettaMessage> {
+        calls.add("listStepMessages:${stepId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        return stepMessages[stepId] ?: listOf(AssistantMessage(id = "msg-1", contentRaw = null))
+        return stepMessages[stepId.value] ?: listOf(AssistantMessage(id = "msg-1", contentRaw = null))
     }
 
-    override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
-        calls.add("updateStepFeedback:$stepId")
+    override suspend fun updateStepFeedback(stepId: StepId, params: StepFeedbackUpdateParams): Step {
+        calls.add("updateStepFeedback:${stepId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val step = (steps.firstOrNull { it.id == stepId } ?: sampleStep(stepId)).copy(
+        val step = (steps.firstOrNull { it.id == stepId.value } ?: sampleStep(stepId.value)).copy(
             feedback = params.feedback,
             tags = params.tags ?: emptyList(),
         )
-        val index = steps.indexOfFirst { it.id == stepId }
+        val index = steps.indexOfFirst { it.id == stepId.value }
         if (index >= 0) {
             steps[index] = step
         } else {

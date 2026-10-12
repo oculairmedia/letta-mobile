@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop.agent
 
+import com.letta.mobile.desktop.memory.BlockValueUpdate
+import com.letta.mobile.desktop.memory.BlockCreateAttachParams
+import com.letta.mobile.data.model.BlockId
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -196,8 +199,8 @@ internal fun DesktopEditAgentSurface(
                 // captured back into state — a re-save then UPDATEs in place
                 // instead of attaching a second block.
                 suspend fun upsertBlock(label: String, value: String, existingId: String?): String? = when {
-                    existingId != null -> { blockApi?.updateBlockById(existingId, value); existingId }
-                    value.isNotBlank() -> blockApi?.createAndAttachBlock(agentId, label, value)?.id?.value
+                    existingId != null -> { blockApi?.updateBlockById(BlockId(existingId), BlockValueUpdate(value)); existingId }
+                    value.isNotBlank() -> blockApi?.createAndAttachBlock(BlockCreateAttachParams(AgentId(agentId), label, value))?.id?.value
                     else -> existingId
                 }
                 // Write ONLY the fields that changed, and run those writes

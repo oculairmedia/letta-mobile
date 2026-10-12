@@ -45,7 +45,7 @@ class McpServerRepositoryTest {
 
     @Test
     fun `refreshServers in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+        val failure = runCatching {
             val settings = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
                     id = "test",
@@ -61,7 +61,8 @@ class McpServerRepositoryTest {
             }
             val repo = McpServerRepository(apiThatThrows)
             repo.refreshServers()
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test

@@ -550,7 +550,7 @@ class AgentRepositoryTest {
 
     @Test
     fun `createAgent in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        kotlin.test.assertFailsWith<com.letta.mobile.data.backend.NoAppServerRouteException> {
+        val failure = runCatching {
             val apiThatThrows = object : FakeAgentApi() {
                 override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
                     throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
@@ -558,7 +558,8 @@ class AgentRepositoryTest {
             }
             val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
             repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
-        }
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
     }
 
     @Test
