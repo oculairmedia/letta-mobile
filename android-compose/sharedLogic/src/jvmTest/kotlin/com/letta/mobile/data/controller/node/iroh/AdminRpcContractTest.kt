@@ -110,6 +110,7 @@ class AdminRpcContractTest {
             "provider.disconnect",
             "reflection.get",
             "reflection.set",
+            "reflection.run",
             "run.get",
             "run.list",
             "cron.add",

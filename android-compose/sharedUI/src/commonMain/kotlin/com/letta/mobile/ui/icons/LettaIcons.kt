@@ -42,6 +42,7 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.MessageCircle
 import com.composables.icons.lucide.MessageSquare
+import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Package
 import com.composables.icons.lucide.PanelLeftClose
 import com.composables.icons.lucide.PanelLeftOpen
@@ -100,6 +101,7 @@ object LettaIcons {
 
     // Actions
     val Add: ImageVector get() = Lucide.Plus
+    val Remove: ImageVector get() = Lucide.Minus
     val Edit: ImageVector get() = Lucide.Pencil
     val Delete: ImageVector get() = Lucide.Trash2
     val Save: ImageVector get() = Lucide.Save
