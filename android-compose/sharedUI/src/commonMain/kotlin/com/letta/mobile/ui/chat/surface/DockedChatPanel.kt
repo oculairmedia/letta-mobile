@@ -677,7 +677,7 @@ private fun PanelBody(content: DockedPanelContent, modifier: Modifier) {
     ) { open ->
         if (open) {
             RecentInteractionsList(
-                rows = recents.recents.conversations,
+                content = recents.content,
                 actions = recents.hop,
                 maxHeight = ChatSurfaceDimens.dockMaxHeight,
                 modifier = Modifier.fillMaxSize().padding(top = LettaDimens.Space.sm),
