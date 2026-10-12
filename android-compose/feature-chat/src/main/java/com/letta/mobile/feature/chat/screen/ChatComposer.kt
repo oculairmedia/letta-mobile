@@ -27,10 +27,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -257,7 +259,7 @@ private fun ChatComposerContent(
     // uses ComponentActivity, not HiltTestActivity), so hiltViewModel()
     // would throw IllegalStateException. In those contexts we silently
     // skip the voice affordance — production always has the Hilt host.
-    val voice = rememberChatComposerVoice(model)
+    val voice = rememberChatComposerVoice(model, callbacks)
 
     Column(modifier = modifier.fillMaxWidth()) {
         // letta-mobile-8jtf3: the agent's mascot above the box, on the attach button's edge,
@@ -335,12 +337,23 @@ private fun ChatComposerContent(
 }
 
 @Composable
-private fun rememberChatComposerVoice(model: ChatComposerUiModel): ChatComposerVoice {
+private fun rememberChatComposerVoice(
+    model: ChatComposerUiModel,
+    callbacks: ChatComposerCallbacks,
+): ChatComposerVoice {
     val activity = LocalContext.current as? android.app.Activity
     val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
     val viewModel: VoiceInputViewModel? = if (isHiltHost) hiltViewModel() else null
     val state by (viewModel?.uiState ?: remember { MutableStateFlow(VoiceInputUiState()) })
         .collectAsState()
+    // letta-mobile-7a1vl: collect transcripts while composed; the view model holds no callback.
+    val currentText by rememberUpdatedState(model.inputText)
+    val currentOnTextChange by rememberUpdatedState(callbacks.onTextChange)
+    LaunchedEffect(viewModel) {
+        viewModel?.dictations?.collect { dictated ->
+            currentOnTextChange(if (currentText.isBlank()) dictated else "$currentText $dictated")
+        }
+    }
     val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
     return ChatComposerVoice(
         viewModel = viewModel,
@@ -447,7 +460,7 @@ private fun ChatComposerInput(
         actionPulse = stops && !model.isCancelling,
         actionVisible = state.showAction || state.voice.enabled,
         hasStagedContent = model.pendingAttachments.isNotEmpty(),
-        customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
+        customTrailingContent = voiceTrailingContent(state.voice),
         contentPadding = PaddingValues(
             horizontal = ChatComposerInputHorizontalPadding,
             vertical = verticalPadding,
@@ -466,24 +479,13 @@ private fun ChatComposerInput(
     )
 }
 
-private fun voiceTrailingContent(
-    model: ChatComposerUiModel,
-    callbacks: ChatComposerCallbacks,
-    voice: ChatComposerVoice,
-): (@Composable () -> Unit)? {
+private fun voiceTrailingContent(voice: ChatComposerVoice): (@Composable () -> Unit)? {
     val viewModel = voice.viewModel ?: return null
     if (!voice.enabled) return null
     return {
         HoldToDictateButton(
             isRecognizing = voice.state.recognizing,
-            onStart = {
-                viewModel.startSpeechRecognition { dictated ->
-                    if (dictated.isNotBlank()) {
-                        val merged = if (model.inputText.isBlank()) dictated else "${model.inputText} $dictated"
-                        callbacks.onTextChange(merged)
-                    }
-                }
-            },
+            onStart = viewModel::startSpeechRecognition,
             onStop = viewModel::stopSpeechRecognition,
             onCancel = viewModel::cancelSpeechRecognition,
         )
