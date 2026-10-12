@@ -95,7 +95,6 @@ private fun stubSettingsRepository() = mockk<ISettingsRepository>(relaxed = true
     every { getChatBackgroundKey() } returns flowOf("default")
     every { getChatFontScale() } returns flowOf(1f)
     every { getHapticsEnabled() } returns flowOf(false)
-    every { getSharedChatPageEnabled() } returns flowOf(false)
     every { getOpenChatsOnCanvas() } returns flowOf(true)
     every { getPinnedAgentIds() } returns flowOf(emptySet())
 }

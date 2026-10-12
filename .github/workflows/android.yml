@@ -255,12 +255,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   row-parity:
-    # letta-mobile-ckmub.1 (hard cut S1): legacy Android chat rows vs the shared
-    # sharedUI rows, rendered from one fixture timeline at phone width, light and
-    # dark. Produces paired PNGs, diff images and a row type -> pixel diff % table
-    # as an artifact and in the step summary. Advisory until the S4 row fixes land:
-    # continue-on-error, and the task itself fails only when nothing renders.
-    name: row parity (advisory)
+    # Hard cut S9 (letta-mobile-ckmub.2.2): the shared sharedUI chat rows against
+    # their committed goldens (feature-chat/src/test/snapshots/rows), rendered from
+    # one fixture timeline at phone width, light and dark. Until S9 this compared
+    # the legacy Android rows with the shared ones (S1/S4). Produces golden/shared/
+    # diff PNGs and a row type -> pixel diff % table as an artifact and in the step
+    # summary; the task fails when a row moves more than 2% from its golden.
+    # Advisory (continue-on-error) while the goldens settle across platforms.
+    name: row goldens (advisory)
     needs: [test]
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -284,20 +286,20 @@ jobs:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Render legacy vs shared chat rows
-        run: ./gradlew :feature-chat:rowParityReport
+      - name: Render the shared chat rows against their goldens
+        run: ./gradlew :feature-chat:rowGoldenReport
 
-      - name: Publish row parity summary
+      - name: Publish row golden summary
         if: always()
         run: |
           report=feature-chat/build/outputs/roborazzi/row-parity/report.md
           {
-            echo "## Chat row parity (advisory)"
+            echo "## Chat row goldens (advisory)"
             echo
             if [ -f "$report" ]; then cat "$report"; else echo "No report was written."; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload row parity images
+      - name: Upload row golden images
         if: always()
         uses: actions/upload-artifact@v4
         with:

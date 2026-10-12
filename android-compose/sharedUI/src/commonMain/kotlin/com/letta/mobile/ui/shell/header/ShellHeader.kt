@@ -178,6 +178,7 @@ private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
             .testTag(ShellHeaderTags.SEARCH),
         config = slot.config,
         compact = compact,
+        openSignal = slot.openSignal,
     )
 }
 

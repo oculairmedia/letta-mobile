@@ -9,7 +9,7 @@ internal data class ParityResult(
     val rowId: String,
     val label: String,
     val diffPercent: Double?,
-    val legacyHeightDp: Int?,
+    val goldenHeightDp: Int?,
     val sharedHeightDp: Int?,
     val note: String = "",
 ) {
@@ -18,7 +18,7 @@ internal data class ParityResult(
         rowId,
         label,
         diffPercent?.let { String.format(Locale.US, "%.2f", it) }.orEmpty(),
-        legacyHeightDp?.toString().orEmpty(),
+        goldenHeightDp?.toString().orEmpty(),
         sharedHeightDp?.toString().orEmpty(),
         note.replace('\t', ' ').replace('\n', ' '),
     ).joinToString("\t")
@@ -35,7 +35,7 @@ internal data class ParityResult(
 }
 
 /**
- * The harness's summary: row type -> pixel diff % per theme, with each side's content height. Each
+ * The goldens' summary: row type -> pixel diff % per theme, with each side's content height. Each
  * theme's test writes its own results file and then rebuilds report.md from every results file in
  * the directory, so the report is whole after whichever test runs last.
  */
@@ -50,17 +50,17 @@ internal object RowParityReport {
     private const val NOT_AVAILABLE = "n/a"
 
     private val INTRO =
-        "Pixel diff % per row type: each side cropped to its own content, top-aligned, a pixel " +
+        "Pixel diff % per row type against the committed golden: each side cropped to its own content, top-aligned, a pixel " +
             "differs when any channel moves by more than ${RowParityImages.CHANNEL_TOLERANCE}/255. " +
             "Phone width (412dp, xhdpi). Heights are each side's content height in dp. " +
-            "Images: `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`."
+            "Images: `<theme>/<row>.{golden,shared,diff,side-by-side}.png`."
 
     fun rebuild(dir: File, order: List<String>): String {
         val results = readResults(dir)
         val themes = results.map { it.theme }.distinct().sorted()
         val byRow = results.groupBy { it.rowId }
         val rows = order.filter { it in byRow } + byRow.keys.filterNot { it in order }
-        val lines = listOf("# Legacy vs shared chat row parity (ckmub.1)", "", INTRO, "") +
+        val lines = listOf("# Shared chat rows vs their goldens (ckmub.2.2)", "", INTRO, "") +
             header(themes) +
             rows.map { tableRow(it, byRow.getValue(it), themes) }
         val markdown = lines.joinToString("\n", postfix = "\n")
@@ -74,7 +74,7 @@ internal object RowParityReport {
             .flatMap { it.readLines().mapNotNull(ParityResult::parse) }
 
     private fun header(themes: List<String>): List<String> = listOf(
-        "| Row type |" + themes.joinToString("") { " $it diff % | $it legacy/shared dp |" } + " Notes |",
+        "| Row type |" + themes.joinToString("") { " $it diff % | $it golden/shared dp |" } + " Notes |",
         "|---|" + themes.joinToString("") { "---:|---:|" } + "---|",
     )
 
@@ -92,8 +92,8 @@ internal object RowParityReport {
     }
 
     private fun ParityResult.heights(): String? {
-        val legacy = legacyHeightDp ?: return null
+        val golden = goldenHeightDp ?: return null
         val shared = sharedHeightDp ?: return null
-        return "$legacy/$shared"
+        return "$golden/$shared"
     }
 }

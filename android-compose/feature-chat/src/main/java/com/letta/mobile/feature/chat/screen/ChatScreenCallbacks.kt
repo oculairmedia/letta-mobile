@@ -1,12 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.model.UiImageAttachment
-import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.chat.projection.ToolTimelineGroup
-import com.letta.mobile.ui.theme.ChatBackground
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.staticCompositionLocalOf
 
 internal data class ChatScreenNavigationCallbacks(
     val onBugCommand: (() -> Unit)? = null,
@@ -20,48 +14,15 @@ internal data class ChatScreenNavigationCallbacks(
     val onOpenConversation: ((String, String) -> Unit)? = null,
 )
 
-internal data class ChatContentCallbacks(
-    val onSendMessage: (String) -> Unit,
-    val onRerunMessage: (UiMessage) -> Unit,
-    val onLoadOlderMessages: () -> Unit,
-    val onReleaseOlderMessages: () -> Unit = {},
-    val onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
-    val onToggleRunCollapsed: (String) -> Unit,
-    val onToggleReasoningExpanded: (String) -> Unit,
-    val onOpenToolRunDetails: (List<ToolTimelineGroup>) -> Unit = {},
-    val onA2uiAction: (A2uiAction) -> Unit = {},
-    val onDismissA2uiSurface: (String) -> Unit = {},
-    val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-    val onActiveFontScaleChange: (Float) -> Unit = {},
-    val onFontScaleChange: (Float) -> Unit = {},
-) {
-    /** User-facing name for the historical rerun callback. */
-    val onSendAgainMessage: (UiMessage) -> Unit
-        get() = onRerunMessage
-}
-
-internal data class ChatContentAppearance(
-    val chatMode: String = "simple",
-    val chatBackground: ChatBackground = ChatBackground.Default,
-    val topPadding: Dp = 0.dp,
-    val bottomPadding: Dp = 0.dp,
-    /**
-     * Bottom clearance for the scroll-to-bottom FAB: [bottomPadding] minus the
-     * visually transparent band above the composer's input card, so the FAB
-     * anchors above the card the user perceives as the composer (2026-09-28
-     * product feedback). Defaults to [bottomPadding] for callers that have no
-     * measured input card.
-     */
-    val scrollFabBottomPadding: Dp = bottomPadding,
-    val activeFontScale: Float = 1f,
-    val scrollToMessageId: String? = null,
+/**
+ * letta-mobile-bccty: the inter-agent provenance label's two lookups, from the scaffold: an agent
+ * id's display name, and opening that agent's most recent conversation. Hard cut S9: the shared
+ * page hands them to its rows as the surface host's resolveAgentName and openAgent (the legacy
+ * bubbles read them from here directly).
+ */
+internal data class AndroidAgentMessageContext(
+    val resolveName: ((String) -> String?)? = null,
+    val onAgentClick: ((String) -> Unit)? = null,
 )
 
-internal data class GoalStatusCallbacks(
-    val onRefresh: () -> Unit,
-    val onContinue: () -> Unit,
-    val onPause: () -> Unit,
-    val onResume: () -> Unit,
-    val onComplete: () -> Unit,
-    val onClear: () -> Unit,
-)
+internal val LocalAndroidAgentMessageContext = staticCompositionLocalOf { AndroidAgentMessageContext() }

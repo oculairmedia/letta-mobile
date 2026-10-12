@@ -25,9 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.data.chat.projection.requiresUserInput
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
+import com.letta.mobile.sharedui.resources.rows_message_actions
 import com.letta.mobile.sharedui.resources.rows_copy_response
 import com.letta.mobile.sharedui.resources.rows_role_error
 import com.letta.mobile.sharedui.resources.rows_role_tool_activity
@@ -87,8 +90,17 @@ private fun AssistantMessageColumn(
     // the fork button that shows beside Copy on hover.
     val menuActions = remember(callbacks.actions) { callbacks.actions.asMessageMenuActions() }
     val menu = rememberMessageMenu(message, context.capabilities, menuActions, sendAgain = false)
+    // Hard cut S9: the legacy Android bubble's accessibility long-click, so TalkBack (and switch
+    // access) reach the same actions a right-click or the fork button does.
+    val actionsLabel = stringResource(Res.string.rows_message_actions)
+    val openMenu = menu.openMenu
+    val a11yActions = if (openMenu == null) {
+        Modifier
+    } else {
+        Modifier.semantics { onLongClick(label = actionsLabel) { openMenu(); true } }
+    }
     Column(
-        modifier = Modifier.fillMaxWidth().onSecondaryClick(menu.openMenu),
+        modifier = Modifier.fillMaxWidth().onSecondaryClick(openMenu).then(a11yActions),
         verticalArrangement = Arrangement.spacedBy(ChatRowSpacing.messagePart),
     ) {
         if (touchStyle() && showsSpeakerHeader(message, position)) SpeakerHeader(message, context)

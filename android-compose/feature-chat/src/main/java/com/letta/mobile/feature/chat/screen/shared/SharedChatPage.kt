@@ -31,14 +31,16 @@ import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
+import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.AndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalAndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
-import com.letta.mobile.feature.chat.screen.saveAttachment
-import com.letta.mobile.feature.chat.screen.shareAttachment
+import com.letta.mobile.feature.chat.util.saveAttachment
+import com.letta.mobile.feature.chat.util.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
@@ -122,8 +124,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
     // Read live by the rings overlay, whose slot lambda is remembered with the platform.
     val currentSubagents by rememberUpdatedState(params.subagents)
-    val host = remember(params.navigation, subagentSheet) {
-        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
+    val agentMessages = LocalAndroidAgentMessageContext.current
+    val host = remember(params.navigation, subagentSheet, agentMessages) {
+        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch, agentMessages = agentMessages)
     }
     val hasCanvasSlot = canvasSlot != null
     val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
@@ -329,11 +332,14 @@ private fun rememberAdminChatSessionPort(
 
 private fun ChatScreenNavigationCallbacks.toSurfaceHost(
     openSubagent: (toolCallId: String, subagentAgentId: String?, description: String) -> Unit,
+    agentMessages: AndroidAgentMessageContext,
 ): ChatSurfaceHost {
     val openPane = onOpenAgentPane
     return ChatSurfaceHost(
         openCanvas = onOpenCanvas,
-        openAgent = openPane?.let { { _: String -> it() } },
+        // An inter-agent label opens that agent's latest conversation, as the legacy bubbles did.
+        openAgent = agentMessages.onAgentClick ?: openPane?.let { { _: String -> it() } },
+        resolveAgentName = agentMessages.resolveName,
         openSubagent = openSubagent,
         openModelPicker = null,
         // The composer companion mascot opens the agent drawer, as the legacy page's does.

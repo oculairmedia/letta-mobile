@@ -3,7 +3,6 @@ package com.letta.mobile.ui.screens.config
 import androidx.compose.runtime.Stable
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 
 // What each settings card can ask of the screen's owner. ConfigScreen builds them once from the
@@ -53,7 +52,5 @@ internal class AppearanceCallbacks(
 internal class FeatureToggleCallbacks(
     val onEnableProjectsChange: (Boolean) -> Unit,
     val onHapticsEnabledChange: (Boolean) -> Unit,
-    val onSharedChatPageEnabledChange: (Boolean) -> Unit,
     val onOpenChatsOnCanvasChange: (Boolean) -> Unit,
-    val onFeatureFlagChange: (FeatureFlag, Boolean) -> Unit = { _, _ -> },
 )

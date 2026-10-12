@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -26,7 +24,7 @@ internal fun AgentScaffoldMainContent(
     val topPadding = paddingValues.calculateTopPadding()
     Column(modifier = Modifier.fillMaxSize()) {
         AgentScaffoldProjectInfoSection(state, topPadding)
-        AgentScaffoldChatSection(state, paddingValues, topPadding, onHeaderHiddenChange)
+        AgentScaffoldChatSection(state, topPadding, onHeaderHiddenChange)
     }
 }
 
@@ -59,75 +57,20 @@ private fun AgentScaffoldProjectInfoSection(
 @Composable
 private fun ColumnScope.AgentScaffoldChatSection(
     state: AgentScaffoldRuntimeState,
-    paddingValues: PaddingValues,
     topPadding: androidx.compose.ui.unit.Dp,
     onHeaderHiddenChange: (Boolean) -> Unit,
 ) {
-    val params = state.params
-    val dismissIdleSearchOnTimelineTap = params.searchUi.isChatSearchExpanded &&
-        state.uiState.searchQuery.isBlank() && !state.uiState.isSearchActive
+    // The message search lives in the header's search pane (ChatMessageSearch); the chat stays put.
     val chatModifier = Modifier
         .fillMaxWidth()
         .weight(1f)
-        .then(
-            if (dismissIdleSearchOnTimelineTap) {
-                Modifier.pointerInput(Unit) {
-                    detectTapGestures {
-                        params.searchUi.onChatSearchExpandedChange(false)
-                    }
-                }
-            } else {
-                Modifier
-            },
-        )
         .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT)
     val contentTopPadding = if (state.projectContext == null) topPadding else 0.dp
-
-    if (state.uiState.isSearchActive) {
-        AgentScaffoldSearchResultsPane(
-            state = state,
-            chatModifier = chatModifier,
-            contentTopPadding = contentTopPadding,
-            bottomPadding = paddingValues.calculateBottomPadding(),
-        )
-    } else {
-        AgentScaffoldChatScreenPane(
-            state = state,
-            chatModifier = chatModifier,
-            contentTopPadding = contentTopPadding,
-            onHeaderHiddenChange = onHeaderHiddenChange,
-        )
-    }
-}
-
-@Composable
-private fun AgentScaffoldSearchResultsPane(
-    state: AgentScaffoldRuntimeState,
-    chatModifier: Modifier,
-    contentTopPadding: androidx.compose.ui.unit.Dp,
-    bottomPadding: androidx.compose.ui.unit.Dp,
-) {
-    val params = state.params
-    ChatSearchResultsContent(
-        params = ChatSearchResultsParams(
-            searchQuery = state.uiState.searchQuery,
-            results = state.uiState.searchResults,
-            isSearching = state.uiState.isSearching,
-            conversations = state.drawerConversations,
-            currentConversationId = state.conversationId,
-            onResultClick = { result ->
-                params.searchUi.onChatSearchExpandedChange(false)
-                params.viewModel.clearChatSearch()
-                result.conversationId?.let { targetConversationId ->
-                    params.navigation.onSwitchConversation?.invoke(
-                        state.agentIdValue,
-                        targetConversationId,
-                        state.agentName.takeIf { it.isNotBlank() },
-                    )
-                }
-            },
-        ),
-        modifier = chatModifier.padding(top = contentTopPadding, bottom = bottomPadding),
+    AgentScaffoldChatScreenPane(
+        state = state,
+        chatModifier = chatModifier,
+        contentTopPadding = contentTopPadding,
+        onHeaderHiddenChange = onHeaderHiddenChange,
     )
 }
 

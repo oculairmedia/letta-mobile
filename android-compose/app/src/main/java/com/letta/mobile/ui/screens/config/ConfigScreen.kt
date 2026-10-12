@@ -147,9 +147,7 @@ private fun rememberConfigContentCallbacks(
             features = FeatureToggleCallbacks(
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
                 onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
-                onSharedChatPageEnabledChange = { viewModel.updateSharedChatPageEnabled(it) },
                 onOpenChatsOnCanvasChange = { viewModel.updateOpenChatsOnCanvas(it) },
-                onFeatureFlagChange = viewModel::updateFeatureFlag,
             ),
             onRefresh = viewModel::loadConfig,
             onSave = { currentOnSave() },

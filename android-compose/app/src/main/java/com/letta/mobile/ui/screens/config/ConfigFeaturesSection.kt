@@ -4,7 +4,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import ca.oculair.meridian.R
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.ui.components.CardGroup
 
 // The settings screen's features card: the app-wide feature switches.
@@ -38,36 +37,14 @@ internal fun FeaturesSection(
             },
         )
         item(
-            headlineContent = { Text(stringResource(R.string.screen_config_shared_chat_page)) },
-            supportingContent = { Text(stringResource(R.string.screen_config_shared_chat_page_description)) },
+            headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
+            supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
             trailingContent = {
                 HapticSwitch(
-                    checked = state.sharedChatPageEnabled,
-                    onCheckedChange = callbacks.onSharedChatPageEnabledChange,
+                    checked = state.openChatsOnCanvas,
+                    onCheckedChange = callbacks.onOpenChatsOnCanvasChange,
                 )
             },
         )
-        item(
-            headlineContent = { Text(stringResource(R.string.screen_config_shared_nav_drawer)) },
-            supportingContent = { Text(stringResource(R.string.screen_config_shared_nav_drawer_description)) },
-            trailingContent = {
-                HapticSwitch(
-                    checked = FeatureFlag.SharedNavDrawer in state.enabledFeatureFlags,
-                    onCheckedChange = { callbacks.onFeatureFlagChange(FeatureFlag.SharedNavDrawer, it) },
-                )
-            },
-        )
-        if (state.sharedChatPageEnabled) {
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas)) },
-                supportingContent = { Text(stringResource(R.string.screen_config_open_chats_on_canvas_description)) },
-                trailingContent = {
-                    HapticSwitch(
-                        checked = state.openChatsOnCanvas,
-                        onCheckedChange = callbacks.onOpenChatsOnCanvasChange,
-                    )
-                },
-            )
-        }
     }
 }

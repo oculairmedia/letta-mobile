@@ -39,7 +39,6 @@ internal suspend fun createCanonicalChatPagingPresentation(
     owner: CanonicalTimelineCoordinator.Owner,
     uiScope: CoroutineScope,
     target: String?,
-    decodeDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,
 ): ChatPagingPresentation {
     val canonical = CanonicalTimelinePresentation.open(coordinator, owner, uiScope, target?.let(::TimelineMessageId))
     val job = SupervisorJob(uiScope.coroutineContext[Job])
@@ -58,15 +57,6 @@ internal suspend fun createCanonicalChatPagingPresentation(
                 row.item
             }
         }.cachedIn(scope),
-        deferredReader = { item ->
-            val row = synchronized(rows) { rows[item] }
-            if (row?.deferred == null) null else {
-                val read: DeferredBodyRead = { field, offset ->
-                    canonical.readTextWindow(row, field, offset, decodeDispatcher)
-                }
-                read
-            }
-        },
         live = canonical.live,
         missingTarget = MutableStateFlow(canonical.missingTarget),
         onResidentRows = { resident ->

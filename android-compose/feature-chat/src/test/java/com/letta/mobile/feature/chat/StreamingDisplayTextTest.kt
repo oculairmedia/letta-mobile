@@ -1,11 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.feature.chat.render.MAX_HELD_TAIL_CHARS
-import com.letta.mobile.feature.chat.render.MarkdownClampSource
-import com.letta.mobile.feature.chat.render.clampToStableMarkdown
 import com.letta.mobile.feature.chat.render.clampToWordBoundary
-import com.letta.mobile.feature.chat.render.MarkdownOpenerScanLine
-import com.letta.mobile.feature.chat.render.findUnmatchedOpenerInLine
 import com.letta.mobile.feature.chat.render.hasOpenDisplayMathFence
 import com.letta.mobile.feature.chat.render.insideOpenCodeFence
 import com.letta.mobile.feature.chat.render.isStreamingBoundary
@@ -246,144 +242,6 @@ class StreamingDisplayTextTest {
         assertEquals("Hello ", clampToWordBoundary("Hello $tail"))
     }
 
-    // ═══ clampToStableMarkdown ═══
-
-    @Test
-    fun `clampToStableMarkdown balanced returns full`() {
-        assertEquals("Hello world", clampToStableMarkdown(MarkdownClampSource("Hello world")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched star-star clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello **wor")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched star clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello *wor")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched underscore clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello _wor")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched double-underscore clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello __wor")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched backtick clips before`() {
-        assertEquals("Run ", clampToStableMarkdown(MarkdownClampSource("Run `ls /tmp/so")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched strikethrough clips before`() {
-        assertEquals("This is ", clampToStableMarkdown(MarkdownClampSource("This is ~~wr")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown unmatched bracket clips before`() {
-        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [the docs")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown bracket closed no paren clips before bracket`() {
-        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [the docs] f")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown bracket with paren no close-paren clips before bracket`() {
-        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [docs](https://ex")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown balanced bold returns full`() {
-        assertEquals("**bold** here", clampToStableMarkdown(MarkdownClampSource("**bold** here")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown balanced backtick returns full`() {
-        assertEquals("Run `ls` now", clampToStableMarkdown(MarkdownClampSource("Run `ls` now")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown balanced link returns full`() {
-        assertEquals("See [d](https://x.com)", clampToStableMarkdown(MarkdownClampSource("See [d](https://x.com)")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown balanced strikethrough returns full`() {
-        assertEquals("~~done~~ here", clampToStableMarkdown(MarkdownClampSource("~~done~~ here")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown multiple unmatched earliest wins`() {
-        assertEquals("a ", clampToStableMarkdown(MarkdownClampSource("a *b `c")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown mixed underscore and star`() {
-        assertEquals("__bold__ and ", clampToStableMarkdown(MarkdownClampSource("__bold__ and *italic text ")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown text ending at newline returns full`() {
-        assertEquals("Hello\n", clampToStableMarkdown(MarkdownClampSource("Hello\n")))
-    }
-
-    @Test
-    fun `clampToStableMarkdown multi-line only last line scanned`() {
-        val result = clampToStableMarkdown(MarkdownClampSource("**done** here\n**open"))
-        assertEquals("**done** here\n", result)
-    }
-
-    // ═══ findUnmatchedOpenerInLine ═══
-
-    @Test
-    fun `findUnmatchedOpenerInLine balanced returns -1`() {
-        assertEquals(-1, openerScanIndex("**bold**"))
-        assertEquals(-1, openerScanIndex("*italic*"))
-        assertEquals(-1, openerScanIndex("`code`"))
-        assertEquals(-1, openerScanIndex("~~strike~~"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched double-star`() {
-        assertEquals(6, openerScanIndex("Hello **world"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched single-star`() {
-        assertEquals(6, openerScanIndex("Hello *world"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched backtick`() {
-        assertEquals(4, openerScanIndex("Run `command"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched tilde-tilde`() {
-        assertEquals(5, openerScanIndex("This ~~text"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched bracket`() {
-        assertEquals(4, openerScanIndex("See [link"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine unmatched underscore`() {
-        assertEquals(6, openerScanIndex("Hello _world"))
-    }
-
-    @Test
-    fun `findUnmatchedOpenerInLine multiple unmatched returns earliest`() {
-        assertEquals(2, openerScanIndex("a *b `c"))
-    }
-
     // ═══ insideOpenCodeFence ═══
 
     @Test
@@ -517,6 +375,3 @@ class StreamingDisplayTextTest {
         assertEquals("Jules queue", streamingDisplayText("Jules queue"))
     }
 }
-
-private fun openerScanIndex(line: String): Int =
-    findUnmatchedOpenerInLine(MarkdownOpenerScanLine(line))

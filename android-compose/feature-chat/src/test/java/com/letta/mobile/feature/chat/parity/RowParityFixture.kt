@@ -10,13 +10,9 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import kotlinx.collections.immutable.toPersistentList
 
 /**
- * letta-mobile-ckmub.1 (hard cut S1): the one realistic conversation the row parity harness draws
- * through both the legacy Android timeline and the shared one. Every [ParityRow] is a slice of
- * [timeline] by message id, so legacy and shared always render the same messages.
- *
- * The messages follow the builders already in feature-chat's screenshot tests
- * (RunBlockScreenshotTest, SharedTimelineParityScreenshotTest): there is no shared UiMessage
- * builder in core:testutil, so the shapes are spelled out here once.
+ * letta-mobile-ckmub.1 (hard cut S1): the one realistic conversation the row goldens draw through
+ * the shared timeline. Every [ParityRow] is a slice of [timeline] by message id. (Until hard cut S9
+ * the same slices were drawn through the legacy Android timeline too, for the side-by-side parity.)
  */
 internal object RowParityFixture {
     const val AGENT_ID = "agent-parity"
@@ -179,30 +175,24 @@ internal object RowParityFixture {
     )
 }
 
-/** How a row is drawn on each side. */
+/** How a row is drawn. */
 internal enum class ParityLayout {
-    /** Timeline only: legacy ChatMessageList vs shared ChatTimelineSnapshot. */
+    /** Timeline only: ChatTimelineSnapshot. */
     TIMELINE,
 
-    /** Timeline plus the composer's thinking token vs the shared timeline's thinking row. */
+    /** Timeline plus the composer's thinking token. */
     THINKING,
 
-    /**
-     * The page's bottom with the agent's mascot: legacy ChatMessageList over ChatComposer with its
-     * mascot companion and thinking token vs the shared ChatSurface page with its
-     * COMPOSER_COMPANION seat.
-     */
+    /** The ChatSurface page with the agent's mascot in its COMPOSER_COMPANION seat. */
     THINKING_MASCOT,
 }
 
-/** One row type: a slice of [RowParityFixture.timeline] (or the thinking prompt) drawn both ways. */
+/** One row type: a slice of [RowParityFixture.timeline] (or the thinking prompt). */
 internal data class ParityRow(
     val id: String,
     val label: String,
     val messages: List<UiMessage>,
     val layout: ParityLayout = ParityLayout.TIMELINE,
-    /** Why a remaining diff is expected (S4 explained diffs), shown in the report's Notes column. */
-    val note: String = "",
 ) {
     val state: ChatUiState
         get() = RowParityFixture.state(messages, thinking = layout != ParityLayout.TIMELINE)
@@ -210,26 +200,23 @@ internal data class ParityRow(
     companion object {
         private val f = RowParityFixture
 
-        private const val ERROR_NOTE = "explained: the shared error bubble's Retry action (bzvro.9) has no legacy counterpart"
-        private const val ANCHOR_NOTE = "explained: legacy top-anchors a short chat, shared bottom-anchors it over the composer; the token's place over the composer is asserted in ComposerThinkingPlacementTest"
-
         val all: List<ParityRow> = listOf(
             ParityRow("user", "User bubble", listOf(f.userPrompt)),
             ParityRow("assistant", "Assistant bubble (no run)", listOf(f.assistantStandalone)),
-            ParityRow("reasoning", "Reasoning (ChatReasoning / ChatRowReasoning)", listOf(f.reasoning)),
-            ParityRow("tool-call-return", "Tool call + return (ProjectedToolTimeline / ChatRowToolRun)", listOf(f.toolCallReturn)),
+            ParityRow("reasoning", "Reasoning (ChatRowReasoning)", listOf(f.reasoning)),
+            ParityRow("tool-call-return", "Tool call + return (ChatRowToolRun)", listOf(f.toolCallReturn)),
             ParityRow("tool-call-error", "Tool call, failed return", listOf(f.toolCallFailed)),
             ParityRow("assistant-in-run", "Assistant reply in a run", listOf(f.assistantReply)),
             ParityRow(
                 "run-block",
-                "Run block (RunBlock / ChatRowRunBlock)",
+                "Run block (ChatRowRunBlock)",
                 listOf(f.userPrompt, f.reasoning, f.toolCallReturn, f.toolCallFailed, f.assistantReply),
             ),
             ParityRow("approval", "Approval card", listOf(f.approval)),
-            ParityRow("error", "Error frame", listOf(f.error), note = ERROR_NOTE),
+            ParityRow("error", "Error frame", listOf(f.error)),
             ParityRow("queued", "Queued (pending) user prompt", listOf(f.queued)),
-            ParityRow("thinking", "Thinking row (no mascot)", listOf(f.thinkingPrompt), ParityLayout.THINKING, ANCHOR_NOTE),
-            ParityRow("thinking-mascot", "Thinking row with mascot seat", listOf(f.thinkingPrompt), ParityLayout.THINKING_MASCOT, ANCHOR_NOTE),
+            ParityRow("thinking", "Thinking row (no mascot)", listOf(f.thinkingPrompt), ParityLayout.THINKING),
+            ParityRow("thinking-mascot", "Thinking row with mascot seat", listOf(f.thinkingPrompt), ParityLayout.THINKING_MASCOT),
             ParityRow("timeline", "Whole fixture timeline", f.timeline),
         )
     }

@@ -382,17 +382,6 @@ open class CachedSettingsRepository(
         }
     }
 
-    override fun getSharedChatPageEnabled(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
-        // letta-mobile-ckmub.1 (S4): on by default; turning it off keeps the legacy page for one release.
-        prefs.getBoolean(SettingsPreferenceKeys.SHARED_CHAT_PAGE) ?: true
-    }
-
-    override suspend fun setSharedChatPageEnabled(enabled: Boolean) {
-        preferencesStore.edit { prefs ->
-            prefs.putBoolean(SettingsPreferenceKeys.SHARED_CHAT_PAGE, enabled)
-        }
-    }
-
     override fun getOpenChatsOnCanvas(): Flow<Boolean> = preferencesStore.snapshots.map { prefs ->
         prefs.getBoolean(SettingsPreferenceKeys.OPEN_CHATS_ON_CANVAS) ?: true
     }
