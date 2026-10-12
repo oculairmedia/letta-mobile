@@ -4,18 +4,13 @@ import com.letta.mobile.data.repository.api.VibesyncEventStreamSource
 import com.letta.mobile.data.repository.api.VibesyncEventStreamLogger
 import com.letta.mobile.data.repository.api.VibesyncStreamEndpointUnavailableException
 import io.ktor.utils.io.ByteReadChannel
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 
 /**
  * Android binding for [CachedVibesyncEventStreamRepository]. letta-mobile-ckmub.4: the VibeSync
  * event stream was read over the Letta REST client (`/api/events/stream`), which is gone; no App
  * Server or Iroh route carries it yet, so production reports the endpoint as unavailable.
  */
-@Singleton
 class VibesyncEventStreamRepository internal constructor(
     streamSource: VibesyncEventStreamSource,
     scope: CoroutineScope,
@@ -31,9 +26,6 @@ class VibesyncEventStreamRepository internal constructor(
         scope = scope,
         logger = AndroidVibesyncEventStreamLogger(),
     )
-
-    @Inject
-    constructor() : this(CoroutineScope(SupervisorJob() + Dispatchers.IO))
 }
 
 /** No backend carries the VibeSync event stream since the Letta REST client was removed. */

@@ -27,6 +27,8 @@ class NoAppServerRouteException(operation: String) : UnsupportedOperationExcepti
  */
 inline fun <reified T : Any> noAppServerRoute(): T = noAppServerRoute(T::class.java)
 
+// java.lang.reflect.Proxy is typed on Any; this is the only boundary that touches it.
+@Suppress("NoAnyType")
 fun <T : Any> noAppServerRoute(contract: Class<T>): T {
     require(contract.isInterface) { "${contract.name} is not an interface" }
     return contract.cast(
@@ -34,6 +36,7 @@ fun <T : Any> noAppServerRoute(contract: Class<T>): T {
     )
 }
 
+@Suppress("NoAnyType") // InvocationHandler's signature is fixed by java.lang.reflect.
 private class NoAppServerRouteHandler(private val contractName: String) : InvocationHandler {
     override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any? =
         when {

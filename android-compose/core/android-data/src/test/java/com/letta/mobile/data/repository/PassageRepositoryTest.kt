@@ -114,15 +114,17 @@ class PassageRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.backend.NoAppServerRouteException::class)
+    @Test
     fun `refreshPassages in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val apiThatThrows = object : FakePassageApi() {
-            override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+        kotlin.test.assertFailsWith<com.letta.mobile.data.backend.NoAppServerRouteException> {
+            val apiThatThrows = object : FakePassageApi() {
+                override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
+                    throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = PassageRepository(apiThatThrows)
+            repo.refreshPassages("a1")
         }
-        val repo = PassageRepository(apiThatThrows)
-        repo.refreshPassages("a1")
     }
 
     @Test

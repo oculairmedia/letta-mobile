@@ -43,23 +43,25 @@ class McpServerRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = NoAppServerRouteException::class)
+    @Test
     fun `refreshServers in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeMcpServerApi() {
-            override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeMcpServerApi() {
+                override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = McpServerRepository(apiThatThrows)
+            repo.refreshServers()
         }
-        val repo = McpServerRepository(apiThatThrows)
-        repo.refreshServers()
     }
 
     @Test

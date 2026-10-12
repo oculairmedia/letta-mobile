@@ -121,10 +121,12 @@ class BlockRepositoryTest {
         ),
     )
 
-    @Test(expected = com.letta.mobile.data.api.ApiException::class)
+    @Test
     fun `updateAgentBlock throws on API failure`() = runTest {
-        fakeApi.shouldFail = true
-        repository.updateAgentBlock("a1", "persona", BlockUpdateParams(value = "value"))
+        kotlin.test.assertFailsWith<com.letta.mobile.data.api.ApiException> {
+            fakeApi.shouldFail = true
+            repository.updateAgentBlock("a1", "persona", BlockUpdateParams(value = "value"))
+        }
     }
 
     @Test
@@ -154,32 +156,36 @@ class BlockRepositoryTest {
         assertEquals(true, result[0].isTemplate)
     }
 
-    @Test(expected = com.letta.mobile.data.api.ApiException::class)
+    @Test
     fun `listAllBlocks throws on API failure`() = runTest {
-        fakeApi.shouldFail = true
-        repository.listAllBlocks()
+        kotlin.test.assertFailsWith<com.letta.mobile.data.api.ApiException> {
+            fakeApi.shouldFail = true
+            repository.listAllBlocks()
+        }
     }
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = NoAppServerRouteException::class)
+    @Test
     fun `retrieveBlock in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        // RED: repository has no irohBlockSource yet, so raw API call throws
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+            // RED: repository has no irohBlockSource yet, so raw API call throws
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeBlockApi() {
-            override suspend fun retrieveBlock(blockId: String): Block {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeBlockApi() {
+                override suspend fun retrieveBlock(blockId: String): Block {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = BlockRepository(apiThatThrows)
+            repo.retrieveBlock("b1")
         }
-        val repo = BlockRepository(apiThatThrows)
-        repo.retrieveBlock("b1")
     }
 
     @Test

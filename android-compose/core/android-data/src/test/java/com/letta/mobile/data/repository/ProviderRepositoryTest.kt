@@ -43,23 +43,25 @@ class ProviderRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = NoAppServerRouteException::class)
+    @Test
     fun `refreshProviders in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeProviderApi() {
-            override suspend fun listProviders(before: String?, after: String?, limit: Int?, order: String?, name: String?, providerType: String?): List<Provider> {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeProviderApi() {
+                override suspend fun listProviders(before: String?, after: String?, limit: Int?, order: String?, name: String?, providerType: String?): List<Provider> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = ProviderRepository(apiThatThrows)
+            repo.refreshProviders(name = null, providerType = null)
         }
-        val repo = ProviderRepository(apiThatThrows)
-        repo.refreshProviders(name = null, providerType = null)
     }
 
     @Test

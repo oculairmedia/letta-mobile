@@ -18,8 +18,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Inject
 
+/** The scope of a repository built outside a session graph (tests, previews); graphs pass their own. */
+@Suppress("NoDetachedCoroutineLifecycle")
 internal fun defaultAllConversationsScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -49,19 +50,6 @@ open class AllConversationsRepository(
     irohConversationListSource = irohConversationListSource,
     transport = transport,
 ) {
-    /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
-    @Inject
-    constructor(
-        conversationDao: Lazy<ConversationDao>?,
-        localConversationSource: LocalRuntimeConversationSource,
-        settingsRepository: ISettingsRepository,
-    ) : this(
-        conversationDao = conversationDao,
-        repositoryScope = defaultAllConversationsScope(),
-        localConversationSource = localConversationSource,
-        settingsRepository = settingsRepository,
-    )
-
     /** A repository over [remote] (the backend seam; tests and previews bind a fake). */
     constructor(
         remote: ConversationRemoteSource,

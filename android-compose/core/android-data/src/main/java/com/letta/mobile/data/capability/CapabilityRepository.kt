@@ -1,6 +1,8 @@
 package com.letta.mobile.data.capability
 
 import android.util.Log
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.ProjectListLimit
@@ -10,8 +12,6 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,8 +36,7 @@ import javax.inject.Singleton
  * Iroh transport yet — are not cached; [observeSessionForRetry] re-probes after
  * the session graph switches.
  */
-internal fun defaultCapabilityScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+internal fun defaultCapabilityScope(): CoroutineScope = ProcessLifecycleOwner.get().lifecycleScope
 
 private sealed class ProbeOutcome {
     data class Definitive(val supported: Boolean) : ProbeOutcome()

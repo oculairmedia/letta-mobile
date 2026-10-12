@@ -39,6 +39,7 @@ internal fun buildIrohRepositories(
     )
 }
 
+@Suppress("NoAnyType") // java.lang.reflect.Proxy is typed on Any.
 internal inline fun <reified T : Any> unavailableRepository(): T {
     val contract = T::class.java
     val handler = UnavailableRepositoryInvocationHandler(contract.simpleName)
@@ -49,6 +50,7 @@ internal inline fun <reified T : Any> unavailableRepository(): T {
     ) as T
 }
 
+@Suppress("NoAnyType") // InvocationHandler's signature and the defaults it returns are untyped by design.
 internal class UnavailableRepositoryInvocationHandler(
     private val contractName: String,
 ) : InvocationHandler {

@@ -105,7 +105,7 @@ open class FakeMcpServerApi : McpServerRemoteSource by noAppServerRoute<McpServe
             ?: McpToolExecutionResult(status = "success", funcReturn = JsonPrimitive("ok"))
     }
 
-    private fun parseArgsFast(configValue: Any?): List<String> {
+    private fun parseArgsFast(configValue: kotlinx.serialization.json.JsonElement?): List<String> {
         if (configValue == null) return emptyList()
         val str = configValue.toString()
         if (str.isEmpty() || str == "[]") return emptyList()

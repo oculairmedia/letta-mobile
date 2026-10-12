@@ -21,6 +21,8 @@ import kotlinx.coroutines.SupervisorJob
  * Phase 5a — caching / refresh / transport routing live in sharedLogic; this type keeps the
  * historical constructor for Hilt and existing unit tests.
  */
+// The default scope serves repositories built outside a session graph (tests); graphs pass their own.
+@Suppress("NoDetachedCoroutineLifecycle")
 open class AgentRepository(
     remote: AgentRemoteSource = noAppServerRoute(),
     agentDao: Lazy<AgentDao>,

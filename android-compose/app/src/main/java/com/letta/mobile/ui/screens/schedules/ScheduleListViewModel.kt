@@ -46,6 +46,7 @@ class ScheduleListViewModel @Inject constructor(
         scheduleAdminUnavailableMatcher = { throwable -> throwable.isScheduleAdminUnavailable() },
     )
 
+    @Suppress("NoDetachedCoroutineLifecycle") // viewModelScope is this ViewModel's own lifecycle.
     val uiState: StateFlow<UiState<ScheduleListUiState>> = controller.state
         .map { it.toUiState() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)

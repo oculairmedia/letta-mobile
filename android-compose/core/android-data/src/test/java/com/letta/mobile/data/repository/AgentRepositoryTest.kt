@@ -548,15 +548,17 @@ class AgentRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.backend.NoAppServerRouteException::class)
+    @Test
     fun `createAgent in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val apiThatThrows = object : FakeAgentApi() {
-            override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+        kotlin.test.assertFailsWith<com.letta.mobile.data.backend.NoAppServerRouteException> {
+            val apiThatThrows = object : FakeAgentApi() {
+                override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
+                    throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
+            repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
         }
-        val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
-        repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
     }
 
     @Test

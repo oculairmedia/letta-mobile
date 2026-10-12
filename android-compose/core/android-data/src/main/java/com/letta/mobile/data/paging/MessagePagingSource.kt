@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.MessageRemoteSource
+import kotlinx.coroutines.CancellationException
 
 class MessagePagingSource(
     private val remote: MessageRemoteSource,
@@ -51,6 +52,8 @@ class MessagePagingSource(
                 prevKey = null, // Only support forward pagination for messages
                 nextKey = nextKey
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             LoadResult.Error(e)
         }

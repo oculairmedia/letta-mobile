@@ -75,23 +75,25 @@ class RunRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = NoAppServerRouteException::class)
+    @Test
     fun `refreshRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeRunApi() {
-            override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeRunApi() {
+                override suspend fun listRuns(params: RunListParams): List<Run> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = RunRepository(apiThatThrows)
+            repo.refreshRuns(RunListParams())
         }
-        val repo = RunRepository(apiThatThrows)
-        repo.refreshRuns(RunListParams())
     }
 
     @Test
@@ -175,15 +177,17 @@ class RunRepositoryTest {
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    @Test(expected = NoAppServerRouteException::class)
+    @Test
     fun `getRecentRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
-        val apiThatThrows = object : FakeRunApi() {
-            override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+        kotlin.test.assertFailsWith<NoAppServerRouteException> {
+            val apiThatThrows = object : FakeRunApi() {
+                override suspend fun listRuns(params: RunListParams): List<Run> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
+            val repo = RunRepository(apiThatThrows)
+            repo.getRecentRuns(limit = 5)
         }
-        val repo = RunRepository(apiThatThrows)
-        repo.getRecentRuns(limit = 5)
     }
 
     @Test

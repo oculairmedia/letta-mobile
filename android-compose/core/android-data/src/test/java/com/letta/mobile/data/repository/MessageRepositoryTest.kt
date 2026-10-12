@@ -151,11 +151,13 @@ class MessageRepositoryTest {
         assertEquals(1, fakeApi.calls.count { it == "resetMessages:agent-1" })
     }
 
-    @Test(expected = ApiException::class)
+    @Test
     fun `fetchOlderMessages propagates api failures for explicit pagination`() = runTest {
-        fakeApi.shouldFail = true
+        kotlin.test.assertFailsWith<ApiException> {
+            fakeApi.shouldFail = true
 
-        repository.fetchOlderMessages("agent-1", "conv-1", "before-1")
+            repository.fetchOlderMessages("agent-1", "conv-1", "before-1")
+        }
     }
 
     @Test
