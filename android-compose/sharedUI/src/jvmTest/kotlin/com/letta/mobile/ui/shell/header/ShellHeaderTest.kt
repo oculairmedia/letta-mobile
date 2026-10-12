@@ -23,6 +23,7 @@ import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneTags
 import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.search.SearchFieldTestTag
+import com.letta.mobile.ui.search.SearchPanelTestTag
 import com.letta.mobile.ui.search.SearchTriggerTestTag
 import kotlin.math.abs
 import kotlin.test.Test
@@ -39,10 +40,10 @@ class ShellHeaderTest {
     private val opened = mutableListOf<UnifiedSearchHit>()
     private val sources = UnifiedSearchSources(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
 
-    private fun ComposeUiTest.header(onHome: Boolean) {
+    private fun ComposeUiTest.header(onHome: Boolean, host: LettaHost = LettaHost.Pointer) {
         setContent {
             MaterialTheme {
-                ProvideLettaHost(LettaHost.Pointer) {
+                ProvideLettaHost(host) {
                     ShellHeader(
                         title = HeaderTitle.Text("Letta"),
                         controls = HeaderControls(nav = HeaderNav.Back(onClick = {})),
@@ -104,6 +105,30 @@ class ShellHeaderTest {
         assertTrue(abs(pane.width - field.width) <= 1f, "pane width ${pane.width} vs header field width ${field.width}")
         assertTrue(abs(pane.top - field.top) <= 1f, "pane top ${pane.top} vs header field top ${field.top}")
         onNodeWithText("Filter to this agent").assertExists()
+    }
+
+    /** A phone on Home: the header itself becomes the search bar; no floating pane, no second field. */
+    @Test
+    fun onAPhoneHomeTheHeaderBecomesTheSearchBarInPlace() = runComposeUiTest {
+        header(onHome = true, host = LettaHost.Touch)
+        onNodeWithTag(SearchTriggerTestTag).performClick()
+        waitForIdle()
+        onNodeWithTag(ShellHeaderTags.SEARCH_BAR).assertExists()
+        onNodeWithTag(ShellHeaderTags.TITLE).assertDoesNotExist()
+        onNodeWithTag(LettaPaneTags.POPOVER).assertDoesNotExist()
+        onNodeWithTag(SearchPanelTestTag).assertDoesNotExist()
+        onAllNodes(hasSetTextAction()).assertCountEquals(1)
+
+        onNodeWithTag(SearchFieldTestTag).performTextInput("mer")
+        waitForIdle()
+        assertEquals("mer", home.queries.last())
+        onAllNodesWithText("mer").assertCountEquals(1)
+
+        onNodeWithTag(ShellHeaderTags.SEARCH_CLOSE).performClick()
+        waitForIdle()
+        onNodeWithTag(ShellHeaderTags.SEARCH_BAR).assertDoesNotExist()
+        onNodeWithTag(ShellHeaderTags.TITLE).assertExists()
+        assertEquals("", home.queries.last(), "leaving search mode clears the Home filter")
     }
 
     private class RecordingHome : HomePageActions {

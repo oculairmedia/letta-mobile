@@ -37,6 +37,8 @@ import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStats
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.ui.mascot.AgentAvatarTestTag
@@ -225,6 +227,26 @@ class HomePageTest {
         avatarInside(HomePageTags.recent(recent)).assertExists()
         scrollTo(HomePageTags.agentRow(scout))
         avatarInside(HomePageTags.agentRow(scout)).assertExists()
+    }
+
+    /** The section counts are the query's matches, not the catalog's size (letta-mobile-06whj). */
+    @Test
+    fun sectionCountsReflectTheQuery() = runComposeUiTest {
+        val catalog = HomeSearchCatalog(
+            agents = listOf(Agent(id = AgentId("a-1"), name = "Mercury"), Agent(id = AgentId("a-2"), name = "Scout")),
+            blocks = listOf(
+                Block(id = BlockId("b-1"), label = "merge notes", value = "x"),
+                Block(id = BlockId("b-2"), label = "persona", value = "helpful"),
+                Block(id = BlockId("b-3"), label = "human", value = "likes summer"),
+            ),
+        )
+        show(HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "mer", awaitMessages = false))
+        onNodeWithText("Agents").assertExists()
+        onNodeWithText("(1)").assertExists()
+        onNodeWithText("Blocks").assertExists()
+        onNodeWithText("(2)").assertExists()
+        onNodeWithTag(HomePageTags.searchHit("b-2")).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.searchHit("a-2")).assertDoesNotExist()
     }
 
     private fun ComposeUiTest.avatarInside(tag: String) =
