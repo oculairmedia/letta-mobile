@@ -45,6 +45,7 @@ import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.providers.icons.ProviderIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Callbacks of [ModelPickerContent]; [bind] wires the controller-owned ones. */
@@ -88,6 +89,7 @@ object ModelPickerTags {
     const val SEARCH = "model_picker_search"
     const val LIST = "model_picker_list"
     const val GROUP_PREFIX = "model_picker_group_"
+    const val GROUP_LOGO_PREFIX = "model_picker_group_logo_"
     const val ROW_PREFIX = "model_picker_row_"
     const val REFRESH = "model_picker_refresh"
     const val REFRESH_PROGRESS = "model_picker_refresh_progress"
@@ -146,6 +148,7 @@ fun ColumnScope.ModelPickerContent(
     val slots = PickerSlots<ModelPickerEntry>(
         row = { item, row -> PickerRow(item.value, row, actions) },
         footer = { PickerFooterBar(state, actions) },
+        sectionLeading = { section -> GroupLogo(section) },
     )
     LettaPickerContent(spec, callbacks, modifier, slots)
 }
@@ -157,6 +160,18 @@ private fun ModelPickerGroup.toSection(collapsed: Boolean): PickerSection<ModelP
     items = entries.mapIndexed { index, entry -> PickerItem("$key-$index-${entry.value}", entry, entry.displayName) },
     collapsed = collapsed,
 )
+
+/** The provider's logo before its group title; nothing for "Recent" or a provider without one. */
+@Composable
+private fun GroupLogo(section: PickerSection<ModelPickerEntry>) {
+    val logo = ProviderIcons.brandOfAny(listOf(section.key, section.title))?.logo ?: return
+    Icon(
+        logo,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(LettaDimens.Control.iconSm).testTag("${ModelPickerTags.GROUP_LOGO_PREFIX}${section.key}"),
+    )
+}
 
 private fun emptyState(state: ModelPickerState): PickerEmpty = when {
     state.loading -> PickerEmpty(ModelControlStrings.LOADING_MODELS)
