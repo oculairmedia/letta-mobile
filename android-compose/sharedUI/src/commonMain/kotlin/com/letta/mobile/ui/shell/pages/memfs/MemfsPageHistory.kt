@@ -123,13 +123,13 @@ internal fun MemfsDiffPane(page: MemfsPageScope) {
         history.diffError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(LettaDimens.Space.lg)) }
         if (history.hasEmptyDiff) MemfsDetailHint(EMPTY_COMMIT)
         LazyColumn(contentPadding = HistoryPadding, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-            items(history.diff, key = { it.path }) { file -> FileDiff(file) }
+            items(history.diff, key = { it.path }) { file -> MemfsFileDiffView(file) }
         }
     }
 }
 
 @Composable
-private fun FileDiff(file: MemfsFileDiff) {
+internal fun MemfsFileDiffView(file: MemfsFileDiff) {
     Column(Modifier.fillMaxWidth().testTag(MemfsPageTags.diffFile(file.path))) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             Text(file.path, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)

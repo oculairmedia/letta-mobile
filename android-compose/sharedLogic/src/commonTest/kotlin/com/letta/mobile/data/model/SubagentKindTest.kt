@@ -42,6 +42,16 @@ class SubagentKindTest {
     }
 
     @Test
+    fun memoryUpkeepIsBackground() {
+        // letta-mobile-iczm7: letta-code's git-conflict / invalid-memory repair workers.
+        listOf("Memory", "memory", " MEMORY ").forEach { label ->
+            assertEquals(SubagentKind.Memory, SubagentKind.fromWire(label), label)
+            assertTrue(SubagentKind.fromWire(label).isBackground, label)
+        }
+        assertFalse(SubagentKind.fromWire("Memory palace").isBackground)
+    }
+
+    @Test
     fun nullTypeIsOtherAndVisible() {
         assertEquals(SubagentKind.Other, SubagentKind.fromWire(null))
         assertFalse(SubagentKind.fromWire(null).isBackground)

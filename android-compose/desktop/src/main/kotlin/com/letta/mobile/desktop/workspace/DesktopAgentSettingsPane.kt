@@ -24,38 +24,37 @@ import com.letta.mobile.ui.shell.pages.vault.AgentVaultPageOptions
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
 
-private enum class AgentSettingsView(val label: String) { Profile("Profile"), Secrets("Secrets") }
+private enum class AgentSettingsView(val label: String) { Profile("Profile"), Dreaming("Dreaming"), Secrets("Secrets") }
 
 /**
- * The agent editor pane: the agent's [profile] and, where the vault is enabled, its secrets
- * (letta-mobile-bzvro.25). The vault's values live only while the Secrets view is open.
+ * The agent editor pane: the agent's [profile], its Dreaming settings (letta-mobile-iczm7) and,
+ * where the vault is enabled, its secrets (letta-mobile-bzvro.25). The vault's values live only
+ * while the Secrets view is open; [dreaming] draws only while its view is open.
  */
 @Composable
 internal fun DesktopAgentSettingsPane(
     agentId: String,
     scope: CoroutineScope,
     feature: AgentSecretsFeature = AgentSecretsFeature.Desktop,
+    dreaming: @Composable (Modifier) -> Unit = {},
     profile: @Composable (Modifier) -> Unit,
 ) {
-    if (!feature.enabled) {
-        profile(Modifier.fillMaxSize())
-        return
-    }
+    val views = AgentSettingsView.entries.filter { it != AgentSettingsView.Secrets || feature.enabled }
     var view by rememberSaveable(agentId) { mutableStateOf(AgentSettingsView.Profile.name) }
     Column(Modifier.fillMaxSize()) {
         SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm)) {
-            AgentSettingsView.entries.forEachIndexed { index, option ->
+            views.forEachIndexed { index, option ->
                 SegmentedButton(
                     selected = view == option.name,
                     onClick = { view = option.name },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = AgentSettingsView.entries.size),
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = views.size),
                 ) { Text(option.label) }
             }
         }
-        if (view == AgentSettingsView.Secrets.name) {
-            DesktopAgentVault(agentId, scope, Modifier.weight(1f))
-        } else {
-            profile(Modifier.weight(1f))
+        when (view) {
+            AgentSettingsView.Secrets.name -> DesktopAgentVault(agentId, scope, Modifier.weight(1f))
+            AgentSettingsView.Dreaming.name -> dreaming(Modifier.weight(1f))
+            else -> profile(Modifier.weight(1f))
         }
     }
 }

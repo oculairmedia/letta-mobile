@@ -39,6 +39,10 @@ object AdminRpcRegistry {
         "conversation.compact",
         // letta-mobile-joigh: context-limit relay (ConversationContextLimitHandlers).
         "conversation.context_limit",
+        // letta-mobile-iczm7: dreaming (ReflectionAdminHandlers).
+        "reflection.get",
+        "reflection.set",
+        "reflection.run",
         "message.list",
         "message.get",
         "tool_return.get",

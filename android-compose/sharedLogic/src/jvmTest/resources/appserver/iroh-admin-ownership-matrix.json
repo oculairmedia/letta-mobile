@@ -1901,6 +1901,25 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "reflection.run",
+      "handler": "ReflectionAdminHandlers.kt",
+      "current_backend": "native App Server v2 execute_command dream (letta-code /dream; letta-mobile-iczm7)",
+      "owner": "app_server_v2",
+      "public_contract": "execute_command",
+      "native_contract": [
+        "execute_command",
+        "execute_command_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-iczm7: starts a dream (local reflection on the local backend) for Iroh clients; answers when the run is launched.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "memfs.list",
       "handler": "WorkspaceAdminHandlers.kt",
       "current_backend": "native App Server v2 list_memory relayed for Iroh clients (no shim path)",

@@ -63,6 +63,22 @@ class MascotPresenceTest {
     }
 
     @Test
+    fun anIdleAgentDozesWhileItDreamsAndATurnWakesIt() {
+        // letta-mobile-iczm7: a background dream is not a turn; only an otherwise idle agent sleeps.
+        val (director, entered) = director().let { it.director to it.entered }
+        val dreaming = AgentPresence(dreaming = true)
+        director.applyPresence(AgentPresence.IDLE, dreaming)
+        assertEquals(AvatarState.SLEEPING, director.state)
+        val thinking = dreaming.copy(activity = AgentActivityKind.THINKING)
+        director.applyPresence(dreaming, thinking)
+        assertEquals(AvatarState.THINKING, director.state)
+        director.applyPresence(thinking, dreaming)
+        director.applyPresence(dreaming, AgentPresence.IDLE)
+        assertTrue(director.state != AvatarState.SLEEPING, "the dream ended: ${director.state}")
+        assertTrue(entered.count { it == AvatarState.SLEEPING } >= 2, "dozed again after the turn: $entered")
+    }
+
+    @Test
     fun entryFeedsPresenceDeltasAndTicksOncePerFrame() {
         var loads = 0
         var ticks = 0
