@@ -27,6 +27,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.components.LocalMenuActionScope
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.desktopPointer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -339,12 +342,12 @@ internal fun DesktopJewelWindow(
                             }
                         }
                     }
-                    // The pen belongs to this window: a canvas composed inside it registers
-                    // under this window's identity, so two open windows cannot take each other's
-                    // strokes.
+                    // The pen belongs to this window (two windows cannot take each other's strokes).
                     // The window's own scope runs what a menu item chose: a popup is dismissed by
                     // being removed, so the action cannot belong to the popup.
                     val windowScope = rememberCoroutineScope()
+                    // letta-mobile-ckmub.3.1: panes, tooltips and row menus as a pointer window draws them.
+                    val lettaHost = remember { LettaHost.desktopPointer(::hoverTimeLabel) }
                     // Text selected by touch gets finger-sized handles and a Copy / Quote bar;
                     // the mouse keeps its own, and the bar only shows just after a finger.
                     val touchToolbar = remember {
@@ -360,6 +363,7 @@ internal fun DesktopJewelWindow(
                         LocalCanvasPenTarget provides com.letta.mobile.desktop.input.WindowPenTarget(window),
                         com.letta.mobile.ui.canvas.LocalCanvasPenRegistry provides penRegistry,
                         LocalMenuActionScope provides windowScope,
+                        LocalLettaHost provides lettaHost,
                     ) {
                         content()
                         com.letta.mobile.ui.text.TouchTextToolbarHost(touchToolbar, quoteSink)

@@ -24,7 +24,6 @@ import com.letta.mobile.ui.context.AgentContextCardBinding
 import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
-import com.letta.mobile.ui.context.AgentContextPresentation
 
 /**
  * letta-mobile-3io8k: the sidebar's model-and-context card for the focused agent, opening as a
@@ -65,7 +64,6 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
         AgentContextCardBinding(
             deps = deps,
             actions = AgentContextCardActions(onModelSelected = { entry -> chatController.setConversationModel(entry.value) }),
-            presentation = AgentContextPresentation.Popover,
         )
     }
     AgentContextCardHost(
