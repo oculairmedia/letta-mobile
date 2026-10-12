@@ -6,19 +6,17 @@ import com.letta.mobile.desktop.phone.PhoneAwareContent
 import com.letta.mobile.desktop.phone.isBareChatPage
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageContent
-import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.storage.SecureSettingsStore
@@ -26,17 +24,12 @@ import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
 import com.letta.mobile.desktop.workspace.DesktopAgentSettingsPane
 import com.letta.mobile.desktop.workspace.DesktopDreamingDeps
 import com.letta.mobile.desktop.workspace.DesktopDreamingPane
-import com.letta.mobile.desktop.chat.ChatDetailPane
-import com.letta.mobile.desktop.chat.ChatDetailPaneActions
-import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.showsCanvasSidePane
-import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.ui.components.LettaSidePane
-import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class DesktopMainContentInputs(
     val editingAgentId: String?,
@@ -48,27 +41,20 @@ internal data class DesktopMainContentInputs(
     val blockApi: DesktopBlockApi?,
     val secureSettingsStore: SecureSettingsStore,
     val chatScope: CoroutineScope,
-    val chatDetailState: ChatDetailPaneState,
+    val selectedConversationId: String?,
     val destinationInputs: DestinationContentInputs,
-    val showBackgroundTasks: Boolean,
     val subagentRepository: SubagentRepository?,
-    val activeSubagents: List<SubagentEntry>,
     val activeCanvasSession: CanvasSession? = null,
     /** The board the shared page has docked; the side pane never shows it a second time. */
     val dockedCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
-    /**
-     * letta-mobile-bglj6.1: the shared KMP chat page, set only while DesktopSharedChatPageFlag is
-     * on. Null keeps [ChatDetailPane], the default.
-     */
-    val sharedChatPage: (@Composable (Modifier) -> Unit)? = null,
+    /** letta-mobile-ckmub.3.11: the shared KMP chat page, desktop's only chat. */
+    val chatPage: @Composable (Modifier) -> Unit,
 )
 
 internal data class DesktopMainContentActions(
     val onEditAgentClose: () -> Unit,
     val onEditAgentSaved: (com.letta.mobile.avatar.core.MascotIdentity, Boolean) -> Unit,
-    val chatDetailActions: ChatDetailPaneActions,
     val destinationActions: DestinationContentActions,
-    val onShowBackgroundTasks: () -> Unit,
     val onCloseCanvas: () -> Unit = {},
     val onShareCanvasToChat: ((bytes: ByteArray, mimeType: String) -> Unit)? = null,
 )
@@ -81,8 +67,8 @@ internal fun DesktopMainContentPane(
 ) {
     // The phone preview frames every destination but the chat page in a phone app bar; null on the desktop.
     val phone = LocalDesktopPhone.current
-    ClosePhoneDrawerOnNavigation(phone, inputs.selectedDestination, inputs.chatDetailState.surface.selectedConversationId, inputs.editingAgentId)
-    val bare = isBareChatPage(inputs.selectedDestination, inputs.sharedChatPage != null, inputs.editingAgentId)
+    ClosePhoneDrawerOnNavigation(phone, inputs.selectedDestination, inputs.selectedConversationId, inputs.editingAgentId)
+    val bare = isBareChatPage(inputs.selectedDestination, inputs.editingAgentId)
     PhoneAwareContent(phone, title = inputs.selectedDestination.label, bare = bare, modifier = modifier) { paneModifier ->
         MainContentRow(inputs, actions, paneModifier)
     }
@@ -105,39 +91,21 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
 /** letta-mobile-ckmub.3.4: the desktop maps its route to a shared destination; ShellPage draws its page. */
 @Composable
 private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
-    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> DesktopChatContainer(inputs, actions, modifier) }
+    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> DesktopChatContainer(inputs.chatPage, modifier) }
     val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, chat)
     ShellPage(destination = inputs.pageDestination, deps = deps, modifier = Modifier.fillMaxSize())
 }
 
-/** The desktop chat container: the shared chat page, or the default page with the background-tasks toggle over it. */
-@Composable
-private fun DesktopChatContainer(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions, modifier: Modifier) {
-    Box(modifier) {
-        val sharedChatPage = inputs.sharedChatPage
-        if (sharedChatPage != null) {
-            sharedChatPage(Modifier.fillMaxSize())
-        } else {
-            ChatDetailPane(state = inputs.chatDetailState, actions = actions.chatDetailActions, modifier = Modifier.fillMaxSize())
-        }
-        // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
-        if (inputs.showsBackgroundTasksToggle()) {
-            DesktopBackgroundTasksToggle(
-                runningCount = inputs.activeSubagents.visibleRunningCount(),
-                onClick = actions.onShowBackgroundTasks,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
-            )
-        }
-    }
-}
-
 /**
- * The conversation's background-tasks toggle: only over [ChatDetailPane] (the shared page draws
- * its own), while the tasks pane is closed and there is a repository to list.
+ * The desktop chat container: the bundled runtime's crash banner (F03) over the shared chat page.
+ * The page draws the background-tasks toggle in its canvas header.
  */
-private fun DesktopMainContentInputs.showsBackgroundTasksToggle(): Boolean {
-    if (sharedChatPage != null) return false
-    return !showBackgroundTasks && subagentRepository != null
+@Composable
+private fun DesktopChatContainer(chatPage: @Composable (Modifier) -> Unit, modifier: Modifier) {
+    Column(modifier) {
+        DesktopLocalRuntimeBanner()
+        chatPage(Modifier.weight(1f).fillMaxWidth())
+    }
 }
 
 @Composable

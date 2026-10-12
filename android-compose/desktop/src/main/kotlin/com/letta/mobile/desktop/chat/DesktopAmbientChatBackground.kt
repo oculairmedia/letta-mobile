@@ -37,16 +37,6 @@ import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
 import kotlin.math.sin
 
-/** Coarse agent activity used to tint the ambient glow. */
-internal enum class DesktopAmbientStatus { Idle, Running, Failed, Completed }
-
-private fun DesktopAmbientStatus.toMotionStatus(): AmbientMotionStatus = when (this) {
-    DesktopAmbientStatus.Idle -> AmbientMotionStatus.Idle
-    DesktopAmbientStatus.Running -> AmbientMotionStatus.Running
-    DesktopAmbientStatus.Failed -> AmbientMotionStatus.Failed
-    DesktopAmbientStatus.Completed -> AmbientMotionStatus.Completed
-}
-
 /**
  * Desktop port of the mobile chat's ambient agent-status glow — the REAL noise
  * shader, not a flat gradient. Desktop Compose renders through Skia, and
@@ -62,7 +52,8 @@ private fun DesktopAmbientStatus.toMotionStatus(): AmbientMotionStatus = when (t
  */
 @Composable
 internal fun DesktopAmbientChatBackground(
-    status: DesktopAmbientStatus,
+    /** The shared run status (rememberChatAmbientStatus), which also drives the docked panel's glow. */
+    status: AmbientMotionStatus,
     modifier: Modifier = Modifier,
     /**
      * Optional per-agent identity color: non-terminal states lean toward it so
@@ -73,14 +64,14 @@ internal fun DesktopAmbientChatBackground(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val spec = remember(status) { AmbientMotion.spec(status.toMotionStatus()) }
+    val spec = remember(status) { AmbientMotion.spec(status) }
     val targetColor = remember(status, colorScheme, identitySeed) {
         when (status) {
-            DesktopAmbientStatus.Idle -> Color.Transparent
-            DesktopAmbientStatus.Running ->
+            AmbientMotionStatus.Idle -> Color.Transparent
+            AmbientMotionStatus.Running, AmbientMotionStatus.Active ->
                 identitySeed?.let { lerp(colorScheme.tertiary, it, IdentityBlend) } ?: colorScheme.tertiary
-            DesktopAmbientStatus.Failed -> colorScheme.error
-            DesktopAmbientStatus.Completed -> colorScheme.secondary
+            AmbientMotionStatus.Failed -> colorScheme.error
+            AmbientMotionStatus.Completed -> colorScheme.secondary
         }
     }
     val tint by animateColorAsState(
@@ -104,7 +95,7 @@ internal fun DesktopAmbientChatBackground(
     LaunchedEffect(status) {
         // Same shared ramp as the Android renderer: climb into a bloom, never step into
         // one. See AmbientMotion.ramp for the flash this removed.
-        val ramp = AmbientMotion.ramp(current = envelope.value, status = status.toMotionStatus())
+        val ramp = AmbientMotion.ramp(current = envelope.value, status = status)
         if (ramp.risesFirst) {
             // Ease IN to the bloom for the same reason as the Android renderer: an
             // ease-out climb front-loads the brightening and reads as a flash.
