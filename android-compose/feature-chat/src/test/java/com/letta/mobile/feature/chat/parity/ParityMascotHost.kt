@@ -23,9 +23,9 @@ import com.letta.mobile.ui.mascot.MascotIdentityRegistry
 import com.letta.mobile.ui.mascot.MascotTransport
 
 /**
- * A mascot renderer for the parity harness: every agent has a mascot, drawn as a flat disc in the
+ * A mascot renderer for the row goldens: every agent has a mascot, drawn as a flat disc in the
  * agent's colour (no Rive scene, no frame loop), so the seat a row reserves for the character shows
- * in the PNG the same way on both sides. No transport layer is mounted: each seat draws its own
+ * in the PNG the same way every run. No transport layer is mounted: each seat draws its own
  * character, as on Android.
  */
 private object DiscMascotHost : MascotHost {

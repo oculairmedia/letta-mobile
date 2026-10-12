@@ -196,14 +196,18 @@ tasks.register<Test>("testScreenshot") {
     systemProperty("kotest.tags.include", "screenshot")
 }
 
-// letta-mobile-ckmub.1 (hard cut S1): legacy vs shared chat row parity harness. Renders every row
-// type both ways and writes paired PNGs, diff images and report.md (row type -> pixel diff %) to
-// build/outputs/roborazzi/row-parity. Advisory: it fails only when nothing renders. The test is
-// skipped by the regular testDebugUnitTest run (it needs letta.rowParity=true, set here).
-//   ./gradlew --no-daemon :feature-chat:rowParityReport
+// Hard cut S9 (letta-mobile-ckmub.2.2): the shared chat rows' golden screenshots (formerly the S1
+// legacy vs shared parity harness). Renders every row type through the shared timeline, compares
+// it with src/test/snapshots/rows/<theme>/<row>.png and writes golden/shared/diff PNGs and
+// report.md (row type -> pixel diff %) to build/outputs/roborazzi/row-parity. Fails when a row
+// moves more than 2% from its golden. Skipped by the regular testDebugUnitTest run (it needs
+// letta.rowParity=true, set here). Record goldens with -Pletta.rowGolden.record=true.
+//   ./gradlew --no-daemon :feature-chat:rowGoldenReport
 val rowParityDir = layout.buildDirectory.dir("outputs/roborazzi/row-parity")
-tasks.register<Test>("rowParityReport") {
-    description = "Renders legacy vs shared chat rows side by side and reports the pixel diff per row type"
+val rowGoldenDir = layout.projectDirectory.dir("src/test/snapshots/rows")
+val recordRowGoldens = providers.gradleProperty("letta.rowGolden.record").orElse("false")
+tasks.register<Test>("rowGoldenReport") {
+    description = "Renders the shared chat rows and reports the pixel diff from their goldens per row type"
     group = "verification"
 
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
@@ -216,12 +220,14 @@ tasks.register<Test>("rowParityReport") {
     filter { includeTestsMatching("com.letta.mobile.feature.chat.parity.RowParityScreenshotTest") }
     systemProperty("letta.rowParity", "true")
     systemProperty("letta.rowParity.dir", rowParityDir.get().asFile.absolutePath)
+    systemProperty("letta.rowGolden.dir", rowGoldenDir.asFile.absolutePath)
+    systemProperty("letta.rowGolden.record", recordRowGoldens.get())
     outputs.dir(rowParityDir)
     outputs.upToDateWhen { false }
 
     val report = rowParityDir.map { it.file("report.md").asFile }
     doLast {
         val file = report.get()
-        if (file.exists()) println(file.readText()) else println("row parity: no report at $file")
+        if (file.exists()) println(file.readText()) else println("row goldens: no report at $file")
     }
 }

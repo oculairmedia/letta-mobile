@@ -25,8 +25,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * letta-mobile-bglj6.1.22: the chat header and the phone canvas mode draw the one shared agent
- * pill ([com.letta.mobile.ui.chat.AgentIdentityPill]), at the same size and in the same spot.
+ * letta-mobile-bglj6.1.22: the chat header (the shared ShellHeader since hard cut S9) and the phone
+ * canvas mode draw the one shared agent pill ([com.letta.mobile.ui.chat.AgentIdentityPill]), at the
+ * same size and in the same spot.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -52,9 +53,8 @@ class AgentScaffoldTopChromeUiTest {
             AgentScaffoldTopChromeLayout(
                 headerHidden = headerHidden,
                 identity = identity,
-                searchField = null,
+                search = null,
                 onMenuClick = {},
-                scrollBehavior = null,
             )
         }
 

@@ -79,7 +79,7 @@ private fun routeClientCommand(state: AgentScaffoldRuntimeState, command: Client
     val navigation = params.navigation
     val agentId = state.agentIdValue
     when (command) {
-        ClientSlashCommand.Search -> params.searchUi.onChatSearchExpandedChange(true)
+        ClientSlashCommand.Search -> params.searchUi.onOpenSearch()
         ClientSlashCommand.Memory -> navigation.onNavigateToMemory?.invoke(agentId)
         // The tools screen is where Android manages tools and MCP servers.
         ClientSlashCommand.Mcp -> navigation.onNavigateToTools?.invoke()

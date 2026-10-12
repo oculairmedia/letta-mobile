@@ -177,19 +177,20 @@ sharedUI's `jvmTest`, desktop's `test` and desktop's `phonePlayground` source se
 Behaviour the fixture port does not cover (approvals, A2UI actions, commands) belongs in
 `FixtureChatSessionPort`; keep it server-free.
 
-## Checking shared rows against the legacy Android rows
+## Chat row goldens
 
-The hard cut (letta-mobile-ckmub) deletes the legacy feature-chat rows only once the shared rows
-match them. `./gradlew --no-daemon :feature-chat:rowParityReport` renders every row type (user,
-assistant, reasoning, tool call/return, run block, approval, error, queued, thinking with and
-without the mascot seat) both ways from one fixture timeline (`feature-chat/src/test/.../parity/`),
-at phone width in light and dark. It writes `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`
-and `report.md` (row type -> pixel diff %) to `feature-chat/build/outputs/roborazzi/row-parity/`
-and prints the table. CI runs it as the advisory `row parity` job and uploads the folder.
+The shared chat rows are the only chat rows: hard cut S9 (letta-mobile-ckmub.2.2) deleted the legacy
+Android chat screen and its rows once S4 brought the shared rows to parity with them.
+`./gradlew --no-daemon :feature-chat:rowGoldenReport` renders every row type (user, assistant,
+reasoning, tool call/return, run block, approval, error, queued, thinking with and without the
+mascot seat) through the shared timeline from one fixture timeline
+(`feature-chat/src/test/.../parity/`), at phone width in light and dark, and compares each with its
+committed golden in `feature-chat/src/test/snapshots/rows/<theme>/<row>.png`. It writes
+`<theme>/<row>.{golden,shared,diff,side-by-side}.png` and `report.md` (row type -> pixel diff %) to
+`feature-chat/build/outputs/roborazzi/row-parity/`, prints the table, and fails when a row moves
+more than 2 % from its golden. A row without a golden records one; re-record them all with
+`-Pletta.rowGolden.record=true` after an intended visual change. CI runs it as the advisory
+`row goldens` job and uploads the folder.
 
-Since slice S4 the rows match (each row type at or under 2 % in both themes; the remaining
-error-frame and thinking-row diffs are explained in the report's Notes column) and the shared chat
-page is the default on Android (`Settings > Features > Shared chat page`). Turning the toggle off
-brings back the legacy chat screen for ONE release, as a fallback; slice S9 deletes the legacy
-Android page and the toggle with it. On desktop, slice S11 already deleted the legacy chat page
-and its toggle: the shared chat page is desktop's only chat.
+The shared chat page is the only chat page on both platforms: slice S9 deleted the legacy Android
+chat screen and its `Settings > Features > Shared chat page` toggle, and slice S11 the desktop one.

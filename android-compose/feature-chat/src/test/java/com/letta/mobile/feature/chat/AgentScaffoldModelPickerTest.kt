@@ -6,7 +6,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
-import com.letta.mobile.feature.chat.screen.ModelInfoCard
 import com.letta.mobile.feature.chat.screen.ModelPickerSheet
 import com.letta.mobile.feature.chat.screen.ModelPickerSheetCallbacks
 import com.letta.mobile.ui.modelcontrol.ModelPickerTags
@@ -22,24 +21,6 @@ class AgentScaffoldModelPickerTest {
 
     @get:Rule
     val composeRule = createComposeRule()
-
-    @Test
-    fun `ModelInfoCard displays model and calls onTap`() {
-        var tapCount = 0
-        composeRule.setContent {
-            LettaTheme {
-                ModelInfoCard(
-                    currentModel = "gpt-4-test",
-                    onTap = { tapCount++ },
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD).assertIsDisplayed()
-        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD).performClick()
-
-        assertEquals(1, tapCount)
-    }
 
     @Test
     fun `ModelPickerSheet selects model correctly`() {

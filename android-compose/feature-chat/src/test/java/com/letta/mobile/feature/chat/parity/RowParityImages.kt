@@ -87,7 +87,7 @@ internal class Pixels(val size: PixelSize, val argb: IntArray) {
 
 /** What one comparison found. */
 internal data class ParityDiff(
-    val legacyHeightPx: Int,
+    val goldenHeightPx: Int,
     val sharedHeightPx: Int,
     val differingPixels: Long,
     val comparedPixels: Long,
@@ -100,9 +100,9 @@ internal data class ParityDiff(
 }
 
 /**
- * The pixel maths of the parity harness. Each side is cropped vertically to its own content (rows
- * that differ from the side's background, the corner pixel), so a list anchored at the bottom and
- * one anchored at the top still compare row against row. Both are then laid top-aligned on the
+ * The pixel maths of the row goldens. Each side is cropped vertically to its own content (rows
+ * that differ from the side's background, the corner pixel), so a row that moved down the page
+ * still compares row against row. Both are then laid top-aligned on the
  * taller height; a pixel differs when any channel moves by more than [CHANNEL_TOLERANCE], which
  * absorbs anti-aliasing but not a colour, a weight or a shift.
  */
@@ -121,17 +121,17 @@ internal object RowParityImages {
         return p.rows(from..to)
     }
 
-    class Result(val legacy: Pixels, val shared: Pixels, val diff: Pixels, val summary: ParityDiff)
+    class Result(val golden: Pixels, val shared: Pixels, val diff: Pixels, val summary: ParityDiff)
 
-    fun compare(legacyRaw: Pixels, sharedRaw: Pixels): Result {
-        val legacyCrop = cropToContent(legacyRaw)
+    fun compare(goldenRaw: Pixels, sharedRaw: Pixels): Result {
+        val goldenCrop = cropToContent(goldenRaw)
         val sharedCrop = cropToContent(sharedRaw)
-        val size = legacyCrop.size.union(sharedCrop.size)
-        val legacy = legacyCrop.paddedTo(size)
+        val size = goldenCrop.size.union(sharedCrop.size)
+        val golden = goldenCrop.paddedTo(size)
         val shared = sharedCrop.paddedTo(size)
         var differing = 0L
         val diff = IntArray(size.area) { i ->
-            val before = Argb(legacy.argb[i])
+            val before = Argb(golden.argb[i])
             if (before.differsFrom(Argb(shared.argb[i]))) {
                 differing++
                 Argb.DIFF_RED.packed
@@ -139,13 +139,13 @@ internal object RowParityImages {
                 before.faded().packed
             }
         }
-        val summary = ParityDiff(legacyCrop.height, sharedCrop.height, differing, size.area.toLong())
-        return Result(legacy, shared, Pixels(size, diff), summary)
+        val summary = ParityDiff(goldenCrop.height, sharedCrop.height, differing, size.area.toLong())
+        return Result(golden, shared, Pixels(size, diff), summary)
     }
 
-    /** legacy | shared | diff, separated by grey gutters. */
+    /** golden | shared | diff, separated by grey gutters. */
     fun sideBySide(result: Result): Pixels {
-        val panes = listOf(result.legacy, result.shared, result.diff)
+        val panes = listOf(result.golden, result.shared, result.diff)
         val size = PixelSize(panes.sumOf { it.width } + GUTTER_PX * (panes.size - 1), panes.maxOf { it.height })
         val out = IntArray(size.area) { Argb.GUTTER.packed }
         var left = 0

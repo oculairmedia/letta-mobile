@@ -53,7 +53,6 @@ data class ConfigUiState(
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
-    val sharedChatPageEnabled: Boolean = true,
     val openChatsOnCanvas: Boolean = true,
     /** The Settings preview switches that are on. */
     val enabledFeatureFlags: Set<FeatureFlag> = emptySet(),
@@ -146,7 +145,7 @@ class ConfigViewModel @Inject constructor(
                 throw cancelled
             } catch (e: Exception) {
                 if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
-                showLoadFailure(retainedState, e.message ?: "Failed to load config")
+                showLoadFailure(retainedState, e)
             }
         }
     }
@@ -194,7 +193,6 @@ class ConfigViewModel @Inject constructor(
                 dynamicColor = preferences.dynamicColor,
                 enableProjects = preferences.enableProjects,
                 hapticsEnabled = preferences.hapticsEnabled,
-                sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
                 localModelPath = activeConfig.localModelPath.orEmpty(),
                 localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
@@ -220,7 +218,6 @@ class ConfigViewModel @Inject constructor(
                 dynamicColor = preferences.dynamicColor,
                 enableProjects = preferences.enableProjects,
                 hapticsEnabled = preferences.hapticsEnabled,
-                sharedChatPageEnabled = preferences.sharedChatPageEnabled,
                 openChatsOnCanvas = preferences.openChatsOnCanvas,
                 huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
@@ -231,7 +228,8 @@ class ConfigViewModel @Inject constructor(
     }
 
     /** A failed load: an error screen, or the retained form with the refresh error under it. */
-    private fun showLoadFailure(retainedState: ConfigUiState?, message: String) {
+    private fun showLoadFailure(retainedState: ConfigUiState?, error: Exception) {
+        val message = error.message ?: "Failed to load config"
         when (val failure = RetainedContentRefresh.failure(retainedContent = retainedState, message = message)) {
             is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
             is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
@@ -246,7 +244,6 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor = async { settingsRepository.getDynamicColor().first() }
         val enableProjects = async { settingsRepository.getEnableProjects().first() }
         val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
-        val sharedChatPageEnabled = async { settingsRepository.getSharedChatPageEnabled().first() }
         val openChatsOnCanvas = async { settingsRepository.getOpenChatsOnCanvas().first() }
         DisplayPreferences(
             theme = theme.await(),
@@ -254,7 +251,6 @@ class ConfigViewModel @Inject constructor(
             dynamicColor = dynamicColor.await(),
             enableProjects = enableProjects.await(),
             hapticsEnabled = hapticsEnabled.await(),
-            sharedChatPageEnabled = sharedChatPageEnabled.await(),
             openChatsOnCanvas = openChatsOnCanvas.await(),
         )
     }
@@ -268,7 +264,6 @@ class ConfigViewModel @Inject constructor(
         val dynamicColor: Boolean,
         val enableProjects: Boolean,
         val hapticsEnabled: Boolean,
-        val sharedChatPageEnabled: Boolean,
         val openChatsOnCanvas: Boolean,
     )
 
@@ -391,14 +386,6 @@ class ConfigViewModel @Inject constructor(
             viewModelScope.launch {
                 settingsRepository.setHapticsEnabled(enabled)
             }
-        }
-    }
-
-    fun updateSharedChatPageEnabled(enabled: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, sharedChatPageEnabled = enabled))
-        viewModelScope.launch {
-            settingsRepository.setSharedChatPageEnabled(enabled)
         }
     }
 

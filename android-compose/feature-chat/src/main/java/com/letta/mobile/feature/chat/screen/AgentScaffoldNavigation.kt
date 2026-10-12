@@ -46,10 +46,10 @@ internal data class AgentScaffoldSheetVisibility(
     val onShowModelPickerChange: (Boolean) -> Unit,
 )
 
+/** The header's message search: [openSignal] grows each time `/search` asks the pane to open. */
 internal data class AgentScaffoldSearchUiState(
-    val isChatSearchExpanded: Boolean,
-    val onChatSearchExpandedChange: (Boolean) -> Unit,
-    val chatSearchFocusRequester: androidx.compose.ui.focus.FocusRequester,
+    val openSignal: Int = 0,
+    val onOpenSearch: () -> Unit = {},
 )
 
 internal data class AgentScaffoldProjectUiState(

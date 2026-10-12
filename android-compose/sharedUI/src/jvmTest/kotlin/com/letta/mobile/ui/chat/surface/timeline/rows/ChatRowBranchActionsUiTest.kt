@@ -3,7 +3,11 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
@@ -127,5 +131,22 @@ class ChatRowBranchActionsUiTest {
         setContent { MaterialTheme { RenderRow(single(reply), rowContext(capabilities = branching), rowCallbacks(RecordingChatActions())) } }
 
         onNodeWithTag(ChatRowTestTags.FORK_REPLY).assertIsNotEnabled()
+    }
+
+    /** Hard cut S9: the legacy bubble's accessibility long-click, on the shared reply. */
+    @Test
+    fun aReplyOffersItsActionsToAccessibilityAsALongClick() = runComposeUiTest {
+        val actions = RecordingChatActions()
+        val reply = message("assistant-5", "assistant", "Here is another plan.")
+        setContent { MaterialTheme { RenderRow(single(reply), rowContext(capabilities = branching), rowCallbacks(actions)) } }
+
+        onNode(
+            SemanticsMatcher("has the Message actions long-click") { node ->
+                node.config.getOrNull(SemanticsActions.OnLongClick)?.label == "Message actions"
+            },
+        ).performSemanticsAction(SemanticsActions.OnLongClick)
+        onNodeWithText("Fork from here").performClick()
+
+        runOnIdle { assertEquals(listOf(reply), actions.forks) }
     }
 }

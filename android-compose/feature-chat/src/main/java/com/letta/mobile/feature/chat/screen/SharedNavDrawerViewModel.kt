@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.agents.RecentAgents
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
@@ -84,9 +83,6 @@ internal class SharedNavDrawerViewModel @Inject constructor(
         (lineage?.parents ?: kotlinx.coroutines.flow.MutableStateFlow(emptyMap()))
             .map { parents -> parents.mapValues { it.value.conversationId } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyMap())
-
-    val enabled: StateFlow<Boolean> = settingsRepository.getFeatureFlag(FeatureFlag.SharedNavDrawer)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     /** Agents pinned to Home; the rail orbs' menu pins and unpins them. */
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()

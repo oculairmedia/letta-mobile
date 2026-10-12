@@ -10,7 +10,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.FakeConversationRepository
@@ -35,8 +34,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -60,17 +57,6 @@ class SharedNavDrawerBindingTest {
     private val now = Instant.parse("2026-10-17T12:00:00Z")
 
     private fun viewModel() = SharedNavDrawerViewModel(settings, canvasStore, allConversations, InMemorySecureSettingsStore())
-
-    @Test
-    fun followsTheSettingsFlag() = runTest(mainDispatcherRule.dispatcher) {
-        val vm = viewModel()
-        backgroundScope.launch { vm.enabled.collect {} }
-        advanceUntilIdle()
-        assertFalse(vm.enabled.value)
-        settings.setFeatureFlag(FeatureFlag.SharedNavDrawer, true)
-        advanceUntilIdle()
-        assertTrue(vm.enabled.value)
-    }
 
     @Test
     fun refreshReadsTheCanvasLibraryAndKeepsItOnFailure() = runTest(mainDispatcherRule.dispatcher) {
