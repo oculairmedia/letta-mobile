@@ -74,7 +74,7 @@ fun QuickQueryPanel(items: List<PaletteItem>, ambientContext: String?, actions: 
         }
     }
     LettaDialogFrame(
-        spec = PaneSpec(onDismiss = actions.onClose, size = PaneSize(width = Dp.Infinity), modifier = Modifier.fillMaxWidth()),
+        spec = PaneSpec(onDismiss = actions.onClose, size = PaneSize(width = Dp.Infinity), modifier = QuickQueryInset),
         tag = CommandPaletteTags.QUICK_QUERY,
     ) {
         LettaPickerContent(
@@ -157,6 +157,9 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
         }
     }
 }
+
+/** Full width, inset from the platform window's edge so the frame's corners and shadow show. */
+private val QuickQueryInset = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm)
 
 private const val RECENT_AGENTS_LIMIT = 9
 private const val RECENTLY_VIEWED = "Recently viewed"

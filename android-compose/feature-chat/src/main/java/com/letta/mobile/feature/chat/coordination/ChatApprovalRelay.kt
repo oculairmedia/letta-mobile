@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.approval.OutboxNotice
 import com.letta.mobile.data.chat.approval.OutboxSubmitResult
 import com.letta.mobile.data.runtime.ApprovalRelayClient
 import com.letta.mobile.data.runtime.PendingApprovalDetails
+import com.letta.mobile.data.runtime.PermissionModeRuntime
 import com.letta.mobile.data.runtime.RelayedPermissionModes
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -53,10 +54,13 @@ class ChatApprovalRelay @Inject constructor(
             .flatMapLatest { supported -> if (supported) chip(runtime) else flowOf(null) }
     }
 
-    /** This client's view at once; the host's answer then confirms or replaces it. */
+    /**
+     * This client's view at once; the host's answer then confirms or replaces it, and the host's
+     * `permission_mode` pushes (letta-mobile-a4tm7) keep it current while open. Names the host.
+     */
     private fun chip(runtime: AppServerRuntimeScope): Flow<ChatPermissionModeUiState> = channelFlow {
         launch { modes.sync(runtime) }
-        modes.observe(runtime).collect { send(it.toUiState()) }
+        modes.observe(runtime).collect { send(it.toUiState(runtime = PermissionModeRuntime.Host(transport.hostNodeId))) }
     }
 
     suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
