@@ -102,6 +102,12 @@ class FakeConversationRepository(
         return ""
     }
 
+    /** letta-mobile-7mys7: a fork through a message records it, so callers can assert the fork point. */
+    override suspend fun forkConversation(id: ConversationId, agentId: AgentId, throughMessageId: String?): Conversation {
+        if (throughMessageId != null) calls += "forkConversationThrough:${id.value}:$throughMessageId"
+        return forkConversation(id, agentId)
+    }
+
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation {
         calls += "forkConversation:${id.value}:${agentId.value}"
         val source = requireConversation(id)

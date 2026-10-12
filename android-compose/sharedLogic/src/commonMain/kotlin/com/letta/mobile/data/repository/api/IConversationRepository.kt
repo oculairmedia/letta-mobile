@@ -31,6 +31,12 @@ interface IConversationRepository {
     suspend fun recompileConversation(id: ConversationId, dryRun: Boolean = false, agentId: AgentId? = null): String = error("recompileConversation unsupported")
     suspend fun recompileConversation(id: String, dryRun: Boolean = false, agentId: String? = null): String =
         recompileConversation(ConversationId(id), dryRun, agentId?.let(::AgentId))
+    /**
+     * letta-mobile-7mys7: whether the active backend can fork, so pages offer fork, edit-and-resend
+     * and rerun only where they work (the embedded runtime cannot).
+     */
+    fun canForkConversations(): Boolean = true
+
     suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = error("forkConversation unsupported")
     suspend fun forkConversation(id: String, agentId: String): Conversation = forkConversation(ConversationId(id), AgentId(agentId))
 

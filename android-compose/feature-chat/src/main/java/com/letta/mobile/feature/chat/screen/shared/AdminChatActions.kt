@@ -76,6 +76,10 @@ internal class AdminChatActions(
         onOpenConversation?.let { open -> viewModel.editAndResend(message, open) }
     }
 
+    override fun rerunInFork(message: UiMessage) {
+        onOpenConversation?.let { open -> viewModel.rerunInFork(message, open) }
+    }
+
     override fun submitApproval(answer: ChatApprovalAnswer) =
         viewModel.submitApproval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason)
 

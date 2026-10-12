@@ -42,6 +42,16 @@ import org.junit.Test
 class AdminChatSessionPortTest {
 
     @Test
+    fun `fork, edit and rerun come and go together with the page's ability to branch`() {
+        val on = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = true)
+        val off = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = false)
+
+        assertTrue(on.fork && on.editAndResend && on.rerunInFork)
+        assertFalse(off.fork || off.editAndResend || off.rerunInFork)
+        assertTrue("send again stays: it is not a branch", off.rerun)
+    }
+
+    @Test
     fun `composer mirrors the view model draft and attachment limit`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         var viewModel: AdminChatViewModel? = null
