@@ -166,6 +166,18 @@ internal class ChatDockState(initial: ChatDockGeometry) {
     /** The last laid-out frame; gestures resolve against it. */
     internal var frame: ChatDockFrame? = null
 
+    /** letta-mobile-zxk2n.29: the minimised bar's own width (CanvasBubbleLayout), null: the panel's. */
+    internal var collapsedWidthDp: Float? = null
+
+    /** An edge of the minimised bar is being dragged: its width follows the pointer without gliding. */
+    internal var layoutResizing: Boolean by mutableStateOf(false)
+
+    /** The minimised bar's width as last laid out, or null before the first frame. */
+    internal fun collapsedBarWidthDp(): Float? {
+        val frame = frame ?: return null
+        return ChatDockGeometryMath.rect(geometry.copy(collapsed = true), frame).width
+    }
+
     /** The host's value as last seen. */
     private var lastFromHost: ChatDockGeometry = geometry
 
@@ -323,7 +335,9 @@ internal fun DockedChatPanel(
     morph: SurfaceMorph = SurfaceMorph.Docked,
 ) {
     BoxWithConstraints(modifier.fillMaxSize().imePadding()) {
-        val frame = ChatDockFrame(maxWidth.value, maxHeight.value, DockLimits, state.collapsedHeightDp)
+        val collapsedWidth = animatedBubbleComposerWidth(state)
+        state.collapsedWidthDp = collapsedWidth
+        val frame = ChatDockFrame(maxWidth.value, maxHeight.value, DockLimits, state.collapsedHeightDp, collapsedWidth)
         SideEffect { state.frame = frame }
         val geometry = state.geometry
         val collapsed = geometry.collapsed
@@ -393,6 +407,8 @@ internal fun DockedChatPanel(
                 }
             }
             if (layers.handles) Box(Modifier.matchParentSize()) { ResizeHandles(state) }
+            // Minimised at rest, the bar's own edges set its width (letta-mobile-zxk2n.29).
+            if (layers.wrapHeight && collapsed) Box(Modifier.matchParentSize()) { ComposerWidthHandles(state, composerBarHeight(state)) }
             // Over the panel, its handles and its surface's glow: the agent's avatar on the top edge.
             if (showPanel) {
                 PanelBadge(
@@ -693,7 +709,7 @@ private fun PanelBody(content: DockedPanelContent, modifier: Modifier) {
  * it out at, so a morph that starts or ends here lines up with the panel at rest.
  */
 internal fun ChatDockState.rectIn(widthDp: Float, heightDp: Float): ChatDockRect {
-    return ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp))
+    return ChatDockGeometryMath.rect(geometry, ChatDockFrame(widthDp, heightDp, DockLimits, collapsedHeightDp, collapsedWidthDp))
 }
 
 /** Where the panel stands open for [geometry]: itself, or where a minimised dock would open. */

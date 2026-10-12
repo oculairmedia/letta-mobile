@@ -69,6 +69,11 @@ data class ChatDockFrame(
     val containerHeightDp: Float,
     val limits: ChatDockLimits,
     val collapsedHeightDp: Float,
+    /**
+     * letta-mobile-zxk2n.29: the collapsed bar's own width, as the person set it; null keeps it as
+     * wide as the expanded panel. It never leaves the usable area.
+     */
+    val collapsedWidthDp: Float? = null,
 )
 
 /** Which panel edges a resize moves; corners move two. */
@@ -107,15 +112,19 @@ object ChatDockGeometryMath {
 
     /**
      * Where the panel is drawn in [frame]. Collapsed, it is the composer bar alone, as wide as the
-     * expanded panel and placed by its own anchor in the free height (see [ChatDockGeometry]).
+     * expanded panel (or [ChatDockFrame.collapsedWidthDp]) and placed by its own anchors in the free
+     * area (see [ChatDockGeometry]).
      */
     fun rect(geometry: ChatDockGeometry, frame: ChatDockFrame): ChatDockRect {
         val area = Area(frame)
         val expanded = expandedRect(geometry, area)
         if (!geometry.collapsed) return expanded
+        val clean = sanitize(geometry)
         val height = barHeight(frame, area)
-        val top = area.top + sanitize(geometry).anchorY * (area.height - height).coerceAtLeast(0f)
-        return expanded.copy(top = top, height = height)
+        val top = area.top + clean.anchorY * (area.height - height).coerceAtLeast(0f)
+        val width = collapsedWidth(frame, area) ?: return expanded.copy(top = top, height = height)
+        val left = area.left + clean.anchorX * (area.width - width).coerceAtLeast(0f)
+        return ChatDockRect(left = left, top = top, width = width, height = height)
     }
 
     /**
@@ -204,6 +213,11 @@ object ChatDockGeometryMath {
     private fun expandedHeight(geometry: ChatDockGeometry, area: Area): Float =
         (sanitize(geometry).heightDp ?: (area.containerHeight * area.limits.defaultHeightFraction))
             .coerceIn(area.minHeight, area.maxHeight)
+
+    private fun collapsedWidth(frame: ChatDockFrame, area: Area): Float? {
+        val width = frame.collapsedWidthDp?.takeIf { it.isFinite() && it > 0f } ?: return null
+        return width.coerceIn(area.minWidth, area.width)
+    }
 
     private fun barHeight(frame: ChatDockFrame, area: Area): Float = frame.collapsedHeightDp.coerceIn(0f, area.height)
 
