@@ -21,6 +21,17 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /** Small pieces the model-control surfaces share (letta-mobile-w4q4p). */
 
+/** A group's provider name in caps: the look of the Models sheet's section headers. */
+@Composable
+internal fun ProviderCapsTitle(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
+    )
+}
+
 /** One line under the progress bar: an error in the error colour, else a confirmation. */
 @Composable
 internal fun ModelControlNotice(error: String?, message: String?) {

@@ -71,7 +71,12 @@ Current policy:
 Warm startup was refreshed to a `405.889 ms` baseline after consecutive
 canonical PR runs measured `353.541 ms` and `405.889 ms` while cold startup
 remained below its baseline. That evidence showed the previous `285.988 ms`
-seed no longer represented the shared runner. Cold startup retains its
+seed no longer represented the shared runner. It was rebaselined again to
+`542.299 ms` (letta-mobile-gvswz) when #1886 stopped resolving the start
+destination from placeholder settings: the benchmark's unconfigured install
+used to draw a throwaway Conversations frame first, and TTID stopped there; it
+now draws the real first screen (the settings form) on its first frame, so TTID
+includes rendering it. Cold startup retains its
 `1512.749 ms` baseline after healthy runs measured bounded drift up to
 `1772.844 ms` (`+17.2%`).
 

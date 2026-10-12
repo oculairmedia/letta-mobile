@@ -10,7 +10,7 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
-import com.letta.mobile.desktop.chat.DesktopCommandPalette
+import com.letta.mobile.ui.shell.palette.CommandPalettePane
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.chat.DesktopModelControlOverlays
 import com.letta.mobile.desktop.chat.DesktopModelSurfaces
@@ -102,7 +102,7 @@ internal fun DesktopAppOverlays(
         )
     }
     if (visibility.commandPalette) {
-        DesktopCommandPalette(
+        CommandPalettePane(
             items = data.paletteItems,
             onSelect = { item ->
                 when (item.kind) {

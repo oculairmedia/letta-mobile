@@ -34,6 +34,7 @@ import com.letta.mobile.data.context.overviewFor
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.ui.notify.AgentNotificationsSection
+import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
 import com.letta.mobile.ui.host.LettaPane
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.host.PaneAnchor
@@ -133,9 +134,11 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
     Box(modifier) {
         AgentContextCard(model = model, onClick = { open = true })
         if (open) {
+            // letta-mobile-pt1ze.5: Escape, back or a scrim tap first leaves the model list.
+            val levels = rememberPickerDrillIn(AgentSettingsLevel.Root)
             LettaPane(
                 kind = LettaPaneKind.Adaptive(PaneAnchor.BelowStart),
-                onDismiss = { open = false },
+                onDismiss = { if (!levels.back()) open = false },
                 size = PaneSize(AgentContextDimens.popoverWidth, AgentContextDimens.popoverMaxHeight),
                 testTag = AgentContextTags.SHEET,
             ) {
@@ -144,10 +147,13 @@ fun AgentContextCardHost(binding: AgentContextCardBinding, focus: AgentContextFo
                     LimitTarget.of(focus, windows, windows.current(overview), model.meter?.usage?.usedTokens),
                     onApplied = { deps.breakdown?.load(requests.breakdown, force = true) },
                 )
-                AgentContextSheetContent(model, rememberPicker(deps.pickerSource, focus, binding.actions), onCompact, limit)
-                deps.attention?.let { prefs ->
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    AgentNotificationsSection(prefs, focus.agentId)
+                val picker = rememberPicker(deps.pickerSource, focus, binding.actions)?.copy(levels = levels)
+                AgentContextSheetContent(model, picker, onCompact, limit)
+                if (levels.atRoot) {
+                    deps.attention?.let { prefs ->
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        AgentNotificationsSection(prefs, focus.agentId)
+                    }
                 }
             }
         }

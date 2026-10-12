@@ -40,7 +40,16 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import com.letta.mobile.ui.components.LettaListRow
+import com.letta.mobile.ui.components.LettaListRowSpec
+import com.letta.mobile.ui.components.picker.PickerDrillIn
+import com.letta.mobile.ui.components.picker.rememberPickerDrillIn
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.modelcontrol.LocalModelPickerContextTokens
+import com.letta.mobile.ui.modelcontrol.ModelControlStrings
 import com.letta.mobile.ui.modelcontrol.ModelPickerActions
 import com.letta.mobile.ui.modelcontrol.ModelPickerContent
 import com.letta.mobile.ui.theme.LettaDimens
@@ -55,12 +64,24 @@ data class AgentContextPicker(
     val state: ModelPickerState,
     val actions: ModelPickerActions,
     val onEffortApplied: ((ModelPickerEntry, String?) -> Unit)? = null,
+    /**
+     * letta-mobile-pt1ze.5: which level the sheet shows, owned by the pane so its dismissal can go
+     * back first; null keeps the levels inside the sheet.
+     */
+    val levels: PickerDrillIn<AgentSettingsLevel>? = null,
 )
 
+/** The agent settings sheet's levels: its rows, and the model list opened over them (letta-mobile-pt1ze.5). */
+enum class AgentSettingsLevel { Root, Model }
+
 /**
- * letta-mobile-3io8k: the card's sheet — the searchable model list (grouped by provider, with
- * windows and effort chips) under "Applies to this agent/conversation", then the context: used /
- * limit, the per-section legend with its provenance, and Compact.
+ * letta-mobile-3io8k: the card's sheet. letta-mobile-pt1ze.5 (built on the S8 picker,
+ * letta-mobile-ckmub.3.6): two levels. The root is one scroll of rows: the "Model" row under
+ * "Applies to this agent/conversation" with the selected model's effort slider, then the context
+ * (used / limit, the per-section legend with its provenance, Compact). The "Model" row opens the
+ * searchable model list as the second level, with a back arrow, its search pinned and its own
+ * scroll; a pick returns to the root. The pane holding the sheet asks [AgentContextPicker.levels]
+ * to go back before it closes.
  */
 @Composable
 fun ColumnScope.AgentContextSheetContent(
@@ -69,21 +90,55 @@ fun ColumnScope.AgentContextSheetContent(
     onCompact: () -> Unit,
     limit: ContextLimitControl? = null,
 ) {
-    SheetHeading(AgentContextStrings.MODEL_TITLE, AgentContextStrings.scope(model.scope), Modifier.testTag(AgentContextTags.SCOPE))
-    if (picker != null) {
-        CompositionLocalProvider(LocalModelPickerContextTokens provides model.meter?.usage?.usedTokens) {
-            ModelPickerContent(state = picker.state, actions = picker.actions)
-        }
-        SelectedModelEffort(picker)
-    } else {
-        Text(
-            text = modelLine(model),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
-        )
+    val ownLevels = rememberPickerDrillIn(AgentSettingsLevel.Root)
+    val levels = picker?.levels ?: ownLevels
+    if (picker != null && levels.current == AgentSettingsLevel.Model) {
+        ModelLevel(model, picker, levels)
+        return
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-    ContextSection(model, onCompact, limit)
+    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+        SheetHeading(AgentContextStrings.MODEL_TITLE, AgentContextStrings.scope(model.scope), Modifier.testTag(AgentContextTags.SCOPE))
+        if (picker != null) {
+            ModelRow(model, picker, onOpen = { levels.open(AgentSettingsLevel.Model) })
+            SelectedModelEffort(picker)
+        } else {
+            Text(
+                text = modelLine(model),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        ContextSection(model, onCompact, limit)
+    }
+}
+
+/** The second level: the model list alone, so it gets the pane's height; a pick goes back to the rows. */
+@Composable
+private fun ColumnScope.ModelLevel(model: AgentContextCardModel, picker: AgentContextPicker, levels: PickerDrillIn<AgentSettingsLevel>) {
+    val actions = picker.actions.copy(
+        onSelect = { entry ->
+            picker.actions.onSelect(entry)
+            levels.back()
+        },
+        onBack = { levels.back() },
+    )
+    CompositionLocalProvider(LocalModelPickerContextTokens provides model.meter?.usage?.usedTokens) {
+        ModelPickerContent(state = picker.state, actions = actions, autoFocusSearch = true)
+    }
+}
+
+/** "Model  Opus 4 · High  >": the current model; tapping opens the model list. */
+@Composable
+private fun ModelRow(model: AgentContextCardModel, picker: AgentContextPicker, onOpen: () -> Unit) {
+    val selected = picker.state.selected
+    val name = selected?.displayName ?: modelLine(model)
+    LettaListRow(
+        spec = LettaListRowSpec(title = name, trailing = selected?.tier?.let(ModelControlStrings::tierLabel)),
+        onClick = onOpen,
+        modifier = Modifier.padding(horizontal = LettaDimens.Space.sm).testTag(AgentContextTags.MODEL_ROW),
+        end = { Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
+    )
 }
 
 /**
