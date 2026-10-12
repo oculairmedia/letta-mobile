@@ -110,9 +110,13 @@ private fun AssistantMessageColumn(
         MessageImages(message, callbacks)
         val toolCalls = message.toolCalls.orEmpty()
         if (toolCalls.isNotEmpty()) {
+            // letta-mobile-sieej: the line carries its request, so it reads "Approval needed" and the
+            // card shows right under it.
+            val approval = message.approvalRequest
             ToolRunGroup(
                 calls = ToolRunCalls(
                     toolCalls = remember(toolCalls) { toolCalls.toImmutableList() },
+                    approvals = remember(approval) { listOfNotNull(approval).toImmutableList() },
                     startedAtTimestamp = message.timestamp.takeIf { it.isNotBlank() },
                 ),
                 context = context,
@@ -121,7 +125,7 @@ private fun AssistantMessageColumn(
         }
         message.generatedUi?.let { GeneratedUiCard(it, context, callbacks) }
         if (message.artifacts.isNotEmpty()) CanvasArtifactCards(message.artifacts, callbacks)
-        ApprovalRequestSlot(message.approvalRequest, context, callbacks)
+        if (toolCalls.isEmpty()) ApprovalRequestSlot(message.approvalRequest, context, callbacks)
         message.approvalResponse?.let { ApprovalResponseCard(it) }
     }
 }
