@@ -65,15 +65,34 @@ class CanvasLargeSceneBench {
     fun bench() {
         if (System.getenv("CANVAS_BENCH") != "1") return
         val sizes = (System.getenv("CANVAS_BENCH_SIZES") ?: "500,2000,10000").split(',').map { it.trim().toInt() }
-        for (n in sizes) {
-            log("=== N=$n ===")
-            val payload = CanvasLargeSceneFixtures.scene(n)
-            dataPath(payload)
-            hitTesting(payload)
-            render(payload)
-            if (n <= 2000) sessionOps(payload)
-        }
+        val parts = (System.getenv("CANVAS_BENCH_PARTS") ?: "data,hit,render,session").split(',').toSet()
+        for (n in sizes) runSize(n, parts)
         File("build/canvas-bench").apply { mkdirs() }.resolve("results.txt").writeText(out.toString())
+    }
+
+    /** The stages named in [parts] on a board of [n] elements. */
+    private fun runSize(n: Int, parts: Set<String>) {
+        log("=== N=$n ===")
+        val payload = CanvasLargeSceneFixtures.scene(n)
+        val stages = linkedMapOf<String, () -> Unit>(
+            "data" to { dataPath(payload) },
+            "hit" to { hitTesting(payload) },
+            "render" to { profiled { render(payload) } },
+            // The notebook store is slow enough on big boards that 2,000 elements is the useful top.
+            "session" to { if (n <= 2000) profiled { sessionOps(payload) } },
+        )
+        stages.filterKeys { it in parts }.values.forEach { it() }
+    }
+
+    /** Runs [block] under a JFR recording written to `CANVAS_BENCH_JFR`, when that is set. */
+    private fun profiled(block: () -> Unit) {
+        val path = System.getenv("CANVAS_BENCH_JFR") ?: return block()
+        jdk.jfr.Recording(jdk.jfr.Configuration.getConfiguration("profile")).use { recording ->
+            recording.start()
+            block()
+            recording.stop()
+            recording.dump(java.nio.file.Path.of(path))
+        }
     }
 
     // ---------------------------------------------------------------- data path
@@ -98,9 +117,10 @@ class CanvasLargeSceneBench {
                 if (evaluated?.shouldImport == true) CanvasImageAssets.parse(CanvasSceneStateGuard(null).drawable(json), null)
             },
         )
-        // What autosave does on the main thread after every import or edit (CanvasBoardSync.onJsonExported).
+        // What autosave does after every import or edit: serialize + strip twice. On the main thread before
+        // letta-mobile-24zur.2, on Dispatchers.Default after (and skipped for a drawing just imported).
         log(
-            "autosave.mainThread.ms=" + median {
+            "autosave.serializeAndStrip.ms=" + median {
                 val exported = DrawingSerializer.serialize(payload)
                 CanvasOpProjector.stripMetadataForDrawBox(exported)
                 CanvasOpProjector.stripMetadataForDrawBox(exported)
@@ -156,9 +176,15 @@ class CanvasLargeSceneBench {
                 moved = moved.translate(Offset(2f, 1f))
                 controller.onIntent(Intent.UpdateElement(moved))
             }
-            // An external import: same content, every element a new instance (as parsing makes it).
+            // An external import as an agent's op makes it: one element moved, every element a new
+            // instance (as parsing makes it).
+            var nudge = 0f
             scenario("afterImport", frames = 10) {
-                controller.importExternal(payload.copy(elements = payload.elements.map { it.freshCopy() }))
+                nudge += 3f
+                val fresh = payload.elements.map { it.freshCopy() }.toMutableList()
+                val i = fresh.indexOfFirst { it is Element.Shape }
+                fresh[i] = fresh[i].translate(Offset(nudge, 0f))
+                controller.importExternal(payload.copy(elements = fresh))
             }
             log("render.importApply.mainThread.ms=${median(reps = 8) { controller.importExternal(payload.copy(elements = payload.elements.map { it.freshCopy() })) }}")
         } finally {

@@ -162,6 +162,13 @@ sealed class Intent {
      */
     data class SyncTextMeasuredHeight(val id: String, val height: Float) : Intent()
 
+    /**
+     * [SyncTextMeasuredHeight] for many text elements at once, by id: one pass over the drawing and
+     * one new state, where one intent per text cost a pass over the whole drawing each. A board
+     * opened or taken in from elsewhere with a thousand text blocks re-measured did a thousand.
+     */
+    data class SyncTextMeasuredHeights(val heights: Map<String, Float>) : Intent()
+
     // ==================== Shape Operations ====================
 
     /**

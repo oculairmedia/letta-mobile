@@ -12,6 +12,8 @@ import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.domain.usecase.SvgExporter
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.reducer.holdsText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -489,6 +491,20 @@ class DrawBoxController(
     }
 
     /**
+     * [exportJson] with the drawing serialised on [Dispatchers.Default]: the state is immutable, so
+     * it is taken as it is now and only the finished JSON is emitted. A big board serialises in a
+     * hundred milliseconds or more, a dropped frame on the main thread. Cancelled before it is
+     * done, nothing is emitted.
+     */
+    suspend fun exportJsonInBackground() {
+        val drawing = _state.value
+        val json = withContext(Dispatchers.Default) {
+            DrawingSerializer.serialize(PayLoad(bgColor = drawing.bgColor, elements = drawing.elements))
+        }
+        _events.tryEmit(Event.JsonExported(json))
+    }
+
+    /**
      * Import a previously exported drawing from JSON string.
      *
      * Clears the canvas and loads elements from the provided JSON.
@@ -546,13 +562,30 @@ class DrawBoxController(
             val ids = payLoad.elements.mapTo(HashSet()) { it.id }
             val before = _state.value
             _state.value = before.copy(
-                elements = payLoad.elements,
+                elements = sharedWith(before.elements, payLoad.elements),
                 bgColor = payLoad.bgColor,
                 selectedIds = before.selectedIds.filterTo(HashSet()) { it in ids },
                 history = emptyList(),
                 future = emptyList(),
             ).also { it.invokeBitmap = before.invokeBitmap }
         }
+    }
+
+    /**
+     * [incoming] with every element equal to the one already on the board kept as that same
+     * instance, and the board's own list kept when nothing differs at all. A change from elsewhere
+     * is usually one element; parsed afresh, every other element was a new instance too, so the
+     * renderer's caches (keyed on instances) re-drew and re-measured the whole board for it.
+     */
+    private fun sharedWith(current: List<Element>, incoming: List<Element>): List<Element> {
+        val byId = current.associateBy { it.id }
+        var allSame = current.size == incoming.size
+        val shared = incoming.mapIndexed { i, element ->
+            val existing = byId[element.id]?.takeIf { it == element }
+            if (existing == null || current.getOrNull(i) !== existing) allSame = false
+            existing ?: element
+        }
+        return if (allSame) current else shared
     }
 }
 
