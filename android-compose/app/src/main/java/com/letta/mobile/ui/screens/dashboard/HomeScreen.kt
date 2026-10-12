@@ -18,10 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.shell.shellHomePage
 import kotlinx.coroutines.launch
 
 /** The phone presentation of the shared Home page: the app bar and drawer carry title and search. */
@@ -151,11 +154,11 @@ fun HomeScreen(
                 )
             },
         ) { paddingValues ->
-            HomePage(
-                state = state,
-                callbacks = HomePageCallbacks(viewModel.actions, navigation.homePageNavigation(state, routes)),
+            val callbacks = HomePageCallbacks(viewModel.actions, navigation.homePageNavigation(state, routes))
+            ShellPage(
+                destination = ShellDestination.Home,
+                deps = ShellPageDeps(home = shellHomePage(state, callbacks, AndroidHomeOptions)),
                 modifier = Modifier.padding(paddingValues),
-                options = AndroidHomeOptions,
             )
         }
     }

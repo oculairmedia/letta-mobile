@@ -86,7 +86,7 @@ private fun DesktopShellRoutingEffects(
 }
 
 private data class DesktopDeepLinkRoutingActions(
-    val onDestinationSelected: (DesktopDestination) -> Unit,
+    val onDestinationSelected: (com.letta.mobile.data.shell.ShellDestination) -> Unit,
     val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onPairLink: (String) -> Unit,

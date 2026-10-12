@@ -4,8 +4,6 @@ import com.letta.mobile.desktop.phone.ClosePhoneDrawerOnNavigation
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.PhoneAwareContent
 import com.letta.mobile.desktop.phone.isBareChatPage
-
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +15,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -40,6 +41,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 internal data class DesktopMainContentInputs(
     val editingAgentId: String?,
     val selectedDestination: DesktopDestination,
+    /** The shared destination of the route on screen, without the editor/canvas panels beside it. */
+    val pageDestination: ShellDestination,
     val modelOptions: List<Pair<String, String>>,
     val agentRepository: IAgentRepository,
     val blockApi: DesktopBlockApi?,
@@ -91,9 +94,7 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
     val canvas = inputs.activeCanvasSession
     // The editor is a panel beside the chat, not a page: the conversation stays in view.
     androidx.compose.foundation.layout.Row(modifier = modifier) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            MainDestination(inputs, actions)
-        }
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()) { MainDestination(inputs, actions) }
         when {
             editing != null -> EditAgentSidePane(editing, inputs, actions)
             canvas != null && showsCanvasSidePane(canvas.canvasId, inputs.dockedCanvasId) -> CanvasSidePane(canvas, actions)
@@ -101,40 +102,32 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
     }
 }
 
-/** The conversation (with the background-tasks toggle over it) or whichever destination is chosen. */
+/** letta-mobile-ckmub.3.4: the desktop maps its route to a shared destination; ShellPage draws its page. */
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.MainDestination(
-    inputs: DesktopMainContentInputs,
-    actions: DesktopMainContentActions,
-) {
-    if (inputs.selectedDestination != DesktopDestination.Conversations) {
-        DestinationContent(
-            destination = inputs.selectedDestination,
-            inputs = inputs.destinationInputs,
-            actions = actions.destinationActions,
-            modifier = Modifier.fillMaxSize(),
-        )
-        return
-    }
-    val sharedChatPage = inputs.sharedChatPage
-    if (sharedChatPage != null) {
-        sharedChatPage(Modifier.fillMaxSize())
-    } else {
-        ChatDetailPane(
-            state = inputs.chatDetailState,
-            actions = actions.chatDetailActions,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-    // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
-    if (inputs.showsBackgroundTasksToggle()) {
-        DesktopBackgroundTasksToggle(
-            runningCount = inputs.activeSubagents.visibleRunningCount(),
-            onClick = actions.onShowBackgroundTasks,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
-        )
+private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
+    val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> DesktopChatContainer(inputs, actions, modifier) }
+    val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, chat)
+    ShellPage(destination = inputs.pageDestination, deps = deps, modifier = Modifier.fillMaxSize())
+}
+
+/** The desktop chat container: the shared chat page, or the default page with the background-tasks toggle over it. */
+@Composable
+private fun DesktopChatContainer(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions, modifier: Modifier) {
+    Box(modifier) {
+        val sharedChatPage = inputs.sharedChatPage
+        if (sharedChatPage != null) {
+            sharedChatPage(Modifier.fillMaxSize())
+        } else {
+            ChatDetailPane(state = inputs.chatDetailState, actions = actions.chatDetailActions, modifier = Modifier.fillMaxSize())
+        }
+        // The shared page draws it in the canvas header (see DesktopShellMainPane's canvasHeaderTrailing).
+        if (inputs.showsBackgroundTasksToggle()) {
+            DesktopBackgroundTasksToggle(
+                runningCount = inputs.activeSubagents.visibleRunningCount(),
+                onClick = actions.onShowBackgroundTasks,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = LettaDimens.Space.md, end = LettaDimens.Space.lg),
+            )
+        }
     }
 }
 

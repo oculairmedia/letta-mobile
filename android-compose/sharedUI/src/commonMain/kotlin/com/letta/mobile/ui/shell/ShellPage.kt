@@ -1,0 +1,162 @@
+package com.letta.mobile.ui.shell
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.channel.ChannelsPageActions
+import com.letta.mobile.data.channel.ChannelsPageState
+import com.letta.mobile.data.home.HomePageState
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellPageKind
+import com.letta.mobile.data.shell.ShellSkillsSection
+import com.letta.mobile.ui.settings.BackendSettingsActions
+import com.letta.mobile.ui.settings.SettingsPage
+import com.letta.mobile.ui.settings.SettingsPageState
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
+import com.letta.mobile.ui.shell.pages.home.HomePage
+import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
+import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
+import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspacePage
+import com.letta.mobile.ui.shell.pages.skills.SkillsPage
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
+
+/** Draws the page for one kind of destination. */
+fun interface ShellPageContent<in D : ShellDestination> {
+    @Composable
+    fun Content(destination: D, modifier: Modifier)
+}
+
+/**
+ * letta-mobile-ckmub.3.4 (hard cut S5, primitive P8): what [ShellPage] draws each destination with.
+ *
+ * A host fills only the pages it can show right now (Android builds one per nav entry, the desktop
+ * and web all of theirs); a destination without one goes to [fallback].
+ *
+ * - The shared pages ([home], [channels], [skills], [memory], [settings]) are built from the shared
+ *   page bindings below ([shellHomePage], ...), so the page itself is always the sharedUI one.
+ * - [chat] is the platform's chat-page container: it binds the shared ChatSurface to the platform's
+ *   session port (DesktopSharedChatPage, SharedChatPage, WebSharedChatPage). It stays a slot.
+ * - [fallback] is TEMPORARY: the platform pages that have no shared page yet (listed in the bead
+ *   letta-mobile-ckmub.3.4 and in the hosts' fallbacks). Each later slice moves one into sharedUI
+ *   and deletes its fallback branch; copying a fallback page into another platform is a review blocker.
+ */
+class ShellPageDeps(
+    home: ShellPageContent<ShellDestination.Home>? = null,
+    chat: ShellPageContent<ShellDestination.Chat>? = null,
+    canvas: ShellPageContent<ShellDestination.Canvas>? = null,
+    memory: ShellPageContent<ShellDestination.Memory>? = null,
+    schedules: ShellPageContent<ShellDestination.Schedules>? = null,
+    channels: ShellPageContent<ShellDestination.Channels>? = null,
+    skills: ShellPageContent<ShellDestination.Skills>? = null,
+    settings: ShellPageContent<ShellDestination.Settings>? = null,
+    agentEditor: ShellPageContent<ShellDestination.AgentEditor>? = null,
+    providers: ShellPageContent<ShellDestination.Providers>? = null,
+    val fallback: ShellPageContent<ShellDestination> = EmptyShellPage,
+) {
+    // Each page is registered under the kind of the destination type it was typed for above, so
+    // the lookup in [pageFor] always hands a page the destination type it expects.
+    private val pages: Map<ShellPageKind, ShellPageContent<*>> = listOf(
+        ShellPageKind.Home to home,
+        ShellPageKind.Chat to chat,
+        ShellPageKind.Canvas to canvas,
+        ShellPageKind.Memory to memory,
+        ShellPageKind.Schedules to schedules,
+        ShellPageKind.Channels to channels,
+        ShellPageKind.Skills to skills,
+        ShellPageKind.Settings to settings,
+        ShellPageKind.AgentEditor to agentEditor,
+        ShellPageKind.Providers to providers,
+    ).mapNotNull { (kind, page) -> page?.let { kind to it } }.toMap()
+
+    /** The kinds this host draws with a page of its own (not the fallback). */
+    val registered: Set<ShellPageKind> get() = pages.keys
+
+    @Suppress("UNCHECKED_CAST")
+    internal fun pageFor(destination: ShellDestination): ShellPageContent<ShellDestination> =
+        pages[destination.kind] as ShellPageContent<ShellDestination>? ?: fallback
+}
+
+object ShellPageTags {
+    const val EMPTY = "shell_page_empty"
+}
+
+/** A destination nobody can draw here: an empty page rather than a crash. */
+val EmptyShellPage = ShellPageContent<ShellDestination> { _, modifier ->
+    Box(modifier.fillMaxSize().testTag(ShellPageTags.EMPTY))
+}
+
+/**
+ * The only page switch of the shell: [destination] -> its page. Platform navigation hosts map their
+ * routes, deep links and back stack to a [ShellDestination] and call this; they never pick a page.
+ */
+@Composable
+fun ShellPage(destination: ShellDestination, deps: ShellPageDeps, modifier: Modifier = Modifier) {
+    // One state scope per kind of page: leaving Memory for Channels never hands Memory's saved view to Channels.
+    key(destination.kind) { deps.pageFor(destination).Content(destination, modifier) }
+}
+
+// --- the shared pages ---------------------------------------------------------------------------
+
+/** The shared Home page. */
+fun shellHomePage(
+    state: HomePageState,
+    callbacks: HomePageCallbacks,
+    options: HomePageOptions = HomePageOptions(),
+) = ShellPageContent<ShellDestination.Home> { _, modifier ->
+    HomePage(state = state, callbacks = callbacks, modifier = modifier, options = options)
+}
+
+/** The shared Channels page. */
+fun shellChannelsPage(
+    state: ChannelsPageState,
+    actions: ChannelsPageActions,
+    options: ChannelsPageOptions = ChannelsPageOptions(),
+) = ShellPageContent<ShellDestination.Channels> { _, modifier ->
+    ChannelsPage(state = state, actions = actions, modifier = modifier, options = options)
+}
+
+/** The shared Skills page, opened on the destination's section (the Tools anchor). */
+fun shellSkillsPage(
+    state: SkillsPageState,
+    actions: SkillsPageActions,
+    options: SkillsPageOptions = SkillsPageOptions(),
+) = ShellPageContent<ShellDestination.Skills> { destination, modifier ->
+    SkillsPage(
+        state = state,
+        actions = actions,
+        modifier = modifier,
+        options = options.copy(initialSection = destination.section.toPageSection()),
+    )
+}
+
+/** The shared Memory page: the block graph and the agent's files. */
+fun shellMemoryPage(binding: MemoryWorkspaceBinding) = ShellPageContent<ShellDestination.Memory> { _, modifier ->
+    MemoryWorkspacePage(binding = binding, modifier = modifier)
+}
+
+/** The shared Settings page (backend and connection). */
+fun shellSettingsPage(
+    state: SettingsPageState,
+    actions: BackendSettingsActions,
+    onBack: (() -> Unit)? = null,
+) = ShellPageContent<ShellDestination.Settings> { _, modifier ->
+    SettingsPage(state = state, actions = actions, modifier = modifier, onBack = onBack)
+}
+
+fun ShellSkillsSection.toPageSection(): SkillsPageSection = when (this) {
+    ShellSkillsSection.Skills -> SkillsPageSection.Skills
+    ShellSkillsSection.Tools -> SkillsPageSection.Tools
+}
+
+fun SkillsPageSection.toShellSection(): ShellSkillsSection = when (this) {
+    SkillsPageSection.Skills -> ShellSkillsSection.Skills
+    SkillsPageSection.Tools -> ShellSkillsSection.Tools
+}

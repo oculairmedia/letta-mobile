@@ -14,6 +14,8 @@ import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
@@ -159,6 +161,7 @@ private fun desktopMainContentInputs(
     return DesktopMainContentInputs(
         editingAgentId = navigator.editAgentId,
         selectedDestination = navigator.selectedDestination,
+        pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination(),
         modelOptions = frame.lists.modelOptions,
         agentRepository = core.bootstrap.dataBindings.sessionGraphProvider.current.agentRepository,
         blockApi = panels.httpApis.blockApi,
@@ -372,7 +375,7 @@ private fun desktopHomeCallbacks(context: DesktopShellContext, frame: DesktopShe
             onOpenShortcut = { shortcut -> DesktopHome.destinationFor(shortcut)?.let(navigator::navigate) },
             onConfigureAgent = { navigator.editAgentId = it },
             onOpenMessage = { message -> message.conversationId?.let(openConversation) },
-            onOpenTool = { navigator.navigate(DesktopDestination.Agents) },
+            onOpenTool = { navigator.navigate(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
             onOpenBlock = { navigator.navigate(DesktopDestination.Memory) },
             onA2uiAction = context.onA2uiAction,
         ),
