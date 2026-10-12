@@ -2,6 +2,7 @@ package io.ak1.drawbox.domain.model
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import io.ak1.drawbox.sortedByZIndexIfNeeded
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -23,7 +24,7 @@ import kotlin.math.sqrt
 
 /** Axis-aligned bounding box of the element in unrotated logical space. */
 fun Element.bounds(): Rect = when (this) {
-    is Element.Path -> pointsBounds(positions)
+    is Element.Path -> samplesBounds(samples)
     is Element.Image -> pointsBounds(points)
     is Element.Text -> Rect(
         left = topLeft.x,
@@ -352,6 +353,23 @@ private fun circleBounds(points: List<Offset>): Rect {
     return Rect(cx - radius, cy - radius, cx + radius, cy + radius)
 }
 
+/** [pointsBounds] of a stroke's sample positions, without building the positions list. */
+private fun samplesBounds(samples: List<Element.PathSample>): Rect {
+    if (samples.isEmpty()) return Rect(0f, 0f, 0f, 0f)
+    var minX = samples[0].position.x
+    var minY = samples[0].position.y
+    var maxX = minX
+    var maxY = minY
+    for (i in 1 until samples.size) {
+        val p = samples[i].position
+        if (p.x < minX) minX = p.x
+        if (p.y < minY) minY = p.y
+        if (p.x > maxX) maxX = p.x
+        if (p.y > maxY) maxY = p.y
+    }
+    return Rect(minX, minY, maxX, maxY)
+}
+
 private fun pointsBounds(points: List<Offset>): Rect {
     if (points.isEmpty()) return Rect(0f, 0f, 0f, 0f)
     var minX = points[0].x
@@ -382,11 +400,18 @@ fun Element.hitTest(point: Offset, tolerance: Float = 8f, hollowInterior: Boolea
     val b = bounds()
     val local = if (rotation == 0f) point else rotateAround(point, b.center, -rotation)
     return when (this) {
-        is Element.Path -> hitTestPath(this, local, tolerance)
+        // Far from the stroke's box, no segment can be within reach: the walk is skipped.
+        is Element.Path -> b.inflate(tolerance + maxSampleWidth(this)).contains(local) && hitTestPath(this, local, tolerance)
         is Element.Shape -> hitTestShape(this, local, b, tolerance, hollowInterior)
         is Element.Image -> b.inflate(tolerance).contains(local)
         is Element.Text -> b.inflate(tolerance).contains(local)
     }
+}
+
+private fun maxSampleWidth(path: Element.Path): Float {
+    var widest = path.strokeWidth
+    for (s in path.samples) if (s.width > widest) widest = s.width
+    return widest
 }
 
 private fun hitTestPath(path: Element.Path, p: Offset, tolerance: Float): Boolean {
@@ -484,10 +509,11 @@ fun topmostHit(
     tolerance: Float = 8f,
     hollowInterior: Boolean = false,
 ): Element? {
-    // Reversed first so equal zIndex values go to the later element, which the renderer draws on top.
+    // Walked from the top of the paint order down, so equal zIndex values go to the later element,
+    // which the renderer draws on top. A drawing is kept in zIndex order, so this sorts nothing.
     return elements
+        .sortedByZIndexIfNeeded()
         .asReversed()
-        .sortedByDescending { it.zIndex }
         .firstOrNull { it.hitTest(point, tolerance, hollowInterior) }
 }
 
