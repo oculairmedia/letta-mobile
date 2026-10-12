@@ -7,11 +7,25 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.CoroutineContext
 import kotlin.test.fail
 
-/** Shared by the real-Pager tests: a presenter that records rows, and a real-time wait. */
-internal class RecordingPresenter<T : Any> : PagingDataPresenter<T>(Dispatchers.Default, null) {
+/**
+ * Shared by the real-Pager tests: a presenter that records rows, and a real-time wait. Pass a test
+ * dispatcher as [mainContext] to present on virtual time and settle with `advanceUntilIdle`.
+ */
+internal class RecordingPresenter<T : Any>(
+    mainContext: CoroutineContext = Dispatchers.Default,
+) : PagingDataPresenter<T>(mainContext, null) {
     override suspend fun presentPagingDataEvent(event: PagingDataEvent<T>) = Unit
+
+    /** Virtual time: every load state is idle now, after the caller ran the scheduler dry. */
+    fun assertIdle(detail: () -> String = { "" }) {
+        val states = loadStateFlow.value
+        val idle = states != null && states.refresh is LoadState.NotLoading &&
+            states.prepend is LoadState.NotLoading && states.append is LoadState.NotLoading
+        if (!idle) fail("Paging did not settle: $states ${detail()}")
+    }
 
     suspend fun awaitIdle() {
         val idle = withTimeoutOrNull(5_000) {
