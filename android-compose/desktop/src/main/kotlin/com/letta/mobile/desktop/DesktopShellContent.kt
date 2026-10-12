@@ -71,10 +71,10 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 DesktopShellOverlays(context, frame)
                 // F03: the bundled runtime's crash notice, over every page while it is down.
                 val runtimeBanner = DesktopLocalRuntimeHost.health.collectAsState().value.runtimeBanner()
-                OverlayWhile(runtimeBanner, key = runtimeBanner?.let { it.message to it.action?.label })
+                OverlayWhile(runtimeBanner, key = runtimeBanner?.let { "${it.message}|${it.action?.label}" })
                 val chat = context.core.chatController
                 val offer = chat.deletionUndo.pending.collectAsState().value
-                UndoDeleteOverlay(offer, offer?.behavior, { offer?.let(chat::undoDeleteConversation) }) {
+                UndoDeleteOverlay(offer?.undoKey(), offer?.behavior, { offer?.let(chat::undoDeleteConversation) }) {
                     offer?.let { chat.deletionUndo.clear(it.conversationId) }
                 }
             }

@@ -11,8 +11,8 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSnackbarEffect
 import com.letta.mobile.ui.chat.surface.timeline.ErrorSnackbarEffect
 import com.letta.mobile.ui.host.Overlay
-import com.letta.mobile.ui.host.OverlayDurations
 import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayPresentation
 
 /**
  * letta-mobile-bglj6.1 / ckmub.3.15 (hard cut S13): the page's transient messages, queued on the
@@ -40,12 +40,12 @@ internal fun RecompileSnackbarEffect(status: RecompileStatus, overlays: OverlayH
     LaunchedEffect(status, overlays) {
         val message = status.message() ?: return@LaunchedEffect
         val queued = status == RecompileStatus.Queued
-        val duration = when {
-            queued -> null
-            status.isError -> OverlayDurations.LONG
-            else -> OverlayDurations.SHORT
+        val presentation = when {
+            queued -> OverlayPresentation(durationMillis = null)
+            status.isError -> OverlayPresentation.Long
+            else -> OverlayPresentation.Short.copy(dismissible = true)
         }
-        overlays.show(Overlay.Snackbar(message, key = RECOMPILE_KEY, durationMillis = duration, dismissible = !queued))
+        overlays.show(Overlay.Snackbar(message, key = RECOMPILE_KEY, presentation = presentation))
         if (!queued) currentActions.dismissRecompileStatus()
     }
 }

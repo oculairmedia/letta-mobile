@@ -10,7 +10,9 @@ import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import com.letta.mobile.desktop.runtime.desktopRuntimeHeapMb
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayPresentation
 import com.letta.mobile.ui.host.OverlayPriority
+import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.host.OverlayTone
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -156,9 +158,8 @@ internal fun RuntimeHealth.runtimeBanner(): Overlay.Banner? {
     return Overlay.Banner(
         message = "Local runtime: ",
         key = LOCAL_RUNTIME_BANNER_KEY,
-        priority = OverlayPriority.High,
-        tone = OverlayTone.Error,
-        action = action,
+        presentation = OverlayPresentation(OverlayPriority.High, durationMillis = null, tone = OverlayTone.Error),
+        response = OverlayResponse(action),
     )
 }
 

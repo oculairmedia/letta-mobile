@@ -31,6 +31,7 @@ import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
 import com.letta.mobile.ui.chat.subagents.SubagentRosterList
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayPresentation
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.CoroutineScope
@@ -179,7 +180,7 @@ internal fun SharedChatSubagentBanner(state: SharedChatSubagentSheetState) {
     val message = state.bannerMessage
     LaunchedEffect(message, overlays) {
         if (message.isBlank()) return@LaunchedEffect
-        overlays?.show(Overlay.Banner(message, key = SUBAGENT_BANNER_KEY, durationMillis = SUBAGENT_BANNER_MILLIS))
+        overlays?.show(Overlay.Banner(message, key = SUBAGENT_BANNER_KEY, presentation = OverlayPresentation(durationMillis = SUBAGENT_BANNER_MILLIS)))
         state.bannerMessage = ""
     }
 }

@@ -44,9 +44,10 @@ import com.letta.mobile.ui.common.toOverlay
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayAction
-import com.letta.mobile.ui.host.OverlayDurations
 import com.letta.mobile.ui.host.OverlayHost
 import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
@@ -161,7 +162,7 @@ class MainActivity : ComponentActivity() {
                 clipboard?.setPrimaryClip(ClipData.newPlainText("letta-mobile crash", payload))
                 Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
-            overlays.show(Overlay.Snackbar(summary, durationMillis = OverlayDurations.LONG, action = copy, dismissible = true))
+            overlays.show(Overlay.Snackbar(summary, presentation = OverlayPresentation.Long, response = OverlayResponse(copy)))
             crashReporter.dismiss()
         }
     }

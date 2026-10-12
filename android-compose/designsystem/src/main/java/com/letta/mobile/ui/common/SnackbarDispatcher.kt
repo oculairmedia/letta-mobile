@@ -5,6 +5,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayAction
 import com.letta.mobile.ui.host.OverlayDurations
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayResponse
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 
@@ -36,11 +38,10 @@ val LocalSnackbarDispatcher = staticCompositionLocalOf { SnackbarDispatcher() }
  */
 fun SnackbarMessage.toOverlay(): Overlay.Snackbar = Overlay.Snackbar(
     message = message,
-    durationMillis = when (duration) {
-        SnackbarDuration.Short -> OverlayDurations.SHORT
-        SnackbarDuration.Long -> OverlayDurations.LONG
-        SnackbarDuration.Indefinite -> null
+    presentation = when (duration) {
+        SnackbarDuration.Short -> OverlayPresentation.Short
+        SnackbarDuration.Long -> OverlayPresentation(durationMillis = OverlayDurations.LONG)
+        SnackbarDuration.Indefinite -> OverlayPresentation.Sticky
     },
-    action = actionLabel?.let { label -> OverlayAction(label) { onAction?.invoke() } },
-    dismissible = duration == SnackbarDuration.Indefinite,
+    response = OverlayResponse(actionLabel?.let { label -> OverlayAction(label) { onAction?.invoke() } }),
 )

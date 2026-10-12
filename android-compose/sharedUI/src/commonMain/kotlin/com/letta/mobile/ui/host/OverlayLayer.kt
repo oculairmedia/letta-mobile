@@ -116,7 +116,7 @@ fun OverlaySnackbarSlot(modifier: Modifier = Modifier) {
  * null, changes [key], or leaves composition (a banner that mirrors state, an undo offer).
  */
 @Composable
-fun OverlayWhile(overlay: Overlay?, key: Any? = overlay?.dedupeKey) {
+fun OverlayWhile(overlay: Overlay?, key: String? = overlay?.dedupeKey) {
     val host = LocalOverlayHost.current ?: return
     DisposableEffect(host, key, overlay != null) {
         val handle = overlay?.let(host::show)
@@ -141,7 +141,7 @@ private fun OverlaySnackbar(host: OverlayHost, modifier: Modifier) {
     val reduced = LocalReducedMotion.current
     AnimatedContent(
         targetState = host.snackbar,
-        contentKey = { it?.id },
+        contentKey = { it?.id?.value },
         transitionSpec = { overlayTransition(reduced) },
         modifier = modifier,
         contentAlignment = Alignment.Center,
@@ -185,7 +185,7 @@ private fun OverlayBanners(host: OverlayHost, modifier: Modifier) {
 @Composable
 private fun OverlayBannerCard(host: OverlayHost, entry: OverlayEntry) {
     val overlay = entry.overlay
-    val error = (overlay as? Overlay.Banner)?.tone == OverlayTone.Error
+    val error = overlay.presentation.tone == OverlayTone.Error
     val reduced = LocalReducedMotion.current
     val visible = remember(entry.id) { MutableTransitionState(reduced).apply { targetState = true } }
     val enter = if (reduced) EnterTransition.None else fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + slideInVertically { -it / 2 }

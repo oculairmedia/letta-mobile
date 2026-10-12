@@ -54,8 +54,9 @@ import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayAction
-import com.letta.mobile.ui.host.OverlayDurations
 import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayResponse
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
@@ -124,16 +125,8 @@ internal fun A2uiSnackbarEffect(
     LaunchedEffect(snackbar?.id, overlays) {
         val shown = snackbar ?: return@LaunchedEffect
         val retry: A2uiAction? = shown.retryAction
-        val duration = shown.duration.toMillis()
-        overlays.show(
-            Overlay.Snackbar(
-                message = shown.message,
-                durationMillis = duration,
-                action = shown.actionLabel?.let { label -> OverlayAction(label) { retry?.let(currentActions::submitA2uiAction) } },
-                // One that waits for its action can still be put away.
-                dismissible = duration == null,
-            ),
-        )
+        val action = shown.actionLabel?.let { label -> OverlayAction(label) { retry?.let(currentActions::submitA2uiAction) } }
+        overlays.show(Overlay.Snackbar(shown.message, presentation = shown.duration.toPresentation(), response = OverlayResponse(action)))
         currentActions.markA2uiSnackbarShown(A2uiSnackbarId(shown.id))
     }
 }
@@ -144,14 +137,15 @@ internal fun ErrorSnackbarEffect(error: String?, overlays: OverlayHost, actions:
     val currentActions by rememberUpdatedState(actions)
     LaunchedEffect(error, overlays) {
         val message = error ?: return@LaunchedEffect
-        overlays.show(Overlay.Snackbar(message, durationMillis = OverlayDurations.SHORT))
+        overlays.show(Overlay.Snackbar(message))
         currentActions.clearError()
     }
 }
 
-private fun ChatSnackbarDuration.toMillis(): Long? = when (this) {
-    ChatSnackbarDuration.Short -> OverlayDurations.SHORT
-    ChatSnackbarDuration.Indefinite -> null
+/** One that waits for its action can still be put away. */
+private fun ChatSnackbarDuration.toPresentation(): OverlayPresentation = when (this) {
+    ChatSnackbarDuration.Short -> OverlayPresentation.Short
+    ChatSnackbarDuration.Indefinite -> OverlayPresentation.Sticky
 }
 
 /**

@@ -48,9 +48,9 @@ class OverlayHostTest {
     @Test
     fun theHighestPriorityWaitingSnackbarShowsNext() {
         host.show(Overlay.Snackbar("showing"))
-        host.show(Overlay.Snackbar("low", priority = OverlayPriority.Low))
+        host.show(Overlay.Snackbar("low", presentation = OverlayPresentation(OverlayPriority.Low)))
         host.show(Overlay.Snackbar("normal"))
-        host.show(Overlay.Snackbar("critical", priority = OverlayPriority.Critical))
+        host.show(Overlay.Snackbar("critical", presentation = OverlayPresentation(OverlayPriority.Critical)))
         // Critical outranks the one on screen, which waits to show again.
         assertEquals("critical", host.snackbar?.overlay?.message)
         assertEquals(listOf("showing", "low", "normal"), host.waiting.map { it.overlay.message })
@@ -69,7 +69,7 @@ class OverlayHostTest {
         assertEquals(first.id, again.id)
         assertTrue(host.waiting.isEmpty())
 
-        host.show(Overlay.Snackbar("Recompiling…", key = "recompile", durationMillis = null))
+        host.show(Overlay.Snackbar("Recompiling…", key = "recompile", presentation = OverlayPresentation.Sticky))
         host.show(Overlay.Snackbar("Recompiled", key = "recompile"))
         assertEquals(listOf("Recompiled"), host.waiting.map { it.overlay.message })
 
@@ -111,8 +111,8 @@ class OverlayHostTest {
 
     @Test
     fun aWaitingSnackbarsTimeStartsWhenItReachesTheScreen() {
-        host.show(Overlay.Snackbar("first", durationMillis = 1_000))
-        host.show(Overlay.Snackbar("second", durationMillis = 1_000))
+        host.show(Overlay.Snackbar("first", presentation = OverlayPresentation(durationMillis = 1_000)))
+        host.show(Overlay.Snackbar("second", presentation = OverlayPresentation(durationMillis = 1_000)))
         now = 1_000
         host.tick()
         assertEquals("second", host.snackbar?.overlay?.message)
@@ -127,10 +127,10 @@ class OverlayHostTest {
     @Test
     fun withdrawingIsSilentAndDismissingIsNot() {
         var dismissed = 0
-        val banner = host.show(Overlay.Banner("Offline", onDismissed = { dismissed++ }))
+        val banner = host.show(Overlay.Banner("Offline", response = OverlayResponse(onDismissed = { dismissed++ })))
         banner.withdraw()
         assertEquals(0, dismissed)
-        val again = host.show(Overlay.Banner("Offline", onDismissed = { dismissed++ }))
+        val again = host.show(Overlay.Banner("Offline", response = OverlayResponse(onDismissed = { dismissed++ })))
         again.dismiss()
         assertEquals(1, dismissed)
         assertTrue(host.banners.isEmpty())
@@ -139,7 +139,7 @@ class OverlayHostTest {
     @Test
     fun bannersShowTogetherHighestPriorityFirst() {
         host.show(Overlay.Banner("info"))
-        host.show(Overlay.Banner("runtime down", priority = OverlayPriority.Critical, tone = OverlayTone.Error))
+        host.show(Overlay.Banner("runtime down", presentation = OverlayPresentation(OverlayPriority.Critical, null, tone = OverlayTone.Error)))
         host.show(Overlay.Snackbar("saved"))
         assertEquals(listOf("runtime down", "info"), host.banners.map { it.overlay.message })
         assertEquals("saved", host.snackbar?.overlay?.message)
@@ -155,7 +155,7 @@ class OverlayHostTest {
                 }
             }
         }
-        runOnIdle { host.show(Overlay.Snackbar("Saved", durationMillis = null)) }
+        runOnIdle { host.show(Overlay.Snackbar("Saved", presentation = OverlayPresentation.Sticky)) }
         onNodeWithTag(OverlayTags.SNACKBAR).assertExists()
         slot = true
         waitForIdle()
@@ -219,7 +219,7 @@ class OverlayHostTest {
         setContent {
             MaterialTheme {
                 OverlayHostRoot(host) {
-                    OverlayWhile(if (down) Overlay.Banner("Local runtime: Restarting…", tone = OverlayTone.Error) else null)
+                    OverlayWhile(if (down) Overlay.Banner("Local runtime: Restarting…", presentation = OverlayPresentation(tone = OverlayTone.Error, durationMillis = null)) else null)
                 }
             }
         }
