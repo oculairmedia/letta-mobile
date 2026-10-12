@@ -52,6 +52,16 @@ class LettaSearchSource(
 enum class LettaSearchTriggerStyle { Field, Icon }
 
 /**
+ * How the anchored search is opened: its trigger [style], and an [openSignal] that opens the pane
+ * whenever it grows (a host command that asks for the search); 0 never does.
+ */
+@Immutable
+data class LettaSearchAnchor(
+    val style: LettaSearchTriggerStyle = LettaSearchTriggerStyle.Field,
+    val openSignal: Int = 0,
+)
+
+/**
  * Anchored field: the header expression (the shell header's SearchSlot).
  *
  * The header box is a TRIGGER, not the input. Clicking it opens a
@@ -79,9 +89,6 @@ enum class LettaSearchTriggerStyle { Field, Icon }
  * An [LettaSearchTriggerStyle.Icon] trigger has no field to overlay: the pane
  * opens below it, and its field is still the only one.
  *
- * [openSignal] opens the pane whenever it grows, for a host command that asks
- * for the search; 0 never does.
- *
  * It is the same [LettaSearchScaffold] as every other expression.
  */
 @Composable
@@ -89,16 +96,15 @@ fun LettaSearchAnchoredField(
     source: LettaSearchSource,
     modifier: Modifier = Modifier,
     config: LettaSearchConfig = LettaSearchConfig(),
-    style: LettaSearchTriggerStyle = LettaSearchTriggerStyle.Field,
-    openSignal: Int = 0,
+    anchor: LettaSearchAnchor = LettaSearchAnchor(),
 ) {
     var expanded by remember { mutableStateOf(false) }
     var triggerWidth by remember { mutableStateOf(Dp.Unspecified) }
     val density = LocalDensity.current
-    LaunchedEffect(openSignal) { if (openSignal > 0) expanded = true }
+    LaunchedEffect(anchor.openSignal) { if (anchor.openSignal > 0) expanded = true }
     Box(modifier = modifier.onSizeChanged { triggerWidth = with(density) { it.width.toDp() } }) {
         val query = source.query
-        when (style) {
+        when (anchor.style) {
             LettaSearchTriggerStyle.Icon -> LettaSearchIconTrigger(active = query.isNotBlank(), label = config.placeholder) { expanded = true }
             LettaSearchTriggerStyle.Field -> LettaSearchFieldTrigger(
                 text = if (expanded) "" else query.ifBlank { config.placeholder },
@@ -107,7 +113,7 @@ fun LettaSearchAnchoredField(
             ) { expanded = true }
         }
         if (expanded) {
-            AnchoredSearchPane(source, config, AnchoredPlacement.of(style, triggerWidth)) { expanded = false }
+            AnchoredSearchPane(source, config, AnchoredPlacement.of(anchor.style, triggerWidth)) { expanded = false }
         }
     }
 }

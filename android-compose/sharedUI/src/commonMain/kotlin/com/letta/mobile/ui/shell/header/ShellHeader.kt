@@ -16,10 +16,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.search.LettaSearchAnchor
 import com.letta.mobile.ui.search.LettaSearchAnchoredField
 import com.letta.mobile.ui.search.LettaSearchSource
 import com.letta.mobile.ui.search.LettaSearchTriggerStyle
@@ -92,11 +92,7 @@ fun ShellHeader(
     controls: HeaderControls = HeaderControls(),
 ) {
     val touch = LocalLettaHost.current.input == LettaInput.Touch
-    // A phone searching the page behind it (Home) searches in place: the header itself becomes the bar.
-    val inPlaceSearch = search?.takeIf { touch && !it.config.showResults }
-    var searching by remember { mutableStateOf(false) }
-    val signal = inPlaceSearch?.openSignal ?: 0
-    LaunchedEffect(signal) { if (signal > 0) searching = true }
+    val mode = rememberHeaderSearchMode(search, touch)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -104,17 +100,47 @@ fun ShellHeader(
             .testTag(ShellHeaderTags.HEADER),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (inPlaceSearch != null && searching) {
-            ShellHeaderSearchBar(inPlaceSearch, onClose = { searching = false })
+        val bar = mode.openBar
+        if (bar != null) {
+            ShellHeaderSearchBar(bar, onClose = mode::close)
         } else {
-            HeaderContent(title, controls) {
-                if (inPlaceSearch != null) {
-                    HeaderIconButton(LettaIcons.Search, inPlaceSearch.config.placeholder, { searching = true }, SearchTriggerTestTag)
-                } else if (search != null) {
-                    SearchSlotField(search, compact = touch)
-                }
-            }
+            HeaderContent(title, controls) { HeaderSearchAffordance(search, mode, touch) }
         }
+    }
+}
+
+/**
+ * Whether the header is a search bar right now. Only a phone searching the page behind it (Home,
+ * whose config shows no results of its own) searches in place: the header itself becomes the bar.
+ */
+private class HeaderSearchMode(val inPlace: SearchSlot?, private val searching: MutableState<Boolean>) {
+    val openBar: SearchSlot? get() = inPlace?.takeIf { searching.value }
+
+    fun open() {
+        searching.value = true
+    }
+
+    fun close() {
+        searching.value = false
+    }
+}
+
+@Composable
+private fun rememberHeaderSearchMode(search: SearchSlot?, touch: Boolean): HeaderSearchMode {
+    val searching = remember { mutableStateOf(false) }
+    val mode = HeaderSearchMode(search?.takeIf { touch && !it.config.showResults }, searching)
+    val signal = mode.inPlace?.openSignal ?: 0
+    LaunchedEffect(signal) { if (signal > 0) mode.open() }
+    return mode
+}
+
+/** The search control at rest: the in-place bar's icon, or the anchored field (a pointer field or a phone icon). */
+@Composable
+private fun HeaderSearchAffordance(search: SearchSlot?, mode: HeaderSearchMode, touch: Boolean) {
+    val inPlace = mode.inPlace
+    when {
+        inPlace != null -> HeaderIconButton(LettaIcons.Search, inPlace.config.placeholder, mode::open, SearchTriggerTestTag)
+        search != null -> SearchSlotField(search, compact = touch)
     }
 }
 
@@ -202,8 +228,10 @@ private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
             .focusProperties { canFocus = true }
             .testTag(ShellHeaderTags.SEARCH),
         config = slot.config,
-        style = if (compact) LettaSearchTriggerStyle.Icon else LettaSearchTriggerStyle.Field,
-        openSignal = slot.openSignal,
+        anchor = LettaSearchAnchor(
+            style = if (compact) LettaSearchTriggerStyle.Icon else LettaSearchTriggerStyle.Field,
+            openSignal = slot.openSignal,
+        ),
     )
 }
 
