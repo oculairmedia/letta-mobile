@@ -230,7 +230,7 @@ android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentContextCardSession.kt 99 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffold.kt 132 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldBody.kt 14 legacy-pending(ckmub.2)
-android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldBodySections.kt 193 legacy-pending(ckmub.2)
+android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldBodySections.kt 190 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldBodyState.kt 135 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldChatOptions.kt 80 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldClientCommands.kt 127 legacy-pending(ckmub.2)
