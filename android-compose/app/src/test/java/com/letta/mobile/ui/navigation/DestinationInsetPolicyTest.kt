@@ -36,6 +36,8 @@ class DestinationInsetPolicyTest {
             composable<SkillsRoute> {}
             composable<AllToolsRoute> {}
             composable<ConversationsRoute> {}
+            composable<AgentListRoute> {}
+            composable<ShareToAgentRoute> {}
             composable<AgentChatRoute> {}
         }.associateBy { it.route.orEmpty().substringBefore('/').substringBefore('?').substringAfterLast('.') }
     }
@@ -44,14 +46,17 @@ class DestinationInsetPolicyTest {
 
     @Test
     fun sharedPagesOwnTheirInsets() {
-        listOf("AdminRoute", "ChannelsRoute", "MemoryRoute", "SchedulesRoute", "SkillsRoute", "AllToolsRoute").forEach {
+        listOf(
+            "AdminRoute", "ChannelsRoute", "MemoryRoute", "SchedulesRoute", "SkillsRoute", "AllToolsRoute",
+            // letta-mobile-ckmub.2.4: the shared conversations and agents pages.
+            "ConversationsRoute", "AgentListRoute", "ShareToAgentRoute",
+        ).forEach {
             assertEquals(it, DestinationInsetPolicy.PageScaffold, policyOf(it))
         }
     }
 
     @Test
     fun chatInsetsItsOwnControlsAndLegacyScreensArePaddedByTheScaffold() {
-        assertEquals(DestinationInsetPolicy.SelfVertical, policyOf("ConversationsRoute"))
         assertEquals(DestinationInsetPolicy.SelfVertical, policyOf("AgentChatRoute"))
         assertEquals(DestinationInsetPolicy.Host, policyOf("ConfigListRoute"))
         assertEquals(DestinationInsetPolicy.Host, (null as NavDestination?).insetPolicy())

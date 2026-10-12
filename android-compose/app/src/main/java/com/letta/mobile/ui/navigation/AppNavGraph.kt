@@ -231,7 +231,7 @@ fun AppNavGraph(
 
     // letta-mobile-cdlk: backend-switcher bottom sheet. State is lifted to
     // the NavHost host so a single sheet instance overlays whichever screen
-    // owns the pill (Home, Conversations, ProjectHome, TwoPaneConversations).
+    // owns the pill (Home, Conversations, ProjectHome).
     // rememberSaveable so the sheet survives configuration changes; the
     // ModalBottomSheet manages its own enter/exit animation internally.
     var showBackendSwitcher by rememberSaveable { mutableStateOf(false) }

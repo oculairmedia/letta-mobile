@@ -269,38 +269,27 @@ class AgentListViewModelTest {
     }
 
     @Test
-    fun `create form local missing prerequisites reports exact blocker`() = runTest {
-        val validation = validateCreateAgentForm(
-            name = "Local",
-            runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE,
-            localReadiness = LocalLettaCodeCreateReadiness(
-                runtimeEnabled = true,
-                activeConfigIsLocal = true,
-                modelDownloaded = false,
-                modelSelected = false,
-            ),
-        )
+    fun `create form local agent needs a downloaded model and nothing remote`() = runTest {
+        val missing = localCreateValidation(modelReady = false)
+        assertFalse(missing.enabled)
+        assertEquals("Download or import a model in Settings before creating a local agent.", missing.disabledReason)
 
-        assertFalse(validation.enabled)
-        assertEquals("Download or import a model in Settings before creating a local agent.", validation.disabledReason)
+        val ready = localCreateValidation(modelReady = true)
+        assertTrue(ready.enabled)
+        assertNull(ready.disabledReason)
     }
 
-    @Test
-    fun `create form local ready does not require remote model fields`() = runTest {
-        val validation = validateCreateAgentForm(
-            name = "Local",
-            runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE,
-            localReadiness = LocalLettaCodeCreateReadiness(
-                runtimeEnabled = true,
-                activeConfigIsLocal = true,
-                modelDownloaded = true,
-                modelSelected = true,
-            ),
-        )
-
-        assertTrue(validation.enabled)
-        assertNull(validation.disabledReason)
-    }
+    /** A local-runtime create form named "Local", with the model downloaded and selected or neither. */
+    private fun localCreateValidation(modelReady: Boolean) = validateCreateAgentForm(
+        name = "Local",
+        runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE,
+        localReadiness = LocalLettaCodeCreateReadiness(
+            runtimeEnabled = true,
+            activeConfigIsLocal = true,
+            modelDownloaded = modelReady,
+            modelSelected = modelReady,
+        ),
+    )
 
     @Test
     fun `create form missing name reports disabled reason`() = runTest {
@@ -344,14 +333,11 @@ class AgentListViewModelTest {
 
     @Test
     fun `getAllTags returns sorted distinct tags from all agents`() = runTest {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("beta", "alpha")),
-                Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha", "gamma")),
-                Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf()),
-            )
+        viewModel = viewModelWith(
+            Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("beta", "alpha")),
+            Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha", "gamma")),
+            Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf()),
         )
-        viewModel = newViewModel()
 
         val tags = viewModel.getAllTags()
         assertEquals(listOf("alpha", "beta", "gamma"), tags)
@@ -359,15 +345,15 @@ class AgentListViewModelTest {
 
     @Test
     fun `getAllTags returns empty list when no agents have tags`() = runTest {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "Agent1"),
-                Agent(id = AgentId("a2"), name = "Agent2"),
-            )
-        )
-        viewModel = newViewModel()
+        viewModel = viewModelWith(Agent(id = AgentId("a1"), name = "Agent1"), Agent(id = AgentId("a2"), name = "Agent2"))
 
         assertTrue(viewModel.getAllTags().isEmpty())
+    }
+
+    /** A view model over a repository holding [agents]. */
+    private fun viewModelWith(vararg agents: Agent): AgentListViewModel {
+        every { agentRepository.agents } returns MutableStateFlow(agents.toList())
+        return newViewModel()
     }
 
     @Test
@@ -400,14 +386,11 @@ class AgentListViewModelTest {
 
     @Test
     fun `getFilteredAgents filters by selected tags with AND logic`() = runTest {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha", "beta")),
-                Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha")),
-                Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf("beta", "gamma")),
-            )
+        viewModel = viewModelWith(
+            Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha", "beta")),
+            Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha")),
+            Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf("beta", "gamma")),
         )
-        viewModel = newViewModel()
 
         // No filter — all agents
         assertEquals(3, viewModel.getFilteredAgents().size)
@@ -428,14 +411,11 @@ class AgentListViewModelTest {
 
     @Test
     fun `getFilteredAgents combines tag filter with search query`() = runTest {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "ChatBot", tags = persistentListOf("production")),
-                Agent(id = AgentId("a2"), name = "HelperBot", tags = persistentListOf("production")),
-                Agent(id = AgentId("a3"), name = "TestBot", tags = persistentListOf("staging")),
-            )
+        viewModel = viewModelWith(
+            Agent(id = AgentId("a1"), name = "ChatBot", tags = persistentListOf("production")),
+            Agent(id = AgentId("a2"), name = "HelperBot", tags = persistentListOf("production")),
+            Agent(id = AgentId("a3"), name = "TestBot", tags = persistentListOf("staging")),
         )
-        viewModel = newViewModel()
 
         viewModel.toggleTag("production")
         viewModel.updateSearchQuery("Chat")
@@ -447,13 +427,7 @@ class AgentListViewModelTest {
 
     @Test
     fun `getFilteredAgents returns all when no tags selected and no search`() = runTest {
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha")),
-                Agent(id = AgentId("a2"), name = "Agent2"),
-            )
-        )
-        viewModel = newViewModel()
+        viewModel = viewModelWith(Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha")), Agent(id = AgentId("a2"), name = "Agent2"))
 
         assertEquals(2, viewModel.getFilteredAgents().size)
     }
@@ -481,41 +455,19 @@ class AgentListViewModelTest {
     }
 
     @Test
-    fun `empty local runtime mode exposes create action`() = runTest {
+    fun `empty local runtime mode settles and its create action opens the create dialog`() = runTest {
         clearMocks(agentRepository, answers = false, recordedCalls = true)
         activeConfigFlow.value = localConfig()
         every { agentRepository.agents } returns MutableStateFlow(emptyList())
-
         viewModel = newViewModel()
 
         assertTrue(viewModel.uiState.value.agents.isEmpty())
         assertFalse(viewModel.uiState.value.isLoading)
-        assertTrue(
-            shouldShowEmptyAgentCreateAction(
-                isShareMode = false,
-                isHydrating = viewModel.uiState.value.isHydrating,
-                searchQuery = viewModel.uiState.value.searchQuery,
-            )
-        )
-    }
-
-    @Test
-    fun `empty local create action opens shared create dialog`() = runTest {
-        clearMocks(agentRepository, answers = false, recordedCalls = true)
-        activeConfigFlow.value = localConfig()
-        every { agentRepository.agents } returns MutableStateFlow(emptyList())
-        viewModel = newViewModel()
+        assertFalse(viewModel.uiState.value.isHydrating)
 
         viewModel.showCreateDialog()
 
         assertTrue(viewModel.uiState.value.showCreateDialog)
-    }
-
-    @Test
-    fun `empty create action hidden while searching or sharing`() = runTest {
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = true, isHydrating = false, searchQuery = ""))
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = false, searchQuery = "missing"))
-        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = true, searchQuery = ""))
     }
 
     @Test

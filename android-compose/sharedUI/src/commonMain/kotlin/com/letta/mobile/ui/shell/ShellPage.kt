@@ -18,6 +18,9 @@ import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPage
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageActions
+import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageState
 import com.letta.mobile.ui.shell.pages.home.HomePage
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
@@ -164,6 +167,17 @@ fun shellSchedulesPage(
 /** The shared Memory page: the block graph and the agent's files. */
 fun shellMemoryPage(binding: MemoryWorkspaceBinding) = ShellPageContent<ShellDestination.Memory> { _, modifier ->
     MemoryWorkspacePage(binding = binding, modifier = modifier)
+}
+
+/**
+ * A chat destination without an agent: the fleet conversations page (letta-mobile-ckmub.2.4). A host
+ * whose chat page is its own container registers this only where a chat route has no agent.
+ */
+fun shellConversationsPage(
+    state: ConversationsPageState,
+    actions: ConversationsPageActions,
+) = ShellPageContent<ShellDestination.Chat> { _, modifier ->
+    ConversationsPage(state = state, actions = actions, modifier = modifier)
 }
 
 /** The shared Settings page, opened on the destination's section (Pairing, About). */

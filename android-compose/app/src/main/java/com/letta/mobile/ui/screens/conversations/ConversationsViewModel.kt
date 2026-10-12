@@ -3,7 +3,9 @@ package com.letta.mobile.ui.screens.conversations
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.isLettaCodeEphemeralWorker
@@ -101,6 +103,14 @@ class ConversationsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ConversationsUiState())
     val uiState: StateFlow<ConversationsUiState> = _uiState.asStateFlow()
+
+    /** The Iroh backend has no delete command, so a delete there only archives; the confirm dialog says so. */
+    val deleteBehavior: ConversationDeleteBehavior
+        get() = if (settingsRepository.activeBackendIsIroh()) {
+            ConversationDeleteBehavior.MovesToArchived
+        } else {
+            ConversationDeleteBehavior.Permanent
+        }
 
     private var agentNameCache = mutableMapOf<AgentId, String>()
     private var pinnedConversationIds: Set<ConversationId> = emptySet()

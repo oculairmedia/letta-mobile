@@ -13,10 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.letta.mobile.data.pairing.PairInviteSession
 import com.letta.mobile.data.pairing.PairingAdminRepository
@@ -25,7 +23,6 @@ import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrEncoder
 import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.ui.theme.LettaDimens
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -44,12 +41,16 @@ class InstallAndPairBindings(
     /** A deep-linked pairing link to redeem once; [onPendingLinkConsumed] clears it. */
     val pendingLink: String? = null,
     val onPendingLinkConsumed: () -> Unit = {},
+    /** This device's own NodeId (groups "This device" in the list); null when unknown. */
+    val selfNodeId: suspend () -> String? = { null },
+    /** The platform share sheet, when there is one. */
+    val onShareLink: ((String) -> Unit)? = null,
 )
 
 /**
  * Settings card for scan-to-connect:
  *  - Join: paste a pairing link (or open one — `meridian://pair` deep links land
- *    here) and this device pairs with that host, saves it, and connects.
+ *    here); the trust prompt confirms the host before anything is dialled.
  *  - Invite: the install-and-pair QRs — one to get the phone app, one minted
  *    by the HOST for this pairing — plus the paired-device list with revoke.
  */
@@ -78,20 +79,28 @@ private fun JoinHostSection(bindings: InstallAndPairBindings) {
     val scope = rememberCoroutineScope()
     val flow = remember { bindings.joinFlow() }
     val state by flow.state.collectAsState()
-    // A meridian://pair link opened from outside the app is consumed once, from memory.
+    // A meridian://pair link opened from outside the app is consumed once, from memory; it stops at the trust prompt.
     LaunchedEffect(bindings.pendingLink) {
         val link = bindings.pendingLink ?: return@LaunchedEffect
         bindings.onPendingLinkConsumed()
         flow.submit(link)
     }
-
     Text(PairingStrings.JOIN_TITLE, style = MaterialTheme.typography.titleMedium)
-    Text(PairingStrings.JOIN_BODY, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    if (state is PairingState.Idle) {
-        PairCodeEntry(onSubmit = { raw -> scope.launch { flow.submit(raw) } })
-    }
-    PairingStatusCard(state = state, onScanAgain = flow::reset, onOpenChat = bindings.onOpenChat)
+    PairingScanContent(
+        scan = PairingScan(state, ScanCamera.Unavailable, pairingScanActions(flow, scope, bindings.onOpenChat)),
+        nowMs = rememberTickingNow(bindings.nowMs, active = state is PairingState.ConfirmHost),
+    )
 }
+
+/** The scanner's actions over a [PairingFlow]; [onOpenChat] after a successful pairing. */
+fun pairingScanActions(flow: PairingFlow, scope: kotlinx.coroutines.CoroutineScope, onOpenChat: () -> Unit) = PairingScanActions(
+    onSubmit = { raw -> flow.submit(raw) },
+    onConfirm = { scope.launch { flow.confirm() } },
+    onCancel = flow::cancel,
+    onRetry = { scope.launch { flow.retry() } },
+    onScanAgain = flow::reset,
+    onOpenChat = onOpenChat,
+)
 
 @Composable
 private fun InstallAppSection(qrEncoder: QrEncoder) {
@@ -104,29 +113,7 @@ private fun InstallAppSection(qrEncoder: QrEncoder) {
 @Composable
 private fun InviteSection(rpc: AdminRpcInvoker, bindings: InstallAndPairBindings) {
     val scope = rememberCoroutineScope()
-    val session = remember(rpc) { PairInviteSession(PairingAdminRepository(rpc), bindings.qrEncoder, scope) }
-    val state by session.state.collectAsState()
-    var nowMs by remember { mutableLongStateOf(bindings.nowMs()) }
-    LaunchedEffect(session) { session.refresh() }
-    LaunchedEffect(state.invite?.inviteId) {
-        if (state.invite == null) return@LaunchedEffect
-        while (true) {
-            delay(INVITE_POLL_INTERVAL_MS)
-            nowMs = bindings.nowMs()
-            session.refresh()
-        }
-    }
-    PairDevicePanel(
-        state = state,
-        agents = bindings.agents,
-        actions = PairDeviceActions(
-            onMint = session::mint,
-            onRevokeDevice = session::revokeDevice,
-            onRevokeInvite = session::revokeInvite,
-            onDismissInvite = session::dismissInvite,
-        ),
-        nowMs = nowMs,
-    )
+    val session = remember(rpc) { PairInviteSession(PairingAdminRepository(rpc), bindings.qrEncoder, scope, bindings.nowMs) }
+    LaunchedEffect(session) { session.identifySelf(runCatching { bindings.selfNodeId() }.getOrNull()) }
+    PairDeviceSessionPanel(PairDeviceBinding(session, bindings.agents, bindings.nowMs, bindings.onShareLink))
 }
-
-private const val INVITE_POLL_INTERVAL_MS = 3_000L

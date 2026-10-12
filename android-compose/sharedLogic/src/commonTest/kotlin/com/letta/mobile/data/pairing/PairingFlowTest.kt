@@ -9,11 +9,15 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalEncodingApi::class)
 class PairingFlowTest {
-    private val nodeId = "ab".repeat(32)
+    private val nodeId = "ab".repeat(30) + "cdef"
     private val secret = "invite:" + "5".repeat(64)
     private var now = 1_000L
 
@@ -40,9 +44,10 @@ class PairingFlowTest {
 
     private val sink = RecordingSink()
     private var redeemed: ScannedInvite? = null
+    private var dials = 0
 
-    private fun flow(outcome: (ScannedInvite) -> RedeemOutcome) = PairingFlow(
-        redeemer = { invite, _ -> redeemed = invite; outcome(invite) },
+    private fun flow(outcome: suspend (ScannedInvite) -> RedeemOutcome) = PairingFlow(
+        redeemer = { invite, _ -> dials++; redeemed = invite; outcome(invite) },
         store = SettingsPairedHostStore(sink),
         deviceName = "pixel",
         nowMs = { now },
@@ -50,16 +55,56 @@ class PairingFlowTest {
 
     private fun pairedOutcome(invite: ScannedInvite) = RedeemOutcome.Paired(PairedHost(invite.nodeId, "${invite.nodeId}@h:1"), alreadyPaired = false)
 
+    private suspend fun PairingFlow.submitAndConfirm(raw: String): PairingState {
+        val prompted = submit(raw)
+        return if (prompted is PairingState.ConfirmHost) confirm() else prompted
+    }
+
     @Test
-    fun scanPairsPersistsWithoutACredentialAndActivatesTheHost() = runTest {
-        val state = flow(::pairedOutcome).submit(PairLink(envelope(), "h:1").encode())
-        val paired = assertIs<PairingState.Paired>(state)
+    fun scanStopsAtTheTrustPromptAndDialsOnlyAfterConnect() = runTest {
+        val f = flow(::pairedOutcome)
+        val prompt = assertIs<PairingState.ConfirmHost>(f.submit(PairLink(envelope(), "h:1").encode()))
+        assertEquals(0, dials, "the trust prompt must come before any dial")
+        assertEquals("ababab…abcdef", prompt.hostShortId)
+        assertEquals(100_000L, prompt.expiresAtMs)
+        val paired = assertIs<PairingState.Paired>(f.confirm())
+        assertEquals(1, dials)
+        assertEquals("pixel", paired.deviceName)
         assertEquals("iroh://$nodeId@h:1", paired.host.serverUrl)
         val config = sink.saved.single()
         assertNull(config.accessToken, "pairing must not persist the one-time invite")
         assertEquals(config.id, sink.active)
         assertEquals("h:1", redeemed?.dial)
         assertEquals(secret, redeemed?.inviteToken)
+    }
+
+    @Test
+    fun deepLinksOfBothSchemesNeverAutoConnect() = runTest {
+        listOf("meridian://pair?qr=", "letta://pair?qr=").forEach { prefix ->
+            val f = flow(::pairedOutcome)
+            assertIs<PairingState.ConfirmHost>(f.submit(prefix + envelope()))
+            f.cancel()
+            assertEquals(PairingState.Idle, f.state.value)
+        }
+        assertEquals(0, dials)
+        assertTrue(sink.saved.isEmpty())
+    }
+
+    @Test
+    fun cancelOnThePromptDropsTheCodeSoConfirmCannotDialIt() = runTest {
+        val f = flow(::pairedOutcome)
+        f.submit(envelope())
+        f.cancel()
+        assertEquals(PairingState.Idle, f.confirm())
+        assertEquals(0, dials)
+    }
+
+    @Test
+    fun repeatedFramesWhileThePromptIsUpAreIgnored() = runTest {
+        val f = flow(::pairedOutcome)
+        val first = f.submit(envelope())
+        assertEquals(first, f.submit("https://example.com"))
+        assertIs<PairingState.ConfirmHost>(f.state.value)
     }
 
     @Test
@@ -78,26 +123,62 @@ class PairingFlowTest {
         now = 100_000L + PairingFlow.CLOCK_SKEW_ALLOWANCE_MS
         assertEquals(PairingState.Failed(PairingError.EXPIRED), flow { error("no dial") }.submit(envelope()))
         now = 100_000L + PairingFlow.CLOCK_SKEW_ALLOWANCE_MS - 1
-        assertIs<PairingState.Paired>(flow(::pairedOutcome).submit(envelope()))
+        assertIs<PairingState.Paired>(flow(::pairedOutcome).submitAndConfirm(envelope()))
+    }
+
+    @Test
+    fun aCodeThatExpiresWhileThePromptIsOpenIsNotDialled() = runTest {
+        val f = flow(::pairedOutcome)
+        f.submit(envelope())
+        now = 100_000L + PairingFlow.CLOCK_SKEW_ALLOWANCE_MS
+        assertEquals(PairingState.Failed(PairingError.EXPIRED), f.confirm())
+        assertEquals(0, dials)
     }
 
     @Test
     fun hostRejectionsSurfaceAsTypedErrorsAndSaveNothing() = runTest {
         listOf(PairingError.INVITE_INVALID, PairingError.EXPIRED, PairingError.DENIED, PairingError.HOST_MISMATCH).forEach { error ->
-            assertEquals(PairingState.Failed(error), flow { RedeemOutcome.Failed(error) }.submit(envelope()))
+            assertEquals(PairingState.Failed(error), flow { RedeemOutcome.Failed(error) }.submitAndConfirm(envelope()))
         }
         assertTrue(sink.saved.isEmpty())
     }
 
     @Test
-    fun aThrowingTransportIsReportedAsHostUnreachable() = runTest {
-        assertEquals(PairingState.Failed(PairingError.HOST_UNREACHABLE), flow { error("connect refused") }.submit(envelope()))
+    fun anUnreachableHostIsRetryableWithTheSameCode() = runTest {
+        var reachable = false
+        val f = flow { if (reachable) pairedOutcome(it) else error("connect refused") }
+        assertEquals(PairingState.Failed(PairingError.HOST_UNREACHABLE, retryable = true), f.submitAndConfirm(envelope()))
+        assertTrue(sink.saved.isEmpty(), "fail closed: an unreachable host is never saved")
+        reachable = true
+        assertIs<PairingState.Paired>(f.retry())
+        assertEquals(2, dials)
+    }
+
+    @Test
+    fun aSilentHostTimesOutAsUnreachable() = runTest {
+        val f = flow { awaitCancellation() }
+        assertEquals(PairingState.Failed(PairingError.HOST_UNREACHABLE, retryable = true), f.submitAndConfirm(envelope()))
+    }
+
+    @Test
+    fun cancellingWhileVerifyingNeverPersistsALateAnswer() = runTest {
+        val answer = CompletableDeferred<RedeemOutcome>()
+        val f = flow { answer.await() }
+        f.submit(envelope())
+        val job = launch { f.confirm() }
+        runCurrent()
+        assertIs<PairingState.Pairing>(f.state.value)
+        f.cancel()
+        answer.complete(RedeemOutcome.Paired(PairedHost(nodeId, nodeId), alreadyPaired = false))
+        job.join()
+        assertEquals(PairingState.Idle, f.state.value)
+        assertTrue(sink.saved.isEmpty())
     }
 
     @Test
     fun alreadyPairedDeviceStillLandsConnectedAndRepairingReusesTheConfig() = runTest {
         sink.existing = listOf(LettaConfig(id = "old", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://$nodeId@old:1"))
-        val state = flow { RedeemOutcome.Paired(PairedHost(it.nodeId, it.nodeId), alreadyPaired = true) }.submit(envelope())
+        val state = flow { RedeemOutcome.Paired(PairedHost(it.nodeId, it.nodeId), alreadyPaired = true) }.submitAndConfirm(envelope())
         assertEquals(true, assertIs<PairingState.Paired>(state).alreadyPaired)
         assertEquals("old", sink.saved.single().id)
     }
