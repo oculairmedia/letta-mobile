@@ -210,6 +210,7 @@ private fun TopLevelDestination.isSelected(currentDestination: NavDestination?):
             AboutRoute::class,
             ModelsRoute::class,
             AllToolsRoute::class,
+            SkillsRoute::class,
             UsageRoute::class,
             SystemAccessRoute::class,
             EditAgentRoute::class,

@@ -48,9 +48,10 @@ import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.desktop.workspace.DesktopMemoryDestination
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
-import com.letta.mobile.desktop.skills.DesktopSkillsSurface
-import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceActions
-import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceState
+import com.letta.mobile.ui.shell.pages.skills.SkillsPage
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -334,27 +335,28 @@ private fun AgentsDestinationContent(
     modifier: Modifier = Modifier,
 ) {
     val skills = inputs.skills
-    DesktopSkillsSurface(
-        state = DesktopSkillsSurfaceState(
+    // letta-mobile-zxk2n.32: the shared Skills page (skills, then the agent's tools), as on Android.
+    SkillsPage(
+        state = SkillsPageState(
             skills = skills.skills,
             installedSkillNames = skills.installedSkillNames,
             skillsLoading = skills.skillsLoading,
             skillsError = skills.skillsError,
             canManageSkills = skills.canManageSkills,
             focusedAgentName = skills.focusedAgentName,
-            toolState = inputs.toolLibraryState,
+            tools = inputs.toolLibraryState,
         ),
-        actions = DesktopSkillsSurfaceActions(
+        actions = SkillsPageActions(
             onRefreshSkills = actions.skills.onRefresh,
             onInstallSkill = actions.skills.onInstall,
             onUninstallSkill = actions.skills.onUninstall,
-            onToolsRefresh = actions.tools.onRefresh,
-            onToolsSearchQueryChanged = actions.tools.onSearchQueryChanged,
-            onToolsTagToggled = actions.tools.onTagToggled,
-            onToolsClearTags = actions.tools.onClearTags,
-            onToolsLoadMore = actions.tools.onLoadMore,
+            onRefreshTools = actions.tools.onRefresh,
+            onToolTagToggled = actions.tools.onTagToggled,
+            onClearToolTags = actions.tools.onClearTags,
+            onLoadMoreTools = actions.tools.onLoadMore,
         ),
         modifier = modifier,
+        options = SkillsPageOptions(slots = DesktopChannelsPageSlots),
     )
 }
 

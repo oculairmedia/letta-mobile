@@ -1,0 +1,147 @@
+@file:OptIn(ExperimentalTestApi::class)
+
+package com.letta.mobile.ui.shell.pages.skills
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.skills.Skill
+import com.letta.mobile.data.tools.ToolLibraryState
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/** The shared Skills page with its Tools section, on desktop and a phone (letta-mobile-zxk2n.32). */
+class SkillsPageTest {
+    private val github = Skill(name = "github", description = "Work with GitHub issues and PRs")
+    private val notion = Skill(name = "notion", description = "Read and write Notion pages")
+    private val gitStatus = Tool(id = ToolId("tool-git"), name = "git_status", description = "Show the working tree status", toolType = "custom")
+    private val sendEmail = Tool(id = ToolId("tool-mail"), name = "send_email", description = "Send an email")
+
+    private fun state(skills: List<Skill> = listOf(github, notion), installed: Set<String> = setOf("notion")) = SkillsPageState(
+        skills = skills,
+        installedSkillNames = installed,
+        canManageSkills = true,
+        tools = ToolLibraryState(tools = listOf(gitStatus, sendEmail), isLoading = false, hasMorePages = false),
+    )
+
+    private fun ComposeUiTest.show(
+        state: SkillsPageState,
+        actions: SkillsPageActions = SkillsPageActions(),
+        width: Dp = WIDE,
+        options: SkillsPageOptions = SkillsPageOptions(),
+    ) {
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(width).height(PAGE_HEIGHT)) {
+                    SkillsPage(state = state, actions = actions, options = options)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun skillsAndToolsBothRender() = runComposeUiTest {
+        show(state())
+        onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Skills)).assertExists()
+        onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Tools)).assertExists()
+        onNodeWithTag(SkillsPageTags.skill("github")).assertExists()
+        onNodeWithTag(SkillsPageTags.skill("notion")).assertExists()
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).assertExists()
+        onNodeWithTag(SkillsPageTags.tool("tool-mail")).assertExists()
+    }
+
+    @Test
+    fun oneSearchNarrowsSkillsAndTools() = runComposeUiTest {
+        show(state(), width = COMPACT)
+        onNodeWithTag(SkillsPageTags.SEARCH).performTextInput("git")
+        onNodeWithTag(SkillsPageTags.skill("github")).assertExists()
+        onNodeWithTag(SkillsPageTags.skill("notion")).assertDoesNotExist()
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).assertExists()
+        onNodeWithTag(SkillsPageTags.tool("tool-mail")).assertDoesNotExist()
+    }
+
+    @Test
+    fun aSearchThatMatchesNothingSaysSoInBothSections() = runComposeUiTest {
+        show(state())
+        onNodeWithTag(SkillsPageTags.SEARCH).performTextInput("zzz")
+        onNodeWithTag("skills-empty").assertExists()
+        onNodeWithTag("tools-empty").assertExists()
+    }
+
+    @Test
+    fun theAssignedFilterKeepsOnlyTheAgentsSkills() = runComposeUiTest {
+        show(state())
+        onNodeWithTag(SkillsPageTags.ASSIGNED_ONLY).performClick()
+        onNodeWithTag(SkillsPageTags.skill("notion")).assertExists()
+        onNodeWithTag(SkillsPageTags.skill("github")).assertDoesNotExist()
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).assertExists()
+    }
+
+    @Test
+    fun addAndToggleReachTheActions() = runComposeUiTest {
+        val calls = mutableListOf<String>()
+        val actions = SkillsPageActions(
+            onInstallSkill = { calls += "install:$it" },
+            onUninstallSkill = { calls += "uninstall:$it" },
+            onToolClick = { calls += "tool:${it.id.value}" },
+            onAddTool = { calls += "add-tool" },
+        )
+        show(state(), actions)
+        onNodeWithTag(SkillsPageTags.skillToggle("github")).performClick()
+        onNodeWithTag(SkillsPageTags.skillToggle("notion")).performClick()
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
+        onNodeWithTag(SkillsPageTags.ADD_TOOL).performClick()
+        assertEquals(listOf("install:github", "uninstall:notion", "tool:tool-git", "add-tool"), calls)
+    }
+
+    @Test
+    fun noCreateButtonWhenTheHostCannotCreateTools() = runComposeUiTest {
+        show(state())
+        onNodeWithTag(SkillsPageTags.ADD_TOOL).assertDoesNotExist()
+    }
+
+    @Test
+    fun aTappedSkillOpensItsDetail() = runComposeUiTest {
+        show(state())
+        onNodeWithTag(SkillsPageTags.skill("github")).performClick()
+        onNodeWithTag(SkillsPageTags.DETAIL).assertExists()
+        onNodeWithTag(SkillsPageTags.DETAIL_CLOSE).performClick()
+        onNodeWithTag(SkillsPageTags.DETAIL).assertDoesNotExist()
+    }
+
+    @Test
+    fun theToolsRouteOpensScrolledToTools() = runComposeUiTest {
+        val many = (1..30).map { Skill(name = "skill-$it", description = "Skill number $it") }
+        show(state(skills = many, installed = emptySet()), width = COMPACT, options = SkillsPageOptions(initialSection = SkillsPageSection.Tools))
+        waitForIdle()
+        onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Tools)).assertIsDisplayed()
+        onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Skills)).assertDoesNotExist()
+    }
+
+    @Test
+    fun rowsKeepSectionKeysApart() {
+        val rows = SkillsPageRows.build(state(), SkillsPageQuery(), columns = 2)
+        assertEquals(rows.size, rows.map { it.key }.toSet().size)
+        assertEquals(0, SkillsPageRows.indexOf(rows, SkillsPageSection.Skills))
+        assertEquals(true, SkillsPageRows.indexOf(rows, SkillsPageSection.Tools) > 0)
+    }
+
+    private companion object {
+        val WIDE = 1000.dp
+        val COMPACT = 400.dp
+        val PAGE_HEIGHT = 900.dp
+    }
+}

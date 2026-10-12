@@ -49,6 +49,9 @@ class AllToolsViewModel @Inject constructor(
         },
     )
 
+    /** The raw library, for the shared Skills page's Tools section (letta-mobile-zxk2n.32). */
+    val toolState: StateFlow<ToolLibraryState> = controller.state
+
     val uiState: StateFlow<UiState<AllToolsUiState>> = controller.state
         .map { it.toUiState() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)

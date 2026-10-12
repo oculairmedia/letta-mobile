@@ -60,6 +60,7 @@ fun AgentScaffold(
     onNavigateToAppSettings: (() -> Unit)? = null,
     onOpenCanvas: ((canvasId: String) -> Unit)? = null,
     onNavigateToChannels: (() -> Unit)? = null,
+    onNavigateToSkills: ((agentId: String) -> Unit)? = null,
 ) {
     val navigation = AgentScaffoldNavigationCallbacks(
         onNavigateBack = onNavigateBack,
@@ -78,6 +79,7 @@ fun AgentScaffold(
         onNavigateToAppSettings = onNavigateToAppSettings,
         onOpenCanvas = onOpenCanvas,
         onNavigateToChannels = onNavigateToChannels,
+        onNavigateToSkills = onNavigateToSkills,
     )
     // letta-mobile-c3np7.5.5: the shared navigation drawer's binding, for the drawer to pick up.
     CompositionLocalProvider(LocalSharedNavDrawer provides hiltViewModel<SharedNavDrawerViewModel>()) {

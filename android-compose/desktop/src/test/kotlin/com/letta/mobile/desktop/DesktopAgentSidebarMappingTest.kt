@@ -25,6 +25,14 @@ class DesktopAgentSidebarMappingTest {
         assertTrue(state(DesktopDestination.Home).toShellPanelState().home)
     }
 
+    /** letta-mobile-zxk2n.32: Skills lands on the destination that draws the shared Skills page. */
+    @Test
+    fun skillsOpensTheSkillsPageDestination() {
+        WorkPlayMode.entries.forEach { mode ->
+            assertEquals(DesktopDestination.Agents, lensNavTarget(mode, LensDestination.Skills).first)
+        }
+    }
+
     @Test
     fun aConversationIsSelectedOnlyWhileTheConversationPageShows() {
         val onChat = state(DesktopDestination.Conversations).toShellPanelState().conversations.single()

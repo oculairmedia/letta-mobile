@@ -35,8 +35,10 @@ import kotlin.time.Instant
  * Sections the host has no page for: their rows stay out of the drawer. Channels shows once the
  * host wires the shared Channels page (letta-mobile-c3np7.5.7).
  */
-internal fun androidHiddenDrawerSections(navigation: AgentScaffoldNavigationCallbacks): Set<LensDestination> =
-    if (navigation.onNavigateToChannels == null) setOf(LensDestination.Channels) else emptySet()
+internal fun androidHiddenDrawerSections(navigation: AgentScaffoldNavigationCallbacks): Set<LensDestination> = buildSet {
+    if (navigation.onNavigateToChannels == null) add(LensDestination.Channels)
+    if (navigation.onNavigateToSkills == null) add(LensDestination.Skills)
+}
 
 /**
  * The hamburger's drawer when the shared navigation drawer is on (letta-mobile-c3np7.5.5): the
@@ -196,7 +198,8 @@ internal fun openSection(navigation: AgentScaffoldNavigationCallbacks, agentId: 
     when (section) {
         LensDestination.Memory -> navigation.onNavigateToMemory?.invoke(agentId)
         LensDestination.Schedules -> navigation.onNavigateToSchedules?.invoke(agentId)
-        LensDestination.Skills -> navigation.onNavigateToTools?.invoke()
+        // letta-mobile-zxk2n.32: Skills opens the Skills page (which owns the Tools section), not Tools.
+        LensDestination.Skills -> navigation.onNavigateToSkills?.invoke(agentId)
         LensDestination.Conversations -> navigation.onNavigateToConversationList?.invoke()
         LensDestination.Channels -> navigation.onNavigateToChannels?.invoke()
     }

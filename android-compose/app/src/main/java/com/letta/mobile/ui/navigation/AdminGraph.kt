@@ -26,7 +26,8 @@ import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
 import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
-import com.letta.mobile.ui.screens.tools.AllToolsScreen
+import com.letta.mobile.ui.screens.skills.SkillsScreen
+import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import com.letta.mobile.ui.screens.pairing.PairInviteScreen
 import com.letta.mobile.ui.screens.pairing.QrScanScreen
@@ -277,20 +278,32 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
+    // letta-mobile-zxk2n.32: Skills and Tools are one shared page; the Tools route (deep links,
+    // dashboard shortcut, /mcp) opens it scrolled to its Tools section.
+    composable<SkillsRoute>(
+        enterTransition = drillInEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) {
+        SkillsScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToToolDetail = { toolId -> navController.navigate(ToolDetailRoute(toolId)) },
+            initialSection = SkillsPageSection.Skills,
+        )
+    }
+
     composable<AllToolsRoute>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) {
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-            AllToolsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToToolDetail = { toolId ->
-                    navController.navigate(ToolDetailRoute(toolId))
-                },
-            )
-        }
+        SkillsScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToToolDetail = { toolId -> navController.navigate(ToolDetailRoute(toolId)) },
+            initialSection = SkillsPageSection.Tools,
+        )
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
