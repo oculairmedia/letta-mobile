@@ -18,11 +18,11 @@ import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import java.util.UUID
 import kotlin.system.exitProcess
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -104,13 +104,13 @@ internal class IrohAdminDialer(
     private val token: String?,
     private val timeoutMs: Long,
 ) {
-    suspend fun <T> use(block: suspend (AppServerClient) -> T): T {
-        // The transport's reader coroutines live in their OWN scope, not the
-        // caller's: on teardown the connection tears down with ConnectionLost,
-        // and if those readers shared the runBlocking scope that benign error
-        // would clobber an already-delivered result. We cancel this scope in
-        // finally so teardown never propagates past the returned value.
-        val transportScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    suspend fun <T> use(block: suspend (AppServerClient) -> T): T = supervisorScope {
+        // The transport's reader coroutines are children of this SUPERVISOR
+        // scope, not of the caller's: on teardown the connection ends with
+        // ConnectionLost, and a supervised reader failing cannot clobber an
+        // already-delivered result. They are cancelled in finally so teardown
+        // never outlives the returned value.
+        val transportScope = this + Dispatchers.Default
         val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
         try {
             // Bring the endpoint online so its native driver/reactor stays alive
@@ -131,9 +131,9 @@ internal class IrohAdminDialer(
                 ),
             )
             if (!auth.success) error("Iroh auth failed: ${auth.error ?: "denied"}")
-            return block(client)
+            block(client)
         } finally {
-            runCatching { transportScope.cancel() }
+            coroutineContext.cancelChildren()
             runCatching { endpoint.close() }
         }
     }

@@ -49,7 +49,7 @@ internal object AtomicJsonFile {
      */
     fun <T> withProcessLock(path: Path, block: () -> T): T {
         val absolute = path.toAbsolutePath().normalize()
-        val monitor = inProcessLocks.computeIfAbsent(absolute.toString()) { Any() }
+        val monitor = inProcessLocks.computeIfAbsent(absolute.toString()) { PathMonitor() }
         return synchronized(monitor) {
             absolute.parent?.let(Files::createDirectories)
             val lockPath = absolute.resolveSibling("${absolute.fileName}.lock")
@@ -59,5 +59,8 @@ internal object AtomicJsonFile {
         }
     }
 
-    private val inProcessLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+    /** The in-process half of [withProcessLock]: one monitor per absolute state-file path. */
+    private class PathMonitor
+
+    private val inProcessLocks = java.util.concurrent.ConcurrentHashMap<String, PathMonitor>()
 }
