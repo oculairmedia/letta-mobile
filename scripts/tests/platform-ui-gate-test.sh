@@ -70,4 +70,18 @@ out="$(gate PLATFORM_UI_REASON=)"
 assert_contains "$out" "WARN|PUI003|android-compose/desktop/src/main/kotlin/Legacy.kt"
 assert_contains "$out" "exit=0"
 
+# PUI004 (PR mode): raising an allowlist line vs the base needs a reason.
+composable "$UI/Legacy.kt" 20
+cp "$ALLOW" "$TMP/scripts-allow.txt"
+ALLOW="$TMP/scripts-allow.txt"
+g() { git -C "$TMP" -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c core.autocrlf=false "$@" >/dev/null 2>&1; }
+g init -q
+g add -A
+g commit -q -m base
+sed -i 's/Legacy.kt 20 /Legacy.kt 40 /' "$ALLOW"
+g commit -q -am raise
+out="$(env -u PR_BODY -u GITHUB_EVENT_PATH PLATFORM_UI_REASON= bash "$GATE" --root "$TMP" --allowlist "$ALLOW" --diff-base HEAD~1 --enforce 2>&1)" \
+  && fail "raised allowlist line without a reason passed: $out"
+assert_contains "$out" "ERROR|PUI004|android-compose/desktop/src/main/kotlin/Legacy.kt|allowlist maxLines raised 20 -> 40"
+
 echo "platform-ui-gate-test: ok"

@@ -180,8 +180,11 @@ if [[ -n "$DIFF_BASE" ]]; then
       max="${LISTED[$path]%% *}"
       if [[ -z "${BASE_LISTED[$path]+x}" ]]; then
         emit_error PUI004 "$path" "allowlist line added"
-      elif ((max > BASE_LISTED[$path])); then
-        emit_error PUI004 "$path" "allowlist maxLines raised ${BASE_LISTED[$path]} -> $max"
+      else
+        base_max="${BASE_LISTED[$path]}"
+        if ((max > base_max)); then
+          emit_error PUI004 "$path" "allowlist maxLines raised $base_max -> $max"
+        fi
       fi
     done
   fi
