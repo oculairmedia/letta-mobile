@@ -72,12 +72,17 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         tiers: NativeReadTiers,
     ) {
-        registerConversationListRoute(router, nativeClient)
+        val hiddenAgents = tiers.localBackendStore?.let { store -> HiddenAgentIndex(load = store::hiddenAgentIds) }
+        registerConversationListRoute(router, nativeClient, hiddenAgents)
         registerConversationAgentListRoute(router, tiers)
         registerConversationGetRoute(router, nativeClient)
     }
 
-    private fun registerConversationListRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+    private fun registerConversationListRoute(
+        router: AdminRpcRouter,
+        nativeClient: AppServerClient?,
+        hiddenAgents: HiddenAgentIndex?,
+    ) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
@@ -97,8 +102,20 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversations ?: JsonArray(emptyList()) else null
             }
-            scopeConversationList(conversations, context)
+            val scoped = scopeConversationList(conversations, context)
+            // letta-mobile-fxoew.9: the agent-wide chat list drops conversations owned by hidden
+            // (subagent) agents. A list asked for one agent explicitly is served as is.
+            if (agentId == null && hiddenAgents != null) dropHiddenAgentConversations(scoped, hiddenAgents) else scoped
         }
+    }
+
+    private fun dropHiddenAgentConversations(result: JsonElement, hiddenAgents: HiddenAgentIndex): JsonElement {
+        val rows = result as? JsonArray ?: return result
+        val visible = withoutHiddenAgentConversations(rows, hiddenAgents.hiddenAgentIds())
+        if (visible.size != rows.size) {
+            Telemetry.event("IrohNode", "conversation_list.hidden_agent_rows_dropped", "dropped" to (rows.size - visible.size))
+        }
+        return JsonArray(visible)
     }
 
     private fun registerConversationAgentListRoute(router: AdminRpcRouter, tiers: NativeReadTiers) {
