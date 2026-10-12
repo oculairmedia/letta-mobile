@@ -5,11 +5,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.focus.FocusRequester
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.feature.chat.route.ProjectChatStartAction
@@ -21,7 +21,7 @@ internal object AgentScaffoldTestTags {
     const val CONVERSATION_PICKER_TRIGGER = com.letta.mobile.ui.chat.AgentIdentityPillTestTags.TRIGGER
     const val HEADER = "agent_scaffold_header"
     const val CANVAS_IDENTITY_PILL = "agent_scaffold_canvas_identity_pill"
-    const val CONVERSATION_PICKER_SHEET = "agent_scaffold_conversation_picker_sheet"
+    const val AGENT_PICKER_SHEET = "agent_scaffold_agent_picker_sheet"
     const val PROJECT_BUG_FAB = "agent_scaffold_project_bug_fab"
     const val PROJECT_BUG_REPORT_SHEET = "agent_scaffold_project_bug_report_sheet"
     const val CHAT_SCREEN_CONTENT = "agent_scaffold_chat_screen_content"
@@ -29,14 +29,8 @@ internal object AgentScaffoldTestTags {
     const val PROJECT_AGENTS_CARD = "agent_scaffold_project_agents_card"
     const val PROJECT_BRIEF_CARD = "agent_scaffold_project_brief_card"
     const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
-    const val CHAT_SEARCH_FIELD = "agent_scaffold_chat_search_field"
-    const val DRAWER_SEARCH_MESSAGES = "agent_scaffold_drawer_search_messages"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
-    const val DRAWER_EDIT_AGENT = "agent_scaffold_drawer_edit_agent"
     const val MODEL_PICKER_SHEET = "agent_scaffold_model_picker_sheet"
-    const val DRAWER_MODEL_CARD = "agent_scaffold_drawer_model_card"
-    const val DRAWER_CONTEXT_CARD = "agent_scaffold_drawer_context_card"
-    fun drawerChatMode(mode: String) = "agent_scaffold_drawer_chat_mode_$mode"
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -104,8 +98,7 @@ internal fun AgentScaffoldContent(
         mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT)
     }
     var showAgentSwitcher by remember { mutableStateOf(false) }
-    var isChatSearchExpanded by rememberSaveable { mutableStateOf(false) }
-    val chatSearchFocusRequester = remember { FocusRequester() }
+    var searchOpenSignal by remember { mutableIntStateOf(0) }
     var showModelPicker by remember { mutableStateOf(false) }
     val projectContext = viewModel.projectContext
     var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
@@ -126,9 +119,8 @@ internal fun AgentScaffoldContent(
                 onShowModelPickerChange = { showModelPicker = it },
             ),
             searchUi = AgentScaffoldSearchUiState(
-                isChatSearchExpanded = isChatSearchExpanded,
-                onChatSearchExpandedChange = { isChatSearchExpanded = it },
-                chatSearchFocusRequester = chatSearchFocusRequester,
+                openSignal = searchOpenSignal,
+                onOpenSearch = { searchOpenSignal++ },
             ),
             projectUi = AgentScaffoldProjectUiState(
                 isProjectInfoExpanded = isProjectInfoExpanded,

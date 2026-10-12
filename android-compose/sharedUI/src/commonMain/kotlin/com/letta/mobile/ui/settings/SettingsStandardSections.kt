@@ -41,25 +41,11 @@ fun AppearanceSettingsSection(settings: AppearanceSettings, modifier: Modifier =
     }
 }
 
-/** The shared chat page switch, canvas-first conversations and the default permission mode. */
+/** Canvas-first conversations and the default permission mode. */
 @Composable
 fun ChatSettingsSection(settings: ChatSettings, modifier: Modifier = Modifier) {
     if (settings.isEmpty) return
     SettingsSection(SettingsHeader("chat", "Chat"), modifier) {
-        settings.sharedChatPage?.let { flag ->
-            val locked = settings.sharedChatPageLockedReason
-            val on by flag.current.collectAsState()
-            ToggleRow(
-                SettingsRow.Toggle(
-                    key = "chat-shared-page",
-                    title = "Shared chat page",
-                    checked = on || locked != null,
-                    supporting = locked ?: "On by default. Turn off to use the previous chat page for this release; it is removed in the next one.",
-                    enabled = locked == null,
-                    onChange = flag::set,
-                ),
-            )
-        }
         settings.openChatsOnCanvas?.let {
             ToggleSetting(it, ToggleText("chat-open-on-canvas", "Open conversations on the canvas", "Turn off to open the full-screen chat instead."))
         }

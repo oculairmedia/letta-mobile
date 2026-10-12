@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -21,11 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -36,7 +33,6 @@ import kotlinx.coroutines.launch
 internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
     val params = state.params
     val viewModel = params.viewModel
-    val searchUi = params.searchUi
 
     LaunchedEffect(viewModel.agentId) {
         runCatching {
@@ -46,17 +42,6 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
 
     BackHandler(enabled = state.drawerState.isOpen) {
         state.scope.launch { state.drawerState.close() }
-    }
-
-    BackHandler(enabled = !state.drawerState.isOpen && (searchUi.isChatSearchExpanded || state.uiState.isSearchActive)) {
-        searchUi.onChatSearchExpandedChange(false)
-        viewModel.clearChatSearch()
-    }
-
-    LaunchedEffect(searchUi.isChatSearchExpanded) {
-        if (searchUi.isChatSearchExpanded) {
-            searchUi.chatSearchFocusRequester.requestFocus()
-        }
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -77,108 +62,19 @@ internal fun AgentScaffoldInteractionEffects(state: AgentScaffoldRuntimeState) {
 @Composable
 internal fun AgentScaffoldDrawerScaffold(state: AgentScaffoldRuntimeState) {
     LogDrawerTransitions(state.drawerState)
-    // letta-mobile-c3np7.5.5: Settings > "Shared navigation drawer" swaps in the desktop's rail and
-    // agent panel (sharedUI). The legacy drawer stays the default until it is deleted.
+    // Hard cut S9: the shared navigation drawer (the desktop's rail and agent panel, sharedUI) is
+    // the only drawer; AgentScaffold always provides its binding (a test host may leave it out).
     val sharedDrawer = LocalSharedNavDrawer.current
-    val sharedDrawerEnabled = sharedDrawer?.enabled?.collectAsStateWithLifecycle()?.value == true
     ModalNavigationDrawer(
         drawerState = state.drawerState,
-        drawerContent = {
-            if (sharedDrawer != null && sharedDrawerEnabled) {
-                AgentScaffoldSharedDrawerSheet(state, sharedDrawer)
-            } else {
-                AgentScaffoldDrawerSheet(state)
-            }
-        },
+        drawerContent = { sharedDrawer?.let { AgentScaffoldSharedDrawerSheet(state, it) } },
     ) {
         AgentScaffoldChromeScaffold(state)
     }
 }
 
-@Composable
-private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
-    val params = state.params
-    ModalDrawerSheet {
-        DrawerContent(
-            agentName = state.agentName,
-            agentId = state.agentIdValue,
-            activeBackendLabel = state.activeBackendLabel,
-            currentModel = state.activeAgentModel,
-            contextWindow = state.uiState.contextWindow,
-            chatMode = params.chatMode,
-            onChatModeSelected = params.onChatModeChange,
-            onModelTap = { params.sheetVisibility.onShowModelPickerChange(true) },
-            onSearchMessages = {
-                closeDrawerThenRun(state) {
-                    params.searchUi.onChatSearchExpandedChange(true)
-                }
-            },
-            conversations = state.drawerConversations,
-            currentConversationId = state.conversationId,
-            onNewConversation = {
-                closeDrawerAndRun(state) {
-                    params.navigation.onSwitchConversation?.invoke(
-                        state.agentIdValue,
-                        null,
-                        state.agentName.takeIf { it.isNotBlank() },
-                    )
-                }
-            },
-            onConversationSelected = { selectedConversationId ->
-                closeDrawerAndRun(state) {
-                    params.navigation.onSwitchConversation?.invoke(
-                        state.agentIdValue,
-                        selectedConversationId,
-                        state.agentName.takeIf { it.isNotBlank() },
-                    )
-                }
-            },
-            onEditAgent = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToSettings(state.agentIdValue) }
-            },
-            onResetMessages = {
-                closeDrawerAndRun(state) { params.viewModel.resetMessages() }
-            },
-            onRefreshContextWindow = state.projectBindings::refreshContextWindow,
-            navigation = DrawerNavigationCallbacks(
-                onNavigateToAdmin = {
-                    closeDrawerAndRun(state) { params.navigation.onNavigateToAdmin?.invoke() }
-                },
-                onNavigateToConversations = {
-                    closeDrawerAndRun(state) { params.navigation.onNavigateToConversationList?.invoke() }
-                },
-                onNavigateToMemory = {
-                    closeDrawerAndRun(state) { params.navigation.onNavigateToMemory?.invoke(state.agentIdValue) }
-                },
-                onNavigateToSchedules = {
-                    closeDrawerAndRun(state) { params.navigation.onNavigateToSchedules?.invoke(state.agentIdValue) }
-                },
-                onNavigateToProjects = {
-                    closeDrawerThenRun(state) { params.navigation.onNavigateToProjects?.invoke() }
-                },
-            ),
-            onClose = { state.scope.launch { state.drawerState.close() } },
-            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
-        )
-    }
-}
-
 internal fun closeDrawerAndRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
     state.scope.launch { state.drawerState.close() }
-    action()
-}
-
-private fun closeDrawerThenRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
-    state.scope.launch {
-        closeDrawerThenRun(closeDrawer = state.drawerState::close, action = action)
-    }
-}
-
-internal suspend fun closeDrawerThenRun(
-    closeDrawer: suspend () -> Unit,
-    action: () -> Unit,
-) {
-    closeDrawer()
     action()
 }
 
@@ -190,7 +86,6 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
     // letta-mobile-bglj6.1.22: the agent's pill alone stays, so the agent is known at a glance.
     var headerHidden by rememberSaveable { mutableStateOf(false) }
     Scaffold(
-        modifier = Modifier.nestedScroll(state.scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { AgentScaffoldTopChrome(state, headerHidden) },
@@ -216,8 +111,10 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
         // alone silently fell through to null — ChatGraph never passes it.
         val conversationRepo = state.drawerConversationRepo
         val scope = rememberCoroutineScope()
-        CompositionLocalProvider(
-            LocalAndroidAgentMessageContext provides AndroidAgentMessageContext(
+        val switchConversation by androidx.compose.runtime.rememberUpdatedState(state.params.navigation.onSwitchConversation)
+        // Remembered: the shared page keys its surface host on it, and a fresh one would reach every row.
+        val agentMessages = remember(agentNamesById, conversationRepo, scope) {
+            AndroidAgentMessageContext(
                 resolveName = { id -> agentNamesById[id] },
                 onAgentClick = { id ->
                     scope.launch {
@@ -225,15 +122,12 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
                             repo = conversationRepo,
                             agentId = com.letta.mobile.data.model.AgentId(id),
                         )
-                        state.params.navigation.onSwitchConversation?.invoke(
-                            id,
-                            resolvedConversationId,
-                            agentNamesById[id],
-                        )
+                        switchConversation?.invoke(id, resolvedConversationId, agentNamesById[id])
                     }
                 },
-            ),
-        ) {
+            )
+        }
+        CompositionLocalProvider(LocalAndroidAgentMessageContext provides agentMessages) {
             AgentScaffoldMainContent(
                 state = state,
                 paddingValues = paddingValues,
@@ -268,7 +162,6 @@ internal fun AgentScaffoldSheets(state: AgentScaffoldRuntimeState) {
             favoriteAgentId = state.favoriteAgentId,
             pinnedAgentIds = state.pinnedAgentIds,
             onDismiss = { sheetVisibility.onShowAgentSwitcherChange(false) },
-            onTogglePinned = { selectedAgent -> params.viewModel.toggleAgentPinned(selectedAgent.id.value) },
             onAgentSelected = { selectedAgent ->
                 sheetVisibility.onShowAgentSwitcherChange(false)
                 if (selectedAgent.id.value != state.agentIdValue) {

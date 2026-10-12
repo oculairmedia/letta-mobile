@@ -3,28 +3,33 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.feature.chat.screen.messageactions.LocalMessageBranchActions
-import com.letta.mobile.feature.chat.screen.messageactions.rememberMessageBranchActions
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPage
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageParams
+import com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
+import com.letta.mobile.feature.chat.subagent.SelfTodoSource
+import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
 import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
+import com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
 
+/**
+ * The Android chat route's binding: the shared KMP chat page (sharedUI ChatSurface through
+ * [SharedChatPage]) over the agent's ambient glow. Hard cut S9 (letta-mobile-ckmub.2.2): this is
+ * the only chat page; the legacy Android layout, its rows, list and composer are gone.
+ */
 @Composable
 internal fun ChatScreen(
     modifier: Modifier = Modifier,
@@ -43,18 +48,15 @@ internal fun ChatScreen(
     /** letta-mobile-y5q9z: the agent's conversations for the shared page's canvas bubble "+". */
     recentInteractions: com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions? = null,
     activeSubagentSource: ActiveSubagentSource? = null,
-    selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
+    selfTodoSource: SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel(),
 ) {
     val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
     val resolvedSelfTodoSource = selfTodoSource ?: viewModel.selfTodoSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val pagingPresentation by viewModel.pagingPresentation.collectAsStateWithLifecycle()
-    val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val activeFontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-    val sharedChatPageEnabled by viewModel.sharedChatPageEnabled.collectAsStateWithLifecycle()
-    // Subscribed alongside the gate above so both come from the same settings snapshot.
     val openChatsOnCanvas by viewModel.openChatsOnCanvas.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
@@ -76,120 +78,61 @@ internal fun ChatScreen(
         )
     }
 
-    val committedFontScale = activeFontScale
-    LettaChatTheme(fontScale = committedFontScale ?: 1f) {
-        var floatingBannerMessage by remember { mutableStateOf("") }
-        val currentConversationId = viewModel.conversationId?.value
+    // The font scale loads from settings; the page waits for it so its rows never re-lay out on arrival.
+    val fontScale = activeFontScale ?: return
+    LettaChatTheme(fontScale = fontScale) {
         val subagentBarState = rememberChatScreenSubagentBarState(
             resolvedSubagentSource = resolvedSubagentSource,
             resolvedSelfTodoSource = resolvedSelfTodoSource,
-            currentConversationId = currentConversationId,
+            currentConversationId = viewModel.conversationId?.value,
         )
-        // letta-mobile-6237v.2: outer .imePadding() (line 103) shrinks the layout
-        // to the top of the keyboard when IME is open, so the composer
-        // Column has no bottom-padding work to do. Hardcoding 0.dp here
-        // makes the composer fill to the screen bottom edge when the
-        // keyboard is down — the home indicator gesture bar overlays the
-        // composer's bottom region, which is intended (composer bg is
-        // opaque, so the gesture bar is still visually distinct).
-        val bottomInsetDp = 0.dp
         val ambient = rememberChatScreenAmbientState()
         val streamActivityPulse = rememberVisibleAssistantStreamPulse(state)
-        val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
 
         ChatScreenEffects(
             params = ChatScreenEffectsParams(
                 state = state,
-                composerState = composerState,
                 hapticsEnabled = hapticsEnabled,
-                viewModel = viewModel,
-                floatingBannerMessage = floatingBannerMessage,
-                onFloatingBannerMessageChange = { floatingBannerMessage = it },
                 ambient = ambient,
-                sharedChatPage = sharedChatPageEnabled,
             ),
         )
 
-        // letta-mobile-6237v.2: outer .imePadding() binds BOTH the
-        // shader canvas and the ChatScreenLayout to keyboard height so
-        // the shader shrinks with the keyboard. The Column inside still
-        // receives `bottomInsetDp` for navbar-clearance.
-        // The composer's height, as the layout measures it, so the glow can stay above it.
+        // The composer's height, as the page measures it, so the glow can stay above it.
         var composerHeight by remember { mutableStateOf(androidx.compose.ui.unit.Dp.Unspecified) }
-        if (committedFontScale != null && sharedChatPageEnabled) {
-            // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
-            // layer (it is opaque over the docked canvas), and its composer handles the IME.
-            SharedChatPage(
-                params = SharedChatPageParams(
-                    viewModel = viewModel,
-                    navigation = navigation,
-                    chatMode = chatMode,
-                    fontScale = committedFontScale,
-                    hapticsEnabled = hapticsEnabled,
-                    pagingPresentation = pagingPresentation,
-                    openOnCanvas = openChatsOnCanvas,
-                    subagents = com.letta.mobile.feature.chat.screen.shared.SharedChatSubagentInputs(
-                        source = resolvedSubagentSource,
-                        selfTodoSource = resolvedSelfTodoSource,
-                        barState = subagentBarState,
-                    ),
-                    pageBackground = { content ->
-                        AmbientShaderAgentBackground(
-                            agentStatus = ambient.status,
-                            streamActivityPulse = streamActivityPulse,
-                            composerHeight = { composerHeight },
-                            modifier = Modifier.fillMaxSize().then(backgroundModifier),
-                        ) { content() }
-                    },
-                    // The shared composer reports its height so the glow keeps clear of it.
-                    onComposerHeightChange = { composerHeight = it },
-                    // Edge to edge, as the legacy layout: the page draws under the status bar and the
-                    // floating header, and only rests its content (and the canvas's chrome) below them.
-                    topChromeInset = contentPadding.calculateTopPadding(),
-                    onHostHeaderHiddenChange = onHostHeaderHiddenChange,
-                    recentInteractions = recentInteractions,
+        // letta-mobile-bglj6.1: the shared page draws the glow behind its own full-screen
+        // layer (it is opaque over the docked canvas), and its scaffold owns the IME inset.
+        SharedChatPage(
+            params = SharedChatPageParams(
+                viewModel = viewModel,
+                navigation = navigation,
+                chatMode = chatMode,
+                fontScale = fontScale,
+                hapticsEnabled = hapticsEnabled,
+                pagingPresentation = pagingPresentation,
+                openOnCanvas = openChatsOnCanvas,
+                subagents = SharedChatSubagentInputs(
+                    source = resolvedSubagentSource,
+                    selfTodoSource = resolvedSelfTodoSource,
+                    barState = subagentBarState,
                 ),
-                modifier = modifier.fillMaxSize(),
-            )
-            return@LettaChatTheme
-        }
-        AmbientShaderAgentBackground(
-            agentStatus = ambient.status,
-            streamActivityPulse = streamActivityPulse,
-            composerHeight = { composerHeight },
-            modifier = modifier
-                .fillMaxSize()
-                .imePadding()
-                .then(backgroundModifier),
-        ) {
-            if (committedFontScale != null) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalChatPagingPresentation provides pagingPresentation,
-                    LocalMessageBranchActions provides rememberMessageBranchActions(viewModel, onOpenConversation),
-                ) {
-                    ChatScreenLayout(
-                    params = ChatScreenLayoutParams(
-                        state = state,
-                        composerState = composerState,
-                        viewModel = viewModel,
-                        contentPadding = contentPadding,
-                        chatBackground = chatBackground,
-                        chatMode = chatMode,
-                        navigation = navigation,
-                        resolvedSubagentSource = resolvedSubagentSource,
-                        subagentBarState = subagentBarState,
-                        activeFontScale = committedFontScale,
-                        onActiveFontScaleChange = viewModel::setChatFontScale,
-                        bottomInsetDp = bottomInsetDp,
-                        floatingBannerMessage = floatingBannerMessage,
-                        onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                        streamingRevealPulse = streamingRevealPulse,
-                        onComposerMeasured = { composerHeight = it },
-                    ),
-                )
-                }
-            }
-        }
+                pageBackground = { content ->
+                    AmbientShaderAgentBackground(
+                        agentStatus = ambient.status,
+                        streamActivityPulse = streamActivityPulse,
+                        composerHeight = { composerHeight },
+                        modifier = Modifier.fillMaxSize().then(backgroundModifier),
+                    ) { content() }
+                },
+                // The shared composer reports its height so the glow keeps clear of it.
+                onComposerHeightChange = { composerHeight = it },
+                // Edge to edge: the page draws under the status bar and the floating header, and
+                // only rests its content (and the canvas's chrome) below them.
+                topChromeInset = contentPadding.calculateTopPadding(),
+                onHostHeaderHiddenChange = onHostHeaderHiddenChange,
+                recentInteractions = recentInteractions,
+            ),
+            modifier = modifier.fillMaxSize(),
+        )
     }
 }
 
@@ -208,10 +151,17 @@ private fun rememberVisibleAssistantStreamPulse(state: com.letta.mobile.ui.chat.
     return pulseState.pulse
 }
 
-// NoConversationContent (the prior placeholder for ConversationState.
-// NoConversation showing only "Start a conversation / Send a message to
-// create a new conversation.") was removed when the empty-state for the
-// in-chat "New Conversation" path was unified with the chat-list FAB
-// path — both now render StarterPrompts. The strings
-// screen_chat_empty_title and screen_chat_empty_subtitle remain in
-// res/values/strings.xml in case a future surface needs them.
+/** The dictation overlay over the page while the recognizer listens (Hilt hosts only). */
+@Composable
+internal fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    if (activity !is dagger.hilt.internal.GeneratedComponentManager<*>) return
+    val voice: VoiceInputViewModel = hiltViewModel()
+    val voiceState by voice.uiState.collectAsStateWithLifecycle()
+    VoiceRecognizerOverlay(
+        visible = voiceState.recognizing,
+        recognizedText = voiceState.recognizedText,
+        amplitude = voiceState.amplitude,
+        modifier = modifier,
+    )
+}

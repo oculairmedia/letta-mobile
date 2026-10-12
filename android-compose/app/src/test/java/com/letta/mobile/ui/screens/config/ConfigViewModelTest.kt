@@ -474,15 +474,6 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun updateSharedChatPageEnabled_updatesStateAndPersists() = runTest {
-        // ckmub.1 (S4): on by default; the toggle opts back to the legacy page for one release.
-        val successState = loadedFormAfter { updateSharedChatPageEnabled(false) }
-
-        assertEquals(false, successState.sharedChatPageEnabled)
-        assertEquals(false, fakeRepository.getSharedChatPageEnabled().first())
-    }
-
-    @Test
     fun openChatsOnCanvas_defaultsOn_andUpdatePersists() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()

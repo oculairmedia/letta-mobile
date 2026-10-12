@@ -80,23 +80,6 @@ class AdminChatSessionPortTest {
     }
 
     @Test
-    fun `shared page flag starts on the shared page until the setting is read`() = runTest {
-        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        var viewModel: AdminChatViewModel? = null
-        try {
-            val vm = openedChatViewModel(canonicalPagingHost(), TestData.agent("agent-flag", "Flag"), "conversation-flag", "flag")
-            viewModel = vm
-            // ckmub.1 (S4): the shared page is the default, so it draws on the first frame.
-            assertEquals(true, vm.sharedChatPageEnabled.value)
-            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.sharedChatPageEnabled.collect {} }
-            assertEquals(false, vm.sharedChatPageEnabled.value)
-        } finally {
-            viewModel?.viewModelScope?.cancel()
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test
     fun `the page knows the route's agent from the first state`() = runTest {
         // letta-mobile-bglj6.1: the Touch chat head and the composer companion draw the agent's
         // mascot from uiState.agentId; null drew the stand-in sphere for every agent.

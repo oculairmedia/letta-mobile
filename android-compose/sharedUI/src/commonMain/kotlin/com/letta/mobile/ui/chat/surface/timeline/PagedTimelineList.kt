@@ -44,6 +44,7 @@ import com.letta.mobile.ui.chat.surface.timeline.rows.isUserRole
 import com.letta.mobile.ui.mascot.MascotLoading
 import com.letta.mobile.ui.theme.ChatTimelineDimens
 import com.letta.mobile.ui.theme.LettaDimens
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
@@ -105,7 +106,11 @@ private fun PagedTimelineBody(
     val listState = params.listState
     val scope = rememberCoroutineScope()
     val anchoredTarget by presentation.target.collectAsState()
-    val restoreAnchor = remember(presentation) { presentation.viewport }
+    // Hard cut S9: a route that targets a message (search hit, deep link) opens ON that row, as the
+    // legacy Android list did; a saved reading position still wins on a later reopen.
+    val restoreAnchor = remember(presentation) {
+        openingAnchor(presentation.viewport, presentation.target.value.takeIf { presentation.missingTarget == null })
+    }
     var anchorRestored by remember(presentation) { mutableStateOf(restoreAnchor == null) }
     val follow = rememberPagedListFollow(params, settled, rows, restoring = restoreAnchor != null)
     if (!anchorRestored) {
@@ -304,6 +309,17 @@ private fun SettledRow(scope: PagedRowsScope, index: Int, modifier: Modifier) {
     val row = scope.settled[settledIndex]
     if (row == null) {
         Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
+    } else if (row.deferred != null) {
+        // A body too large to decode inline pages in on demand, above its (blanked) row.
+        val presentation = scope.params.presentation
+        Column(modifier.fillMaxWidth()) {
+            TimelineDeferredBody(
+                rowKey = row.identity.value,
+                read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
+                modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+            )
+            PagedRow(row.item, scope.rows.itemAt(index + 1), scope, Modifier)
+        }
     } else {
         PagedRow(row.item, scope.rows.itemAt(index + 1), scope, modifier)
     }
@@ -364,6 +380,13 @@ internal fun ObserveResidentRows(
 /** What a view reports as resident: nothing (null) while its first page is still loading. */
 internal fun <T> residentReport(rows: List<T>, refresh: LoadState): List<T>? =
     rows.takeUnless { it.isEmpty() && refresh is LoadState.Loading }
+
+/**
+ * Where the paged list opens: the reader's saved position (row identity, offset) when there is one,
+ * else the route's target message at the newest edge of the viewport, else the newest edge (null).
+ */
+internal fun openingAnchor(viewport: Pair<String, Int>?, target: String?): Pair<String, Int>? =
+    viewport ?: target?.let { it to 0 }
 
 /** Puts the reader back where they left off, once, from resident rows only. */
 @Composable

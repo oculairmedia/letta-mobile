@@ -594,16 +594,6 @@ internal class AdminChatViewModel @Inject constructor(
     val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    /**
-     * letta-mobile-bglj6.1: render the shared KMP chat page instead of the legacy layout. Starts true,
-     * the setting's default since hard cut S4 (letta-mobile-ckmub.1), so the shared page draws on the
-     * first frame; a person who turned it off sees the legacy layout once the setting is read (a
-     * one-frame flash, accepted: the settings store has no synchronous read). The legacy layout stays
-     * reachable this way for one release (slice S9 deletes it).
-     */
-    val sharedChatPageEnabled: StateFlow<Boolean> = settingsRepository.getSharedChatPageEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
     /** letta-mobile-bglj6.1: open conversations canvas-first on the shared chat page (default on). */
     val openChatsOnCanvas: StateFlow<Boolean> = settingsRepository.getOpenChatsOnCanvas()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)

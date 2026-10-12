@@ -693,8 +693,11 @@ fun LettaSearchAnchoredField(
     modifier: Modifier = Modifier,
     config: LettaSearchConfig = LettaSearchConfig(),
     compact: Boolean = false,
+    /** Opens the pane whenever it grows, for a host command that asks for the search; 0 never does. */
+    openSignal: Int = 0,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    LaunchedEffect(openSignal) { if (openSignal > 0) expanded = true }
     Box(modifier = modifier) {
         if (compact) {
             LettaSearchIconTrigger(active = query.isNotBlank(), label = config.placeholder, onClick = { expanded = true })

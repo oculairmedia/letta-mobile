@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.paging.PagingData
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import kotlinx.coroutines.flow.Flow
@@ -63,11 +62,6 @@ class ChatPagingPresentation(
     val opening: Boolean = false,
     val openError: String? = null,
     val retryOpen: () -> Unit = {},
-    /**
-     * The field is the caller's, not the reader's: which string a stored body should show is
-     * discovered per row by [com.letta.mobile.data.timeline.resolveDeferredBody].
-     */
-    val deferredReader: (ChatRenderItem) -> DeferredBodyRead? = { null },
     /**
      * letta-mobile-bglj6.1: the canonical presentation this one adapts, when it has one. The
      * shared chat page reads it directly instead of this Android paging adapter.
@@ -175,5 +169,3 @@ internal class ChatPagingBinding {
         previous?.close?.invoke()
     }
 }
-
-internal val LocalChatPagingPresentation = staticCompositionLocalOf<ChatPagingPresentation?> { null }

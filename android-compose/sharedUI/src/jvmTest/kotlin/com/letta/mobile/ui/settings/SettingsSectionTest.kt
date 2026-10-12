@@ -98,25 +98,22 @@ class SettingsSectionTest {
     }
 
     @Test
-    fun aToggleRowWritesItsSettingAndALockedOneSaysWhy() = runComposeUiTest {
+    fun aToggleRowWritesItsSetting() = runComposeUiTest {
         val written = mutableListOf<Boolean>()
-        val sharedPage = SettingValue(MutableStateFlow(false)) { written += it }
-        val canvas = SettingValue(MutableStateFlow(true)) {}
-        setContent { Frame { ChatSettingsSection(ChatSettings(sharedChatPage = sharedPage, openChatsOnCanvas = canvas)) } }
+        val canvas = SettingValue(MutableStateFlow(false)) { written += it }
+        setContent { Frame { ChatSettingsSection(ChatSettings(openChatsOnCanvas = canvas)) } }
 
-        onNode(toggleIn("chat-shared-page")).assertIsOff().performClick()
+        onNode(toggleIn("chat-open-on-canvas")).assertIsOff().performClick()
         assertEquals(listOf(true), written)
     }
 
     @Test
-    fun aLockedSwitchIsOnAndDisabledWithItsReason() = runComposeUiTest {
-        val sharedPage = SettingValue(MutableStateFlow(false)) {}
-        setContent {
-            Frame { ChatSettingsSection(ChatSettings(sharedChatPage = sharedPage, sharedChatPageLockedReason = "Turned on for this launch.")) }
-        }
+    fun aDisabledToggleRowCannotChange() = runComposeUiTest {
+        val row = SettingsRow.Toggle("auto-launch", "Launch Letta when I sign in", checked = true, supporting = "Unsupported here.", enabled = false) {}
+        setContent { Frame { SettingsModelSection(SettingsSectionModel("login", "Start at login", listOf(row))) } }
 
-        onNodeWithText("Turned on for this launch.").assertExists()
-        onNode(toggleIn("chat-shared-page")).assertIsNotEnabled()
+        onNodeWithText("Unsupported here.").assertExists()
+        onNode(toggleIn("auto-launch")).assertIsNotEnabled()
     }
 
     @Test

@@ -32,14 +32,16 @@ import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
+import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.AndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalAndroidClientCommands
 import com.letta.mobile.feature.chat.screen.LocalSharedNavDrawer
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenVoiceOverlay
-import com.letta.mobile.feature.chat.screen.saveAttachment
-import com.letta.mobile.feature.chat.screen.shareAttachment
+import com.letta.mobile.feature.chat.util.saveAttachment
+import com.letta.mobile.feature.chat.util.shareAttachment
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
@@ -123,8 +125,9 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     val subagentSheet = rememberSharedChatSubagentSheetState(params.subagents.source)
     // Read live by the rings overlay, whose slot lambda is remembered with the platform.
     val currentSubagents by rememberUpdatedState(params.subagents)
-    val host = remember(params.navigation, subagentSheet) {
-        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch)
+    val agentMessages = LocalAndroidAgentMessageContext.current
+    val host = remember(params.navigation, subagentSheet, agentMessages) {
+        params.navigation.toSurfaceHost(openSubagent = subagentSheet::openDispatch).withAgentMessages(agentMessages)
     }
     val hasCanvasSlot = canvasSlot != null
     val onIntent = rememberSurfaceIntentHandler(presentationState, hasCanvasSlot, host)
@@ -343,6 +346,10 @@ private fun ChatScreenNavigationCallbacks.toSurfaceHost(
         openAgentSwitcher = onOpenAgentSwitcher,
     )
 }
+
+/** An inter-agent label names its agent and opens that agent's latest conversation, as the legacy bubbles did. */
+private fun ChatSurfaceHost.withAgentMessages(agentMessages: AndroidAgentMessageContext): ChatSurfaceHost =
+    copy(openAgent = agentMessages.onAgentClick ?: openAgent, resolveAgentName = agentMessages.resolveName)
 
 /** Dictation needs the Hilt-provided recognizer; previews and tests without one get no mic. */
 @Composable

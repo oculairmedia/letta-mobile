@@ -31,19 +31,13 @@ class AppearanceSettings(
     val isEmpty: Boolean get() = listOfNotNull(theme, themePreset, dynamicColor, haptics).isEmpty()
 }
 
-/**
- * Chat: the shared chat page switch (kept for one release, letta-mobile-ckmub S4/S9), whether a
- * conversation opens on the canvas, and the default permission mode new conversations start in.
- */
+/** Chat: whether a conversation opens on the canvas, and the default permission mode new conversations start in. */
 class ChatSettings(
-    val sharedChatPage: SettingValue<Boolean>? = null,
-    /** Why the shared chat page switch cannot change (the launch forces it on), or null. */
-    val sharedChatPageLockedReason: String? = null,
     val openChatsOnCanvas: SettingValue<Boolean>? = null,
     val permissionMode: PermissionModeSettings? = null,
 ) {
     /** True when the platform binds none of these, so the page leaves the section out. */
-    val isEmpty: Boolean get() = listOfNotNull(sharedChatPage, openChatsOnCanvas, permissionMode).isEmpty()
+    val isEmpty: Boolean get() = openChatsOnCanvas == null && permissionMode == null
 }
 
 /** Notifications: the app-wide approval notification switch. Platform rows come as contributions. */

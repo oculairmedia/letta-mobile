@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.screens.config
 
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsOption
 import com.letta.mobile.data.settings.SettingsRow
@@ -232,15 +231,6 @@ internal fun developerSection(state: ConfigUiState, vm: ConfigViewModel, debug: 
                 checked = state.enableProjects,
                 supporting = "Group agents and conversations into projects (preview).",
                 onChange = vm::updateEnableProjects,
-            ),
-        )
-        add(
-            SettingsRow.Toggle(
-                key = "dev-shared-nav-drawer",
-                title = "Shared navigation drawer",
-                checked = FeatureFlag.SharedNavDrawer in state.enabledFeatureFlags,
-                supporting = "Use the navigation drawer every platform shares (preview).",
-                onChange = { vm.updateFeatureFlag(FeatureFlag.SharedNavDrawer, it) },
             ),
         )
         debug?.let { destinations ->

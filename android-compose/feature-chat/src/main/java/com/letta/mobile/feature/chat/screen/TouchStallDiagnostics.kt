@@ -15,21 +15,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  */
 private const val INPUT_TAG = "Input"
 
-internal object SwipeUpToCanvasDiagnostics {
-    /** The composer swipe claimed the stream (first consumed upward move past slop). */
-    fun started() {
-        if (!InputDiagnostics.enabled.get()) return
-        Telemetry.event(INPUT_TAG, "swipeUpToCanvas.start")
-    }
-
-    /** How a claimed gesture ended: Committed, Released, Cancelled or detached. */
-    fun ended(outcome: String) {
-        if (!InputDiagnostics.enabled.get()) return
-        val name = if (outcome == SwipeUpToCanvasOutcome.Committed.name) "commit" else "abandon"
-        Telemetry.event(INPUT_TAG, "swipeUpToCanvas.$name", "result" to outcome)
-    }
-}
-
 /** Logs every settled/target change of the agent drawer, including drags that settle back. */
 @Composable
 internal fun LogDrawerTransitions(drawerState: DrawerState) {

@@ -32,6 +32,11 @@ class SearchSlot(
     val sections: List<LettaSearchSection> = emptyList(),
     val onRowSelected: (LettaSearchRow) -> Unit = {},
     val onDismiss: () -> Unit = {},
+    /**
+     * Opens the pane from outside the field whenever it grows (Android chat's `/search` command);
+     * 0 never opens it.
+     */
+    val openSignal: Int = 0,
 )
 
 /** The unified search's own filters: the scope tab and "Filter to this agent" (on by default). */
