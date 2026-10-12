@@ -35,10 +35,15 @@ import com.letta.mobile.ui.theme.LettaDimens
  * the search under the title. [Medium]: the same list under a sticky row of section chips. [Wide]: a
  * section rail (search on top, scroll-spy selection) beside a content column capped at a readable width.
  */
-enum class SettingsLayout {
-    Phone,
-    Medium,
-    Wide,
+enum class SettingsLayout(
+    /** The content column's side gutter. */
+    val gutter: Dp,
+    /** The content column's widest; a phone uses its whole width. */
+    val columnMaxWidth: Dp,
+) {
+    Phone(LettaDimens.Space.lg, Dp.Unspecified),
+    Medium(LettaDimens.Space.xl, LettaDimens.Pane.settingsColumnMaxWidth),
+    Wide(LettaDimens.Space.xl, LettaDimens.Pane.settingsColumnMaxWidth),
     ;
 
     companion object {
