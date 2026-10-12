@@ -277,6 +277,11 @@ data class ChatUiState(
     val completionTokens: Int? = null,
     val totalTokens: Int? = null,
     val activeApprovalRequestId: String? = null,
+    /**
+     * letta-mobile-bzvro.14: approval requests answered while the connection was down, waiting in
+     * the outbox; their cards say so and take no second answer.
+     */
+    val queuedApprovalRequestIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val collapsedRunIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val expandedReasoningMessageIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),

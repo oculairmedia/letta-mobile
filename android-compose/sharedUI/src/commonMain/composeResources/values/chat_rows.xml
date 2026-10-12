@@ -126,6 +126,10 @@
     <string name="rows_approved">Approved</string>
     <string name="rows_rejected">Rejected</string>
     <string name="rows_approval_response">Approval response</string>
+    <string name="rows_approval_step">Approval %1$d of %2$d</string>
+    <string name="rows_approval_step_back">Previous approval</string>
+    <string name="rows_approval_step_next">Next approval</string>
+    <string name="rows_approval_queued">Offline. Your answer is saved and sends when you reconnect.</string>
     <plurals name="rows_tool_decisions">
         <item quantity="one">%1$d tool decision</item>
         <item quantity="other">%1$d tool decisions</item>

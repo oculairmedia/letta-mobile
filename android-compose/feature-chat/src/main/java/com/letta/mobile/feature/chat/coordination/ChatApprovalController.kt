@@ -1,10 +1,11 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
+import com.letta.mobile.data.chat.approval.OutboxNotice
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.feature.chat.state.ChatBannerController
-import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,14 @@ internal class ChatApprovalController(
     private val tracker = ApprovalSubmissionTracker()
 
     init {
+        // letta-mobile-bzvro.14: an answer made offline that the host no longer needed is said so.
+        relay?.let { owner ->
+            scope.launch {
+                owner.outbox.notices.collect { notice ->
+                    if (notice is OutboxNotice.Dropped) bannerController.showError(DROPPED_OFFLINE_ANSWER)
+                }
+            }
+        }
         scope.launch {
             combine(
                 uiState.map { state -> state.messages.mapNotNull { it.approvalRequest?.requestId }.toSet() },
@@ -60,31 +69,35 @@ internal class ChatApprovalController(
         val conversationId = conversationOverride?.value ?: activeConversationId()
         scope.launch {
             markApprovalInFlight(answer, conversationId)
-            val submitted = try {
-                accepted(coordinator.submitApproval(agentId, conversationId, answer))
+            val result = try {
+                coordinator.submitApproval(agentId, conversationId, answer)
             } catch (cancelled: CancellationException) {
                 failApprovalInFlight(answer)
                 throw cancelled
             } catch (e: Exception) {
-                bannerController.showError(e.message ?: "Failed to submit approval")
-                false
+                ChatApprovalResult.Failed(e.message ?: "Failed to submit approval")
             }
-            // Presence flags reset as they always have; only a successful answer keeps its card
-            // in flight, until the timeline reconciles it. Anything else is actionable again now.
-            if (submitted) {
-                // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot.
-                answer.toolCallIds.forEach { relay?.resolve(it) }
-                settleApprovalPresence(answer)
-            } else {
-                failApprovalInFlight(answer)
-            }
+            settle(answer, result)
         }
+    }
+
+    /**
+     * Presence flags reset as they always have; only an answer that went out (or waits in the
+     * offline outbox) keeps its card in flight, until the timeline reconciles it. Anything else is
+     * actionable again now.
+     */
+    private fun settle(answer: ChatApprovalAnswer, result: ChatApprovalResult) {
+        if (!accepted(result)) return failApprovalInFlight(answer)
+        // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot; a queued
+        // one (letta-mobile-bzvro.14) stays, marked as waiting for the connection.
+        if (result == ChatApprovalResult.Submitted) answer.toolCallIds.forEach { relay?.resolve(it) }
+        settleApprovalPresence(answer)
     }
 
     /** Whether [result] means the answer went out; anything else is shown on the banner. */
     private fun accepted(result: ChatApprovalResult): Boolean {
         val error = when (result) {
-            ChatApprovalResult.Submitted -> return true
+            ChatApprovalResult.Submitted, ChatApprovalResult.Queued -> return true
             ChatApprovalResult.MissingActiveAgent -> "No active agent available for approval"
             ChatApprovalResult.MissingActiveConversation -> "No active conversation available for approval"
             is ChatApprovalResult.Failed -> result.message
@@ -135,5 +148,6 @@ internal class ChatApprovalController(
 
     private companion object {
         const val NO_CONVERSATION = ""
+        const val DROPPED_OFFLINE_ANSWER = "An approval you answered offline was already resolved, so it was not sent."
     }
 }

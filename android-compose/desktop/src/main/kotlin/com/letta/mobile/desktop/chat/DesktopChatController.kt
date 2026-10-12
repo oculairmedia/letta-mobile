@@ -128,6 +128,9 @@ class DesktopChatController(
      * structured AskUserQuestion card can disable its buttons while submitting.
      */
     val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
+
+    /** letta-mobile-bzvro.14: requests answered offline, waiting in the gateway's outbox. */
+    val queuedApprovals: StateFlow<Set<String>> = approvalCoordinator.queuedApprovals
     val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
         approvalCoordinator.pendingApprovalDetails
 
