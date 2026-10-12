@@ -29,8 +29,8 @@ import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
-import com.letta.mobile.ui.shell.ShellChromeDecorations
+import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -137,44 +137,44 @@ class ShellAgentPanelTest {
     fun deletingFromTheRowMenuAsksFirst() = runComposeUiTest {
         val deleted = mutableListOf<String>()
         // A stand-in host: the row menu's entries as plain buttons, the confirmation as one button.
-        val decorations = ShellChromeDecorations(
+        val host = LettaHost(
             rowMenu = { items, content ->
                 Column {
                     content()
                     items.forEach { Text("menu:${it.label}", Modifier.clickable(onClick = it.onClick)) }
                 }
             },
-            confirm = { request, onConfirm, _ -> Text("confirm:${request.confirmLabel}", Modifier.clickable(onClick = onConfirm)) },
+            // The confirmation arrives through the host's alert container; draw it in place.
+            alert = { spec, content -> Column { Text("alert:${spec.title}"); content() } },
         )
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides decorations) {
+            CompositionLocalProvider(LocalLettaHost provides host) {
                 Panel(state, ShellAgentPanelActions(onDeleteConversation = { deleted += it }))
             }
         }
         onNodeWithText("menu:Archive chat").assertExists()
         onNodeWithText("menu:Delete chat").performClick()
         assertEquals(emptyList(), deleted)
-        onNodeWithText("confirm:Delete").performClick()
+        onNodeWithText("alert:Delete chat?").assertExists()
+        onNodeWithText("Delete").performClick()
         assertEquals(listOf("c1"), deleted)
-        onNodeWithText("confirm:Delete").assertDoesNotExist()
+        onNodeWithText("alert:Delete chat?").assertDoesNotExist()
     }
 
     @Test
     fun deleteOnABackendThatOnlyArchivesSaysArchive() = runComposeUiTest {
         val deleted = mutableListOf<String>()
-        val decorations = ShellChromeDecorations(
+        val host = LettaHost(
             rowMenu = { items, content ->
                 Column {
                     content()
                     items.forEach { Text("menu:${it.label}", Modifier.clickable(onClick = it.onClick)) }
                 }
             },
-            confirm = { request, onConfirm, _ ->
-                Text("confirm:${request.title}|${request.message}|${request.confirmLabel}", Modifier.clickable(onClick = onConfirm))
-            },
+            alert = { spec, content -> Column { Text("alert:${spec.title}"); content() } },
         )
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides decorations) {
+            CompositionLocalProvider(LocalLettaHost provides host) {
                 Panel(
                     state,
                     ShellAgentPanelActions(onDeleteConversation = { deleted += it }, deleteBehavior = ConversationDeleteBehavior.MovesToArchived),
@@ -186,7 +186,9 @@ class ShellAgentPanelTest {
         assertEquals("Archive chat?", copy.title)
         assertEquals("Archive", copy.confirmLabel)
         assertEquals(false, copy.message.contains("permanently removed"))
-        onNodeWithText("confirm:${copy.title}|${copy.message}|${copy.confirmLabel}").performClick()
+        onNodeWithText("alert:${copy.title}").assertExists()
+        onNodeWithText(copy.message).assertExists()
+        onNodeWithText(copy.confirmLabel).performClick()
         assertEquals(listOf("c1"), deleted)
     }
 
@@ -209,7 +211,7 @@ class ShellAgentPanelTest {
     }
 
     /** A stand-in host: the row menu's entries as plain buttons under the row. */
-    private val menuAsButtons = ShellChromeDecorations(
+    private val menuAsButtons = LettaHost(
         rowMenu = { items, content ->
             Column {
                 content()
@@ -223,7 +225,7 @@ class ShellAgentPanelTest {
         // letta-mobile-bzvro.17: Enter saves a changed title, trimmed.
         val renames = mutableListOf<Pair<String, String>>()
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+            CompositionLocalProvider(LocalLettaHost provides menuAsButtons) {
                 Panel(state, ShellAgentPanelActions(onRenameConversation = { id, title -> renames += id to title }))
             }
         }
@@ -254,7 +256,7 @@ class ShellAgentPanelTest {
         val pins = mutableListOf<Pair<String, Boolean>>()
         val pinned = state.copy(conversations = state.conversations.map { it.copy(pinned = true) })
         setContent {
-            CompositionLocalProvider(LocalShellChromeDecorations provides menuAsButtons) {
+            CompositionLocalProvider(LocalLettaHost provides menuAsButtons) {
                 Panel(pinned, ShellAgentPanelActions(onPinConversation = { id, pin -> pins += id to pin }))
             }
         }

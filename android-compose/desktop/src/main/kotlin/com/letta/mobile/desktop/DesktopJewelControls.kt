@@ -1,17 +1,9 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,8 +17,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
-import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import org.jetbrains.jewel.foundation.theme.LocalContentColor as JewelLocalContentColor
 import org.jetbrains.jewel.ui.component.Chip as JewelChip
@@ -38,63 +28,15 @@ import org.jetbrains.jewel.ui.component.RadioButtonChip as JewelRadioButtonChip
 import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.text.font.FontWeight
+import com.letta.mobile.ui.host.PointerTooltip
+import com.letta.mobile.ui.host.PointerTooltipArea
+import com.letta.mobile.ui.host.PointerTooltipSurface
 import com.letta.mobile.ui.theme.LettaDimens
 
-// Snappy: 450ms read as "the tooltip is broken" on quick hovers.
-private const val TooltipShowDelayMs = 150
-
-/** Simple text tooltip backed by the shared desktop hover lifecycle. */
+/** A text tooltip on hover: the shared pointer host's (letta-mobile-ckmub.3.1). */
 @Composable
-internal fun DesktopTooltip(
-    text: String,
-    modifier: Modifier = Modifier,
-    delayMillis: Int = TooltipShowDelayMs,
-    position: DesktopTooltipPosition = DesktopTooltipPosition.Cursor,
-    content: @Composable () -> Unit,
-) {
-    DesktopTooltipArea(
-        modifier = modifier,
-        delayMillis = delayMillis,
-        position = position,
-        tooltip = { DesktopTooltipSurface(text) },
-    ) {
-        content()
-    }
-}
-
-internal enum class DesktopTooltipPosition {
-    Cursor,
-    BelowAnchor,
-}
-
-/** Shared hover lifecycle for simple labels and rich desktop hover cards. */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-internal fun DesktopTooltipArea(
-    tooltip: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    delayMillis: Int = TooltipShowDelayMs,
-    position: DesktopTooltipPosition = DesktopTooltipPosition.Cursor,
-    content: @Composable () -> Unit,
-) {
-    val placement = when (position) {
-        DesktopTooltipPosition.Cursor -> TooltipPlacement.CursorPoint(offset = DpOffset(LettaDimens.Space.md, LettaDimens.Space.md))
-        DesktopTooltipPosition.BelowAnchor -> TooltipPlacement.ComponentRect(
-            anchor = Alignment.BottomCenter,
-            alignment = Alignment.TopCenter,
-            offset = DpOffset(0.dp, LettaDimens.Space.sm),
-        )
-    }
-    TooltipArea(
-        tooltip = tooltip,
-        modifier = modifier,
-        delayMillis = delayMillis,
-        tooltipPlacement = placement,
-        content = content,
-    )
+internal fun DesktopTooltip(text: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    PointerTooltip(text = text, modifier = modifier, content = content)
 }
 
 /**
@@ -107,73 +49,9 @@ internal fun DesktopRichTooltip(
     modifier: Modifier = Modifier,
     timeLabel: String? = null,
     body: String? = null,
-    delayMillis: Int = TooltipShowDelayMs,
-    position: DesktopTooltipPosition = DesktopTooltipPosition.Cursor,
     content: @Composable () -> Unit,
 ) {
-    DesktopTooltipArea(
-        modifier = modifier,
-        delayMillis = delayMillis,
-        position = position,
-        tooltip = { DesktopTooltipSurface(title, timeLabel = timeLabel, body = body) },
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun DesktopTooltipSurface(text: String, timeLabel: String? = null, body: String? = null) {
-    val rich = timeLabel != null || !body.isNullOrBlank()
-    Surface(
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = LettaDimens.Space.sm,
-    ) {
-        if (!rich) {
-            Text(
-                text = text,
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs),
-                style = MaterialTheme.typography.labelMedium,
-            )
-        } else {
-            Column(
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm).widthIn(max = 320.dp),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-                ) {
-                    Text(
-                        text = text,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    if (timeLabel != null) {
-                        Text(
-                            text = timeLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (!body.isNullOrBlank()) {
-                    Text(
-                        text = body,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
+    PointerTooltipArea(tooltip = { PointerTooltipSurface(title, timeLabel, body) }, modifier = modifier, content = content)
 }
 
 @Composable

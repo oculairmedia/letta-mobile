@@ -94,7 +94,7 @@ private const val TIER_ALPHA = 0.7f
  * The model picker (letta-mobile-w4q4p.6.1): "Search models", the exposed
  * models under collapsible provider headers, the current one marked, and a
  * footer with "Refresh Models" and "Edit Models…". Hosts put it in a
- * [ModelControlModal]; Android and desktop render this same content.
+ * [com.letta.mobile.ui.host.LettaPane] (LettaPaneKind.Modal); Android and desktop render this same content.
  */
 @Composable
 fun ColumnScope.ModelPickerContent(

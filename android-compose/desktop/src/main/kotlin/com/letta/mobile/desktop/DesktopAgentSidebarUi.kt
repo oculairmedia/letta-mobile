@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,7 +25,6 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
-import com.letta.mobile.ui.shell.LocalShellChromeDecorations
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
@@ -52,17 +50,16 @@ internal fun DesktopAgentSidebar(
     // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
     // Temporarily hidden — restore by rendering WorkPlaySwitcher above the panel. The lens itself
     // still drives the sidebar (the panel reads state.mode); only the toggle that changes it is hidden.
-    CompositionLocalProvider(LocalShellChromeDecorations provides DesktopShellChromeDecorations) {
-        ShellAgentPanel(
-            state = state.toShellPanelState(),
-            actions = actions.toShellPanelActions(state.mode),
-            agentCard = agentCard,
-            modifier = Modifier
-                .width(231.dp)
-                .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest),
-        )
-    }
+    // Tooltips, right-click menus and dialog windows come from the window's LettaHost.
+    ShellAgentPanel(
+        state = state.toShellPanelState(),
+        actions = actions.toShellPanelActions(state.mode),
+        agentCard = agentCard,
+        modifier = Modifier
+            .width(231.dp)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest),
+    )
 }
 
 /** The desktop sidebar state as the shared panel's: relative times resolved, destinations as sections. */
