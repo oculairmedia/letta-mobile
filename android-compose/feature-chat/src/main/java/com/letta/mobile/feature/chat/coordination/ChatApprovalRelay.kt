@@ -64,7 +64,7 @@ class ChatApprovalRelay @Inject constructor(
  * conversations; inert (no parked requests, no chip) when the screen has no relay.
  */
 internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, private val agentId: String) {
-    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: NONE
+    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: MutableStateFlow(emptyMap())
 
     /** The chip for whichever conversation [conversationIds] names now. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -82,9 +82,5 @@ internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, privat
     private fun runtimeOf(conversationId: String?): AppServerRuntimeScope? {
         val conversation = conversationId?.takeIf { it.isNotBlank() } ?: return null
         return agentId.takeIf { it.isNotBlank() }?.let { AppServerRuntimeScope(it, conversation) }
-    }
-
-    private companion object {
-        val NONE: StateFlow<Map<String, PendingApprovalDetails>> = MutableStateFlow(emptyMap())
     }
 }

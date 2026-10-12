@@ -123,8 +123,11 @@ class IrohAdminRpcChatGateway(
         if (!response.success) error(response.error ?: "Iroh admin_rpc approval.submit failed")
     }
 
+    private val noPendingApprovals: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
+        kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
+
     override val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
-        get() = approvalControls?.relay?.pending ?: NO_PENDING_APPROVALS
+        get() = approvalControls?.relay?.pending ?: noPendingApprovals
 
     override val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
         get() = approvalControls?.modes?.takeIf { it.supported }?.modes
@@ -610,7 +613,5 @@ class IrohAdminRpcChatGateway(
 
     companion object {
         const val STREAM_HEARTBEAT_INTERVAL_MS = 15_000L
-        private val NO_PENDING_APPROVALS: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
-            kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
     }
 }
