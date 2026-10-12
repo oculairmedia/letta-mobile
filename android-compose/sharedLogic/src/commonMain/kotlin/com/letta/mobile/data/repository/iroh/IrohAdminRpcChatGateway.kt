@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
@@ -285,20 +286,20 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = listConversationMessagesRpc(conversationId, limit, after, before = null, order = order)
+    ): List<LettaMessage> = listConversationMessagesRpc(conversationId.value, limit, after, before = null, order = order)
 
     // The wrapper's message.list handler forwards `before` to the App Server, so older history
     // pages take the same route as the tail read instead of failing the continuation.
     override suspend fun listConversationMessagesBefore(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int,
         before: String,
         order: String,
-    ): List<LettaMessage> = listConversationMessagesRpc(conversationId, limit, after = null, before = before, order = order)
+    ): List<LettaMessage> = listConversationMessagesRpc(conversationId.value, limit, after = null, before = before, order = order)
 
     private suspend fun listConversationMessagesRpc(
         conversationId: String,
@@ -336,24 +337,24 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
         Telemetry.event(
             "IrohChatGateway", "listAgentMessages.gated",
-            "agentId" to agentId,
-            "conversationId" to (conversationId ?: "<null>"),
+            "agentId.value" to agentId.value,
+            "conversationId?.value" to (conversationId?.value ?: "<null>"),
         )
         return emptyList()
     }
 
-    override suspend fun getToolReturn(conversationId: String, messageId: String): LettaMessage? {
+    override suspend fun getToolReturn(conversationId: ConversationId, messageId: MessageId): LettaMessage? {
         val result = rpc(
             AdminRpcCall.of(
                 method = AdminRpcMethod("tool_return.get"),
-                path = AdminRpcPath("/v1/conversations/$conversationId/messages/$messageId"),
+                path = AdminRpcPath("/v1/conversations/${conversationId.value}/messages/${messageId.value}"),
             ),
         ) ?: return null
         return json.decodeFromJsonElement(LettaMessage.serializer(), result)
@@ -456,10 +457,10 @@ class IrohAdminRpcChatGateway(
     // ------------------------------------------------------------------
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> {
-        val conversation = ConversationId(conversationId)
+        val conversation = conversationId
         val agentId = agentIdFor(conversation)
         val outbound = OutboundMessageCreate.decode(request)
         return channelFlow {
@@ -496,15 +497,15 @@ class IrohAdminRpcChatGateway(
         )
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
         val frames = flow {
             var activeTurnConversationId: String? = null
             bridge.events.collect { event ->
                 when (event) {
                     is WsTimelineEvent.TurnStarted -> activeTurnConversationId = event.conversationId
                     is WsTimelineEvent.MessageDelta -> {
-                        val belongs = event.conversationId?.let { it == conversationId }
-                            ?: (activeTurnConversationId == conversationId)
+                        val belongs = event.conversationId?.let { it == conversationId.value }
+                            ?: (activeTurnConversationId == conversationId.value)
                         if (belongs) {
                             emit(TimelineStreamFrame.Message(event.message))
                         }

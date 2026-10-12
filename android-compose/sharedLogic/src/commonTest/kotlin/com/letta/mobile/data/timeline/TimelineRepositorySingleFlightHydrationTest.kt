@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,7 +65,7 @@ class TimelineRepositorySingleFlightHydrationTest {
         }
 
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,

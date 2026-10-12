@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
@@ -95,7 +96,7 @@ class IrohAdminRpcTimelineTransportOlderMessagesTest {
             }
         }
 
-        val messages = transport(fake).listConversationMessages("conv-1", limit = 50)
+        val messages = transport(fake).listConversationMessages(ConversationId("conv-1"), limit = 50)
 
         assertEquals(1, messages.size)
         assertEquals("letta-msg-30", messages.single().id)

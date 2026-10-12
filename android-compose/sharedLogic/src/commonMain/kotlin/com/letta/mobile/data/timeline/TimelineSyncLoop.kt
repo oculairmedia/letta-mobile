@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -1241,7 +1243,7 @@ class TimelineSyncLoop(
      * marker). Returns true when a full body was fetched and applied.
      */
     suspend fun resolveTruncatedToolReturn(messageId: String): Boolean {
-        val message = runCatching { messageApi.getToolReturn(conversationId, messageId) }
+        val message = runCatching { messageApi.getToolReturn(ConversationId(conversationId), MessageId(messageId)) }
             .onFailure { t ->
                 Telemetry.error(
                     "TimelineSync", "toolReturn.resolveFailed", t,

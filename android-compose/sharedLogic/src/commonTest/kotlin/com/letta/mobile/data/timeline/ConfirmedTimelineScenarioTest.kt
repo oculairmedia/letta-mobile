@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
@@ -29,7 +30,7 @@ class ConfirmedTimelineScenarioTest {
         val listMessagesStarted = CompletableDeferred<Unit>()
 
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,
@@ -38,7 +39,7 @@ class ConfirmedTimelineScenarioTest {
             listMessagesStarted.complete(Unit)
             delayCompletion?.await()
             throwOnList?.let { throw it }
-            val messages = messagesByConversation[conversationId] ?: emptyList()
+            val messages = messagesByConversation[conversationId.value] ?: emptyList()
             return if (order == "desc") messages.reversed() else messages
         }
     }

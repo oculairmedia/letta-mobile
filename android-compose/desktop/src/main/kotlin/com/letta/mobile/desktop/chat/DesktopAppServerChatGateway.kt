@@ -272,11 +272,6 @@ class DesktopAppServerChatGateway internal constructor(
     private val runtimeEventMapper = AppServerRuntimeEventMapper()
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
-        request: MessageCreateRequest,
-    ): Flow<LettaMessage> = sendConversationMessage(ConversationId(conversationId), request)
-
-    suspend fun sendConversationMessage(
         conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> {
@@ -360,10 +355,7 @@ class DesktopAppServerChatGateway internal constructor(
         else -> false
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        streamConversation(ConversationId(conversationId))
-
-    suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
         val agentId = runCatching { agentIdFor(conversationId) }.getOrDefault(AgentId(""))
         val frames = flow {
             client.events.collect { received ->
@@ -427,27 +419,27 @@ class DesktopAppServerChatGateway internal constructor(
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = admin.listConversationMessages(conversationId, limit, after, order)
+    ): List<LettaMessage> = admin.listConversationMessages(conversationId.value, limit, after, order)
 
     override suspend fun listConversationMessagesBefore(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int,
         before: String,
         order: String,
-    ): List<LettaMessage> = admin.listConversationMessagesBefore(conversationId, limit, before, order)
+    ): List<LettaMessage> = admin.listConversationMessagesBefore(conversationId.value, limit, before, order)
 
     /** The App Server reads messages per conversation; an agent-wide read would fan out, so it is refused. */
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> = admin.listConversationMessages(
-        requireNotNull(conversationId) { "App Server message reads require conversationId" },
+        requireNotNull(conversationId?.value) { "App Server message reads require conversationId?.value" },
         limit,
         after = null,
         order = order,

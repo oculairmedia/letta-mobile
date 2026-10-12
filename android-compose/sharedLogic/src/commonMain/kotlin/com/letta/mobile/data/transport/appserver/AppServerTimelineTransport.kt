@@ -91,28 +91,28 @@ class AppServerTimelineTransport(
     private val observerMapper = AppServerRuntimeEventMapper()
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
-    ): Flow<LettaMessage> = send(ConversationId(conversationId), request)
+    ): Flow<LettaMessage> = send(conversationId, request)
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        stream(ConversationId(conversationId))
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> =
+        stream(conversationId)
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = list(ConversationId(conversationId), AppServerMessagePage(limit = limit, after = after, order = order))
+    ): List<LettaMessage> = list(conversationId, AppServerMessagePage(limit = limit, after = after, order = order))
 
     /** The App Server lists by conversation; an agent-wide read is the conversation's when one is named. */
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> =
-        conversationId?.let { list(ConversationId(it), AppServerMessagePage(limit = limit, order = order)) }.orEmpty()
+        conversationId?.value?.let { list(ConversationId(it), AppServerMessagePage(limit = limit, order = order)) }.orEmpty()
 
     /** Runs [request] as a turn on [conversation] and emits the turn's messages as they stream. */
     suspend fun send(conversation: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> {

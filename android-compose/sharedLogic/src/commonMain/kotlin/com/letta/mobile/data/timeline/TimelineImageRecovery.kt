@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
@@ -52,7 +53,7 @@ internal class TimelineImageRecovery(
     private suspend fun fetchImages(target: Target): List<MessageContentPart.Image>? {
         val page = try {
             transport.listConversationMessages(
-                conversationId = conversationId,
+                conversationId = ConversationId(conversationId),
                 limit = PAGE_LIMIT,
                 after = target.afterServerId,
                 order = "asc",

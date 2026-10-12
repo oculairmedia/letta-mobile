@@ -702,7 +702,7 @@ open class FakeDesktopChatGateway(
         listConversations().first { it.id.value == conversationId }
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> {
         sentRequests += request
@@ -717,17 +717,17 @@ open class FakeDesktopChatGateway(
         )
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
-        throw TimelineNoActiveRunException(conversationId)
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+        throw TimelineNoActiveRunException(conversationId.value)
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
     ): List<LettaMessage> {
-        conversationMessageRequests += conversationId
+        conversationMessageRequests += conversationId.value
         if (emptyHistory) return emptyList()
         return listOf(
             UserMessage(
@@ -739,17 +739,17 @@ open class FakeDesktopChatGateway(
     }
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
-        agentMessageRequests += agentId to conversationId
+        agentMessageRequests += agentId.value to conversationId?.value
         if (emptyHistory) return emptyList()
         return listOf(
             UserMessage(
-                id = "agent-user-$agentId",
-                contentRaw = JsonPrimitive("Hello from $agentId history"),
+                id = "agent-user-${agentId.value}",
+                contentRaw = JsonPrimitive("Hello from ${agentId.value} history"),
                 date = "2026-06-07T01:00:00Z",
             ),
         )

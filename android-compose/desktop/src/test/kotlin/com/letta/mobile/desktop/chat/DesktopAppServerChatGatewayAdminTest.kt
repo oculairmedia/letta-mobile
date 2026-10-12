@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -97,7 +99,7 @@ class DesktopAppServerChatGatewayAdminTest {
         val gateway = DesktopAppServerChatGateway(turnEngine = turnEngine, client = client)
         val created = gateway.createConversation("agent-1", null)
 
-        gateway.sendConversationMessage(created.id.value, userRequest("hello")).toList()
+        gateway.sendConversationMessage(created.id, userRequest("hello")).toList()
 
         assertEquals("conversation-persisted", turnEngine.command?.conversationId?.value)
         val reloaded = adminGateway(client)
@@ -217,7 +219,7 @@ class DesktopAppServerChatGatewayAdminTest {
         val gateway = adminGateway(client)
 
         assertFailsWith<IllegalArgumentException> {
-            gateway.listAgentMessages("agent-1", limit = 5, order = "desc", conversationId = null)
+            gateway.listAgentMessages(AgentId("agent-1"), limit = 5, order = "desc", conversationId = null)
         }
 
         assertEquals(null, client.messagesCommand)
@@ -231,10 +233,10 @@ class DesktopAppServerChatGatewayAdminTest {
         val gateway = adminGateway(client)
 
         val messages = gateway.listAgentMessages(
-            agentId = "agent-1",
+            agentId = AgentId("agent-1"),
             limit = 5,
             order = "desc",
-            conversationId = "conversation-1",
+            conversationId = ConversationId("conversation-1"),
         )
 
         assertEquals(listOf("message-1"), messages.map { it.id })

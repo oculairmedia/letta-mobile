@@ -18,16 +18,16 @@ internal class DefaultShimDesktopTimelineTransport(
     private val ids: DefaultShimTransportIds,
 ) : TimelineTransport {
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> =
-        gateway.sendConversationMessage(ids.externalConversationId.value, request)
+        gateway.sendConversationMessage(ids.externalConversationId, request)
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        gateway.streamConversation(ids.externalConversationId.value)
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> =
+        gateway.streamConversation(ids.externalConversationId)
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -43,16 +43,16 @@ internal class DefaultShimDesktopTimelineTransport(
         )
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> =
         listViaGateway(
             GatewayListParams(
                 limit = limit?.let(::TimelinePageLimit),
                 order = order?.let(::MessageListOrder),
-                conversationId = conversationId?.let(::ConversationId),
+                conversationId = conversationId,
             ),
         )
 
@@ -64,10 +64,10 @@ internal class DefaultShimDesktopTimelineTransport(
 
     private suspend fun listViaGateway(params: GatewayListParams): List<LettaMessage> =
         gateway.listAgentMessages(
-            agentId = ids.agentId.value,
+            agentId = ids.agentId,
             limit = params.limit?.value,
             order = params.order?.value,
-            conversationId = params.conversationId?.value,
+            conversationId = params.conversationId,
         )
 }
 

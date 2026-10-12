@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
@@ -72,7 +73,7 @@ class TimelineImageRecoveryTest {
     ) : TimelineTransport by EmptyTimelineTransport {
         val requests = mutableListOf<Triple<String?, String?, Int?>>()
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,

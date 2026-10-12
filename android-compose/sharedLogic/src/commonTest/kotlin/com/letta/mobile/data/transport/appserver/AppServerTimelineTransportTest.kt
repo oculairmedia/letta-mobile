@@ -44,7 +44,7 @@ class AppServerTimelineTransportTest {
             Json.parseToJsonElement("""{"messages":[$ASSISTANT_ROW]}""")
         })
 
-        val messages = transport.listConversationMessages("conv-1", limit = 20, after = null, order = "asc")
+        val messages = transport.listConversationMessages(ConversationId("conv-1"), limit = 20, after = null, order = "asc")
         val older = transport.list(ConversationId("conv-1"), AppServerMessagePage(limit = 10, before = "msg-9", order = "desc"))
 
         assertEquals("hello", (messages.single() as AssistantMessage).content)
@@ -61,14 +61,14 @@ class AppServerTimelineTransportTest {
     fun aBareArrayAnswerDecodesToo() = runTest {
         val transport = transport(admin = { _, _ -> Json.parseToJsonElement("[$ASSISTANT_ROW]") })
 
-        assertEquals(1, transport.listConversationMessages("conv-1").size)
+        assertEquals(1, transport.listConversationMessages(ConversationId("conv-1")).size)
     }
 
     @Test
     fun aFailedListIsATransportFailure() = runTest {
         val transport = transport(admin = { _, _ -> error("message.list timed out") })
 
-        assertFailsWith<TimelineTransportHttpException> { transport.listConversationMessages("conv-1") }
+        assertFailsWith<TimelineTransportHttpException> { transport.listConversationMessages(ConversationId("conv-1")) }
     }
 
     @Test
@@ -77,7 +77,7 @@ class AppServerTimelineTransportTest {
         val transport = transport(events = events)
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
-            transport.streamConversation("conv-1").collect { received += it }
+            transport.streamConversation(ConversationId("conv-1")).collect { received += it }
         }
         runCurrent()
 
@@ -96,7 +96,7 @@ class AppServerTimelineTransportTest {
             flowOf(draft(command, RuntimeEventPayload.RemoteStreamFrame(frameId = "frame-1", messageType = "assistant_message", body = ASSISTANT_DELTA)))
         })
 
-        val messages = transport.sendConversationMessage("conv-1", MessageCreateRequest(input = "hi")).toList()
+        val messages = transport.sendConversationMessage(ConversationId("conv-1"), MessageCreateRequest(input = "hi")).toList()
 
         assertTrue(messages.any { it is AssistantMessage && it.content == "hello" })
     }
@@ -109,7 +109,7 @@ class AppServerTimelineTransportTest {
         val emitted = mutableListOf<com.letta.mobile.data.model.LettaMessage>()
 
         assertFailsWith<TimelineTransportHttpException> {
-            transport.sendConversationMessage("conv-1", MessageCreateRequest(input = "hi")).collect { emitted += it }
+            transport.sendConversationMessage(ConversationId("conv-1"), MessageCreateRequest(input = "hi")).collect { emitted += it }
         }
         assertIs<ErrorMessage>(emitted.single())
     }

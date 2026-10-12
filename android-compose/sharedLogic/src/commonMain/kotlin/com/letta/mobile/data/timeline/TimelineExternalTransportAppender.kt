@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
@@ -134,10 +136,10 @@ class TimelineExternalTransportAppender(
     ): Result<List<LettaMessage>> = try {
         Result.success(
             messageApi.listAgentMessages(
-                agentId = request.agentId,
+                agentId = AgentId(request.agentId),
                 limit = RECONCILE_LIMIT,
                 order = "desc",
-                conversationId = request.externalConversationId,
+                conversationId = ConversationId(request.externalConversationId),
             ),
         )
     } catch (cancelled: CancellationException) {

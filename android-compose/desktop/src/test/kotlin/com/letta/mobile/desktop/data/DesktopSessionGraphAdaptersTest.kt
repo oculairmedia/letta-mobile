@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.BackendConfigStore
 import com.letta.mobile.data.chat.runtime.SecureTokenStore
@@ -402,25 +404,25 @@ class DesktopSessionGraphAdaptersTest {
                     error("not used")
 
                 override suspend fun sendConversationMessage(
-                    conversationId: String,
+                    conversationId: ConversationId,
                     request: MessageCreateRequest,
                 ) = emptyFlow<LettaMessage>()
 
-                override suspend fun streamConversation(conversationId: String) =
+                override suspend fun streamConversation(conversationId: ConversationId) =
                     emptyFlow<TimelineStreamFrame>()
 
                 override suspend fun listConversationMessages(
-                    conversationId: String,
+                    conversationId: ConversationId,
                     limit: Int?,
                     after: String?,
                     order: String?,
                 ) = emptyList<LettaMessage>()
 
                 override suspend fun listAgentMessages(
-                    agentId: String,
+                    agentId: AgentId,
                     limit: Int?,
                     order: String?,
-                    conversationId: String?,
+                    conversationId: ConversationId?,
                 ) = emptyList<LettaMessage>()
 
                 override fun close() {

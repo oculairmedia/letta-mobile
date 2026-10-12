@@ -16,26 +16,26 @@ class MessageApiTimelineTransport(
     private val messageApi: TestMessageSource,
 ) : TimelineTransport {
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> = translateTimelineTransportErrors {
-        SseParser.parse(messageApi.sendConversationMessage(ConversationId(conversationId), request))
+        SseParser.parse(messageApi.sendConversationMessage(conversationId, request))
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> =
         translateTimelineTransportErrors {
-        SseParser.parseFrames(messageApi.streamConversation(ConversationId(conversationId)))
+        SseParser.parseFrames(messageApi.streamConversation(conversationId))
             .map { it.toTimelineStreamFrame() }
         }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
     ): List<LettaMessage> = translateTimelineTransportErrors {
         messageApi.listConversationMessages(
-            conversationId = ConversationId(conversationId),
+            conversationId = conversationId,
             limit = limit,
             after = after,
             order = order,
@@ -67,18 +67,18 @@ class MessageApiTimelineTransport(
     }
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> = translateTimelineTransportErrors {
         messageApi.listMessages(
-            agentId = AgentId(agentId),
+            agentId = agentId,
             limit = limit,
             before = null,
             after = null,
             order = order,
-            conversationId = conversationId?.let(::ConversationId),
+            conversationId = conversationId?.value?.let(::ConversationId),
         )
     }
 

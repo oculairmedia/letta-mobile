@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -126,16 +128,16 @@ class CanonicalTimelineEngineTest {
         val store = Store()
         val transport = object : TimelineTransport {
             override suspend fun sendConversationMessage(
-                conversationId: String,
+                conversationId: ConversationId,
                 request: com.letta.mobile.data.model.MessageCreateRequest,
             ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
-            override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
+            override suspend fun streamConversation(conversationId: ConversationId): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
                 error("selection must not start transport")
             override suspend fun listConversationMessages(
-                conversationId: String, limit: Int?, after: String?, order: String?,
+                conversationId: ConversationId, limit: Int?, after: String?, order: String?,
             ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
             override suspend fun listAgentMessages(
-                agentId: String, limit: Int?, order: String?, conversationId: String?,
+                agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
             ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected agent hydration")
         }
         val coordinator = CanonicalTimelineCoordinator(store, transport)

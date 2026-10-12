@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
@@ -196,7 +197,7 @@ class DesktopAppServerChatGatewayTest {
         val turnEngine = FakeTurnEngine { flowOf() }
         val gw = gateway(turnEngine)
 
-        gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
+        gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).toList()
 
         val command = turnEngine.recordedTurnCommand ?: error("runTurn was not invoked")
         assertEquals("agent-1", command.agentId.value)
@@ -215,7 +216,7 @@ class DesktopAppServerChatGatewayTest {
             add(buildJsonObject { put("type", "text"); put("text", "hi") })
         }
 
-        gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1", contentParts = parts)).toList()
+        gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1", contentParts = parts)).toList()
 
         val input = assertIs<TurnInput.UserMessage>(turnEngine.recordedTurnCommand!!.input)
         assertEquals(parts.toString(), input.contentPartsJson)
@@ -246,7 +247,7 @@ class DesktopAppServerChatGatewayTest {
         val turnEngine = FakeTurnEngine { flowOf(*drafts.toTypedArray()) }
         val gw = gateway(turnEngine)
 
-        val messages = gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
+        val messages = gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).toList()
 
         val assistant = assertIs<AssistantMessage>(messages.single { it is AssistantMessage })
         assertEquals("lm-a1", assistant.id)
@@ -272,7 +273,7 @@ class DesktopAppServerChatGatewayTest {
         val gw = gateway(turnEngine)
 
         val error = assertFailsWith<TimelineTransportHttpException> {
-            gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
+            gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).toList()
         }
         assertEquals(502, error.code)
         assertTrue(error.message.orEmpty().contains("boom"), "message was: ${error.message}")
@@ -296,7 +297,7 @@ class DesktopAppServerChatGatewayTest {
         val collected = mutableListOf<LettaMessage>()
 
         assertFailsWith<TimelineTransportHttpException> {
-            gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).collect { collected += it }
+            gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).collect { collected += it }
         }
 
         val errorRow = assertIs<ErrorMessage>(collected.single())
@@ -334,7 +335,7 @@ class DesktopAppServerChatGatewayTest {
         }
         val gw = gateway(turnEngine)
 
-        val messages = gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
+        val messages = gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).toList()
 
         assertTrue(messages.none { it is ErrorMessage }, "no error row expected: $messages")
         assertEquals("Hello", assertIs<AssistantMessage>(messages.single { it is AssistantMessage }).content)
@@ -348,7 +349,7 @@ class DesktopAppServerChatGatewayTest {
 
         val results = mutableListOf<TimelineStreamFrame>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
-            gw.streamConversation("conv-1").take(1).collect { results += it }
+            gw.streamConversation(ConversationId("conv-1")).take(1).collect { results += it }
         }
         // merge() fans the frames/heartbeats sources out onto separately
         // scheduled child coroutines rather than subscribing inline under the
@@ -374,7 +375,7 @@ class DesktopAppServerChatGatewayTest {
 
         val results = mutableListOf<TimelineStreamFrame>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
-            gw.streamConversation("conv-1").take(2).collect { results += it }
+            gw.streamConversation(ConversationId("conv-1")).take(2).collect { results += it }
         }
         runCurrent()
 
@@ -409,17 +410,17 @@ class DesktopAppServerChatGatewayTest {
         // registered as active but still collecting (the fake engine's
         // channel never emits, so it stays "in flight").
         val sendJob = launch(start = CoroutineStart.UNDISPATCHED) {
-            gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).collect { }
+            gw.sendConversationMessage(ConversationId("conv-1"), userMessageRequest("hi", otid = "otid-1")).collect { }
         }
         runCurrent()
 
         val conv1Results = mutableListOf<TimelineStreamFrame>()
         val conv2Results = mutableListOf<TimelineStreamFrame>()
         val conv1Job = launch(start = CoroutineStart.UNDISPATCHED) {
-            gw.streamConversation("conv-1").collect { conv1Results += it }
+            gw.streamConversation(ConversationId("conv-1")).collect { conv1Results += it }
         }
         val conv2Job = launch(start = CoroutineStart.UNDISPATCHED) {
-            gw.streamConversation("conv-2").collect { conv2Results += it }
+            gw.streamConversation(ConversationId("conv-2")).collect { conv2Results += it }
         }
         runCurrent()
 
@@ -441,7 +442,7 @@ class DesktopAppServerChatGatewayTest {
         val turnEngine = FakeTurnEngine { flowOf() }
         val gw = gateway(turnEngine, heartbeatIntervalMs = 10L)
 
-        val first = gw.streamConversation("conv-1").take(1).toList().single()
+        val first = gw.streamConversation(ConversationId("conv-1")).take(1).toList().single()
 
         assertIs<TimelineStreamFrame.Heartbeat>(first)
     }
@@ -451,7 +452,7 @@ class DesktopAppServerChatGatewayTest {
         val client = FakeAppServerClient()
         val gw = gateway(FakeTurnEngine { flowOf() }, client = client, heartbeatIntervalMs = 10L)
         val frames = mutableListOf<TimelineStreamFrame>()
-        val job = launch(start = CoroutineStart.UNDISPATCHED) { gw.streamConversation("conv-1").collect { frames += it } }
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { gw.streamConversation(ConversationId("conv-1")).collect { frames += it } }
         runCurrent()
         advanceTimeBy(35L)
         val beforeDrop = frames.size

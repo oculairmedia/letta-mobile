@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
@@ -191,7 +192,7 @@ class TimelineHydrationProcessorIntegrationTest {
         private var next = 0
 
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,

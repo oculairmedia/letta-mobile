@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -177,24 +179,24 @@ class TimelineRepositoryIrohRegressionTest {
         val stream = MutableSharedFlow<TimelineStreamFrame>()
 
         override suspend fun sendConversationMessage(
-            conversationId: String,
+            conversationId: ConversationId,
             request: MessageCreateRequest,
         ): Flow<LettaMessage> = emptyFlow()
 
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = stream
+        override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = stream
 
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,
         ): List<LettaMessage> = emptyList()
 
         override suspend fun listAgentMessages(
-            agentId: String,
+            agentId: AgentId,
             limit: Int?,
             order: String?,
-            conversationId: String?,
+            conversationId: ConversationId?,
         ): List<LettaMessage> = emptyList()
     }
 }

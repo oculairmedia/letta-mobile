@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -41,27 +44,27 @@ class IrohAdminRpcTimelineTransport(
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> {
-        httpGated("/v1/conversations/$conversationId/messages")
+        httpGated("/v1/conversations/${conversationId.value}/messages")
         throw TimelineTransportHttpException(0, "HTTP send is gated while backend is iroh://")
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
-        httpGated("/v1/conversations/$conversationId/stream")
-        throw TimelineNoActiveRunException(conversationId)
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+        httpGated("/v1/conversations/${conversationId.value}/stream")
+        throw TimelineNoActiveRunException(conversationId.value)
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
     ): List<LettaMessage> {
         val path = buildString {
             append("/v1/conversations/")
-            append(conversationId)
+            append(conversationId.value)
             append("/messages")
             val params = listOfNotNull(
                 limit?.let { "limit=$it" },
@@ -177,12 +180,12 @@ class IrohAdminRpcTimelineTransport(
     }
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
-        httpGated("/v1/agents/$agentId/messages")
+        httpGated("/v1/agents/${agentId.value}/messages")
         throw TimelineTransportHttpException(0, "HTTP agent message reads are gated while backend is iroh://")
     }
 
@@ -191,12 +194,12 @@ class IrohAdminRpcTimelineTransport(
      * that `message.list` projected down to a preview (pointer diet).
      */
     override suspend fun getToolReturn(
-        conversationId: String,
-        messageId: String,
+        conversationId: ConversationId,
+        messageId: MessageId,
     ): LettaMessage? {
         val response = channelTransport.adminRpc(
             method = "tool_return.get",
-            path = "/v1/conversations/$conversationId/messages/$messageId",
+            path = "/v1/conversations/${conversationId.value}/messages/${messageId.value}",
             body = null,
         )
         if (!response.success) {

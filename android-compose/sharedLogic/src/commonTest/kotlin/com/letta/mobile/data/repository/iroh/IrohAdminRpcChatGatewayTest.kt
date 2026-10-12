@@ -93,7 +93,7 @@ class IrohAdminRpcChatGatewayTest {
             } else ok("""{"id":"conv-1","agent_id":"agent-1"}""")
         }
         val gateway = IrohAdminRpcChatGateway(transport)
-        val messages = gateway.listConversationMessages("conv-1", limit = 50, after = null, order = "desc")
+        val messages = gateway.listConversationMessages(ConversationId("conv-1"), limit = 50, after = null, order = "desc")
         assertEquals(1, messages.size)
         assertEquals("m-1", messages.single().id)
     }
@@ -127,7 +127,7 @@ class IrohAdminRpcChatGatewayTest {
         }
         val gateway = IrohAdminRpcChatGateway(transport)
 
-        val messages = gateway.listConversationMessages("conv-1", limit = 50, after = null, order = "desc")
+        val messages = gateway.listConversationMessages(ConversationId("conv-1"), limit = 50, after = null, order = "desc")
 
         assertEquals(listOf("msg-1"), messages.map { it.id })
     }
@@ -143,7 +143,7 @@ class IrohAdminRpcChatGatewayTest {
         }
         val gateway = IrohAdminRpcChatGateway(transport)
 
-        val messages = gateway.listConversationMessagesBefore("conv-1", limit = 50, before = "id/a?b&c=d", order = "desc")
+        val messages = gateway.listConversationMessagesBefore(ConversationId("conv-1"), limit = 50, before = "id/a?b&c=d", order = "desc")
 
         assertEquals(listOf("msg-0"), messages.map { it.id })
     }
@@ -155,7 +155,7 @@ class IrohAdminRpcChatGatewayTest {
         val gateway = IrohAdminRpcChatGateway(transport)
         val turn = TurnRef(conversationId = "conv-1", turnId = "turn-1")
 
-        val collected = async { gateway.sendConversationMessage("conv-1", request("hello")).toList() }
+        val collected = async { gateway.sendConversationMessage(ConversationId("conv-1"), request("hello")).toList() }
         transport.frameEvents.subscriptionCount.first { it > 0 }
         transport.emitFrame(turnStarted(turn))
         transport.emitFrame(assistantDelta(turn, id = "cm-stream-1", content = "Hi there"))
@@ -174,7 +174,7 @@ class IrohAdminRpcChatGatewayTest {
         val gateway = IrohAdminRpcChatGateway(transport)
         val turn = TurnRef(conversationId = "conv-1", turnId = "turn-9")
 
-        val collected = async { runCatching { gateway.sendConversationMessage("conv-1", request("boom")).toList() } }
+        val collected = async { runCatching { gateway.sendConversationMessage(ConversationId("conv-1"), request("boom")).toList() } }
         transport.frameEvents.subscriptionCount.first { it > 0 }
         transport.emitFrame(turnStarted(turn))
         transport.emitFrame(turnDone(turn, status = "failed"))
@@ -205,7 +205,7 @@ class IrohAdminRpcChatGatewayTest {
         val gateway = IrohAdminRpcChatGateway(transport)
 
         assertFailsWith<TimelineTransportHttpException> {
-            gateway.sendConversationMessage("conv-1", request("hello")).toList()
+            gateway.sendConversationMessage(ConversationId("conv-1"), request("hello")).toList()
         }
     }
 
@@ -217,7 +217,7 @@ class IrohAdminRpcChatGatewayTest {
         val turnB = TurnRef(conversationId = "conv-b", turnId = "turn-b")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
-            gateway.streamConversation("conv-a").collect { received += it }
+            gateway.streamConversation(ConversationId("conv-a")).collect { received += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
@@ -246,13 +246,13 @@ class IrohAdminRpcChatGatewayTest {
         // The UI's persistent stream subscriber: continuous, opened BEFORE the send.
         val streamed = mutableListOf<TimelineStreamFrame>()
         val streamCollector = launch {
-            gateway.streamConversation("conv-i").collect { streamed += it }
+            gateway.streamConversation(ConversationId("conv-i")).collect { streamed += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
         // The initiator send runs concurrently (its own bridge.events collector).
         val send = launch {
-            gateway.sendConversationMessage("conv-i", request("go")).collect { /* drain the send flow */ }
+            gateway.sendConversationMessage(ConversationId("conv-i"), request("go")).collect { /* drain the send flow */ }
         }
         // Wait until BOTH the stream and the send collectors are subscribed.
         transport.frameEvents.subscriptionCount.first { it >= 2 }
@@ -284,7 +284,7 @@ class IrohAdminRpcChatGatewayTest {
         val turnObs = TurnRef(conversationId = "conv-obs", turnId = "turn-obs")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
-            gateway.streamConversation("conv-obs").collect { received += it }
+            gateway.streamConversation(ConversationId("conv-obs")).collect { received += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
@@ -310,7 +310,7 @@ class IrohAdminRpcChatGatewayTest {
         val turnB = TurnRef(conversationId = "conv-b", turnId = "turn-b")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
-            gateway.streamConversation("conv-a").collect { received += it }
+            gateway.streamConversation(ConversationId("conv-a")).collect { received += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
@@ -332,7 +332,7 @@ class IrohAdminRpcChatGatewayTest {
         // empty (keeps a default-shim conversation functional) instead of
         // throwing a load error.
         val gateway = IrohAdminRpcChatGateway(FakeIrohTransport())
-        assertEquals(emptyList(), gateway.listAgentMessages("agent-1"))
+        assertEquals(emptyList(), gateway.listAgentMessages(AgentId("agent-1")))
     }
 
     @Test
@@ -712,7 +712,7 @@ class IrohAdminRpcChatGatewayTest {
         val transport = FakeIrohTransport()
         val gateway = IrohAdminRpcChatGateway(transport = transport, heartbeatIntervalMs = 10)
         val frames = mutableListOf<TimelineStreamFrame>()
-        val collector = launch { gateway.streamConversation("conv-1").collect { frames += it } }
+        val collector = launch { gateway.streamConversation(ConversationId("conv-1")).collect { frames += it } }
         try {
             while (frames.none { it is TimelineStreamFrame.Heartbeat }) {
                 kotlinx.coroutines.delay(10)

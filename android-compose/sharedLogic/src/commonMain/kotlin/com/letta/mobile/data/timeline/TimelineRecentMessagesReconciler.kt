@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
@@ -292,7 +293,7 @@ class TimelineRecentMessagesReconciler(
         // makes this snapshot stale rather than allowing it to overwrite newer data.
         val freshnessSequence = freshnessState.value.sequence
         val serverMessages = messageApi.listConversationMessages(
-            conversationId = conversationId,
+            conversationId = ConversationId(conversationId),
             limit = RECONCILE_LIMIT,
             order = "desc",
         ).reversed()

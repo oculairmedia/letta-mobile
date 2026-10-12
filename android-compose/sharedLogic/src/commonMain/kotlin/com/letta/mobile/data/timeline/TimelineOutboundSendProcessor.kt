@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreate
@@ -193,7 +194,7 @@ internal class TimelineOutboundSendProcessor(
             includeReturnMessageTypes = TimelineSyncLoop.DEFAULT_INCLUDE_TYPES,
         )
         val postTimer = Telemetry.startTimer("TimelineSync", "send.post")
-        val stream = messageApi.sendConversationMessage(conversationId, request)
+        val stream = messageApi.sendConversationMessage(ConversationId(conversationId), request)
         postTimer.stop("otid" to otid)
 
         val streamTimer = Telemetry.startTimer("TimelineSync", "send.stream")
@@ -289,7 +290,7 @@ internal class TimelineOutboundSendProcessor(
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
                 return messageApi.listConversationMessages(
-                    conversationId = conversationId,
+                    conversationId = ConversationId(conversationId),
                     limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
                     after = afterCursor,
                     order = if (afterCursor != null) "asc" else "desc",

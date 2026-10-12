@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import androidx.paging.PagingSource
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -43,24 +45,24 @@ class TimelineLedgerPagingSourceTest {
         var calls = 0
         val transport = object : TimelineTransport {
             override suspend fun sendConversationMessage(
-                conversationId: String,
+                conversationId: ConversationId,
                 request: MessageCreateRequest,
             ): Flow<LettaMessage> = emptyFlow()
 
-            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
+            override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = emptyFlow()
 
             override suspend fun listConversationMessages(
-                conversationId: String,
+                conversationId: ConversationId,
                 limit: Int?,
                 after: String?,
                 order: String?,
             ): List<LettaMessage> = emptyList()
 
             override suspend fun listAgentMessages(
-                agentId: String,
+                agentId: AgentId,
                 limit: Int?,
                 order: String?,
-                conversationId: String?,
+                conversationId: ConversationId?,
             ): List<LettaMessage> = emptyList()
 
             override suspend fun listConversationMessagePage(
@@ -184,10 +186,10 @@ class TimelineLedgerPagingSourceTest {
             )
         }
 
-        override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> = emptyList()
-        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
+        override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+        override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = emptyFlow()
+        override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> = emptyList()
+        override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<LettaMessage> = emptyList()
     }
 
     private class Store : TimelineBoundedStore, TimelineStoreReader, TimelineStoreTransaction {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -44,7 +45,7 @@ internal suspend fun runStreamSubscriber(
     var runHeartbeatCount: Int
     while (currentCoroutineContext().isActive) {
         try {
-            val stream = messageApi.streamConversation(conversationId)
+            val stream = messageApi.streamConversation(ConversationId(conversationId))
             val activeStreamCountOnOpen = activeStreamCount.incrementAndGet()
             var activeStreamCountAfterClose: Int
             var streamTimedOut = false
