@@ -29,7 +29,7 @@ import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.settings.BackendConnectionNotice
 import com.letta.mobile.ui.settings.BackendConnectionNoticeActions
 import com.letta.mobile.ui.settings.BackendConnectionStatusRow
-import com.letta.mobile.ui.settings.BackendSettingsActions
+import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellNavDrawer
 import com.letta.mobile.ui.shell.ShellPage
@@ -76,13 +76,7 @@ fun LettaWebApp() {
         chat = chat,
         connection = connection,
         canvas = canvas,
-        settings = BackendSettingsActions(
-            onConfigSaved = { saved ->
-                shell.config = saved
-                settingsStore.saveBackend(saved)
-            },
-            onTokenCleared = { shell.config = shell.config.copy(accessToken = null) },
-        ),
+        settings = webSettingsServices(shell, settingsStore),
     )
     SharedMaterialTheme {
         ProvideLettaHost(LettaHost.Pointer) {
@@ -117,7 +111,7 @@ private class WebPageInputs(
     val chat: WebChatLoad,
     val connection: BackendConnectionStatus,
     val canvas: WebChatCanvas,
-    val settings: BackendSettingsActions,
+    val settings: SettingsPageServices,
 )
 
 @Composable

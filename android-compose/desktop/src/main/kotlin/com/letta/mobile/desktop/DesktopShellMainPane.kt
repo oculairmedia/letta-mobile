@@ -243,6 +243,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
     val selectedAgentId = frame.focus.selectedAgentId
     return DestinationContentActions(
         onRailRecencyDaysChange = core.railPrefs::updateRecencyDays,
+        onOpenProviders = { context.navigator.navigate(ShellDestination.Providers) },
         onRetryConnection = core.chatController::retryConnection,
         home = desktopHomeCallbacks(context, frame),
         memory = controllers.memory,

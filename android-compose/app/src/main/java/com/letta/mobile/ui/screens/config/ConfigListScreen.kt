@@ -233,7 +233,6 @@ private fun ConfigCard(
 
                 Text(
                     text = when (config.mode) {
-                        ServerMode.CLOUD -> stringResource(R.string.common_letta_cloud)
                         ServerMode.SELF_HOSTED -> config.url
                         ServerMode.LOCAL -> stringResource(R.string.common_local_kotlin_runtime)
                     },
@@ -279,7 +278,6 @@ private fun ConfigCard(
 
 @Composable
 private fun serverModeLabel(mode: ServerMode): String = when (mode) {
-    ServerMode.CLOUD -> stringResource(R.string.common_cloud)
     ServerMode.SELF_HOSTED -> stringResource(R.string.common_self_hosted)
     ServerMode.LOCAL -> stringResource(R.string.common_local_runtime)
 }
@@ -289,7 +287,7 @@ private fun serverModeLabel(mode: ServerMode): String = when (mode) {
 private val previewServerConfigs = listOf(
     ServerConfig(
         id = "config-1",
-        mode = ServerMode.CLOUD,
+        mode = ServerMode.SELF_HOSTED,
         url = "example.test/local",
         isActive = true,
         health = ServerHealthState.ONLINE,

@@ -1,22 +1,10 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
@@ -50,7 +38,6 @@ import com.letta.mobile.ui.shell.shellHomePage
 import com.letta.mobile.ui.shell.shellMemoryPage
 import com.letta.mobile.ui.shell.shellSchedulesPage
 import com.letta.mobile.ui.shell.shellSkillsPage
-import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class DestinationSkillsInputs(
     val catalog: SkillsCatalogState,
@@ -113,6 +100,8 @@ internal data class DestinationContentActions(
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val onRailRecencyDaysChange: (Int) -> Unit = {},
+    /** Settings' Providers section opens the Providers destination. */
+    val onOpenProviders: () -> Unit = {},
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
@@ -120,10 +109,9 @@ internal data class DestinationContentActions(
 
 /**
  * letta-mobile-ckmub.3.4: the desktop's pages for the shared ShellPage switch. The shared pages
- * (Home, Memory, Schedules, Channels, Skills) are the sharedUI bindings over the desktop's
- * controllers; [chat] is the desktop chat container. The rest are the TEMPORARY platform fallback
- * pages, each waiting on its slice: Settings and Overview (desktop settings cards, S10), Providers
- * (desktop binding of the shared ProviderSettingsPane).
+ * (Home, Memory, Schedules, Channels, Skills, Settings) are the sharedUI bindings over the desktop's
+ * controllers; Overview is the shared Settings page on its About section (S10, ckmub.3.12); [chat]
+ * is the desktop chat container and Providers the desktop binding of the shared ProviderSettingsPane.
  */
 internal fun desktopShellPageDeps(
     inputs: DestinationContentInputs,
@@ -136,14 +124,9 @@ internal fun desktopShellPageDeps(
     schedules = shellSchedulesPage(inputs.schedule, actions.schedules),
     channels = shellChannelsPage(inputs.channels, actions.channels, ChannelsPageOptions(slots = DesktopChannelsPageSlots)),
     skills = desktopSkillsPage(inputs, actions),
-    settings = ShellPageContent { _, modifier -> SettingsFallbackPage(inputs, actions, DesktopDestination.Settings, modifier) },
+    settings = desktopSettingsPage(inputs, actions),
     providers = inputs.state.modelControl?.let { session ->
         ShellPageContent { _, modifier -> ProvidersDestinationContent(session = session, modifier = modifier) }
-    },
-    fallback = ShellPageContent { destination, modifier ->
-        if (destination == ShellDestination.Overview) {
-            SettingsFallbackPage(inputs, actions, DesktopDestination.Overview, modifier)
-        }
     },
 )
 
@@ -226,75 +209,3 @@ private val DesktopChannelsPageSlots = ChannelsPageSlots(
         DesktopIconButton(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh", onClick = onRefresh, modifier = modifier)
     },
 )
-
-// --- TEMPORARY platform fallback pages (letta-mobile-ckmub.3.4) ---------------------------------
-
-/** Fallback until the shared SettingsSection contributions (S10): the desktop's settings and overview cards. */
-@Composable
-private fun SettingsFallbackPage(
-    inputs: DestinationContentInputs,
-    actions: DestinationContentActions,
-    destination: DesktopDestination,
-    modifier: Modifier = Modifier,
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = LettaDimens.Space.xxl, vertical = LettaDimens.Space.xl),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
-    ) {
-        item { DestinationHeader(destination) }
-        if (destination == DesktopDestination.Overview) {
-            item { BackendCard(inputs.state.config) }
-            item { StartupReadinessCard(inputs.state.featureReadiness) }
-        } else {
-            settingsItems(inputs, actions)
-        }
-    }
-}
-
-@Composable
-private fun DestinationHeader(destination: DesktopDestination) {
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-        Text(
-            text = destination.label,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = destination.summary,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-private fun LazyListScope.settingsItems(inputs: DestinationContentInputs, actions: DestinationContentActions) {
-    item {
-        BackendSettingsCard(
-            config = inputs.state.config,
-            onConfigSaved = actions.onConfigSaved,
-            onTokenCleared = actions.onTokenCleared,
-            onIrohIdentityReset = actions.onIrohIdentityReset,
-        )
-    }
-    inputs.pairing?.let { item { com.letta.mobile.ui.pairing.InstallAndPairCard(it) } }
-    item { LocalRuntimeProviderSettingsCard(state = inputs.localRuntimeProvider, actions = actions.localRuntimeProvider) }
-    item {
-        DesktopLocalBackendDirectorySettingsCard(
-            state = inputs.localBackendDirectory,
-            actions = actions.localBackendDirectory,
-        )
-    }
-    item { DesktopLocalRuntimeSettingsCard(controller = inputs.localRuntime) }
-    item { DesktopChatSettingsCard() }
-    item {
-        DesktopRailSettingsCard(
-            recencyDays = inputs.railRecencyDays,
-            onRecencyDaysChange = actions.onRailRecencyDaysChange,
-        )
-    }
-    item { DesktopPermissionModeSettingsCard() }
-    item { DesktopNucleusSettingsCard(state = inputs.nucleus, actions = actions.nucleus) }
-}

@@ -8,11 +8,6 @@ import org.junit.jupiter.api.Tag
 class LettaConfigLabelTest {
 
     @Test
-    fun `cloud label is cloud`() {
-        assertEquals("Cloud", config(LettaConfig.Mode.CLOUD, "https://app.letta.com").toBackendLabel())
-    }
-
-    @Test
     fun `local label is local lettacode by default`() {
         assertEquals(
             "Local LettaCode",
