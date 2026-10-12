@@ -45,6 +45,8 @@ import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_approval_body
 import com.letta.mobile.sharedui.resources.rows_approval_requested
@@ -166,6 +168,26 @@ private fun rememberRowApprovalOwner(context: ChatRowContext, callbacks: ChatRow
         ApprovalOwner(busy, context.capabilities.approvals, answer)
     }
 }
+
+/**
+ * letta-mobile-sieej: whether [this] request still waits on the person: it needs them
+ * ([requiresUserInput]: a runtime question, or a gate parked under a permission mode that asks)
+ * and none of the calls it names on [toolCalls] has been decided or has returned. A pending
+ * request is never folded away: its run stays open and its card shows inline on every host.
+ */
+internal fun UiApprovalRequest.isWaitingOn(toolCalls: List<UiToolCall>): Boolean {
+    if (!requiresUserInput()) return false
+    val ids = this.toolCalls.map { it.toolCallId }.toSet()
+    val named = toolCalls.filter { it.toolCallId != null && it.toolCallId in ids }
+    return named.isEmpty() || named.any { it.result == null && it.approvalDecision == null }
+}
+
+/** letta-mobile-sieej: [this] message's request, while it waits on the person; null once answered. */
+internal fun UiMessage.waitingApproval(): UiApprovalRequest? =
+    approvalRequest?.takeIf { approvalResponse == null && it.isWaitingOn(toolCalls.orEmpty()) }
+
+/** letta-mobile-sieej: some message of [this] run has a request waiting on the person. */
+internal fun List<UiMessage>.hasWaitingApproval(): Boolean = any { it.waitingApproval() != null }
 
 /**
  * A timeline row's approval card, drawn only while the request waits on the person
