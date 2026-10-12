@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutorService
 import java.util.Optional
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ForkJoinWorkerThread
+import com.letta.mobile.data.document.HistoryPressure
 import com.letta.mobile.util.Telemetry
 import org.automerge.repo.Repo
 import org.automerge.repo.Storage
@@ -100,9 +101,10 @@ internal class NotebookStorageHealth(
     private fun applyBudgetIfIndexed(key: String) {
         if (key !in index.read()) return
         val document = Subject(key, archive.documentBytes(key))
-        when {
-            document.size > budget.maxDocumentBytes -> move(document)
-            document.size >= budget.warnBytes -> nearBudget(document, BudgetLevel.WARNED)
+        when (budget.history.assess(document.size)) {
+            HistoryPressure.OVER -> move(document)
+            HistoryPressure.NEAR -> nearBudget(document, BudgetLevel.WARNED)
+            HistoryPressure.WITHIN -> Unit
         }
     }
 
@@ -193,9 +195,10 @@ internal class NotebookStorageHealth(
     fun checkBudget(key: String) {
         val bytes = runCatching { archive.documentBytes(key) }.getOrNull() ?: return
         val document = Subject(key, bytes)
-        when {
-            bytes > budget.maxDocumentBytes -> nearBudget(document, BudgetLevel.OVER)
-            bytes >= budget.warnBytes -> nearBudget(document, BudgetLevel.WARNED)
+        when (budget.history.assess(bytes)) {
+            HistoryPressure.OVER -> nearBudget(document, BudgetLevel.OVER)
+            HistoryPressure.NEAR -> nearBudget(document, BudgetLevel.WARNED)
+            HistoryPressure.WITHIN -> Unit
         }
     }
 

@@ -1,4 +1,4 @@
-package com.letta.mobile.data.canvas
+package com.letta.mobile.data.document
 
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -6,13 +6,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * Get-or-create over a map held in a [MutableStateFlow], for state a suspending writer and a
  * non-suspending reader both reach.
  *
- * The canvas transports need exactly this and cannot get it from a lock: the write paths are
- * `suspend` and can hold a [kotlinx.coroutines.sync.Mutex], but `subscribe`/`observe` are not, so
- * they reached for `synchronized` instead. Those are two different locks over one map — they do not
- * exclude each other, so the map could be mutated from two threads at once, and because both sides
- * created the missing entry a subscriber could end up holding a different flow than the publisher
- * wrote to and silently receive nothing. `synchronized` is also JVM-only, so it did not compile for
- * wasm or native at all.
+ * The document op logs, presence and canvas transports need exactly this and cannot get it from a
+ * lock: the write paths are `suspend` and can hold a [kotlinx.coroutines.sync.Mutex], but
+ * `subscribe`/`observe` are not, so they reached for `synchronized` instead. Those are two
+ * different locks over one map - they do not exclude each other, so the map could be mutated from
+ * two threads at once, and because both sides created the missing entry a subscriber could end up
+ * holding a different flow than the publisher wrote to and silently receive nothing.
+ * `synchronized` is also JVM-only, so it did not compile for wasm or native at all.
  *
  * Compare-and-set is the repo's existing answer for shared maps in `commonMain` (see
  * `ConversationRunRegistry`, `CachedProjectWorkRepository`): one source of truth, no lock to pair

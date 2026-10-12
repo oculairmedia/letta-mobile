@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.document.DocumentStorageHealth
+import com.letta.mobile.data.document.StorageFault
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -15,9 +17,9 @@ data class CanvasStorageFault(
     val canvasId: CanvasId?,
     /** The document's size on disk when the fault was seen, when known. */
     val documentBytes: Long?,
-    val message: String,
-    val atEpochMs: Long,
-) {
+    override val message: String,
+    override val atEpochMs: Long,
+) : StorageFault {
     enum class Kind {
         /** A save did not reach disk: changes since [atEpochMs] are only in memory. */
         SAVE_FAILED,
@@ -52,15 +54,18 @@ data class CanvasStorageFault(
     }
 
     /** Faults the person must act on or be told about; budget notes are only logged. */
-    val isError: Boolean get() = when (kind) {
+    override val isError: Boolean get() = when (kind) {
         Kind.SAVE_FAILED, Kind.LOAD_FAILED, Kind.QUARANTINED, Kind.OVER_BUDGET, Kind.READ_ONLY -> true
         Kind.NEAR_BUDGET, Kind.COMPACTED -> false
     }
 }
 
-/** A canvas store that can report storage faults. Android and desktop render [faults]. */
-interface CanvasStorageHealth {
-    val storageFaults: StateFlow<List<CanvasStorageFault>>
+/**
+ * A canvas store that can report storage faults: the shared-document [DocumentStorageHealth] for
+ * canvases. Android and desktop render [storageFaults].
+ */
+interface CanvasStorageHealth : DocumentStorageHealth<CanvasStorageFault> {
+    override val storageFaults: StateFlow<List<CanvasStorageFault>>
 }
 
 /** The faults that concern [canvasId]: its own, and ones no board could be named for. */

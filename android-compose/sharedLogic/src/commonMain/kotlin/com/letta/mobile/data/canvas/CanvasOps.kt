@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
+import com.letta.mobile.data.document.DocumentOp
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -10,13 +11,14 @@ import kotlinx.serialization.json.JsonObject
  * Domain operations for Canvas mutations.
  *
  * Each operation carries a unique [opId], the originating [actorId] (agent ID or user ID),
- * and a logical [lamport] timestamp for ordering in multiplayer and sync phases.
+ * and a logical [lamport] timestamp for ordering in multiplayer and sync phases: the
+ * shared-document [DocumentOp] fields.
  */
 @Serializable
-sealed interface CanvasOp {
-    val opId: String
-    val actorId: String
-    val lamport: Long
+sealed interface CanvasOp : DocumentOp {
+    override val opId: String
+    override val actorId: String
+    override val lamport: Long
 
     @Serializable
     @SerialName("replace_scene")
