@@ -175,7 +175,7 @@ private fun PendingInvites(pending: List<PendingInvite>, cancelling: Set<String>
             Column(Modifier.weight(1f)) {
                 Text(invite.name.ifBlank { PairingStrings.INVITE_TITLE })
                 Text(
-                    PairingStrings.expiresIn(invite.expiresAtMs - nowMs),
+                    PairingStrings.expiresIn(TimeLeft(invite.expiresAtMs - nowMs)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

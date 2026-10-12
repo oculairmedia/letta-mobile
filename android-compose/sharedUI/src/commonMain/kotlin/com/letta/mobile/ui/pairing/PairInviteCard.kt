@@ -81,40 +81,55 @@ private enum class AgentScopeOption(val label: String, val tag: String) {
     CHOOSE(PairingStrings.INVITE_CHOOSE_AGENTS, PairingTags.INVITE_CHOOSE_AGENTS),
 }
 
+/**
+ * The scope form's values and the rules that derive the request from them,
+ * kept out of the composable. Least privilege by default (dpv7m.5): named
+ * agents (when any are offered), chat only, five minutes.
+ */
+private class InviteFormState(var agents: List<AgentChoice>) {
+    var name by mutableStateOf("")
+    var scope by mutableStateOf(if (agents.isEmpty()) AgentScopeOption.ALL else AgentScopeOption.CHOOSE)
+    var selected by mutableStateOf(emptySet<String>())
+    var allowSettings by mutableStateOf(false)
+
+    val options: List<AgentScopeOption> get() = if (agents.isEmpty()) listOf(AgentScopeOption.ALL) else AgentScopeOption.entries
+    val choosing: Boolean get() = scope == AgentScopeOption.CHOOSE
+    val ready: Boolean get() = !choosing || selected.isNotEmpty()
+
+    val summary: InviteScopeSummary
+        get() = InviteScopeSummary(
+            agentNames = agents.filter { it.id in selected }.map { it.name }.takeIf { choosing },
+            allowSettings = allowSettings,
+            ttlMs = PairInviteRequest.DEFAULT_TTL_MS,
+        )
+
+    fun request() = PairInviteRequest(
+        deviceName = name.trim(),
+        agentIds = selected.takeIf { choosing }.orEmpty(),
+        role = PairInviteRequest.roleFor(allowSettings),
+    )
+}
+
 @Composable
 private fun InviteForm(agents: List<AgentChoice>, enabled: Boolean, onMint: (PairInviteRequest) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    // Least privilege by default (dpv7m.5): named agents, chat only, five minutes.
-    var scope by remember { mutableStateOf(if (agents.isEmpty()) AgentScopeOption.ALL else AgentScopeOption.CHOOSE) }
-    var selected by remember { mutableStateOf(emptySet<String>()) }
-    var allowSettings by remember { mutableStateOf(false) }
-    val allAgents = scope == AgentScopeOption.ALL
+    // One form per screen visit; the offered agents are refreshed each composition without resetting it.
+    val form = remember { InviteFormState(agents) }.also { it.agents = agents }
     OutlinedTextField(
-        value = name,
-        onValueChange = { name = it },
+        value = form.name,
+        onValueChange = { form.name = it },
         label = { Text(PairingStrings.INVITE_DEVICE_NAME) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
     Text(PairingStrings.INVITE_ACCESS, style = MaterialTheme.typography.labelLarge)
-    val options = if (agents.isEmpty()) listOf(AgentScopeOption.ALL) else AgentScopeOption.entries
-    options.forEach { option -> ChoiceRow(option, selected = scope == option) { scope = option } }
-    if (!allAgents) AgentChecklist(agents, selected) { selected = it }
-    SettingsToggle(allowSettings) { allowSettings = it }
-    val summary = InviteScopeSummary(
-        agentNames = if (allAgents) null else agents.filter { it.id in selected }.map { it.name },
-        allowSettings = allowSettings,
-        ttlMs = PairInviteRequest.DEFAULT_TTL_MS,
-    )
-    Text(PairingStrings.accessSummary(summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val ready = allAgents || selected.isNotEmpty()
-    if (!ready) Text(PairingStrings.INVITE_CHOOSE_AT_LEAST_ONE, style = MaterialTheme.typography.bodySmall)
+    form.options.forEach { option -> ChoiceRow(option, selected = form.scope == option) { form.scope = option } }
+    if (form.choosing) AgentChecklist(agents, form.selected) { form.selected = it }
+    SettingsToggle(form.allowSettings) { form.allowSettings = it }
+    Text(PairingStrings.accessSummary(form.summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (!form.ready) Text(PairingStrings.INVITE_CHOOSE_AT_LEAST_ONE, style = MaterialTheme.typography.bodySmall)
     Button(
-        onClick = {
-            val agentIds = if (allAgents) emptySet() else selected
-            onMint(PairInviteRequest(deviceName = name.trim(), agentIds = agentIds, role = PairInviteRequest.roleFor(allowSettings)))
-        },
-        enabled = enabled && ready,
+        onClick = { onMint(form.request()) },
+        enabled = enabled && form.ready,
         modifier = Modifier.testTag(PairingTags.INVITE_SHOW),
     ) { Text(PairingStrings.INVITE_SHOW_CODE) }
 }
@@ -197,7 +212,7 @@ private fun QrCard(qr: QrModules, remainingMs: Long?) {
             modifier = Modifier
                 .padding(LettaDimens.Space.md)
                 .widthIn(min = LettaDimens.Pane.qrCodeMinWidth, max = LettaDimens.Pane.qrCodeMaxWidth)
-                .clearAndSetSemantics { contentDescription = PairingStrings.qrDescription(remainingMs ?: 0) },
+                .clearAndSetSemantics { contentDescription = PairingStrings.qrDescription(TimeLeft(remainingMs ?: 0)) },
         )
     }
 }
@@ -220,7 +235,7 @@ private class AnnouncementLatch {
 
     fun update(remainingMs: Long): String {
         lastRemainingMs?.let { previous ->
-            InviteCountdown.crossedThreshold(previous, remainingMs)?.let { text = PairingStrings.countdownAnnouncement(it) }
+            InviteCountdown.crossedThreshold(previous, remainingMs)?.let { text = PairingStrings.countdownAnnouncement(TimeLeft(it * MS_PER_SECOND)) }
         }
         lastRemainingMs = remainingMs
         return text
@@ -236,7 +251,7 @@ private class AnnouncementLatch {
 private fun Countdown(code: LiveCode) {
     val latch = remember { AnnouncementLatch() }
     val announcement = latch.update(code.remainingMs)
-    val label = PairingStrings.expiresIn(code.remainingMs) + if (code.expiring) " · ${PairingStrings.EXPIRING_SOON}" else ""
+    val label = PairingStrings.expiresIn(TimeLeft(code.remainingMs)) + if (code.expiring) " · ${PairingStrings.EXPIRING_SOON}" else ""
     Text(
         label,
         style = MaterialTheme.typography.bodyMedium,
@@ -305,3 +320,5 @@ private fun Redeemed(device: PairedDevice, onDone: () -> Unit) {
     )
     Button(onClick = onDone) { Text(PairingStrings.DONE) }
 }
+
+private const val MS_PER_SECOND = 1_000L

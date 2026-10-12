@@ -94,7 +94,7 @@ private fun TrustPrompt(state: PairingState.ConfirmHost, actions: PairingScanAct
         Text(PairingStrings.trustTitle(state), style = MaterialTheme.typography.titleMedium)
         Text(PairingStrings.trustHostLine(state), style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.TRUST_ACCESS, style = MaterialTheme.typography.bodyMedium)
-        Text(PairingStrings.trustExpiresLine(state.expiresAtMs - nowMs), style = MaterialTheme.typography.bodyMedium)
+        Text(PairingStrings.trustExpiresLine(TimeLeft(state.expiresAtMs - nowMs)), style = MaterialTheme.typography.bodyMedium)
         Text(PairingStrings.TRUST_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // Destructive-safe default: Cancel comes first and is never the filled button's neighbour by accident.
         Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.align(Alignment.End)) {

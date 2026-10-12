@@ -6,6 +6,10 @@ import com.letta.mobile.data.pairing.PairedDevice
 import com.letta.mobile.data.pairing.PairingError
 import com.letta.mobile.data.pairing.PairingState
 
+/** Time left on a pairing code; negative or zero once it has expired. */
+@kotlin.jvm.JvmInline
+value class TimeLeft(val ms: Long)
+
 /** What a new code will grant, as the inviter's form summarises it. Null [agentNames] = every agent. */
 data class InviteScopeSummary(val agentNames: List<String>?, val allowSettings: Boolean, val ttlMs: Long)
 
@@ -43,7 +47,7 @@ object PairingStrings {
 
     fun trustHostLine(prompt: PairingState.ConfirmHost) = "Host ID: ${prompt.hostShortId}"
 
-    fun trustExpiresLine(remainingMs: Long) = "Code expires in ${countdown(remainingMs)}"
+    fun trustExpiresLine(left: TimeLeft) = "Code expires in ${countdown(left)}"
 
     const val TRUST_ACCESS = "Access: what the inviter chose for this code"
     const val CONNECT = "Connect"
@@ -110,18 +114,21 @@ object PairingStrings {
     const val EXPIRING_SOON = "Expiring soon"
     const val DONE = "Done"
 
-    fun countdown(remainingMs: Long) = com.letta.mobile.data.pairing.InviteCountdown.format(remainingMs)
+    fun countdown(left: TimeLeft) = com.letta.mobile.data.pairing.InviteCountdown.format(left.ms)
 
-    fun expiresIn(remainingMs: Long) = "Expires in ${countdown(remainingMs)}"
+    fun expiresIn(left: TimeLeft) = "Expires in ${countdown(left)}"
 
     /** The QR's accessible description, coarse on purpose (no per-second chatter). */
-    fun qrDescription(remainingMs: Long): String {
-        val minutes = (remainingMs + MS_PER_MINUTE - 1) / MS_PER_MINUTE
+    fun qrDescription(left: TimeLeft): String {
+        val minutes = (left.ms + MS_PER_MINUTE - 1) / MS_PER_MINUTE
         return if (minutes <= 1) "Pairing code, expires in under a minute" else "Pairing code, expires in $minutes minutes"
     }
 
-    fun countdownAnnouncement(thresholdSeconds: Long) =
-        if (thresholdSeconds >= SECONDS_PER_MINUTE) "Pairing code expires in 1 minute" else "Pairing code expires in $thresholdSeconds seconds"
+    /** The polite announcement at a countdown threshold (60 s or 10 s left). */
+    fun countdownAnnouncement(left: TimeLeft): String {
+        val seconds = left.ms / MS_PER_SECOND
+        return if (seconds >= SECONDS_PER_MINUTE) "Pairing code expires in 1 minute" else "Pairing code expires in $seconds seconds"
+    }
 
     fun accessSummary(scope: InviteScopeSummary): String {
         val agents = scope.agentNames?.joinToString(", ")?.ifBlank { "no agents" } ?: INVITE_ALL_AGENTS
@@ -187,6 +194,7 @@ object PairingStrings {
     const val APP_DOWNLOAD_URL = "https://github.com/oculairmedia/letta-mobile/releases/latest"
 
     private const val MS_PER_MINUTE = 60_000L
+    private const val MS_PER_SECOND = 1_000L
     private const val SECONDS_PER_MINUTE = 60L
     private const val MINUTES_PER_HOUR = 60L
     private const val MINUTES_PER_DAY = 1_440L

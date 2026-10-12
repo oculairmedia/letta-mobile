@@ -84,7 +84,7 @@ class PairingSurfacesUiTest {
         val r = Recorder()
         setContent { MaterialTheme { PairingStatusCard(PairingState.ConfirmHost(nodeId, expiresAtMs = 272_000), r.actions(), nowMs = 0) } }
         onNodeWithText("Connect to ababab…ababab?").assertIsDisplayed()
-        onNodeWithText(PairingStrings.trustExpiresLine(272_000)).assertTextContains("4:32", substring = true)
+        onNodeWithText(PairingStrings.trustExpiresLine(TimeLeft(272_000))).assertTextContains("4:32", substring = true)
         onNodeWithTag(PairingTags.TRUST_CANCEL).performClick()
         onNodeWithTag(PairingTags.TRUST_CONNECT).performClick()
         assertEquals(listOf("cancel", "confirm"), r.events)
