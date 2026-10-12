@@ -25,6 +25,8 @@ import com.composables.icons.lucide.Database
 import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.FileText
+import com.composables.icons.lucide.Flashlight
+import com.composables.icons.lucide.FlashlightOff
 import com.composables.icons.lucide.GitFork
 import com.composables.icons.lucide.Grid2x2
 import com.composables.icons.lucide.HardDrive
@@ -123,6 +125,8 @@ object LettaIcons {
     // letta-mobile-g2d2i: device pairing (QR scan / invite generation).
     val QrCode: ImageVector get() = Lucide.QrCode
     val Camera: ImageVector get() = Lucide.Camera
+    val Flashlight: ImageVector get() = Lucide.Flashlight
+    val FlashlightOff: ImageVector get() = Lucide.FlashlightOff
 
     // Status
     val Check: ImageVector get() = Lucide.Check

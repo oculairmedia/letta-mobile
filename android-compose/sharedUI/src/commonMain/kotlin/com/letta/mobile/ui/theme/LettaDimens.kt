@@ -169,6 +169,14 @@ object LettaDimens {
         /** A pairing QR code (letta-mobile-dpv7m): big enough to scan across a desk, no bigger. */
         val qrCodeMaxWidth: Dp = 320.dp
 
+        /** The smallest a pairing QR is drawn (dpv7m.5): phone cameras lock on reliably from here. */
+        val qrCodeMinWidth: Dp = 240.dp
+
+        /** The scan viewfinder's square and its corner brackets (dpv7m.5). */
+        val scanFrameSize: Dp = 240.dp
+        val scanBracketLength: Dp = 28.dp
+        val scanBracketStroke: Dp = 4.dp
+
         /** A settings page's left navigation column on wide windows. */
         val navWidth: Dp = 220.dp
 

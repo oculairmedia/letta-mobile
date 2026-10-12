@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.qr
 
+import com.letta.mobile.data.controller.node.iroh.IrohNodeIdentity
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.pairing.PairedHostStore
@@ -13,6 +14,8 @@ import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.qr.ZxingQrEncoder
 import com.letta.mobile.ui.pairing.AgentChoice
 import com.letta.mobile.ui.pairing.InstallAndPairBindings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Desktop binding for the shared install-and-pair card (letta-mobile-dpv7m.3):
@@ -31,7 +34,13 @@ internal fun desktopInstallAndPairBindings(context: DesktopShellContext, focus: 
         nowMs = System::currentTimeMillis,
         pendingLink = navigator.pendingPairLink,
         onPendingLinkConsumed = { navigator.pendingPairLink = null },
+        selfNodeId = ::desktopNodeId,
     )
+}
+
+/** This desktop's own NodeId (the identity it pairs and chats with); null if it cannot be derived. */
+private suspend fun desktopNodeId(): String? = withContext(Dispatchers.IO) {
+    runCatching { IrohNodeIdentity.nodeIdHexFromSecretBytes(DesktopIrohIdentity.loadOrCreate()) }.getOrNull()
 }
 
 private fun desktopPairingFlow(onConfigSaved: (LettaConfig) -> Unit): PairingFlow =

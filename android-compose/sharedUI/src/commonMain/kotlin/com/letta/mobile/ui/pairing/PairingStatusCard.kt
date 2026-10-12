@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,21 +27,41 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import com.letta.mobile.data.pairing.HostIds
 import com.letta.mobile.data.pairing.PairingState
 import com.letta.mobile.data.pairing.QrModules
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
+/** What the joining device can do from the status card and the scanner (letta-mobile-dpv7m.5). */
+class PairingScanActions(
+    /** A scanned, opened or pasted value. */
+    val onSubmit: (String) -> Unit,
+    /** "Connect" on the trust prompt — the only path to a dial. */
+    val onConfirm: () -> Unit,
+    /** "Cancel" on the trust prompt or while verifying. */
+    val onCancel: () -> Unit,
+    /** "Retry" after an unreachable host. */
+    val onRetry: () -> Unit,
+    val onScanAgain: () -> Unit,
+    val onOpenChat: () -> Unit,
+)
+
 /**
- * What the joining device sees while a scanned code is processed
- * (letta-mobile-dpv7m.2). Renders nothing while [PairingState.Idle] so the
- * platform's scanner (camera on Android, paste field on desktop) shows through.
+ * What the joining device sees once a code was read (letta-mobile-dpv7m.2/.5):
+ * the mandatory trust prompt, Verifying, Success, or one distinct error with one
+ * action. Renders nothing while [PairingState.Idle] so the scanner shows through.
+ * Status is always carried by text (and an icon), never colour alone.
  */
 @Composable
 fun PairingStatusCard(
     state: PairingState,
-    onScanAgain: () -> Unit,
-    onOpenChat: () -> Unit,
+    actions: PairingScanActions,
+    nowMs: Long,
     modifier: Modifier = Modifier,
 ) {
     if (state is PairingState.Idle) return
@@ -49,14 +71,15 @@ fun PairingStatusCard(
         tonalElevation = LettaDimens.Space.hair,
     ) {
         Column(
-            modifier = Modifier.padding(LettaDimens.Space.lg),
+            modifier = Modifier.padding(LettaDimens.Space.lg).semantics { liveRegion = LiveRegionMode.Polite },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             when (state) {
-                is PairingState.Pairing -> PairingProgress(state.hostFingerprint)
-                is PairingState.Paired -> PairedContent(state, onOpenChat)
-                is PairingState.Failed -> FailedContent(PairingStrings.error(state.error), onScanAgain)
+                is PairingState.ConfirmHost -> TrustPrompt(state, actions, nowMs)
+                is PairingState.Pairing -> VerifyingContent(actions.onCancel)
+                is PairingState.Paired -> PairedContent(state, actions.onOpenChat)
+                is PairingState.Failed -> FailedContent(state, actions)
                 PairingState.Idle -> Unit
             }
         }
@@ -64,42 +87,92 @@ fun PairingStatusCard(
 }
 
 @Composable
-private fun PairingProgress(fingerprint: String) {
+private fun TrustPrompt(state: PairingState.ConfirmHost, actions: PairingScanActions, nowMs: Long) {
+    Column(
+        modifier = Modifier.testTag(PairingTags.TRUST_PROMPT),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Text(PairingStrings.trustTitle(state.hostShortId), style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.trustHostLine(state.hostShortId), style = MaterialTheme.typography.bodyMedium)
+        Text(PairingStrings.TRUST_ACCESS, style = MaterialTheme.typography.bodyMedium)
+        Text(PairingStrings.trustExpiresLine(state.expiresAtMs - nowMs), style = MaterialTheme.typography.bodyMedium)
+        Text(PairingStrings.TRUST_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // Destructive-safe default: Cancel comes first and is never the filled button's neighbour by accident.
+        Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), modifier = Modifier.align(Alignment.End)) {
+            TextButton(onClick = actions.onCancel, modifier = Modifier.testTag(PairingTags.TRUST_CANCEL)) {
+                Text(PairingStrings.CANCEL)
+            }
+            Button(onClick = actions.onConfirm, modifier = Modifier.testTag(PairingTags.TRUST_CONNECT)) {
+                Text(PairingStrings.CONNECT)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerifyingContent(onCancel: () -> Unit) {
     CircularProgressIndicator()
-    Text(PairingStrings.pairing(fingerprint), textAlign = TextAlign.Center)
+    Column(
+        modifier = Modifier.testTag(PairingTags.VERIFYING),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        Text(PairingStrings.VERIFYING_TITLE, style = MaterialTheme.typography.titleMedium)
+        Text(PairingStrings.VERIFYING_STEP_CONTACT)
+        Text(PairingStrings.VERIFYING_STEP_SECURE)
+        Text(
+            PairingStrings.VERIFYING_KEEP_OPEN,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    TextButton(onClick = onCancel, modifier = Modifier.testTag(PairingTags.VERIFY_CANCEL)) { Text(PairingStrings.CANCEL) }
 }
 
 @Composable
 private fun PairedContent(state: PairingState.Paired, onOpenChat: () -> Unit) {
-    Text(PairingStrings.PAIRED_TITLE, style = MaterialTheme.typography.titleMedium)
+    Icon(LettaIcons.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+    Text(PairingStrings.pairedTitle(HostIds.short(state.host.nodeId)), style = MaterialTheme.typography.titleMedium)
     Text(
         text = if (state.alreadyPaired) PairingStrings.ALREADY_PAIRED_BODY else PairingStrings.PAIRED_BODY,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Text(
-        PairingStrings.hostLine(state.host.nodeId.take(FINGERPRINT_CHARS)),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    if (state.deviceName.isNotBlank()) {
+        Text(
+            PairingStrings.pairedDeviceLine(state.deviceName),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     Button(onClick = onOpenChat, modifier = Modifier.testTag(PairingTags.OPEN_CHAT)) { Text(PairingStrings.OPEN_CHAT) }
 }
 
 @Composable
-private fun FailedContent(message: String, onScanAgain: () -> Unit) {
+private fun FailedContent(state: PairingState.Failed, actions: PairingScanActions) {
+    Icon(LettaIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
     Text(
-        text = message,
-        color = MaterialTheme.colorScheme.error,
+        text = PairingStrings.error(state.error),
         textAlign = TextAlign.Center,
         modifier = Modifier.testTag(PairingTags.ERROR),
     )
-    OutlinedButton(onClick = onScanAgain, modifier = Modifier.testTag(PairingTags.SCAN_AGAIN)) { Text(PairingStrings.SCAN_AGAIN) }
+    if (state.retryable) {
+        Button(onClick = actions.onRetry, modifier = Modifier.testTag(PairingTags.RETRY)) { Text(PairingStrings.RETRY) }
+        TextButton(onClick = actions.onScanAgain, modifier = Modifier.testTag(PairingTags.SCAN_AGAIN)) {
+            Text(PairingStrings.CANCEL)
+        }
+    } else {
+        OutlinedButton(onClick = actions.onScanAgain, modifier = Modifier.testTag(PairingTags.SCAN_AGAIN)) {
+            Text(PairingStrings.SCAN_AGAIN)
+        }
+    }
 }
 
 /**
- * Paste a pairing link: desktop's scanner, and Android's fallback when the
- * camera is unavailable. The value is the one-time invite; it lives only in
- * this field's state until submitted.
+ * Paste a pairing link: desktop's and web's scanner, and Android's "Paste link"
+ * fallback. The value is the one-time invite; it lives only in this field's
+ * state until submitted.
  */
 @Composable
 fun PairCodeEntry(onSubmit: (String) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
@@ -128,10 +201,12 @@ fun PairCodeEntry(onSubmit: (String) -> Unit, modifier: Modifier = Modifier, ena
 
 /**
  * Draws a QR grid black-on-white with a quiet zone — scanners need the fixed
- * contrast, so this deliberately ignores the theme.
+ * contrast, so this deliberately ignores the theme. [dimmed] greys it out (an
+ * expired code) so it can no longer be scanned by accident.
  */
 @Composable
-fun QrModulesImage(modules: QrModules, modifier: Modifier = Modifier) {
+fun QrModulesImage(modules: QrModules, modifier: Modifier = Modifier, dimmed: Boolean = false) {
+    val ink = if (dimmed) Color.LightGray else Color.Black
     Canvas(modifier = modifier.fillMaxWidth().aspectRatio(1f)) {
         val total = modules.size + QUIET_ZONE_MODULES * 2
         val cell = size.minDimension / total
@@ -140,7 +215,7 @@ fun QrModulesImage(modules: QrModules, modifier: Modifier = Modifier) {
             for (col in 0 until modules.size) {
                 if (!modules.isDark(row, col)) continue
                 drawRect(
-                    color = Color.Black,
+                    color = ink,
                     topLeft = Offset((col + QUIET_ZONE_MODULES) * cell, (row + QUIET_ZONE_MODULES) * cell),
                     size = Size(cell, cell),
                 )
@@ -150,4 +225,3 @@ fun QrModulesImage(modules: QrModules, modifier: Modifier = Modifier) {
 }
 
 private const val QUIET_ZONE_MODULES = 4
-private const val FINGERPRINT_CHARS = 8
