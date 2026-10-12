@@ -82,7 +82,7 @@ class DefaultSessionRepositoryGraphFactoryTest {
             settingsRepository = settingsWith(
                 LettaConfig(
                     id = "test-remote",
-                    mode = LettaConfig.Mode.CLOUD,
+                    mode = LettaConfig.Mode.SELF_HOSTED,
                     serverUrl = "https://test.letta.com",
                 ),
             ),

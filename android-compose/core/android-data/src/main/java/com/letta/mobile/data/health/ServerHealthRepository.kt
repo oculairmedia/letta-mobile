@@ -1,5 +1,7 @@
 package com.letta.mobile.data.health
 
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -12,7 +14,6 @@ import io.ktor.client.request.header
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -37,10 +38,8 @@ import javax.inject.Singleton
  * comes back [ServerHealthState.OFFLINE] is the picker's signal to refuse the tap
  * (the row's own composable runs the shake-and-flash refusal animation).
  *
- * The probe is intentionally cheap and tolerant for self-hosted servers: any
- * HTTP response from `/v1/health/` is treated as ONLINE because the server is
- * at least answering. Cloud configs are stricter for auth failures: 401/403
- * means the saved API key cannot be used, so the row is marked OFFLINE.
+ * The probe is intentionally cheap and tolerant: any HTTP response from
+ * `/v1/health/` is treated as ONLINE because the server is at least answering.
  *
  * Re-probing fires (a) automatically whenever the set of configured IDs
  * changes, and (b) on demand via [refreshAll] from picker UIs that want
@@ -49,12 +48,12 @@ import javax.inject.Singleton
  */
 /**
  * Long-lived scope ServerHealthRepository uses for its config-observer
- * coroutine. Defaults to [Dispatchers.IO] + a fresh [SupervisorJob]; tests
- * can substitute a [kotlinx.coroutines.test.TestScope] via the primary
- * constructor (see letta-mobile-0dnn.7).
+ * coroutine: the process lifecycle's scope (the repository is an app-wide
+ * singleton), with the work itself on [Dispatchers.IO]; tests can substitute
+ * a [kotlinx.coroutines.test.TestScope] via the primary constructor (see
+ * letta-mobile-0dnn.7).
  */
-internal fun defaultServerHealthScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+internal fun defaultServerHealthScope(): CoroutineScope = ProcessLifecycleOwner.get().lifecycleScope
 
 @Singleton
 class ServerHealthRepository(
@@ -83,7 +82,7 @@ class ServerHealthRepository(
     }
 
     init {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             // First probe runs as soon as any configs are visible. Re-probe
             // only when the set of IDs actually changes — purely renaming an
             // entry shouldn't burn another network round-trip.
@@ -165,7 +164,7 @@ class ServerHealthRepository(
             Result.failure(t)
         }
         val statusCode = outcome.getOrNull()?.status?.value
-        val health = if (outcome.isSuccess && !config.isCloudAuthFailure(statusCode)) {
+        val health = if (outcome.isSuccess) {
             ServerHealthState.ONLINE
         } else {
             ServerHealthState.OFFLINE
@@ -179,9 +178,6 @@ class ServerHealthRepository(
             "result" to health.name,
         )
     }
-
-    private fun LettaConfig.isCloudAuthFailure(statusCode: Int?): Boolean =
-        mode == LettaConfig.Mode.CLOUD && statusCode in setOf(401, 403)
 
     companion object {
         private const val PROBE_TIMEOUT_MS = 3_000L
