@@ -124,7 +124,7 @@ class ConversationModelRepository(
             recents?.record(modelHandle.value)
             if (update.appliedTo == APPLIED_TO_AGENT) {
                 // The agent's own model moved; the refreshed agent is the source of truth.
-                selections.clear(target.conversationId)
+                selections.record(target.conversationId, model = null)
             } else {
                 selections.record(target.conversationId, update.modelHandle ?: modelHandle.value)
             }

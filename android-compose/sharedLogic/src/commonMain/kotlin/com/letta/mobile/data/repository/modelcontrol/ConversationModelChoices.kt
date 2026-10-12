@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository.modelcontrol
 
 import com.letta.mobile.data.model.Conversation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 
 /**
  * letta-mobile-dxz5s: what each conversation runs, as pickers, composer labels and context meters
@@ -13,6 +16,16 @@ data class ConversationModelChoices(
     val windows: Map<String, Int> = emptyMap(),
     val efforts: Map<String, String> = emptyMap(),
 )
+
+/**
+ * letta-mobile-dxz5s: seeds these selections from a conversation list (cache plus refreshes) until
+ * cancelled; a failing source stops quietly.
+ */
+suspend fun ConversationModelSelections.followHost(conversations: Flow<List<Conversation>>) {
+    conversations
+        .catch { e -> if (e is CancellationException) throw e }
+        .collect { seedFromHost(it) }
+}
 
 /** A model picked for one conversation in this session; a null [model] withdraws the pick. */
 internal data class ConversationPick(val conversationId: String, val model: String?)

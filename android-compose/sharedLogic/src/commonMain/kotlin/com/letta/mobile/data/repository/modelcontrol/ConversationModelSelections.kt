@@ -3,12 +3,9 @@ package com.letta.mobile.data.repository.modelcontrol
 import com.letta.mobile.data.model.Conversation
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 
 /**
  * letta-mobile-okvyf / letta-mobile-dxz5s: each conversation's model.
@@ -41,8 +38,6 @@ class ConversationModelSelections {
         update { ledger.pick(ConversationPick(conversationId, model)) }
     }
 
-    fun clear(conversationId: String) = record(conversationId, null)
-
     /**
      * Undoes a failed switch of [conversationId] to [model] by restoring
      * [previous], unless a newer pick has replaced [model] meanwhile: an
@@ -60,13 +55,6 @@ class ConversationModelSelections {
      * stays in force until the host reports that same model.
      */
     fun seedFromHost(conversations: Iterable<Conversation>) = update { ledger.report(conversations) }
-
-    /** Follows a conversation list (cache plus refreshes) until cancelled; a failing source stops quietly. */
-    suspend fun followHost(conversations: Flow<List<Conversation>>) {
-        conversations
-            .catch { e -> if (e is CancellationException) throw e }
-            .collect { seedFromHost(it) }
-    }
 
     /** The model to show as selected for [conversationId] when its agent runs [agentModel]. */
     fun effectiveModel(conversationId: String?, agentModel: String?): String? =

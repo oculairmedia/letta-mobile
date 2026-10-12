@@ -10,6 +10,7 @@ import com.letta.mobile.data.repository.modelcontrol.ModelPickerSource
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectionRepository
 import com.letta.mobile.data.repository.modelcontrol.ProviderManagementController
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.repository.modelcontrol.followHost
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
