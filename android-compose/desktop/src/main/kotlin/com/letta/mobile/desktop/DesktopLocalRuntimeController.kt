@@ -2,6 +2,8 @@ package com.letta.mobile.desktop
 
 import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.desktop.runtime.DesktopGitPlatform
+import com.letta.mobile.desktop.runtime.DesktopGitStatus
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchPreference
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
@@ -30,14 +32,30 @@ internal data class DesktopRuntimeLaunchState(
 /** What the local-runtime settings need from the outside world; faked in tests. */
 internal interface DesktopLocalRuntimeBindings {
     val health: StateFlow<RuntimeHealth>
+    val git: StateFlow<DesktopGitStatus>
     fun forceRestart()
+    fun stop()
+    fun start()
+
+    /** Checks for git again; blocking. */
+    fun recheckGit()
     fun currentLaunchState(store: SecureSettingsStore): DesktopRuntimeLaunchState
 }
 
 internal object DefaultDesktopLocalRuntimeBindings : DesktopLocalRuntimeBindings {
     override val health: StateFlow<RuntimeHealth> get() = DesktopLocalRuntimeHost.health
 
+    override val git: StateFlow<DesktopGitStatus> get() = DesktopLocalRuntimeHost.gitEnvironment.status
+
     override fun forceRestart() = DesktopLocalRuntimeHost.forceRestart()
+
+    override fun stop() = DesktopLocalRuntimeHost.stopByUser()
+
+    override fun start() = DesktopLocalRuntimeHost.startByUser()
+
+    override fun recheckGit() {
+        DesktopLocalRuntimeHost.gitEnvironment.refresh()
+    }
 
     override fun currentLaunchState(store: SecureSettingsStore): DesktopRuntimeLaunchState {
         val context = DesktopRuntimeLaunchPreference.currentContext()
@@ -79,7 +97,16 @@ internal class DesktopLocalRuntimeController(
         }
     }
 
+    val git: StateFlow<DesktopGitStatus> get() = bindings.git
+
     fun forceRestart() = bindings.forceRestart()
+
+    /** The card's on/off switch (G05): [on] false stops the runtime until it is turned on again. */
+    fun setRunning(on: Boolean) = if (on) bindings.start() else bindings.stop()
+
+    fun recheckGit() {
+        scope.launch { withContext(io) { bindings.recheckGit() } }
+    }
 
     fun changeWorkingDirectory(path: String) {
         scope.launch {
@@ -106,8 +133,30 @@ internal class DesktopLocalRuntimeController(
     }
 }
 
+/** The runtime is down, restarting, or switched off: the chat says so and offers the fix. */
+internal val RuntimeHealth.needsChatBanner: Boolean
+    get() = restartPending || needsForceRestart || stoppedByUser
+
+/** The git line of the runtime card (G07). */
+internal fun DesktopGitStatus.describe(): String = when (this) {
+    DesktopGitStatus.Unknown -> "Checking…"
+    is DesktopGitStatus.Available ->
+        if (onInheritedPath) "Found in ${directory.path}." else "Found in ${directory.path} (added to the runtime's PATH)."
+    is DesktopGitStatus.Missing -> when (platform) {
+        DesktopGitPlatform.WINDOWS ->
+            "Not found. Memory sync, diffs and branches need Git. Install Git for Windows " +
+                "(or run winget install Git.Git); the runtime restarts by itself once it is installed."
+        DesktopGitPlatform.MAC ->
+            "Not found. Memory sync, diffs and branches need Git. Run xcode-select --install in " +
+                "Terminal (or install Git); it is picked up automatically once installed."
+        DesktopGitPlatform.OTHER ->
+            "Not found. Memory sync, diffs and branches need Git. Install it with your package manager."
+    }
+}
+
 /** One-line description of the runtime's health for the card and the chat banner. */
 internal fun RuntimeHealth.describe(): String = when {
+    stoppedByUser -> "Stopped. Local agents are offline until you start the runtime again."
     gaveUp -> "Stopped after $consecutiveCrashes crashes in a minute. Automatic restart is off until you restart it."
     restartPending -> "Crashed (exit ${lastExitCode ?: "?"}). Restarting…"
     active -> if (consecutiveCrashes > 0) "Running (recovered from $consecutiveCrashes recent crash${if (consecutiveCrashes == 1) "" else "es"})." else "Running."
