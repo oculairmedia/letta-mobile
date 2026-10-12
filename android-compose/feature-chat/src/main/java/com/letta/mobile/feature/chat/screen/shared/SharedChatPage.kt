@@ -157,12 +157,7 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
     // letta-mobile-bglj6.1.17: the Android haptics backend behind the shared seam — the
     // chat page's cues (send flight, disclosures, approvals, scroll glide) route through
     // HapticPolicy to the designsystem Android realization, gated by the haptics setting.
-    CompositionLocalProvider(
-        LocalReducedMotion provides rememberReducedMotionEnabled(),
-        LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
-        LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
-        LocalHaptics provides rememberSharedChatHaptics(params.hapticsEnabled),
-    ) {
+    SharedChatPageLocals(hapticsEnabled = params.hapticsEnabled) {
         SharedChatWorkspaceFilesBox(workspaceFiles, port, target.agentId, modifier) {
             ChatSurface(
                 port = surfacePort,
@@ -189,6 +184,16 @@ internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = M
         }
     }
 }
+
+/** Android's bindings behind the page's seams; the row parity harness (ckmub.1) draws inside them too. */
+@Composable
+internal fun SharedChatPageLocals(hapticsEnabled: Boolean, content: @Composable () -> Unit) = CompositionLocalProvider(
+    LocalReducedMotion provides rememberReducedMotionEnabled(),
+    LocalChatLoadingIndicator provides ExpressiveChatLoadingIndicator,
+    LocalSharedRichMarkdownRenderer provides SharedChatRichMarkdown,
+    LocalHaptics provides rememberSharedChatHaptics(hapticsEnabled),
+    content = content,
+)
 
 /** The canvas the page docks the chat under, or null without the app's canvas slot. */
 private fun canvasContent(

@@ -187,3 +187,10 @@ without the mascot seat) both ways from one fixture timeline (`feature-chat/src/
 at phone width in light and dark. It writes `<theme>/<row>.{legacy,shared,diff,side-by-side}.png`
 and `report.md` (row type -> pixel diff %) to `feature-chat/build/outputs/roborazzi/row-parity/`
 and prints the table. CI runs it as the advisory `row parity` job and uploads the folder.
+
+Since slice S4 the rows match (each row type at or under 2 % in both themes; the remaining
+error-frame and thinking-row diffs are explained in the report's Notes column) and the shared chat
+page is the default on Android (`Settings > Features > Shared chat page`) and desktop
+(`Settings > Chat > Shared chat page`). Turning the toggle off brings back the legacy chat screen
+for ONE release, as a fallback; slices S9 (Android) and S11 (desktop) delete the legacy page and
+the toggle with it.

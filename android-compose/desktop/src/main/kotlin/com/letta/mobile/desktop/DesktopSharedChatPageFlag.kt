@@ -37,8 +37,9 @@ internal data class SharedChatFlagEnvironment(
  * (`sharedUI`'s `ChatSurface`) instead of desktop's own `ChatDetailPane`.
  *
  * On when the launch forces it (system property [SHARED_CHAT_SYSTEM_PROPERTY] or env
- * [SHARED_CHAT_ENV_VARIABLE]) or when the persisted settings toggle is on. Off by default: the old
- * page stays the default until the shared page reaches parity.
+ * [SHARED_CHAT_ENV_VARIABLE]) or when the persisted settings toggle is on. On by default since hard
+ * cut S4 (letta-mobile-ckmub.1, rows at parity): turning the toggle off keeps the old page for ONE
+ * release as a fallback; slice S11 deletes it and this flag.
  */
 internal class DesktopSharedChatPageFlag(
     private val store: DesktopSharedChatPageFlagStore = DesktopSharedChatPageFlagStore(),
@@ -49,7 +50,7 @@ internal class DesktopSharedChatPageFlag(
     /** The launch environment forces the page on; the settings toggle cannot turn it off. */
     val forcedByEnvironment: Boolean = environment.forcesOn()
 
-    private val persisted = MutableStateFlow(runCatching { store.load() }.getOrDefault(false))
+    private val persisted = MutableStateFlow(runCatching { store.load() }.getOrDefault(true))
 
     /** The user's saved toggle, independent of any launch override. */
     val persistedEnabled: StateFlow<Boolean> = persisted.asStateFlow()

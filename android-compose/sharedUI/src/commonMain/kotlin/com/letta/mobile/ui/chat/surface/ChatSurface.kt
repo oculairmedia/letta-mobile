@@ -2,9 +2,7 @@ package com.letta.mobile.ui.chat.surface
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import com.letta.mobile.ui.chat.session.ChatDockRect
 import androidx.compose.foundation.lazy.LazyListState
@@ -182,15 +180,24 @@ fun ChatSurface(
         LocalAmbientGlowShaders provides glowShaders,
         LocalChatImageActions provides stablePlatform.imageActions,
     ) {
-        SendFlightLayer(rememberSendFlightState(), modifier) {
-            if (appearance.platformStyle == ChatPlatformStyle.Touch) {
-                // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
-                TouchCanvasWithChat(frame, canvas?.let { { it(canvasActions) } })
-            } else if (canvas == null) {
-                PageWithoutCanvas(frame)
-            } else {
-                CanvasWithChat(frame, { canvas(canvasActions) })
-            }
+        // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
+        ChatSurfacePageFrame(modifier) {
+            ChatSurfaceLayers(frame, canvas?.let { { it(canvasActions) } })
+        }
+    }
+}
+
+/** The page's layers for its idiom, under the send flight. Skipped while only the keyboard moves. */
+@Composable
+private fun ChatSurfaceLayers(frame: ChatSurfaceFrame, canvas: (@Composable () -> Unit)?) {
+    SendFlightLayer(rememberSendFlightState(), Modifier.fillMaxSize()) {
+        if (frame.appearance.platformStyle == ChatPlatformStyle.Touch) {
+            // Phones: the canvas over a flush chat bar with a floating chat head, no panel.
+            TouchCanvasWithChat(frame, canvas)
+        } else if (canvas == null) {
+            PageWithoutCanvas(frame)
+        } else {
+            CanvasWithChat(frame, canvas)
         }
     }
 }
@@ -295,11 +302,10 @@ private fun CanvasChatLayers(frame: ChatSurfaceFrame, layers: SurfaceMorphLayers
     }
     if (layers.showDocked) DockedOverlay(frame, dock, morph, primary = layers.dockedPrimary)
     if (layers.showPage) {
-        // The panel rises above the keyboard (DockedChatPanel pads for it); the page does not.
-        val density = LocalDensity.current
-        val imeDp = with(density) { WindowInsets.ime.getBottom(density).toDp().value }
+        // The panel rises above the keyboard (DockedChatPanel lifts itself); the page does not.
+        val keyboard = LocalChatKeyboardLift.current
         PageLayerLocals(primary = !layers.dockedPrimary) {
-            MorphPageLayer({ w, h -> dock.rectIn(w, (h - imeDp).coerceAtLeast(0f)) }, morph, Modifier.fillMaxSize()) {
+            MorphPageLayer({ w, h -> dock.rectIn(w, (h - keyboard.value.value).coerceAtLeast(0f)) }, morph, Modifier.fillMaxSize()) {
                 FullPageBody(frame, ChatSurfaceMode.FullScreen)
             }
         }

@@ -31,9 +31,9 @@ import kotlin.test.assertEquals
  * body 22dp up under its header (an animated `completedRunBodyLift`); #1758 made that lift structural
  * so it snapped instead of sliding.
  *
- * letta-mobile-bglj6.1.11: the run header and its tuck are gone. The run's label ("Working" ->
- * "Worked for 9s") leads the tool summary's own line, so the newest run has the same shape working
- * and settled: settling only rewrites the label. These tests hold that: on the first frame after
+ * letta-mobile-ckmub.1 (hard cut S4): the legacy header is back on its own line, with the body lifted
+ * under it working and settled alike and the fold's floor held while the run works, so the newest
+ * run has the same shape working and settled: settling only rewrites the label. These tests hold that: on the first frame after
  * `isActive` flips false (the clock held still, so no animation can have run) the row is already
  * exactly its settled height, and that height is the one a run composed cold as settled reports.
  */

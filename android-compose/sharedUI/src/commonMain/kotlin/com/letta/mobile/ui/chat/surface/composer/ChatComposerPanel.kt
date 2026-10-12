@@ -3,7 +3,6 @@ package com.letta.mobile.ui.chat.surface.composer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
+import com.letta.mobile.ui.chat.surface.liftAboveKeyboard
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -86,7 +86,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .imePadding()
+            .liftAboveKeyboard()
             // Docked, the bar sits in the panel's corner: the same inset on the sides and the bottom.
             .padding(
                 start = LettaDimens.Space.lg,
@@ -117,7 +117,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
 @Composable
 private fun TouchComposerPanel(model: ComposerModel, attachImage: () -> Unit, modifier: Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().imePadding(),
+        modifier = modifier.fillMaxWidth().liftAboveKeyboard(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(

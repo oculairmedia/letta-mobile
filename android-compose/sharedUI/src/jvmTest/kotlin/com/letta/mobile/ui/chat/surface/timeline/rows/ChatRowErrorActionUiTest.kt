@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
 class ChatRowErrorActionUiTest {
     private val prompt = message("u-1", "user", "summarise the repo")
 
-    private fun error(text: String) = UiMessage(id = "e-1", role = "assistant", content = text, timestamp = "2026-10-08T10:00:00Z", isError = true)
+    private fun error(text: String) = UiMessage(id = ERROR_ID, role = "assistant", content = text, timestamp = "2026-10-08T10:00:00Z", isError = true)
 
     @Test
     fun aRateLimitOffersRetryWhichRerunsTheLastPrompt() = runComposeUiTest {
@@ -29,7 +29,7 @@ class ChatRowErrorActionUiTest {
             MaterialTheme {
                 ChatMessageRow(
                     error(TurnFailureNotices.messageFor("rate_limited")),
-                    rowContext(),
+                    newest(),
                     callbacks(actions, lastPrompt = prompt),
                 )
             }
@@ -45,7 +45,7 @@ class ChatRowErrorActionUiTest {
             MaterialTheme {
                 ChatMessageRow(
                     error("fetch failed: ECONNRESET"),
-                    rowContext(capabilities = ChatSurfaceCapabilities(rerun = false)),
+                    rowContext(capabilities = ChatSurfaceCapabilities(rerun = false), newestMessageId = ERROR_ID),
                     callbacks(actions, lastPrompt = prompt),
                 )
             }
@@ -61,7 +61,7 @@ class ChatRowErrorActionUiTest {
             MaterialTheme {
                 ChatMessageRow(
                     error(TurnFailureNotices.messageFor("credit_limit")),
-                    rowContext(),
+                    newest(),
                     callbacks(RecordingChatActions(), host = ChatSurfaceHost(openModelPicker = { opened++ })),
                 )
             }
@@ -75,7 +75,7 @@ class ChatRowErrorActionUiTest {
         val actions = RecordingChatActions()
         setContent {
             MaterialTheme {
-                ChatMessageRow(error(TurnFailureNotices.messageFor("context_window_exceeded")), rowContext(), callbacks(actions))
+                ChatMessageRow(error(TurnFailureNotices.messageFor("context_window_exceeded")), newest(), callbacks(actions))
             }
         }
         onNodeWithTag(ChatRowTestTags.ERROR_ACTION).assertTextEquals("Compact").performClick()
@@ -85,7 +85,7 @@ class ChatRowErrorActionUiTest {
     @Test
     fun anUnknownErrorKeepsTheGenericBubble() = runComposeUiTest {
         setContent {
-            MaterialTheme { ChatMessageRow(error(TurnFailureNotices.GENERIC_MESSAGE), rowContext(), callbacks(RecordingChatActions())) }
+            MaterialTheme { ChatMessageRow(error(TurnFailureNotices.GENERIC_MESSAGE), newest(), callbacks(RecordingChatActions())) }
         }
         onNodeWithTag(ChatRowTestTags.ERROR_ACTION).assertDoesNotExist()
     }
@@ -94,15 +94,32 @@ class ChatRowErrorActionUiTest {
     fun switchModelIsHiddenWhenThePageCannotOpenThePicker() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                ChatMessageRow(error(TurnFailureNotices.messageFor("model_not_supported")), rowContext(), callbacks(RecordingChatActions()))
+                ChatMessageRow(error(TurnFailureNotices.messageFor("model_not_supported")), newest(), callbacks(RecordingChatActions()))
             }
         }
         onNodeWithTag(ChatRowTestTags.ERROR_ACTION).assertDoesNotExist()
     }
+
+    @Test
+    fun anOlderErrorOffersNoAction() = runComposeUiTest {
+        // ckmub.1 (S4): Retry re-sends the newest prompt, so only the newest error offers it.
+        setContent {
+            MaterialTheme {
+                ChatMessageRow(error(TurnFailureNotices.messageFor("rate_limited")), rowContext(newestMessageId = null), callbacks(RecordingChatActions(), lastPrompt = prompt))
+            }
+        }
+        onNodeWithTag(ChatRowTestTags.ERROR_ACTION).assertDoesNotExist()
+    }
+
+    private fun newest() = rowContext(newestMessageId = ERROR_ID)
 
     private fun callbacks(
         actions: RecordingChatActions,
         host: ChatSurfaceHost = ChatSurfaceHost(),
         lastPrompt: UiMessage? = null,
     ) = ChatRowCallbacks(actions = actions, host = host, onImageTap = { _, _ -> }, lastPrompt = { lastPrompt })
+
+    private companion object {
+        const val ERROR_ID = "e-1"
+    }
 }

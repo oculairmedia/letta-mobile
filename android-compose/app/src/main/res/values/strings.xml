@@ -348,8 +348,8 @@
     <string name="screen_config_enable_projects_description">Show the Projects dashboard as the home screen. Requires a project registry endpoint on your server.</string>
     <string name="screen_config_haptics">Haptic feedback</string>
     <string name="screen_config_haptics_description">Vibrate as the agent streams replies and runs tools. Turn off to silence streaming and tool-call buzzes.</string>
-    <string name="screen_config_shared_chat_page">Shared chat page (preview)</string>
-    <string name="screen_config_shared_chat_page_description">Use the new chat page shared with desktop. Turn off to return to the current chat screen.</string>
+    <string name="screen_config_shared_chat_page">Shared chat page</string>
+    <string name="screen_config_shared_chat_page_description">The chat page shared with desktop, on by default. Turn off to use the previous chat screen for this release; it is removed in the next one.</string>
     <string name="screen_config_shared_nav_drawer">Shared navigation drawer (preview)</string>
     <string name="screen_config_shared_nav_drawer_description">The chat menu opens the desktop\'s agent rail and agent panel. Turn off to return to the current menu.</string>
     <string name="screen_config_open_chats_on_canvas">Open conversations on the canvas</string>

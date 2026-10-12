@@ -53,7 +53,7 @@ data class ConfigUiState(
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
-    val sharedChatPageEnabled: Boolean = false,
+    val sharedChatPageEnabled: Boolean = true,
     val openChatsOnCanvas: Boolean = true,
     /** The Settings preview switches that are on. */
     val enabledFeatureFlags: Set<FeatureFlag> = emptySet(),

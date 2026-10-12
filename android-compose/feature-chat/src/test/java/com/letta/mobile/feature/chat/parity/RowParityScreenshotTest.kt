@@ -28,6 +28,7 @@ import com.letta.mobile.feature.chat.NoOpChatActions
 import com.letta.mobile.feature.chat.screen.ChatComposer
 import com.letta.mobile.feature.chat.screen.ChatMessageList
 import com.letta.mobile.feature.chat.screen.activeRunActivity
+import com.letta.mobile.feature.chat.screen.shared.SharedChatPageLocals
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
@@ -38,6 +39,7 @@ import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
+import com.letta.mobile.ui.chat.surface.composer.ComposerThinkingSnapshot
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimelineSnapshot
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -138,8 +140,28 @@ class RowParityScreenshotTest {
         }
         composeRule.mainClock.advanceTimeBy(SETTLE_MILLIS)
         composeRule.waitForIdle()
-        return Pixels.of(composeRule.onRoot().captureToImage().asAndroidBitmap())
+        return captureWhenStable()
     }
+
+    /**
+     * Markdown parses off the main thread on real time, not the manual clock, so a row can still show
+     * its plain-text placeholder (or nothing) on the first grab. Grab until two consecutive frames
+     * agree (pages whose mascot never stops animating give up after [STABLE_ATTEMPTS]).
+     */
+    private fun captureWhenStable(): Pixels {
+        var previous = grab()
+        repeat(STABLE_ATTEMPTS) { attempt ->
+            Thread.sleep(STABLE_WAIT_MILLIS)
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            val next = grab()
+            if (attempt >= MIN_ATTEMPTS && next.argb.contentEquals(previous.argb)) return next
+            previous = next
+        }
+        return previous
+    }
+
+    private fun grab(): Pixels = Pixels.of(composeRule.onRoot().captureToImage().asAndroidBitmap())
 
     /** Where one theme's images go, and the theme's name in the report. */
     private class ThemeOutput(val name: String, val dir: File)
@@ -160,6 +182,7 @@ class RowParityScreenshotTest {
             diffPercent = result.summary.percent,
             legacyHeightDp = (result.summary.legacyHeightPx / density).toInt(),
             sharedHeightDp = (result.summary.sharedHeightPx / density).toInt(),
+            note = row.note,
         )
     }
 
@@ -170,17 +193,23 @@ class RowParityScreenshotTest {
         when (row.layout) {
             ParityLayout.TIMELINE, ParityLayout.THINKING -> when (target.side) {
                 Side.LEGACY -> LegacyTimeline(state, thinkingToken = row.layout == ParityLayout.THINKING)
-                Side.SHARED -> ChatTimelineSnapshot(
-                    state = state,
-                    actions = NoOpChatActions,
-                    appearance = AndroidAppearance,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                Side.SHARED -> SharedChatPageLocals(hapticsEnabled = false) {
+                    // The shared page's composer, like the legacy one, carries the thinking token.
+                    Column(Modifier.fillMaxSize()) {
+                        ChatTimelineSnapshot(
+                            state = state,
+                            actions = NoOpChatActions,
+                            appearance = AndroidAppearance,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        if (row.layout == ParityLayout.THINKING) ComposerThinkingSnapshot(state, Modifier.fillMaxWidth())
+                    }
+                }
             }
             ParityLayout.THINKING_MASCOT -> WithParityMascot(RowParityFixture.AGENT_ID) {
                 when (target.side) {
                     Side.LEGACY -> LegacyPageBottom(state)
-                    Side.SHARED -> SharedPage(state)
+                    Side.SHARED -> SharedChatPageLocals(hapticsEnabled = false) { SharedPage(state) }
                 }
             }
         }
@@ -289,6 +318,9 @@ class RowParityScreenshotTest {
         const val DEFAULT_OUTPUT = "build/outputs/roborazzi/row-parity"
         const val SETTLE_MILLIS = 1_500L
         const val SETTLE_FRAMES = 3
+        const val STABLE_ATTEMPTS = 12
+        const val MIN_ATTEMPTS = 3
+        const val STABLE_WAIT_MILLIS = 60L
         const val MAX_NOTE = 160
 
         /** SharedChatPage's appearance: tool calls open in a sheet, the phone's Touch idiom. */

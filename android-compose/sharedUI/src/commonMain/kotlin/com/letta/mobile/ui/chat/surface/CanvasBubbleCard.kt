@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -141,7 +140,7 @@ internal fun BubbleCardLayer(bubble: TouchBubble, agentName: String, anchor: Bub
     val origin = TransformOrigin(if (anchor.headOnRight) 1f else 0f, if (below) 0f else 1f)
     val expanded = bubble.state.expanded
     // Laid out above the keyboard; the head's own band is not, so the head never moves with it.
-    Box(Modifier.fillMaxSize().imePadding().then(cardLayout(anchor, below))) {
+    Box(Modifier.fillMaxSize().liftAboveKeyboard().then(cardLayout(anchor, below))) {
         AnimatedVisibility(visible = expanded, enter = motion.popEnter(origin), exit = motion.popExit(origin)) {
             BubbleCard(bubble, agentName, CardLook(anchor.headOnRight, below, motion, reduced))
         }

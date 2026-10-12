@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.chat.surface.composer
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import com.letta.mobile.ui.chat.surface.touchStyle
+import com.letta.mobile.ui.theme.ChatRowMotion
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -45,9 +48,14 @@ import org.jetbrains.compose.resources.stringResource
  */
 @Composable
 internal fun TouchCompanionSlot(model: ComposerModel) {
+    if (!LocalComposerCompanion.current) return
     val agentId = model.uiState.agentId
-    if (!LocalComposerCompanion.current || agentId == null) return
-    if (!mascotAvailable(agentId)) return
+    if (agentId == null || !mascotAvailable(agentId)) {
+        // letta-mobile-ckmub.1 (S4): with no mascot the thinking token still sits over the bar,
+        // where the legacy composer drew it, not in the timeline.
+        ComposerThinkingStatus(model.uiState)
+        return
+    }
     val presence = LocalMascotRegistry.current.presence[agentId]
     val working = companionWorking(model.uiState, presence)
     val reducedMotion = LocalReducedMotion.current
@@ -94,9 +102,37 @@ internal fun TouchCompanionSlot(model: ComposerModel) {
 @Composable
 internal fun companionIndicatorShowing(uiState: ChatUiState): Boolean {
     if (!LocalComposerCompanion.current) return false
-    val agentId = uiState.agentId ?: return false
-    if (!mascotAvailable(agentId)) return false
+    val agentId = uiState.agentId
+    if (agentId == null || !mascotAvailable(agentId)) {
+        // The Touch composer's mascot-less thinking token says it instead (ComposerThinkingStatus).
+        return touchStyle() && companionWorking(uiState, presence = null)
+    }
     return companionWorking(uiState, LocalMascotRegistry.current.presence[agentId])
+}
+
+/**
+ * The thinking token over the Touch bar when the agent has no mascot to carry it (legacy
+ * ChatComposer's companion status, ThinkingTextToken): "0:12  Thinking…", inset from the screen
+ * edges, folding in and out with the run.
+ */
+@Composable
+internal fun ComposerThinkingStatus(uiState: ChatUiState) {
+    val reducedMotion = LocalReducedMotion.current
+    AnimatedVisibility(
+        visible = companionWorking(uiState, presence = null),
+        enter = ChatRowMotion(reducedMotion).expansionEnter(),
+        exit = ChatRowMotion(reducedMotion).expansionExit(),
+        label = "composerThinkingStatus",
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs)
+                .testTag(ComposerTestTags.TOUCH_COMPANION_STATUS),
+        ) {
+            ThinkingStatusText(messages = uiState.messages, delayMessage = uiState.a2uiThinkingDelayMessage)
+        }
+    }
 }
 
 /**

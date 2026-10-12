@@ -174,8 +174,10 @@ private fun TimelineBody(params: TimelineBodyParams, modifier: Modifier) {
 @Composable
 private fun TimelineList(params: TimelineBodyParams, modifier: Modifier) {
     val paged = params.pagedTimeline
-    // The agent's mascot beside the composer shows its thinking; the row would say it twice.
-    val showThinkingRow = !mascotAvailable(params.state.agentId)
+    // The agent's mascot beside the composer shows its thinking; the row would say it twice. On a
+    // phone the composer carries the thinking token even without a mascot, as the legacy composer
+    // did (letta-mobile-ckmub.1, S4), so the row is the pointer hosts' alone.
+    val showThinkingRow = !mascotAvailable(params.state.agentId) && !touchStyle()
     if (paged == null) {
         LegacyTimelineList(
             LegacyTimelineParams(
