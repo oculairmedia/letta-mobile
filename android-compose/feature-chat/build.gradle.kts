@@ -195,3 +195,33 @@ tasks.register<Test>("testScreenshot") {
 
     systemProperty("kotest.tags.include", "screenshot")
 }
+
+// letta-mobile-ckmub.1 (hard cut S1): legacy vs shared chat row parity harness. Renders every row
+// type both ways and writes paired PNGs, diff images and report.md (row type -> pixel diff %) to
+// build/outputs/roborazzi/row-parity. Advisory: it fails only when nothing renders. The test is
+// skipped by the regular testDebugUnitTest run (it needs letta.rowParity=true, set here).
+//   ./gradlew --no-daemon :feature-chat:rowParityReport
+val rowParityDir = layout.buildDirectory.dir("outputs/roborazzi/row-parity")
+tasks.register<Test>("rowParityReport") {
+    description = "Renders legacy vs shared chat rows side by side and reports the pixel diff per row type"
+    group = "verification"
+
+    val testTask = tasks.named("testDebugUnitTest", Test::class).get()
+    testClassesDirs = testTask.testClassesDirs
+    classpath = testTask.classpath
+    maxHeapSize = testTask.maxHeapSize
+    jvmArgs(testTask.jvmArgs ?: emptyList<String>())
+
+    useJUnitPlatform()
+    filter { includeTestsMatching("com.letta.mobile.feature.chat.parity.RowParityScreenshotTest") }
+    systemProperty("letta.rowParity", "true")
+    systemProperty("letta.rowParity.dir", rowParityDir.get().asFile.absolutePath)
+    outputs.dir(rowParityDir)
+    outputs.upToDateWhen { false }
+
+    val report = rowParityDir.map { it.file("report.md").asFile }
+    doLast {
+        val file = report.get()
+        if (file.exists()) println(file.readText()) else println("row parity: no report at $file")
+    }
+}
