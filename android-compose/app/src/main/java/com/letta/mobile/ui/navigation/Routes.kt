@@ -34,6 +34,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object AboutRoute
 @Serializable data object ModelsRoute
 @Serializable data object AllToolsRoute
+/** letta-mobile-zxk2n.32: the shared Skills page; [agentId] is whose skills install / remove act on. */
+@Serializable data class SkillsRoute(val agentId: String? = null)
 @Serializable data class MemoryRoute(val agentId: String? = null)
 @Serializable data object UsageRoute
 @Serializable data class ShareToAgentRoute(val sharedText: String)

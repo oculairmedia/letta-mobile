@@ -26,7 +26,6 @@ import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
 import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
-import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
@@ -230,21 +229,7 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
-    composable<AllToolsRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-            AllToolsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToToolDetail = { toolId ->
-                    navController.navigate(ToolDetailRoute(toolId))
-                },
-            )
-        }
-    }
+    skillsGraph(navController)
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     composable<ToolDetailRoute>(

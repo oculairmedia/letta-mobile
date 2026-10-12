@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -49,9 +50,12 @@ class AllToolsViewModel @Inject constructor(
         },
     )
 
+    /** The raw library, for the shared Skills page's Tools section (letta-mobile-zxk2n.32). */
+    val toolState: StateFlow<ToolLibraryState> = controller.state
+
     val uiState: StateFlow<UiState<AllToolsUiState>> = controller.state
         .map { it.toUiState() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(UI_STATE_STOP_TIMEOUT_MS), UiState.Loading)
 
     init {
         controller.start()
@@ -70,6 +74,8 @@ class AllToolsViewModel @Inject constructor(
             try {
                 toolRepository.upsertTool(ToolCreateParams(sourceCode = sourceCode))
                 controller.loadTools()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 controller.showError(mapErrorToUserMessage(e, "Failed to create tool"))
             }
@@ -100,6 +106,9 @@ class AllToolsViewModel @Inject constructor(
         controller.close()
     }
 }
+
+/** Keeps the mapped state alive across a configuration change, then lets it stop. */
+private const val UI_STATE_STOP_TIMEOUT_MS = 5_000L
 
 private fun ToolLibraryState.toUiState(): UiState<AllToolsUiState> {
     val message = errorMessage

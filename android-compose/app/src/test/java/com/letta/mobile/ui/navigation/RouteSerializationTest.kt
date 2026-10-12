@@ -110,6 +110,12 @@ class RouteSerializationTest {
     }
 
     @Test
+    fun `SkillsRoute round-trips`() {
+        verifyRoundTrip(SkillsRoute(agentId = "agent-1"))
+        verifyRoundTrip(SkillsRoute())
+    }
+
+    @Test
     fun `EditAgentRoute round-trips`() {
         verifyRoundTrip(EditAgentRoute(agentId = "agent-edit"))
     }

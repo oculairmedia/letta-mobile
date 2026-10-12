@@ -286,15 +286,30 @@ class SharedNavDrawerBindingTest {
             onNavigateToTools = { calls += "tools" },
             onNavigateToConversationList = { calls += "conversations" },
             onNavigateToChannels = { calls += "channels" },
+            onNavigateToSkills = { calls += "skills:$it" },
         )
         LensDestination.entries.forEach { openSection(navigation, "agent-1", it) }
-        assertEquals(listOf("memory:agent-1", "schedules:agent-1", "channels", "tools", "conversations"), calls)
+        assertEquals(listOf("memory:agent-1", "schedules:agent-1", "channels", "skills:agent-1", "conversations"), calls)
         assertEquals(emptySet<LensDestination>(), androidHiddenDrawerSections(navigation))
     }
 
+    /** letta-mobile-zxk2n.32: the drawer's Skills row opened the Tools page; it must open Skills. */
     @Test
-    fun channelsStaysHiddenWithoutAChannelsPage() {
+    fun skillsOpensTheSkillsPageNotTools() {
+        val calls = mutableListOf<String>()
+        val navigation = AgentScaffoldNavigationCallbacks(
+            onNavigateBack = {},
+            onNavigateToSettings = {},
+            onNavigateToTools = { calls += "tools" },
+            onNavigateToSkills = { calls += "skills:$it" },
+        )
+        openSection(navigation, "agent-1", LensDestination.Skills)
+        assertEquals(listOf("skills:agent-1"), calls)
+    }
+
+    @Test
+    fun sectionsStayHiddenWithoutTheirPages() {
         val navigation = AgentScaffoldNavigationCallbacks(onNavigateBack = {}, onNavigateToSettings = {})
-        assertEquals(setOf(LensDestination.Channels), androidHiddenDrawerSections(navigation))
+        assertEquals(setOf(LensDestination.Channels, LensDestination.Skills), androidHiddenDrawerSections(navigation))
     }
 }

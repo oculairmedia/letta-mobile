@@ -726,6 +726,7 @@
     <string name="screen_memory_view_blocks">Blocks</string>
     <string name="screen_memory_view_files">Files</string>
     <string name="screen_channels_title">Channels</string>
+    <string name="screen_skills_title">Skills</string>
     <string name="screen_archival_title">Archival Memory</string>
     <string name="screen_archival_search_hint">Search archival memory…</string>
     <string name="screen_archival_add_title">Add Passage</string>

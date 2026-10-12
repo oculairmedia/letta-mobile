@@ -28,6 +28,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToAppSettings: (() -> Unit)? = null,
     onOpenCanvas: ((canvasId: String) -> Unit)? = null,
     onNavigateToChannels: (() -> Unit)? = null,
+    onNavigateToSkills: ((agentId: String) -> Unit)? = null,
 ) {
     composable<AgentChatRoute>(
         enterTransition = enterTransition,
@@ -95,6 +96,7 @@ fun NavGraphBuilder.chatGraph(
             onNavigateToAppSettings = onNavigateToAppSettings,
             onOpenCanvas = onOpenCanvas,
             onNavigateToChannels = onNavigateToChannels,
+            onNavigateToSkills = onNavigateToSkills,
         )
     }
 }

@@ -127,6 +127,7 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
         onNavigateToAppSettings = { navController.navigate(ConfigRoute()) },
         onOpenCanvas = { canvasId -> navController.navigate(CanvasRoute(canvasId = canvasId)) },
         onNavigateToChannels = { navController.navigate(ChannelsRoute) },
+        onNavigateToSkills = { agentId -> navController.navigate(SkillsRoute(agentId)) },
     )
 }
 
