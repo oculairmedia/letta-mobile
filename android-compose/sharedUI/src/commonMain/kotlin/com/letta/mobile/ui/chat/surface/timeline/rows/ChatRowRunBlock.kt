@@ -49,6 +49,7 @@ import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_run_collapse
@@ -73,6 +74,7 @@ import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -99,40 +101,89 @@ internal fun RunBlockRow(
     position: GroupPosition = GroupPosition.None,
 ) {
     val messages = remember(runMessages) { runMessages.toImmutableList() }
-    if (messages.isEmpty()) return
-    val active = isRunStreaming(messages, context)
-    val activity = remember(messages, active) { projectRunActivity(messages, active) } ?: return
-    val headerVisible = activity.isActive || context.isNewest
-    // letta-mobile-zxk2n.5: hidden reasoning leaves the run's steps, so no empty step keeps its gap.
-    val visible = remember(messages, context.displayOptions) { context.displayOptions.visible(messages) }
-    // The legacy fold, owned by the page (its collapsed run ids), as the legacy RunBlock's was: only a
-    // settled run of several messages folds, and a stale fold never hides active work.
-    val runId = messages.first().runId
-    val foldable = runId != null && messages.size > 1 && !activity.isActive
-    val collapsed = foldable && runId in context.itemState.collapsedRunIds
-    val header = RunHeaderState(
-        activity = activity,
-        visible = headerVisible,
-        // A run that folds once settled keeps the fold's floor while it works, so settling never grows it.
-        tall = messages.size > 1,
-        fold = if (foldable && runId != null) RunFold(collapsed) { callbacks.actions.toggleRunCollapsed(ChatRunId(runId)) } else null,
-    )
+    val plan = rememberRunBlockPlan(messages, context) ?: return
+    val row = RunRowScope(context, callbacks)
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
-        RunHeader(header)
-        val lone = visible.singleOrNull()
-        if (messages.size == 1 && lone != null && !lone.isRunToolCallMessage()) {
+        RunHeader(plan.header(callbacks.actions))
+        val lone = plan.loneMessage
+        if (lone != null) {
             // One message keeps its own row's geometry under the header (no body lift).
-            Box(Modifier.fillMaxWidth().padding(top = runStepTop(lone, position))) {
-                ChatMessageRow(lone, context, callbacks, position)
-            }
+            RunStepRow(PositionedRunStep(RunStep.Message(lone), position), row, Modifier.padding(top = runStepTop(lone, position)))
         } else {
-            // Lifted whenever the header shows, working or settled: legacy's settled geometry, held from
-            // the run's first frame so settling never moves it (no jump, bglj6.1.12).
-            RunBody(visible, collapsed, lifted = headerVisible, context, callbacks)
+            RunBody(plan.body, row)
         }
     }
 }
 
+/** What every part of a run block draws with: the row's inputs and where its intents leave. */
+@Immutable
+private class RunRowScope(val context: ChatRowContext, val callbacks: ChatRowCallbacks)
+
+/**
+ * How one run block draws, decided from its messages and the row's context: whether its header
+ * shows, what its body shows, and whether (and how) it folds.
+ */
+@Immutable
+internal class RunBlockPlan(
+    val activity: RunActivityProjection,
+    /** Working, or settled on the conversation's newest row. */
+    val headerVisible: Boolean,
+    /** The run's messages the chat options leave on screen (zxk2n.5: hidden reasoning leaves no gap). */
+    val visible: List<UiMessage>,
+    val runId: String?,
+    val messageCount: Int,
+    /** The page's fold for this run (its collapsed run ids), honoured only while [foldable]. */
+    val collapsedByOwner: Boolean,
+) {
+    /** The legacy fold: only a settled run of several messages folds; a stale fold never hides active work. */
+    val foldable: Boolean get() = runId != null && isMultiStep() && !activity.isActive
+
+    val collapsed: Boolean get() = foldable && collapsedByOwner
+
+    /** One message that is not a bare tool call draws as its own row under the header. */
+    val loneMessage: UiMessage?
+        get() = visible.singleOrNull()?.takeIf { messageCount == 1 && !it.isRunToolCallMessage() }
+
+    /**
+     * Lifted whenever the header shows, working or settled: legacy's settled geometry, held from the
+     * run's first frame so settling never moves it (no jump, bglj6.1.12).
+     */
+    val body: RunBodyState get() = RunBodyState(visible, collapsed, lifted = headerVisible)
+
+    /** The header; a run that folds once settled keeps the fold's floor while it works. */
+    fun header(actions: ChatActions): RunHeaderState =
+        RunHeaderState(activity, headerVisible, tall = isMultiStep(), fold = foldOf(actions))
+
+    private fun isMultiStep(): Boolean = messageCount > 1
+
+    private fun foldOf(actions: ChatActions): RunFold? {
+        val id = runId ?: return null
+        if (!foldable) return null
+        return RunFold(collapsed) { actions.toggleRunCollapsed(ChatRunId(id)) }
+    }
+}
+
+/** The run's plan, or null when it has nothing to draw. */
+@Composable
+private fun rememberRunBlockPlan(messages: ImmutableList<UiMessage>, context: ChatRowContext): RunBlockPlan? {
+    if (messages.isEmpty()) return null
+    val active = isRunStreaming(messages, context)
+    val activity = remember(messages, active) { projectRunActivity(messages, active) } ?: return null
+    val visible = remember(messages, context.displayOptions) { context.displayOptions.visible(messages) }
+    val runId = messages.first().runId
+    return RunBlockPlan(
+        activity = activity,
+        headerVisible = activity.isActive || context.isNewest,
+        visible = visible,
+        runId = runId,
+        messageCount = messages.size,
+        collapsedByOwner = runId != null && runId in context.itemState.collapsedRunIds,
+    )
+}
+
+/** What a run's body shows: its steps, folded or not, and whether it lifts under the header. */
+@Immutable
+internal class RunBodyState(val messages: List<UiMessage>, val collapsed: Boolean, val lifted: Boolean)
 /** The run's header and whether it shows; [fold] when a settled run of several steps can fold. */
 @Immutable
 internal data class RunHeaderState(
@@ -273,22 +324,16 @@ private fun RunSummaryTitleText(title: String, color: Color, reducedMotion: Bool
  * band below); folded, only the run's last non-reasoning step shows.
  */
 @Composable
-private fun RunBody(
-    messages: List<UiMessage>,
-    collapsed: Boolean,
-    lifted: Boolean,
-    context: ChatRowContext,
-    callbacks: ChatRowCallbacks,
-) {
+private fun RunBody(body: RunBodyState, row: RunRowScope) {
     val reducedMotion = LocalReducedMotion.current
     val lift by animateDpAsState(
-        targetValue = if (lifted) ChatRowSpacing.settledRunBodyLift else 0.dp,
+        targetValue = if (body.lifted) ChatRowSpacing.settledRunBodyLift else 0.dp,
         animationSpec = if (reducedMotion) snap() else tween(RUN_BODY_LIFT_MILLIS),
         label = "runBodyLift",
     )
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
         AnimatedContent(
-            targetState = collapsed,
+            targetState = body.collapsed,
             transitionSpec = {
                 val motion = ChatRowMotion(reducedMotion)
                 (fadeIn(motion.contentSize()) togetherWith fadeOut(motion.contentSize()))
@@ -296,8 +341,8 @@ private fun RunBody(
             },
             label = "runBodyFold",
         ) { folded ->
-            val shown = if (folded) listOfNotNull(collapsedPreview(messages)) else messages
-            RunSteps(remember(shown) { compactRunSteps(shown) }, folded, context, callbacks)
+            val shown = if (folded) listOfNotNull(collapsedPreview(body.messages)) else body.messages
+            RunSteps(remember(shown) { compactRunSteps(shown) }, folded, row)
         }
     }
 }
@@ -315,21 +360,13 @@ private fun Modifier.pullUp(distance: () -> Dp): Modifier = layout { measurable,
 
 /** The run's steps, each on the legacy row beat above it (RenderChatMessage's item padding). */
 @Composable
-private fun RunSteps(
-    steps: List<RunStep>,
-    folded: Boolean,
-    context: ChatRowContext,
-    callbacks: ChatRowCallbacks,
-) {
+private fun RunSteps(steps: List<RunStep>, folded: Boolean, row: RunRowScope) {
+
     Column(modifier = Modifier.fillMaxWidth()) {
         steps.forEachIndexed { index, step ->
             key(step.key) {
-                val position = stepPosition(index, steps.size, folded)
-                val top = when (step) {
-                    is RunStep.Message -> runStepTop(step.message, position)
-                    is RunStep.ToolCalls -> ChatRowSpacing.grouped
-                }
-                RunStepRow(step, position, context, callbacks, Modifier.padding(top = top))
+                val positioned = PositionedRunStep(step, stepPosition(index, steps.size, folded))
+                RunStepRow(positioned, row, Modifier.padding(top = positioned.top()))
             }
         }
     }
@@ -352,22 +389,26 @@ internal fun runStepTop(message: UiMessage, position: GroupPosition): Dp = when 
     else -> ChatRowSpacing.ungrouped
 }
 
+/** A run step and its place among the run's visible steps (the legacy row's group position). */
+@Immutable
+private class PositionedRunStep(val step: RunStep, val position: GroupPosition) {
+    /** The legacy row beat above it: a tool summary always takes the grouped beat. */
+    fun top(): Dp = when (step) {
+        is RunStep.Message -> runStepTop(step.message, position)
+        is RunStep.ToolCalls -> ChatRowSpacing.grouped
+    }
+}
+
 @Composable
-private fun RunStepRow(
-    step: RunStep,
-    position: GroupPosition,
-    context: ChatRowContext,
-    callbacks: ChatRowCallbacks,
-    modifier: Modifier,
-) {
-    when (step) {
+private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier: Modifier) {
+    when (val step = positioned.step) {
         is RunStep.Message -> Box(modifier = modifier.fillMaxWidth()) {
-            ChatMessageRow(step.message, context, callbacks, position)
+            ChatMessageRow(step.message, row.context, row.callbacks, positioned.position)
         }
         is RunStep.ToolCalls -> ToolRunGroup(
             calls = step.calls,
-            context = context,
-            callbacks = callbacks,
+            context = row.context,
+            callbacks = row.callbacks,
             modifier = modifier,
         )
     }

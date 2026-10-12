@@ -131,9 +131,8 @@ internal fun ToolRunGroup(
         split.shown.forEach { ApprovalRequestCard(it, context, callbacks) }
     }
     if (detailsOpen && !inline) {
-        ToolRunDetailsSheet(ToolRunDetails(toolCalls, split.folded), ToolRunLine(summary, startedAtEpochMs), context, callbacks) {
-            detailsOpen = false
-        }
+        val sheet = ToolRunSheetContent(ToolRunDetails(toolCalls, split.folded), ToolRunLine(summary, startedAtEpochMs))
+        ToolRunDetailsSheet(sheet, context, callbacks) { detailsOpen = false }
     }
 }
 
@@ -168,6 +167,10 @@ private fun FoldedApprovalCue(folded: List<UiApprovalRequest>) {
 /** What the line's disclosure opens: the calls in full, and the approvals folded under the line. */
 @Immutable
 private class ToolRunDetails(val toolCalls: ImmutableList<UiToolCall>, val approvals: ImmutableList<UiApprovalRequest>)
+
+/** The touch host's sheet: the line's [details] under a title that says what the line says. */
+@Immutable
+private class ToolRunSheetContent(val details: ToolRunDetails, val heading: ToolRunLine)
 
 /**
  * The calls one summary line folds: every call, the approvals among them, and when the first of
@@ -340,12 +343,13 @@ private const val ELAPSED_TICK_MILLIS = 1_000L
 /** The run's calls in full, one [ToolCard] each, led by its step status. */
 @Composable
 private fun ToolRunDetailsSheet(
-    details: ToolRunDetails,
-    heading: ToolRunLine,
+    sheet: ToolRunSheetContent,
     context: ChatRowContext,
     callbacks: ChatRowCallbacks,
     onDismiss: () -> Unit,
 ) {
+    val details = sheet.details
+    val heading = sheet.heading
     val elapsed by rememberElapsedSeconds(heading.summary.running, heading.startedAtEpochMs)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
