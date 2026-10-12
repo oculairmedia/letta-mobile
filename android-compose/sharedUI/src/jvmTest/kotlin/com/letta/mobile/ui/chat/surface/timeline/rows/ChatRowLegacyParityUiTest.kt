@@ -65,7 +65,11 @@ class ChatRowLegacyParityUiTest {
     }
 
     @Test
-    fun aPermissionApprovalFoldsIntoTheToolLineUntilOpened() = runComposeUiTest {
+    /**
+     * letta-mobile-sieej (P0): the one place a pending row may differ from legacy. A parked permission
+     * approval is NOT folded into the tool line: its card shows under the line without a tap.
+     */
+    fun aPendingPermissionApprovalShowsUnderTheToolLineWithoutATap() = runComposeUiTest {
         val approval = UiMessage(
             id = "ap",
             role = "assistant",
@@ -82,7 +86,10 @@ class ChatRowLegacyParityUiTest {
         setContent {
             MaterialTheme { RenderRow(runOf(approval), rowContext(newestMessageId = "ap", toolDetails = ChatToolDetails.Inline)) }
         }
-        onNodeWithText("Approval requested").assertDoesNotExist()
+        onNodeWithText("Approval requested").assertExists()
+        onNodeWithText("Approve").assertExists()
+        onNodeWithText("Approval needed - 1 command").assertExists()
+        // Opening the line's disclosure shows the calls, never a second card.
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
         waitForIdle()
         onNodeWithText("Approval requested").assertExists()
