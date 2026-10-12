@@ -81,9 +81,10 @@ class ShellPageTest {
         for (destination in destinations) {
             current = destination
             waitForIdle()
-            val expected = if (destination.kind == ShellPageKind.Overview) FALLBACK else tag(destination.kind)
-            onNodeWithTag(expected).assertExists()
-            assertEquals(destination, fakes.seen.last())
+            // S10: Overview is the Settings page on its About section.
+            val overview = destination.kind == ShellPageKind.Overview
+            onNodeWithTag(tag(if (overview) ShellPageKind.Settings else destination.kind)).assertExists()
+            assertEquals(if (overview) ShellDestination.Settings(ShellSettingsSection.About) else destination, fakes.seen.last())
         }
     }
 
@@ -101,6 +102,13 @@ class ShellPageTest {
             onNodeWithTag(FALLBACK).assertExists()
             assertEquals(destination, fakes.seen.last())
         }
+    }
+
+    @Test
+    fun overviewIsRegisteredOnlyWithASettingsPage() {
+        val fakes = FakePages()
+        assertEquals(true, ShellPageKind.Overview in fakes.all().registered)
+        assertEquals(false, ShellPageKind.Overview in ShellPageDeps(home = fakes.page(ShellPageKind.Home)).registered)
     }
 
     @Test

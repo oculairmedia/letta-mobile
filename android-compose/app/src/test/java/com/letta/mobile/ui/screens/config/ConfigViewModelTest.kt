@@ -3,12 +3,13 @@ package com.letta.mobile.ui.screens.config
 import android.net.Uri
 import app.cash.turbine.test
 import androidx.lifecycle.SavedStateHandle
-import com.letta.mobile.data.api.CloudConnectionValidationResult
-import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.transport.appserver.AppServerIdentity
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
@@ -22,6 +23,7 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.ui.common.UiState
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -48,7 +50,6 @@ import org.junit.jupiter.api.Tag
 class ConfigViewModelTest {
 
     private lateinit var fakeRepository: FakeSettingsRepository
-    private lateinit var fakeValidator: FakeCloudConnectionValidator
     private lateinit var fakeModelImporter: FakeOnDeviceModelImporter
     private lateinit var fakeEmbeddedModelRepository: FakeEmbeddedModelRepository
     private lateinit var fakeEndpointCatalog: FakeEndpointOpenAiModelCatalog
@@ -60,7 +61,6 @@ class ConfigViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeSettingsRepository()
-        fakeValidator = FakeCloudConnectionValidator()
         fakeModelImporter = FakeOnDeviceModelImporter()
         fakeEmbeddedModelRepository = FakeEmbeddedModelRepository()
         fakeEndpointCatalog = FakeEndpointOpenAiModelCatalog()
@@ -75,12 +75,12 @@ class ConfigViewModelTest {
         ConfigViewModel(
             SavedStateHandle(),
             settingsRepository,
-            fakeValidator,
             FakeEmbeddedLettaCodeRuntimeStatusProvider(),
             fakeModelImporter,
             fakeEmbeddedModelRepository,
             fakeEndpointCatalog,
             fakeConnectionTester,
+            PermissionModeSettings(InMemorySecureSettingsStore()),
         )
 
     @After
@@ -88,79 +88,75 @@ class ConfigViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun selfHostedForm() {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
-        viewModel.updateMode(ServerMode.SELF_HOSTED)
-    }
-
-    private fun connectionTest(): ConnectionTestUiState =
-        (viewModel.uiState.value as UiState.Success).data.connectionTest
-
     @Test
-    fun testConnection_reportsTheClassifiedProbeResultForTheFormValues() = runTest {
-        // letta-mobile-bzvro.1 (F01): the form is tested before it is saved.
-        selfHostedForm()
-        viewModel.updateServerUrl("wss://appserver.example/ws")
-        viewModel.updateApiToken(" tkn ")
-        val gate = CompletableDeferred<AppServerProbeResult?>()
-        fakeConnectionTester.next = { gate.await() }
+    fun testConnection_reportsTheClassifiedProbeResultWithoutSaving() = runTest {
+        // letta-mobile-bzvro.1 (F01): the shared Backend section tests the form before it is saved.
+        fakeRepository.activeConfigState.value = null
+        fakeConnectionTester.next = { AppServerProbeResult.Authentication("HTTP 401") }
 
-        viewModel.testConnection()
-        assertEquals(ConnectionTestUiState.Running, connectionTest())
-        gate.complete(AppServerProbeResult.Authentication("HTTP 401"))
+        val status = viewModel.testConnection(" wss://appserver.example/ws ", " tkn ")
 
-        assertEquals(ConnectionTestUiState.Finished(AppServerProbeResult.Authentication("HTTP 401")), connectionTest())
+        assertEquals(SettingsTone.Error, status.tone)
         assertEquals(listOf("wss://appserver.example/ws" to "tkn"), fakeConnectionTester.calls)
         assertEquals("testing never saves", null, fakeRepository.activeConfigState.value)
     }
 
     @Test
     fun testConnection_okCarriesTheServerIdentity() = runTest {
-        selfHostedForm()
-        viewModel.updateServerUrl("ws://10.0.0.2:4500")
-        val ok = AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
-        fakeConnectionTester.next = { ok }
+        fakeConnectionTester.next = { AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1)) }
 
-        viewModel.testConnection()
+        val status = viewModel.testConnection("ws://10.0.0.2:4500", null)
 
-        assertEquals(ConnectionTestUiState.Finished(ok), connectionTest())
+        assertEquals(SettingsStatus("Connected: letta-code 0.33.6 (local backend, protocol 1)", SettingsTone.Positive), status)
     }
 
     @Test
-    fun testConnection_unprobeableUrlIsNotSupported() = runTest {
-        selfHostedForm()
-        viewModel.updateServerUrl("iroh://node-ticket")
+    fun testConnection_anIrohAddressCannotBeProbed() = runTest {
         fakeConnectionTester.next = { null }
 
-        viewModel.testConnection()
+        val status = viewModel.testConnection("iroh://node-ticket", "  ")
 
-        assertEquals(ConnectionTestUiState.NotSupported, connectionTest())
+        assertEquals(SettingsTone.Normal, status.tone)
+        assertEquals(listOf<Pair<String, String?>>("iroh://node-ticket" to null), fakeConnectionTester.calls)
     }
 
     @Test
-    fun testConnection_resultForAnEditedUrlIsDropped() = runTest {
-        selfHostedForm()
-        viewModel.updateServerUrl("ws://old:4500")
-        val gate = CompletableDeferred<AppServerProbeResult?>()
-        fakeConnectionTester.next = { gate.await() }
+    fun saveBackend_savesTheSharedFormsRemoteHost() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+        var saved = false
 
-        viewModel.testConnection()
-        viewModel.updateServerUrl("ws://new:4500")
-        gate.complete(AppServerProbeResult.Unavailable("refused"))
+        viewModel.saveBackend(
+            LettaConfig(id = "ignored", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://abc@10.0.0.2:4433", accessToken = "t"),
+            onSuccess = { saved = true },
+        )
 
-        assertEquals(ConnectionTestUiState.Idle, connectionTest())
+        val config = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, config?.mode)
+        assertEquals("iroh://abc@10.0.0.2:4433", config?.serverUrl)
+        assertEquals("t", config?.accessToken)
+        assertTrue(saved)
     }
 
     @Test
-    fun testConnection_isOnlyForSelfHosted() = runTest {
+    fun saveBackend_localRuntimeUsesTheEmbeddedRuntimeAddress() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
 
-        viewModel.testConnection()
+        viewModel.saveBackend(LettaConfig(id = "x", mode = LettaConfig.Mode.LOCAL, serverUrl = ""), onSuccess = {})
 
-        assertEquals(ConnectionTestUiState.Idle, connectionTest())
-        assertTrue(fakeConnectionTester.calls.isEmpty())
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, fakeRepository.activeConfig.value?.serverUrl)
+        assertEquals(null, fakeRepository.activeConfig.value?.accessToken)
+    }
+
+    @Test
+    fun backendConfig_isAFreshRemoteHostBeforeTheFirstSetup() = runTest {
+        fakeRepository.activeConfigState.value = null
+
+        val config = viewModel.backendConfig.value
+
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, config.mode)
+        assertEquals("", config.serverUrl)
     }
 
     @Test
@@ -173,7 +169,7 @@ class ConfigViewModelTest {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
             val successState = (state as UiState.Success).data
-            assertEquals(ServerMode.CLOUD, successState.mode)
+            assertEquals(ServerMode.SELF_HOSTED, successState.mode)
             assertEquals("", successState.serverUrl)
             assertEquals("", successState.apiToken)
             assertEquals(AppTheme.SYSTEM, successState.theme)
@@ -186,8 +182,8 @@ class ConfigViewModelTest {
     fun loadConfig_doesNotReplaceUnsavedEdits() = runTest {
         fakeRepository.activeConfigState.value = LettaConfig(
             id = "config-1",
-            mode = LettaConfig.Mode.CLOUD,
-            serverUrl = "https://cloud.letta.ai",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://remote.letta.ai",
             accessToken = "persisted-token",
         )
         viewModel.loadConfig()
@@ -198,28 +194,6 @@ class ConfigViewModelTest {
         val state = (viewModel.uiState.value as UiState.Success).data
         assertEquals("unsaved-token", state.apiToken)
         assertTrue(state.hasUnsavedChanges)
-    }
-
-    @Test
-    fun loadConfig_withExistingCloudConfig_mapsModeUrlTokenCorrectly() = runTest {
-        val config = LettaConfig(
-            id = "config-1",
-            mode = LettaConfig.Mode.CLOUD,
-            serverUrl = "https://cloud.letta.ai",
-            accessToken = "cloud-token-123"
-        )
-        fakeRepository.activeConfigState.value = config
-
-        viewModel.loadConfig()
-
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertTrue(state is UiState.Success)
-            val successState = (state as UiState.Success).data
-            assertEquals(ServerMode.CLOUD, successState.mode)
-            assertEquals("https://cloud.letta.ai", successState.serverUrl)
-            assertEquals("cloud-token-123", successState.apiToken)
-        }
     }
 
     @Test
@@ -270,8 +244,8 @@ class ConfigViewModelTest {
     fun loadConfig_withConfigWithoutToken_mapsToEmptyString() = runTest {
         val config = LettaConfig(
             id = "config-3",
-            mode = LettaConfig.Mode.CLOUD,
-            serverUrl = "https://cloud.letta.ai",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://remote.letta.ai",
             accessToken = null
         )
         fakeRepository.activeConfigState.value = config
@@ -343,27 +317,6 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun saveConfig_buildsLettaConfigFromFormState_withCloudMode() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
-
-        viewModel.updateMode(ServerMode.CLOUD)
-        viewModel.updateServerUrl("https://api.letta.com")
-        viewModel.updateApiToken("new-token")
-
-        var onSuccessCalled = false
-        viewModel.saveConfig(onSuccess = {
-            onSuccessCalled = true
-        })
-
-        val savedConfig = fakeRepository.activeConfig.value
-        assertEquals(LettaConfig.Mode.CLOUD, savedConfig?.mode)
-        assertEquals("https://api.letta.com", savedConfig?.serverUrl)
-        assertEquals("new-token", savedConfig?.accessToken)
-        assertTrue(onSuccessCalled)
-    }
-
-    @Test
     fun saveConfig_buildsLettaConfigFromFormState_withSelfHostedMode() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
@@ -387,7 +340,6 @@ class ConfigViewModelTest {
     @Test
     fun saveConfig_buildsLettaConfigFromFormState_withLocalMode() = runTest {
         fakeRepository.activeConfigState.value = null
-        fakeValidator.result = CloudConnectionValidationResult.Failed("local should not validate cloud")
         viewModel.loadConfig()
 
         viewModel.updateMode(ServerMode.LOCAL)
@@ -404,7 +356,6 @@ class ConfigViewModelTest {
         assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
         assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, savedConfig?.serverUrl)
         assertEquals(null, savedConfig?.accessToken)
-        assertEquals(0, fakeValidator.calls)
         assertEquals(null, errorMessage)
         assertTrue(onSuccessCalled)
     }
@@ -413,7 +364,7 @@ class ConfigViewModelTest {
     fun saveConfig_preservesExistingConfigId() = runTest {
         val existingConfig = LettaConfig(
             id = "existing-id-123",
-            mode = LettaConfig.Mode.CLOUD,
+            mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "https://old.letta.ai",
             accessToken = "old-token"
         )
@@ -426,93 +377,7 @@ class ConfigViewModelTest {
 
         val savedConfig = fakeRepository.activeConfig.value
         assertEquals("existing-id-123", savedConfig?.id)
-        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, savedConfig?.serverUrl)
-    }
-
-    @Test
-    fun saveConfig_withBlankCloudToken_reportsErrorAndDoesNotSave() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
-
-        viewModel.updateMode(ServerMode.CLOUD)
-        viewModel.updateServerUrl("https://api.letta.com")
-        viewModel.updateApiToken("")
-
-        var errorMessage: String? = null
-        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
-
-        assertEquals(null, fakeRepository.activeConfig.value)
-        assertEquals(
-            "Letta Cloud API key is required. Paste a key from app.letta.com before saving.",
-            errorMessage,
-        )
-    }
-
-    @Test
-    fun saveConfig_withBlankCloudToken_keepsImmediatePreferenceChanges() = runTest {
-        fakeRepository.activeConfigState.value = null
-        viewModel.loadConfig()
-
-        viewModel.updateTheme(AppTheme.DARK)
-        viewModel.updateThemePreset(ThemePreset.SAKURA)
-        viewModel.updateDynamicColor(false)
-        viewModel.updateEnableProjects(false)
-        viewModel.updateMode(ServerMode.CLOUD)
-        viewModel.updateApiToken("")
-
-        var errorMessage: String? = null
-        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
-
-        assertEquals(null, fakeRepository.activeConfig.value)
-        assertEquals(
-            "Letta Cloud API key is required. Paste a key from app.letta.com before saving.",
-            errorMessage,
-        )
-        assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
-        assertEquals(ThemePreset.SAKURA, fakeRepository.getThemePreset().first())
-        assertEquals(false, fakeRepository.getDynamicColor().first())
-        assertEquals(false, fakeRepository.getEnableProjects().first())
-    }
-
-    @Test
-    fun saveConfig_withRejectedCloudToken_reportsErrorAndDoesNotSave() = runTest {
-        fakeRepository.activeConfigState.value = null
-        fakeValidator.result = CloudConnectionValidationResult.Failed("bad key")
-        viewModel.loadConfig()
-
-        viewModel.updateMode(ServerMode.CLOUD)
-        viewModel.updateApiToken("bad-token")
-
-        var onSuccessCalled = false
-        var errorMessage: String? = null
-        viewModel.saveConfig(
-            onSuccess = { onSuccessCalled = true },
-            onError = { errorMessage = it },
-        )
-
-        assertEquals(null, fakeRepository.activeConfig.value)
-        assertEquals("bad key", errorMessage)
-        assertEquals(false, onSuccessCalled)
-    }
-
-    @Test
-    fun saveConfig_withRejectedCloudToken_keepsImmediateThemeChanges() = runTest {
-        fakeRepository.activeConfigState.value = null
-        fakeValidator.result = CloudConnectionValidationResult.Failed("bad key")
-        viewModel.loadConfig()
-
-        viewModel.updateTheme(AppTheme.DARK)
-        viewModel.updateThemePreset(ThemePreset.SAKURA)
-        viewModel.updateDynamicColor(false)
-        viewModel.updateMode(ServerMode.CLOUD)
-        viewModel.updateApiToken("bad-token")
-
-        viewModel.saveConfig(onSuccess = {}, onError = {})
-
-        assertEquals(null, fakeRepository.activeConfig.value)
-        assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
-        assertEquals(ThemePreset.SAKURA, fakeRepository.getThemePreset().first())
-        assertEquals(false, fakeRepository.getDynamicColor().first())
+        assertEquals("https://new.letta.ai", savedConfig?.serverUrl)
     }
 
     /**
@@ -542,26 +407,14 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun updateMode_roundTripsCloudAndSelfHostedUrlsCorrectly() = runTest {
+    fun updateMode_roundTripsLocalAndRemoteHostUrlsCorrectly() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
 
-        viewModel.updateMode(ServerMode.CLOUD)
-        var successState = (viewModel.uiState.value as UiState.Success).data
-        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, successState.serverUrl)
-
-        viewModel.updateMode(ServerMode.SELF_HOSTED)
-        successState = (viewModel.uiState.value as UiState.Success).data
-        assertEquals("", successState.serverUrl)
-
         viewModel.updateServerUrl("http://localhost:8080")
-        viewModel.updateMode(ServerMode.CLOUD)
-        successState = (viewModel.uiState.value as UiState.Success).data
-        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, successState.serverUrl)
-
         viewModel.updateMode(ServerMode.SELF_HOSTED)
-        successState = (viewModel.uiState.value as UiState.Success).data
-        assertEquals("", successState.serverUrl)
+        var successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("http://localhost:8080", successState.serverUrl)
 
         viewModel.updateMode(ServerMode.LOCAL)
         successState = (viewModel.uiState.value as UiState.Success).data
@@ -1089,19 +942,5 @@ class ConfigViewModelTest {
         }
 
         override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? = null
-    }
-
-    private class FakeCloudConnectionValidator(
-        var result: CloudConnectionValidationResult = CloudConnectionValidationResult.Success,
-    ) : CloudConnectionValidator() {
-        var calls: Int = 0
-
-        override suspend fun validate(
-            baseUrl: String,
-            apiToken: String,
-        ): CloudConnectionValidationResult {
-            calls++
-            return result
-        }
     }
 }

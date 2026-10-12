@@ -28,7 +28,7 @@ import kotlin.test.assertNull
 class CronApiTest {
     private val config = LettaConfig(
         id = "test-config",
-        mode = LettaConfig.Mode.CLOUD,
+        mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl = "https://api.example.com/",
         accessToken = "test-token"
     )

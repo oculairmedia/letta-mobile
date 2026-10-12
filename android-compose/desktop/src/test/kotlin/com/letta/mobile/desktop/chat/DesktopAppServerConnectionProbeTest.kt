@@ -3,7 +3,8 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.transport.appserver.AppServerIdentity
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.desktop.DesktopSuspendResponder
-import com.letta.mobile.desktop.desktopConnectionTestMessage
+import com.letta.mobile.data.settings.SettingsStatus
+import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.controller.reconnect.SuspendEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -55,16 +56,16 @@ class DesktopAppServerConnectionProbeTest {
         val finished = assertIs<DesktopConnectionTestState.Finished>(runDesktopConnectionTest(" ws://h:1 ", "  ", probe))
         assertEquals(null, sentToken, "a blank token is not sent")
         assertEquals(
-            "Connected: letta-code 0.33.6 (local backend, protocol 1)" to false,
-            desktopConnectionTestMessage(finished),
+            SettingsStatus("Connected: letta-code 0.33.6 (local backend, protocol 1)", SettingsTone.Positive),
+            finished.toSettingsStatus(),
         )
 
         val failed = runDesktopConnectionTest("ws://h:1", "t", DesktopAppServerProbe { _, _ -> AppServerProbeResult.Unavailable("refused") })
-        assertEquals("Server unavailable: refused" to true, desktopConnectionTestMessage(failed))
+        assertEquals(SettingsStatus("Server unavailable: refused", SettingsTone.Error), failed.toSettingsStatus())
 
         assertIs<DesktopConnectionTestState.NotSupported>(runDesktopConnectionTest("", null, probe))
-        assertIs<DesktopConnectionTestState.NotSupported>(runDesktopConnectionTest("iroh://x", null, DesktopAppServerProbe { _, _ -> null }))
-        assertEquals(null, desktopConnectionTestMessage(DesktopConnectionTestState.Running))
+        val iroh = runDesktopConnectionTest("iroh://x", null, DesktopAppServerProbe { _, _ -> null })
+        assertEquals(SettingsTone.Normal, assertIs<DesktopConnectionTestState.NotSupported>(iroh).toSettingsStatus().tone)
     }
 
     @Test

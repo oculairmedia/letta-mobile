@@ -195,12 +195,6 @@ class ConfigListViewModel @Inject constructor(
     }
 }
 
-private fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
-    LettaConfig.Mode.CLOUD -> ServerMode.CLOUD
-    LettaConfig.Mode.SELF_HOSTED -> ServerMode.SELF_HOSTED
-    LettaConfig.Mode.LOCAL -> ServerMode.LOCAL
-}
-
 private fun LettaConfig.isEmbeddedLettaCodeConfig(): Boolean {
     if (mode != LettaConfig.Mode.LOCAL) return false
     val trimmed = serverUrl.trim()
