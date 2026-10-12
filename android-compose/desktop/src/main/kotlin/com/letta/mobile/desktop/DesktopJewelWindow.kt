@@ -49,6 +49,7 @@ import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.SearchSlot
@@ -253,32 +254,39 @@ internal fun DesktopJewelWindow(
  */
 @Composable
 private fun DesktopTitleBarHeader(title: String, header: DesktopHeaderChromeState, modifier: Modifier) {
-    val identity = header.identity
     ShellHeader(
-        modifier = modifier,
-        navIcon = HeaderNav.Custom {
-            // The one control that survives collapse (o5m90 AC #1), so the hidden sidebar stays findable.
-            DesktopSidebarToggleButton(
-                collapsed = header.sidebarCollapsed,
-                onToggle = header.onToggleSidebar,
-                focusRequester = header.sidebarToggleFocusRequester,
-            )
-            header.sidebarOverflow?.takeIf { header.sidebarCollapsed }?.let { overflow ->
-                DesktopSidebarOverflowMenu(
-                    mode = overflow.mode,
-                    onNewChat = overflow.onNewChat,
-                    onDestination = overflow.onDestination,
-                    onSettings = overflow.onSettings,
-                )
-            }
-            Box(modifier = Modifier.width(LettaDimens.Space.xs))
-        },
         title = desktopHeaderTitle(title, header),
+        modifier = modifier,
         search = header.search,
-        actions = identity?.let { state ->
-            listOf(HeaderAction.Custom { DesktopHeaderTrailingControls(state = state, actions = header.identityActions) })
-        }.orEmpty(),
+        controls = desktopHeaderControls(header),
     )
+}
+
+/** Leading: the sidebar toggle and, while collapsed, its overflow. Trailing: the run controls. */
+private fun desktopHeaderControls(header: DesktopHeaderChromeState): HeaderControls = HeaderControls(
+    nav = HeaderNav.Custom { DesktopSidebarControls(header) },
+    actions = header.identity?.let { state ->
+        listOf(HeaderAction.Custom { DesktopHeaderTrailingControls(state = state, actions = header.identityActions) })
+    }.orEmpty(),
+)
+
+/** The one control that survives collapse (o5m90 AC #1), so the hidden sidebar stays findable. */
+@Composable
+private fun DesktopSidebarControls(header: DesktopHeaderChromeState) {
+    DesktopSidebarToggleButton(
+        collapsed = header.sidebarCollapsed,
+        onToggle = header.onToggleSidebar,
+        focusRequester = header.sidebarToggleFocusRequester,
+    )
+    header.sidebarOverflow?.takeIf { header.sidebarCollapsed }?.let { overflow ->
+        DesktopSidebarOverflowMenu(
+            mode = overflow.mode,
+            onNewChat = overflow.onNewChat,
+            onDestination = overflow.onDestination,
+            onSettings = overflow.onSettings,
+        )
+    }
+    Box(modifier = Modifier.width(LettaDimens.Space.xs))
 }
 
 /** The tab strip when tabs are open, else the agent identity block, else the window title. */

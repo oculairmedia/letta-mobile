@@ -61,12 +61,18 @@ sealed interface HeaderAction {
     class Custom(val content: @Composable RowScope.() -> Unit) : HeaderAction
 }
 
+/** The header's controls around the title: the leading [nav] affordance and the trailing [actions]. */
+data class HeaderControls(
+    val nav: HeaderNav = HeaderNav.None,
+    val actions: List<HeaderAction> = emptyList(),
+)
+
 /**
- * The one shell header (hard cut P3, letta-mobile-ckmub.3.5): the leading [navIcon], the [title],
- * the page's ONE [search] and the trailing [actions], on every platform. Desktop draws it inside its
- * window title bar (the free width between title and search stays the native drag region); Android
- * draws it in [com.letta.mobile.ui.shell.scaffold.LettaPageScaffold]'s header slot, which puts it below
- * the status bar while the page colour runs behind it (edge to edge).
+ * The one shell header (hard cut P3, letta-mobile-ckmub.3.5): the leading nav affordance, the
+ * [title], the page's ONE [search] and the trailing actions ([controls]), on every platform. Desktop
+ * draws it inside its window title bar (the free width between title and search stays the native drag
+ * region); Android draws it in [com.letta.mobile.ui.shell.scaffold.LettaPageScaffold]'s header slot,
+ * which puts it below the status bar while the page colour runs behind it (edge to edge).
  *
  * The header has no background of its own: the page's container (or the title bar) shows through.
  */
@@ -75,8 +81,7 @@ fun ShellHeader(
     title: HeaderTitle,
     modifier: Modifier = Modifier,
     search: SearchSlot? = null,
-    actions: List<HeaderAction> = emptyList(),
-    navIcon: HeaderNav = HeaderNav.None,
+    controls: HeaderControls = HeaderControls(),
 ) {
     val touch = LocalLettaHost.current.input == LettaInput.Touch
     Row(
@@ -86,14 +91,14 @@ fun ShellHeader(
             .testTag(ShellHeaderTags.HEADER),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HeaderNavSlot(navIcon)
+        HeaderNavSlot(controls.nav)
         HeaderTitleSlot(title)
         if (title !is HeaderTitle.Custom || !title.fill) {
             // The free width: on desktop this is the window's drag lane.
             Box(Modifier.weight(1f).fillMaxHeight())
         }
         if (search != null) SearchSlotField(search, compact = touch)
-        actions.forEach { action -> HeaderActionSlot(action) }
+        controls.actions.forEach { action -> HeaderActionSlot(action) }
     }
 }
 

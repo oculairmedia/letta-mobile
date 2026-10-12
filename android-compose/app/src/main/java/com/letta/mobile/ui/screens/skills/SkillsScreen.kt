@@ -19,6 +19,7 @@ import com.letta.mobile.ui.screens.tools.CreateToolDialog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
@@ -54,7 +55,7 @@ fun SkillsScreen(
         header = {
             ShellHeader(
                 title = HeaderTitle.Text(stringResource(R.string.screen_skills_title)),
-                navIcon = HeaderNav.Back(navigation.onNavigateBack, stringResource(R.string.action_back)),
+                controls = HeaderControls(nav = HeaderNav.Back(navigation.onNavigateBack, stringResource(R.string.action_back))),
             )
         },
     ) { paddingValues ->

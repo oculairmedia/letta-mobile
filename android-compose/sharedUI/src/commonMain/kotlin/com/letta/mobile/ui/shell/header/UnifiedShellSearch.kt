@@ -29,6 +29,18 @@ enum class UnifiedSearchKind(val id: String, val label: String) {
     Canvases("canvases", "Canvases"),
 }
 
+/**
+ * What the user asked the unified search: the typed [text], the "Filter to this agent" checkbox
+ * (on by default) and the scope tab ([UnifiedShellSearch.ALL] or a [UnifiedSearchKind.id]).
+ */
+data class UnifiedSearchQuery(
+    val text: String,
+    val filterToAgent: Boolean = true,
+    val scopeId: String = UnifiedShellSearch.ALL,
+) {
+    fun includes(kind: UnifiedSearchKind): Boolean = scopeId == UnifiedShellSearch.ALL || scopeId == kind.id
+}
+
 /** A picked row: what kind it is and the id of the thing to open. */
 data class UnifiedSearchHit(val kind: UnifiedSearchKind, val id: String)
 
@@ -56,19 +68,18 @@ object UnifiedShellSearch {
     }
 
     /**
-     * The sections for [query]. [filterToAgent] (the "Filter to this agent" checkbox, on by default)
-     * restricts conversations and canvases to the focused agent; agents are never restricted, since
-     * narrowing the agent list to the agent already selected would leave one row.
+     * The sections for [query] over [sources]. [UnifiedSearchQuery.filterToAgent] restricts
+     * conversations and canvases to the focused agent; agents are never restricted, since narrowing
+     * the agent list to the agent already selected would leave one row.
      */
     fun sections(
-        query: String,
+        query: UnifiedSearchQuery,
         sources: UnifiedSearchSources,
-        filterToAgent: Boolean,
-        scopeId: String = ALL,
         limitPerSection: Int = DEFAULT_LIMIT,
     ): List<LettaSearchSection> {
-        val search = SectionSearch(query, sources, sources.agentId.takeIf { filterToAgent }, limitPerSection)
-        fun inScope(kind: UnifiedSearchKind) = scopeId == ALL || scopeId == kind.id
+        val scopedAgentId = sources.agentId.takeIf { query.filterToAgent }
+        val search = SectionSearch(query.text, sources, scopedAgentId, limitPerSection)
+        val inScope = query::includes
         return listOf(
             LettaSearchSection("Conversations", if (inScope(UnifiedSearchKind.Conversations)) search.conversations() else emptyList()),
             LettaSearchSection("Agents", if (inScope(UnifiedSearchKind.Agents)) search.agents() else emptyList()),

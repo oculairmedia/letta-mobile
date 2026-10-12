@@ -41,7 +41,7 @@ class ShellHeaderTest {
                 ProvideLettaHost(LettaHost.Pointer) {
                     ShellHeader(
                         title = HeaderTitle.Text("Letta"),
-                        navIcon = HeaderNav.Back(onClick = {}),
+                        controls = HeaderControls(nav = HeaderNav.Back(onClick = {})),
                         search = rememberShellSearchSlot(home, onHome, sources) { opened += it },
                     )
                 }

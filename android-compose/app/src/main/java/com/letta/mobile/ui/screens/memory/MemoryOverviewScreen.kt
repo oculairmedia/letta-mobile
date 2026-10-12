@@ -16,6 +16,7 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.memory.MemoryPageOptions
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
@@ -72,7 +73,7 @@ fun MemoryOverviewScreen(
         header = {
             ShellHeader(
                 title = HeaderTitle.Text(stringResource(R.string.screen_memory_title)),
-                navIcon = HeaderNav.Back(onBack, stringResource(R.string.action_back)),
+                controls = HeaderControls(nav = HeaderNav.Back(onBack, stringResource(R.string.action_back))),
             )
         },
     ) { paddingValues ->

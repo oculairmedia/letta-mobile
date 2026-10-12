@@ -18,6 +18,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
@@ -145,9 +146,11 @@ fun HomeScreen(
                 ShellHeader(
                     // The backend label under the title opens the switcher, when this host can switch.
                     title = HeaderTitle.Text(title, activeBackendLabel, onSubtitleClick = onNavigateToBackendSwitcher),
-                    navIcon = HeaderNav.Menu(onClick = { scope.launch { drawerState.open() } }),
                     search = search,
-                    actions = listOf(HeaderAction.Icon(LettaIcons.Settings, "Settings", onNavigateToSettings)),
+                    controls = HeaderControls(
+                        nav = HeaderNav.Menu(onClick = { scope.launch { drawerState.open() } }),
+                        actions = listOf(HeaderAction.Icon(LettaIcons.Settings, "Settings", onNavigateToSettings)),
+                    ),
                 )
             },
         ) { paddingValues ->

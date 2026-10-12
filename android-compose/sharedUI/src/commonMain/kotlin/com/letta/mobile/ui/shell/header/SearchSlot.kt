@@ -63,7 +63,7 @@ fun rememberShellSearchSlot(
     val state by search.state.collectAsState()
     val sections = remember(state, filters.scopeId, filters.filterToAgent, sources) {
         if (state.showsShellResults) {
-            UnifiedShellSearch.sections(state.query, sources, filters.filterToAgent, filters.scopeId)
+            UnifiedShellSearch.sections(UnifiedSearchQuery(state.query, filters.filterToAgent, filters.scopeId), sources)
         } else {
             emptyList()
         }

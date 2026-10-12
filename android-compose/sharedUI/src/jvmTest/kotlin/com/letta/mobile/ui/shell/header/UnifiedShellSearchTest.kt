@@ -27,16 +27,16 @@ class UnifiedShellSearchTest {
 
     @Test
     fun filterToAgentNarrowsConversationsButNotAgents() {
-        val sections = UnifiedShellSearch.sections("plan", sources, filterToAgent = true)
+        val sections = UnifiedShellSearch.sections(UnifiedSearchQuery("plan", filterToAgent = true), sources)
         assertEquals(listOf("Plan the release"), sections.single { it.title == "Conversations" }.rows.map { it.label })
         assertEquals(listOf("Planner"), sections.single { it.title == "Agents" }.rows.map { it.label })
     }
 
     @Test
     fun widenedSearchAndScopes() {
-        val all = UnifiedShellSearch.sections("plan", sources, filterToAgent = false)
+        val all = UnifiedShellSearch.sections(UnifiedSearchQuery("plan", filterToAgent = false), sources)
         assertEquals(2, all.single { it.title == "Conversations" }.rows.size)
-        val agentsOnly = UnifiedShellSearch.sections("", sources, filterToAgent = false, scopeId = UnifiedSearchKind.Agents.id)
+        val agentsOnly = UnifiedShellSearch.sections(UnifiedSearchQuery("", filterToAgent = false, scopeId = UnifiedSearchKind.Agents.id), sources)
         assertEquals(listOf("Agents"), agentsOnly.map { it.title })
     }
 

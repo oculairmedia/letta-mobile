@@ -12,6 +12,7 @@ import ca.oculair.meridian.R
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
@@ -39,7 +40,7 @@ fun ChannelsScreen(
         header = {
             ShellHeader(
                 title = HeaderTitle.Text(stringResource(R.string.screen_channels_title)),
-                navIcon = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back)),
+                controls = HeaderControls(nav = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back))),
             )
         },
     ) { paddingValues ->
