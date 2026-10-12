@@ -38,7 +38,6 @@ Status legend:
 | `ProjectWorkApi` | Ready work, issues, analytics, issue detail, claim/unclaim/status/note/close/reopen | `project-work ready/issues/analytics/issue/claim/unclaim/status/note/close/reopen` | typed |
 | `VibesyncDebugApi` | `/health`, `/api/stats` | `debug health/stats` | typed |
 | `VibesyncAdminApi` | `POST /api/admin/agents-md/refresh` | `vibesync-admin refresh-agents-md` | typed |
-| `CloudConnectionValidator` | `GET /v1/agents?limit=1` probe | `agents list --query limit=1`, `setup export --skip-errors` | typed |
 | `WsChatBridge` / timeline reducer | Admin-shim WS, record/replay/timeline paths | `connect/send/record/replay/dump-timeline/disconnect/reconnect` | diagnostic |
 | Arbitrary backend route | Any route not listed here | `rest get/post/put/patch/delete` | generic |
 

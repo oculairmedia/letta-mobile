@@ -1,20 +1,24 @@
 package com.letta.mobile.ui.screens.config
 
 import android.net.Uri
+import android.os.Build
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.letta.mobile.data.api.AppServerConnectionTester
-import com.letta.mobile.data.api.CloudConnectionValidationResult
-import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.transport.appserver.AppServerProbeResult
-import com.letta.mobile.data.modelvalidation.ModelHandleValidator
+import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.settings.AppearanceSettings
+import com.letta.mobile.data.settings.ChatSettings
+import com.letta.mobile.data.settings.SettingValue
+import com.letta.mobile.data.settings.BackendConnectionTester
+import com.letta.mobile.data.settings.toSettingsStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
@@ -28,24 +32,27 @@ import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 
+/** The form's backend mode (letta-mobile-ckmub.9: a remote host or the local runtime; no Letta Cloud). */
 enum class ServerMode {
-    CLOUD,
     SELF_HOSTED,
     LOCAL,
 }
 
 @androidx.compose.runtime.Immutable
 data class ConfigUiState(
-    val mode: ServerMode = ServerMode.CLOUD,
+    val mode: ServerMode = ServerMode.SELF_HOSTED,
     val serverUrl: String = "",
     val apiToken: String = "",
     val theme: AppTheme = AppTheme.SYSTEM,
@@ -77,36 +84,24 @@ data class ConfigUiState(
     val refreshError: String? = null,
     val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
-    val connectionTest: ConnectionTestUiState = ConnectionTestUiState.Idle,
 )
-
-/** The server card's "Test connection" result (letta-mobile-bzvro.1, F01). */
-@androidx.compose.runtime.Immutable
-sealed interface ConnectionTestUiState {
-    data object Idle : ConnectionTestUiState
-
-    data object Running : ConnectionTestUiState
-
-    data class Finished(val result: AppServerProbeResult) : ConnectionTestUiState
-
-    /** The URL is an Iroh ticket or not a ws/wss/http/https URL; it is checked when connecting. */
-    data object NotSupported : ConnectionTestUiState
-}
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val settingsRepository: ISettingsRepository,
-    private val cloudConnectionValidator: CloudConnectionValidator,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceModelImporter: OnDeviceModelImporter,
     private val embeddedModelRepository: EmbeddedModelRepository,
     private val endpointOpenAiModelCatalog: EndpointOpenAiModelCatalog,
     private val appServerConnectionTester: AppServerConnectionTester,
+    /** The default permission mode new conversations start in, for the Chat section. */
+    val permissionModeSettings: PermissionModeSettings,
 ) : ViewModel() {
 
     companion object {
-        const val DEFAULT_CLOUD_URL = "https://api.letta.com"
+        /** How long a settings value keeps following the form after the page stops watching it. */
+        private const val SETTING_STOP_TIMEOUT_MS = 5_000L
         const val LOCAL_RUNTIME_URL = "local-lettacode://device"
         const val DEFAULT_LOCAL_MODEL_HANDLE = "local/model"
         const val DEFAULT_LOCAL_MODEL_RUNTIME = "litert-lm"
@@ -129,6 +124,45 @@ class ConfigViewModel @Inject constructor(
     init {
         loadConfig()
         observeEmbeddedModelCatalog()
+    }
+
+    /**
+     * letta-mobile-ckmub.3.12: the backend the shared Settings page's Backend section edits: the
+     * active config, or a fresh remote host when adding one (createNew) or before the first setup.
+     */
+    private val newBackendId = UUID.randomUUID().toString()
+
+    val backendConfig: StateFlow<LettaConfig> = settingsRepository.activeConfig
+        .map { active -> active?.takeUnless { createNew } ?: blankBackend }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), settingsRepository.activeConfig.value?.takeUnless { createNew } ?: blankBackend)
+
+    private val blankBackend: LettaConfig
+        get() = LettaConfig(id = newBackendId, mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "")
+
+    /** The Appearance section's settings, read from the form and written straight through. */
+    val appearance: AppearanceSettings by lazy {
+        AppearanceSettings(
+            theme = setting(AppTheme.SYSTEM, { it.theme }, ::updateTheme),
+            themePreset = setting(ThemePreset.DEFAULT, { it.themePreset }, ::updateThemePreset),
+            // Wallpaper colours exist from Android 12.
+            dynamicColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) setting(false, { it.dynamicColor }, ::updateDynamicColor) else null,
+            haptics = setting(true, { it.hapticsEnabled }, ::updateHapticsEnabled),
+        )
+    }
+
+    /** The Chat section's settings. */
+    val chat: ChatSettings by lazy {
+        ChatSettings(
+            openChatsOnCanvas = setting(true, { it.openChatsOnCanvas }, ::updateOpenChatsOnCanvas),
+            permissionMode = permissionModeSettings,
+        )
+    }
+
+    private fun <T> setting(default: T, read: (ConfigUiState) -> T, write: (T) -> Unit): SettingValue<T> {
+        val current = _uiState
+            .map { state -> (state as? UiState.Success)?.data?.let(read) ?: default }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SETTING_STOP_TIMEOUT_MS), (_uiState.value as? UiState.Success)?.data?.let(read) ?: default)
+        return SettingValue(current, write)
     }
 
     fun loadConfig() {
@@ -208,10 +242,8 @@ class ConfigViewModel @Inject constructor(
             )
         } else {
             // createNew = true: empty form, fresh UUID at save time.
-            // OR there's no active config yet (first-time setup).
-            // Mode falls through to ConfigUiState's default (CLOUD)
-            // — the existing first-time setup expects that default,
-            // and the user toggles to SELF_HOSTED inline if needed.
+            // OR there's no active config yet (first-time setup): a remote
+            // host to set up (ConfigUiState's default mode).
             ConfigUiState(
                 theme = preferences.theme,
                 themePreset = preferences.themePreset,
@@ -270,21 +302,15 @@ class ConfigViewModel @Inject constructor(
     fun updateMode(mode: ServerMode) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         val updatedUrl = when (mode) {
-            ServerMode.CLOUD -> DEFAULT_CLOUD_URL
             ServerMode.LOCAL -> LOCAL_RUNTIME_URL
             ServerMode.SELF_HOSTED ->
-                if (currentState.serverUrl in setOf(DEFAULT_CLOUD_URL, LOCAL_RUNTIME_URL, LEGACY_LOCAL_RUNTIME_URL)) {
-                    ""
-                } else {
-                    currentState.serverUrl
-                }
+                if (currentState.serverUrl in setOf(LOCAL_RUNTIME_URL, LEGACY_LOCAL_RUNTIME_URL)) "" else currentState.serverUrl
         }
         _uiState.value = UiState.Success(
             currentState.copy(
                 hasUnsavedChanges = true,
                 mode = mode,
                 serverUrl = updatedUrl,
-                connectionTest = ConnectionTestUiState.Idle,
             )
         )
     }
@@ -293,7 +319,7 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(
-                currentState.copy(hasUnsavedChanges = true, serverUrl = url, connectionTest = ConnectionTestUiState.Idle)
+                currentState.copy(hasUnsavedChanges = true, serverUrl = url)
             )
         }
     }
@@ -302,33 +328,42 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(
-                currentState.copy(hasUnsavedChanges = true, apiToken = token, connectionTest = ConnectionTestUiState.Idle)
+                currentState.copy(hasUnsavedChanges = true, apiToken = token)
             )
         }
     }
 
     /**
-     * Probes the self-hosted URL and token in the form, before they are saved (F01). HTTP only:
-     * it never opens a WebSocket, so the live session is not disturbed.
+     * Probes a remote host's address and token before they are saved (F01), for the shared Backend
+     * section's Test connection. HTTP only: it never opens a WebSocket, so the live session is not
+     * disturbed; an Iroh address cannot be probed and says so.
      */
-    fun testConnection() {
-        val state = (_uiState.value as? UiState.Success)?.data ?: return
-        if (state.mode != ServerMode.SELF_HOSTED || state.connectionTest == ConnectionTestUiState.Running) return
-        val request = ++latestConnectionTest
-        _uiState.value = UiState.Success(state.copy(connectionTest = ConnectionTestUiState.Running))
-        viewModelScope.launch {
-            val result = appServerConnectionTester.test(state.serverUrl.trim(), state.apiToken.trim().ifBlank { null })
-            finishConnectionTest(request, result?.let { ConnectionTestUiState.Finished(it) } ?: ConnectionTestUiState.NotSupported)
-        }
+    val connectionTester = BackendConnectionTester { serverUrl, accessToken ->
+        appServerConnectionTester.test(serverUrl.trim(), accessToken?.trim()?.ifBlank { null }).toSettingsStatus()
     }
 
-    private var latestConnectionTest = 0L
+    /**
+     * letta-mobile-ckmub.3.12: saves what the shared Backend section [config] holds (mode, address,
+     * token) together with the on-device model fields of this form.
+     */
+    fun saveBackend(config: LettaConfig, onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
+        val state = (_uiState.value as? UiState.Success)?.data ?: return
+        val mode = config.mode.toServerMode()
+        _uiState.value = UiState.Success(
+            state.copy(
+                hasUnsavedChanges = true,
+                mode = mode,
+                serverUrl = if (mode == ServerMode.LOCAL) LOCAL_RUNTIME_URL else config.serverUrl,
+                apiToken = config.accessToken.orEmpty(),
+            )
+        )
+        saveConfig(onSuccess = onSuccess, onError = onError)
+    }
 
-    /** Applies [next] only to the latest test, and only if no edit reset it meanwhile (the result would be stale). */
-    private fun finishConnectionTest(request: Long, next: ConnectionTestUiState) {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        if (request != latestConnectionTest || current.connectionTest != ConnectionTestUiState.Running) return
-        _uiState.value = UiState.Success(current.copy(connectionTest = next))
+    /** Forgets the remote host's saved access token. */
+    fun clearToken(onError: ((String) -> Unit)? = null) {
+        updateApiToken("")
+        saveConfig(onSuccess = {}, onError = onError)
     }
 
     fun updateTheme(theme: AppTheme) {
@@ -567,7 +602,6 @@ class ConfigViewModel @Inject constructor(
             if (state.isSaving) return@launch
             try {
                 val url = when (state.mode) {
-                    ServerMode.CLOUD -> DEFAULT_CLOUD_URL
                     ServerMode.LOCAL -> LOCAL_RUNTIME_URL
                     ServerMode.SELF_HOSTED -> {
                         val raw = state.serverUrl.trim()
@@ -611,23 +645,6 @@ class ConfigViewModel @Inject constructor(
                     _uiState.value = UiState.Success(state.copy(isSaving = false))
                     onError?.invoke(modelValidation.reason)
                     return@launch
-                }
-                if (state.mode == ServerMode.CLOUD) {
-                    if (apiToken.isBlank()) {
-                        _uiState.value = UiState.Success(state.copy(isSaving = false))
-                        onError?.invoke(
-                            "Letta Cloud API key is required. Paste a key from app.letta.com before saving."
-                        )
-                        return@launch
-                    }
-                    when (val validation = cloudConnectionValidator.validate(url, apiToken)) {
-                        CloudConnectionValidationResult.Success -> Unit
-                        is CloudConnectionValidationResult.Failed -> {
-                            _uiState.value = UiState.Success(state.copy(isSaving = false))
-                            onError?.invoke(validation.message)
-                            return@launch
-                        }
-                    }
                 }
                 settingsRepository.setHuggingFaceToken(state.huggingFaceToken.trim().ifBlank { null })
                 // letta-mobile-cdlk: asNewEntry bypasses the activeConfig
@@ -722,14 +739,12 @@ class ConfigViewModel @Inject constructor(
     }
 }
 
-private fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
-    LettaConfig.Mode.CLOUD -> ServerMode.CLOUD
+internal fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
     LettaConfig.Mode.SELF_HOSTED -> ServerMode.SELF_HOSTED
     LettaConfig.Mode.LOCAL -> ServerMode.LOCAL
 }
 
 private fun ServerMode.toLettaMode(): LettaConfig.Mode = when (this) {
-    ServerMode.CLOUD -> LettaConfig.Mode.CLOUD
     ServerMode.SELF_HOSTED -> LettaConfig.Mode.SELF_HOSTED
     ServerMode.LOCAL -> LettaConfig.Mode.LOCAL
 }

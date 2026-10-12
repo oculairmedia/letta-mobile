@@ -103,7 +103,7 @@ internal class RunBlockPlan(
     val loneMessage: UiMessage? = loneRunMessage(visible, messageCount)
 
     /** A run folds when it has work to tuck under its summary line and nothing holds it open. */
-    val foldable: Boolean = runFolds(RunFoldInputs(runId, hasWorkSteps(), awaitingApproval))
+    val foldable: Boolean = runFolds(RunFoldInputs(runId, hasWorkSteps(), RunHold(awaitingApproval)))
 
     /** Folded by default; the person's toggle opens it. */
     val collapsed: Boolean = isCollapsed()
@@ -156,18 +156,24 @@ private fun loneRunMessage(visible: List<UiMessage>, messageCount: Int): UiMessa
     return only
 }
 
-/** What decides whether a run may fold. */
-@Immutable
-internal class RunFoldInputs(val runId: String?, val hasWorkSteps: Boolean, val awaitingApproval: Boolean)
-
 /**
- * Only a run with an id and work steps (reasoning, tool calls) folds, and never while one of its
- * requests waits on the person (letta-mobile-sieej). Working does not hold it open: the summary line
+ * letta-mobile-sieej: what holds a run open whatever its owner's fold says: one of its requests waits
+ * on the person's approval. letta-mobile-zxk2n.37: working no longer holds it open; the summary line
  * says "Working…", and a run folded the same way working and settled keeps its shape as it settles.
  */
+@Immutable
+internal class RunHold(val awaitingApproval: Boolean) {
+    fun isHeld(): Boolean = awaitingApproval
+}
+
+/** What decides whether a run may fold. */
+@Immutable
+internal class RunFoldInputs(val runId: String?, val hasWorkSteps: Boolean, val hold: RunHold)
+
+/** Only a run with an id and work steps (reasoning, tool calls) folds, and never while [RunHold] holds it open. */
 internal fun runFolds(inputs: RunFoldInputs): Boolean {
     if (inputs.runId == null || !inputs.hasWorkSteps) return false
-    return !inputs.awaitingApproval
+    return !inputs.hold.isHeld()
 }
 
 /** The run's plan, or null when it has nothing to draw. */

@@ -116,7 +116,7 @@ object TestData {
 
     fun lettaConfig(
         id: String = "config-1",
-        mode: LettaConfig.Mode = LettaConfig.Mode.CLOUD,
+        mode: LettaConfig.Mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl: String = "https://api.letta.com",
         accessToken: String? = "test-token",
     ) = LettaConfig(

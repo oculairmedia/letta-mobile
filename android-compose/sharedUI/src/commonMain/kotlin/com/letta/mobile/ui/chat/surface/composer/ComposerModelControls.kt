@@ -21,7 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.Lucide
 import com.letta.mobile.data.composer.ComposerEffort
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.ui.providers.icons.ProviderIcons
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_effort_default
 import com.letta.mobile.sharedui.resources.composer_effort_header
@@ -49,7 +51,11 @@ internal fun ComposerModelControls(
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
     ComposerActionChip(
-        label = ComposerChipLabel(model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) }),
+        label = ComposerChipLabel(
+            text = model.currentLabel.ifBlank { stringResource(Res.string.composer_model_fallback) },
+            // The provider the current model routes through ("lmstudio/…"), when the app has its logo.
+            leadingIcon = model.currentHandle?.let { ProviderIcons.forProvider(ModelCatalogNormalizer.providerPrefix(it)) },
+        ),
         onClick = { host.openModelPicker?.invoke() ?: run { sheetOpen = true } },
         enabled = !model.isSwitching,
         modifier = Modifier.testTag(ComposerTestTags.MODEL_CHIP),

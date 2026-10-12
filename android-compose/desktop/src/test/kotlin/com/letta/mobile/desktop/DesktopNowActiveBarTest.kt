@@ -46,13 +46,9 @@ class DesktopNowActiveBarTest {
     private fun host(
         thinkingConversationId: String? = null,
         isStreamingReplySelected: Boolean = false,
-        avatarStyleByAgentId: Map<String, Int> = emptyMap(),
-        fallbackOrbIndex: Int = 0,
     ) = NowActiveBarHostState(
         thinkingConversationId = thinkingConversationId,
         isStreamingReplySelected = isStreamingReplySelected,
-        avatarStyleByAgentId = avatarStyleByAgentId,
-        fallbackOrbIndex = fallbackOrbIndex,
     )
 
     @Test
@@ -171,28 +167,15 @@ class DesktopNowActiveBarTest {
     }
 
     @Test
-    fun orbIndexPrefersTheAgentStyleOverrideOverTheFallback() {
+    fun carriesTheAgentIdSoTheSharedAvatarCanPictureIt() {
         val convo = conversation("c1", agentId = "agent-1")
         val pin = deriveNowActiveBarPin(
             lastPromptedId = "c1",
             streamingId = null,
             cancellingId = null,
             chatState = surfaceState(conversations = listOf(convo), selectedConversationId = "c1"),
-            host = host(avatarStyleByAgentId = mapOf("agent-1" to 4), fallbackOrbIndex = 9),
+            host = host(),
         )
-        assertEquals(4, pin?.state?.orbIndex)
-    }
-
-    @Test
-    fun orbIndexFallsBackWhenTheAgentHasNoStyleOverride() {
-        val convo = conversation("c1", agentId = "agent-1")
-        val pin = deriveNowActiveBarPin(
-            lastPromptedId = "c1",
-            streamingId = null,
-            cancellingId = null,
-            chatState = surfaceState(conversations = listOf(convo), selectedConversationId = "c1"),
-            host = host(avatarStyleByAgentId = emptyMap(), fallbackOrbIndex = 9),
-        )
-        assertEquals(9, pin?.state?.orbIndex)
+        assertEquals("agent-1", pin?.state?.agentId)
     }
 }

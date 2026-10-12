@@ -12,8 +12,9 @@ import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellSkillsSection
-import com.letta.mobile.ui.settings.BackendSettingsActions
+import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.ui.settings.SettingsPage
+import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
@@ -76,12 +77,22 @@ class ShellPageDeps(
         ShellPageKind.Providers to providers,
     ).mapNotNull { (kind, page) -> page?.let { kind to it } }.toMap()
 
+    /**
+     * letta-mobile-ckmub.3.12 (S10): Overview has no page of its own. It is the Settings page opened
+     * on its diagnostics section, so a host with a Settings page never needs a fallback for it.
+     */
+    private val overview: ShellPageContent<ShellDestination>? = settings?.let { page ->
+        ShellPageContent { _, modifier -> page.Content(ShellDestination.Settings(ShellSettingsSection.About), modifier) }
+    }
+
     /** The kinds this host draws with a page of its own (not the fallback). */
-    val registered: Set<ShellPageKind> get() = pages.keys
+    val registered: Set<ShellPageKind> get() = if (overview != null) pages.keys + ShellPageKind.Overview else pages.keys
 
     @Suppress("UNCHECKED_CAST")
     internal fun pageFor(destination: ShellDestination): ShellPageContent<ShellDestination> =
-        pages[destination.kind] as ShellPageContent<ShellDestination>? ?: fallback
+        pages[destination.kind] as ShellPageContent<ShellDestination>?
+            ?: overview?.takeIf { destination.kind == ShellPageKind.Overview }
+            ?: fallback
 }
 
 object ShellPageTags {
@@ -142,13 +153,13 @@ fun shellMemoryPage(binding: MemoryWorkspaceBinding) = ShellPageContent<ShellDes
     MemoryWorkspacePage(binding = binding, modifier = modifier)
 }
 
-/** The shared Settings page (backend and connection). */
+/** The shared Settings page, opened on the destination's section (Pairing, About). */
 fun shellSettingsPage(
     state: SettingsPageState,
-    actions: BackendSettingsActions,
+    services: SettingsPageServices,
     onBack: (() -> Unit)? = null,
-) = ShellPageContent<ShellDestination.Settings> { _, modifier ->
-    SettingsPage(state = state, actions = actions, modifier = modifier, onBack = onBack)
+) = ShellPageContent<ShellDestination.Settings> { destination, modifier ->
+    SettingsPage(state = state.copy(section = destination.section ?: state.section), services = services, modifier = modifier, onBack = onBack)
 }
 
 fun ShellSkillsSection.toPageSection(): SkillsPageSection = when (this) {
