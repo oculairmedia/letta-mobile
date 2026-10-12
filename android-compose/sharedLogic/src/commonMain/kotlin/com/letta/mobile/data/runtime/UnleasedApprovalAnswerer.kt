@@ -49,8 +49,10 @@ internal enum class UnleasedApprovalOutcome {
     Rejected,
 
     /**
-     * No turn on this engine ever ran on the runtime key: another client owns it, and its own
-     * permission policy decides. Left pending, never auto-allowed.
+     * No turn on this engine ever ran on the runtime key: another client may own it, and its own
+     * permission policy decides. Never auto-allowed, but parked for a viewer like [LeftPending]: an
+     * in-memory engine also sees every runtime as unowned right after a restart, when the App
+     * Server replays the approval its turn is still parked on. Dropping it wedged the conversation.
      */
     NotOwned,
 }
@@ -107,6 +109,8 @@ internal class UnleasedApprovalAnswerer(
         // which is not the owning client's policy, so auto-allowing would bypass that policy.
         if (!runtimeOwned(details.key)) {
             record("approval.unleasedNotOwned", details)
+            // A person may still answer it; only the auto-allow is withheld.
+            parkLeftPending(details.key, details.parked())
             return UnleasedApprovalOutcome.NotOwned
         }
         if (!autoAllowPermitted(details.mode, details.toolName, details.argumentsJson)) {

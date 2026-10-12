@@ -207,6 +207,21 @@ class AppServerTurnEngineOrphanedTurnTest {
     }
 
     @Test
+    fun unleasedApprovalReplayedAfterRestartIsParkedForAViewer() = runTest {
+        // A wrapper restart empties the lease slots while the App Server's turn is still parked on
+        // the approval and replays it. Without a parked card no viewer can answer it, and every
+        // later send to the conversation is rejected as busy behind the wedged server turn.
+        val client = TurnEngineTestRecordingClient()
+        val engine = engine(client)
+
+        assertEquals(UnleasedApprovalOutcome.NotOwned, engine.answerUnleasedControlRequest(TestApprovalTool.Bash.controlRequest()))
+
+        val parked = engine.pendingApprovalsByRuntime.value[TurnRuntimeKey("agent-1", "conv-1")].orEmpty()
+        assertEquals(listOf("call-perm-1"), parked.map { it.toolCallId })
+        assertTrue(client.approvalResponses.isEmpty(), "parked for a person, never auto-allowed")
+    }
+
+    @Test
     fun unleasedInteractiveApprovalStaysPending() = runTest {
         val client = TurnEngineTestRecordingClient()
         val engine = engine(client).also { it.ownRuntime() }
