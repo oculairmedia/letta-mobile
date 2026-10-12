@@ -3,6 +3,7 @@ package com.letta.mobile.ui.components.picker
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -96,13 +97,17 @@ class PickerCallbacks<T>(
 @Immutable
 data class PickerRowState(val selected: Boolean, val highlighted: Boolean, val mode: PickMode, val onClick: () -> Unit)
 
-/** The parts a surface draws itself: its own rows, a leading glyph, a band under the search, a footer. */
+/**
+ * The parts a surface draws itself: its own rows, a leading glyph, a band under the search, a footer,
+ * and a glyph before a section's title (a provider's logo over its models).
+ */
 @Immutable
 class PickerSlots<T>(
     val row: (@Composable (PickerItem<T>, PickerRowState) -> Unit)? = null,
     val leading: (@Composable (PickerItem<T>) -> Unit)? = null,
     val header: (@Composable ColumnScope.() -> Unit)? = null,
     val footer: (@Composable ColumnScope.() -> Unit)? = null,
+    val sectionLeading: (@Composable (PickerSection<T>) -> Unit)? = null,
 )
 
 /** Which container the picker opens in. [LettaPaneKind.Modal]: a sheet on touch, a dialog on pointer. */
@@ -227,7 +232,7 @@ private fun <T> PickerList(model: PickerListModel<T>, callbacks: PickerCallbacks
         if (model.layout.isEmpty) emptyLine(spec)
         items(model.layout.lines, key = { it.key }) { line ->
             when (line) {
-                is PickerLine.Header -> PickerSectionHeader(line.section, spec.tags, callbacks.onToggleSection)
+                is PickerLine.Header -> PickerSectionHeader(line.section, spec.tags, callbacks.onToggleSection, slots.sectionLeading)
                 is PickerLine.Row -> PickerRow(line, model, callbacks, slots)
             }
         }
@@ -307,7 +312,12 @@ fun Modifier.pickerRowSemantics(state: PickerRowState): Modifier = semantics {
 }
 
 @Composable
-private fun <T> PickerSectionHeader(section: PickerSection<T>, tags: PickerTags, onToggle: ((PickerSection<T>) -> Unit)?) {
+private fun <T> PickerSectionHeader(
+    section: PickerSection<T>,
+    tags: PickerTags,
+    onToggle: ((PickerSection<T>) -> Unit)?,
+    leading: (@Composable (PickerSection<T>) -> Unit)?,
+) {
     val collapsed = section.collapsed
     val toggle: (() -> Unit)? = onToggle?.takeIf { collapsed != null }?.let { { it(section) } }
     Row(
@@ -322,6 +332,7 @@ private fun <T> PickerSectionHeader(section: PickerSection<T>, tags: PickerTags,
             .testTag(tags.sectionPrefix + section.key),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leading?.let { draw -> Box(Modifier.padding(start = LettaDimens.Space.xs, top = LettaDimens.Space.md)) { draw(section) } }
         LettaSectionLabel(section.title.orEmpty(), Modifier.weight(1f))
         if (collapsed != null) DisclosureChevron(expanded = !collapsed, compact = true)
     }

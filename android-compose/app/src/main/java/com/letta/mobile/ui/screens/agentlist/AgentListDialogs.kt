@@ -52,7 +52,6 @@ internal data class CreateAgentFormState(
     val temperature: String = "1.0",
     val maxOutputTokens: String = "4096",
     val parallelToolCalls: Boolean = true,
-    val enableSleeptime: Boolean = false,
     val includeBaseTools: Boolean = true,
     val selectedToolIds: List<String> = emptyList(),
     val runtimeOption: AgentCreateRuntimeOption = AgentCreateRuntimeOption.REMOTE,
@@ -219,7 +218,6 @@ internal fun buildAgentCreateParams(
             formState.selectedToolIds.map { ToolId(it) }.ifEmpty { null }?.toImmutableList()
         },
         system = formState.systemPrompt.ifBlank { null },
-        enableSleeptime = if (isLocal) false else formState.enableSleeptime,
         includeBaseTools = if (isLocal) false else formState.includeBaseTools,
         parallelToolCalls = if (isLocal) false else null,
     )
@@ -459,15 +457,6 @@ private fun CreateAgentRemoteToolsSection(
     formState: CreateAgentFormState,
     onFormStateChange: (CreateAgentFormState) -> Unit,
 ) {
-    FormItem(
-        label = { Text(stringResource(R.string.common_enable_sleeptime)) },
-        tail = {
-            Switch(
-                checked = formState.enableSleeptime,
-                onCheckedChange = { onFormStateChange(formState.copy(enableSleeptime = it)) },
-            )
-        },
-    )
     FormItem(
         label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
         tail = {

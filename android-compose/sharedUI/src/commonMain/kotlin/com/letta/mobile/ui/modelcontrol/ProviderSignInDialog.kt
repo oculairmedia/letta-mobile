@@ -93,7 +93,7 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
     AlertDialog(
         // A stray tap outside or Back must not drop a running sign-in; Cancel does that explicitly.
         onDismissRequest = { if (finished) actions.onClose() },
-        icon = { Icon(LettaIcons.AccountCircle, contentDescription = null) },
+        icon = { Icon(provider.logoOrNull() ?: LettaIcons.AccountCircle, contentDescription = null) },
         title = { Text(provider.signInTitle) },
         text = {
             Column(

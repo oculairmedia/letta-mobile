@@ -12,11 +12,15 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,6 +29,7 @@ import com.letta.mobile.data.home.FleetOverview
 import com.letta.mobile.data.home.FleetRecentConversation
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.FleetSummary
+import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePageActions
 import com.letta.mobile.data.home.HomePageReducer
 import com.letta.mobile.data.home.HomePageState
@@ -34,10 +39,14 @@ import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.home.HomeStats
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.ui.mascot.AgentAvatarTestTag
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * The shared Home page on a wide desktop window and a phone (letta-mobile-c3np7.3.11), including
@@ -71,8 +80,11 @@ class HomePageTest {
 
     private val toolsPin = HomePinnedItem.Shortcut(HomeShortcut.TOOLS)
 
-    private fun baseState(pins: List<String> = listOf("shortcut:TOOLS")): HomePageState {
-        val withFleet = HomePageReducer.withFleet(HomePageState(availableShortcuts = setOf(HomeShortcut.TOOLS, HomeShortcut.SCHEDULES)), fleet)
+    private fun baseState(
+        pins: List<String> = listOf("shortcut:TOOLS"),
+        available: Set<HomeShortcut> = setOf(HomeShortcut.TOOLS, HomeShortcut.SCHEDULES),
+    ): HomePageState {
+        val withFleet = HomePageReducer.withFleet(HomePageState(availableShortcuts = available), fleet)
         val withPins = HomePageReducer.withPins(withFleet, pins)
         return HomePageReducer.withStats(withPins, HomeStats(loading = false, toolCount = 12))
     }
@@ -143,14 +155,65 @@ class HomePageTest {
         assertEquals(listOf("sort:Model", "agent:a-1=true"), actions.events)
     }
 
+    /** letta-mobile-zxk2n.34: running work, recents, agents, then the counters as one strip; composer docked below. */
     @Test
-    fun aPhoneGetsSortChipsAndTheComposerDockedBelow() = runComposeUiTest {
-        show(baseState(), width = COMPACT)
-        onNodeWithTag(HomePageTags.COMPOSER).assertExists()
-        scrollTo(HomePageTags.sort(FleetSortKey.Conversations))
-        onNodeWithTag(HomePageTags.sort(FleetSortKey.Conversations)).performClick()
-        assertEquals(listOf("sort:Chats"), actions.events)
-        onNodeWithText("gpt-5 · 3 chats").assertExists()
+    fun aPhoneLeadsWithRunningWorkAndRecentsThenAgentsThenTheStatsStrip() = runComposeUiTest {
+        show(baseState(available = setOf(HomeShortcut.TOOLS, HomeShortcut.CONVERSATIONS, HomeShortcut.AGENTS)), width = COMPACT)
+        val order = listOf(
+            HomePageTags.NOW_STRIP,
+            HomePageTags.RECENTS,
+            HomePageTags.recent(recent),
+            HomePageTags.AGENT_ROW,
+            HomePageTags.STATS_STRIP,
+            HomePageTags.COMPOSER,
+        ).map { onNodeWithTag(it).getUnclippedBoundsInRoot().top }
+        assertEquals(order.sorted(), order, "now, recents, agents, stats, then the docked composer")
+        onNodeWithTag(HomePageTags.STATS).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.sort(FleetSortKey.Conversations)).assertDoesNotExist()
+        onNodeWithText("1 running · Scout").assertExists()
+
+        onNodeWithTag(HomePageTags.seeAll(HomeShortcut.CONVERSATIONS)).performClick()
+        onNodeWithTag(HomePageTags.seeAll(HomeShortcut.AGENTS)).performClick()
+        onNodeWithTag(HomePageTags.agentAvatar("a-1")).performClick()
+        onNodeWithTag(HomePageTags.NOW_STRIP).performClick()
+        assertEquals(listOf("shortcut:CONVERSATIONS", "shortcut:AGENTS", "agent:a-1", "agent:a-1"), navigation.events)
+    }
+
+    @Test
+    fun nothingRunningHidesTheNowStrip() = runComposeUiTest {
+        val idle = fleet.copy(summary = fleet.summary.copy(runningNow = 0), agents = listOf(scout.copy(running = false)))
+        show(HomePageReducer.withFleet(baseState(), idle), width = COMPACT)
+        onNodeWithTag(HomePageTags.NOW_STRIP).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.recent(recent)).assertExists()
+    }
+
+    @Test
+    fun theStatsStripIsOneRowAtPhoneWidth() = runComposeUiTest {
+        show(baseState(), width = PHONE)
+        val labels = listOf("Agents", "Conversations", "Active today", "Running now", "Tools")
+        val tops = labels.map { onNodeWithTag(HomePageTags.stat(it)).getUnclippedBoundsInRoot().top }
+        assertEquals(1, tops.distinct().size, "every figure on one line: $tops")
+        val strip = onNodeWithTag(HomePageTags.STATS_STRIP).getUnclippedBoundsInRoot()
+        assertTrue(strip.bottom - strip.top < STRIP_MAX_HEIGHT, "the strip stays one compact row: ${strip.bottom - strip.top}")
+        onNodeWithTag(HomePageTags.STATS_TREND).assertDoesNotExist()
+    }
+
+    @Test
+    fun theStatsStripOpensPagesExpandsAndCustomizesPins() = runComposeUiTest {
+        show(baseState(), width = PHONE)
+        // Tools sits past the phone's edge: the strip scrolls sideways instead of wrapping.
+        onNodeWithTag(HomePageTags.stat("Tools")).performScrollTo().performClick()
+        onNodeWithTag(HomePageTags.stat("Agents")).performScrollTo().performClick()
+        assertEquals(listOf("shortcut:TOOLS"), navigation.events, "only figures whose page the host offers link")
+
+        onNodeWithTag(HomePageTags.STATS_EXPAND).performClick()
+        onNodeWithTag(HomePageTags.STATS_TREND).assertExists()
+
+        onNodeWithTag(HomePageTags.PINNED_GRID).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.STATS_MENU).performClick()
+        onNodeWithTag(HomePageTags.CUSTOMIZE).performClick()
+        onNodeWithTag(HomePageTags.unpin(toolsPin)).performClick()
+        assertEquals(listOf("pin:TOOLS=false"), actions.events)
     }
 
     @Test
@@ -201,6 +264,50 @@ class HomePageTest {
         onNodeWithTag(HomePageTags.SEARCH_RESULTS).assertExists()
         onNodeWithTag(HomePageTags.searchHit("a-1")).assertExists()
     }
+
+    /** letta-mobile-zxk2n.28: an agent on Home is pictured by AgentAvatar, never the generic robot icon. */
+    @Test
+    fun agentSearchHitsArePicturedByTheirAgentAvatar() = runComposeUiTest {
+        val catalog = HomeSearchCatalog(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
+        show(HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "plan", awaitMessages = false))
+        avatarInside(HomePageTags.searchHit("a-1")).assertExists()
+        // No mascot is registered in tests, so the avatar is the agent's initial tile.
+        onNode(hasText("P") and hasAnyAncestor(hasTestTag(HomePageTags.searchHit("a-1"))), useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun fleetRecentAndPinnedAgentRowsUseTheAgentAvatar() = runComposeUiTest {
+        val pinned = HomePinnedItem.Agent(HomeAgentRef("a-1", "Scout"))
+        val state = HomePageReducer.withPersistedAgentNames(baseState(pins = listOf(HomePinnedItem.agentKey("a-1"))), mapOf("a-1" to "Scout"))
+        show(state)
+        avatarInside(HomePageTags.pin(pinned)).assertExists()
+        avatarInside(HomePageTags.recent(recent)).assertExists()
+        scrollTo(HomePageTags.agentRow(scout))
+        avatarInside(HomePageTags.agentRow(scout)).assertExists()
+    }
+
+    /** The section counts are the query's matches, not the catalog's size (letta-mobile-06whj). */
+    @Test
+    fun sectionCountsReflectTheQuery() = runComposeUiTest {
+        val catalog = HomeSearchCatalog(
+            agents = listOf(Agent(id = AgentId("a-1"), name = "Mercury"), Agent(id = AgentId("a-2"), name = "Scout")),
+            blocks = listOf(
+                Block(id = BlockId("b-1"), label = "merge notes", value = "x"),
+                Block(id = BlockId("b-2"), label = "persona", value = "helpful"),
+                Block(id = BlockId("b-3"), label = "human", value = "likes summer"),
+            ),
+        )
+        show(HomePageReducer.withQuery(HomePageReducer.withCatalog(baseState(), catalog), "mer", awaitMessages = false))
+        onNodeWithText("Agents").assertExists()
+        onNodeWithText("(1)").assertExists()
+        onNodeWithText("Blocks").assertExists()
+        onNodeWithText("(2)").assertExists()
+        onNodeWithTag(HomePageTags.searchHit("b-2")).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.searchHit("a-2")).assertDoesNotExist()
+    }
+
+    private fun ComposeUiTest.avatarInside(tag: String) =
+        onNode(hasTestTag(AgentAvatarTestTag) and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true)
 
     @Test
     fun aSearchWithNothingFoundSaysSo() = runComposeUiTest {
@@ -287,6 +394,8 @@ class HomePageTest {
     private companion object {
         val WIDE = 1100.dp
         val COMPACT = 380.dp
+        val PHONE = 412.dp
         val PAGE_HEIGHT = 900.dp
+        val STRIP_MAX_HEIGHT = 72.dp
     }
 }

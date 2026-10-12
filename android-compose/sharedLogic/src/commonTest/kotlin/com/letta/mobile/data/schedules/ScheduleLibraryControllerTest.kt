@@ -109,6 +109,26 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
+    fun createRecurringScheduleSendsThePageRequestToTheSelectedAgent() = runTest {
+        val scheduleRepository = FakeScheduleRepository()
+        val controller = controller(scheduleRepository = scheduleRepository)
+        controller.start()
+        advanceUntilIdle()
+
+        controller.createRecurringSchedule(
+            ScheduleCreateRequest(agentId = null, name = "Digest", prompt = "Summarize the day", cron = "0 18 * * *", timezone = "UTC"),
+        )
+        advanceUntilIdle()
+
+        val created = scheduleRepository.createdSchedules.single()
+        assertEquals("recurring", created.schedule.type)
+        assertEquals("0 18 * * *", created.schedule.cronExpression)
+        assertEquals(ScheduleMessage(content = "Summarize the day", role = "user", name = "Digest"), created.messages.single())
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertTrue(controller.state.value.schedules.any { it.id == "created-1" })
+    }
+
+    @Test
     fun deleteScheduleDelegatesAndRefreshesSchedules() = runTest {
         val scheduleRepository = FakeScheduleRepository()
         val controller = controller(scheduleRepository = scheduleRepository)

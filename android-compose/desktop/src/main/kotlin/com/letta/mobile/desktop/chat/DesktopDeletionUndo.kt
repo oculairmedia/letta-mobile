@@ -23,7 +23,10 @@ class DesktopDeletionUndo {
         val backendGeneration: Long,
         /** The row as listed, for putting it straight back when the roster cannot be re-read. */
         val listed: DesktopConversationSummary? = null,
-    )
+    ) {
+        /** Names this delete for its undo bar: a newer delete replaces the bar. */
+        fun undoKey(): String = "$conversationId@$backendGeneration"
+    }
 
     private val _pending = MutableStateFlow<Offer?>(null)
     val pending: StateFlow<Offer?> = _pending.asStateFlow()

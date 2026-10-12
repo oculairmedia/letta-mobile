@@ -40,6 +40,31 @@ class SkillsCatalogControllerTest {
         assertEquals(emptySet(), controller.state.value.installedSkillNames)
     }
 
+    /** letta-mobile-zxk2n.33: the desktop builds one controller and reloads it for the focused agent. */
+    @Test
+    fun reloadingForTheFocusedAgentRetargetsInstallsAndNoAgentClearsTheInstalledSet() = runTest {
+        val api = FakeSkillsApi(
+            registry = listOf(github, notion),
+            installed = mutableMapOf("agent-1" to mutableSetOf("notion"), "agent-2" to mutableSetOf()),
+        )
+        val controller = SkillsCatalogController(api, this)
+        controller.reload("agent-1")
+        advanceUntilIdle()
+        assertEquals(setOf("notion"), controller.state.value.installedSkillNames)
+
+        controller.reload("agent-2")
+        controller.install("github")
+        advanceUntilIdle()
+        assertEquals("agent-2", controller.state.value.agentId)
+        assertEquals(setOf("github"), controller.state.value.installedSkillNames)
+        assertEquals(setOf("notion"), api.installed.getValue("agent-1"))
+
+        controller.reload(null)
+        advanceUntilIdle()
+        assertEquals(emptySet(), controller.state.value.installedSkillNames)
+        assertFalse(controller.state.value.canManage)
+    }
+
     @Test
     fun withoutAnAgentTheCatalogIsReadOnly() = runTest {
         val api = FakeSkillsApi(registry = listOf(github), installed = mutableMapOf())
@@ -79,7 +104,7 @@ class SkillsCatalogControllerTest {
 
     private class FakeSkillsApi(
         private val registry: List<Skill> = emptyList(),
-        private val installed: MutableMap<String, MutableSet<String>> = mutableMapOf(),
+        val installed: MutableMap<String, MutableSet<String>> = mutableMapOf(),
         private val failWith: String? = null,
     ) : SkillsApi {
         var mutations = 0

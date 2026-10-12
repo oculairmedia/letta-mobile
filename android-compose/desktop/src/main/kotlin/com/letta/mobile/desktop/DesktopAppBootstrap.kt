@@ -18,8 +18,8 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.schedules.CronTask
-import com.letta.mobile.data.skills.Skill
-import com.letta.mobile.data.skills.SkillsApi
+import com.letta.mobile.data.schedules.ScheduleLibraryController
+import com.letta.mobile.data.repository.http.LettaHttpAdminRepositoryException
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.data.home.HomePageController
@@ -36,7 +36,6 @@ import com.letta.mobile.desktop.workspace.memfs
 import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
@@ -125,7 +124,7 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
 /** The per-agent library controllers behind the sidebar destinations. */
 internal class DesktopLibraryControllers(
     val memory: MemoryPageController,
-    val schedules: DesktopScheduleLibraryController,
+    val schedules: ScheduleLibraryController,
     val channels: ChannelsPageController,
     val tools: DesktopToolLibraryController,
     val home: HomePageController,
@@ -148,7 +147,7 @@ internal fun rememberDesktopLibraryControllers(
         )
     }
     val schedules = remember(sessionGraphId, chatScope) {
-        DesktopScheduleLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
+        desktopScheduleLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
     val channels = remember(sessionGraphId, chatScope) {
         ChannelsPageController.forSession(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
@@ -164,6 +163,30 @@ internal fun rememberDesktopLibraryControllers(
     val memfs = remember(chatScope) { MemfsPageController(DesktopWorkspaceSources().memfs(), chatScope) }
     return DesktopLibraryControllers(memory, schedules, channels, tools, home, memfs)
 }
+
+/** The shared schedule library over the session graph; a 404/405/501 from the native route means "not served here". */
+private fun desktopScheduleLibraryController(
+    sessionGraphProvider: DesktopSessionGraphProvider,
+    scope: CoroutineScope,
+): ScheduleLibraryController {
+    val graph = sessionGraphProvider.current
+    return ScheduleLibraryController(
+        agentRepository = graph.agentRepository,
+        scheduleRepository = graph.scheduleRepository,
+        scope = scope,
+        errorMessageMapper = { throwable, fallback ->
+            when (throwable) {
+                is DesktopRepositoryUnavailableException -> "Desktop schedule repositories are not available for this backend yet."
+                else -> throwable.message ?: throwable::class.simpleName ?: fallback
+            }
+        },
+        scheduleAdminUnavailableMatcher = { throwable ->
+            throwable is LettaHttpAdminRepositoryException && throwable.code in ScheduleAdminUnavailableCodes
+        },
+    )
+}
+
+private val ScheduleAdminUnavailableCodes = setOf(404, 405, 501)
 
 private fun desktopMemoryErrorMessage(throwable: Throwable): String =
     when (throwable) {
@@ -332,10 +355,6 @@ private fun isCommandPaletteKey(event: java.awt.event.KeyEvent): Boolean =
 @JvmInline
 internal value class DesktopAgentId(val value: String)
 
-/** Typed skill name for install/uninstall panel actions. */
-@JvmInline
-internal value class DesktopSkillName(val value: String)
-
 /** A cron creation request from the schedules surface. */
 internal data class CronDraft(
     val agentId: DesktopAgentId,
@@ -412,85 +431,6 @@ private suspend fun CronApi.createCronFromDraft(draft: CronDraft) {
         timezone = draft.timezone,
         recurring = draft.recurring,
     )
-}
-
-/**
- * Snapshot-backed state + actions for the Skills page: the registry list,
- * the focused agent's installed set, and install/remove with reload. All
- * actions no-op when the active backend exposes no skill API.
- */
-internal class DesktopSkillsPanelState(
-    private val skillApi: SkillsApi?,
-    private val scope: CoroutineScope,
-) {
-    var all by mutableStateOf<List<Skill>>(emptyList())
-        private set
-    var installedNames by mutableStateOf<Set<String>>(emptySet())
-        private set
-    var loading by mutableStateOf(false)
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
-
-    val available: Boolean get() = skillApi != null
-
-    /** Load the registry + [agentId]'s installed skills (null agent -> none). */
-    suspend fun reload(agentId: DesktopAgentId?) {
-        val api = skillApi ?: return
-        loading = true
-        error = null
-        runCatching { loadSkillsSnapshot(api, agentId) }
-            .onSuccess { (registry, installed) ->
-                all = registry
-                installedNames = installed
-            }
-            .onFailure { error = it.message ?: "Could not load skills." }
-        loading = false
-    }
-
-    fun install(agentId: DesktopAgentId?, name: DesktopSkillName) {
-        mutateSkill(
-            SkillMutationParams(agentId, name, "Could not install skill.") { api, agent, skill ->
-                api.installSkill(agent.value, skill.value)
-            },
-        )
-    }
-
-    fun uninstall(agentId: DesktopAgentId?, name: DesktopSkillName) {
-        mutateSkill(
-            SkillMutationParams(agentId, name, "Could not remove skill.") { api, agent, skill ->
-                api.uninstallSkill(agent.value, skill.value)
-            },
-        )
-    }
-
-    private fun mutateSkill(params: SkillMutationParams) {
-        val api = skillApi ?: return
-        val agent = params.agentId ?: return
-        scope.launch {
-            runCatching { params.action(api, agent, params.name) }
-                .onFailure { error = it.message ?: params.failureMessage }
-            reload(agent)
-        }
-    }
-}
-
-private data class SkillMutationParams(
-    val agentId: DesktopAgentId?,
-    val name: DesktopSkillName,
-    val failureMessage: String,
-    val action: suspend (SkillsApi, DesktopAgentId, DesktopSkillName) -> Unit,
-)
-
-private suspend fun loadSkillsSnapshot(
-    api: SkillsApi,
-    agentId: DesktopAgentId?,
-): Pair<List<Skill>, Set<String>> {
-    val registry = api.listSkills()
-    val installed = agentId?.let { id ->
-        api.listAgentSkills(id.value).map { skill -> skill.name }.toSet()
-    } ?: emptySet()
-    return registry to installed
 }
 
 /** The focused agent's server slash commands for the composer palette. */

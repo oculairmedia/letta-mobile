@@ -91,6 +91,8 @@ private fun canOpenInlineMathAt(cursor: MarkdownMathScanCursor): Boolean {
     if (next >= cursor.line.raw.length) return false
     if (cursor.line.raw[next].isWhitespace()) return false
     if (cursor.line.raw[next].isDigit()) return false
+    // letta-mobile-qvkmg: `$(cmd)` / `${VAR}` are shell expansions, never an inline-math opener.
+    if (cursor.line.raw[next] == '(' || cursor.line.raw[next] == '{') return false
     if (index > 0 && cursor.line.raw[index - 1].isWordChar()) return false
     return true
 }

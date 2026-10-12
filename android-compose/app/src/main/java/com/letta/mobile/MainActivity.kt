@@ -8,10 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.mascot.ProvideMascotShell
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
@@ -42,7 +40,15 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
+import com.letta.mobile.ui.common.toOverlay
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.host.Overlay
+import com.letta.mobile.ui.host.OverlayAction
+import com.letta.mobile.ui.host.OverlayHost
+import com.letta.mobile.ui.host.OverlayHostRoot
+import com.letta.mobile.ui.host.OverlayPresentation
+import com.letta.mobile.ui.host.OverlayResponse
+import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -80,7 +86,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
-            val snackbarHostState = remember { SnackbarHostState() }
+            val overlays = rememberOverlayHost()
             val haptic = LocalHapticFeedback.current
             val view = LocalView.current
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
@@ -88,20 +94,14 @@ class MainActivity : ComponentActivity() {
             val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
 
             LaunchedEffect(Unit) {
+                // letta-mobile-ckmub.3.15: app screens' messages join the activity's one overlay queue.
                 snackbarDispatcher.messages.collect { message ->
                     HapticEffects.reject(haptic, view)
-                    val result = snackbarHostState.showSnackbar(
-                        message = message.message,
-                        actionLabel = message.actionLabel,
-                        duration = message.duration,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        message.onAction?.invoke()
-                    }
+                    overlays.show(message.toOverlay())
                 }
             }
 
-            LastCrashSnackbarEffect(snackbarHostState)
+            LastCrashSnackbarEffect(overlays)
             ChatPushServiceStartEffect()
 
             LettaTheme(
@@ -119,14 +119,16 @@ class MainActivity : ComponentActivity() {
                         settings = deps.secureSettingsStore,
                         runs = deps.conversationRunRegistry,
                     ) {
-                        Scaffold(modifier = debugRootPointerObserver(), snackbarHost = { SnackbarHost(snackbarHostState) }) { _ ->
-                            val navController = rememberNavController()
-                            AdaptiveScaffold(navController = navController) {
-                                AppNavGraph(
-                                    navController = navController,
-                                    notificationTarget = launchTarget.value,
-                                    onNotificationTargetConsumed = { launchTarget.value = null },
-                                )
+                        Surface(modifier = debugRootPointerObserver(), color = MaterialTheme.colorScheme.background) {
+                            OverlayHostRoot(overlays) {
+                                val navController = rememberNavController()
+                                AdaptiveScaffold(navController = navController) {
+                                    AppNavGraph(
+                                        navController = navController,
+                                        notificationTarget = launchTarget.value,
+                                        onNotificationTargetConsumed = { launchTarget.value = null },
+                                    )
+                                }
                             }
                         }
                     }
@@ -144,7 +146,7 @@ class MainActivity : ComponentActivity() {
      * Copy/dismiss leaves the diagnostic record available on disk.
      */
     @Composable
-    private fun LastCrashSnackbarEffect(snackbarHostState: SnackbarHostState) {
+    private fun LastCrashSnackbarEffect(overlays: OverlayHost) {
         val haptic = LocalHapticFeedback.current
         val view = LocalView.current
         val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
@@ -153,19 +155,14 @@ class MainActivity : ComponentActivity() {
             HapticEffects.reject(haptic, view)
             val label = if (crash.sentryEventId != null) "Copy id" else "Details"
             val summary = "App crashed last run (${crash.type.substringAfterLast('.')}). Tap to copy."
-            val result = snackbarHostState.showSnackbar(
-                message = summary,
-                actionLabel = label,
-                withDismissAction = true,
-                duration = androidx.compose.material3.SnackbarDuration.Long,
-            )
-            if (result == SnackbarResult.ActionPerformed) {
+            val copy = OverlayAction(label) {
                 val payload = crash.sentryEventId
                     ?: "${crash.type}: ${crash.message}\n${crash.stackHead}"
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
                 clipboard?.setPrimaryClip(ClipData.newPlainText("letta-mobile crash", payload))
                 Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
             }
+            overlays.show(Overlay.Snackbar(summary, presentation = OverlayPresentation.Long, response = OverlayResponse(copy)))
             crashReporter.dismiss()
         }
     }

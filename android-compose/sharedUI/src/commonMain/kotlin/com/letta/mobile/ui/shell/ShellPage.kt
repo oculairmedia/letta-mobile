@@ -23,6 +23,10 @@ import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspacePage
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPage
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageOptions
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
 import com.letta.mobile.ui.shell.pages.skills.SkillsPage
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
@@ -41,7 +45,7 @@ fun interface ShellPageContent<in D : ShellDestination> {
  * A host fills only the pages it can show right now (Android builds one per nav entry, the desktop
  * and web all of theirs); a destination without one goes to [fallback].
  *
- * - The shared pages ([home], [channels], [skills], [memory], [settings]) are built from the shared
+ * - The shared pages ([home], [channels], [skills], [schedules], [memory], [settings]) are built from the shared
  *   page bindings below ([shellHomePage], ...), so the page itself is always the sharedUI one.
  * - [chat] is the platform's chat-page container: it binds the shared ChatSurface to the platform's
  *   session port (DesktopSharedChatPage, SharedChatPage, WebSharedChatPage). It stays a slot.
@@ -146,6 +150,15 @@ fun shellSkillsPage(
         modifier = modifier,
         options = options.copy(initialSection = destination.section.toPageSection()),
     )
+}
+
+/** The shared Schedules page (letta-mobile-ckmub.3.16). */
+fun shellSchedulesPage(
+    state: SchedulesPageState,
+    actions: SchedulesPageActions,
+    options: SchedulesPageOptions = SchedulesPageOptions(),
+) = ShellPageContent<ShellDestination.Schedules> { _, modifier ->
+    SchedulesPage(state = state, actions = actions, modifier = modifier, options = options)
 }
 
 /** The shared Memory page: the block graph and the agent's files. */

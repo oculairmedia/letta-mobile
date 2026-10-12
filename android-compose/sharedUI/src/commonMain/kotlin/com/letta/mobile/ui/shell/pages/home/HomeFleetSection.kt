@@ -35,9 +35,9 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.home.FleetAgentStat
 import com.letta.mobile.data.home.FleetSortKey
 import com.letta.mobile.data.home.relativeAge
-import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.mascot.AgentAvatar
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -154,7 +154,7 @@ private fun FleetAgentRow(agent: FleetAgentStat, page: HomePageScope) {
 @Composable
 private fun FleetAgentIdentity(agent: FleetAgentStat, page: HomePageScope, modifier: Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.md)) {
-        AgentOrb(agentId = agent.agentId, index = page.orbIndex(agent.agentId), size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
+        AgentAvatar(agentId = agent.agentId, name = agent.name, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)
         Column(Modifier.weight(1f, fill = false)) {
             // An unresolved name is the raw backend id; it renders as the technical fallback it is.
             Text(

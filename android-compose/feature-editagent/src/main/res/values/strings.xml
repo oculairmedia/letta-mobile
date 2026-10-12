@@ -16,7 +16,6 @@
   <string name="action_save_settings">Save Settings</string>
   <string name="common_context_window">Context Window</string>
   <string name="common_description">Description</string>
-  <string name="common_enable_sleeptime">Enable Sleeptime</string>
   <string name="common_id">ID</string>
   <string name="common_max_output_tokens">Max Output Tokens</string>
   <string name="common_model">Model</string>

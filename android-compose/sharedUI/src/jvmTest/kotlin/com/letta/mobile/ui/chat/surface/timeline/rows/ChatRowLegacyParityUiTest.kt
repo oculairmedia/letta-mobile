@@ -39,6 +39,7 @@ class ChatRowLegacyParityUiTest {
     @Test
     fun theRunHeaderCountsToolsAndFailuresOnItsOwnLine() = runComposeUiTest {
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = "a")) } }
+        awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertExists()
         onNodeWithText("2 tools").assertExists()
         onNodeWithText("1 failure").assertExists()
@@ -52,6 +53,7 @@ class ChatRowLegacyParityUiTest {
         // The page owns the fold, as the legacy RunBlock's owner did: a folded run shows its last step.
         val folded = rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "a")
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), folded, rowCallbacks(actions)) } }
+        awaitText("Fixed it.")
         onNodeWithText("2 ran - 1 failed").assertDoesNotExist()
         onNodeWithText("Fixed it.", substring = true).assertExists()
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).performClick()
@@ -61,11 +63,16 @@ class ChatRowLegacyParityUiTest {
     @Test
     fun anOlderRunHasNoHeader() = runComposeUiTest {
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), rowContext(newestMessageId = null)) } }
+        awaitText("Fixed it.")
         onNodeWithTag(ChatRowTestTags.RUN_HEADER).assertDoesNotExist()
     }
 
     @Test
-    fun aPermissionApprovalFoldsIntoTheToolLineUntilOpened() = runComposeUiTest {
+    /**
+     * letta-mobile-sieej (P0): the one place a pending row may differ from legacy. A parked permission
+     * approval is NOT folded into the tool line: its card shows under the line without a tap.
+     */
+    fun aPendingPermissionApprovalShowsUnderTheToolLineWithoutATap() = runComposeUiTest {
         val approval = UiMessage(
             id = "ap",
             role = "assistant",
@@ -82,7 +89,10 @@ class ChatRowLegacyParityUiTest {
         setContent {
             MaterialTheme { RenderRow(runOf(approval), rowContext(newestMessageId = "ap", toolDetails = ChatToolDetails.Inline)) }
         }
-        onNodeWithText("Approval requested").assertDoesNotExist()
+        onNodeWithText("Approval requested").assertExists()
+        onNodeWithText("Approve").assertExists()
+        onNodeWithText("Approval needed - 1 command").assertExists()
+        // Opening the line's disclosure shows the calls, never a second card.
         onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
         waitForIdle()
         onNodeWithText("Approval requested").assertExists()
@@ -92,6 +102,7 @@ class ChatRowLegacyParityUiTest {
     fun anErrorLabelsItselfOnlyAtTheHeadOfItsGroup() = runComposeUiTest {
         val error = UiMessage(id = "e", role = "assistant", content = "Run failed.", timestamp = "2026-10-11T16:05:00Z", isError = true)
         setContent { MaterialTheme { ChatMessageRow(error, rowContext(), rowCallbacks(), GroupPosition.Last) } }
+        awaitText("Run failed.")
         onNodeWithText("Error").assertDoesNotExist()
         onNodeWithText("Run failed.", substring = true).assertExists()
     }
@@ -100,6 +111,7 @@ class ChatRowLegacyParityUiTest {
     fun theHeadOfAGroupKeepsTheErrorLabel() = runComposeUiTest {
         val error = UiMessage(id = "e", role = "assistant", content = "Run failed.", timestamp = "2026-10-11T16:05:00Z", isError = true)
         setContent { MaterialTheme { ChatMessageRow(error, rowContext(), rowCallbacks(), GroupPosition.None) } }
+        awaitText("Run failed.")
         onNodeWithText("Error").assertExists()
     }
 }

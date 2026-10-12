@@ -16,7 +16,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,6 +33,7 @@ import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.ui.components.ChevronEmphasis
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
+import com.letta.mobile.ui.components.LettaInlineError
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
@@ -144,14 +144,8 @@ private fun MemorySummaryStrip(metrics: List<MemorySummaryMetric>) {
     }
 }
 
+/** letta-mobile-ckmub.3.15 (S13): the page's load failure, as every page shows one. */
 @Composable
 private fun MemoryErrorBanner(message: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(LettaDimens.Space.md))
-    }
+    LettaInlineError(message = message, title = null)
 }

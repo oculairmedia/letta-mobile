@@ -2,11 +2,9 @@ package com.letta.mobile.desktop
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
@@ -14,15 +12,12 @@ import com.letta.mobile.data.memory.graph.MemoryPageActions
 import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.shell.ShellDestination
-import com.letta.mobile.data.skills.Skill
+import com.letta.mobile.data.skills.SkillsCatalogState
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
-import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
@@ -33,42 +28,19 @@ import com.letta.mobile.ui.shell.pages.channels.ChannelsSearchFieldSlot
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.rememberMemoryWorkspaceView
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
+import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
 import com.letta.mobile.ui.shell.shellChannelsPage
 import com.letta.mobile.ui.shell.shellHomePage
 import com.letta.mobile.ui.shell.shellMemoryPage
+import com.letta.mobile.ui.shell.shellSchedulesPage
 import com.letta.mobile.ui.shell.shellSkillsPage
 
-internal data class DestinationScheduleInputs(
-    val scheduleLibraryState: DesktopScheduleLibraryState,
-    val crons: List<CronTask>,
-    val focusedAgentId: String?,
-    val canCreateCron: Boolean,
-)
-
-internal data class DestinationScheduleActions(
-    val onRefresh: () -> Unit,
-    val onAgentSelected: (String) -> Unit,
-    val onDeleteCron: (String) -> Unit,
-    val onCreateCron: (
-        agentId: String?,
-        name: String,
-        prompt: String,
-        cron: String,
-        recurring: Boolean,
-        timezone: String,
-    ) -> Unit,
-    val onTogglePauseCron: ((String, Boolean) -> Unit)? = null,
-)
-
 internal data class DestinationSkillsInputs(
-    val skills: List<Skill>,
-    val installedSkillNames: Set<String>,
-    val skillsLoading: Boolean,
-    val skillsError: String?,
-    val canManageSkills: Boolean,
+    val catalog: SkillsCatalogState,
     val focusedAgentName: String?,
 )
 
@@ -93,7 +65,7 @@ internal data class DestinationContentInputs(
     val home: DesktopHomeInputs,
     val chat: DesktopChatSurfaceState,
     val memoryState: MemoryPageState,
-    val schedule: DestinationScheduleInputs,
+    val schedule: SchedulesPageState,
     val channels: ChannelsPageState,
     val toolLibraryState: DesktopToolLibraryState,
     val skills: DestinationSkillsInputs,
@@ -120,7 +92,7 @@ internal data class DestinationContentActions(
     val memory: MemoryPageActions,
     /** letta-mobile-bzvro.24: the Memory destination's Files view. */
     val memfs: MemfsPageController,
-    val schedules: DestinationScheduleActions,
+    val schedules: SchedulesPageActions,
     val channels: ChannelsPageActions,
     val tools: DestinationToolsActions,
     val skills: DestinationSkillsActions,
@@ -137,10 +109,9 @@ internal data class DestinationContentActions(
 
 /**
  * letta-mobile-ckmub.3.4: the desktop's pages for the shared ShellPage switch. The shared pages
- * (Home, Memory, Channels, Skills, Settings) are the sharedUI bindings over the desktop's
+ * (Home, Memory, Schedules, Channels, Skills, Settings) are the sharedUI bindings over the desktop's
  * controllers; Overview is the shared Settings page on its About section (S10, ckmub.3.12); [chat]
- * is the desktop chat container. Schedules is still a TEMPORARY platform page (DesktopScheduleSurface,
- * S14) and Providers the desktop binding of the shared ProviderSettingsPane.
+ * is the desktop chat container and Providers the desktop binding of the shared ProviderSettingsPane.
  */
 internal fun desktopShellPageDeps(
     inputs: DestinationContentInputs,
@@ -150,7 +121,7 @@ internal fun desktopShellPageDeps(
     home = desktopHomePage(inputs, actions),
     chat = chat,
     memory = desktopMemoryPage(inputs.memoryState, actions),
-    schedules = ShellPageContent { _, modifier -> SchedulesFallbackPage(inputs.schedule, actions.schedules, modifier) },
+    schedules = shellSchedulesPage(inputs.schedule, actions.schedules),
     channels = shellChannelsPage(inputs.channels, actions.channels, ChannelsPageOptions(slots = DesktopChannelsPageSlots)),
     skills = desktopSkillsPage(inputs, actions),
     settings = desktopSettingsPage(inputs, actions),
@@ -208,11 +179,11 @@ private fun desktopSkillsPage(
     val skills = inputs.skills
     return shellSkillsPage(
         state = SkillsPageState(
-            skills = skills.skills,
-            installedSkillNames = skills.installedSkillNames,
-            skillsLoading = skills.skillsLoading,
-            skillsError = skills.skillsError,
-            canManageSkills = skills.canManageSkills,
+            skills = skills.catalog.skills,
+            installedSkillNames = skills.catalog.installedSkillNames,
+            skillsLoading = skills.catalog.isLoading,
+            skillsError = skills.catalog.errorMessage,
+            canManageSkills = skills.catalog.canManage,
             focusedAgentName = skills.focusedAgentName,
             tools = inputs.toolLibraryState,
         ),
@@ -238,26 +209,3 @@ private val DesktopChannelsPageSlots = ChannelsPageSlots(
         DesktopIconButton(imageVector = Icons.Outlined.Refresh, contentDescription = "Refresh", onClick = onRefresh, modifier = modifier)
     },
 )
-
-// --- TEMPORARY platform fallback pages (letta-mobile-ckmub.3.4) ---------------------------------
-
-/** Fallback until the shared SchedulesPage (S14). */
-@Composable
-private fun SchedulesFallbackPage(
-    inputs: DestinationScheduleInputs,
-    actions: DestinationScheduleActions,
-    modifier: Modifier = Modifier,
-) {
-    DesktopScheduleSurface(
-        state = inputs.scheduleLibraryState,
-        onRefresh = actions.onRefresh,
-        onAgentSelected = actions.onAgentSelected,
-        modifier = modifier,
-        crons = inputs.crons,
-        focusedAgentId = inputs.focusedAgentId,
-        onDeleteCron = actions.onDeleteCron,
-        canCreate = inputs.canCreateCron,
-        onCreateCron = actions.onCreateCron,
-        onTogglePauseCron = actions.onTogglePauseCron,
-    )
-}

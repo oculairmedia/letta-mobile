@@ -18,8 +18,6 @@ import com.composables.icons.lucide.Users
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -72,6 +70,8 @@ import com.letta.mobile.sharedui.resources.chat_surface_canvas_share_failed
 import com.letta.mobile.sharedui.resources.chat_surface_canvas_switch_agent
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.ui.chat.surface.timeline.A2uiSurfaceStack
+import com.letta.mobile.ui.host.OverlaySnackbarSlot
+import com.letta.mobile.ui.host.ProvideOverlayHost
 import com.letta.mobile.ui.chat.surface.timeline.ChatTimeline
 import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalRequestCard
 import com.letta.mobile.ui.chat.surface.timeline.rows.ApprovalOwner
@@ -139,7 +139,6 @@ fun ChatSurface(
     val effectiveHost = remember(stableHost, canvas != null, canvasActions) {
         pageHost(stableHost, canvas != null, canvasActions, stableOnIntent)
     }
-    val snackbars = rememberChatSurfaceSnackbars(uiState, port)
     // One scroll position per conversation (and paged presentation), kept across mode changes.
     val conversationId = (uiState.conversationState as? ConversationState.Ready)?.conversationId
     ReleaseImagesOnConversationChange(conversationId)
@@ -153,7 +152,6 @@ fun ChatSurface(
     val companionAnchors = remember { CompanionSeatAnchors() }
     val frame = ChatSurfaceFrame(
         port = port,
-        snackbars = snackbars,
         listState = listState,
         uiState = uiState,
         composer = composer,
@@ -171,18 +169,23 @@ fun ChatSurface(
     val focusHandoff = remember { ComposerFocusHandoff() }
     // The thinking glow's shader, compiled once for the page rather than at every run's start.
     val glowShaders = rememberAmbientGlowShaders()
-    // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
-    CompositionLocalProvider(
-        LocalComposerImageAttacher provides imageAttacher,
-        LocalCompanionSeatAnchors provides companionAnchors,
-        LocalComposerFocusHandoff provides focusHandoff,
-        LocalChatPlatformStyle provides appearance.platformStyle,
-        LocalAmbientGlowShaders provides glowShaders,
-        LocalChatImageActions provides stablePlatform.imageActions,
-    ) {
-        // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
-        ChatSurfacePageFrame(modifier) {
-            ChatSurfaceLayers(frame, canvas?.let { { it(canvasActions) } })
+    // letta-mobile-ckmub.3.15 (S13): the page's messages go to the window's overlay queue (its own
+    // when composed without a window root); its snackbar slot draws them above the composer.
+    ProvideOverlayHost { overlays ->
+        ChatSurfaceOverlays(uiState, port, overlays)
+        // letta-mobile-cc25e: a sent prompt flies from the composer into its row over the whole page.
+        CompositionLocalProvider(
+            LocalComposerImageAttacher provides imageAttacher,
+            LocalCompanionSeatAnchors provides companionAnchors,
+            LocalComposerFocusHandoff provides focusHandoff,
+            LocalChatPlatformStyle provides appearance.platformStyle,
+            LocalAmbientGlowShaders provides glowShaders,
+            LocalChatImageActions provides stablePlatform.imageActions,
+        ) {
+            // letta-mobile-ckmub.1 (S4): the page's insets are owned once, by its LettaPageScaffold.
+            ChatSurfacePageFrame(modifier) {
+                ChatSurfaceLayers(frame, canvas?.let { { it(canvasActions) } })
+            }
         }
     }
 }
@@ -245,7 +248,6 @@ internal object ChatSurfaceTags {
 @Immutable
 internal class ChatSurfaceFrame(
     val port: ChatSessionPort,
-    val snackbars: SnackbarHostState,
     val listState: LazyListState,
     val uiState: ChatUiState,
     val composer: ChatComposerUiState,
@@ -425,17 +427,17 @@ private fun TouchDock(frame: ChatSurfaceFrame, morph: SurfaceMorph, parts: Touch
     )
 }
 
-/** The bar, or (the canvas bubble) no bar and only its snackbars while its card is folded. */
+/** The bar, or (the canvas bubble) no bar and only its snackbar slot while its card is folded. */
 private fun touchDockSlots(frame: ChatSurfaceFrame, approval: UiApprovalRequest?, bubble: TouchBubble?): TouchDockSlots {
     val inputTray: @Composable () -> Unit = { TouchCanvasInput(frame, approval) }
     if (bubble == null) {
         return TouchDockSlots(inputTray = inputTray, composer = { DockComposer(frame, ChatSurfaceMode.Docked, collapsed = true) })
     }
-    // The open card's composer has the snackbars; folded, they float at the foot of the board.
+    // The open card's composer has the snackbar slot; folded, it floats at the foot of the board.
     return TouchDockSlots(
         inputTray = inputTray,
         composer = null,
-        floating = { if (!bubble.state.expanded) SnackbarHost(frame.snackbars, Modifier.fillMaxWidth()) },
+        floating = { if (!bubble.state.expanded) OverlaySnackbarSlot(Modifier.fillMaxWidth()) },
     )
 }
 
@@ -610,7 +612,7 @@ internal fun dockedReplyParams(frame: ChatSurfaceFrame): DockedReplyParams {
 @Composable
 internal fun DockComposer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, collapsed: Boolean) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
+        OverlaySnackbarSlot(Modifier.fillMaxWidth())
         if (!collapsed && mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
         CompositionLocalProvider(LocalComposerCompanion provides false) {
             ComposerPanel(frame, mode, Modifier.fillMaxWidth())
@@ -673,13 +675,13 @@ private fun TimelineWithOverlay(frame: ChatSurfaceFrame, modifier: Modifier) {
 }
 
 /**
- * The composer with what must stay visible in every mode above it: the page's one snackbar host
+ * The composer with what must stay visible in every mode above it: the page's snackbar slot
  * and, while docked (no timeline on screen), the A2UI surfaces.
  */
 @Composable
 private fun Composer(frame: ChatSurfaceFrame, mode: ChatSurfaceMode, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        SnackbarHost(frame.snackbars, Modifier.fillMaxWidth())
+        OverlaySnackbarSlot(Modifier.fillMaxWidth())
         if (mode == ChatSurfaceMode.Docked) DockedA2uiStack(frame)
         LiveRunStatus(frame)
         ComposerPanel(frame, mode, Modifier.fillMaxWidth())
