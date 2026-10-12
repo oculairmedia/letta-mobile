@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
@@ -141,20 +142,7 @@ internal fun ComposerTextField(
             .focusRequester(focusRequester)
             // Only the primary field speaks for the page: the outgoing one losing focus to it is not "unfocused".
             .onFocusChanged { focus.report(it) }
-            .onPreviewKeyEvent { event ->
-                composerEnterKeyHandled(
-                    ComposerEnterKeyParams(
-                        eventKey = event.key,
-                        eventType = event.type,
-                        shiftPressed = event.isShiftPressed,
-                        ctrlPressed = event.isCtrlPressed,
-                        matchedCommands = model.decisions.autocomplete.matchedCommands,
-                        canSend = model.decisions.sendEnabled,
-                        onRunCommand = { chooseComposerCommand(model.composer, model.decisions.autocomplete, model.actions, it) },
-                        onSend = { sendFromKeyboard() },
-                    ),
-                )
-            },
+            .onPreviewKeyEvent { event -> composerKeyHandled(event, model, sendFromKeyboard) },
         textStyle = textStyle,
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         singleLine = style.singleLine,
@@ -168,6 +156,27 @@ internal fun ComposerTextField(
                 inner()
             }
         },
+    )
+}
+
+/** One key at the prompt: Shift+Tab cycles the permission mode (letta-mobile-bzvro.40), Enter sends. */
+private fun composerKeyHandled(event: KeyEvent, model: ComposerModel, sendFromKeyboard: () -> Boolean): Boolean {
+    if (isModeCycleKey(event.key, event.type, event.isShiftPressed)) {
+        val next = nextPermissionMode(model.composer.permissionMode) ?: return false
+        model.actions.setPermissionMode(next)
+        return true
+    }
+    return composerEnterKeyHandled(
+        ComposerEnterKeyParams(
+            eventKey = event.key,
+            eventType = event.type,
+            shiftPressed = event.isShiftPressed,
+            ctrlPressed = event.isCtrlPressed,
+            matchedCommands = model.decisions.autocomplete.matchedCommands,
+            canSend = model.decisions.sendEnabled,
+            onRunCommand = { chooseComposerCommand(model.composer, model.decisions.autocomplete, model.actions, it) },
+            onSend = { sendFromKeyboard() },
+        ),
     )
 }
 

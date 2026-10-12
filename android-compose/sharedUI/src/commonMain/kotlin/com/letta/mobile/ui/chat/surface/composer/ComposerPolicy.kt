@@ -11,9 +11,11 @@ import com.letta.mobile.data.composer.ComposerAutocomplete
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 
 /**
  * letta-mobile-bglj6.1: the composer's pure decisions (what the action button does, when
@@ -159,6 +161,23 @@ internal fun draftAfterDictation(draft: String, dictated: String): String {
 internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: String): TextFieldValue {
     if (current.text == externalText) return current
     return TextFieldValue(text = externalText, selection = TextRange(externalText.length))
+}
+
+/**
+ * letta-mobile-bzvro.40 (G48): the mode Shift+Tab moves to, the next of the chip's options after the
+ * one shown; null while the chip cannot change (locked, or a change still pending).
+ */
+internal fun nextPermissionMode(state: ChatPermissionModeUiState?): AppServerPermissionMode? {
+    val options = state?.takeIf { it.canChange }?.options ?: return null
+    if (options.isEmpty()) return null
+    val current = options.indexOf(state.unconfirmed ?: state.selected)
+    return options[(current + 1).mod(options.size)]
+}
+
+/** Shift+Tab, the key that cycles the permission mode at the prompt (as Letta Desktop's composer does). */
+internal fun isModeCycleKey(eventKey: Key, eventType: KeyEventType, shiftPressed: Boolean): Boolean {
+    if (eventType != KeyEventType.KeyDown) return false
+    return shiftPressed && eventKey == Key.Tab
 }
 
 /** One key event at the prompt, with what Enter would do. */

@@ -43,6 +43,8 @@ private fun DesktopShellChatEffects(
         chatController.refreshSelectedConversationWorkingDirectory()
     }
     CommandPaletteKeyDispatcherEffect(onOpenPalette = { context.overlays.commandPalette = true })
+    // letta-mobile-zxk2n.5: mod+Alt+Up / Down for the previous / next conversation.
+    ConversationStepKeyDispatcherEffect(context, frame)
     DesktopControllerLifecycles(
         DesktopControllerLifecycleParams(
             chatController = chatController,
@@ -90,6 +92,7 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             },
             onOpenConversation = { context.router.openConversation(ConversationId(it)) },
             onReplyToConversation = chatController::replyFromNotification,
+            attention = rememberShellAttentionBindings(context),
         ),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(
@@ -118,6 +121,28 @@ private fun DesktopShellNucleusEffects(context: DesktopShellContext, frame: Desk
             onActivate = { activateDesktopWindow(context.shell.window) },
         ),
     )
+}
+
+/**
+ * letta-mobile-bzvro.27: the window's run registry and the person's mutes, with agent and
+ * conversation lookups read through the controller's live state (the toasts fire from coroutines).
+ */
+@Composable
+private fun rememberShellAttentionBindings(context: DesktopShellContext): DesktopAttentionBindings {
+    val chatController = context.core.chatController
+    val prefs = context.core.attentionPrefs
+    return remember(chatController, prefs) {
+        DesktopAttentionBindings(
+            runs = chatController.runs,
+            prefs = prefs,
+            agentNameFor = { agentId ->
+                chatController.state.value.conversations.firstOrNull { it.agentId == agentId }?.agentName
+            },
+            agentIdForConversation = { conversationId ->
+                chatController.state.value.conversations.firstOrNull { it.id == conversationId }?.agentId
+            },
+        )
+    }
 }
 
 /**

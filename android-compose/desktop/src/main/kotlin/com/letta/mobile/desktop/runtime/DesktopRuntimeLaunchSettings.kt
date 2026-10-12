@@ -29,6 +29,9 @@ internal data class DesktopRuntimeLaunchInputs(
     val inheritedNodeOptions: String? = null,
     /** letta-mobile-iczm7: the user allowed automatic dreams on Windows. */
     val allowWindowsAutoReflection: Boolean = false,
+    /** A tool directory (git, G07) found after launch, prepended to the child's [inheritedPath]. */
+    val extraPathDirectory: File? = null,
+    val inheritedPath: String? = null,
 )
 
 /** letta-code's switch for automatic reflection (dreaming) on Windows (letta.js 0.34.8 L:451887). */
@@ -58,7 +61,7 @@ internal fun desktopRuntimeLaunchContext(inputs: DesktopRuntimeLaunchInputs): De
             "LETTA_LISTENER_INSTANCE_ID" to "$INSTANCE_ID_PREFIX${inputs.instanceId}",
             "USER_CWD" to cwd,
             "PERSIST_CWD" to "1",
-        ) + windowsAutoReflectionEnv(inputs.allowWindowsAutoReflection),
+        ) + windowsAutoReflectionEnv(inputs.allowWindowsAutoReflection) + pathEnvironment(inputs),
         workingDirectory = inputs.workingDirectory,
     )
 }
@@ -73,6 +76,12 @@ internal fun windowsAutoReflectionEnv(allowed: Boolean): Map<String, String> =
  */
 internal fun windowsBlocksAutoReflection(osName: String?, environment: Map<String, String?>): Boolean =
     osName.orEmpty().startsWith("Windows", ignoreCase = true) && environment[WINDOWS_AUTO_REFLECTION_ENV] != "1"
+
+private fun pathEnvironment(inputs: DesktopRuntimeLaunchInputs): Map<String, String> {
+    val extra = inputs.extraPathDirectory?.absolutePath ?: return emptyMap()
+    val inherited = inputs.inheritedPath?.takeIf { it.isNotBlank() } ?: return mapOf("PATH" to extra)
+    return mapOf("PATH" to extra + File.pathSeparator + inherited)
+}
 
 /**
  * The first existing directory of: the user's preference, Documents, home, temp. A preference
@@ -101,6 +110,10 @@ internal object DesktopRuntimeLaunchPreference {
     @Volatile
     var allowWindowsAutoReflection: Boolean = false
 
+    /** Set by the git environment check when git lives off the inherited PATH (G07). */
+    @Volatile
+    var extraPathDirectory: File? = null
+
     /** The context for the next spawn, from the live preference and this machine. */
     fun currentContext(): DesktopRuntimeLaunchContext {
         val home = System.getProperty("user.home")?.takeIf { it.isNotBlank() }?.let(::File)
@@ -115,6 +128,8 @@ internal object DesktopRuntimeLaunchPreference {
                 ),
                 inheritedNodeOptions = System.getenv("NODE_OPTIONS"),
                 allowWindowsAutoReflection = allowWindowsAutoReflection,
+                extraPathDirectory = extraPathDirectory,
+                inheritedPath = System.getenv("PATH"),
             ),
         )
     }

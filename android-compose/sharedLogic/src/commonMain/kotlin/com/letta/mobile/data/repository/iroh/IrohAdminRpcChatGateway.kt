@@ -13,9 +13,6 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.ApprovalCreate
-import com.letta.mobile.data.model.ApprovalSubmission
-import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -75,11 +72,16 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
+    /** letta-mobile-bzvro.40: the host's approval relay and the mode chip; null leaves both off. */
+    private val approvalControls: com.letta.mobile.data.runtime.IrohApprovalControls? = null,
 ) : ChatGateway,
     ChatGatewayExtras,
     ConversationSummaryGateway,
     ConversationForkGateway,
     ApprovalSubmittingGateway,
+    com.letta.mobile.data.chat.runtime.PendingApprovalSource,
+    com.letta.mobile.data.chat.runtime.PermissionModeGateway,
+    AutoCloseable,
     ConnectionStatusGateway {
 
     private val deviceLabel: IrohDeviceLabel = IrohDeviceLabel(deviceLabel)
@@ -98,32 +100,49 @@ class IrohAdminRpcChatGateway(
         approve: Boolean,
         reason: String?,
     ) {
-        val decoded = if (approve) AskUserQuestion.decodeAnswerReason(reason) else null
-        val effectiveReason = if (decoded != null) null else reason?.takeIf { it.isNotBlank() }
-        val approvalCreate = ApprovalCreate(
-            approvals = toolCallId?.let {
-                listOf(ApprovalSubmission(toolCallId = it, approve = approve, reason = effectiveReason))
-            },
-            approve = approve,
-            approvalRequestId = approvalRequestId,
-            reason = effectiveReason,
-            updatedInput = decoded,
-        )
-        val payload = MessageCreateRequest(
-            messages = listOf(json.encodeToJsonElement(ApprovalCreate.serializer(), approvalCreate)),
-            streaming = false,
-        )
-        val body = buildJsonObject {
-            put("agent_id", agentId)
-            conversationId.takeIf { it.isNotBlank() }?.let { put("conversation_id", it) }
-            put("payload", json.encodeToJsonElement(MessageCreateRequest.serializer(), payload))
+        postApproval(IrohApprovalSubmitBody.params(agentId, conversationId, IrohApprovalSubmitBody.decision(approvalRequestId, toolCallId, approve, reason)))
+        toolCallId?.let { approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(it)) }
+    }
+
+    /** letta-mobile-bzvro.40: only a host that relays approvals applies the rule ids. */
+    override suspend fun submitAlwaysAllow(answer: com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer) {
+        if (com.letta.mobile.data.runtime.ApprovalRelay.CAPABILITY !in transport.hostCapabilities) {
+            throw UnsupportedOperationException("this host cannot persist always-allow rules")
         }
+        postApproval(IrohApprovalSubmitBody.params(answer.agentId, answer.conversationId, IrohApprovalSubmitBody.alwaysAllow(answer.binding, answer.suggestionIds)))
+        approvalControls?.relay?.resolve(com.letta.mobile.runtime.ToolCallId(answer.binding.toolCallId))
+    }
+
+    private suspend fun postApproval(params: JsonObject) {
+        val agentId = (params["agent_id"] as? JsonPrimitive)?.content.orEmpty()
         val response = transport.adminRpc(
             method = "approval.submit",
             path = "/v1/agents/$agentId/messages",
-            body = body.toString(),
+            body = params.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc approval.submit failed")
+    }
+
+    private val noPendingApprovals: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
+        kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
+
+    override val pendingApprovalDetails: kotlinx.coroutines.flow.StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>>
+        get() = approvalControls?.relay?.pending ?: noPendingApprovals
+
+    override val permissionModes: com.letta.mobile.data.runtime.PermissionModeRegistry?
+        get() = approvalControls?.modes?.takeIf { it.supported }?.modes
+
+    override suspend fun setPermissionMode(
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode,
+    ): Boolean = approvalControls?.modes?.set(runtime, mode) ?: false
+
+    override suspend fun syncPermissionMode(runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) {
+        approvalControls?.modes?.sync(runtime)
+    }
+
+    override fun close() {
+        approvalControls?.close()
     }
 
     /** conversationId -> agentId, learned from conversation.get/list. */

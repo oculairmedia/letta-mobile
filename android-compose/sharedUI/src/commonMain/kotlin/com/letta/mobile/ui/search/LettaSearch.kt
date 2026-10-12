@@ -743,7 +743,7 @@ fun LettaSearchAnchoredField(
                             autoFocus = true,
                             maxResultsHeight = config.maxResultsHeight ?: AnchoredPanelMaxHeight,
                         ),
-                        parts = LettaSearchParts.All,
+                        parts = if (config.showResults) LettaSearchParts.All else LettaSearchParts.FieldOnly,
                     )
                 }
             }

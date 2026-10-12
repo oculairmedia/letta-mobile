@@ -32,6 +32,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.timeline.CanonicalTimelinePresentation
+import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.desktop.LocalDesktopChatFontScale
 import com.letta.mobile.desktop.LocalDesktopChatFontScaleSetter
 import com.letta.mobile.desktop.LocalDesktopOpenChatsOnCanvas
@@ -154,6 +155,7 @@ internal fun DesktopSharedChatPage(
     // The run's own state, as the composer's Stop button and the docked panel's glow read it: the
     // shell's "thinking" flag clears at the first reply and put the page's glow out mid-run.
     val uiState by port.uiState.collectAsState()
+    val displayOptions by port.displayOptions.collectAsState()
     val ambientStatus = rememberDesktopAmbientStatus(uiState.isRunInFlight, state.errorMessage)
     val session = rememberConversationCanvasSession(state.canvasStore, state.canvasOwner)
     state.dockedCanvas?.let { router ->
@@ -183,7 +185,7 @@ internal fun DesktopSharedChatPage(
                     if (collapse) presentation = ChatSurfaceModeReducer.reduce(presentation, ChatSurfaceIntent.Collapse)
                     collapse
                 },
-            appearance = phone.chatAppearance(rememberDesktopChatAppearance()),
+            appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions)),
             platform = rememberDesktopChatPlatform(ambientStatus, frame),
             pagedTimeline = state.pagedTimeline,
             canvas = { actions ->
@@ -200,12 +202,16 @@ internal fun DesktopSharedChatPage(
     }
 }
 
-/** The desktop's appearance: its own font scale, already applied to the window's text through density. */
+/**
+ * The desktop's appearance: its own font scale, already applied to the window's text through
+ * density, and the Chat options' [displayOptions] (letta-mobile-zxk2n.5).
+ */
 @Composable
-private fun rememberDesktopChatAppearance(): ChatSurfaceAppearance {
+private fun rememberDesktopChatAppearance(displayOptions: ChatDisplayOptions): ChatSurfaceAppearance {
     val fontScale = LocalDesktopChatFontScale.current
-    return remember(fontScale) {
+    return remember(fontScale, displayOptions) {
         ChatSurfaceAppearance(
+            displayOptions = displayOptions,
             fontScale = fontScale,
             // The font-scale host already scales the window's text through density.
             fontScaleAppliedByHost = true,

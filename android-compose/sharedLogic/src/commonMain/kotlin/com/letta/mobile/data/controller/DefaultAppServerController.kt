@@ -17,6 +17,12 @@ import com.letta.mobile.data.runtime.releaseUserInputGateUnlessRejected
 import com.letta.mobile.data.runtime.DeviceStateChanger
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnInboundSource
+import com.letta.mobile.data.runtime.ApprovalBinding
+import com.letta.mobile.data.runtime.PendingApprovalDetails
+import com.letta.mobile.data.runtime.approvalIdForSuggestions
+import com.letta.mobile.data.runtime.pendingApprovalDetails
+import com.letta.mobile.data.runtime.pendingApprovalsByRuntime
+import com.letta.mobile.data.runtime.stricter
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -198,6 +204,13 @@ class DefaultAppServerController(
      */
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
     private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
+
+    /**
+     * letta-mobile-bzvro.40: modes a relayed client chose with [changePermissionMode]. A later start
+     * (a client's `runtime_start` naming its own default, a reconnect, an eviction) never runs the
+     * runtime looser than this; only another [changePermissionMode] can relax it.
+     */
+    private val pinnedPermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
     /**
@@ -239,8 +252,8 @@ class DefaultAppServerController(
             client = client,
             clientInfo = clientInfo,
             permissionModeProvider = { command ->
-                runtimePermissionModes[RuntimeKey(command.agentId.value, command.conversationId.value)]
-                    ?: defaultPermissionMode()
+                val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+                runtimePermissionModes[key] ?: pinnedPermissionModes[key] ?: defaultPermissionMode()
             },
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
@@ -311,7 +324,8 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        when (val lookup = runtimeMutex.withLock { lookupCachedRuntime(key, mode) }) {
+        val requested = runtimeMutex.withLock { pinnedMode(key, mode) }
+        when (val lookup = runtimeMutex.withLock { lookupCachedRuntime(key, requested) }) {
             is CachedRuntimeLookup.Current -> return lookup.runtime
             is CachedRuntimeLookup.ModeChange -> changeModeInPlace(key, lookup)?.let { return it }
             null -> Unit
@@ -321,11 +335,17 @@ class DefaultAppServerController(
                 agentId = agentId,
                 conversationId = conversationId,
                 cwd = cwd,
-                mode = mode,
+                mode = requested,
                 recoverApprovals = recoverApprovals,
                 forceDeviceStatus = forceDeviceStatus,
             )
         }
+    }
+
+    /** letta-mobile-bzvro.40: [mode], never looser than a pinned choice; the pin when nothing was asked for. */
+    private fun pinnedMode(key: RuntimeKey, mode: AppServerPermissionMode?): AppServerPermissionMode? {
+        val pinned = pinnedPermissionModes[key] ?: return mode
+        return mode?.let { stricter(pinned, it) } ?: pinned
     }
 
     /** letta-mobile-qygvv.7: what the cache holds for [key] under the requested [mode]. */
@@ -561,20 +581,13 @@ class DefaultAppServerController(
         reason: String?,
         toolCallId: String?,
         updatedInput: kotlinx.serialization.json.JsonObject?,
-    ): ApprovalSubmitResult {
-        val runtime = runtimeMutex.withLock {
-            val conversationValue = conversationId?.value
-            runtimeCache.entries.firstOrNull { (key, _) ->
-                key.agentId == agentId.value && (conversationValue == null || key.conversationId == conversationValue)
-            }?.value?.scope
-        } ?: throw AppServerControllerException("No active runtime found for approval $approvalRequestId")
+    ): ApprovalSubmitResult = submitApproval(
+        ControllerApprovalAnswer(agentId, conversationId, approvalRequestId, approve, reason, toolCallId, updatedInput),
+    )
 
-        // letta-mobile-vilsn: the structured close payload (e.g. an AskUserQuestion
-        // answer) is now threaded as a first-class `updated_input` param (decoded
-        // upstream in MessageRepositoryApproval), so this terminal no longer
-        // re-decodes the `reason` sentinel. When present, close the tool call by
-        // returning the answer as `updated_input` rather than a bare allow.
-        val answerUpdatedInput = if (approve) updatedInput else null
+    override suspend fun submitApproval(answer: ControllerApprovalAnswer): ApprovalSubmitResult {
+        val runtime = cachedScopeFor(answer.agentId, answer.conversationId)
+            ?: throw AppServerControllerException("No active runtime found for approval ${answer.approvalRequestId}")
         // letta-mobile-vilsn: interactive tools (AskUserQuestion) are gated by
         // letta-code's `can_use_tool` control request, whose id (e.g.
         // `perm-call_…`) is NOT the display approval id the app renders from and
@@ -582,16 +595,23 @@ class DefaultAppServerController(
         // (`call_…` vs `toolu_…`). Answer against the REAL id the engine captured
         // when it surfaced the approval; fall back to the historical heuristic
         // only if nothing was captured.
-        val capturedRequestId = toolCallId?.let(turnEngine::userInputApprovalId)
-        val effectiveRequestId = capturedRequestId ?: approvalRequestId
-
+        val capturedRequestId = answer.toolCallId?.let(turnEngine::userInputApprovalId)
+        // letta-mobile-bzvro.40: an always-allow is honoured only for the request the card drew,
+        // while it is still parked and still offers every chosen rule.
+        val effectiveRequestId = if (answer.selectedSuggestionIds.isEmpty()) {
+            capturedRequestId ?: answer.approvalRequestId
+        } else {
+            suggestionApprovalId(answer) ?: return ApprovalSubmitResult.Rejected(RULE_NOT_OFFERED)
+        }
+        // letta-mobile-vilsn: a structured close payload (an AskUserQuestion answer) closes the
+        // call with `Allow(updated_input=…)` rather than a bare allow.
         val decision = AppServerApprovalDecisions.decide(
-            approve = approve,
-            updatedInput = answerUpdatedInput,
-            message = reason,
+            approve = answer.approve,
+            updatedInput = answer.updatedInput.takeIf { answer.approve },
+            message = answer.reason,
             defaultApproveMessage = "Approved by mobile client.",
             defaultDenyMessage = "Denied by mobile client.",
-        )
+        ).withSelectedSuggestions(answer.selectedSuggestionIds)
         // lgns8.22.4.1.4: capture the generation this decision is sent ON. Reading
         // the live generation after the send would let an old-connection response
         // mark a successor-generation recovery replay Answered, dropping the replay
@@ -604,8 +624,43 @@ class DefaultAppServerController(
             ApprovalSubmission(runtime, effectiveRequestId, decision),
             claimGeneration = claimGeneration,
         )
-        turnEngine.releaseUserInputGateUnlessRejected(result, toolCallId, capturedRequestId)
+        turnEngine.releaseUserInputGateUnlessRejected(result, answer.toolCallId, capturedRequestId)
         return result
+    }
+
+    private suspend fun cachedScopeFor(agentId: AgentId, conversationId: ConversationId?): AppServerRuntimeScope? =
+        runtimeMutex.withLock {
+            val conversationValue = conversationId?.value
+            runtimeCache.entries.firstOrNull { (key, _) ->
+                key.agentId == agentId.value && (conversationValue == null || key.conversationId == conversationValue)
+            }?.value?.scope
+        }
+
+    private fun suggestionApprovalId(answer: ControllerApprovalAnswer): String? {
+        val toolCallId = answer.toolCallId ?: return null
+        val parked: PendingApprovalDetails? = turnEngine.pendingApprovalDetails.value[toolCallId]
+        return parked.approvalIdForSuggestions(ApprovalBinding(toolCallId, answer.approvalRequestId), answer.selectedSuggestionIds)
+    }
+
+    override val pendingApprovals: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>
+        get() = turnEngine.pendingApprovalsByRuntime
+
+    override suspend fun permissionModeOf(runtime: AppServerRuntimeScope): AppServerPermissionMode? {
+        val key = RuntimeKey(runtime.agentId, runtime.conversationId)
+        return runtimeMutex.withLock { runtimePermissionModes[key] ?: pinnedPermissionModes[key] }
+    }
+
+    override suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
+        val key = RuntimeKey(runtime.agentId, runtime.conversationId)
+        runtimeMutex.withLock { pinnedPermissionModes[key] = mode }
+        startRuntime(
+            agentId = AgentId(runtime.agentId),
+            conversationId = ConversationId(runtime.conversationId),
+            mode = mode,
+            recoverApprovals = false,
+            forceDeviceStatus = false,
+        )
+        return runtimeMutex.withLock { runtimePermissionModes[key] == mode }
     }
 
     override suspend fun sync(
@@ -669,6 +724,8 @@ class DefaultAppServerController(
     }
 
     companion object {
+        private const val RULE_NOT_OFFERED = "the permission rule is no longer offered for this request"
+
         private val DEFAULT_CLIENT_INFO = AppServerRuntimeStartClientInfo(
             name = "letta-mobile-controller",
             title = "Letta Mobile Controller",

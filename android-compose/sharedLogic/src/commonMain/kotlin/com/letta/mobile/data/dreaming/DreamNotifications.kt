@@ -22,7 +22,7 @@ class DreamFinishTracker {
 
     /** The dreams that were running in the previous snapshot and are terminal in [entries]. */
     fun update(entries: List<SubagentEntry>): List<DreamFinished> {
-        val dreams = entries.filter { SubagentKind.fromWire(it.subagentType) == SubagentKind.Reflection }
+        val dreams = entries.filter { SubagentKind.fromWire(it.subagentType).isDream }
         val finished = dreams.mapNotNull { entry ->
             val was = running[entry.toolCallId] ?: return@mapNotNull null
             if (entry.status == SubagentStatus.RUNNING) return@mapNotNull null

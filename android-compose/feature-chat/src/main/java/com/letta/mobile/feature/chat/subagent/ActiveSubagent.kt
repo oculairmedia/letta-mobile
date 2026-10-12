@@ -258,12 +258,14 @@ data class ActiveSubagent(
         const val TERMINAL_LINGER_MS: Long = 8_000L
 
         /**
-         * letta-mobile-dvobc: how long a RUNNING entry may go without any
-         * todo-state change before its progress ring flips to the YELLOW
-         * "stuck" state. Chosen at 35s — inside the bead's requested 30-45s
-         * window. The signal is derived from elapsed-since-[lastUpdateAt].
+         * How long a RUNNING entry may go without host-observed progress
+         * ([lastUpdateAt]) before its ring flips to the YELLOW "stuck" state.
+         * letta-mobile-ulcg6 (RC4): progress is now a new tool call, and a
+         * model routinely thinks for well over a minute between tool calls,
+         * so the old 35s (dvobc, todo-change semantics) flagged healthy work.
+         * Five minutes matches the stuck-suspected soft threshold of d9a7p.
          */
-        const val STUCK_THRESHOLD_MS: Long = 35_000L
+        const val STUCK_THRESHOLD_MS: Long = 5 * 60_000L
 
         /**
          * letta-mobile-lgns8.26: letta.js sleeptime `Agent(subagent_type:"reflection")`

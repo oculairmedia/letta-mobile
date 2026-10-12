@@ -47,6 +47,9 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.Sync -> SafeRead
             // Capability discovery is idempotent read.
             is AppServerCommand.AppServerInfo -> SafeRead
+            // A terminal receipt is idempotent per (idempotency_key, consumer_id), and the server
+            // keeps replaying the terminal until it lands, so re-sending it is the intended path.
+            is AppServerCommand.TurnFinishedAck -> SafeRead
 
             // AdminRpc: reads are safe; everything else is an ambiguous mutation.
             is AppServerCommand.AdminRpc ->
@@ -83,6 +86,8 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.ConversationCompact -> AmbiguousMutation(dedupKey = null)
             // A replayed fork makes a second copy of the conversation.
             is AppServerConversationFork -> AmbiguousMutation(dedupKey = null)
+            // A recompile rewrites the stored system prompt; it is not replayed blindly.
+            is AppServerConversationRecompile -> AmbiguousMutation(dedupKey = null)
 
             // Control capabilities (lgns8.8): model listing is a read; skill
             // enable/disable are idempotent-by-target but treated as ambiguous.

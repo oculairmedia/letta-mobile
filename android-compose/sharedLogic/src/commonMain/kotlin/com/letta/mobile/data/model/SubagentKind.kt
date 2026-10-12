@@ -17,19 +17,31 @@ package com.letta.mobile.data.model
  */
 enum class SubagentKind {
     Reflection,
+
+    /**
+     * letta-mobile-ulcg6: letta-code's memory upkeep worker (memory git-conflict
+     * and invalid-memory repair; wire label "Memory", always silent).
+     */
+    Memory,
+
+    /** Sleep-time runs marketed as "Dreaming". */
+    Dream,
     GeneralPurpose,
     Fork,
     Recall,
-    Memory,
     Other,
     ;
 
     /**
      * Background work the user did not ask to see (sleeptime reflection, its
-     * integration step, memory upkeep). Hidden from the active-subagent chrome.
+     * integration step, memory upkeep, dream runs). Hidden from the active-subagent chrome.
      */
     val isBackground: Boolean
-        get() = this == Reflection || this == Memory
+        get() = this == Reflection || this == Memory || this == Dream
+
+    /** letta-mobile-iczm7: a dream (sleep-time reflection) run, as opposed to memory upkeep. */
+    val isDream: Boolean
+        get() = this == Reflection || this == Dream
 
     companion object {
         /** Trimmed, case-insensitive; any label starting with "reflection" is [Reflection]. */
@@ -37,16 +49,16 @@ enum class SubagentKind {
             val normalized = raw?.trim()?.lowercase().orEmpty()
             return when {
                 normalized.startsWith(REFLECTION_PREFIX) -> Reflection
+                normalized == "memory" -> Memory
+                normalized.startsWith("dream") -> Dream
                 normalized in GENERAL_PURPOSE_LABELS -> GeneralPurpose
                 normalized == "fork" -> Fork
                 normalized == "recall" -> Recall
-                normalized == MEMORY -> Memory
                 else -> Other
             }
         }
 
         private const val REFLECTION_PREFIX = "reflection"
-        private const val MEMORY = "memory"
         private val GENERAL_PURPOSE_LABELS = setOf("general-purpose", "general purpose", "general_purpose")
     }
 }

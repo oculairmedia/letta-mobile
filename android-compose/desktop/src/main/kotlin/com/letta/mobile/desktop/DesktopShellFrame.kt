@@ -78,6 +78,8 @@ internal data class DesktopShellLists(
     val archiveFilter: ConversationArchiveFilter,
     /** Every conversation across the selected stack, newest first (see [filterStackConversations]). */
     val agentConversations: List<DesktopConversationSummary>,
+    /** letta-mobile-zxk2n.5: the stack's archived conversations, whatever the filter (Archived chats dialog). */
+    val archivedAgentConversations: List<DesktopConversationSummary> = emptyList(),
     val mentionables: List<Mentionable>,
     val paletteItems: List<PaletteItem>,
     val modelOptions: List<Pair<String, String>>,
@@ -250,29 +252,23 @@ private fun rememberDesktopShellLists(
     // For a "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by
     // authoritative parent identity via the shared model, so unrelated same-name agents are NOT
     // merged); for a normal agent it is its display-name convs, unchanged.
-    val agentConversations = remember(
-        conversations,
-        activeSubagents,
-        focus.selectedAgentName,
-        focus.selectedAgentId,
-        selectedConversationId,
-        archiveFilter,
-    ) {
-        filterStackConversations(
-            FilterStackConversationsParams(
-                conversations = conversations,
-                activeSubagents = activeSubagents,
-                selectedAgentName = focus.selectedAgentName,
-                selectedAgentId = focus.selectedAgentId,
-                selectedConversationId = selectedConversationId,
-                archiveFilter = archiveFilter,
-            ),
-        )
+    val stack = FilterStackConversationsParams(
+        conversations = conversations,
+        activeSubagents = activeSubagents,
+        selectedAgentName = focus.selectedAgentName,
+        selectedAgentId = focus.selectedAgentId,
+        selectedConversationId = selectedConversationId,
+        archiveFilter = archiveFilter,
+    )
+    val agentConversations = remember(stack) { filterStackConversations(stack) }
+    val archivedAgentConversations = remember(stack.copy(archiveFilter = ConversationArchiveFilter.Archived)) {
+        filterStackConversations(stack.copy(archiveFilter = ConversationArchiveFilter.Archived))
     }
     return DesktopShellLists(
         activeSubagents = activeSubagents,
         archiveFilter = archiveFilter,
         agentConversations = agentConversations,
+        archivedAgentConversations = archivedAgentConversations,
         mentionables = remember(focus.railAgents, memoryState, fileMentions) {
             buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity)) + fileMentions
         },
@@ -320,6 +316,8 @@ internal fun rememberDesktopHomeInputs(context: DesktopShellContext, frame: Desk
     return DesktopHomeInputs(
         state = state,
         options = HomePageOptions(
+            // The header's search field searches Home while it shows (letta-mobile-xuhmy).
+            showSearch = false,
             orbIndexByAgentId = homeOrbIndexes,
             composerPlaceholder = WorkPlayLens.composerPlaceholder(navigator.workPlayMode, focus.selectedAgentName),
         ),

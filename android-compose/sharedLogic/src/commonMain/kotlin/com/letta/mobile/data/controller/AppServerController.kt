@@ -11,6 +11,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.data.runtime.AppServerQueueSnapshot
 import com.letta.mobile.data.runtime.CancelledQueuedInput
 import com.letta.mobile.data.runtime.TurnRuntimeKey
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -159,6 +160,43 @@ interface AppServerController {
     }
 
     /**
+     * letta-mobile-bzvro.40: [submitApproval] with the always-allow rule ids the person chose
+     * ([ControllerApprovalAnswer.selectedSuggestionIds]). A controller that cannot validate them against
+     * the request it parked refuses an answer that carries any, rather than drop the rule silently.
+     */
+    suspend fun submitApproval(answer: ControllerApprovalAnswer): ApprovalSubmitResult {
+        if (answer.selectedSuggestionIds.isNotEmpty()) {
+            return ApprovalSubmitResult.Rejected("always-allow rules are not supported by this controller")
+        }
+        return submitApproval(
+            agentId = answer.agentId,
+            conversationId = answer.conversationId,
+            approvalRequestId = answer.approvalRequestId,
+            approve = answer.approve,
+            reason = answer.reason,
+            toolCallId = answer.toolCallId,
+            updatedInput = answer.updatedInput,
+        )
+    }
+
+    /**
+     * letta-mobile-bzvro.40: what each runtime's parked `can_use_tool` requests offered, for a relaying
+     * node to push to its clients. Empty for a controller that parks nothing.
+     */
+    val pendingApprovals: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>
+        get() = EMPTY_PENDING_APPROVALS
+
+    /** letta-mobile-bzvro.40: the mode [runtime] runs in as far as this controller knows; null when unknown. */
+    suspend fun permissionModeOf(runtime: AppServerRuntimeScope): AppServerPermissionMode? = null
+
+    /**
+     * letta-mobile-bzvro.40: puts [runtime] in [mode] (starting it when needed) and keeps it there for
+     * later starts. True once the server runs it in [mode].
+     */
+    suspend fun changePermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
+        throw UnsupportedOperationException("change_device_state is not supported by this controller")
+
+    /**
      * letta-mobile-1n5py / qygvv.9: drops one queued input ([itemId] is the queue item's `id`).
      * Lets a relaying node forward its clients' `remove_queue_item`.
      */
@@ -223,6 +261,22 @@ interface AppServerController {
         // Default no-op for test fakes.
     }
 }
+
+private val EMPTY_PENDING_APPROVALS: StateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>> =
+    MutableStateFlow<Map<TurnRuntimeKey, List<PendingApprovalDetails>>>(emptyMap()).asStateFlow()
+
+/** letta-mobile-bzvro.40: one approval answer as a relaying node receives it. */
+data class ControllerApprovalAnswer(
+    val agentId: AgentId,
+    val conversationId: ConversationId?,
+    val approvalRequestId: String,
+    val approve: Boolean,
+    val reason: String? = null,
+    val toolCallId: String? = null,
+    val updatedInput: kotlinx.serialization.json.JsonObject? = null,
+    /** The `permission_suggestions` ids chosen with an approval ("always allow"). */
+    val selectedSuggestionIds: List<String> = emptyList(),
+)
 
 private val EMPTY_QUEUE_SNAPSHOTS: StateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>> =
     MutableStateFlow<Map<TurnRuntimeKey, AppServerQueueSnapshot>>(emptyMap()).asStateFlow()

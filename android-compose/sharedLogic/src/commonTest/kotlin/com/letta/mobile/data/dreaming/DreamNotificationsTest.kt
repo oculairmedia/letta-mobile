@@ -33,6 +33,14 @@ class DreamNotificationsTest {
     }
 
     @Test
+    fun aDreamLabelledRunCountsLikeReflection() {
+        // SubagentKind.Dream (ulcg6 roster) is the same dream as Reflection; one classifier decides.
+        val tracker = DreamFinishTracker()
+        tracker.update(listOf(entry("t1", "Dream", "running")))
+        assertEquals(listOf(true), tracker.update(listOf(entry("t1", "Dream", "completed"))).map { it.succeeded })
+    }
+
+    @Test
     fun notificationsAreOptInPerAgent() {
         val prefs = DreamNotifyPrefs(MapStore())
         assertFalse(prefs.isEnabled("agent-1"))

@@ -1515,6 +1515,45 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "permission_mode.get",
+      "handler": "PermissionModeAdminHandlers.kt",
+      "current_backend": "controller runtime mode cache (runtime_start / change_device_state outcome)",
+      "owner": "app_server_v2",
+      "public_contract": "the conversation runtime's current permission mode",
+      "native_contract": [
+        "runtime_start",
+        "update_device_status"
+      ],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.40: lets an Iroh client show the host runtime's mode on its chip. capability_unavailable without a controller.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
+      "method": "permission_mode.set",
+      "handler": "PermissionModeAdminHandlers.kt",
+      "current_backend": "controller.changePermissionMode (change_device_state on a running runtime, else runtime_start with the mode; pinned for later starts)",
+      "owner": "app_server_v2",
+      "public_contract": "change_device_state mode, confirmed by update_device_status",
+      "native_contract": [
+        "change_device_state",
+        "runtime_start",
+        "update_device_status"
+      ],
+      "authorization_class": "runtime_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-bzvro.40: the permission-mode chip for Iroh clients. Gated by conversation.manage. capability_unavailable without a controller.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "subagent.list",
       "handler": "SubagentAdminHandlers.kt",
       "current_backend": "ControllerSubagentRegistrySource from update_subagent_state (no shim HTTP)",

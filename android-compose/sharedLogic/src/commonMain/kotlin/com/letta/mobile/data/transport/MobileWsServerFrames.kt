@@ -648,6 +648,12 @@ sealed interface ServerFrame {
      * state (§13.4). Carries the changed [subagent], a fresh
      * [subagentsActive] snapshot so the bar reduces by replacement, and
      * an informational [reason] (e.g. `started`, `completed`, `failed`).
+     *
+     * letta-mobile-ulcg6 (RC2): the host registry pushes one frame per parent
+     * (agent, conversation). [parentAgentId] / [parentConversationId] name
+     * that scope so the client folds the snapshot into that conversation only;
+     * without them an empty push for conversation B looked like every chip of
+     * conversation A had vanished. Both are null on older hosts.
      */
     @Serializable
     data class SubagentsUpdated(
@@ -659,7 +665,32 @@ sealed interface ServerFrame {
         val subagent: SubagentEntry? = null,
         @SerialName("subagents_active") val subagentsActive: List<SubagentEntry> = emptyList(),
         val at: String = "",
+        @SerialName("parent_agent_id") val parentAgentId: String? = null,
+        @SerialName("parent_conversation_id") val parentConversationId: String? = null,
     ) : ServerFrame
+
+    /**
+     * letta-mobile-bzvro.40: an Iroh host's snapshot of the approvals parked for one conversation
+     * (see [com.letta.mobile.data.runtime.ApprovalRelay]). Routing-only: it feeds the client's
+     * pending-approval store, never the timeline.
+     */
+    @Serializable
+    data class PendingApprovalsUpdated(
+        override val v: Int = 1,
+        val type: String = com.letta.mobile.data.runtime.ApprovalRelay.FRAME_TYPE,
+        override val id: String = "",
+        override val ts: String = "",
+        @SerialName("agent_id") val agentId: String = "",
+        @SerialName("conversation_id") val conversationId: String,
+        val approvals: kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(emptyList()),
+    ) : ServerFrame {
+        fun decode(): com.letta.mobile.data.runtime.RelayedPendingApprovals =
+            com.letta.mobile.data.runtime.RelayedPendingApprovals(
+                agentId = agentId,
+                conversationId = conversationId,
+                approvals = com.letta.mobile.data.runtime.ApprovalRelay.decodeApprovals(approvals),
+            )
+    }
 
     /**
      * Forward-compat sink for unknown `type` values. Spec §2 mandates
