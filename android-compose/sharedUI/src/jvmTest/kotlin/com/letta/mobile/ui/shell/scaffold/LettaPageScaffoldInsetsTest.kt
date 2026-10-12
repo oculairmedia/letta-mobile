@@ -4,11 +4,14 @@ package com.letta.mobile.ui.shell.scaffold
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.union
@@ -97,6 +100,28 @@ class LettaPageScaffoldInsetsTest {
         page(wrap = { inner -> Box(Modifier.consumeWindowInsets(statusBarTakenAbove)) { inner() } })
         assertEquals(0.dp, top("header"))
         assertEquals(HEIGHT - NAV, bottom("bottom"))
+    }
+
+    @Test
+    fun aHeaderThatFillsTheHeightItIsOfferedStillWrapsAndTheContentFills() = runComposeUiTest {
+        // ShellHeader's free-width lane fills its height (to span desktop's title bar); in the page's
+        // header slot that must not take the whole page and leave the content nothing (letta-mobile-kg4vy).
+        setContent {
+            LettaPageScaffold(
+                modifier = Modifier.size(WIDTH, HEIGHT),
+                header = {
+                    Row(Modifier.fillMaxWidth().heightIn(min = BAR).testTag("header")) {
+                        Box(Modifier.weight(1f).fillMaxHeight())
+                    }
+                },
+                insets = phone,
+                imeInsets = noKeyboard,
+            ) { padding -> Box(Modifier.fillMaxSize().padding(padding).testTag("content")) }
+        }
+        assertEquals(STATUS, top("header"))
+        assertEquals(STATUS + BAR, bottom("header"))
+        assertEquals(STATUS + BAR, top("content"))
+        assertEquals(HEIGHT - NAV, bottom("content"))
     }
 
     @Test
