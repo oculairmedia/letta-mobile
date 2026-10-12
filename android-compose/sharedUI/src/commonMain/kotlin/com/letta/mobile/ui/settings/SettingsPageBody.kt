@@ -74,31 +74,33 @@ internal class SettingsPageModel(
         }
     }
 
+    /** The section chips under the search, sticky above the list. */
     @Composable
     private fun MediumBody(active: SettingsGroup?) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Column(
-                Modifier.widthIn(max = LettaDimens.Pane.settingsColumnMaxWidth).padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-            ) {
-                SettingsSearchField(search.query, search.onQuery)
-                SettingsChips(groupList, active, search.onOpen)
-            }
+            val bar = Modifier.widthIn(max = LettaDimens.Pane.settingsColumnMaxWidth).padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm)
+            SearchAbove(bar) { SettingsChips(groupList, active, search.onOpen) }
             Content(SettingsLayout.Medium, Modifier.weight(1f).fillMaxWidth())
         }
     }
 
+    /** The section rail under the search, beside the list. */
     @Composable
     private fun WideBody(active: SettingsGroup?) {
         Row(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight().padding(LettaDimens.Space.lg),
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-            ) {
-                SettingsSearchField(search.query, search.onQuery)
+            SearchAbove(Modifier.width(LettaDimens.Pane.navWidth).fillMaxHeight().padding(LettaDimens.Space.lg)) {
                 SettingsRail(groupList, active, search.onOpen)
             }
             Content(SettingsLayout.Wide, Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+
+    /** The search field over the page's section navigation ([nav]). */
+    @Composable
+    private fun SearchAbove(modifier: Modifier, nav: @Composable () -> Unit) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+            SettingsSearchField(search.query, search.onQuery)
+            nav()
         }
     }
 
