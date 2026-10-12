@@ -19,7 +19,6 @@ import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ComposerCommand
-import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
@@ -30,6 +29,7 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
@@ -368,7 +368,7 @@ private fun backgroundTasksHeaderToggle(context: DesktopShellContext, frame: Des
     if (navigator.showBackgroundTasks || context.panels.subagents.repository == null) return null
     val activeSubagents = frame.lists.activeSubagents
     return {
-        DesktopBackgroundTasksToggle(
+        BackgroundTasksToggle(
             runningCount = activeSubagents.visibleRunningCount(),
             onClick = { navigator.showBackgroundTasks = true },
             inBar = true,
