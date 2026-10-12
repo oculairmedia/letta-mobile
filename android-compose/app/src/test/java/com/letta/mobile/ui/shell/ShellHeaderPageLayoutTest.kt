@@ -10,11 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
@@ -79,28 +80,28 @@ class ShellHeaderPageLayoutTest {
                 ),
             )
         }
-        assertHeaderAtTopAndContentFills(contentTag = HomePageTags.PAGE)
-        assertTrue("the Home composer is laid out", composeRule.height(HomePageTags.COMPOSER) > 0.dp)
+        assertHeaderAtTopAndContentFills(HOME_PAGE)
+        assertTrue("the Home composer is laid out", bounds(HOME_COMPOSER).height > 0.dp)
     }
 
     @Test
-    fun channelsHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage("Channels")
+    fun channelsHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage(PushedPage.Channels)
 
     @Test
-    fun memoryHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage("Memory")
+    fun memoryHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage(PushedPage.Memory)
 
     @Test
-    fun skillsHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage("Skills")
+    fun skillsHeaderSitsAtTheTopAndThePageFillsTheRest() = assertPushedPage(PushedPage.Skills)
 
     /** Channels, Memory and Skills: a back arrow and a title, as their screens draw them. */
-    private fun assertPushedPage(title: String) {
-        show(content = { modifier -> Box(modifier.fillMaxSize().testTag(CONTENT)) }) {
+    private fun assertPushedPage(page: PushedPage) {
+        show(content = { modifier -> Box(modifier.fillMaxSize().testTag(CONTENT.value)) }) {
             ShellHeader(
-                title = HeaderTitle.Text(title),
+                title = HeaderTitle.Text(page.name),
                 controls = HeaderControls(nav = HeaderNav.Back(onClick = {})),
             )
         }
-        assertHeaderAtTopAndContentFills(contentTag = CONTENT)
+        assertHeaderAtTopAndContentFills(CONTENT)
     }
 
     private fun show(content: @Composable (Modifier) -> Unit, header: @Composable () -> Unit) {
@@ -136,16 +137,18 @@ class ShellHeaderPageLayoutTest {
 
     private var density = 1f
 
-    private fun assertHeaderAtTopAndContentFills(contentTag: String) {
+    private fun assertHeaderAtTopAndContentFills(content: PageTag) {
         val status = (STATUS_BAR_PX / density).dp
         val nav = (NAV_BAR_PX / density).dp
         val window = composeRule.onRoot().getBoundsInRoot().bottom
         val headerHeight = ShellHeaderDefaults.TouchMinHeight
+        val header = bounds(HEADER)
+        val page = bounds(content)
 
-        assertDpEquals(status, composeRule.top(ShellHeaderTags.HEADER), "header starts right under the status bar")
-        assertDpEquals(headerHeight, composeRule.height(ShellHeaderTags.HEADER), "header keeps its app-bar height")
-        assertDpEquals(status + headerHeight, composeRule.top(contentTag), "content starts under the header")
-        assertDpEquals(window - nav, composeRule.bottom(contentTag), "content fills down to the navigation bar")
+        assertDpEquals(Expected.HeaderTop, status, header.top)
+        assertDpEquals(Expected.HeaderHeight, headerHeight, header.height)
+        assertDpEquals(Expected.ContentTop, status + headerHeight, page.top)
+        assertDpEquals(Expected.ContentBottom, window - nav, page.bottom)
     }
 
     private fun dispatchPhoneInsets(view: View) {
@@ -156,15 +159,25 @@ class ShellHeaderPageLayoutTest {
         ViewCompat.dispatchApplyWindowInsets(view, insets)
     }
 
-    private fun ComposeContentTestRule.top(tag: String): Dp = onNodeWithTag(tag, useUnmergedTree = true).getBoundsInRoot().top
+    private fun bounds(tag: PageTag): DpRect = composeRule.onNodeWithTag(tag.value, useUnmergedTree = true).getBoundsInRoot()
 
-    private fun ComposeContentTestRule.bottom(tag: String): Dp = onNodeWithTag(tag, useUnmergedTree = true).getBoundsInRoot().bottom
+    private fun assertDpEquals(expectation: Expected, expected: Dp, actual: Dp) =
+        assertEquals(expectation.message, expected.value, actual.value, 1f)
 
-    private fun ComposeContentTestRule.height(tag: String): Dp =
-        onNodeWithTag(tag, useUnmergedTree = true).getBoundsInRoot().let { it.bottom - it.top }
+    /** A node the layout is measured by. */
+    @JvmInline
+    private value class PageTag(val value: String)
 
-    private fun assertDpEquals(expected: Dp, actual: Dp, message: String) =
-        assertEquals(message, expected.value, actual.value, 1f)
+    /** The pages pushed under Home that frame a back-arrow header the same way. */
+    private enum class PushedPage { Channels, Memory, Skills }
+
+    /** What each layout assertion checks. */
+    private enum class Expected(val message: String) {
+        HeaderTop("header starts right under the status bar"),
+        HeaderHeight("header keeps its app-bar height"),
+        ContentTop("content starts under the header"),
+        ContentBottom("content fills down to the navigation bar"),
+    }
 
     private object NoopHome : HomePageActions {
         override fun refresh() = Unit
@@ -180,7 +193,10 @@ class ShellHeaderPageLayoutTest {
         /** A phone's status bar (24dp) and gesture bar (16dp) at xxhdpi. */
         const val STATUS_BAR_PX = 72
         const val NAV_BAR_PX = 48
-        const val CONTENT = "content"
+        val CONTENT = PageTag("content")
+        val HEADER = PageTag(ShellHeaderTags.HEADER)
+        val HOME_PAGE = PageTag(HomePageTags.PAGE)
+        val HOME_COMPOSER = PageTag(HomePageTags.COMPOSER)
 
         val NoopNavigation = HomePageNavigation(
             onSubmitPrompt = {},
