@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.list.RosterActions
 import com.letta.mobile.ui.components.list.RosterList
 import com.letta.mobile.ui.components.list.RosterListTag
@@ -49,6 +54,7 @@ object ConversationsPageTags {
     const val ARCHIVED = "conversations-page-archived"
     const val ERROR = "conversations-page-error"
     const val CREATE_AGENT = "conversations-page-create-agent"
+    const val REFRESH = "conversations-page-refresh"
 
     fun filter(filter: ShellArchiveFilter) = "conversations-page-filter-${filter.name}"
 }
@@ -58,17 +64,26 @@ object ConversationsPageTags {
  * route without an agent opens. Composed from the shell's primitives only: the agent panel's
  * conversation rows ([ShellConversationRow], with its menu, rename, pin, fork and delete confirm), the
  * Active / Archived / All filter, the Archived chats dialog, all in one [RosterList] grouped by agent.
- * [modifier] carries the host frame's insets.
+ * The body reloads through [LettaRefreshable] (letta-mobile-ckmub.3.22): a pull on touch, the filter
+ * row's refresh on a pointer host. [modifier] carries the host frame's insets.
  */
 @Composable
 fun ConversationsPage(state: ConversationsPageState, actions: ConversationsPageActions, modifier: Modifier = Modifier) {
     Column(modifier.testTag(ConversationsPageTags.PAGE).padding(horizontal = LettaDimens.Space.md)) {
         val error = state.error
         when {
-            error != null -> ConversationsPageError(error, actions.onRetry)
-            state.noAgents && !state.loading -> ConversationsPageNoAgents(actions.onCreateAgent)
+            error != null -> ConversationsPageRefreshable(actions) { ConversationsPageError(error, actions.onReload) }
+            state.noAgents && !state.loading -> ConversationsPageRefreshable(actions) { ConversationsPageNoAgents(actions.onCreateAgent) }
             else -> ConversationsRoster(state, actions)
         }
+    }
+}
+
+/** An error or empty body: a scrolling column, so a pull reaches the refresh. */
+@Composable
+private fun ColumnScope.ConversationsPageRefreshable(actions: ConversationsPageActions, content: @Composable () -> Unit) {
+    LettaRefreshable(refreshing = false, onRefresh = actions.onReload, modifier = Modifier.fillMaxWidth().weight(1f)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) { content() }
     }
 }
 
@@ -79,20 +94,9 @@ private fun ColumnScope.ConversationsRoster(state: ConversationsPageState, actio
     val ui = remember { ShellConversationListUi() }
     val panel = actions.conversations
     val sections = remember(state.pinned, state.groups) { conversationSections(state) }
-    RosterList(
-        RosterSpec(
-            sections = sections,
-            key = ShellConversationRowModel::id,
-            selection = RosterSelection(isSelected = ShellConversationRowModel::selected, onSelect = { panel.onConversationSelected(it.id) }),
-            actions = RosterActions(
-                menu = { model, row -> shellConversationMenu(model, conversationRowActions(model, panel), ui, row) + actions.rowMenu(model) },
-                rename = panel.onRenameConversation?.let(::conversationRename),
-            ),
-            options = RosterOptions(loading = state.loading, testTag = RosterListTag(ConversationsPageTags.LIST)),
-            empty = { LettaEmptyHint(emptyHint(state.archiveFilter), Modifier.padding(LettaDimens.Space.md)) },
-        ),
-        modifier = Modifier.fillMaxWidth().weight(1f),
-    ) { model, row -> ShellConversationRow(model, conversationRowActions(model, panel), row, ui) }
+    LettaRefreshable(refreshing = false, onRefresh = actions.onReload, modifier = Modifier.fillMaxWidth().weight(1f)) {
+        ConversationsRosterList(state, actions, sections, ui)
+    }
     ShellConversationDialogs(ui, state.rows) { conversationRowActions(it, panel) }
     if (showArchived) {
         ShellArchivedChatsDialog(
@@ -105,6 +109,30 @@ private fun ColumnScope.ConversationsRoster(state: ConversationsPageState, actio
             onDismiss = { showArchived = false },
         )
     }
+}
+
+@Composable
+private fun ConversationsRosterList(
+    state: ConversationsPageState,
+    actions: ConversationsPageActions,
+    sections: List<RosterSection<ShellConversationRowModel>>,
+    ui: ShellConversationListUi,
+) {
+    val panel = actions.conversations
+    RosterList(
+        RosterSpec(
+            sections = sections,
+            key = ShellConversationRowModel::id,
+            selection = RosterSelection(isSelected = ShellConversationRowModel::selected, onSelect = { panel.onConversationSelected(it.id) }),
+            actions = RosterActions(
+                menu = { model, row -> shellConversationMenu(model, conversationRowActions(model, panel), ui, row) + actions.rowMenu(model) },
+                rename = panel.onRenameConversation?.let(::conversationRename),
+            ),
+            options = RosterOptions(loading = state.loading, testTag = RosterListTag(ConversationsPageTags.LIST)),
+            empty = { LettaEmptyHint(emptyHint(state.archiveFilter), Modifier.padding(LettaDimens.Space.md)) },
+        ),
+        modifier = Modifier.fillMaxSize(),
+    ) { model, row -> ShellConversationRow(model, conversationRowActions(model, panel), row, ui) }
 }
 
 /** The pinned chats, then one section per agent headed by its name. */
@@ -127,7 +155,7 @@ private fun emptyHint(filter: ShellArchiveFilter): String = when (filter) {
     else -> "No chats yet"
 }
 
-/** Active / Archived / All, then the Archived chats dialog's button. */
+/** Active / Archived / All, then the pointer host's refresh and the Archived chats dialog's button. */
 @Composable
 private fun ConversationsFilterRow(filter: ShellArchiveFilter, actions: ConversationsPageActions, onShowArchived: () -> Unit) {
     Row(
@@ -144,6 +172,7 @@ private fun ConversationsFilterRow(filter: ShellArchiveFilter, actions: Conversa
             )
         }
         Spacer(Modifier.weight(1f))
+        LettaRefreshAction(refreshing = false, onRefresh = actions.onReload, modifier = Modifier.testTag(ConversationsPageTags.REFRESH))
         TextButton(onClick = onShowArchived, modifier = Modifier.testTag(ConversationsPageTags.ARCHIVED)) { Text("Archived chats") }
     }
 }

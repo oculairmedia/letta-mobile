@@ -30,6 +30,9 @@ class AndroidShellRoutesTest {
         ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
+        ShellDestination.Runs,
+        ShellDestination.Templates,
+        ShellDestination.Projects,
     )
 
     @Test
@@ -72,9 +75,16 @@ class AndroidShellRoutesTest {
 
     @Test
     fun routesOutsideTheSharedShellHaveNoDestination() {
-        assertNull(shellDestinationOf(RunsRoute))
         assertNull(shellDestinationOf(PairingScanRoute))
-        assertNull(shellDestinationOf(TemplatesRoute))
-        assertNull(shellDestinationOf(HomeRoute))
+        assertNull(shellDestinationOf(TelemetryRoute))
+    }
+
+    @Test
+    fun theAdminPagesAreSharedDestinations() {
+        assertEquals(RunsRoute, ShellDestination.Runs.toAndroidRoute())
+        assertEquals(TemplatesRoute, ShellDestination.Templates.toAndroidRoute())
+        assertEquals(ProjectsRoute, ShellDestination.Projects.toAndroidRoute())
+        // The Home tab's root shows the same projects catalog.
+        assertEquals(ShellDestination.Projects, shellDestinationOf(HomeRoute))
     }
 }

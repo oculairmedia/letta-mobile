@@ -7,7 +7,9 @@ import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
+import com.letta.mobile.data.repository.CachedProjectRepository
 import com.letta.mobile.data.repository.CronRepository
+import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -27,6 +29,7 @@ import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAgentRepository
 import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
@@ -229,10 +232,18 @@ class DesktopRepositoryAdapters(
     } else {
         null
     }
+    private val irohSettings = ActiveConfigSettingsRepository(config)
     private val irohAdminReads = if (irohMode) {
-        buildIrohAdminReadRepositories(
-            channelTransport = channelTransport,
-            settingsRepository = ActiveConfigSettingsRepository(config),
+        buildIrohAdminReadRepositories(channelTransport = channelTransport, settingsRepository = irohSettings)
+    } else {
+        null
+    }
+
+    // letta-mobile-ckmub.2.6: projects ride the Iroh host's `project.*` relay; no other backend has them.
+    private val irohProjectRepository = if (irohMode) {
+        CachedProjectRepository(
+            remote = unavailableRepository<ProjectRemoteSource>(),
+            irohProjectSource = IrohAdminRpcProjectSource(channelTransport, irohSettings),
         )
     } else {
         null
@@ -270,7 +281,7 @@ class DesktopRepositoryAdapters(
         irohAdminReads?.modelRepository ?: unavailableRepository()
     val passageRepository: IPassageRepository =
         irohAdminReads?.passageRepository ?: unavailableRepository()
-    val projectRepository: IProjectRepository = unavailableRepository()
+    val projectRepository: IProjectRepository = irohProjectRepository ?: unavailableRepository()
     val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
     val providerRepository: IProviderRepository =
         irohAdminReads?.providerRepository ?: unavailableRepository()

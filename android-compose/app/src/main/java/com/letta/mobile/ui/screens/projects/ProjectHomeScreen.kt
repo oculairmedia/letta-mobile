@@ -11,7 +11,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.projects.ProjectsPageController
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.shell.ShellAdminPages
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.header.HeaderAction
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
@@ -21,9 +25,9 @@ import com.letta.mobile.ui.shell.pages.projects.ProjectChatIntent
 import com.letta.mobile.ui.shell.pages.projects.ProjectDetailActions
 import com.letta.mobile.ui.shell.pages.projects.ProjectEditorActions
 import com.letta.mobile.ui.shell.pages.projects.ProjectsListActions
-import com.letta.mobile.ui.shell.pages.projects.ProjectsPage
 import com.letta.mobile.ui.shell.pages.projects.ProjectsPageActions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.shell.shellProjectsPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /** Where the Projects screen leaves to. [onBack] null is the Home tab's root (no back arrow). */
@@ -60,7 +64,11 @@ fun ProjectHomeScreen(navigation: ProjectHomeNavigation, viewModel: ProjectHomeV
             )
         },
     ) { paddingValues ->
-        ProjectsPage(state = state, actions = actions, modifier = Modifier.padding(paddingValues))
+        ShellPage(
+            destination = ShellDestination.Projects,
+            deps = ShellPageDeps(admin = ShellAdminPages(projects = shellProjectsPage(state, actions))),
+            modifier = Modifier.padding(paddingValues),
+        )
     }
 }
 

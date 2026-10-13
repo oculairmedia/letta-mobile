@@ -67,6 +67,18 @@ enum class DesktopDestination(
         label = "Settings",
         summary = "Desktop settings will use JVM storage instead of Android DataStore and encrypted preferences.",
     ),
+    Runs(
+        label = "Runs",
+        summary = "Every agent's runs, active ones first: open one to see its steps, cancel or delete it.",
+    ),
+    Templates(
+        label = "Starter Agents",
+        summary = "Starter templates a new agent is made from.",
+    ),
+    Projects(
+        label = "Projects",
+        summary = "The projects an Iroh host relays from VibeSync: open one's chat, sync it, or provision its beads remote.",
+    ),
 }
 
 fun defaultDesktopBootstrapState(

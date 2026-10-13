@@ -167,7 +167,7 @@ private class ConversationsBinding(
             onPinConversation = { id, pinned -> display(id)?.takeIf { it.isPinned != pinned }?.let(viewModel::toggleConversationPinned) },
             onForkConversation = { id, name -> display(id)?.let { fork(it, name) } },
         ),
-        onRetry = viewModel::loadConversations,
+        onReload = viewModel::loadConversations,
         onCreateAgent = onCreateAgent,
         rowMenu = { model -> listOf(LettaMenuItem("Inspect…") { display(model.id)?.let(viewModel::openConversationAdmin) }) },
     )

@@ -9,13 +9,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellAdminPages
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
-import com.letta.mobile.ui.shell.pages.templates.TemplatesPage
 import com.letta.mobile.ui.shell.pages.templates.TemplatesPageActions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
+import com.letta.mobile.ui.shell.shellTemplatesPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /**
@@ -44,6 +48,10 @@ fun TemplatesScreen(
             )
         },
     ) { paddingValues ->
-        TemplatesPage(state = state, actions = actions, modifier = Modifier.padding(paddingValues))
+        ShellPage(
+            destination = ShellDestination.Templates,
+            deps = ShellPageDeps(admin = ShellAdminPages(templates = shellTemplatesPage(state, actions))),
+            modifier = Modifier.padding(paddingValues),
+        )
     }
 }

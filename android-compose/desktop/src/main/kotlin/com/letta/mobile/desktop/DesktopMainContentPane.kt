@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
@@ -36,6 +37,8 @@ internal data class DesktopMainContentInputs(
     val dockedCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
     /** letta-mobile-ckmub.3.11: the shared KMP chat page, desktop's only chat. */
     val chatPage: @Composable (Modifier) -> Unit,
+    /** letta-mobile-ckmub.2.6: the shared Runs, Templates and Projects pages, bound to this session. */
+    val adminPages: ShellAdminPages = ShellAdminPages(),
 )
 
 internal data class DesktopMainContentActions(
@@ -79,7 +82,7 @@ private fun MainContentRow(inputs: DesktopMainContentInputs, actions: DesktopMai
 private fun MainDestination(inputs: DesktopMainContentInputs, actions: DesktopMainContentActions) {
     // The bundled runtime's crash notice is a window banner (DesktopShellWindowContent), not part of the page.
     val chat = ShellPageContent<ShellDestination.Chat> { _, modifier -> inputs.chatPage(modifier) }
-    val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, chat)
+    val deps = desktopShellPageDeps(inputs.destinationInputs, actions.destinationActions, DesktopHostPages(chat, inputs.adminPages))
     ShellPage(destination = inputs.pageDestination, deps = deps, modifier = Modifier.fillMaxSize())
 }
 

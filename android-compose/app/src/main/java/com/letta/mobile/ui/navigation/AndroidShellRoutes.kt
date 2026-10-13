@@ -17,7 +17,7 @@ import kotlin.reflect.KClass
  * Two Android routes cannot carry everything a destination can, and say so here rather than invent
  * arguments: a chat needs its agent ([ShellDestination.Chat] without one opens the conversation
  * list), and the standalone Tools route has no agent ([ShellDestination.Skills] on Tools drops it).
- * Routes with no shared destination (admin screens, the pairing scanner, debug) map to null.
+ * Routes with no shared destination (the pairing scanner, telemetry, system access, debug) map to null.
  */
 @Suppress("NoAnyType") // Navigation routes are typed objects of unrelated classes.
 private val AndroidRouteOfKind: Map<ShellPageKind, (ShellDestination) -> Any> = mapOf(
@@ -39,6 +39,9 @@ private val AndroidRouteOfKind: Map<ShellPageKind, (ShellDestination) -> Any> = 
     ShellPageKind.AgentEditor to { d -> EditAgentRoute(d.agentId) },
     ShellPageKind.Providers to { _ -> ProvidersRoute },
     ShellPageKind.Overview to { _ -> AboutRoute },
+    ShellPageKind.Runs to { _ -> RunsRoute },
+    ShellPageKind.Templates to { _ -> TemplatesRoute },
+    ShellPageKind.Projects to { _ -> ProjectsRoute },
 )
 
 /** The Android navigation route that shows [this]. */
@@ -63,6 +66,11 @@ private val ShellDestinationOfRoute: Map<KClass<*>, (Any) -> ShellDestination> =
     EditAgentRoute::class to { r -> ShellDestination.AgentEditor((r as EditAgentRoute).agentId) },
     ProvidersRoute::class to { _ -> ShellDestination.Providers },
     AboutRoute::class to { _ -> ShellDestination.Overview },
+    RunsRoute::class to { _ -> ShellDestination.Runs },
+    TemplatesRoute::class to { _ -> ShellDestination.Templates },
+    ProjectsRoute::class to { _ -> ShellDestination.Projects },
+    // The Home tab's root is the projects catalog too, without a back arrow.
+    HomeRoute::class to { _ -> ShellDestination.Projects },
 )
 
 /** The shared destination an Android route shows, or null for a route outside the shared shell. */

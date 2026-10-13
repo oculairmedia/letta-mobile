@@ -21,6 +21,8 @@ class ShellRouteTest {
         assertEquals("home", ShellRoute.encode(ShellDestination.Home))
         assertEquals("skills?section=tools", ShellRoute.encode(ShellDestination.Skills(section = ShellSkillsSection.Tools)))
         assertEquals("skills", ShellRoute.encode(ShellDestination.Skills()))
+        assertEquals("runs", ShellRoute.encode(ShellDestination.Runs))
+        assertEquals(ShellLink.Open(ShellDestination.Projects), ShellDeepLink.parse("meridian://projects"))
         assertEquals("chat?agent=a%20b&conversation=c%26d", ShellRoute.encode(ShellDestination.Chat("a b", "c&d")))
         assertEquals(ShellDestination.Chat("a b", "c&d"), ShellRoute.decode("chat?agent=a%20b&conversation=c%26d"))
     }
@@ -111,5 +113,8 @@ object ShellDestinationSamples {
         ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
+        ShellDestination.Runs,
+        ShellDestination.Templates,
+        ShellDestination.Projects,
     )
 }

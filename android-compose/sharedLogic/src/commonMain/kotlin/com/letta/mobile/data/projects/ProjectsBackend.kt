@@ -6,8 +6,11 @@ import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlin.jvm.JvmInline
 
@@ -96,4 +99,30 @@ class SettingsProjectPinStore(private val settings: ISettingsRepository) : Proje
         get() = settings.getPinnedProjectIds().map { ids -> ids.mapTo(mutableSetOf(), ::ProjectKey) }
 
     override suspend fun set(key: ProjectKey, pin: ProjectPin) = settings.setProjectPinned(key.value, pin == ProjectPin.Pinned)
+}
+
+/**
+ * Project pins in a [SecureSettingsStore] under [storageKey] (letta-mobile-ckmub.2.6): the desktop,
+ * which has no Android settings repository, keeps them beside its other preferences.
+ */
+class SettingsStoreProjectPinStore(
+    private val store: SecureSettingsStore,
+    private val storageKey: String = DEFAULT_STORAGE_KEY,
+) : ProjectPinStore {
+    private val keys = MutableStateFlow(store.getString(storageKey)?.let(::decode).orEmpty())
+    override val pinned: Flow<Set<ProjectKey>> = keys.asStateFlow()
+
+    override suspend fun set(key: ProjectKey, pin: ProjectPin) {
+        val next = if (pin == ProjectPin.Pinned) keys.value + key else keys.value - key
+        keys.value = next
+        store.putString(storageKey, next.joinToString(SEPARATOR) { it.value })
+    }
+
+    private fun decode(raw: String): Set<ProjectKey> =
+        raw.split(SEPARATOR).filter { it.isNotBlank() }.mapTo(mutableSetOf(), ::ProjectKey)
+
+    companion object {
+        const val DEFAULT_STORAGE_KEY = "projects.pinned"
+        private const val SEPARATOR = "\n"
+    }
 }

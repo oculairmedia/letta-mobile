@@ -32,6 +32,10 @@ internal object DesktopHome {
         HomeShortcut.PROVIDERS to DesktopDestination.Providers,
         HomeShortcut.MODELS to DesktopDestination.Providers,
         HomeShortcut.SETTINGS to DesktopDestination.Settings,
+        // letta-mobile-ckmub.2.6: the shared admin pages.
+        HomeShortcut.RUNS to DesktopDestination.Runs,
+        HomeShortcut.TEMPLATES to DesktopDestination.Templates,
+        HomeShortcut.PROJECTS to DesktopDestination.Projects,
     )
 
     /** What a first launch pins, before the user arranges anything. */

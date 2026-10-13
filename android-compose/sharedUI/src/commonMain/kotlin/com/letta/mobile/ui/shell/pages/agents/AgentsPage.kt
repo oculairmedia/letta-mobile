@@ -1,8 +1,11 @@
 package com.letta.mobile.ui.shell.pages.agents
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.shell.rail.ShellAgentLibrary
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailFocus
@@ -48,28 +52,40 @@ data class AgentsPageState(
  * letta-mobile-ckmub.2.4 (hard cut S16): every agent, the shell's agent library
  * ([ShellAgentLibrary], the desktop's expanded rail) as a page: search, pinned agents first, the rest
  * by space, each with its mascot or orb and the orb's menu (Open, Pin, Agent settings). [actions] is
- * the rail's own action set. [modifier] carries the host frame's insets.
+ * the rail's own action set; [onReload] reloads the roster (the error's Retry, and the pull on touch
+ * through [LettaRefreshable], letta-mobile-ckmub.3.22). [modifier] carries the host frame's insets.
  */
 @Composable
 fun AgentsPage(
     state: AgentsPageState,
     actions: ShellAgentRailActions,
     modifier: Modifier = Modifier,
-    onRetry: () -> Unit = {},
+    onReload: () -> Unit = {},
 ) {
     Column(modifier.testTag(AgentsPageTags.PAGE).padding(horizontal = LettaDimens.Space.md)) {
         state.sharePreview?.let { SharePreview(it) }
-        val error = state.error
-        when {
-            error != null && state.agents.isEmpty() -> AgentsPageError(error, onRetry)
-            state.agents.isEmpty() && state.loading -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag(AgentsPageTags.LOADING))
-            state.agents.isEmpty() -> AgentsPageEmpty()
-            else -> {
-                val groups = remember(state.agents) { ShellRailMapping.groups(state.agents, selectedAgentId = null) }
-                val focus = ShellRailFocus(identityByAgentId = state.identities, pinnedAgentIds = state.pinnedAgentIds)
-                val entries = remember(groups, focus) { ShellRailMapping.entries(groups, focus) }
-                ShellAgentLibrary(groups = groups, entries = entries, actions = actions)
-            }
+        LettaRefreshable(refreshing = false, onRefresh = onReload, modifier = Modifier.fillMaxWidth().weight(1f)) {
+            AgentsPageBody(state, actions, onReload)
+        }
+    }
+}
+
+@Composable
+private fun AgentsPageBody(state: AgentsPageState, actions: ShellAgentRailActions, onReload: () -> Unit) {
+    val error = state.error
+    // A scrolling column for the states without a list, so a pull still reaches the refresh.
+    val still = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+    when {
+        error != null && state.agents.isEmpty() -> Column(still) { AgentsPageError(error, onReload) }
+        state.agents.isEmpty() && state.loading -> Column(still) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().testTag(AgentsPageTags.LOADING))
+        }
+        state.agents.isEmpty() -> Column(still) { AgentsPageEmpty() }
+        else -> Column(Modifier.fillMaxSize()) {
+            val groups = remember(state.agents) { ShellRailMapping.groups(state.agents, selectedAgentId = null) }
+            val focus = ShellRailFocus(identityByAgentId = state.identities, pinnedAgentIds = state.pinnedAgentIds)
+            val entries = remember(groups, focus) { ShellRailMapping.entries(groups, focus) }
+            ShellAgentLibrary(groups = groups, entries = entries, actions = actions)
         }
     }
 }

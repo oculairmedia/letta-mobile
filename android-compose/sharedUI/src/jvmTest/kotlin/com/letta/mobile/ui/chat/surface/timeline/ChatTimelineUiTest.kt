@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -34,6 +35,7 @@ import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.LocalChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
+import com.letta.mobile.ui.chat.surface.timeline.rows.awaitText
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -129,6 +131,31 @@ class ChatTimelineUiTest {
         show(ready.copy(messages = conversation(4).toPersistentList()), RecordingChatActions())
         onNodeWithTag(ChatTimelineTags.LIST).assertExists()
         onNodeWithTag(ChatTimelineTags.SCROLL_TO_LATEST).assertDoesNotExist()
+    }
+
+    /** letta-mobile-ckmub.10: a short chat reads from the top, as the legacy Android list did. */
+    @Test
+    fun aShortChatIsAnchoredAtTheTop() = runComposeUiTest {
+        show(ready.copy(messages = conversation(2).toPersistentList()), RecordingChatActions())
+        awaitText("message 0")
+        awaitText("message 1")
+        val oldest = onNodeWithText("message 0").getBoundsInRoot()
+        val newest = onNodeWithText("message 1").getBoundsInRoot()
+        val list = onNodeWithTag(ChatTimelineTags.LIST).getBoundsInRoot()
+        assertTrue(oldest.top < newest.top, "the oldest row leads: $oldest above $newest")
+        assertTrue(oldest.top.value - list.top.value < SHORT_CHAT_TOP_SLACK_DP, "the short chat starts at the top, not on the composer: $oldest in $list")
+        assertTrue(newest.bottom.value < halfViewportDp, "the newest row follows right below, not at the bottom: $newest")
+    }
+
+    /** A chat taller than the screen still rests on its newest row at the bottom. */
+    @Test
+    fun aLongChatRestsOnTheNewestRowAtTheBottom() = runComposeUiTest {
+        val messages = conversation(40)
+        show(ready.copy(messages = messages.toPersistentList()), RecordingChatActions())
+        awaitText(messages.last().content)
+        val newest = onNodeWithText(messages.last().content).getBoundsInRoot()
+        assertTrue(newest.bottom.value > halfViewportDp, "the newest row sits at the bottom of a full list: $newest")
+        onAllNodesWithText(messages.first().content).assertCountEquals(0)
     }
 
     @Test
@@ -316,5 +343,8 @@ class ChatTimelineUiTest {
         const val NUDGE_STEPS = 6
         const val NUDGE_STEP_PX = 40f
         const val HOLD_BEFORE_LIFT_MILLIS = 500L
+
+        /** The list's top edge padding plus a row's leading space, with room to spare. */
+        const val SHORT_CHAT_TOP_SLACK_DP = 96f
     }
 }

@@ -10,11 +10,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.data.runs.RunMonitorController
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.ui.shell.ShellAdminPages
+import com.letta.mobile.ui.shell.ShellPage
+import com.letta.mobile.ui.shell.ShellPageDeps
+import com.letta.mobile.ui.shell.shellRunsPage
 import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
-import com.letta.mobile.ui.shell.pages.runs.RunsPage
 import com.letta.mobile.ui.shell.pages.runs.RunsPageActions
 import com.letta.mobile.ui.shell.pages.runs.RunsPageState
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
@@ -42,9 +46,10 @@ fun RunMonitorScreen(
             )
         },
     ) { paddingValues ->
-        RunsPage(
-            state = RunsPageState(monitor = monitor, agentNames = agentNames, canManageRuns = viewModel.controller.canManageRuns),
-            actions = actions,
+        val state = RunsPageState(monitor = monitor, agentNames = agentNames, canManageRuns = viewModel.controller.canManageRuns)
+        ShellPage(
+            destination = ShellDestination.Runs,
+            deps = ShellPageDeps(admin = ShellAdminPages(runs = shellRunsPage(state, actions))),
             modifier = Modifier.padding(paddingValues),
         )
     }
