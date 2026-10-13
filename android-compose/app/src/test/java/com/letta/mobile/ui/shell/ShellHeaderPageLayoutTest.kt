@@ -34,6 +34,7 @@ import com.letta.mobile.ui.shell.header.ShellHeader
 import com.letta.mobile.ui.shell.header.ShellHeaderDefaults
 import com.letta.mobile.ui.shell.header.ShellHeaderTags
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.header.ShellSearchContext
 import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
@@ -73,7 +74,7 @@ class ShellHeaderPageLayoutTest {
             // As HomeScreen: menu, title with the backend label, the Home search and Settings.
             ShellHeader(
                 title = HeaderTitle.Text("Admin", "Iroh · 100.93.254.12:4501", onSubtitleClick = {}),
-                search = rememberShellSearchSlot(home = NoopHome, onHome = true, sources = UnifiedSearchSources(), onOpen = {}),
+                search = rememberShellSearchSlot(home = NoopHome, context = ShellSearchContext(onHome = true), sources = UnifiedSearchSources(), onOpen = {}),
                 controls = HeaderControls(
                     nav = HeaderNav.Menu(onClick = {}),
                     actions = listOf(HeaderAction.Icon(LettaIcons.Settings, "Settings") {}),

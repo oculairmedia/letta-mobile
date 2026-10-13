@@ -5,6 +5,7 @@ import com.composables.icons.lucide.Archive
 import com.composables.icons.lucide.ListFilter
 import com.composables.icons.lucide.LoaderCircle
 import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.ArrowRight
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.Camera
@@ -83,6 +84,9 @@ import com.composables.icons.lucide.X
 object LettaIcons {
     // Navigation
     val ArrowBack: ImageVector get() = Lucide.ArrowLeft
+
+    /** A destination to go to (a command palette row). */
+    val ArrowForward: ImageVector get() = Lucide.ArrowRight
     val Close: ImageVector get() = Lucide.X
     val Menu: ImageVector get() = Lucide.Menu
     val ChevronLeft: ImageVector get() = Lucide.ChevronLeft

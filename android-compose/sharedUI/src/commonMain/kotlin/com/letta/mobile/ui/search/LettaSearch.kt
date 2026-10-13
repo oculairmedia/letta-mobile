@@ -531,10 +531,11 @@ private fun LettaSearchResultRow(row: LettaSearchRow, onClick: () -> Unit) {
 /**
  * The agent case draws [AgentAvatar], the one way an agent is pictured, so a
  * result row shows the agent's mascot exactly as the chat header and agent
- * lists do, and its initial tile when it has none (letta-mobile-zxk2n.28).
+ * lists do, and its initial tile when it has none (letta-mobile-zxk2n.28). The command palette's
+ * rows lead with it too, so a result looks the same in both (letta-mobile-ckmub.3.9).
  */
 @Composable
-private fun LettaSearchRowLeading(leading: LettaSearchLeading, label: String) {
+fun LettaSearchRowLeading(leading: LettaSearchLeading, label: String) {
     when (leading) {
         is LettaSearchLeading.None -> Unit
         is LettaSearchLeading.Icon -> Icon(

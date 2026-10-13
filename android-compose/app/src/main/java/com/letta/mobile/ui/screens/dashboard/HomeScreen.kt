@@ -77,7 +77,7 @@ internal fun HomeScreen(spec: HomeScreenSpec, viewModel: DashboardViewModel = hi
         // page colour runs up behind it. Its search slot searches this Home view in place.
         val search = rememberShellSearchSlot(
             home = viewModel.actions,
-            onHome = true,
+            context = com.letta.mobile.ui.shell.header.ShellSearchContext(onHome = true),
             sources = UnifiedSearchSources(),
             onOpen = {},
         )

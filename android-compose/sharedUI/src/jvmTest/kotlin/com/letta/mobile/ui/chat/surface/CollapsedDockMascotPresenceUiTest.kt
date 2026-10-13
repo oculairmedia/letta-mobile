@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -36,6 +37,8 @@ import com.letta.mobile.ui.mascot.FakeMascotShell
 import com.letta.mobile.ui.mascot.MascotEntry
 import com.letta.mobile.ui.mascot.MascotHost
 import com.letta.mobile.ui.mascot.MascotSeat
+import com.letta.mobile.ui.mascot.MascotSemantics
+import com.letta.mobile.avatar.core.MascotShape
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.MascotTransport
 import com.letta.mobile.ui.mascot.MascotTransportLayer
@@ -198,20 +201,32 @@ class CollapsedDockMascotPresenceUiTest {
 
     /**
      * The desktop's visible sidebar holds the agent pane's hero, and the transport sends the live
-     * character there (DriveMascotStage): the minimised dock keeps a still of the agent instead of
-     * standing empty.
+     * character there (DriveMascotStage): the minimised dock shows the same character, live
+     * (letta-mobile-ckmub.15), in the look the hero has - the editor's unsaved preview included.
      */
     @Test
-    fun whileTheAgentPaneHoldsTheCharacterTheDockKeepsAStillOfIt() = runComposeUiTest {
+    fun whileTheAgentPaneHoldsTheCharacterTheDockShowsItLive() = runComposeUiTest {
         val shell = FakeMascotShell(AGENT, layerMounted = false)
+        val previewed = MascotIdentity(MascotShape.entries.last(), PREVIEW_COLOR)
+        shell.transport.preview(AGENT, previewed)
         shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
         showDesktop(shell, storage(null), agentPane = true)
         assertEquals(MascotStage.AGENT_PANE_HERO, shell.transport.activeStage(AGENT), "the pane's hero holds the character")
         val spot = mascotSpot()
-        val standIn = onNodeWithTag(DOCK_COLLAPSED_STAND_IN_TAG, useUnmergedTree = true).getBoundsInRoot()
-        assertTrue((standIn.right - standIn.left).value > 0f, "the stand-in has a size")
-        val centre = androidx.compose.ui.geometry.Offset(((standIn.left + standIn.right) / 2).value, ((standIn.top + standIn.bottom) / 2).value)
+        val standIn = onNodeWithTag(DOCK_COLLAPSED_STAND_IN_TAG, useUnmergedTree = true)
+        val bounds = standIn.getBoundsInRoot()
+        assertTrue((bounds.right - bounds.left).value > 0f, "the stand-in has a size")
+        val centre = androidx.compose.ui.geometry.Offset(((bounds.left + bounds.right) / 2).value, ((bounds.top + bounds.bottom) / 2).value)
         assertTrue(spot.contains(centre), "the stand-in is over the mascot spot")
+        val px = density.density
+        val drawn = onAllNodes(SemanticsMatcher.keyIsDefined(MascotSemantics.Live), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .filter { spot.contains(it.boundsInRoot.center / px) }
+        assertTrue(drawn.isNotEmpty(), "a mascot is drawn over the dock")
+        drawn.forEach { node ->
+            assertEquals(true, node.config[MascotSemantics.Live], "the dock's character is live, not a still")
+            assertEquals(previewed, node.config[MascotSemantics.Identity], "the dock shows the hero's look")
+        }
     }
 
     @Test
@@ -246,5 +261,6 @@ class CollapsedDockMascotPresenceUiTest {
         const val WINDOW_HEIGHT = 800
         const val SETTLE_MILLIS = 2_000L
         const val HERO_SIZE = 80
+        const val PREVIEW_COLOR = 0xFF3355CC.toInt()
     }
 }

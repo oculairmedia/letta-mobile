@@ -31,8 +31,10 @@ import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
-import com.letta.mobile.data.search.PaletteItem
-import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
+import com.letta.mobile.ui.shell.header.UnifiedSearchHit
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.header.rememberConversationMessageIndex
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -262,60 +264,34 @@ internal fun buildMentionables(params: BuildMentionablesParams): List<Mentionabl
         }
 }
 
-/** Cmd/Ctrl-K command palette over conversations, agents, and destinations. */
-internal fun buildPaletteItems(
-    conversations: List<DesktopConversationSummary>,
-    railAgents: List<Pair<String, String>>,
-    workPlayMode: WorkPlayMode,
-): List<PaletteItem> = buildList {
-    conversations.forEach { conversation ->
-        val railIndex = railAgents.indexOfFirst { it.first == conversation.agentId }
-        // Resolve the subtitle through the rail rather than parroting
-        // `agentName`: that field still holds the raw id whenever name
-        // resolution missed at conversation-load time, and "no raw ids in
-        // user-visible text" has to hold on every surface or it holds on none.
-        // The rail entry is already the disambiguated label; fall back to the
-        // same helper for a conversation the rail does not know about.
-        val agentLabel = railAgents.getOrNull(railIndex)?.second
-            ?: DisplayNames.agent(conversation.agentName, conversation.agentId ?: conversation.agentName)
-        add(
-            PaletteItem(
-                id = conversation.id,
-                label = conversation.title,
-                sublabel = agentLabel,
-                kind = PaletteItemKind.Conversation,
-                orbIndex = railIndex.coerceAtLeast(0),
-                agentId = conversation.agentId,
-            ),
-        )
+/**
+ * The pages the command palette and the quick-query bar can go to; conversations, message text and
+ * agents come from the unified search's own sources (letta-mobile-ckmub.3.9).
+ */
+internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedSearchDestination> =
+    WorkPlayLens.navDestinations(workPlayMode)
+        .map { lensDestination ->
+            val target = lensNavTarget(workPlayMode, lensDestination)
+            UnifiedSearchDestination(id = target.first.name, label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination))
+        }
+        // Picker rows are keyed by id: a page reached through two lens entries is listed once.
+        .distinctBy { it.id }
+
+/**
+ * The window's one unified search, shared by the header, the command palette and the quick-query bar:
+ * what the shell holds, plus message text from a host-side index over App Server reads.
+ */
+@Composable
+internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversations: List<DesktopConversationSummary>, focus: DesktopAgentFocus): UnifiedSearchSources {
+    val chat = context.core.chatController
+    val canvases by context.core.canvasShell.library.documents.collectAsState()
+    val messages = rememberConversationMessageIndex(conversations, chat.conversationManagement.messageReader)
+    val workPlayMode = context.navigator.workPlayMode
+    val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }
+    return remember(conversations, focus, canvases, destinations, messages) {
+        UnifiedSearchSources(conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId, destinations, messages)
     }
-    railAgents.forEachIndexed { index, (id, name) ->
-        add(
-            PaletteItem(
-                id = id,
-                label = name,
-                sublabel = "agent",
-                kind = PaletteItemKind.Agent,
-                orbIndex = index,
-                agentId = id,
-            ),
-        )
-    }
-    WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
-        val target = lensNavTarget(workPlayMode, lensDestination)
-        add(
-            PaletteItem(
-                id = target.first.name,
-                label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
-                sublabel = null,
-                kind = PaletteItemKind.Destination,
-            ),
-        )
-    }
-}.distinctBy { it.kind to it.id }
-// ^ Palette LazyColumns key rows by "$kind-$id"; server list endpoints can
-// duplicate rows during active runs, and a duplicated item is an instant
-// crash (seen live: Key "qq-Agent-agent-…" already used).
+}
 
 /**
  * Composer "/" palette: local navigation commands plus the focused agent's
@@ -512,6 +488,8 @@ internal data class CreateDesktopOverlayActionsParams(
     val onNewAgent: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
+    /** Opens a command-palette pick (the unified search's hit). */
+    val onOpenSearchHit: (UnifiedSearchHit) -> Unit = {},
 )
 
 internal fun createDesktopOverlayActions(
@@ -524,13 +502,10 @@ internal fun createDesktopOverlayActions(
         onModelSelected = params.chatController::setConversationModel,
         recentModels = params.chatController.conversationManagement.recentModels,
     ),
-    onSelectConversation = {
-        params.chatController.selectConversation(it)
-        params.onSelectDestination(DesktopDestination.Conversations)
-    },
     onOpenAgent = params.onOpenAgent,
     onNavigate = params.onSelectDestination,
     onNewCanvas = params.onNewCanvas,
+    onOpenSearchHit = params.onOpenSearchHit,
     onNewAgent = params.onNewAgent,
     onIrohIdentityReset = params.onIrohIdentityReset,
 )

@@ -13,8 +13,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
-import com.letta.mobile.data.search.PaletteItem
-import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -23,13 +24,13 @@ import kotlin.test.assertEquals
  * desktop keeps only its always-on-top window, the title capture and the sanitizing.
  */
 class QuickQueryPanelTest {
-    private val items = listOf(PaletteItem("a1", "Ada", null, PaletteItemKind.Agent, orbIndex = 0))
+    private val items = UnifiedSearchSources(agents = listOf(Agent(id = AgentId("a1"), name = "Ada")))
 
     @Test
     fun droppingTheAmbientChipAsksWithoutContextAndCloses() = runComposeUiTest {
         val asked = mutableListOf<Pair<String, String?>>()
         var closed = 0
-        val actions = QuickQueryActions(onSelectItem = {}, onSubmitPrompt = { text, context -> asked += text to context }, onClose = { closed++ })
+        val actions = QuickQueryActions(onOpen = {}, onSubmitPrompt = { text, context -> asked += text to context }, onClose = { closed++ })
         setContent { MaterialTheme { QuickQueryPanel(items, ambientContext = "notes.txt", actions = actions) } }
         onNodeWithTag(CommandPaletteTags.QUICK_QUERY).assertExists()
         onNodeWithContentDescription("Remove context").performClick()
@@ -45,7 +46,7 @@ class QuickQueryPanelTest {
 
     @Test
     fun noAmbientContextShowsNoChip() = runComposeUiTest {
-        val actions = QuickQueryActions(onSelectItem = {}, onSubmitPrompt = { _, _ -> }, onClose = {})
+        val actions = QuickQueryActions(onOpen = {}, onSubmitPrompt = { _, _ -> }, onClose = {})
         setContent { MaterialTheme { QuickQueryPanel(items, ambientContext = null, actions = actions) } }
         onNodeWithTag(CommandPaletteTags.AMBIENT).assertDoesNotExist()
     }

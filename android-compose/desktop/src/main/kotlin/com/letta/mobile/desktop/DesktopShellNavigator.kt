@@ -12,8 +12,9 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.search.PaletteItem
-import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.ui.shell.header.UnifiedSearchHit
+import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellSkillsSection
@@ -202,13 +203,18 @@ internal class DesktopShellRouter(
         }
     }
 
-    /** Opens a quick-query pick the way the in-app command palette does. */
-    fun openPaletteItem(item: PaletteItem) {
-        when (item.kind) {
-            PaletteItemKind.Conversation -> openConversation(ConversationId(item.id))
-            PaletteItemKind.Agent -> openAgent(AgentId(item.id))
-            PaletteItemKind.Destination ->
-                DesktopDestination.entries.firstOrNull { it.name == item.id }?.let(navigator::navigate)
+    /**
+     * Opens a unified-search pick, from the header search, the command palette or the quick-query bar
+     * alike (letta-mobile-ckmub.3.9): a message opens its conversation; a canvas goes to [openCanvas]
+     * (only the header's search lists canvases).
+     */
+    fun openSearchHit(hit: UnifiedSearchHit, openCanvas: (CanvasId) -> Unit = {}) {
+        when (hit.kind) {
+            UnifiedSearchKind.Conversations, UnifiedSearchKind.Messages -> openConversation(ConversationId(hit.id))
+            UnifiedSearchKind.Agents -> openAgent(AgentId(hit.id))
+            UnifiedSearchKind.Canvases -> openCanvas(CanvasId(hit.id))
+            UnifiedSearchKind.Destinations ->
+                DesktopDestination.entries.firstOrNull { it.name == hit.id }?.let(navigator::navigate)
         }
     }
 

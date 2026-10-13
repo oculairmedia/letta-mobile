@@ -29,7 +29,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.ui.components.picker.LettaPickerContent
 import com.letta.mobile.ui.components.picker.LettaPickerSpec
 import com.letta.mobile.ui.components.picker.PickMode
@@ -38,6 +37,9 @@ import com.letta.mobile.ui.components.picker.PickerItem
 import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.host.LettaDialogFrame
+import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.shell.header.UnifiedSearchHit
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.host.PaneSpec
 import com.letta.mobile.ui.icons.LettaIcons
@@ -46,8 +48,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 /** What the quick-query bar routes back into the app. */
 @Immutable
 class QuickQueryActions(
-    /** Opens a palette item (agent, conversation, page) in the main window. */
-    val onSelectItem: (PaletteItem) -> Unit,
+    /** Opens a picked result (agent, conversation, message, page) in the main window. */
+    val onOpen: (UnifiedSearchHit) -> Unit,
     /** Sends free text to the current agent, with the ambient context the user kept (or null). */
     val onSubmitPrompt: (String, String?) -> Unit,
     val onClose: () -> Unit,
@@ -55,16 +57,16 @@ class QuickQueryActions(
 
 /**
  * letta-mobile-ckmub.3.6: the Spotlight-style quick-query bar's body: the palette's [LettaPickerContent]
- * (recent agents first, then the matches), the ambient-context chip under the search, and a key
+ * over the unified search (recent agents first, then the matches), the ambient-context chip under the search, and a key
  * hint. Enter opens the highlighted result or, with none, asks the current agent; Ctrl+Enter always
  * asks. [ambientContext] is already sanitized by the platform that captured it. The always-on-top
  * window around it stays the platform's.
  */
 @Composable
-fun QuickQueryPanel(items: List<PaletteItem>, ambientContext: String?, actions: QuickQueryActions) {
+fun QuickQueryPanel(sources: UnifiedSearchSources, ambientContext: String?, actions: QuickQueryActions) {
     var query by remember { mutableStateOf("") }
     var includeContext by remember { mutableStateOf(true) }
-    val sections = remember(items, query) { paletteSections(items, query, PaletteRecent(RECENTLY_VIEWED, RECENT_AGENTS_LIMIT)) }
+    val sections = rememberPaletteSections(sources, query, QuickQueryRecent)
     val kept = ambientContext.takeIf { includeContext }
     val submit = {
         val text = query.trim()
@@ -89,14 +91,14 @@ fun QuickQueryPanel(items: List<PaletteItem>, ambientContext: String?, actions: 
             callbacks = PickerCallbacks(
                 onQuery = { query = it },
                 onPick = { picked ->
-                    actions.onSelectItem(picked.value)
+                    picked.hit()?.let(actions.onOpen)
                     actions.onClose()
                 },
                 onDismiss = actions.onClose,
                 onKey = { event, highlighted -> handleQuickQueryKey(event, highlighted, submit) },
             ),
             slots = PickerSlots(
-                leading = { PaletteItemLeading(it.value) },
+                leading = { PaletteRowLeading(it.value) },
                 header = { kept?.let { AmbientContextChip(it, onDismiss = { includeContext = false }) } },
                 footer = { QuickQueryFooter() },
             ),
@@ -105,7 +107,7 @@ fun QuickQueryPanel(items: List<PaletteItem>, ambientContext: String?, actions: 
 }
 
 /** Ctrl+Enter always asks the agent; Enter asks it only when no result is highlighted to open. */
-private fun handleQuickQueryKey(event: KeyEvent, highlighted: PickerItem<PaletteItem>?, submit: () -> Unit): Boolean {
+private fun handleQuickQueryKey(event: KeyEvent, highlighted: PickerItem<LettaSearchRow>?, submit: () -> Unit): Boolean {
     if (!event.isEnterDown()) return false
     val asksAgent = event.isCtrlPressed || highlighted == null
     if (asksAgent) submit()
@@ -161,7 +163,6 @@ private fun AmbientContextChip(title: String, onDismiss: () -> Unit) {
 /** Full width, inset from the platform window's edge so the frame's corners and shadow show. */
 private val QuickQueryInset = Modifier.fillMaxWidth().padding(LettaDimens.Space.sm)
 
-private const val RECENT_AGENTS_LIMIT = 9
-private const val RECENTLY_VIEWED = "Recently viewed"
+private val QuickQueryRecent = PaletteRecent(title = "Recently viewed", limit = 9)
 private const val QUICK_QUERY_PLACEHOLDER = "Search agents, or ask anything…"
 private const val QUICK_QUERY_HINT = "⏎ open result · Ctrl+⏎ ask current agent · Esc close"

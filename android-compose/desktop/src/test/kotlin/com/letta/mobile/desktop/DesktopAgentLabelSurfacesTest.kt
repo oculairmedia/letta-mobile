@@ -4,8 +4,14 @@ import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.DisplayNames
-import com.letta.mobile.data.search.mascotAgentId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.ui.search.LettaSearchLeading
+import com.letta.mobile.ui.search.LettaSearchRow
+import com.letta.mobile.ui.shell.header.UnifiedSearchKind
+import com.letta.mobile.ui.shell.header.UnifiedSearchQuery
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.header.UnifiedSearchSurface
+import com.letta.mobile.ui.shell.header.UnifiedShellSearch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,55 +62,63 @@ class DesktopAgentLabelSurfacesTest {
         }
     }
 
+    /** The command palette's rows: the unified search on the palette surface (letta-mobile-ckmub.3.9). */
+    private fun paletteRows(conversations: List<DesktopConversationSummary>, roster: List<Agent> = emptyList()): List<LettaSearchRow> =
+        UnifiedShellSearch.sections(
+            UnifiedSearchQuery("", surface = UnifiedSearchSurface.Palette),
+            UnifiedSearchSources(conversations = conversations, agents = roster),
+        ).flatMap { it.rows }
+
+    private fun List<LettaSearchRow>.row(kind: UnifiedSearchKind, id: String): LettaSearchRow =
+        first { it.id == UnifiedShellSearch.rowId(kind, id) }
+
+    private fun LettaSearchRow.orbAgentId(): String? = (leading as? LettaSearchLeading.Orb)?.agentId
+
     @Test
-    fun paletteConversationSubtitlesResolveThroughTheRail() {
+    fun paletteConversationSubtitlesNeverShowARawId() {
         // `agentName` still holds the raw id whenever resolution missed at
         // conversation-load time. The palette used it verbatim, so the one
         // surface a user reaches for when they cannot find something showed
         // them "agent-c356b8f2-1a2b".
         val rawId = "agent-c356b8f2-1a2b"
-        val conversations = listOf(conversation("c1", agentId = rawId, agentName = rawId))
-        val railAgents = buildRailAgents(conversations, rosterAgents = emptyList())
-
-        val items = buildPaletteItems(conversations, railAgents, workPlayMode = WorkPlayMode.Work)
-        val subtitle = items.first { it.id == "c1" }.sublabel
+        val rows = paletteRows(listOf(conversation("c1", agentId = rawId, agentName = rawId)))
+        val subtitle = rows.row(UnifiedSearchKind.Conversations, "c1").sublabel
 
         assertEquals("Agent c356b8f2", subtitle)
         assertFalse(subtitle.orEmpty().contains(rawId), "no raw id may reach the palette")
     }
 
     @Test
-    fun paletteFallsBackForAConversationTheRailDoesNotKnow() {
-        val rawId = "agent-deadbeef-0000"
-        val conversations = listOf(conversation("c1", agentId = rawId, agentName = rawId))
+    fun paletteConversationSubtitlesUseTheRostersName() {
+        val rows = paletteRows(
+            listOf(conversation("c1", agentId = "agent-deadbeef-0000", agentName = "agent-deadbeef-0000")),
+            roster = listOf(rosterAgent("agent-deadbeef-0000", "Meridian")),
+        )
 
-        val items = buildPaletteItems(conversations, railAgents = emptyList(), workPlayMode = WorkPlayMode.Work)
-
-        assertEquals("Agent deadbeef", items.first { it.id == "c1" }.sublabel)
+        assertEquals("Meridian", rows.row(UnifiedSearchKind.Conversations, "c1").sublabel)
     }
 
     @Test
-    fun paletteRowsCarryTheOwningAgentForMascotOrbs() {
-        val conversations = listOf(conversation("c1", agentId = "agent-owner", agentName = "Owner"))
-        val railAgents = listOf("agent-owner" to "Owner", "agent-other" to "Other")
+    fun paletteRowsCarryTheOwningAgentForMascots() {
+        val rows = paletteRows(
+            listOf(conversation("c1", agentId = "agent-owner", agentName = "Owner")),
+            roster = listOf(rosterAgent("agent-owner", "Owner"), rosterAgent("agent-other", "Other")),
+        )
 
-        val items = buildPaletteItems(conversations, railAgents, workPlayMode = WorkPlayMode.Work)
-
-        val conversationRow = items.first { it.id == "c1" }
-        assertEquals("agent-owner", conversationRow.agentId)
-        assertEquals("agent-owner", conversationRow.mascotAgentId())
-
-        val agentRow = items.first { it.id == "agent-other" }
-        assertEquals("agent-other", agentRow.agentId)
-        assertEquals("agent-other", agentRow.mascotAgentId())
+        assertEquals("agent-owner", rows.row(UnifiedSearchKind.Conversations, "c1").orbAgentId())
+        assertEquals("agent-other", rows.row(UnifiedSearchKind.Agents, "agent-other").orbAgentId())
     }
 
     @Test
-    fun paletteConversationWithoutOwningAgentKeepsGradientFallback() {
-        val conversations = listOf(conversation("c1", agentId = null, agentName = "Unknown"))
-        val items = buildPaletteItems(conversations, railAgents = emptyList(), workPlayMode = WorkPlayMode.Work)
-        val row = items.first { it.id == "c1" }
-        assertEquals(null, row.agentId)
-        assertEquals(null, row.mascotAgentId())
+    fun paletteConversationWithoutOwningAgentHasNoAvatar() {
+        val rows = paletteRows(listOf(conversation("c1", agentId = null, agentName = "Unknown")))
+        assertEquals(LettaSearchLeading.None, rows.row(UnifiedSearchKind.Conversations, "c1").leading)
+    }
+
+    @Test
+    fun paletteDestinationsAreListedOnce() {
+        val destinations = buildPaletteDestinations(WorkPlayMode.Work)
+        assertTrue(destinations.isNotEmpty())
+        assertEquals(destinations.size, destinations.map { it.id }.distinct().size)
     }
 }

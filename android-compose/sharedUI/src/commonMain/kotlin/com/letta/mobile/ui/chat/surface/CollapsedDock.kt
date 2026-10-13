@@ -84,7 +84,7 @@ import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.AgentInitialTile
-import com.letta.mobile.ui.mascot.MascotAvatar
+import com.letta.mobile.ui.mascot.MascotMirror
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
@@ -306,7 +306,7 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent,
             if (seated) CompanionSeatAnchor(anchors, size = size)
             // letta-mobile-8kpk7: the spot never stands empty. While another seat holds the
             // character (the desktop sidebar's agent hero) or the host cannot draw its scene, a
-            // still of it (or its initial) keeps the place; the live one covers it once it is back.
+            // live mirror of it (or its initial) keeps the place; the transported one covers it once it is back.
             if (!mascotDrawnAt(content.agentId, MascotStage.COMPOSER_COMPANION)) CollapsedStandIn(content, size)
         } else {
             CollapsedOwnSeat(content, size)
@@ -338,21 +338,18 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
 }
 
 /**
- * The agent while its live character is away or cannot be drawn: the still every list shows of it,
- * framed as the character stands (no avatar crop), or its initial when there is no mascot to draw.
+ * The agent while its transported character stands at another seat (the desktop sidebar's hero):
+ * the same character, live (letta-mobile-ckmub.15), framed as it stands - or its initial when the
+ * host cannot draw its scene.
  */
 @Composable
 private fun CollapsedStandIn(content: CollapsedDockContent, size: Dp) {
     val tagged = Modifier.testTag(DOCK_COLLAPSED_STAND_IN_TAG)
-    MascotAvatar(
+    MascotMirror(
         agentId = content.agentId,
         size = size,
         modifier = tagged,
-        cornerRadius = 0.dp,
         onClick = content.openAgent,
-        overscale = 1f,
-        // The live character is elsewhere: two of it moving is one too many.
-        live = false,
         fallback = { AgentInitialTile(content.agentName, collapsedFallbackSize(size), modifier = tagged, onClick = content.openAgent) },
     )
 }

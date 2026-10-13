@@ -10,6 +10,7 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.search.ConversationMessageReader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,15 @@ internal class DesktopConversationManagement(
         gateway = { host.gateway as? ConversationRecompileGateway },
         unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
     )
+
+    /**
+     * letta-mobile-ckmub.3.9: a conversation's newest messages, newest first, for the unified search's
+     * host-side message index (the App Server has no message search); none before the gateway is up.
+     */
+    val messageReader = ConversationMessageReader { conversationId, limit ->
+        val gateway = host.gateway.takeUnless { host.isClosed } ?: return@ConversationMessageReader emptyList()
+        gateway.listConversationMessages(ConversationId(conversationId), limit = limit, order = NEWEST_FIRST)
+    }
 
     /** Recompiles the open conversation's system prompt; with nothing open, nothing happens. */
     fun recompileOpenConversation() {
@@ -147,3 +157,6 @@ internal class DesktopConversationManagement(
     /** The fork, edit or rerun in flight, or the last failure. */
     val branchState: StateFlow<BranchState> get() = brancher.state
 }
+
+/** `conversation_messages_list`'s order for the newest messages first. */
+private const val NEWEST_FIRST = "desc"
