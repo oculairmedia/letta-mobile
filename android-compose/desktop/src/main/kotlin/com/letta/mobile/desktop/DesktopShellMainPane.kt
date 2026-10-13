@@ -17,9 +17,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
-import com.letta.mobile.desktop.agent.DesktopAgentEditorDeps
-import com.letta.mobile.desktop.agent.DesktopAgentEditorNavigation
-import com.letta.mobile.desktop.agent.desktopAgentEditorPage
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
@@ -160,7 +157,7 @@ private fun desktopMainContentInputs(
     val navigator = context.navigator
     return DesktopMainContentInputs(
         agentEditor = navigator.agentEditor,
-        agentEditorPage = desktopAgentEditorPage(desktopAgentEditorDeps(context), desktopAgentEditorNavigation(context)),
+        agentEditorPage = context.agentEditorPage(),
         selectedDestination = navigator.selectedDestination,
         pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination(),
         selectedConversationId = frame.chatState.selectedConversationId,
@@ -171,24 +168,6 @@ private fun desktopMainContentInputs(
     )
 }
 
-/** letta-mobile-ckmub.3.24: what the shared agent editor works over in this session. */
-private fun desktopAgentEditorDeps(context: DesktopShellContext): DesktopAgentEditorDeps = DesktopAgentEditorDeps(
-    sessionGraph = context.core.sessionGraph.value,
-    chatController = context.core.chatController,
-    settings = context.core.bootstrap.secureSettingsStore,
-    subagents = context.panels.subagents.repository,
-)
-
-/** The editor closes into the chat, opens the agent's other pages, and shows a picked mascot at once. */
-private fun desktopAgentEditorNavigation(context: DesktopShellContext): DesktopAgentEditorNavigation {
-    val navigator = context.navigator
-    return DesktopAgentEditorNavigation(
-        onClose = { navigator.editAgentId = null },
-        onOpen = navigator::navigate,
-        onIdentityChange = { agentId, identity -> navigator.avatarOverrides = navigator.avatarOverrides + (agentId to identity) },
-        onRosterChanged = context.core.chatController::retryConnection,
-    )
-}
 @Composable
 private fun destinationContentInputs(context: DesktopShellContext, frame: DesktopShellFrame): DestinationContentInputs {
     val core = context.core

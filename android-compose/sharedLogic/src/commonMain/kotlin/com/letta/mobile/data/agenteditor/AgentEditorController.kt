@@ -1,10 +1,12 @@
 package com.letta.mobile.data.agenteditor
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
@@ -56,7 +58,7 @@ class AgentEditorController(
         }
         scope.launch {
             guarded("Could not load ${copyOf.name}") {
-                val source = backend.load(copyOf.agentId)
+                val source = backend.load(AgentId(copyOf.agentId))
                 starterAgent = source
                 _state.update { it.copy(form = AgentEditorParams.starterFormOf(source, it.form)) }
             }
@@ -85,7 +87,7 @@ class AgentEditorController(
         _state.update { it.copy(saving = true, error = null) }
         scope.launch {
             guarded("Could not delete the agent") {
-                backend.delete(agentId)
+                backend.delete(AgentId(agentId))
                 onDeleted()
             }
             _state.update { it.copy(saving = false) }
@@ -98,15 +100,16 @@ class AgentEditorController(
 
     override suspend fun writeMetadata(metadata: Map<String, JsonElement>) {
         val agentId = _state.value.agentId ?: return
-        backend.update(agentId, AgentUpdateParams(metadata = metadata))
+        backend.update(AgentId(agentId), AgentUpdateParams(metadata = metadata))
     }
 
     private suspend fun saveEdits(agentId: String, current: AgentEditorState): AgentCreated {
+        val id = AgentId(agentId)
         val original = current.original ?: current.form
-        AgentEditorParams.updateOf(original, current.form, current.agent)?.let { backend.update(agentId, it) }
+        AgentEditorParams.updateOf(original, current.form, current.agent)?.let { backend.update(id, it) }
         val (attach, detach) = AgentEditorParams.toolChanges(original, current.form)
-        attach.forEach { backend.attachTool(agentId, it) }
-        detach.forEach { backend.detachTool(agentId, it) }
+        attach.forEach { backend.attachTool(id, ToolId(it)) }
+        detach.forEach { backend.detachTool(id, ToolId(it)) }
         return AgentCreated(agentId)
     }
 
@@ -115,7 +118,7 @@ class AgentEditorController(
         _state.update { it.copy(loading = true, loadError = null) }
         scope.launch {
             try {
-                val agent = backend.load(agentId)
+                val agent = backend.load(AgentId(agentId))
                 val form = AgentEditorParams.formOf(agent)
                 _state.update { it.copy(loading = false, agent = agent, form = form, original = form) }
             } catch (e: CancellationException) {

@@ -143,7 +143,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellCon
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellEffects.kt 205 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellFrame.kt 334 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellLayoutController.kt 71 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellMainPane.kt 377 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellMainPane.kt 372 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellServices.kt 241 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSidebarChrome.kt 218 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/LettaDesktopApp.kt 248 legacy-pending(ckmub.3)

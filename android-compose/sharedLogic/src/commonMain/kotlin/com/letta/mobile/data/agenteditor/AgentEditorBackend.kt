@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IToolRepository
@@ -25,16 +26,16 @@ interface AgentEditorBackend {
     val tools: StateFlow<List<Tool>>
 
     /** The agent as the server has it now. */
-    suspend fun load(agentId: String): Agent
+    suspend fun load(agentId: AgentId): Agent
 
     /** Refreshes the roster, models and tools the editor offers; a failure leaves what was there. */
     suspend fun refreshCatalogs()
 
     suspend fun create(params: AgentCreateParams): AgentCreated
-    suspend fun update(agentId: String, params: AgentUpdateParams)
-    suspend fun attachTool(agentId: String, toolId: String)
-    suspend fun detachTool(agentId: String, toolId: String)
-    suspend fun delete(agentId: String)
+    suspend fun update(agentId: AgentId, params: AgentUpdateParams)
+    suspend fun attachTool(agentId: AgentId, toolId: ToolId)
+    suspend fun detachTool(agentId: AgentId, toolId: ToolId)
+    suspend fun delete(agentId: AgentId)
 
     /** The named reasoning efforts [handle] accepts; empty when it has none or the backend cannot say. */
     fun reasoningEffortsFor(handle: String): List<String> = emptyList()
@@ -73,7 +74,7 @@ class RepositoryAgentEditorBackend(
     override val tools: StateFlow<List<Tool>> = catalogOrEmpty { toolRepository.getTools() }
 
     // The flow's last emission re-fetches, so an agent edited elsewhere is never shown stale.
-    override suspend fun load(agentId: String): Agent = agentRepository.getAgent(AgentId(agentId)).last()
+    override suspend fun load(agentId: AgentId): Agent = agentRepository.getAgent(agentId).last()
 
     override suspend fun refreshCatalogs() {
         refreshQuietly { agentRepository.refreshAgentsIfStale(CATALOG_MAX_AGE_MS) }
@@ -83,15 +84,15 @@ class RepositoryAgentEditorBackend(
 
     override suspend fun create(params: AgentCreateParams): AgentCreated = creator.create(params)
 
-    override suspend fun update(agentId: String, params: AgentUpdateParams) {
-        agentRepository.updateAgent(AgentId(agentId), params)
+    override suspend fun update(agentId: AgentId, params: AgentUpdateParams) {
+        agentRepository.updateAgent(agentId, params)
     }
 
-    override suspend fun attachTool(agentId: String, toolId: String) = toolRepository.attachTool(agentId, toolId)
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = toolRepository.attachTool(agentId, toolId)
 
-    override suspend fun detachTool(agentId: String, toolId: String) = toolRepository.detachTool(agentId, toolId)
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = toolRepository.detachTool(agentId, toolId)
 
-    override suspend fun delete(agentId: String) = agentRepository.deleteAgent(AgentId(agentId))
+    override suspend fun delete(agentId: AgentId) = agentRepository.deleteAgent(agentId)
 
     override fun reasoningEffortsFor(handle: String): List<String> {
         val model = models.value.firstOrNull { it.handle == handle || it.id == handle } ?: return emptyList()

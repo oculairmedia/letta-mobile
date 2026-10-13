@@ -64,16 +64,16 @@ class AgentEditorPageTest {
         val attached = mutableListOf<String>()
         val deleted = mutableListOf<String>()
 
-        override suspend fun load(agentId: String): Agent = byId.getValue(agentId)
+        override suspend fun load(agentId: AgentId): Agent = byId.getValue(agentId.value)
         override suspend fun refreshCatalogs() = Unit
         override suspend fun create(params: AgentCreateParams): AgentCreated {
             created += params
             return AgentCreated("a-new")
         }
-        override suspend fun update(agentId: String, params: AgentUpdateParams) { updates += params }
-        override suspend fun attachTool(agentId: String, toolId: String) { attached += toolId }
-        override suspend fun detachTool(agentId: String, toolId: String) = Unit
-        override suspend fun delete(agentId: String) { deleted += agentId }
+        override suspend fun update(agentId: AgentId, params: AgentUpdateParams) { updates += params }
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) { attached += toolId.value }
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = Unit
+        override suspend fun delete(agentId: AgentId) { deleted += agentId.value }
     }
 
     private class Outcome {

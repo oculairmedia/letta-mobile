@@ -49,19 +49,19 @@ class AgentEditorControllerTest {
         val deleted = mutableListOf<String>()
         var failNextUpdate: String? = null
 
-        override suspend fun load(agentId: String): Agent = byId[agentId] ?: error("No agent $agentId")
+        override suspend fun load(agentId: AgentId): Agent = byId[agentId.value] ?: error("No agent ${agentId.value}")
         override suspend fun refreshCatalogs() = Unit
         override suspend fun create(params: AgentCreateParams): AgentCreated {
             created += params
             return AgentCreated("a-new", conversationId = "c-new")
         }
-        override suspend fun update(agentId: String, params: AgentUpdateParams) {
+        override suspend fun update(agentId: AgentId, params: AgentUpdateParams) {
             failNextUpdate?.let { failNextUpdate = null; error(it) }
             updates += params
         }
-        override suspend fun attachTool(agentId: String, toolId: String) { attached += toolId }
-        override suspend fun detachTool(agentId: String, toolId: String) { detached += toolId }
-        override suspend fun delete(agentId: String) { deleted += agentId }
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) { attached += toolId.value }
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) { detached += toolId.value }
+        override suspend fun delete(agentId: AgentId) { deleted += agentId.value }
         override fun reasoningEffortsFor(handle: String) = listOf("low", "high")
     }
 
