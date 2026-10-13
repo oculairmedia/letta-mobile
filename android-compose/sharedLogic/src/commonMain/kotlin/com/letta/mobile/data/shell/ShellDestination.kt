@@ -74,8 +74,8 @@ sealed interface ShellDestination {
         override val kind get() = ShellPageKind.Settings
     }
 
-    /** The agent editor for [agentId]. */
-    data class AgentEditor(override val agentId: String) : ShellDestination {
+    /** The agent editor for [agentId]; without one, the new-agent flow (letta-mobile-ckmub.3.24). */
+    data class AgentEditor(override val agentId: String? = null) : ShellDestination {
         override val kind get() = ShellPageKind.AgentEditor
     }
 

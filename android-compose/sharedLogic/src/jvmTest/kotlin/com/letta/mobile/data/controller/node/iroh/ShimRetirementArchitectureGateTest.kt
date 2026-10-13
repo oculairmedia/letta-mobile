@@ -163,7 +163,6 @@ class ShimRetirementArchitectureGateTest {
             "android-compose/app/src/main",
             "android-compose/core",
             "android-compose/feature-chat/src/main",
-            "android-compose/feature-editagent/src/main",
             "android-compose/sharedLogic/src/commonMain",
             "android-compose/sharedLogic/src/jvmAndAndroid",
             "android-compose/sharedLogic/src/androidMain",

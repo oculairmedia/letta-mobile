@@ -26,13 +26,14 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * The shared, searchable, provider-grouped model picker over the owner's
  * [ChatModelUiState.options]: the shared [LettaPicker] (letta-mobile-ckmub.3.6) in a modal pane,
- * a sheet on touch and a dialog on pointer.
+ * a sheet on touch and a dialog on pointer. The agent editor's Model row opens it too.
  */
 @Composable
 internal fun ComposerModelPickerSheet(
     model: ChatModelUiState,
     onSelect: (ChatModelOption) -> Unit,
     onDismiss: () -> Unit,
+    testTag: String = ComposerTestTags.MODEL_SHEET,
 ) {
     var query by remember { mutableStateOf("") }
     val otherLabel = stringResource(Res.string.composer_model_other_provider)
@@ -54,7 +55,7 @@ internal fun ComposerModelPickerSheet(
         callbacks = PickerCallbacks(onQuery = { query = it }, onPick = { onSelect(it.value) }, onDismiss = onDismiss),
         pane = PickerPane(
             size = PaneSize(ChatComposerDimens.modelSheetWidth, ChatComposerDimens.modelSheetMaxHeight),
-            testTag = ComposerTestTags.MODEL_SHEET,
+            testTag = testTag,
         ),
     )
 }

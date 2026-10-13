@@ -18,7 +18,6 @@ class SharedLogicIsolationTest {
             ":core:domain",
             ":designsystem",
             ":feature-chat",
-            ":feature-editagent",
             ":desktop",
             ":web",
             // sharedUI depends on sharedLogic; reverse edge would be a cycle

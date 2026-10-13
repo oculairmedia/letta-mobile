@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.desktop.DesktopDestination
 
 /*
@@ -29,8 +30,8 @@ internal fun DesktopPhoneChrome?.agentPaneVisible(sidebarVisible: Boolean): Bool
  * The chat page draws edge to edge with its own floating header; every other destination (and the
  * agent editor) gets the phone's app bar.
  */
-internal fun isBareChatPage(destination: DesktopDestination, editingAgentId: String?): Boolean =
-    destination == DesktopDestination.Conversations && editingAgentId == null
+internal fun isBareChatPage(destination: DesktopDestination, agentEditor: ShellDestination.AgentEditor?): Boolean =
+    destination == DesktopDestination.Conversations && agentEditor == null
 
 /** Reports the shell's width to the desktop layout; a phone's width says nothing about the layout the person saved. */
 @Composable
@@ -71,8 +72,8 @@ internal fun ClosePhoneDrawerOnNavigation(
     phone: DesktopPhoneChrome?,
     destination: DesktopDestination,
     conversationId: String?,
-    editingAgentId: String?,
+    agentEditor: ShellDestination.AgentEditor?,
 ) {
     if (phone == null) return
-    LaunchedEffect(destination, conversationId, editingAgentId) { phone.drawerOpen = false }
+    LaunchedEffect(destination, conversationId, agentEditor) { phone.drawerOpen = false }
 }

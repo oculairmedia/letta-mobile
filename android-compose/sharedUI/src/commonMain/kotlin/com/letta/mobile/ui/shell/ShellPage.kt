@@ -3,9 +3,12 @@ package com.letta.mobile.ui.shell
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.agenteditor.AgentEditorController
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.home.HomePageState
@@ -13,6 +16,8 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.shell.ShellSettingsSection
+import com.letta.mobile.ui.agenteditor.AgentEditorPage
+import com.letta.mobile.ui.agenteditor.AgentEditorPageOptions
 import com.letta.mobile.ui.settings.SettingsPage
 import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
@@ -187,6 +192,23 @@ fun shellSettingsPage(
     onBack: (() -> Unit)? = null,
 ) = ShellPageContent<ShellDestination.Settings> { destination, modifier ->
     SettingsPage(state = state.copy(section = destination.section ?: state.section), services = services, modifier = modifier, onBack = onBack)
+}
+
+/**
+ * letta-mobile-ckmub.3.24 (hard cut S15): what the shared agent editor is bound to. [controller] is the
+ * host's editor for an agent id (null: a new agent), kept by the host for as long as it shows the page
+ * (Android's view model, the desktop pane's composition); [options] wires the page for that editor.
+ */
+class AgentEditorBinding(
+    val controller: @Composable (agentId: String?) -> AgentEditorController,
+    val options: (agentId: String?, controller: AgentEditorController) -> AgentEditorPageOptions = { _, _ -> AgentEditorPageOptions() },
+)
+
+/** The shared agent editor, for the destination's agent or a new one. */
+fun shellAgentEditorPage(binding: AgentEditorBinding) = ShellPageContent<ShellDestination.AgentEditor> { destination, modifier ->
+    val controller = binding.controller(destination.agentId)
+    val state by controller.state.collectAsState()
+    AgentEditorPage(state = state, actions = controller, options = binding.options(destination.agentId, controller), modifier = modifier)
 }
 
 fun ShellSkillsSection.toPageSection(): SkillsPageSection = when (this) {

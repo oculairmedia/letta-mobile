@@ -17,6 +17,9 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
+import com.letta.mobile.desktop.agent.DesktopAgentEditorDeps
+import com.letta.mobile.desktop.agent.DesktopAgentEditorNavigation
+import com.letta.mobile.desktop.agent.desktopAgentEditorPage
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
@@ -103,7 +106,7 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             canvasStore = core.canvasShell.store,
             chatScope = core.chatScope,
             onNavigate = { navigator.selectedDestination = it },
-            onCreateAgent = { context.overlays.newAgent = true },
+            onCreateAgent = navigator::openNewAgent,
             onEditAgent = { navigator.editAgentId = it },
             onCanvasSessionChange = { core.canvasShell.activeSession = it },
             showDockedCanvas = showDockedCanvas,
@@ -154,26 +157,38 @@ private fun desktopMainContentInputs(
     host: DesktopShellChatHost,
 ): DesktopMainContentInputs {
     val core = context.core
-    val panels = context.panels
     val navigator = context.navigator
     return DesktopMainContentInputs(
-        editingAgentId = navigator.editAgentId,
+        agentEditor = navigator.agentEditor,
+        agentEditorPage = desktopAgentEditorPage(desktopAgentEditorDeps(context), desktopAgentEditorNavigation(context)),
         selectedDestination = navigator.selectedDestination,
         pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination(),
-        modelOptions = frame.lists.modelOptions,
-        agentRepository = core.bootstrap.dataBindings.sessionGraphProvider.current.agentRepository,
-        blockApi = panels.httpApis.blockApi,
-        secureSettingsStore = core.bootstrap.secureSettingsStore,
-        chatScope = core.chatScope,
         selectedConversationId = frame.chatState.selectedConversationId,
         destinationInputs = destinationContentInputs(context, frame),
-        subagentRepository = panels.subagents.repository,
         activeCanvasSession = core.canvasShell.activeSession,
         dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
         chatPage = desktopSharedChatPage(context, frame, host),
     )
 }
 
+/** letta-mobile-ckmub.3.24: what the shared agent editor works over in this session. */
+private fun desktopAgentEditorDeps(context: DesktopShellContext): DesktopAgentEditorDeps = DesktopAgentEditorDeps(
+    sessionGraph = context.core.sessionGraph.value,
+    chatController = context.core.chatController,
+    settings = context.core.bootstrap.secureSettingsStore,
+    subagents = context.panels.subagents.repository,
+)
+
+/** The editor closes into the chat, opens the agent's other pages, and shows a picked mascot at once. */
+private fun desktopAgentEditorNavigation(context: DesktopShellContext): DesktopAgentEditorNavigation {
+    val navigator = context.navigator
+    return DesktopAgentEditorNavigation(
+        onClose = { navigator.editAgentId = null },
+        onOpen = navigator::navigate,
+        onIdentityChange = { agentId, identity -> navigator.avatarOverrides = navigator.avatarOverrides + (agentId to identity) },
+        onRosterChanged = context.core.chatController::retryConnection,
+    )
+}
 @Composable
 private fun destinationContentInputs(context: DesktopShellContext, frame: DesktopShellFrame): DestinationContentInputs {
     val core = context.core
@@ -222,10 +237,6 @@ private fun desktopMainContentActions(context: DesktopShellContext, frame: Deskt
     val navigator = context.navigator
     return DesktopMainContentActions(
         onEditAgentClose = { navigator.editAgentId = null },
-        onEditAgentSaved = { identity, nameChanged ->
-            navigator.recordSavedIdentity(identity)
-            if (nameChanged) chatController.retryConnection()
-        },
         onCloseCanvas = canvasShell::close,
         onShareCanvasToChat = { bytes, mimeType ->
             handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {

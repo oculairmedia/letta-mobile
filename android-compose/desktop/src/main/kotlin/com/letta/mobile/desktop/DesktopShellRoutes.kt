@@ -13,20 +13,23 @@ import com.letta.mobile.data.shell.skillsSection
  * from the shared [ShellDestination]. The desktop shell only maps; the page is the shared ShellPage.
  *
  * The agent editor and a canvas are panels beside the conversation on the desktop, not pages:
- * [editAgentId] and [canvasOpen] ride on the Conversations route.
+ * [agentEditor] (an agent's, or the new-agent flow) and [canvasOpen] ride on the Conversations route.
  */
 internal data class DesktopShellRoute(
     val destination: DesktopDestination,
     val agentId: String? = null,
     val conversationId: String? = null,
-    val editAgentId: String? = null,
+    val agentEditor: ShellDestination.AgentEditor? = null,
     val canvasOpen: Boolean = false,
     val canvasId: String? = null,
     val skillsSection: ShellSkillsSection = ShellSkillsSection.Skills,
     val settingsSection: ShellSettingsSection? = null,
 ) {
     /** The page the main pane shows: the route without the panels beside it. */
-    val page: DesktopShellRoute get() = copy(editAgentId = null, canvasOpen = false, canvasId = null)
+    val page: DesktopShellRoute get() = copy(agentEditor = null, canvasOpen = false, canvasId = null)
+
+    /** The agent whose editor is open beside the chat (null too while a new agent is being made). */
+    val editAgentId: String? get() = agentEditor?.agentId
 }
 
 private val DesktopDestinationByKind: Map<ShellPageKind, DesktopDestination> = mapOf(
@@ -50,7 +53,7 @@ internal fun ShellDestination.toDesktopRoute(): DesktopShellRoute {
         destination = DesktopDestinationByKind.getValue(kind),
         agentId = agentId,
         conversationId = conversationId,
-        editAgentId = (this as? ShellDestination.AgentEditor)?.agentId,
+        agentEditor = this as? ShellDestination.AgentEditor,
         canvasOpen = canvas != null,
         canvasId = canvas?.canvasId,
         skillsSection = skillsSection,
@@ -72,7 +75,7 @@ private val ShellDestinationOfDesktop: Map<DesktopDestination, (DesktopShellRout
 )
 
 private fun conversationsDestination(route: DesktopShellRoute): ShellDestination {
-    route.editAgentId?.let { return ShellDestination.AgentEditor(it) }
+    route.agentEditor?.let { return it }
     if (route.canvasOpen) return ShellDestination.Canvas(route.canvasId, route.conversationId, route.agentId)
     return ShellDestination.Chat(route.agentId, route.conversationId)
 }

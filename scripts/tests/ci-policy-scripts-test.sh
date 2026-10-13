@@ -163,11 +163,11 @@ actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$stack_base")"
 assert_eq "$actual" ""
 git -C "$repo" reset --hard "$stack_base" -q
 
-mkdir -p "$repo/android-compose/feature-editagent/src"
-git -C "$repo" mv "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/feature-editagent/src/Editor.kt"
+mkdir -p "$repo/android-compose/designsystem/src"
+git -C "$repo" mv "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/designsystem/src/Editor.kt"
 git -C "$repo" commit -qm rename
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" HEAD~1)"
-assert_eq "$actual" ":feature-editagent:testDebugUnitTest"
+assert_eq "$actual" ":designsystem:testDebugUnitTest"
 
 if bash "$repo/scripts/ci/changed-gradle-modules.sh" refs/heads/missing >/dev/null 2>&1; then
   fail "module resolver accepted a missing base"

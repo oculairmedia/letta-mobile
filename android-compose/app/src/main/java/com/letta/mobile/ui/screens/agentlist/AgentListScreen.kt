@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,10 +46,10 @@ import kotlinx.coroutines.launch
 data class AgentListScreenNavigation(
     val onNavigateBack: () -> Unit,
     val onNavigateToAgent: (String, String?, String?) -> Unit,
-    val onNavigateToSettings: () -> Unit = {},
     val onNavigateToEditAgent: (String) -> Unit,
+    /** The shared agent editor's new-agent flow (letta-mobile-ckmub.3.24). */
+    val onNavigateToNewAgent: () -> Unit = {},
     val shareContentPreview: String? = null,
-    val openCreateOnStart: Boolean = false,
 )
 
 object AgentListScreenTags {
@@ -60,7 +59,7 @@ object AgentListScreenTags {
 /**
  * letta-mobile-ckmub.2.4 (hard cut S16): the agent list. A container only: the shared shell header
  * and the shared agents page (the shell's agent library) in [LettaPageScaffold], bound to
- * [AgentListViewModel]; the create and import dialogs stay Android's until the shared New agent flow.
+ * [AgentListViewModel]. Create opens the shared agent editor's new-agent flow; the import dialog stays Android's.
  */
 @Composable
 fun AgentListScreen(
@@ -71,9 +70,6 @@ fun AgentListScreen(
     val isShareMode = navigation.shareContentPreview != null
     var shareNavigationConsumed by rememberSaveable(navigation.shareContentPreview) { mutableStateOf(false) }
 
-    LaunchedEffect(navigation.openCreateOnStart, isShareMode) {
-        if (navigation.openCreateOnStart && !isShareMode) viewModel.showCreateDialog()
-    }
     val selectAgent: (String) -> Unit = { agentId ->
         if (!(isShareMode && shareNavigationConsumed)) {
             if (isShareMode) shareNavigationConsumed = true
@@ -101,19 +97,11 @@ fun AgentListScreen(
         chrome = AgentListChrome(
             onBack = navigation.onNavigateBack,
             onImport = viewModel::showImportDialog.takeUnless { isShareMode },
-            onCreate = viewModel::showCreateDialog.takeUnless { isShareMode },
+            onCreate = navigation.onNavigateToNewAgent.takeUnless { isShareMode },
             onRetry = viewModel::loadAgents,
         ),
     )
-    AgentListDialogHost(
-        params = AgentListDialogHostParams(
-            uiState = uiState,
-            viewModel = viewModel,
-            onNavigateToSettings = navigation.onNavigateToSettings,
-            onNavigateToAgent = navigation.onNavigateToAgent,
-            onImport = { _, _, _ -> onImportLaunch() },
-        ),
-    )
+    AgentListImportDialogHost(uiState = uiState, viewModel = viewModel, onImport = onImportLaunch)
 }
 
 /** The header's back and import, and the create button; a null action is not offered (share mode). */

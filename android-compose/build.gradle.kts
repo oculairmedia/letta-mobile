@@ -212,7 +212,6 @@ dependencies {
     kover(project(":plugin-view"))
     kover(project(":designsystem"))
     kover(project(":feature-chat"))
-    kover(project(":feature-editagent"))
 }
 
 kover {

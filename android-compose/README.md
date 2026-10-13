@@ -11,7 +11,6 @@ This directory contains the production Letta Mobile Android app.
 | `sharedLogic` | Platform-neutral repositories, timeline, and transport | `:sharedLogic:jvmTest` plus host-native compile (required `shared-multiplatform`) |
 | `designsystem` | Android Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
 | `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
-| `feature-editagent` | Agent editor feature module | `:feature-editagent:testDebugUnitTest` (additive on path change) |
 | `sharedUI` | Shared Android/Desktop Compose chat and A2UI rendering | covered by host builds |
 | `desktop` | Compose Desktop host (Windows) | `:desktop:test` (additive in `test` when desktop changes) |
 | `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, probes, and Iroh server wrapper | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |

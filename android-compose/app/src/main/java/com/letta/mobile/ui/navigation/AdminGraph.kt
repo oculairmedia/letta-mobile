@@ -7,7 +7,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
@@ -33,7 +32,7 @@ fun NavGraphBuilder.adminGraph(
 ) {
     composable<AdminRoute> {
         HomeScreen(
-            onNavigateToAgents = { navController.navigate(AgentListRoute()) },
+            onNavigateToAgents = { navController.navigate(AgentListRoute) },
             onNavigateToConversations = { navController.navigate(ConversationsRoute) },
             onNavigateToTools = { navController.navigate(AllToolsRoute) },
             onNavigateToBlocks = { navController.navigate(BlocksRoute) },
@@ -118,7 +117,7 @@ fun NavGraphBuilder.adminGraph(
                 navController.navigate(AgentChatRoute(agentId = agentId))
             },
             onNavigateToAgentList = {
-                navController.navigate(AgentListRoute())
+                navController.navigate(AgentListRoute)
             },
         )
     }

@@ -8,8 +8,8 @@ or projection/reducers here — those stay in `:sharedLogic`.
 
 **Depends on:** `:sharedLogic` (and Compose Multiplatform).
 
-**Consumers:** `:designsystem` (`api`), `:feature-chat`, `:desktop`. `:app` and
-`:feature-editagent` receive shared UI transitively via designsystem.
+**Consumers:** `:designsystem` (`api`), `:feature-chat`, `:desktop`. `:app` receives shared UI
+transitively via designsystem.
 
 **Kept in `:sharedLogic`:** chat timeline projector/presenter, streaming text
 smoother core, tool-display registries, and commonMain projection / token types.

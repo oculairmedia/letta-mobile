@@ -18,7 +18,6 @@ import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.toViewModelKey
 import com.letta.mobile.feature.chat.screen.AgentScaffold
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreenNavigation
@@ -60,8 +59,8 @@ private fun NavGraphBuilder.conversationsRootDestination(
                         navController.openResidentChatOrNavigate(chatRoute(agentId, conversationId, agentName))
                     },
                     onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToAgentList = { navController.navigate(AgentListRoute()) },
-                    onCreateFirstAgent = { navController.navigate(AgentListRoute(openCreate = true)) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onCreateFirstAgent = { navController.navigateTo(ShellDestination.AgentEditor()) },
                     activeBackendLabel = activeBackendLabel,
                     onNavigateToBackendSwitcher = openBackendSwitcher,
                 ),
@@ -136,11 +135,11 @@ private fun ConversationsDetailHost(
 private fun AgentChatRoute.shows(detail: ConversationsDetail): Boolean =
     agentId == detail.agentId && conversationId == detail.conversationId
 
-/** What one agent-list destination opens with: the create dialog, or text shared into the app. */
-private data class AgentListEntry(val openCreate: Boolean = false, val sharedText: String? = null)
+/** What one agent-list destination opens with: text shared into the app, if any. */
+private data class AgentListEntry(val sharedText: String? = null)
 
 private fun NavGraphBuilder.agentListDestination(navController: NavHostController) =
-    agentListComposable<AgentListRoute>(navController) { AgentListEntry(openCreate = it.toRoute<AgentListRoute>().openCreate) }
+    agentListComposable<AgentListRoute>(navController) { AgentListEntry() }
 
 /** The share sheet's target: the same agent list, opened to pick who the shared text goes to. */
 private fun NavGraphBuilder.shareToAgentDestination(navController: NavHostController) =
@@ -177,8 +176,7 @@ private fun agentListNavigation(navController: NavHostController, entry: AgentLi
         // A share hands its text to the chat once: the picker leaves the back stack.
         navController.navigate(route) { if (entry.sharedText != null) popUpTo<ShareToAgentRoute> { inclusive = true } }
     },
-    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+    onNavigateToEditAgent = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
+    onNavigateToNewAgent = { navController.navigateTo(ShellDestination.AgentEditor()) },
     shareContentPreview = entry.sharedText,
-    openCreateOnStart = entry.openCreate,
 )

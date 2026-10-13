@@ -38,7 +38,6 @@ import com.letta.mobile.feature.chat.screen.shared.ChatCanvasSlot
 import com.letta.mobile.feature.chat.screen.shared.LocalChatCanvasSlot
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
-import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -130,8 +129,7 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
     )
 }
 
-/** letta-mobile-c3np7.5.7: the shared Channels page, reached from the shared drawer's Channels row. */
-private fun androidx.navigation.NavGraphBuilder.appChannelsGraph(navController: NavHostController) {
+/** letta-mobile-c3np7.5.7: the shared Channels page, reached from the shared drawer's Channels row. */private fun androidx.navigation.NavGraphBuilder.appChannelsGraph(navController: NavHostController) {
     composable<ChannelsRoute> {
         com.letta.mobile.ui.screens.channels.ChannelsScreen(onNavigateBack = { navController.popBackStack() })
     }
@@ -276,7 +274,7 @@ fun AppNavGraph(
             openBackendSwitcher = openBackendSwitcher,
         )
 
-        editAgentGraph(onNavigateBack = { navController.popBackStack() })
+        appAgentEditorGraph(navController)
 
         appChatGraph(navController)
 

@@ -25,6 +25,7 @@ class DesktopShellRoutesTest {
         ShellDestination.Settings(),
         ShellDestination.Settings(ShellSettingsSection.Pairing),
         ShellDestination.AgentEditor("agent-1"),
+        ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
     )
@@ -71,5 +72,18 @@ class DesktopShellRoutesTest {
         assertEquals(ShellSkillsSection.Skills, navigator.skillsSection)
         navigator.navigate(ShellDestination.Settings(ShellSettingsSection.Pairing))
         assertEquals(ShellSettingsSection.Pairing, navigator.settingsSection)
+    }
+
+    @Test
+    fun theNewAgentFlowIsTheEditorPanelWithoutAnAgent() {
+        val navigator = DesktopShellNavigator(mutableStateOf(DesktopDestination.Home), mutableStateOf(false))
+        navigator.openNewAgent()
+        assertEquals(DesktopDestination.Conversations, navigator.selectedDestination)
+        assertEquals(ShellDestination.AgentEditor(), navigator.agentEditor)
+        assertNull(navigator.editAgentId)
+        assertEquals(ShellDestination.AgentEditor(), navigator.currentRoute(null, "agent-1").toShellDestination())
+        // Closing any editor closes the new-agent flow too.
+        navigator.editAgentId = null
+        assertNull(navigator.agentEditor)
     }
 }
