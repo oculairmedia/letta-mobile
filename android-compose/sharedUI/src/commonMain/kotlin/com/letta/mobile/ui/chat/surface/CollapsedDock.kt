@@ -83,10 +83,13 @@ import com.letta.mobile.ui.components.movePointerIcon
 import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
+import com.letta.mobile.ui.mascot.AgentInitialTile
+import com.letta.mobile.ui.mascot.MascotAvatar
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
+import com.letta.mobile.ui.mascot.mascotDrawnAt
 import com.letta.mobile.ui.chat.surface.composer.CompanionSeatAnchor
 import com.letta.mobile.ui.chat.surface.composer.LocalCompanionSeatAnchors
 import com.letta.mobile.ui.chat.surface.timeline.ActiveRunActivity
@@ -301,6 +304,10 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent,
         val anchors = LocalCompanionSeatAnchors.current
         if (anchors != null && mascotAvailable(content.agentId)) {
             if (seated) CompanionSeatAnchor(anchors, size = size)
+            // letta-mobile-8kpk7: the spot never stands empty. While another seat holds the
+            // character (the desktop sidebar's agent hero) or the host cannot draw its scene, a
+            // still of it (or its initial) keeps the place; the live one covers it once it is back.
+            if (!mascotDrawnAt(content.agentId, MascotStage.COMPOSER_COMPANION)) CollapsedStandIn(content, size)
         } else {
             CollapsedOwnSeat(content, size)
         }
@@ -317,15 +324,41 @@ private fun CollapsedOwnSeat(content: CollapsedDockContent, size: Dp) {
         onClick = content.openAgent,
         onEdit = content.editAgent,
     ) { vacancy ->
-        if (vacancy == MascotSeatVacancy.NO_MASCOT) {
-            val open = content.openAgent
-            AgentSphere(
-                size = ChatMascotDimens.collapsedFallbackSphere * (size / ChatMascotDimens.composerCompanion),
-                modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
-            )
+        when (vacancy) {
+            MascotSeatVacancy.NO_MASCOT -> {
+                val open = content.openAgent
+                AgentSphere(
+                    size = collapsedFallbackSize(size),
+                    modifier = if (open != null) Modifier.clip(CircleShape).clickable(onClick = open) else Modifier,
+                )
+            }
+            MascotSeatVacancy.SEATED_ELSEWHERE -> CollapsedStandIn(content, size)
         }
     }
 }
+
+/**
+ * The agent while its live character is away or cannot be drawn: the still every list shows of it,
+ * framed as the character stands (no avatar crop), or its initial when there is no mascot to draw.
+ */
+@Composable
+private fun CollapsedStandIn(content: CollapsedDockContent, size: Dp) {
+    val tagged = Modifier.testTag(DOCK_COLLAPSED_STAND_IN_TAG)
+    MascotAvatar(
+        agentId = content.agentId,
+        size = size,
+        modifier = tagged,
+        cornerRadius = 0.dp,
+        onClick = content.openAgent,
+        overscale = 1f,
+        // The live character is elsewhere: two of it moving is one too many.
+        live = false,
+        fallback = { AgentInitialTile(content.agentName, collapsedFallbackSize(size), modifier = tagged, onClick = content.openAgent) },
+    )
+}
+
+/** The stand-in's size for a mascot spot of [size]: the sphere's share of the companion. */
+private fun collapsedFallbackSize(size: Dp): Dp = ChatMascotDimens.collapsedFallbackSphere * (size / ChatMascotDimens.composerCompanion)
 
 /** The turn the reply bubble last showed (a plain holder: it is only read as the bubble fades). */
 private class LastShownTurn(var turn: CollapsedTurn)
@@ -572,6 +605,7 @@ private val BubbleShape = BottomTailBubbleShape(
 
 internal const val DOCK_COLLAPSED_TAG = "chat-dock-collapsed"
 internal const val DOCK_COLLAPSED_MASCOT_TAG = "chat-dock-collapsed-mascot"
+internal const val DOCK_COLLAPSED_STAND_IN_TAG = "chat-dock-collapsed-stand-in"
 internal const val DOCK_COLLAPSED_BUBBLE_TAG = "chat-dock-collapsed-bubble"
 internal const val DOCK_COLLAPSED_DISMISS_TAG = "chat-dock-collapsed-dismiss"
 internal const val DOCK_COLLAPSED_THINKING_TAG = "chat-dock-collapsed-thinking"

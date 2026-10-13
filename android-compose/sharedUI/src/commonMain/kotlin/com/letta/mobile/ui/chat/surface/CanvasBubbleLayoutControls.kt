@@ -102,10 +102,10 @@ internal fun currentBubbleLayout(): CanvasBubbleLayout {
 private fun layoutSpec(following: Boolean): AnimationSpec<Float> =
     if (following || LocalReducedMotion.current) snap() else tween(LettaMotionTokens.CONTENT_SIZE_MILLIS)
 
-/** The mascot's size, gliding to what the person set. */
+/** The mascot's size, gliding to what the person set; never outside the layout's range, whatever a host hands in. */
 @Composable
 internal fun animatedBubbleMascotSize(): Dp {
-    val target = currentBubbleLayout().mascotSizeDp
+    val target = CanvasBubbleLayout.clampMascot(currentBubbleLayout().mascotSizeDp, CanvasBubbleLayout.Touch.mascotSizeDp)
     val size by animateFloatAsState(target, layoutSpec(following = false), label = "bubbleMascotSize")
     return size.dp
 }
