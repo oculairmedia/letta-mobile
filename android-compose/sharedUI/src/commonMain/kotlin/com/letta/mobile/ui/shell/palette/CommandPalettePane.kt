@@ -66,7 +66,7 @@ private fun LettaSearchRow.toPickerItem(prefix: String): PickerItem<LettaSearchR
     PickerItem(key = "$prefix-$id", value = this, title = label, trailing = sublabel ?: meta)
 
 /** What a picked palette row opens. */
-internal fun PickerItem<LettaSearchRow>.hit(): UnifiedSearchHit? = UnifiedShellSearch.parseRowId(value.id)
+internal fun PickerItem<LettaSearchRow>.hit(): UnifiedSearchHit? = UnifiedShellSearch.hitOf(value)
 
 /** A palette row's leading glyph: the unified search's own (the agent's avatar, or a destination's arrow). */
 @Composable

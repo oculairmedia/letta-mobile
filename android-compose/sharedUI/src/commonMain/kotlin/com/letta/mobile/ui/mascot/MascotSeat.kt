@@ -49,18 +49,63 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
-/** Whether a seat's agent has a mascot to draw, in which look, and whether it stands at this seat right now. */
-private class SeatOccupancy(val shown: MascotIdentity?, val available: Boolean, val standsHere: Boolean)
+/** An agent's character as the host can draw it: who, and in which look. */
+private class DrawableMascot(val agentId: String, val identity: MascotIdentity)
+
+/**
+ * The one rule for whether [agentId]'s character can be drawn and in which look: [identity] when a
+ * seat overrides it, else the editor's preview, else the registry's; null when the agent has none or
+ * the host cannot bring up its scene.
+ */
+@Composable
+private fun drawableMascot(agentId: String?, identity: MascotIdentity? = null): DrawableMascot? {
+    agentId ?: return null
+    val shown = identity ?: LocalMascotTransport.current.previewOf(agentId) ?: LocalMascotRegistry.current.identities[agentId]
+    val host = LocalMascotHost.current
+    return shown?.takeIf { host.available && host.entry(agentId, it) != null }?.let { DrawableMascot(agentId, it) }
+}
+
+/** Where an agent's character is relative to one seat; resolved once, then dispatched on. */
+private sealed interface SeatPresence {
+    /** Drawn at the seat or on its way there. */
+    val drawn: Boolean
+
+    /** No character the host can draw: the seat shows a stand-in. */
+    data object NoMascot : SeatPresence {
+        override val drawn = false
+    }
+
+    /** No transport layer: the seat draws the character itself. */
+    class InPlace(val mascot: DrawableMascot) : SeatPresence {
+        override val drawn = true
+    }
+
+    /** The layer draws it standing over this seat. */
+    data object Here : SeatPresence {
+        override val drawn = true
+    }
+
+    /** The layer has it at no seat yet: it is about to stand here. */
+    data object Arriving : SeatPresence {
+        override val drawn = true
+    }
+
+    /** Another seat holds it (the agent pane's hero). */
+    data object Elsewhere : SeatPresence {
+        override val drawn = false
+    }
+}
 
 @Composable
-private fun seatOccupancy(agentId: String?, stage: MascotStage, identity: MascotIdentity?): SeatOccupancy {
+private fun seatPresence(agentId: String?, stage: MascotStage, identity: MascotIdentity? = null): SeatPresence {
+    val mascot = drawableMascot(agentId, identity) ?: return SeatPresence.NoMascot
     val transport = LocalMascotTransport.current
-    val registry = LocalMascotRegistry.current
-    val host = LocalMascotHost.current
-    val shown = identity ?: agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
-    val available = agentId != null && shown != null && host.available && host.entry(agentId, shown) != null
-    val standsHere = available && transport.layerMounted && transport.activeStage(agentId!!) == stage
-    return SeatOccupancy(shown, available, standsHere)
+    if (!transport.layerMounted) return SeatPresence.InPlace(mascot)
+    return when (transport.activeStage(mascot.agentId)) {
+        stage -> SeatPresence.Here
+        null -> SeatPresence.Arriving
+        else -> SeatPresence.Elsewhere
+    }
 }
 
 /**
@@ -71,14 +116,7 @@ private fun seatOccupancy(agentId: String?, stage: MascotStage, identity: Mascot
  * stand-in then (letta-mobile-8kpk7).
  */
 @Composable
-fun mascotDrawnAt(agentId: String?, stage: MascotStage): Boolean {
-    val occupancy = seatOccupancy(agentId, stage, identity = null)
-    if (agentId == null || !occupancy.available) return false
-    val transport = LocalMascotTransport.current
-    if (!transport.layerMounted) return true
-    val active = transport.activeStage(agentId)
-    return active == null || active == stage
-}
+fun mascotDrawnAt(agentId: String?, stage: MascotStage): Boolean = seatPresence(agentId, stage).drawn
 
 /**
  * [agentId]'s character, live, at a place that must show it while the transported one stands at
@@ -95,16 +133,9 @@ fun MascotMirror(
     onClick: (() -> Unit)? = null,
     fallback: @Composable () -> Unit,
 ) {
-    val transport = LocalMascotTransport.current
-    val registry = LocalMascotRegistry.current
-    val host = LocalMascotHost.current
-    val shown = agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
-    if (agentId == null || shown == null || !host.available || host.entry(agentId, shown) == null) {
-        fallback()
-        return
-    }
+    val mascot = drawableMascot(agentId) ?: return fallback()
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
-        MascotInPlace(agentId, shown, size = size, live = true, onClick = onClick)
+        MascotInPlace(mascot.agentId, mascot.identity, size = size, live = true, onClick = onClick)
     }
 }
 
@@ -147,7 +178,7 @@ fun MascotSeat(
     empty: @Composable (MascotSeatVacancy) -> Unit,
 ) {
     val transport = LocalMascotTransport.current
-    val occupancy = seatOccupancy(agentId, stage, identity)
+    val presence = seatPresence(agentId, stage, identity)
     val key = agentId?.let { MascotTransport.SeatKey(it, stage) }
     val handlers = remember { SeatHandlers() }
     handlers.onClick = onClick
@@ -162,7 +193,7 @@ fun MascotSeat(
     var bounds by remember { mutableStateOf<Rect?>(null) }
     // The box's own width: a layer scale outside it shows in [bounds] but not here.
     var layoutWidth by remember { mutableFloatStateOf(0f) }
-    val seatKey = key?.takeIf { occupancy.available }
+    val seatKey = key?.takeIf { presence != SeatPresence.NoMascot }
     LaunchedEffect(transport, seatKey, bounds, layoutWidth, overscale, identity) {
         transport.publishSeat(seatKey, bounds) { MascotSeatInfo(it, overscale, identity, handlers, layoutWidth) }
     }
@@ -173,10 +204,11 @@ fun MascotSeat(
         },
         contentAlignment = Alignment.Center,
     ) {
-        when {
-            !occupancy.available -> empty(MascotSeatVacancy.NO_MASCOT)
-            !transport.layerMounted -> MascotInPlace(agentId!!, occupancy.shown!!, size = size * overscale, live = live, onClick = onClick)
-            !occupancy.standsHere -> empty(MascotSeatVacancy.SEATED_ELSEWHERE)
+        when (presence) {
+            SeatPresence.NoMascot -> empty(MascotSeatVacancy.NO_MASCOT)
+            is SeatPresence.InPlace -> MascotInPlace(presence.mascot.agentId, presence.mascot.identity, size = size * overscale, live = live, onClick = onClick)
+            SeatPresence.Here -> Unit
+            SeatPresence.Arriving, SeatPresence.Elsewhere -> empty(MascotSeatVacancy.SEATED_ELSEWHERE)
         }
     }
 }

@@ -98,7 +98,7 @@ fun rememberShellSearchSlot(
         sections = if (state.showsShellResults) sections else emptyList(),
         onRowSelected = { row ->
             search.resultOpened()
-            UnifiedShellSearch.parseRowId(row.id)?.let(onOpen)
+            UnifiedShellSearch.hitOf(row)?.let(onOpen)
         },
         onDismiss = search::dismiss,
     )

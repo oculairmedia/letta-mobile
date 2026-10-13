@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.search.MessageSearchHit
+import com.letta.mobile.ui.search.LettaSearchRow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -22,9 +23,9 @@ class UnifiedShellSearchTest {
     @Test
     fun rowIdsRoundTripToTheirKind() {
         val id = UnifiedShellSearch.rowId(UnifiedSearchKind.Canvases, "canvas:1")
-        assertEquals(UnifiedSearchHit(UnifiedSearchKind.Canvases, "canvas:1"), UnifiedShellSearch.parseRowId(id))
-        assertNull(UnifiedShellSearch.parseRowId("nope"))
-        assertNull(UnifiedShellSearch.parseRowId("unknown:1"))
+        assertEquals(UnifiedSearchHit(UnifiedSearchKind.Canvases, "canvas:1"), UnifiedShellSearch.hitOf(LettaSearchRow(id, "")))
+        assertNull(UnifiedShellSearch.hitOf(LettaSearchRow("nope", "")))
+        assertNull(UnifiedShellSearch.hitOf(LettaSearchRow("unknown:1", "")))
     }
 
     @Test
@@ -53,7 +54,7 @@ class UnifiedShellSearchTest {
         val messages = wide.single { it.title == "Messages" }.rows
         assertEquals(listOf("Ask Emmanuel about it", "emmanuel said hi"), messages.map { it.label })
         assertEquals("Plan the release", messages.first().sublabel)
-        assertEquals(UnifiedSearchHit(UnifiedSearchKind.Messages, "c-1"), UnifiedShellSearch.parseRowId(messages.first().id))
+        assertEquals(UnifiedSearchHit(UnifiedSearchKind.Messages, "c-1"), UnifiedShellSearch.hitOf(messages.first()))
 
         val scoped = UnifiedShellSearch.sections(UnifiedSearchQuery("emmanuel", filterToAgent = true), sources, hits)
         assertEquals(1, scoped.single { it.title == "Messages" }.rows.size)
@@ -75,7 +76,7 @@ class UnifiedShellSearchTest {
     @Test
     fun aLongMessageIsShownAroundWhatMatched() {
         val text = "x".repeat(200) + " the deploy finished " + "y".repeat(200)
-        val shown = UnifiedShellSearch.snippet(text, "deploy")
+        val shown = UnifiedShellSearch.snippet(MessageSearchHit("c-1", null, "m-1", text), UnifiedSearchQuery("deploy"))
         assertTrue("deploy" in shown, shown)
         assertTrue(shown.startsWith("…") && shown.endsWith("…"), shown)
     }

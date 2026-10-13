@@ -91,11 +91,12 @@ object UnifiedShellSearch {
     fun scopesFor(surface: UnifiedSearchSurface): List<LettaSearchScope> =
         listOf(LettaSearchScope(ALL, "All")) + surface.kinds.map { LettaSearchScope(it.id, it.label) }
 
-    /** Row ids carry their kind so a pick routes without a parallel lookup; [parseRowId] reads them. */
+    /** Row ids carry their kind so a pick routes without a parallel lookup; [hitOf] reads them. */
     fun rowId(kind: UnifiedSearchKind, id: String): String = "${kind.id}:$id"
 
-    /** The hit behind "conversations:conv-1"; null if malformed or of an unknown kind. */
-    fun parseRowId(rowId: String): UnifiedSearchHit? {
+    /** The hit behind [row] (its id "conversations:conv-1"); null if malformed or of an unknown kind. */
+    fun hitOf(row: LettaSearchRow): UnifiedSearchHit? {
+        val rowId = row.id
         val separator = rowId.indexOf(':')
         if (separator <= 0 || separator == rowId.lastIndex) return null
         val kind = UnifiedSearchKind.entries.firstOrNull { it.id == rowId.substring(0, separator) } ?: return null
@@ -116,8 +117,7 @@ object UnifiedShellSearch {
         messages: List<MessageSearchHit> = emptyList(),
         limitPerSection: Int = DEFAULT_LIMIT,
     ): List<LettaSearchSection> {
-        val scopedAgentId = sources.agentId.takeIf { query.filterToAgent }
-        val search = SectionSearch(query.text, SearchedSources(sources, messages), scopedAgentId, limitPerSection)
+        val search = SectionSearch(query, SearchedSources(sources, messages), limitPerSection)
         return query.surface.kinds
             .filter(query::includes)
             .map { kind -> LettaSearchSection(kind.label, search.rows(kind)) }
@@ -127,14 +127,18 @@ object UnifiedShellSearch {
     /** The sources a search runs over, with the message hits found for its query. */
     private class SearchedSources(val sources: UnifiedSearchSources, val messages: List<MessageSearchHit>)
 
+    /** The agent a row belongs to, and the name to picture it by (null: the roster's). */
+    private class RowOwner(val agentId: String?, val name: String? = null)
+
     private class SectionSearch(
-        val query: String,
+        private val asked: UnifiedSearchQuery,
         searched: SearchedSources,
-        val scopedAgentId: String?,
-        val limit: Int,
+        private val limit: Int,
     ) {
         private val sources = searched.sources
         private val messageHits = searched.messages
+        private val query = asked.text
+        private val scopedAgentId = sources.agentId.takeIf { asked.filterToAgent }
         private val agentNames: Map<String, String> by lazy { sources.agents.associate { it.id.value to it.name } }
 
         fun rows(kind: UnifiedSearchKind): List<LettaSearchRow> = when (kind) {
@@ -145,10 +149,12 @@ object UnifiedShellSearch {
             UnifiedSearchKind.Destinations -> destinations()
         }
 
-        private fun inScope(agentId: String?): Boolean = scopedAgentId == null || agentId == scopedAgentId
+        /** The items "Filter to this agent" keeps: all of them, or those [owner] says the focused agent owns. */
+        private fun <T> List<T>.inScope(owner: (T) -> String?): List<T> =
+            if (scopedAgentId == null) this else filter { owner(it) == scopedAgentId }
 
         private fun conversations(): List<LettaSearchRow> = sources.conversations
-            .filter { inScope(it.agentId) }
+            .inScope { it.agentId }
             .filter { TextMatch.matches(query, it.displayTitle(), agentNameOf(it)) }
             .sortedByDescending { conversationRecency(it.updatedAtLabel) }
             .take(limit)
@@ -159,7 +165,7 @@ object UnifiedShellSearch {
                     // Scoped to one agent, every row would repeat the agent name you already gave.
                     sublabel = agentNameOf(conversation).takeIf { scopedAgentId == null },
                     meta = relativeAgeLabel(conversation.updatedAtLabel),
-                    leading = orbFor(conversation.agentId, agentNameOf(conversation)),
+                    leading = orbFor(RowOwner(conversation.agentId, agentNameOf(conversation))),
                 )
             }
 
@@ -168,17 +174,17 @@ object UnifiedShellSearch {
             if (query.isBlank()) return emptyList()
             val titles = sources.conversations.associateBy { it.id }
             return messageHits
-                .filter { inScope(it.agentId) }
+                .inScope { it.agentId }
                 .distinctBy { it.conversationId to it.messageId }
                 .take(limit)
                 .mapIndexed { index, hit ->
                     val conversation = titles[hit.conversationId]
                     LettaSearchRow(
                         id = rowId(UnifiedSearchKind.Messages, "${hit.conversationId}$MESSAGE_ID_SEPARATOR${hit.messageId ?: index}"),
-                        label = snippet(hit.text, query),
+                        label = snippet(hit, asked),
                         sublabel = conversation?.displayTitle(),
                         meta = hit.date?.let(::relativeAgeLabel),
-                        leading = orbFor(hit.agentId ?: conversation?.agentId),
+                        leading = orbFor(RowOwner(hit.agentId ?: conversation?.agentId)),
                     )
                 }
         }
@@ -191,12 +197,13 @@ object UnifiedShellSearch {
                     id = rowId(UnifiedSearchKind.Agents, agent.id.value),
                     label = agent.name,
                     sublabel = agent.description?.takeIf { it.isNotBlank() } ?: agent.model,
-                    leading = orbFor(agent.id.value, agent.name),
+                    leading = orbFor(RowOwner(agent.id.value, agent.name)),
                 )
             }
 
+        /** A canvas no agent owns is everyone's: the agent filter keeps it. */
         private fun canvases(): List<LettaSearchRow> = sources.canvases
-            .filter { it.agentId == null || inScope(it.agentId) }
+            .inScope { it.agentId ?: scopedAgentId }
             .filter { TextMatch.matches(query, it.title) }
             .sortedByDescending { it.updatedAtEpochMs }
             .take(limit)
@@ -205,7 +212,7 @@ object UnifiedShellSearch {
                     id = rowId(UnifiedSearchKind.Canvases, canvas.id.value),
                     label = canvas.title,
                     sublabel = "Canvas",
-                    leading = orbFor(canvas.agentId),
+                    leading = orbFor(RowOwner(canvas.agentId)),
                 )
             }
 
@@ -221,19 +228,19 @@ object UnifiedShellSearch {
         }
 
         /** The owning agent's avatar (mascot or initial tile); a row with no owning agent gets none. */
-        private fun orbFor(agentId: String?, agentName: String? = null): LettaSearchLeading = agentId
+        private fun orbFor(owner: RowOwner): LettaSearchLeading = owner.agentId
             ?.let { id ->
-                val name = agentName?.takeIf { it.isNotBlank() } ?: agentNames[id]
+                val name = owner.name?.takeIf { it.isNotBlank() } ?: agentNames[id]
                 LettaSearchLeading.Orb(orbIndex = sources.avatarStyleByAgentId[id] ?: 0, agentId = id, name = name)
             }
             ?: LettaSearchLeading.None
     }
 
-    /** One line of [text] around the first word of [query], so the row shows why it matched. */
-    internal fun snippet(text: String, query: String): String {
-        val flat = text.replace(WHITESPACE, " ").trim()
+    /** One line of [hit]'s text around the first word of [query], so the row shows why it matched. */
+    internal fun snippet(hit: MessageSearchHit, query: UnifiedSearchQuery): String {
+        val flat = hit.text.replace(WHITESPACE, " ").trim()
         if (flat.length <= SNIPPET_LENGTH) return flat
-        val firstWord = query.trim().split(WHITESPACE).firstOrNull().orEmpty()
+        val firstWord = query.text.trim().split(WHITESPACE).firstOrNull().orEmpty()
         val at = if (firstWord.isEmpty()) -1 else flat.indexOf(firstWord, ignoreCase = true)
         val start = (at - SNIPPET_LEAD).coerceIn(0, flat.length - SNIPPET_LENGTH)
         val prefix = if (start > 0) ELLIPSIS else ""
