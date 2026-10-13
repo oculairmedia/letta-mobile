@@ -20,7 +20,7 @@ import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.presence.dreamingAgentIds
 import com.letta.mobile.data.presence.presenceByAgent
 import com.letta.mobile.data.presence.withDreaming
-import com.letta.mobile.data.search.PaletteItem
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -80,7 +80,7 @@ internal data class DesktopShellLists(
     /** letta-mobile-zxk2n.5: the stack's archived conversations, whatever the filter (Archived chats dialog). */
     val archivedAgentConversations: List<DesktopConversationSummary> = emptyList(),
     val mentionables: List<Mentionable>,
-    val paletteItems: List<PaletteItem>,
+    val search: UnifiedSearchSources,
 )
 
 /** letta-mobile-bglj6.1.10: the state the shell derives on each composition, for its pieces to draw. */
@@ -240,7 +240,6 @@ private fun rememberDesktopShellLists(
     val chatController = context.core.chatController
     val activeSubagents = context.panels.subagents.activeSubagents.value
     val archiveFilter by chatController.archiveFilter.collectAsState()
-    val workPlayMode = context.navigator.workPlayMode
     val conversations = chatState.conversations
     val selectedConversationId = chatState.selectedConversationId
     val workingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
@@ -269,9 +268,8 @@ private fun rememberDesktopShellLists(
         mentionables = remember(focus.railAgents, focus.selectedAgentId, memoryState, fileMentions) {
             buildMentionables(BuildMentionablesParams(focus.railAgents, memoryState.parity, focus.selectedAgentId)) + fileMentions
         },
-        paletteItems = remember(conversations, focus.railAgents, workPlayMode) {
-            buildPaletteItems(conversations, focus.railAgents, workPlayMode)
-        },
+        // The window's one unified search: the header, the command palette and the quick-query bar.
+        search = rememberDesktopSearchSources(context, conversations, focus),
     )
 }
 

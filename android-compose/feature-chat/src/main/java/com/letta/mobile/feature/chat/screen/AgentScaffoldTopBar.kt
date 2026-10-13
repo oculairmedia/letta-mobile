@@ -105,7 +105,7 @@ private fun rememberChatMessageSearchSlot(state: AgentScaffoldRuntimeState): Sea
         },
         onDismiss = params.viewModel::clearChatSearch,
         // `/search` opens the pane.
-        openSignal = params.searchUi.openSignal,
+        openRequest = params.searchUi.openRequest,
     )
 }
 

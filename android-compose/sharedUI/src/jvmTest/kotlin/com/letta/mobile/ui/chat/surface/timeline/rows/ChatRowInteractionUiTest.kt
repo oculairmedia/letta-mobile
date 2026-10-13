@@ -26,6 +26,9 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import com.letta.mobile.ui.components.LettaListRowDefaults
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.longClick
@@ -291,6 +294,48 @@ class ChatRowInteractionUiTest {
         runOnIdle { expanded = setOf("r-1") }
         awaitText("Then picking the cheaper one")
         onNodeWithText("Then picking the cheaper one", substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    /**
+     * letta-mobile-ckmub.1.3: the reasoning header is one of the run's step rows - the shared list
+     * row with the run's status glyph (its spinner while the reasoning streams) - not a row of its own.
+     */
+    @Test
+    fun reasoningHeaderIsARunStepRowOnTheRunsGlyph() = runComposeUiTest {
+        var streaming by mutableStateOf(true)
+        val thought = UiMessage(
+            id = "r-2",
+            role = "assistant",
+            content = "Comparing the two plans",
+            timestamp = "2026-07-19T12:00:00Z",
+            isReasoning = true,
+        )
+        setContent {
+            val context = ChatRowContext(
+                newestMessageId = thought.id,
+                toolDetails = ChatToolDetails.Inline,
+                itemState = renderState(),
+                capabilities = ChatSurfaceCapabilities.Default,
+                streamingMessageId = thought.id.takeIf { streaming },
+            )
+            MaterialTheme { RenderRow(single(thought), context, rowCallbacks()) }
+        }
+
+        awaitText("Thinking")
+        onNodeWithTag(ChatRowTestTags.REASONING_GLYPH, useUnmergedTree = true).assertExists()
+        onNodeWithContentDescription("Reasoning in progress", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.REASONING_TOGGLE).assertIsNotEnabled()
+        onNode(
+            hasTestTag(LettaListRowDefaults.TitleTestTag) and hasAnyAncestor(hasTestTag(ChatRowTestTags.REASONING_TOGGLE)),
+            useUnmergedTree = true,
+        ).assertExists()
+
+        runOnIdle { streaming = false }
+        awaitText("Thought")
+        onNodeWithTag(ChatRowTestTags.REASONING_GLYPH, useUnmergedTree = true).assertExists()
+        onNodeWithContentDescription("Reasoning in progress", useUnmergedTree = true).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.REASONING_TOGGLE).assertHasClickAction()
+        onNodeWithContentDescription("Expand reasoning", useUnmergedTree = true).assertExists()
     }
 
     @Test

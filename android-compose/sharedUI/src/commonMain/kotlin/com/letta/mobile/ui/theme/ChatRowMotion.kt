@@ -44,7 +44,6 @@ internal class ChatRowMotion(private val reduced: Boolean) {
 
     private fun <T> exitSize(): FiniteAnimationSpec<T> = tween(LettaMotionTokens.EXIT_MILLIS, easing = FastOutLinearInEasing)
 
-    private fun <T> chipSize(): FiniteAnimationSpec<T> = tween(LettaMotionTokens.CHIP_MILLIS, easing = LinearOutSlowInEasing)
 
     /** Detail expansion (legacy ChatMotionPolicy.expansion): fade + vertical expand, 190 ms in, 130 ms out. */
     fun expansionEnter(): EnterTransition {
@@ -92,17 +91,6 @@ internal class ChatRowMotion(private val reduced: Boolean) {
         return fadeOut(fastFadeOutSpec) +
             slideOutVertically(exitSize(), targetOffsetY = { it / REASONING_SLIDE_DIVISOR }) +
             shrinkVertically(exitSize(), shrinkTowards = Alignment.Top)
-    }
-
-    /** An inline chip (a spinner, a leading label) easing in sideways (legacy LettaMotion.horizontalEnter). */
-    fun horizontalEnter(): EnterTransition {
-        if (reduced) return EnterTransition.None
-        return fadeIn(fastFadeInSpec) + expandHorizontally(chipSize(), expandFrom = Alignment.Start)
-    }
-
-    fun horizontalExit(): ExitTransition {
-        if (reduced) return ExitTransition.None
-        return fadeOut(fastFadeOutSpec) + shrinkHorizontally(chipSize(), shrinkTowards = Alignment.Start)
     }
 
     /**

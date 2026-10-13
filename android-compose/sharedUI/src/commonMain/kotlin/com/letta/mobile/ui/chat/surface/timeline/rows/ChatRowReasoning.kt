@@ -3,28 +3,17 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_reasoning_collapse
@@ -39,24 +28,18 @@ import com.letta.mobile.sharedui.resources.rows_thinking
 import com.letta.mobile.sharedui.resources.rows_thought
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.ui.chat.session.ChatMessageId
-import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.components.ExpressiveLoadingIndicator
 import com.letta.mobile.ui.markdown.SharedMarkdownText
-import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowMotion
-import com.letta.mobile.ui.theme.ChatRowType
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LettaMotionTokens
-import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.theme.LocalReducedMotion
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * letta-mobile-bglj6.1: a reasoning step as the Android timeline draws it (feature-chat
- * MessageReasoning): one line, "Thought for 2.4s" beside a muted, ellipsized first line of the
- * reasoning and a trailing chevron; expanded, the reasoning reads below, flush with the header.
- * While it streams the header says "Thinking…" with a spinner and the text reveals as it lands.
+ * letta-mobile-ckmub.1.3: a reasoning step is one of the run's step rows ([RunStepListRow]: the
+ * shared [LettaListRow], the run's [RunStatusGlyph] and [DisclosureChevron]), so it reads like the
+ * tool calls beside it: "Thinking…" with the run's spinner while it streams, then "Thought for 2.4s"
+ * with a check, its first line under the title and a chevron; expanded, the reasoning reads below.
  *
  * Open/closed is owner state (expandedReasoningMessageIds via toggleReasoningExpanded), so it
  * survives the row leaving and re-entering the list.
@@ -72,8 +55,7 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (isActive || reducedMotion) Modifier else Modifier.animateContentSize(tween(LettaMotionTokens.CONTENT_SIZE_MILLIS)))
-            .padding(vertical = LettaDimens.Space.xs),
+            .then(if (isActive || reducedMotion) Modifier else Modifier.animateContentSize(tween(LettaMotionTokens.CONTENT_SIZE_MILLIS))),
     ) {
         ReasoningHeader(message, disclosure) { callbacks.actions.toggleReasoningExpanded(ChatMessageId(message.id)) }
         ReasoningExpansion(message, disclosure)
@@ -82,113 +64,36 @@ internal fun ReasoningRow(message: UiMessage, context: ChatRowContext, callbacks
 
 /** Whether the reasoning still streams (then it neither collapses nor toggles), and whether it is collapsed. */
 @Immutable
-private data class ReasoningDisclosure(val isActive: Boolean, val collapsed: Boolean) {
-    val canToggle: Boolean get() = !isActive
-}
+private data class ReasoningDisclosure(val isActive: Boolean, val collapsed: Boolean)
 
-/** The one-line header: spinner while thinking, the title, the muted preview, the chevron. */
+/** The reasoning's step row: the run's glyph, the title, its first line, and a chevron once it has settled. */
 @Composable
 private fun ReasoningHeader(message: UiMessage, disclosure: ReasoningDisclosure, onToggle: () -> Unit) {
-    val stateText = stringResource(reasoningStateLabel(disclosure))
-    val click = rememberQuietClick()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.REASONING_TOGGLE)
-            .semantics(mergeDescendants = true) { stateDescription = stateText }
-            .reasoningToggle(disclosure, click, onToggle),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        ReasoningSpinner(disclosure)
-        Text(
-            text = reasoningTitle(message, disclosure.isActive),
-            style = ChatRowType.sectionTitle,
-            color = reasoningTitleColor(disclosure, lifted = click.lifted),
-        )
-        ReasoningPreviewText(message, disclosure)
-        DisclosureChevron(expanded = !disclosure.collapsed, enabled = disclosure.canToggle)
-    }
-}
-
-private fun reasoningStateLabel(disclosure: ReasoningDisclosure): StringResource {
-    return when {
-        disclosure.isActive -> Res.string.rows_reasoning_state_working
-        disclosure.collapsed -> Res.string.rows_reasoning_state_collapsed
-        else -> Res.string.rows_reasoning_state_expanded
-    }
-}
-
-/** A settled header toggles on a quiet click; a streaming one only keeps its padding. */
-@Composable
-private fun Modifier.reasoningToggle(disclosure: ReasoningDisclosure, click: QuietClick, onToggle: () -> Unit): Modifier {
-    val clickLabel = stringResource(if (disclosure.collapsed) Res.string.rows_reasoning_expand else Res.string.rows_reasoning_collapse)
-    return then(
-        if (disclosure.canToggle) {
-            // The same tap-target floor as the run header, so the two rows measure alike.
-            // No hover block: the title lifts instead (the Android row has no inset).
-            Modifier
-                .quietClickable(click, onClickLabel = clickLabel, onClick = onToggle)
-                .heightIn(min = LettaDimens.Orb.railSlotHeight)
-                .padding(vertical = LettaDimens.Space.hair)
-        } else {
-            Modifier.padding(vertical = LettaDimens.Space.xs)
-        },
-    )
-}
-
-/** Docked over the canvas the panel's ambient glow is the thinking cue, not the spinner. */
-@Composable
-private fun RowScope.ReasoningSpinner(disclosure: ReasoningDisclosure) {
-    val reducedMotion = LocalReducedMotion.current
-    AnimatedVisibility(
-        visible = disclosure.isActive && LocalChatWorkingCueAnimated.current,
-        enter = ChatRowMotion(reducedMotion).horizontalEnter(),
-        exit = ChatRowMotion(reducedMotion).horizontalExit(),
-        label = "reasoningSpinner",
-    ) {
-        ReasoningLoadingIndicator(reducedMotion)
-    }
-}
-
-/**
- * The expressive Material 3 loading indicator (legacy ChatReasoning), its shape morph beside the
- * title while the reasoning streams. Still under reduced motion; the title still says "Thinking…".
- */
-@Composable
-private fun ReasoningLoadingIndicator(reducedMotion: Boolean) {
-    ExpressiveLoadingIndicator(
-        color = MaterialTheme.colorScheme.primary,
-        still = reducedMotion,
-        modifier = Modifier.size(LettaDimens.Control.icon).testTag(ChatRowTestTags.REASONING_SPINNER),
-    )
-}
-
-@Composable
-private fun reasoningTitleColor(disclosure: ReasoningDisclosure, lifted: Boolean): Color {
-    return when {
-        disclosure.isActive -> MaterialTheme.colorScheme.primary.copy(alpha = ChatRowAlpha.reasoningActiveTitle)
-        lifted -> MaterialTheme.colorScheme.onSurface
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-}
-
-/** The reasoning's first line while collapsed, "shown" once it reads below. */
-@Composable
-private fun RowScope.ReasoningPreviewText(message: UiMessage, disclosure: ReasoningDisclosure) {
     val emptyPreview = stringResource(Res.string.rows_reasoning_empty)
     val preview = remember(message.content, emptyPreview) { reasoningPreview(message.content) ?: emptyPreview }
-    Text(
-        text = if (disclosure.collapsed) preview else stringResource(Res.string.rows_reasoning_shown),
-        style = ChatRowType.listItemSupporting,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatRowAlpha.reasoningPreview),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.weight(1f),
+    val spec = RunStepRowSpec(
+        title = reasoningTitle(message, disclosure.isActive),
+        subtitle = if (disclosure.collapsed) preview else stringResource(Res.string.rows_reasoning_shown),
+        tone = if (disclosure.isActive) RunSummaryTone.Working else RunSummaryTone.Done,
+        glyphLabel = if (disclosure.isActive) stringResource(Res.string.rows_reasoning_state_working) else null,
+        tags = ReasoningTags,
+    )
+    RunStepListRow(
+        spec = spec,
+        disclosure = if (disclosure.isActive) null else RunStepDisclosure(!disclosure.collapsed, ReasoningLabels, onToggle),
     )
 }
 
-/** The reasoning in full under the header while expanded. */
+private val ReasoningTags = RunStepRowTags(ChatRowTestTags.REASONING_TOGGLE, ChatRowTestTags.REASONING_GLYPH)
+
+private val ReasoningLabels = RunStepDisclosureLabels(
+    expand = Res.string.rows_reasoning_expand,
+    collapse = Res.string.rows_reasoning_collapse,
+    expandedState = Res.string.rows_reasoning_state_expanded,
+    collapsedState = Res.string.rows_reasoning_state_collapsed,
+)
+
+/** The reasoning in full under the header while expanded, in line with the row's title. */
 @Composable
 private fun ColumnScope.ReasoningExpansion(message: UiMessage, disclosure: ReasoningDisclosure) {
     val reducedMotion = LocalReducedMotion.current
@@ -199,7 +104,7 @@ private fun ColumnScope.ReasoningExpansion(message: UiMessage, disclosure: Reaso
         exit = ChatRowMotion(reducedMotion).reasoningBodyExit(),
         label = "reasoningExpansion",
     ) {
-        Column(modifier = Modifier.padding(top = LettaDimens.Space.lg, bottom = LettaDimens.Space.xs)) {
+        Column(modifier = Modifier.padding(horizontal = LettaDimens.Space.sm).padding(top = LettaDimens.Space.xs, bottom = LettaDimens.Space.sm)) {
             ReasoningBody(message, disclosure.isActive)
         }
     }

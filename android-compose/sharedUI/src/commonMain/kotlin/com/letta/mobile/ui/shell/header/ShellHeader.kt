@@ -132,8 +132,9 @@ private class HeaderSearchMode(val inPlace: SearchSlot?, private val searching: 
 private fun rememberHeaderSearchMode(search: SearchSlot?, touch: Boolean): HeaderSearchMode {
     val searching = remember { mutableStateOf(false) }
     val mode = HeaderSearchMode(search?.takeIf { touch && !it.config.showResults }, searching)
-    val signal = mode.inPlace?.openSignal ?: 0
-    LaunchedEffect(signal) { if (signal > 0) mode.open() }
+    // A host's open request is taken once, so coming back to the page never reopens the bar.
+    val request = mode.inPlace?.openRequest
+    LaunchedEffect(request, request?.pending) { if (request?.take() == true) mode.open() }
     return mode
 }
 
@@ -234,7 +235,7 @@ private fun SearchSlotField(slot: SearchSlot, compact: Boolean) {
         config = slot.config,
         anchor = LettaSearchAnchor(
             style = if (compact) LettaSearchTriggerStyle.Icon else LettaSearchTriggerStyle.Field,
-            openSignal = slot.openSignal,
+            openRequest = slot.openRequest,
         ),
     )
 }

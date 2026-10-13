@@ -83,12 +83,6 @@ object ChatRowAlpha {
     /** A run header's title while the run is working. */
     const val workingTitle: Float = 0.88f
 
-    /** The reasoning preview beside "Thought". */
-    const val reasoningPreview: Float = 0.8f
-
-    /** "Thinking…" while reasoning streams. */
-    const val reasoningActiveTitle: Float = 0.92f
-
     /** The "You" label on a prompt bubble. */
     const val userRoleLabel: Float = 0.7f
 

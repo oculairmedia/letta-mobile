@@ -105,8 +105,8 @@ internal object ChatRowTestTags {
     const val PROMPT_PROVENANCE = "chat-user-prompt-provenance"
     const val AGENT_TEXT = "chat-agent-text"
     const val REASONING_TOGGLE = "chat-reasoning-toggle"
-    /** The reasoning header's loading indicator while it streams. */
-    const val REASONING_SPINNER = "chat-reasoning-spinner"
+    /** The reasoning row's [RunStatusGlyph]: the run's spinner while it streams, a check once it settles. */
+    const val REASONING_GLYPH = "chat-reasoning-glyph"
     const val RUN_BLOCK = "chat-run-block"
     const val RUN_HEADER = "chat-run-header"
     /** The run summary line's leading status glyph (check, spinner, warning). */

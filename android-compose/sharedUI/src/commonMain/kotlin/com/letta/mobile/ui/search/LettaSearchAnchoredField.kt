@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,13 +53,34 @@ class LettaSearchSource(
 enum class LettaSearchTriggerStyle { Field, Icon }
 
 /**
- * How the anchored search is opened: its trigger [style], and an [openSignal] that opens the pane
- * whenever it grows (a host command that asks for the search); 0 never does.
+ * A request from outside the field to open its pane (Android chat's `/search` command). The host
+ * keeps one and calls [request]; the field that shows it takes the request once
+ * (letta-mobile-zxk2n.39). A counter the field compared on every composition reopened the pane each
+ * time the header came back (a field leaving composition forgets what it had seen); a taken request
+ * is gone, so returning to the chat leaves the pane closed.
  */
+@Stable
+class LettaSearchOpenRequest {
+    internal var pending: Boolean by mutableStateOf(false)
+        private set
+
+    fun request() {
+        pending = true
+    }
+
+    /** True once per [request]: the caller opens the pane. */
+    internal fun take(): Boolean {
+        if (!pending) return false
+        pending = false
+        return true
+    }
+}
+
+/** How the anchored search is opened: its trigger [style], and the host's [openRequest] (null: only the trigger opens it). */
 @Immutable
 data class LettaSearchAnchor(
     val style: LettaSearchTriggerStyle = LettaSearchTriggerStyle.Field,
-    val openSignal: Int = 0,
+    val openRequest: LettaSearchOpenRequest? = null,
 )
 
 /**
@@ -101,7 +123,8 @@ fun LettaSearchAnchoredField(
     var expanded by remember { mutableStateOf(false) }
     var triggerWidth by remember { mutableStateOf(Dp.Unspecified) }
     val density = LocalDensity.current
-    LaunchedEffect(anchor.openSignal) { if (anchor.openSignal > 0) expanded = true }
+    val openRequest = anchor.openRequest
+    LaunchedEffect(openRequest, openRequest?.pending) { if (openRequest?.take() == true) expanded = true }
     Box(modifier = modifier.onSizeChanged { triggerWidth = with(density) { it.width.toDp() } }) {
         val query = source.query
         when (anchor.style) {

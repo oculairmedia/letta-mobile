@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat.screen
 
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.ui.search.LettaSearchOpenRequest
+
 internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateBack: () -> Unit,
     val onNavigateToSettings: (String) -> Unit,
@@ -45,9 +47,9 @@ internal data class AgentScaffoldSheetVisibility(
     val onShowModelPickerChange: (Boolean) -> Unit,
 )
 
-/** The header's message search: [openSignal] grows each time `/search` asks the pane to open. */
+/** The header's message search: `/search` asks [openRequest] to open the pane, which takes it once. */
 internal data class AgentScaffoldSearchUiState(
-    val openSignal: Int = 0,
+    val openRequest: LettaSearchOpenRequest? = null,
     val onOpenSearch: () -> Unit = {},
 )
 

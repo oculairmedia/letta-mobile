@@ -219,16 +219,15 @@ private fun DesktopShellBackgroundTasks(context: DesktopShellContext, frame: Des
 private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShellFrame) {
     val core = context.core
     val focus = frame.focus
-    val isDragActive by context.imageIntake.isDragActive
     DesktopAppOverlays(
         visibility = context.overlays,
         data = DesktopOverlayData(
             composerModelLabel = frame.chatState.composerModelLabel,
-            paletteItems = frame.lists.paletteItems,
+            searchSources = frame.lists.search,
             railAgents = focus.railAgents,
             rosterAgents = focus.rosterAgents,
             avatarStyleByAgentId = focus.avatarStyleByAgentId,
-            isDragActive = isDragActive,
+            isDragActive = context.imageIntake.isDragActive.value,
         ),
         actions = createDesktopOverlayActions(
             CreateDesktopOverlayActionsParams(
@@ -236,6 +235,7 @@ private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShe
                 onSelectDestination = { context.navigator.selectedDestination = it },
                 onOpenAgent = { context.router.openAgent(AgentId(it)) },
                 onNewCanvas = { core.canvasShell.createNew(focus.selectedAgentId) },
+                onOpenSearchHit = { context.router.openSearchHit(it) },
                 dataBindings = core.bootstrap.dataBindings,
                 onNewAgent = context.navigator::openNewAgent,
                 onIrohIdentityReset = {

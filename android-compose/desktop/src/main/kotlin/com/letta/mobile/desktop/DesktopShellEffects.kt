@@ -155,13 +155,13 @@ private fun DesktopShellQuickQueryBridge(context: DesktopShellContext, frame: De
     val quickQuery = context.shell.quickQuery
     val window = context.shell.window
     val router = context.router
-    val paletteItems = frame.lists.paletteItems
-    LaunchedEffect(paletteItems) { quickQuery.items.value = paletteItems }
+    val sources = frame.lists.search
+    LaunchedEffect(sources) { quickQuery.sources.value = sources }
     SideEffect {
         quickQuery.actions.value = DesktopQuickQueryActions(
-            onSelectItem = { item ->
+            onOpen = { hit ->
                 activateDesktopWindow(window)
-                router.openPaletteItem(item)
+                router.openSearchHit(hit)
             },
             onSubmitPrompt = { text, ambientContext ->
                 router.sendToSelectedConversation(quickQueryPrompt(text, ambientContext))

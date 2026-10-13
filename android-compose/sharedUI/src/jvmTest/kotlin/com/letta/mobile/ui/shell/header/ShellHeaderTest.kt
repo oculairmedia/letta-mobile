@@ -3,11 +3,16 @@
 package com.letta.mobile.ui.shell.header
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -24,6 +29,8 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneTags
 import com.letta.mobile.ui.host.ProvideLettaHost
+import com.letta.mobile.ui.search.LettaSearchConfig
+import com.letta.mobile.ui.search.LettaSearchOpenRequest
 import com.letta.mobile.ui.search.SearchFieldTestTag
 import com.letta.mobile.ui.search.SearchPanelTestTag
 import com.letta.mobile.ui.search.SearchTriggerTestTag
@@ -42,14 +49,14 @@ class ShellHeaderTest {
     private val opened = mutableListOf<UnifiedSearchHit>()
     private val sources = UnifiedSearchSources(agents = listOf(Agent(id = AgentId("a-1"), name = "Planner")))
 
-    private fun ComposeUiTest.header(onHome: Boolean, host: LettaHost = LettaHost.Pointer) {
+    private fun ComposeUiTest.header(onHome: Boolean, host: LettaHost = LettaHost.Pointer, inChat: Boolean = false) {
         setContent {
             MaterialTheme {
                 ProvideLettaHost(host) {
                     ShellHeader(
                         title = HeaderTitle.Text("Letta"),
                         controls = HeaderControls(nav = HeaderNav.Back(onClick = {})),
-                        search = rememberShellSearchSlot(home, onHome, sources) { opened += it },
+                        search = rememberShellSearchSlot(home, ShellSearchContext(onHome = onHome, inChat = inChat), sources) { opened += it },
                     )
                 }
             }
@@ -92,6 +99,67 @@ class ShellHeaderTest {
         onNodeWithText("Planner").performClick()
         waitForIdle()
         assertEquals(listOf(UnifiedSearchHit(UnifiedSearchKind.Agents, "a-1")), opened)
+    }
+
+    /**
+     * letta-mobile-ckmub.3.9: "Filter to this agent" starts off outside a chat (it would hide every
+     * other agent's conversations) and on inside one; the person's own choice then sticks.
+     */
+    @Test
+    fun theAgentFilterStartsOffOutsideAChatAndOnInsideOne() = runComposeUiTest {
+        var inChat by mutableStateOf(false)
+        setContent {
+            MaterialTheme {
+                ProvideLettaHost(LettaHost.Pointer) {
+                    ShellHeader(
+                        title = HeaderTitle.Text("Letta"),
+                        search = rememberShellSearchSlot(home, ShellSearchContext(inChat = inChat), sources) { opened += it },
+                    )
+                }
+            }
+        }
+        typeInSearch("plan")
+        onNode(isToggleable()).assertIsOff()
+        inChat = true
+        waitForIdle()
+        onNode(isToggleable()).assertIsOn()
+        onNode(isToggleable()).performClick()
+        waitForIdle()
+        onNode(isToggleable()).assertIsOff()
+    }
+
+    /**
+     * letta-mobile-zxk2n.39: `/search` opens the pane once. The header leaving and coming back (the
+     * chat page re-entering composition) must not reopen it: the request is taken, not re-read.
+     */
+    @Test
+    fun anOpenRequestOpensThePaneOnceNotEachTimeTheHeaderReturns() = runComposeUiTest {
+        val request = LettaSearchOpenRequest()
+        var showHeader by mutableStateOf(true)
+        setContent {
+            MaterialTheme {
+                ProvideLettaHost(LettaHost.Pointer) {
+                    if (showHeader) {
+                        ShellHeader(
+                            title = HeaderTitle.Text("Letta"),
+                            search = SearchSlot(query = "", onQuery = {}, config = LettaSearchConfig(autoFocus = false), openRequest = request),
+                        )
+                    }
+                }
+            }
+        }
+        waitForIdle()
+        onNodeWithTag(SearchPanelTestTag).assertDoesNotExist()
+        request.request()
+        waitForIdle()
+        onNodeWithTag(SearchPanelTestTag).assertExists()
+        // Away from the chat (its header leaves composition, the pane with it) and back.
+        showHeader = false
+        waitForIdle()
+        showHeader = true
+        waitForIdle()
+        onNodeWithTag(SearchPanelTestTag).assertDoesNotExist()
+        onNodeWithTag(ShellHeaderTags.SEARCH).assertExists()
     }
 
     /** letta-mobile-06whj: the results pane takes the header field's place; it never adds a second input. */

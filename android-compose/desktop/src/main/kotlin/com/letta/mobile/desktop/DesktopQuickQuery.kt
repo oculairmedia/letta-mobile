@@ -14,7 +14,7 @@ import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import com.letta.mobile.data.search.PaletteItem
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.palette.QuickQueryActions
 import com.letta.mobile.ui.shell.palette.QuickQueryPanel
 import dev.nucleusframework.core.runtime.Platform
@@ -25,8 +25,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /** Actions the quick-query window routes back into the main app. */
 @Immutable
 internal data class DesktopQuickQueryActions(
-    /** Open a palette item (agent/conversation/page) in the main window. */
-    val onSelectItem: (PaletteItem) -> Unit,
+    /** Open a pick (agent, conversation, message, page) in the main window. */
+    val onOpen: (com.letta.mobile.ui.shell.header.UnifiedSearchHit) -> Unit,
     /** Send free-typed text to the current agent; second arg is ambient context. */
     val onSubmitPrompt: (String, String?) -> Unit,
 )
@@ -39,7 +39,7 @@ internal data class DesktopQuickQueryActions(
 internal class DesktopQuickQueryCoordinator {
     val visible = MutableStateFlow(false)
     val ambientContext = MutableStateFlow<String?>(null)
-    val items = MutableStateFlow<List<PaletteItem>>(emptyList())
+    val sources = MutableStateFlow(UnifiedSearchSources())
     val actions = MutableStateFlow<DesktopQuickQueryActions?>(null)
 
     /**
@@ -188,10 +188,10 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
     }
 }
 
-/** Feeds the coordinator's items and actions to the shared bar. */
+/** Feeds the coordinator's search sources and actions to the shared bar. */
 @Composable
 private fun QuickQueryBinding(coordinator: DesktopQuickQueryCoordinator) {
-    val items by coordinator.items.collectAsState()
+    val sources by coordinator.sources.collectAsState()
     val actions by coordinator.actions.collectAsState()
     val ambient by coordinator.ambientContext.collectAsState()
     // letta-mobile-sspxj: never forward the raw window title — sanitize at the
@@ -199,10 +199,10 @@ private fun QuickQueryBinding(coordinator: DesktopQuickQueryCoordinator) {
     val sanitized = remember(ambient) { sanitizeAmbientContext(ambient) }
     val bound = remember(actions, coordinator) {
         QuickQueryActions(
-            onSelectItem = { item -> actions?.onSelectItem(item) },
+            onOpen = { hit -> actions?.onOpen(hit) },
             onSubmitPrompt = { text, context -> actions?.onSubmitPrompt(text, context) },
             onClose = coordinator::close,
         )
     }
-    QuickQueryPanel(items = items, ambientContext = sanitized, actions = bound)
+    QuickQueryPanel(sources = sources, ambientContext = sanitized, actions = bound)
 }

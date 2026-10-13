@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
@@ -20,8 +19,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.header.SearchSlot
-import com.letta.mobile.ui.shell.header.UnifiedSearchKind
-import com.letta.mobile.ui.shell.header.UnifiedSearchSources
+import com.letta.mobile.ui.shell.header.ShellSearchContext
 import com.letta.mobile.ui.shell.header.rememberShellSearchSlot
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -108,24 +106,21 @@ private fun DesktopShellHeaderChrome(
     SideEffect { onHeaderChromeChange(headerChrome) }
 }
 
-/** The shared header search over this window's conversations, roster and canvases. */
+/**
+ * The shared header search over this window's unified search sources (conversations, message text,
+ * roster, canvases). "Filter to this agent" starts on only while a chat is the page.
+ */
 @Composable
 private fun rememberDesktopShellSearch(context: DesktopShellContext, frame: DesktopShellFrame): SearchSlot {
-    val focus = frame.focus
-    val canvases by context.core.canvasShell.library.documents.collectAsState()
+    val destination = context.navigator.selectedDestination
     return rememberShellSearchSlot(
         home = context.panels.libraries.home,
-        onHome = context.navigator.selectedDestination == DesktopDestination.Home,
-        sources = UnifiedSearchSources(
-            frame.chatState.conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId,
+        context = ShellSearchContext(
+            onHome = destination == DesktopDestination.Home,
+            inChat = destination == DesktopDestination.Conversations,
         ),
-        onOpen = { hit ->
-            when (hit.kind) {
-                UnifiedSearchKind.Conversations -> context.router.openConversation(ConversationId(hit.id))
-                UnifiedSearchKind.Agents -> context.router.openAgent(AgentId(hit.id))
-                UnifiedSearchKind.Canvases -> context.openCanvas(CanvasId(hit.id))
-            }
-        },
+        sources = frame.lists.search,
+        onOpen = { hit -> context.router.openSearchHit(hit, context::openCanvas) },
     )
 }
 

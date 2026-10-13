@@ -8,8 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.search.PaletteItem
-import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.ui.shell.header.UnifiedSearchHit
+import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.palette.CommandPalettePane
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.chat.DesktopModelControlOverlays
@@ -39,7 +39,8 @@ internal class DesktopOverlayVisibility : DesktopModelSurfaces {
 @Immutable
 internal data class DesktopOverlayData(
     val composerModelLabel: String,
-    val paletteItems: List<PaletteItem>,
+    /** The window's unified search; the command palette is its picker mode. */
+    val searchSources: UnifiedSearchSources,
     val railAgents: List<Pair<String, String>>,
     val rosterAgents: List<Agent>,
     val avatarStyleByAgentId: Map<String, Int>,
@@ -50,13 +51,14 @@ internal data class DesktopOverlayData(
 internal data class DesktopOverlayActions(
     /** The model picker's and Models sheet's host (letta-mobile-w4q4p.6.1). */
     val modelControl: DesktopModelControlHost,
-    val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
     /** Opens the shared agent editor's new-agent flow (letta-mobile-ckmub.3.24). */
     val onNewAgent: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
+    /** Opens a command-palette pick (the unified search's hit). */
+    val onOpenSearchHit: (UnifiedSearchHit) -> Unit = {},
 )
 
 /**
@@ -102,16 +104,8 @@ internal fun DesktopAppOverlays(
     }
     if (visibility.commandPalette) {
         CommandPalettePane(
-            items = data.paletteItems,
-            onSelect = { item ->
-                when (item.kind) {
-                    PaletteItemKind.Conversation -> actions.onSelectConversation(item.id)
-                    PaletteItemKind.Agent -> actions.onOpenAgent(item.id)
-                    PaletteItemKind.Destination ->
-                        DesktopDestination.entries.firstOrNull { it.name == item.id }
-                            ?.let(actions.onNavigate)
-                }
-            },
+            sources = data.searchSources,
+            onOpen = actions.onOpenSearchHit,
             onDismiss = { visibility.commandPalette = false },
         )
     }

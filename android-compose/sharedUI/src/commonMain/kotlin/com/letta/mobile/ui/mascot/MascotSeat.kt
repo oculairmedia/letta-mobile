@@ -80,6 +80,34 @@ fun mascotDrawnAt(agentId: String?, stage: MascotStage): Boolean {
     return active == null || active == stage
 }
 
+/**
+ * [agentId]'s character, live, at a place that must show it while the transported one stands at
+ * another seat (the minimised dock while the desktop sidebar's hero holds it; letta-mobile-ckmub.15).
+ * It is the same character the seat draws - the editor's preview first, then the registry's look,
+ * fed the same presence - so the two move together; [fallback] draws when the host cannot bring up
+ * the agent's scene.
+ */
+@Composable
+fun MascotMirror(
+    agentId: String?,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    fallback: @Composable () -> Unit,
+) {
+    val transport = LocalMascotTransport.current
+    val registry = LocalMascotRegistry.current
+    val host = LocalMascotHost.current
+    val shown = agentId?.let { transport.previewOf(it) ?: registry.identities[it] }
+    if (agentId == null || shown == null || !host.available || host.entry(agentId, shown) == null) {
+        fallback()
+        return
+    }
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        MascotInPlace(agentId, shown, size = size, live = true, onClick = onClick)
+    }
+}
+
 /** Why a seat draws [MascotSeat]'s `empty` content instead of the character. */
 enum class MascotSeatVacancy {
     /** The agent has no mascot the host can draw here: show a stand-in (an orb, a sphere). */

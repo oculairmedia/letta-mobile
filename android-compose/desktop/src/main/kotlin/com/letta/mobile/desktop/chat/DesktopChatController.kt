@@ -745,6 +745,16 @@ class DesktopChatController(
         return com.letta.mobile.data.agenteditor.AgentCreated(agent.id.value, conversation.id.value)
     }
 
+    /**
+     * The newest [limit] messages of [conversationId], newest first, read over the App Server for the
+     * unified search's host-side message index (letta-mobile-ckmub.3.9); none before the gateway is up.
+     */
+    suspend fun recentMessages(conversationId: String, limit: Int): List<com.letta.mobile.data.model.LettaMessage> {
+        if (closed) return emptyList()
+        val current = gateway ?: return emptyList()
+        return current.listConversationMessages(ConversationId(conversationId), limit = limit, order = NEWEST_FIRST)
+    }
+
     /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */
     suspend fun reloadModelCatalog() {
         if (closed) return
@@ -1493,6 +1503,9 @@ class DesktopChatController(
 private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 private const val TELEMETRY_TAG = "DesktopChat"
+
+/** `conversation_messages_list`'s order for the newest messages first. */
+private const val NEWEST_FIRST = "desc"
 
 /** Connection states in which the session is settled enough to merge a re-read roster into. */
 private val ROSTER_REFRESHABLE_STATES = setOf(

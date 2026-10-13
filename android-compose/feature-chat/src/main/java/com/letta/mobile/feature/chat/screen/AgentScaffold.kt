@@ -5,7 +5,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import com.letta.mobile.ui.search.LettaSearchOpenRequest
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -96,7 +96,7 @@ internal fun AgentScaffoldContent(
         mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT)
     }
     var showAgentSwitcher by remember { mutableStateOf(false) }
-    var searchOpenSignal by remember { mutableIntStateOf(0) }
+    val searchOpenRequest = remember { LettaSearchOpenRequest() }
     var showModelPicker by remember { mutableStateOf(false) }
     val projectContext = viewModel.projectContext
     var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
@@ -117,8 +117,8 @@ internal fun AgentScaffoldContent(
                 onShowModelPickerChange = { showModelPicker = it },
             ),
             searchUi = AgentScaffoldSearchUiState(
-                openSignal = searchOpenSignal,
-                onOpenSearch = { searchOpenSignal++ },
+                openRequest = searchOpenRequest,
+                onOpenSearch = searchOpenRequest::request,
             ),
             projectUi = AgentScaffoldProjectUiState(
                 isProjectInfoExpanded = isProjectInfoExpanded,

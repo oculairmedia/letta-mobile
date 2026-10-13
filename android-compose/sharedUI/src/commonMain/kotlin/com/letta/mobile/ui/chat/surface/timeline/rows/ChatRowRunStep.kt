@@ -40,6 +40,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.ImmutableList
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /*
@@ -98,6 +99,15 @@ internal fun ToolTimelineState.glyphTone(): RunSummaryTone = when (this) {
     ToolTimelineState.Succeeded -> RunSummaryTone.Done
 }
 
+/** The test tags a step row carries: on the row (its toggle) and on its glyph. */
+@Immutable
+internal class RunStepRowTags(val row: String, val glyph: String) {
+    companion object {
+        /** A tool call's step. */
+        val Tool = RunStepRowTags(ChatRowTestTags.TOOL_CARD_TOGGLE, ChatRowTestTags.TOOL_STATUS_GLYPH)
+    }
+}
+
 /** What one step row shows: its label, its one-line preview, its glyph and the glyph's spoken state. */
 @Immutable
 internal class RunStepRowSpec(
@@ -105,30 +115,50 @@ internal class RunStepRowSpec(
     val subtitle: String?,
     val tone: RunSummaryTone,
     val glyphLabel: String?,
+    val tags: RunStepRowTags = RunStepRowTags.Tool,
 )
 
-/** A step's disclosure: whether its details are open, and how to flip them. */
+/** What a step's disclosure says: its chevron's action labels and the row's spoken open / closed state. */
 @Immutable
-internal class RunStepDisclosure(val expanded: Boolean, val onToggle: () -> Unit)
+internal class RunStepDisclosureLabels(
+    val expand: StringResource,
+    val collapse: StringResource,
+    val expandedState: StringResource,
+    val collapsedState: StringResource,
+) {
+    companion object {
+        /** A tool call's details. */
+        val Step = RunStepDisclosureLabels(Res.string.rows_expand, Res.string.rows_collapse, Res.string.rows_state_expanded, Res.string.rows_state_collapsed)
+    }
+}
+
+/** A step's disclosure: whether its details are open, how to flip them, and what it says. */
+@Immutable
+internal class RunStepDisclosure(
+    val expanded: Boolean,
+    val labels: RunStepDisclosureLabels = RunStepDisclosureLabels.Step,
+    val onToggle: () -> Unit,
+)
 
 /**
  * One step of a run as a [LettaListRow]: the shared [RunStatusGlyph] leading, the label in the list
  * row's title style, a one-line preview under it, and the shared [DisclosureChevron] trailing only
  * when [disclosure] has details to open. Its height never depends on its state: open or closed,
- * working or settled, it is the list row's height.
+ * working or settled, it is the list row's height. A tool call and a reasoning step both draw
+ * through here (letta-mobile-ckmub.1.3), so the run's rows read alike.
  */
 @Composable
 internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?, modifier: Modifier = Modifier) {
-    val stateText = disclosure?.let { stringResource(if (it.expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed) }
+    val stateText = disclosure?.let { stringResource(if (it.expanded) it.labels.expandedState else it.labels.collapsedState) }
     LettaListRow(
         spec = LettaListRowSpec(title = spec.title, subtitle = spec.subtitle, enabled = disclosure != null),
         onClick = { disclosure?.onToggle?.invoke() },
         modifier = modifier
-            .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
+            .testTag(spec.tags.row)
             .semantics { stateText?.let { stateDescription = it } },
-        leading = { RunStatusGlyph(spec.tone, Modifier.testTag(ChatRowTestTags.TOOL_STATUS_GLYPH), spec.glyphLabel) },
+        leading = { RunStatusGlyph(spec.tone, Modifier.testTag(spec.tags.glyph), spec.glyphLabel) },
         end = if (disclosure != null) {
-            { RunStepChevron(disclosure.expanded) }
+            { RunStepChevron(disclosure) }
         } else {
             null
         },
@@ -136,10 +166,10 @@ internal fun RunStepListRow(spec: RunStepRowSpec, disclosure: RunStepDisclosure?
 }
 
 @Composable
-private fun RunStepChevron(expanded: Boolean) {
+private fun RunStepChevron(disclosure: RunStepDisclosure) {
     DisclosureChevron(
-        expanded = expanded,
-        contentDescription = stringResource(if (expanded) Res.string.rows_collapse else Res.string.rows_expand),
+        expanded = disclosure.expanded,
+        contentDescription = stringResource(if (disclosure.expanded) disclosure.labels.collapse else disclosure.labels.expand),
     )
 }
 
