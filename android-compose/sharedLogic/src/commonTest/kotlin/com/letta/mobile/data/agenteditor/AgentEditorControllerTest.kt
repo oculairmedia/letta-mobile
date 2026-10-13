@@ -10,6 +10,8 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -49,7 +51,11 @@ class AgentEditorControllerTest {
         val deleted = mutableListOf<String>()
         var failNextUpdate: String? = null
 
-        override suspend fun load(agentId: AgentId): Agent = byId[agentId.value] ?: error("No agent ${agentId.value}")
+        var hangLoads = false
+        override suspend fun load(agentId: AgentId): Agent {
+            if (hangLoads) awaitCancellation()
+            return byId[agentId.value] ?: error("No agent ${agentId.value}")
+        }
         override suspend fun refreshCatalogs() = Unit
         override suspend fun create(params: AgentCreateParams): AgentCreated {
             created += params
@@ -191,6 +197,32 @@ class AgentEditorControllerTest {
         controller.retry()
         assertNull(controller.state.value.loadError)
         assertEquals("Two", controller.state.value.form.name)
+    }
+
+    @Test
+    fun aLoadThatNeverAnswersEndsInAnErrorWithRetryNotAnEndlessSpinner() = runTest(UnconfinedTestDispatcher()) {
+        val backend = RecordingBackend(ada).apply { hangLoads = true }
+        val controller = editor(backend)
+        assertTrue(controller.state.value.loading)
+
+        advanceTimeBy(AgentEditorController.LOAD_TIMEOUT_MS + 1)
+
+        val failed = controller.state.value
+        assertFalse(failed.loading)
+        assertEquals(AgentEditorController.LOAD_TIMED_OUT, failed.loadError)
+        assertFalse(failed.canSave)
+
+        backend.hangLoads = false
+        controller.retry()
+        assertNull(controller.state.value.loadError)
+        assertEquals("Ada", controller.state.value.form.name)
+    }
+
+    @Test
+    fun aLoadThatFailsEndsInAnError() = runTest(UnconfinedTestDispatcher()) {
+        val state = editor(RecordingBackend(ada), AgentEditorMode.Edit("missing")).state.value
+        assertFalse(state.loading)
+        assertEquals("No agent missing", state.loadError)
     }
 
     @Test

@@ -12,7 +12,7 @@ import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.first
 
 /**
  * What the agent editor reads and writes. Agent CRUD goes through the session's App Server
@@ -73,8 +73,9 @@ class RepositoryAgentEditorBackend(
     override val models: StateFlow<List<LlmModel>> = repositories.modelCatalog ?: catalogOrEmpty { modelRepository.llmModels }
     override val tools: StateFlow<List<Tool>> = catalogOrEmpty { toolRepository.getTools() }
 
-    // The flow's last emission re-fetches, so an agent edited elsewhere is never shown stale.
-    override suspend fun load(agentId: AgentId): Agent = agentRepository.getAgent(agentId).last()
+    // The first emission, never the last: Android's session-scoped repository flat-maps getAgent over
+    // the live session graph, so its flow never completes and waiting for its last value hangs.
+    override suspend fun load(agentId: AgentId): Agent = agentRepository.getAgent(agentId).first()
 
     override suspend fun refreshCatalogs() {
         refreshQuietly { agentRepository.refreshAgentsIfStale(CATALOG_MAX_AGE_MS) }

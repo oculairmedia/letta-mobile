@@ -205,6 +205,16 @@ class AgentEditorPageTest {
     }
 
     @Test
+    fun anAgentThatCannotLoadShowsTheErrorAndARetryNotTheSpinner() = runComposeUiTest {
+        editor(RecordingBackend(ada, listOf(search)), AgentEditorMode.Edit("missing"))
+
+        onNodeWithTag(AgentEditorPageTags.LOADING).assertDoesNotExist()
+        onNodeWithText("Could not open the agent").assertExists()
+        onNodeWithTag(SettingsSectionTags.ACTION_PREFIX + "retry").assertIsEnabled()
+        onNodeWithTag(AgentEditorPageTags.SAVE).assertIsNotEnabled()
+    }
+
+    @Test
     fun aLinkOpensTheAgentsOtherPage() = runComposeUiTest {
         val outcome = Outcome()
         editor(RecordingBackend(ada, listOf(search)), AgentEditorMode.Edit("a-1"), outcome)

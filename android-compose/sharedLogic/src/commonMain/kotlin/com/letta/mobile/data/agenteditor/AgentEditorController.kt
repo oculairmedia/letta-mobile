@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -58,7 +59,7 @@ class AgentEditorController(
         }
         scope.launch {
             guarded("Could not load ${copyOf.name}") {
-                val source = backend.load(AgentId(copyOf.agentId))
+                val source = loadAgent(copyOf.agentId)
                 starterAgent = source
                 _state.update { it.copy(form = AgentEditorParams.starterFormOf(source, it.form)) }
             }
@@ -113,12 +114,16 @@ class AgentEditorController(
         return AgentCreated(agentId)
     }
 
+    /** The agent, or a failure once [LOAD_TIMEOUT_MS] passes: a load that never answers must not spin forever. */
+    private suspend fun loadAgent(agentId: String): Agent =
+        withTimeoutOrNull(LOAD_TIMEOUT_MS) { backend.load(AgentId(agentId)) } ?: error(LOAD_TIMED_OUT)
+
     private fun load() {
         val agentId = _state.value.agentId ?: return
         _state.update { it.copy(loading = true, loadError = null) }
         scope.launch {
             try {
-                val agent = backend.load(AgentId(agentId))
+                val agent = loadAgent(agentId)
                 val form = AgentEditorParams.formOf(agent)
                 _state.update { it.copy(loading = false, agent = agent, form = form, original = form) }
             } catch (e: CancellationException) {
@@ -165,5 +170,11 @@ class AgentEditorController(
             description = tool.description,
             mcp = tool.toolType?.contains("mcp", ignoreCase = true) == true,
         )
+    }
+
+    companion object {
+        /** How long the editor waits for an agent before it says so and offers a retry. */
+        const val LOAD_TIMEOUT_MS = 20_000L
+        const val LOAD_TIMED_OUT = "The agent did not load. Check the connection and try again."
     }
 }
