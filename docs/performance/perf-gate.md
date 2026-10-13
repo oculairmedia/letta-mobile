@@ -65,7 +65,8 @@ in the checker.
 
 Current policy:
 
-- `startup.cold.p95_ms`: `+20%`
+- `startup.cold.p95_ms`: `+50%` (ceiling `2269.1 ms`; letta-mobile-3gpwo: runner
+  noise alone produced cold p95 of `1955-2091 ms` against the former `1815.3 ms` ceiling)
 - `startup.warm.p95_ms`: `+20%`
 
 Warm startup was refreshed to a `405.889 ms` baseline after consecutive
@@ -80,7 +81,7 @@ includes rendering it. Cold startup retains its
 `1512.749 ms` baseline after healthy runs measured bounded drift up to
 `1772.844 ms` (`+17.2%`).
 
-Both startup metrics use a `+20%` envelope and gate by default. Their minimum
+Warm startup uses a `+20%` envelope, cold startup a `+50%` envelope, and both gate by default. Their minimum
 sample counts prevent absent or undersampled output from silently passing.
 
 ## Retry behavior

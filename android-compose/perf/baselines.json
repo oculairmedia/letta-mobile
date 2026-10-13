@@ -24,12 +24,12 @@
   "metrics": {
     "startup.cold.p95_ms": {
       "baseline": 1512.749,
-      "tolerance_pct": 20,
+      "tolerance_pct": 50,
       "source": "StartupBenchmark.coldStartupCompilationPartial",
       "metric": "timeToInitialDisplayMs",
       "min_samples": 10,
       "notes": [
-        "Cold startup uses a +20% envelope on the shared GitHub Actions API 33 emulator because repeated healthy PR runs measured bounded cold-start drift up to +17.2% over seed (1512.749 ms -> 1772.844 ms)."
+        "letta-mobile-3gpwo: cold startup uses a +50% envelope (ceiling 2269.1 ms) on the shared GitHub Actions API 33 emulator. Unrelated main/PR runs on 2026-10-13 measured cold p95 of 1396-1803 ms on passing runs and 1955-2091 ms on failing runs (both attempts), so the previous +20% ceiling (1815.3 ms) sat inside runner noise and failed ~50% of main runs. The baseline is unchanged; warm keeps its +20% envelope."
       ]
     },
     "startup.warm.p95_ms": {
