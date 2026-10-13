@@ -1,11 +1,10 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import kotlinx.collections.immutable.persistentListOf
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 /**
  * letta-mobile-29h9u: unit coverage for the lingering-terminal visibility
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test
  * instead of vanishing instantly under the active-only rule, while still
  * dropping once its linger window expires. Running chips are unaffected.
  */
-@Tag("unit")
 class LingeringTerminalsTest {
 
     private fun running(id: String) = ActiveSubagent(

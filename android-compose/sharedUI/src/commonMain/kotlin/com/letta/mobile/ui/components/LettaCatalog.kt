@@ -10,12 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,7 +27,8 @@ import com.letta.mobile.ui.theme.LettaDimens
 
 /*
  * Building blocks for the catalog-style pages (Channels, Skills, Tools, ...) on desktop and
- * Android: an accent card, tinted pills, an empty-state box and a sectioned card grid. Everything
+ * Android: an accent card, tinted pills and an empty-state box; the sectioned card grid is a
+ * RosterList with columns (letta-mobile-ckmub.3.25). Everything
  * reads the design tokens (MaterialTheme shapes / colorScheme, LettaDimens).
  */
 
@@ -122,32 +120,9 @@ fun LettaInfoBox(
     }
 }
 
-/** Standard content padding for a catalog grid on a wide window. */
+/** Standard content padding for a catalog grid on a wide window (the grid itself is a RosterList with columns). */
 val LettaCatalogGridPadding: PaddingValues =
     PaddingValues(start = LettaDimens.Space.xxl, end = LettaDimens.Space.xxl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.lg)
-
-/**
- * Renders labelled [sections] as a card grid of [columns] inside a LazyColumn: each section gets a
- * caption, then rows of up to [columns] cards built by [card].
- */
-fun <T> LazyListScope.lettaCardGrid(
-    sections: List<Pair<String, List<T>>>,
-    keyOf: (T) -> String,
-    columns: Int = 2,
-    card: @Composable (T, Modifier) -> Unit,
-) {
-    sections.forEach { (label, sectionItems) ->
-        item(key = "section-$label") {
-            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        items(items = sectionItems.chunked(columns), key = { keyOf(it.first()) }) { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg)) {
-                row.forEach { item -> card(item, Modifier.weight(1f)) }
-                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
 
 private const val CARD_BORDER_ALPHA = 0.6f
 private const val AVATAR_ALPHA = 0.2f

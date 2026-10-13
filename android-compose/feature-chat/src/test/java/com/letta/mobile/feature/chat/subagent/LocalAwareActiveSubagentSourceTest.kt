@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent

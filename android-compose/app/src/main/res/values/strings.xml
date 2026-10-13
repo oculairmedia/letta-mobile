@@ -133,7 +133,7 @@
     <string name="screen_config_dialog_delete_confirm">Are you sure you want to delete this configuration?</string>
     <string name="screen_config_embedded_runtime_title">Embedded LettaCode runtime</string>
     <string name="screen_config_embedded_runtime_disabled_placeholder">Model import and configuration are available, but local turn execution is disabled in this build.</string>
-    <string name="screen_config_embedded_runtime_enabled_placeholder">Local turns run fully on this device through the embedded runtime.</string>
+    <string name="screen_config_embedded_runtime_enabled_placeholder">Local turns run fully on this device through the embedded runtime (for development only; use a remote host for everyday use).</string>
     <string name="screen_config_embedded_runtime_version">Runtime: %1$s</string>
     <string name="screen_config_embedded_runtime_connect">Use embedded LettaCode</string>
     <string name="screen_config_local_model_import_success">Imported %1$s</string>

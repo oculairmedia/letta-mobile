@@ -39,6 +39,14 @@ class SearchSlot(
     val openSignal: Int = 0,
 )
 
+/**
+ * The header search of a page that filters itself (a block library, a model list, an archive): each
+ * keystroke narrows the page ([onQuery]) and nothing opens over it. A phone header becomes the search
+ * bar in place, and leaving the bar clears the filter (letta-mobile-ckmub.3.25).
+ */
+fun pageFilterSearchSlot(query: String, onQuery: (String) -> Unit, placeholder: String): SearchSlot =
+    SearchSlot(query = query, onQuery = onQuery, config = LettaSearchConfig(placeholder = placeholder, autoFocus = false, showResults = false))
+
 /** The unified search's own filters: the scope tab and "Filter to this agent" (on by default). */
 @Stable
 class ShellSearchFilters {

@@ -58,8 +58,9 @@ server that requires bearer auth.
 `src/test/resources/appserver/restart-replay-evidence.json` is **observed**, not
 hand-authored. `AppServerRestartReplayEvidenceTest` runs everywhere and hard-fails
 when the evidence's `source.version` drifts from
-`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`, so every letta-code
-contract bump requires a fresh capture. `AppServerRestartReplayProbeTest` is the
+`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`. The evidence is still
+the 0.29.12 capture; re-capturing it at the 0.34.8 contract is letta-mobile-ckmub.13
+(it needs a model provider, so it runs on the Linux host). `AppServerRestartReplayProbeTest` is the
 capture tool: it launches a real `letta.js app-server`, runs a turn, kills and
 restarts the process against the same backend root, replays the same
 `client_message_id`, and reads the on-disk transcript. It skips unless the
@@ -72,7 +73,7 @@ version you are capturing):
 
 ```bash
 NODE=~/.nvm/versions/node/v24.18.0/bin/node
-LETTA_JS=~/letta-code-0.29.12/node_modules/@letta-ai/letta-code/letta.js
+LETTA_JS=~/letta-code-0.34.8/node_modules/@letta-ai/letta-code/letta.js   # the 0.34.8 contract
 "$NODE" --version   # must match the `source.node` you are about to record
 ```
 

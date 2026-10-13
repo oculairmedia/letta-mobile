@@ -3,12 +3,14 @@
 package com.letta.mobile.ui.shell.header
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -129,6 +131,37 @@ class ShellHeaderTest {
         onNodeWithTag(ShellHeaderTags.SEARCH_BAR).assertDoesNotExist()
         onNodeWithTag(ShellHeaderTags.TITLE).assertExists()
         assertEquals("", home.queries.last(), "leaving search mode clears the Home filter")
+    }
+
+    /** letta-mobile-ckmub.3.25: a page that filters itself (Blocks, Models, Archival) searches in place on a phone. */
+    @Test
+    fun aPageFilterSearchesThePageInPlaceAndCloseLeavesAMode() = runComposeUiTest {
+        val queries = mutableListOf<String>()
+        val query = mutableStateOf("")
+        var closed = 0
+        setContent {
+            MaterialTheme {
+                ProvideLettaHost(LettaHost.Touch) {
+                    ShellHeader(
+                        title = HeaderTitle.Text("Blocks"),
+                        search = pageFilterSearchSlot(query.value, { query.value = it; queries += it }, "Search blocks"),
+                        controls = HeaderControls(nav = HeaderNav.Close(onClick = { closed++ })),
+                    )
+                }
+            }
+        }
+        onNodeWithContentDescription("Close").performClick()
+        assertEquals(1, closed)
+        onNodeWithTag(SearchTriggerTestTag).performClick()
+        waitForIdle()
+        onNodeWithTag(ShellHeaderTags.SEARCH_BAR).assertExists()
+        onNodeWithTag(SearchPanelTestTag).assertDoesNotExist()
+        onNodeWithTag(SearchFieldTestTag).performTextInput("per")
+        waitForIdle()
+        assertEquals("per", queries.last())
+        onNodeWithTag(ShellHeaderTags.SEARCH_CLOSE).performClick()
+        waitForIdle()
+        assertEquals("", queries.last(), "leaving the bar clears the page's filter")
     }
 
     private class RecordingHome : HomePageActions {

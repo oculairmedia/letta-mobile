@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.shell.pages.channels
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +24,12 @@ import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.ui.components.LettaCatalogGridPadding
 import com.letta.mobile.ui.components.LettaInfoBox
 import com.letta.mobile.ui.components.LettaRefreshable
-import com.letta.mobile.ui.components.lettaCardGrid
+import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListTag
+import com.letta.mobile.ui.components.list.RosterOptions
+import com.letta.mobile.ui.components.list.RosterSection
+import com.letta.mobile.ui.components.list.RosterSelection
+import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -149,19 +152,22 @@ private fun ChannelsBodyContent(page: ChannelsPageScope, columns: Int, contentPa
         }
         return
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag(ChannelsPageTags.LIST),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
-        contentPadding = contentPadding,
-    ) {
-        lettaCardGrid(
-            sections = page.state.projection.sections.map { it.status.label to it.channels },
-            keyOf = { it.id },
-            columns = columns,
-        ) { channel, cardModifier ->
-            ChannelCard(channel, page, cardModifier.fillMaxWidth())
-        }
-    }
+    // letta-mobile-ckmub.3.25: the cards are the shared roster laid out as a grid, one section per
+    // status; the open channel reads selected and the keyboard moves through the cards.
+    RosterList(
+        spec = RosterSpec(
+            sections = page.state.projection.sections.map { RosterSection(it.status.label, it.channels, title = it.status.label) },
+            key = ChannelDisplayItem::id,
+            selection = RosterSelection(isSelected = { it.id == page.openChannel?.id }, onSelect = page::onCardClick),
+            options = RosterOptions(
+                testTag = RosterListTag(ChannelsPageTags.LIST),
+                columns = columns,
+                spacing = LettaDimens.Space.lg,
+                contentPadding = contentPadding,
+            ),
+        ),
+        modifier = Modifier.fillMaxSize(),
+    ) { channel, row -> ChannelCard(channel, page, row, Modifier.fillMaxWidth()) }
 }
 
 private val CompactListPadding = PaddingValues(

@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
+import com.letta.mobile.ui.chat.subagents.ActiveSubagentRings
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.SideEffect

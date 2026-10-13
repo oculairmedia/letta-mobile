@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -37,15 +37,16 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.theme.LettaSpacing
+import androidx.compose.ui.unit.Dp
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
-import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.time.Clock
 
 /**
  * letta-mobile-w8mog + i2f23: CIRCULAR progress rings stacked on the RIGHT
@@ -86,7 +87,7 @@ fun ActiveSubagentRings(
     modifier: Modifier = Modifier,
     onRingClick: (ActiveSubagent) -> Unit = {},
     onViewConversation: (ActiveSubagent) -> Unit = {},
-    now: Long = System.currentTimeMillis(),
+    now: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
     // letta-mobile-i2f23: briefly hold COMPLETED rings so the fill animates
     // to 100% (~300ms tween) before the ring collapses away. RUNNING and
@@ -135,8 +136,8 @@ fun ActiveSubagentRings(
         modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.padding(LettaSpacing.SM),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
+            modifier = Modifier.padding(LettaDimens.Space.sm).testTag(ActiveSubagentRingsTags.RINGS),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             horizontalAlignment = Alignment.End,
         ) {
             // letta-mobile-w8mog: overflow constraint — >3 rings → show 3 + a
@@ -185,7 +186,7 @@ private fun ActivityRing(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
 ) {
-    val reducedMotion = rememberReducedMotionEnabled()
+    val reducedMotion = LocalReducedMotion.current
     val ringState = subagent.ringState(now)
     val color = ringColor(ringState)
 
@@ -261,46 +262,36 @@ private fun ActivityRing(
             )
             .semantics {
                 contentDescription = subagent.chipSemanticLabel()
-            },
+            }
+            .testTag(ActiveSubagentRingsTags.ring(subagent.id)),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(
-            modifier = Modifier.size(ringSize),
-        ) {
-            val strokePx = strokeWidth.toPx()
-            val inset = strokePx / 2f
-            val arcSize = Size(
-                size.width - strokePx,
-                size.height - strokePx,
-            )
-            val topLeft = Offset(inset, inset)
-
-            // Track ring (faint outline)
-            drawArc(
-                color = color.copy(alpha = 0.25f),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round),
-            )
-
-            // Determinate / sliver arc — drawn from 12 o'clock (-90°) with
-            // the animated/pulsing sweep angle. No graphicsLayer rotation.
-            drawArc(
-                color = color,
-                startAngle = -90f, // 12 o'clock
-                sweepAngle = drawSweep,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round),
-            )
-        }
-
+        RingCanvas(color = color, sweep = drawSweep, modifier = Modifier.size(ringSize), strokeWidth = strokeWidth)
     }
 }
+
+/**
+ * The ring itself: a faint full track, then the [sweep] arc from 12 o'clock (-90°). The sweep is
+ * drawn, not rotated: no graphicsLayer rotation, no allocation beyond the draw.
+ */
+@Composable
+private fun RingCanvas(color: Color, sweep: Float, modifier: Modifier, strokeWidth: Dp) {
+    Canvas(modifier = modifier) {
+        val strokePx = strokeWidth.toPx()
+        val inset = strokePx / 2f
+        val arcSize = Size(size.width - strokePx, size.height - strokePx)
+        val topLeft = Offset(inset, inset)
+        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round)
+        drawArc(color = color.copy(alpha = TRACK_ALPHA), startAngle = 0f, sweepAngle = COMPLETED_SWEEP, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+        drawArc(color = color, startAngle = TWELVE_O_CLOCK, sweepAngle = sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+    }
+}
+
+/** The faint track under the arc. */
+private const val TRACK_ALPHA = 0.25f
+
+/** Where the arc starts: 12 o'clock. */
+private const val TWELVE_O_CLOCK = -90f
 
 /**
  * letta-mobile-w8mog: overflow count badge shown when >3 rings are active.
@@ -353,6 +344,13 @@ private fun ringColor(state: RingState): Color = when (state) {
  */
 private fun ActiveSubagent.chipSemanticLabel(): String =
     "${statusLabel}: ${description.ifBlank { "(no description)" }}"
+
+/** Test tags of the rings (both clients' UI tests). */
+object ActiveSubagentRingsTags {
+    const val RINGS = "active-subagent-rings"
+
+    fun ring(id: String): String = "active-subagent-ring-$id"
+}
 
 // ── i2f23 constants ──────────────────────────────────────────────────────
 

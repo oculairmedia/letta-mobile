@@ -4,21 +4,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,7 +21,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.subagents.projectSubagentRoster
 import com.letta.mobile.ui.chat.AgentActivity
 import com.letta.mobile.ui.chat.AgentActivityOrb
 import com.letta.mobile.ui.host.InspectorPane
@@ -53,23 +45,18 @@ fun BackgroundTasksPanel(
     onOpenConversation: OpenSubagentConversation? = null,
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
-    var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-    // The panel stays open while subagents stream status updates, so keep the projection keyed to
-    // its inputs instead of re-projecting per recomposition.
-    val roster = remember(subagents, clearedKeys) { projectSubagentRoster(subagents, now(), clearedKeys) }
-    Column(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = LettaDimens.Space.lg)
             .testTag(BackgroundTasksTags.PANEL),
     ) {
-        SubagentRosterList(
-            roster = roster,
+        SubagentRoster(
+            entries = subagents,
             onOpenConversation = onOpenConversation,
-            onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
+            modifier = Modifier.fillMaxHeight().padding(horizontal = LettaDimens.Space.lg),
+            now = now,
         )
     }
 }

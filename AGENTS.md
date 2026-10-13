@@ -549,12 +549,17 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 ### App Server contract / probe toolchain (epic letta-mobile-lgns8)
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
-  `~/.nvm/versions/node/v24.18.0/bin/node`). The contract verifier pins the wire baseline
-  **`@letta-ai/letta-code@0.34.8`** (`app-server-v2-contract-matrix.json`), which is also the
-  desktop's bundled runtime. The restart-replay evidence is still the older **`0.29.12`** capture
-  (it needs a live server + model provider to re-capture), and the Android embedded runtime is
-  held at **`0.26.1`** (nodejs-mobile Node 18; letta-code 0.26.2+ needs Node >= 22.19), so
-  anything "verified against a 0.33/0.34 server" is desktop/remote-only. One table lists every pin:
+  `~/.nvm/versions/node/v24.18.0/bin/node`). There is ONE wire contract:
+  **`@letta-ai/letta-code@0.34.8`** (`app-server-v2-contract-matrix.json` `baseline.version`),
+  which is also the desktop's bundled runtime and what the `appserver-contract-baseline` CI job
+  installs; `LettaCodeVersionPinsTest` fails if they disagree. Not the contract: the Linux host
+  still runs **`0.33.6`** until redeployed (the client must keep working against it: never
+  require a 0.34-only field, gate 0.34-only commands on an advertised capability); the
+  restart-replay evidence is still the older **`0.29.12`** capture (it needs a live server +
+  model provider to re-capture); and the Android embedded runtime **`0.26.1`** is **dev-only**
+  (nodejs-mobile Node 18, letta-code 0.26.2+ needs Node >= 22.19; on-device execution is a
+  Google Play policy risk), so production Android is remote-only and anything "verified against
+  a 0.33/0.34 server" is desktop/remote-only. One table lists every pin:
   `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`
   ("letta-code version pins"). Install the package under test at
   `~/letta-code-install/node_modules/@letta-ai/letta-code` (older VM snapshots carry 0.29.9 there;

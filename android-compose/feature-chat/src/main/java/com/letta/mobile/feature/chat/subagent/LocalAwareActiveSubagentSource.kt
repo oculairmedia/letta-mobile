@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
  * WHY: the production active-subagent bar is fed by [WsActiveSubagentSource],
  * which reads the shim's per-socket subagent registry over the WS. On the
  * LOCAL embedded runtime there is NO shim WS subagent feed, so the WS source
- * never receives the running→terminal transitions its [WsActiveSubagentSource.LingerAccumulator]
+ * never receives the runningâ†’terminal transitions its [WsActiveSubagentSource.LingerAccumulator]
  * needs to clear a chip. The result was phantom chips that appeared on every
  * prompt and never cleared (confirmed on the production app, local runtime).
  *
