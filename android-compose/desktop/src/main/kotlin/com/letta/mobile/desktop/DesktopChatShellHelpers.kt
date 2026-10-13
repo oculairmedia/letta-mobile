@@ -31,7 +31,6 @@ import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
-import com.letta.mobile.data.search.ConversationMessageReader
 import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
@@ -286,8 +285,7 @@ internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedS
 internal fun rememberDesktopSearchSources(context: DesktopShellContext, conversations: List<DesktopConversationSummary>, focus: DesktopAgentFocus): UnifiedSearchSources {
     val chat = context.core.chatController
     val canvases by context.core.canvasShell.library.documents.collectAsState()
-    val reader = remember(chat) { ConversationMessageReader(chat::recentMessages) }
-    val messages = rememberConversationMessageIndex(conversations, reader)
+    val messages = rememberConversationMessageIndex(conversations, chat.conversationManagement.messageReader)
     val workPlayMode = context.navigator.workPlayMode
     val destinations = remember(workPlayMode) { buildPaletteDestinations(workPlayMode) }
     return remember(conversations, focus, canvases, destinations, messages) {
