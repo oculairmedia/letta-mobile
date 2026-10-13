@@ -30,7 +30,7 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScre
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScreenDrawer.kt 146 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt 86 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 145 container
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeScreen.kt 93 container
+android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeScreen.kt 95 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/providers/ProviderAdminScreen.kt 51 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorScreen.kt 66 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/schedules/ScheduleListScreen.kt 75 legacy-pending(ckmub.2)

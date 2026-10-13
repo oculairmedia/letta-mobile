@@ -37,7 +37,8 @@ fun NavGraphBuilder.adminGraph(
             navigation = adminHomeNavigation(navController),
             routes = HomeChatRoutes(
                 onNavigateToChatMessage = { agentId, conversationId, messageId ->
-                    navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId))
+                    val route = AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId)
+                    navController.navigate(route)
                 },
                 onNavigateToConversation = { agentId, conversationId ->
                     navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))

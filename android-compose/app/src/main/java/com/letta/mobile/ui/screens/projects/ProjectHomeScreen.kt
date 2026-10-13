@@ -46,14 +46,16 @@ fun ProjectHomeScreen(navigation: ProjectHomeNavigation, viewModel: ProjectHomeV
     val state by viewModel.state.collectAsStateWithLifecycle()
     val actions = remember(viewModel, navigation) { projectsPageActions(viewModel.controller, navigation.onOpenChat) }
     val back = navigation.onBack
+    val title = stringResource(R.string.screen_projects_title)
+    val settings = HeaderAction.Icon(LettaIcons.Settings, stringResource(R.string.common_settings), navigation.onSettings)
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
             ShellHeader(
-                title = HeaderTitle.Text(stringResource(R.string.screen_projects_title), navigation.backendLabel, navigation.onBackendSwitcher),
+                title = HeaderTitle.Text(title, navigation.backendLabel, navigation.onBackendSwitcher),
                 controls = HeaderControls(
                     nav = back?.let { HeaderNav.Back(it, stringResource(R.string.action_back)) } ?: HeaderNav.None,
-                    actions = listOf(HeaderAction.Icon(LettaIcons.Settings, stringResource(R.string.common_settings), navigation.onSettings)),
+                    actions = listOf(settings),
                 ),
             )
         },
