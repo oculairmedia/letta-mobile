@@ -2,11 +2,9 @@ package com.letta.mobile.web.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTransport
-import com.letta.mobile.web.data.FRAME_PART_CAPABILITY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -37,9 +35,6 @@ internal class IrohWasmAppServerTransport private constructor(
     private var streamPump: Job? = null
     private var closed = false
 
-    /** Set from the server's `auth_response`: whether it reassembles `frame_part`s we send. */
-    private var serverAcceptsFrameParts = false
-
     override val controlFrames: Flow<AppServerReceivedFrame> = control.onSubscription { startControlPump() }
     override val streamFrames: Flow<AppServerReceivedFrame> = stream.onSubscription { startStreamPump() }
     override val isConnected: Flow<Boolean> = connected.asStateFlow()
@@ -63,7 +58,7 @@ internal class IrohWasmAppServerTransport private constructor(
 
     override suspend fun sendControl(command: AppServerCommand) {
         check(connected.value) { "Iroh App Server transport is disconnected" }
-        bridge.sendControl(AppServerProtocol.encodeCommand(command), allowFrameParts = serverAcceptsFrameParts)
+        bridge.sendControl(AppServerProtocol.encodeCommand(command))
     }
 
     suspend fun close() {
@@ -87,9 +82,7 @@ internal class IrohWasmAppServerTransport private constructor(
             while (currentCoroutineContext().isActive && connected.value) {
                 val raw = poll()
                 if (raw != null) {
-                    val frame = AppServerProtocol.decodeFrame(raw, channel)
-                    serverAcceptsFramePartsAfter(frame.frame)?.let { serverAcceptsFrameParts = it }
-                    destination.emit(frame)
+                    destination.emit(AppServerProtocol.decodeFrame(raw, channel))
                     pollIntervalMs = MIN_POLL_INTERVAL_MS
                     continue
                 }
@@ -119,15 +112,4 @@ internal class IrohWasmAppServerTransport private constructor(
         suspend fun connect(ticket: String, scope: CoroutineScope): IrohWasmAppServerTransport =
             IrohWasmAppServerTransport(IrohWasmBridge.connect(ticket), scope)
     }
-}
-
-/**
- * letta-mobile-v27zq: what a received frame says about sending `frame_part`s, or null when it says
- * nothing. Only a successful `auth_response` counts, as on the native transport: one that lists
- * `frame_part` lets a message over 1 MiB (a large attachment) go out in parts.
- */
-internal fun serverAcceptsFramePartsAfter(frame: AppServerInboundFrame): Boolean? {
-    val auth = frame as? AppServerInboundFrame.AuthResponse ?: return null
-    if (!auth.success) return null
-    return FRAME_PART_CAPABILITY in auth.capabilities.orEmpty()
 }

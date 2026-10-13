@@ -1,4 +1,5 @@
 pub mod frame;
+pub mod negotiation;
 mod session;
 
 pub use session::IrohAppServerSession;
