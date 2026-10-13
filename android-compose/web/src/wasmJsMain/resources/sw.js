@@ -27,12 +27,14 @@ const cachedOrOffline = async (request) => {
     return Response.error();
 };
 
-const networkFirst = async (request) => {
+// The cache write runs alongside the response; waitUntil keeps the worker alive until it lands.
+const networkFirst = async (event) => {
+    const { request } = event;
     try {
         const response = await fetch(request);
         if (response.ok) {
             const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
+            event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)));
         }
         return response;
     } catch {
@@ -44,6 +46,8 @@ const networkFirst = async (request) => {
 // reached the cache. The page lists them once the worker is ready (see index.html), including the
 // hashed .wasm names no fixed list could know, and they are cached here for the next offline open.
 self.addEventListener('message', (event) => {
+    // Only this site's own pages may ask; the listed URLs are filtered to this origin as well.
+    if (event.origin !== self.location.origin) return;
     if (event.data?.type !== 'cache-loaded-files' || !Array.isArray(event.data.urls)) return;
     const own = event.data.urls.filter((url) => new URL(url).origin === self.location.origin);
     event.waitUntil(caches.open(CACHE).then((cache) => Promise.allSettled(own.map((url) => cache.add(url)))));
@@ -53,5 +57,5 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     // Only this site's own files; WebSocket and relay traffic never comes through here anyway.
     if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
-    event.respondWith(networkFirst(request));
+    event.respondWith(networkFirst(event));
 });
