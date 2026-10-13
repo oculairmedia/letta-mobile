@@ -39,7 +39,6 @@ fun AgentScaffold(
     initialProjectStartAction: String? = null,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: (String) -> Unit,
-    onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onNavigateToMemory: ((String) -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
@@ -59,7 +58,6 @@ fun AgentScaffold(
     val navigation = AgentScaffoldNavigationCallbacks(
         onNavigateBack = onNavigateBack,
         onNavigateToSettings = onNavigateToSettings,
-        onNavigateToArchival = onNavigateToArchival,
         onNavigateToTools = onNavigateToTools,
         onNavigateToMemory = onNavigateToMemory,
         onSwitchConversation = onSwitchConversation,

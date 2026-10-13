@@ -14,10 +14,7 @@ import com.letta.mobile.ui.screens.skills.SkillsScreenNavigation
  * letta-mobile-ckmub.3.4: each route only maps to its [ShellDestination.Skills].
  */
 internal fun NavGraphBuilder.skillsGraph(navController: NavHostController) {
-    val navigation = SkillsScreenNavigation(
-        onNavigateBack = { navController.popBackStack() },
-        onNavigateToToolDetail = { toolId -> navController.navigate(ToolDetailRoute(toolId)) },
-    )
+    val navigation = SkillsScreenNavigation(onNavigateBack = { navController.popBackStack() })
     composable<SkillsRoute>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,

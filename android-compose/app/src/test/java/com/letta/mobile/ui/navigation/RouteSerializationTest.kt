@@ -48,32 +48,16 @@ class RouteSerializationTest {
     }
 
     @Test
-    fun `BlocksRoute serializes and deserializes`() =
-        verifyIdempotent(BlocksRoute)
+    fun `RunsRoute serializes and deserializes`() =
+        verifyIdempotent(RunsRoute)
 
     @Test
-    fun `McpRoute serializes and deserializes`() =
-        verifyIdempotent(McpRoute)
+    fun `TemplatesRoute serializes and deserializes`() =
+        verifyIdempotent(TemplatesRoute)
 
     @Test
     fun `ProjectsRoute serializes and deserializes`() =
         verifyIdempotent(ProjectsRoute)
-
-    @Test
-    fun `ProjectIssuesRoute round-trips`() {
-        verifyRoundTrip(ProjectIssuesRoute(projectId = "letta-mobile", projectName = "Letta Mobile"))
-    }
-
-    @Test
-    fun `ProjectIssueDetailRoute round-trips`() {
-        verifyRoundTrip(
-            ProjectIssueDetailRoute(
-                projectId = "letta-mobile",
-                issueId = "letta-mobile-x8pm",
-                projectName = "Letta Mobile",
-            )
-        )
-    }
 
     // ── Data classes (parameterized routes) ──────────────────
 
@@ -105,11 +89,6 @@ class RouteSerializationTest {
     }
 
     @Test
-    fun `McpServerToolsRoute round-trips`() {
-        verifyRoundTrip(McpServerToolsRoute(serverId = "server-1"))
-    }
-
-    @Test
     fun `SkillsRoute round-trips`() {
         verifyRoundTrip(SkillsRoute(agentId = "agent-1"))
         verifyRoundTrip(SkillsRoute())
@@ -118,16 +97,6 @@ class RouteSerializationTest {
     @Test
     fun `EditAgentRoute round-trips`() {
         verifyRoundTrip(EditAgentRoute(agentId = "agent-edit"))
-    }
-
-    @Test
-    fun `ToolDetailRoute round-trips`() {
-        verifyRoundTrip(ToolDetailRoute(toolId = "tool-detail"))
-    }
-
-    @Test
-    fun `ArchivalRoute round-trips`() {
-        verifyRoundTrip(ArchivalRoute(agentId = "agent-arch"))
     }
 
     @Test

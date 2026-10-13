@@ -46,15 +46,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * letta-mobile-cygd: signal flag set on the previous backstack entry's
- * SavedStateHandle when CreateProjectRoute pops on success. Both
- * HomeRoute and ProjectsRoute (the two routes that host
- * ProjectHomeScreen) read this flag in a LaunchedEffect on resume and
- * trigger a refresh + clear so the new project shows up immediately.
- */
-const val PROJECT_CREATED_REFRESH_KEY: String = "project_created_refresh"
-
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
@@ -105,7 +96,6 @@ private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavH
         },
         // letta-mobile-ckmub.3.4: shared destinations go through their Android route mapping.
         onNavigateToSettings = { agentId -> navController.navigateTo(ShellDestination.AgentEditor(agentId)) },
-        onNavigateToArchival = { agentId -> navController.navigate(ArchivalRoute(agentId)) },
         onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
         onNavigateToMemory = { agentId -> navController.navigateTo(ShellDestination.Memory(agentId)) },
         onNavigateToAdmin = { navController.navigateTo(ShellDestination.Home) },

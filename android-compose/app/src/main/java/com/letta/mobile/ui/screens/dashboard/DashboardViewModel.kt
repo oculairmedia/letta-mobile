@@ -6,6 +6,7 @@ import com.letta.mobile.data.home.FleetOverviewParams
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomeMessageSearch
 import com.letta.mobile.data.home.HomePageActions
+import com.letta.mobile.data.home.HomePageConfig
 import com.letta.mobile.data.home.HomePageController
 import com.letta.mobile.data.home.HomePageState
 import com.letta.mobile.data.home.HomePinnedItem
@@ -61,6 +62,7 @@ class DashboardViewModel internal constructor(
         ),
         pins = SettingsHomePinStore(repositories.settings, viewModelScope),
         scope = viewModelScope,
+        config = HomePageConfig(availableShortcuts = AndroidHomeShortcuts),
     )
 
     val state: StateFlow<HomePageState> = controller.state

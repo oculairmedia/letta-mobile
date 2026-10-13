@@ -1,320 +1,44 @@
 package com.letta.mobile.ui.screens.runs
 
-import com.letta.mobile.runtime.RunId
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ProviderTrace
-import com.letta.mobile.data.model.Run
-import com.letta.mobile.data.model.RunListParams
-import com.letta.mobile.data.model.RunMetrics
-import com.letta.mobile.data.model.Step
-import com.letta.mobile.data.model.StepFeedbackUpdateParams
-import com.letta.mobile.data.model.StepMetrics
-import com.letta.mobile.data.model.UsageStatistics
+import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IRunRepository
-import com.letta.mobile.data.repository.api.IStepRepository
-import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.data.runs.RunMonitorController
+import com.letta.mobile.data.runs.RunMonitorState
 import com.letta.mobile.util.mapErrorToUserMessage
-import com.letta.mobile.util.runCatchingCancellable
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-@androidx.compose.runtime.Immutable
-data class RunMonitorUiState(
-    val runs: ImmutableList<Run> = persistentListOf(),
-    val searchQuery: String = "",
-    val activeOnly: Boolean = false,
-    val selectedRun: Run? = null,
-    val selectedRunMessages: ImmutableList<LettaMessage> = persistentListOf(),
-    val selectedRunUsage: UsageStatistics? = null,
-    val selectedRunMetrics: RunMetrics? = null,
-    val selectedRunSteps: ImmutableList<Step> = persistentListOf(),
-    val selectedStep: Step? = null,
-    val selectedStepMessages: ImmutableList<LettaMessage> = persistentListOf(),
-    val selectedStepMetrics: StepMetrics? = null,
-    val selectedStepTrace: ProviderTrace? = null,
-    val operationError: String? = null,
-    /**
-     * True when the backend (iroh://) can list runs and steps but not serve run messages, usage,
-     * metrics, step detail or cancel/delete. The detail dialog shows a note instead of erroring.
-     */
-    val runDetailLimited: Boolean = false,
-)
-
-private data class RunDetail(
-    val available: Boolean,
-    val messages: List<LettaMessage> = emptyList(),
-    val usage: UsageStatistics? = null,
-    val metrics: RunMetrics? = null,
-)
-
+/**
+ * Android binding of the shared run monitor (letta-mobile-ckmub.2.5): the sharedLogic
+ * [RunMonitorController] over the session's run repository, plus the agents' names for its rows.
+ */
 @HiltViewModel
 class RunMonitorViewModel @Inject constructor(
-    private val runRepository: IRunRepository,
-    private val stepRepository: IStepRepository,
+    runRepository: IRunRepository,
+    agentRepository: IAgentRepository,
 ) : ViewModel() {
+    val controller = RunMonitorController(
+        runRepository = runRepository,
+        scope = viewModelScope,
+        errorMessageMapper = ::mapErrorToUserMessage,
+    )
 
-    private val _uiState = MutableStateFlow<UiState<RunMonitorUiState>>(UiState.Loading)
-    val uiState: StateFlow<UiState<RunMonitorUiState>> = _uiState.asStateFlow()
+    val state: StateFlow<RunMonitorState> = controller.state
+
+    val agentNames: StateFlow<Map<String, String>> = agentRepository.agents
+        .map { agents -> agents.associate { it.id.value to it.name.ifBlank { it.id.value } } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(NAMES_STOP_TIMEOUT_MS), emptyMap())
 
     init {
-        loadRuns()
-    }
-
-    fun loadRuns() {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data
-            val activeOnly = current?.activeOnly ?: false
-            val searchQuery = current?.searchQuery.orEmpty()
-            val selectedRun = current?.selectedRun
-            _uiState.value = UiState.Loading
-            runCatchingCancellable {
-                runRepository.refreshRuns(RunListParams(active = activeOnly.takeIf { it }))
-                _uiState.value = UiState.Success(
-                    RunMonitorUiState(
-                        runs = runRepository.runs.value.toImmutableList(),
-                        searchQuery = searchQuery,
-                        activeOnly = activeOnly,
-                        selectedRun = selectedRun,
-                        selectedRunMessages = current?.selectedRunMessages ?: persistentListOf(),
-                        selectedRunUsage = current?.selectedRunUsage,
-                        selectedRunMetrics = current?.selectedRunMetrics,
-                        selectedRunSteps = current?.selectedRunSteps ?: persistentListOf(),
-                        selectedStep = current?.selectedStep,
-                        selectedStepMessages = current?.selectedStepMessages ?: persistentListOf(),
-                        selectedStepMetrics = current?.selectedStepMetrics,
-                        selectedStepTrace = current?.selectedStepTrace,
-                        operationError = current?.operationError,
-                        runDetailLimited = current?.runDetailLimited == true,
-                    )
-                )
-            }.onFailure { e ->
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load runs"))
-            }
-        }
-    }
-
-    fun updateSearchQuery(query: String) {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(searchQuery = query))
-    }
-
-    fun toggleActiveOnly(value: Boolean) {
-        val current = (_uiState.value as? UiState.Success)?.data ?: RunMonitorUiState()
-        _uiState.value = UiState.Success(current.copy(activeOnly = value))
-        loadRuns()
-    }
-
-    fun getFilteredRuns(): List<Run> {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
-        if (current.searchQuery.isBlank()) return current.runs
-        val q = current.searchQuery.trim().lowercase()
-        return current.runs.filter { run ->
-            run.id.lowercase().contains(q) ||
-                run.agentId.lowercase().contains(q) ||
-                (run.conversationId?.lowercase()?.contains(q) == true) ||
-                (run.status?.lowercase()?.contains(q) == true) ||
-                (run.stopReason?.lowercase()?.contains(q) == true)
-        }
-    }
-
-    fun inspectRun(runId: String) {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            runCatchingCancellable {
-                val id = RunId(runId)
-                val run = runRepository.getRun(id)
-                val detail = fetchRunDetail(id)
-                val messages = detail.messages
-                val usage = detail.usage
-                val metrics = detail.metrics
-                val detailAvailable = detail.available
-                val steps = runRepository.getRunSteps(id)
-                _uiState.value = UiState.Success(
-                    current.copy(
-                        selectedRun = run,
-                        selectedRunMessages = messages.toImmutableList(),
-                        selectedRunUsage = usage,
-                        selectedRunMetrics = metrics,
-                        selectedRunSteps = steps.toImmutableList(),
-                        selectedStep = null,
-                        selectedStepMessages = persistentListOf(),
-                        selectedStepMetrics = null,
-                        selectedStepTrace = null,
-                        operationError = null,
-                        runDetailLimited = !detailAvailable,
-                    )
-                )
-            }.onFailure { e ->
-                setOperationError(mapErrorToUserMessage(e, "Failed to load run details"))
-            }
-        }
-    }
-
-    /** Messages/usage/metrics where the backend serves them; empty (never an HTTP call) under iroh://. */
-    private suspend fun fetchRunDetail(runId: RunId): RunDetail {
-        if (!runRepository.supportsRunDetail) return RunDetail(available = false)
-        return RunDetail(
-            available = true,
-            messages = runRepository.getRunMessages(runId),
-            usage = runRepository.getRunUsage(runId),
-            metrics = runRepository.getRunMetrics(runId),
-        )
-    }
-
-    fun inspectStep(stepId: String) {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            if (current.runDetailLimited) return@launch
-            runCatchingCancellable {
-                val step = stepRepository.getStep(stepId)
-                val stepMessages = stepRepository.getStepMessages(stepId)
-                val stepMetrics = stepRepository.getStepMetrics(stepId)
-                val stepTrace = stepRepository.getStepTrace(stepId)
-                val updatedSteps = current.selectedRunSteps.map { existing -> if (existing.id == step.id) step else existing }
-                _uiState.value = UiState.Success(
-                    current.copy(
-                        selectedRunSteps = updatedSteps.toImmutableList(),
-                        selectedStep = step,
-                        selectedStepMessages = stepMessages.toImmutableList(),
-                        selectedStepMetrics = stepMetrics,
-                        selectedStepTrace = stepTrace,
-                        operationError = null,
-                    )
-                )
-            }.onFailure { e ->
-                setOperationError(mapErrorToUserMessage(e, "Failed to load step details"))
-            }
-        }
-    }
-
-    fun updateStepFeedback(stepId: String, feedback: String?) {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            val targetStep = current.selectedStep?.takeIf { it.id == stepId }
-                ?: current.selectedRunSteps.firstOrNull { it.id == stepId }
-                ?: return@launch
-            runCatchingCancellable {
-                val updatedStep = stepRepository.updateStepFeedback(
-                    stepId = stepId,
-                    params = StepFeedbackUpdateParams(
-                        feedback = feedback,
-                        tags = targetStep.tags.takeIf { it.isNotEmpty() },
-                    ),
-                )
-                val refreshedSteps = current.selectedRunSteps.map { existing -> if (existing.id == updatedStep.id) updatedStep else existing }
-                _uiState.value = UiState.Success(
-                    current.copy(
-                        selectedRunSteps = refreshedSteps.toImmutableList(),
-                        selectedStep = if (current.selectedStep?.id == updatedStep.id) updatedStep else current.selectedStep,
-                        operationError = null,
-                    )
-                )
-            }.onFailure { e ->
-                setOperationError(mapErrorToUserMessage(e, "Failed to update step feedback"))
-            }
-        }
-    }
-
-    fun cancelRun(runId: String) {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            val selectedRun = current.selectedRun ?: current.runs.firstOrNull { it.id == runId } ?: return@launch
-            runCatchingCancellable {
-                val refreshedRun = runRepository.cancelRun(selectedRun)
-                val refreshedRuns = current.runs.map { if (it.id == refreshedRun.id) refreshedRun else it }
-                    .filterNot { current.activeOnly && it.status !in setOf("created", "running") }
-                _uiState.value = UiState.Success(
-                    current.copy(
-                        runs = refreshedRuns.toImmutableList(),
-                        selectedRun = if (current.activeOnly && refreshedRun.status !in setOf("created", "running")) null else refreshedRun,
-                        selectedStep = null,
-                        selectedStepMessages = persistentListOf(),
-                        selectedStepMetrics = null,
-                        selectedStepTrace = null,
-                        operationError = null,
-                    )
-                )
-            }.onFailure { e ->
-                setOperationError(mapErrorToUserMessage(e, "Failed to cancel run"))
-            }
-        }
-    }
-
-    fun deleteRun(runId: String) {
-        viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            runCatchingCancellable {
-                runRepository.deleteRun(RunId(runId))
-                _uiState.value = UiState.Success(
-                    current.copy(
-                        runs = current.runs.filterNot { it.id == runId }.toImmutableList(),
-                        selectedRun = if (current.selectedRun?.id == runId) null else current.selectedRun,
-                        selectedRunMessages = if (current.selectedRun?.id == runId) persistentListOf() else current.selectedRunMessages,
-                        selectedRunUsage = if (current.selectedRun?.id == runId) null else current.selectedRunUsage,
-                        selectedRunMetrics = if (current.selectedRun?.id == runId) null else current.selectedRunMetrics,
-                        selectedRunSteps = if (current.selectedRun?.id == runId) persistentListOf() else current.selectedRunSteps,
-                        selectedStep = if (current.selectedRun?.id == runId) null else current.selectedStep,
-                        selectedStepMessages = if (current.selectedRun?.id == runId) persistentListOf() else current.selectedStepMessages,
-                        selectedStepMetrics = if (current.selectedRun?.id == runId) null else current.selectedStepMetrics,
-                        selectedStepTrace = if (current.selectedRun?.id == runId) null else current.selectedStepTrace,
-                        operationError = null,
-                    )
-                )
-            }.onFailure { e ->
-                setOperationError(mapErrorToUserMessage(e, "Failed to delete run"))
-            }
-        }
-    }
-
-    fun clearSelectedRun() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            current.copy(
-                selectedRun = null,
-                selectedRunMessages = persistentListOf(),
-                selectedRunUsage = null,
-                selectedRunMetrics = null,
-                selectedRunSteps = persistentListOf(),
-                selectedStep = null,
-                selectedStepMessages = persistentListOf(),
-                selectedStepMetrics = null,
-                selectedStepTrace = null,
-            )
-        )
-    }
-
-    fun clearSelectedStep() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            current.copy(
-                selectedStep = null,
-                selectedStepMessages = persistentListOf(),
-                selectedStepMetrics = null,
-                selectedStepTrace = null,
-            )
-        )
-    }
-
-    fun clearOperationError() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(operationError = null))
-    }
-
-    private fun setOperationError(message: String) {
-        val current = (_uiState.value as? UiState.Success)?.data
-        if (current != null) {
-            _uiState.value = UiState.Success(current.copy(operationError = message))
-        } else {
-            _uiState.value = UiState.Error(message)
-        }
+        controller.start()
     }
 }
+
+/** Keeps the agents' names across a configuration change, then lets them stop. */
+private const val NAMES_STOP_TIMEOUT_MS = 5_000L

@@ -9,36 +9,32 @@ internal data class HomeNavigationCallbacks(
     val onNavigateToAgents: () -> Unit,
     val onNavigateToConversations: () -> Unit,
     val onNavigateToTools: () -> Unit,
-    val onNavigateToBlocks: () -> Unit,
+    /** Blocks are the agent's memory files: the shortcut and a block search hit open Memory. */
+    val onNavigateToMemory: () -> Unit,
     val onNavigateToSettings: () -> Unit,
     val onNavigateToChat: (agentId: String, agentName: String?, initialMessage: String?) -> Unit,
-    val onNavigateToUsage: () -> Unit,
     val onNavigateToTemplates: () -> Unit = {},
+    /** Providers, and the models the picker shows (the Models shortcut opens it too). */
     val onNavigateToProviders: () -> Unit = {},
     val onNavigateToSchedules: () -> Unit = {},
     val onNavigateToRuns: () -> Unit = {},
-    val onNavigateToMcp: () -> Unit = {},
     val onNavigateToAbout: () -> Unit = {},
     val onNavigateToTelemetry: () -> Unit = {},
     val onNavigateToSystemAccess: () -> Unit = {},
     val onNavigateToBotSettings: () -> Unit = {},
     val onNavigateToProjects: () -> Unit = {},
-    val onNavigateToModels: () -> Unit = {},
 ) {
     fun shortcutNavigator(shortcut: DashboardShortcut, favorite: HomeAgentRef?): () -> Unit = when (shortcut) {
         DashboardShortcut.CONVERSATIONS -> onNavigateToConversations
         DashboardShortcut.AGENTS -> onNavigateToAgents
         DashboardShortcut.TOOLS -> onNavigateToTools
-        DashboardShortcut.BLOCKS -> onNavigateToBlocks
+        DashboardShortcut.BLOCKS -> onNavigateToMemory
         DashboardShortcut.TEMPLATES -> onNavigateToTemplates
-        DashboardShortcut.PROVIDERS -> onNavigateToProviders
+        DashboardShortcut.PROVIDERS, DashboardShortcut.MODELS -> onNavigateToProviders
         DashboardShortcut.SCHEDULES -> onNavigateToSchedules
         DashboardShortcut.RUNS -> onNavigateToRuns
-        DashboardShortcut.MCP_SERVERS -> onNavigateToMcp
         DashboardShortcut.BOT_SETTINGS -> onNavigateToBotSettings
         DashboardShortcut.PROJECTS -> onNavigateToProjects
-        DashboardShortcut.MODELS -> onNavigateToModels
-        DashboardShortcut.USAGE -> onNavigateToUsage
         DashboardShortcut.FAVORITE_AGENT -> favorite?.let { { onNavigateToChat(it.id, it.name, null) } } ?: onNavigateToAgents
         DashboardShortcut.SETTINGS -> onNavigateToSettings
         DashboardShortcut.TELEMETRY -> onNavigateToTelemetry
@@ -50,7 +46,10 @@ internal data class HomeNavigationCallbacks(
 /** The drawer's shortcut and the shared page's shortcut share their persistence name. */
 internal fun DashboardShortcut.toHomeShortcut(): HomeShortcut = HomeShortcut.valueOf(name)
 
-internal fun HomeShortcut.toDashboardShortcut(): DashboardShortcut = DashboardShortcut.valueOf(name)
+internal fun HomeShortcut.toDashboardShortcut(): DashboardShortcut? = DashboardShortcut.entries.firstOrNull { it.name == name }
+
+/** The shared page's shortcuts Android can open: the drawer's own (letta-mobile-ckmub.2.5). */
+internal val AndroidHomeShortcuts: Set<HomeShortcut> = DashboardShortcut.entries.mapTo(mutableSetOf()) { it.toHomeShortcut() }
 
 /** Opens a conversation (or, without one, a chat) with the agent at [agentId]. */
 internal data class HomeChatRoutes(
@@ -79,7 +78,7 @@ internal fun HomeNavigationCallbacks.homePageNavigation(state: HomePageState, ro
             val name = state.fleet.agents.firstOrNull { it.agentId == agentId }?.name
             onNavigateToChat(agentId, name, null)
         },
-        onOpenShortcut = { shortcut -> shortcutNavigator(shortcut.toDashboardShortcut(), state.favorite)() },
+        onOpenShortcut = { shortcut -> shortcut.toDashboardShortcut()?.let { shortcutNavigator(it, state.favorite)() } },
         onConfigureAgent = routes.onNavigateToEditAgent,
         onOpenMessage = { message ->
             val agentId = message.agentId
@@ -92,5 +91,5 @@ internal fun HomeNavigationCallbacks.homePageNavigation(state: HomePageState, ro
             }
         },
         onOpenTool = { onNavigateToTools() },
-        onOpenBlock = { onNavigateToBlocks() },
+        onOpenBlock = { onNavigateToMemory() },
     )

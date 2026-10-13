@@ -9,8 +9,8 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.ui.screens.templates.BUILTIN_TEMPLATES
-import com.letta.mobile.ui.screens.templates.StarterAgentTemplate
+import com.letta.mobile.data.templates.BuiltinAgentTemplates
+import com.letta.mobile.data.templates.StarterAgentTemplate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.collections.immutable.ImmutableList
@@ -88,7 +88,7 @@ class TagDrillInViewModel @Inject constructor(
                 .map { it.toTagDrillInItem(normalizedTag) }
                 .toList()
 
-            val templateItems = BUILTIN_TEMPLATES
+            val templateItems = BuiltinAgentTemplates
                 .asSequence()
                 .filter { normalizedTag in it.tags }
                 .map { it.toTagDrillInItem(normalizedTag) }

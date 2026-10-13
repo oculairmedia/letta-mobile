@@ -3,6 +3,7 @@ package com.letta.mobile.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -10,14 +11,18 @@ import androidx.navigation.NavHostController
 import ca.oculair.meridian.R
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.feature.chat.route.AgentChatRoute
+import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.screens.projects.ProjectHomeNavigation
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
+import com.letta.mobile.ui.shell.pages.projects.ProjectChatIntent
 
-internal data class ProjectsCapabilitiesState(
-    val projectsSupported: Boolean,
-    val projectWorkSupported: Boolean,
-)
+internal data class ProjectsCapabilitiesState(val projectsSupported: Boolean)
 
+/** The backend label the Home tab's header shows, and the switcher it opens. */
+internal data class ProjectsBackendLabel(val label: String?, val onOpenSwitcher: () -> Unit)
+
+/** Projects reach Android only through an Iroh host; elsewhere the route falls back to the conversations. */
 @Composable
 internal inline fun <reified PopRoute : Any> rememberProjectsCapabilities(
     navController: NavHostController,
@@ -25,19 +30,11 @@ internal inline fun <reified PopRoute : Any> rememberProjectsCapabilities(
 ): ProjectsCapabilitiesState {
     val capabilities: CapabilityViewModel = hiltViewModel()
     val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
-    val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val unavailableMessage = stringResource(R.string.screen_projects_unavailable_message)
     if (!projectsSupported) {
         LaunchedEffect(Unit) {
-            if (tryPopBackFirst) {
-                if (!navController.popBackStack()) {
-                    navController.navigate(ConversationsRoute) {
-                        popUpTo<PopRoute> { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            } else {
+            if (!tryPopBackFirst || !navController.popBackStack()) {
                 navController.navigate(ConversationsRoute) {
                     popUpTo<PopRoute> { inclusive = true }
                     launchSingleTop = true
@@ -46,70 +43,36 @@ internal inline fun <reified PopRoute : Any> rememberProjectsCapabilities(
             snackbar.dispatch(unavailableMessage)
         }
     }
-    return ProjectsCapabilitiesState(
-        projectsSupported = projectsSupported,
-        projectWorkSupported = projectWorkSupported,
-    )
-}
-
-@Composable
-internal fun rememberProjectWorkSupportedOrPopBack(navController: NavHostController): Boolean {
-    val capabilities: CapabilityViewModel = hiltViewModel()
-    val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
-    if (!projectWorkSupported) {
-        LaunchedEffect(Unit) {
-            navController.popBackStack()
-        }
-    }
-    return projectWorkSupported
+    return ProjectsCapabilitiesState(projectsSupported = projectsSupported)
 }
 
 @Composable
 internal fun ProjectHomeRouteScreen(
     navController: NavHostController,
-    projectWorkSupported: Boolean,
     onNavigateBack: (() -> Unit)?,
-    activeBackendLabel: String? = null,
-    onNavigateToBackendSwitcher: (() -> Unit)? = null,
+    backend: ProjectsBackendLabel? = null,
 ) {
-    ProjectHomeScreen(
-        onNavigateBack = onNavigateBack,
-        onNavigateToProjectChat = projectHomeNavigateToChat(navController),
-        onNavigateToProjectIssues = projectHomeNavigateToIssues(navController),
-        onNavigateToPmAgentChat = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
-        onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-        onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
-        projectWorkSupported = projectWorkSupported,
-        activeBackendLabel = activeBackendLabel,
-        onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
-    )
+    val navigation = remember(navController, onNavigateBack, backend) {
+        ProjectHomeNavigation(
+            onBack = onNavigateBack,
+            onOpenChat = { project, intent -> navController.navigate(project.chatRoute(intent)) },
+            onSettings = { navController.navigate(ConfigRoute()) },
+            backendLabel = backend?.label,
+            onBackendSwitcher = backend?.onOpenSwitcher,
+        )
+    }
+    ProjectHomeScreen(navigation = navigation)
 }
 
-private fun projectHomeNavigateToChat(
-    navController: NavHostController,
-): (ProjectSummary, String?) -> Unit = { project, projectStartAction ->
-    navController.navigate(
-        AgentChatRoute(
-            agentId = project.lettaAgentId?.value.orEmpty(),
-            projectIdentifier = project.identifier,
-            projectName = project.name,
-            projectLettaFolderId = project.lettaFolderId,
-            projectFilesystemPath = project.filesystemPath,
-            projectGitUrl = project.gitUrl,
-            projectLastSyncAt = project.lastSyncAt,
-            projectActiveCodingAgents = project.techStack,
-            projectStartAction = projectStartAction,
-        )
-    )
-}
-
-private fun projectHomeNavigateToIssues(
-    navController: NavHostController,
-): (ProjectSummary) -> Unit = { project ->
-    navController.navigate(
-        ProjectIssuesRoute(
-            projectId = project.identifier,
-            projectName = project.name,
-        )
-    )
-}
+/** The project's agent's chat, carrying the project's context (and the bug-report start). */
+internal fun ProjectSummary.chatRoute(intent: ProjectChatIntent): AgentChatRoute = AgentChatRoute(
+    agentId = lettaAgentId?.value.orEmpty(),
+    projectIdentifier = identifier,
+    projectName = name,
+    projectLettaFolderId = lettaFolderId,
+    projectFilesystemPath = filesystemPath,
+    projectGitUrl = gitUrl,
+    projectLastSyncAt = lastSyncAt,
+    projectActiveCodingAgents = techStack,
+    projectStartAction = ProjectChatStartAction.BUG_REPORT.takeIf { intent == ProjectChatIntent.BugReport },
+)
