@@ -3,10 +3,7 @@ package com.letta.mobile.ui.shell.sidebar
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +17,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
 
 /** Test tags for the rename dialog. */
 object ShellRenameChatDialogTags {
@@ -28,8 +29,8 @@ object ShellRenameChatDialogTags {
 }
 
 /**
- * letta-mobile-zxk2n.5 (G92): `/rename` for the open chat, a dialog with the title selected. Save
- * (or Enter) keeps a changed, non-blank title; anything else leaves the chat as it was.
+ * letta-mobile-zxk2n.5 (G92): `/rename` for the open chat, an alert pane with the title selected.
+ * Save (or Enter) keeps a changed, non-blank title; anything else leaves the chat as it was.
  */
 @Composable
 fun ShellRenameChatDialog(title: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
@@ -41,23 +42,20 @@ fun ShellRenameChatDialog(title: String, onRename: (String) -> Unit, onDismiss: 
         if (canSave) onRename(trimmed)
         onDismiss()
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename chat") },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { save() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(ShellRenameChatDialogTags.FIELD),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = save, enabled = canSave, modifier = Modifier.testTag(ShellRenameChatDialogTags.SAVE)) { Text("Save") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton("Save", save, enabled = canSave, testTag = ShellRenameChatDialogTags.SAVE),
+        dismiss = LettaPaneButton("Cancel", onDismiss),
     )
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    LettaAlertPane(LettaAlertSpec("Rename chat", buttons), onDismiss) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { value = it },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { save() }),
+            modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag(ShellRenameChatDialogTags.FIELD),
+        )
+        // Inside the pane, so it runs after the pane takes focus and the field keeps the caret.
+        LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    }
 }

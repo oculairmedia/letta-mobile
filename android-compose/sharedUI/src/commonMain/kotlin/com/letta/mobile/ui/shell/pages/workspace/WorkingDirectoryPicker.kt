@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,7 +83,11 @@ import com.letta.mobile.ui.components.picker.PickerSearch
 import com.letta.mobile.ui.components.picker.PickerSection
 import com.letta.mobile.ui.components.picker.PickerSlots
 import com.letta.mobile.ui.components.picker.PickerTags
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
 import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -101,8 +103,6 @@ import org.jetbrains.compose.resources.stringResource
 data class WorkingDirectoryPickerHost(
     val openInFileManager: ((String) -> Unit)? = null,
     val pickWithSystemDialog: (() -> Unit)? = null,
-    /** Uses the sheet even in a wide window (a phone frame inside a desktop window). */
-    val forceSheet: Boolean = false,
 )
 
 /** Test tags of the working-directory picker. */
@@ -131,8 +131,9 @@ object WorkingDirectoryPickerTags {
 /**
  * letta-mobile-zxk2n.6 (G32): the shared working-directory picker: browse the device's folders,
  * type a path, create a folder, reopen a recent folder, or move between the repository and its
- * letta-code worktrees. "Use this folder" applies from the next turn. A dialog in a wide window,
- * a bottom sheet on a phone; it draws nothing while [state] is closed.
+ * letta-code worktrees. "Use this folder" applies from the next turn. The host's modal pane (a
+ * dialog on a pointer or in a wide window, a bottom sheet on a phone); it draws nothing while [state]
+ * is closed.
  */
 @Composable
 fun WorkingDirectoryPicker(
@@ -142,11 +143,7 @@ fun WorkingDirectoryPicker(
     host: WorkingDirectoryPickerHost = WorkingDirectoryPickerHost(),
 ) {
     if (!state.isOpen) return
-    BoxWithConstraints(modifier) {
-        // A dialog in a wide window, a sheet on a phone (or a phone frame inside a desktop window).
-        val kind = if (maxWidth >= LettaDimens.Pane.wideBreakpoint && !host.forceSheet) LettaPaneKind.Dialog else LettaPaneKind.Sheet
-        LettaPane(kind, onDismiss = actions::dismiss) { PickerContent(state, actions, host) }
-    }
+    LettaPane(LettaPaneKind.Modal, onDismiss = actions::dismiss, modifier = modifier) { PickerContent(state, actions, host) }
 }
 
 @Composable
@@ -289,27 +286,21 @@ private fun ToolbarButton(spec: ToolbarSpec, enabled: Boolean = true, onClick: (
 private fun NewFolderDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     val valid = FolderName(name).isValid
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.cwd_picker_new_folder)) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(Res.string.cwd_picker_new_folder_name)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (valid) onCreate(name) }),
-                modifier = Modifier.testTag(WorkingDirectoryPickerTags.NEW_FOLDER_NAME),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onCreate(name) }, enabled = valid, modifier = Modifier.testTag(WorkingDirectoryPickerTags.CREATE)) {
-                Text(stringResource(Res.string.cwd_picker_create))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cwd_picker_cancel)) } },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton(stringResource(Res.string.cwd_picker_create), { onCreate(name) }, enabled = valid, testTag = WorkingDirectoryPickerTags.CREATE),
+        dismiss = LettaPaneButton(stringResource(Res.string.cwd_picker_cancel), onDismiss),
     )
+    LettaAlertPane(LettaAlertSpec(stringResource(Res.string.cwd_picker_new_folder), buttons), onDismiss) {
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(stringResource(Res.string.cwd_picker_new_folder_name)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { if (valid) onCreate(name) }),
+            modifier = Modifier.fillMaxWidth().testTag(WorkingDirectoryPickerTags.NEW_FOLDER_NAME),
+        )
+    }
 }
 
 /** The current error, growing in place (snapping under reduced motion). */

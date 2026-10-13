@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsProperties
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneTags
+import com.letta.mobile.ui.host.LocalPaneWindowClass
+import com.letta.mobile.ui.host.PaneWindowClass
 import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -188,9 +191,12 @@ class LettaPickerTest {
     fun thePickerOpensInADialogOnPointerAndASheetOnTouch() = runComposeUiTest {
         var host by mutableStateOf(LettaHost.Pointer)
         setContent {
-            ProvideLettaHost(host) {
-                MaterialTheme {
-                    LettaPicker(LettaPickerSpec(listOf(fruit)), PickerCallbacks(onQuery = {}, onPick = {}))
+            // A phone-sized window: the touch host's modal is its sheet.
+            CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) {
+                ProvideLettaHost(host) {
+                    MaterialTheme {
+                        LettaPicker(LettaPickerSpec(listOf(fruit)), PickerCallbacks(onQuery = {}, onPick = {}))
+                    }
                 }
             }
         }

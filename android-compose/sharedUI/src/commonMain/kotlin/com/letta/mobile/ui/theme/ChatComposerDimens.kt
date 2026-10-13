@@ -35,6 +35,9 @@ object ChatComposerDimens {
     val modelSheetWidth: Dp = 560.dp
     val modelSheetMaxHeight: Dp = 540.dp
 
+    /** The `@` mention suggestions cap at this height and scroll. */
+    val mentionPickerMaxHeight: Dp = 320.dp
+
     /** Swipe-up-to-canvas: commit past this distance... */
     val swipeDistanceThreshold: Dp = 32.dp
 

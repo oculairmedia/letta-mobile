@@ -1,13 +1,9 @@
 package com.letta.mobile.ui.chat.branch
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +17,10 @@ import com.letta.mobile.sharedui.resources.fork_dialog_cancel
 import com.letta.mobile.sharedui.resources.fork_dialog_confirm
 import com.letta.mobile.sharedui.resources.fork_dialog_name
 import com.letta.mobile.sharedui.resources.fork_dialog_title
-import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
 import org.jetbrains.compose.resources.stringResource
 
 /** Test tags for [ForkNameDialog]. */
@@ -43,30 +42,22 @@ fun ForkNameDialog(
     initialName: String = "",
 ) {
     var name by remember { mutableStateOf(initialName) }
-    val confirm = { onFork(name.trim().takeIf { it.isNotEmpty() }) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag(ForkNameDialogTags.DIALOG),
-        title = { Text(stringResource(Res.string.fork_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Text(stringResource(Res.string.fork_dialog_body), style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(Res.string.fork_dialog_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag(ForkNameDialogTags.NAME),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = confirm, modifier = Modifier.testTag(ForkNameDialogTags.CONFIRM)) {
-                Text(stringResource(Res.string.fork_dialog_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.fork_dialog_cancel)) }
-        },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton(
+            stringResource(Res.string.fork_dialog_confirm),
+            onClick = { onFork(name.trim().takeIf { it.isNotEmpty() }) },
+            testTag = ForkNameDialogTags.CONFIRM,
+        ),
+        dismiss = LettaPaneButton(stringResource(Res.string.fork_dialog_cancel), onDismiss),
     )
+    LettaAlertPane(LettaAlertSpec(stringResource(Res.string.fork_dialog_title), buttons, testTag = ForkNameDialogTags.DIALOG), onDismiss) {
+        Text(stringResource(Res.string.fork_dialog_body), style = MaterialTheme.typography.bodyMedium)
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(stringResource(Res.string.fork_dialog_name)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().testTag(ForkNameDialogTags.NAME),
+        )
+    }
 }

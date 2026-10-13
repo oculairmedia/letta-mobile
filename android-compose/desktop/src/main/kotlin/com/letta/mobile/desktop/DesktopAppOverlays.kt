@@ -11,6 +11,10 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.palette.CommandPalettePane
+import com.letta.mobile.ui.shell.palette.NewConversationActions
+import com.letta.mobile.ui.shell.palette.NewConversationDirectory
+import com.letta.mobile.ui.shell.palette.NewConversationPicker
+import com.letta.mobile.ui.shell.palette.newConversationAgents
 import com.letta.mobile.desktop.chat.DesktopModelControlHost
 import com.letta.mobile.desktop.chat.DesktopModelControlOverlays
 import com.letta.mobile.desktop.chat.DesktopModelSurfaces
@@ -18,7 +22,7 @@ import com.letta.mobile.ui.components.ImageDropOverlay
 import com.letta.mobile.ui.host.LettaConfirmPane
 import com.letta.mobile.ui.host.LettaConfirmRequest
 
-/** Avatar chips shown in the New Conversation "Recent" row. */
+/** Agents shown in the New conversation picker's "Recent" section. */
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
 /** Mutable visibility flags for the app-level overlay stack. */
@@ -79,28 +83,13 @@ internal fun DesktopAppOverlays(
         onOpenProviders = { actions.onNavigate(DesktopDestination.Providers) },
     )
     if (visibility.newConversation) {
-        val directoryRows = remember(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId) {
-            buildNewConversationRows(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId)
+        val agents = remember(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId) {
+            newConversationAgents(data.railAgents, data.rosterAgents, data.avatarStyleByAgentId)
         }
-        DesktopNewConversationSurface(
-            recents = directoryRows.take(NEW_CONVERSATION_RECENTS_LIMIT),
-            directory = directoryRows,
-            actions = DesktopNewConversationActions(
-                onAgentSelected = {
-                    visibility.newConversation = false
-                    actions.onOpenAgent(it)
-                },
-                onCreateNewAgent = {
-                    visibility.newConversation = false
-                    actions.onNewAgent()
-                },
-                onDismiss = { visibility.newConversation = false },
-                onNewCanvas = {
-                    visibility.newConversation = false
-                    actions.onNewCanvas()
-                },
-            ),
-        )
+        // The picker closes itself (onDismiss) before it runs any of these.
+        val close = { visibility.newConversation = false }
+        val pickerActions = NewConversationActions(actions.onOpenAgent, actions.onNewAgent, close, actions.onNewCanvas)
+        NewConversationPicker(NewConversationDirectory(agents, NEW_CONVERSATION_RECENTS_LIMIT), pickerActions)
     }
     if (visibility.commandPalette) {
         CommandPalettePane(

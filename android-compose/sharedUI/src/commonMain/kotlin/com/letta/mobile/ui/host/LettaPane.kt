@@ -1,17 +1,8 @@
 package com.letta.mobile.ui.host
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * Shows [content] in the container the current [LettaHost] uses for [kind]. The pane is open while
@@ -34,7 +25,7 @@ fun LettaPane(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val host = LocalLettaHost.current
-    val resolved = host.resolve(kind)
+    val resolved = host.resolve(kind, currentPaneWindowClass())
     val spec = PaneSpec(onDismiss, title, resolved.anchorOrDefault(), size, testTag, modifier)
     when (resolved) {
         LettaPaneKind.Sheet -> host.sheet(spec, content)
@@ -70,26 +61,6 @@ fun LettaMenu(
     if (expanded) DismissWhenOwnerStops(onDismiss)
     if (!ownerIsStarted()) return
     LocalLettaHost.current.menu(expanded, PaneSpec(onDismiss = onDismiss, anchor = anchor, modifier = modifier), content)
-}
-
-/** A destructive action's confirmation: the request's message, then Cancel and the confirm action. */
-@Composable
-fun LettaConfirmPane(request: LettaConfirmRequest, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    LettaPane(LettaPaneKind.Alert, onDismiss = onDismiss, title = request.title, testTag = LettaPaneTags.CONFIRM) {
-        Text(
-            request.message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.xl),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.lg),
-            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm, Alignment.End),
-        ) {
-            TextButton(onClick = onDismiss) { Text(request.dismissLabel) }
-            TextButton(onClick = onConfirm) { Text(request.confirmLabel) }
-        }
-    }
 }
 
 private fun LettaPaneKind.anchorOrDefault(): PaneAnchor = when (this) {

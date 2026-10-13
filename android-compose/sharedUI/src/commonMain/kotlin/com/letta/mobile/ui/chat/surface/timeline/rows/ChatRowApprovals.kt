@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -20,7 +19,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +73,10 @@ import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.LettaDimens
@@ -431,28 +433,25 @@ private fun ApprovalActionRow(approval: UiApprovalRequest, decider: ApprovalDeci
 @Composable
 private fun RejectReasonDialog(onReject: (reason: String?) -> Unit, onDismiss: () -> Unit) {
     var reason by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REJECT_DIALOG),
-        title = { Text(stringResource(Res.string.rows_reject_title)) },
-        text = {
-            OutlinedTextField(
-                value = reason,
-                onValueChange = { reason = it },
-                label = { Text(stringResource(Res.string.rows_reject_reason)) },
-                placeholder = { Text(stringResource(Res.string.rows_reject_reason_placeholder)) },
-                minLines = REJECT_REASON_MIN_LINES,
-                modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_REASON),
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onReject(reason.takeIf { it.isNotBlank() }) },
-                modifier = Modifier.testTag(ChatRowTestTags.APPROVAL_REJECT_CONFIRM),
-            ) { Text(stringResource(Res.string.rows_reject)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.rows_cancel)) } },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton(
+            stringResource(Res.string.rows_reject),
+            onClick = { onReject(reason.takeIf { it.isNotBlank() }) },
+            testTag = ChatRowTestTags.APPROVAL_REJECT_CONFIRM,
+        ),
+        dismiss = LettaPaneButton(stringResource(Res.string.rows_cancel), onDismiss),
     )
+    val spec = LettaAlertSpec(stringResource(Res.string.rows_reject_title), buttons, testTag = ChatRowTestTags.APPROVAL_REJECT_DIALOG)
+    LettaAlertPane(spec, onDismiss) {
+        OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it },
+            label = { Text(stringResource(Res.string.rows_reject_reason)) },
+            placeholder = { Text(stringResource(Res.string.rows_reject_reason_placeholder)) },
+            minLines = REJECT_REASON_MIN_LINES,
+            modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.APPROVAL_REASON),
+        )
+    }
 }
 
 private const val REJECT_REASON_MIN_LINES = 3

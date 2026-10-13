@@ -6,14 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -23,6 +21,11 @@ import androidx.compose.ui.semantics.Role
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
 import com.letta.mobile.ui.components.LettaSectionLabel
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** letta-mobile-zxk2n.5 (G91, G37): what the Chat options dialog shows. */
@@ -67,20 +70,13 @@ object ShellChatOptionsTags {
  */
 @Composable
 fun ShellChatOptionsDialog(state: ShellChatOptionsState, actions: ShellChatOptionsActions, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag(ShellChatOptionsTags.DIALOG),
-        title = { Text("Chat options") },
-        text = { ShellChatOptionsContent(state, actions) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
-        dismissButton = actions.onDownloadTranscript?.takeIf { state.canDownloadTranscript }?.let { download ->
-            {
-                TextButton(onClick = download, modifier = Modifier.testTag(ShellChatOptionsTags.DOWNLOAD)) {
-                    Text("Download transcript")
-                }
-            }
-        },
+    val download = actions.onDownloadTranscript?.takeIf { state.canDownloadTranscript }
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton("Done", onDismiss),
+        extra = download?.let { LettaPaneButton("Download transcript", it, testTag = ShellChatOptionsTags.DOWNLOAD) },
     )
+    val spec = LettaAlertSpec("Chat options", buttons, kind = LettaPaneKind.Dialog, testTag = ShellChatOptionsTags.DIALOG)
+    LettaAlertPane(spec, onDismiss) { ShellChatOptionsContent(state, actions) }
 }
 
 @Composable

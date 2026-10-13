@@ -1,24 +1,24 @@
 package com.letta.mobile.ui.memory
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.memory.graph.MemoryBlockDeletion
 import com.letta.mobile.data.memory.graph.MemoryBlockDraft
 import com.letta.mobile.data.memory.graph.MemoryBlockLifecycleActions
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
-/** The page's modal layer: the "New block" sheet and the delete confirmation. */
+/** The page's modal layer: the "New block" pane and the delete confirmation. */
 @Composable
 internal fun MemoryBlockDialogs(
     creation: MemoryBlockDraft?,
@@ -35,26 +35,13 @@ internal fun MemoryBlockDialogs(
  */
 @Composable
 private fun MemoryBlockCreateDialog(draft: MemoryBlockDraft, actions: MemoryBlockLifecycleActions) {
-    AlertDialog(
-        onDismissRequest = actions::cancelCreate,
-        title = { Text("New memory block") },
-        text = { MemoryBlockCreateFields(draft, actions) },
-        confirmButton = {
-            TextButton(onClick = actions::submitCreate, enabled = draft.canSubmit) {
-                Text(if (draft.isSaving) "Creating…" else "Create")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = actions::cancelCreate, enabled = !draft.isSaving) { Text("Cancel") }
-        },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton(if (draft.isSaving) "Creating…" else "Create", actions::submitCreate, enabled = draft.canSubmit),
+        dismiss = LettaPaneButton("Cancel", actions::cancelCreate, enabled = !draft.isSaving),
     )
-}
-
-@Composable
-private fun MemoryBlockCreateFields(draft: MemoryBlockDraft, actions: MemoryBlockLifecycleActions) {
-    // Only flag the label once the user has typed something.
-    val labelError = draft.labelError.takeIf { draft.label.isNotEmpty() }
-    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
+    LettaAlertPane(LettaAlertSpec("New memory block", buttons, kind = LettaPaneKind.Dialog), actions::cancelCreate) {
+        // Only flag the label once the user has typed something.
+        val labelError = draft.labelError.takeIf { draft.label.isNotEmpty() }
         OutlinedTextField(
             value = draft.label,
             onValueChange = actions::updateCreateLabel,
@@ -81,32 +68,23 @@ private fun MemoryBlockCreateFields(draft: MemoryBlockDraft, actions: MemoryBloc
 /** Delete confirmation: deleting commits a MemFS removal, so it is never one tap. */
 @Composable
 private fun MemoryBlockDeleteDialog(deletion: MemoryBlockDeletion, actions: MemoryBlockLifecycleActions) {
-    AlertDialog(
-        onDismissRequest = actions::cancelDelete,
-        title = { Text("Delete “${deletion.ref.label}”?") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-                Text(
-                    "The block is removed from this agent's memory and the change is committed. " +
-                        "The agent stops seeing it on its next turn.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                deletion.error?.let { MemoryDialogError(it) }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = actions::confirmDelete, enabled = !deletion.isDeleting) {
-                Text(
-                    if (deletion.isDeleting) "Deleting…" else "Delete",
-                    color = MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = actions::cancelDelete, enabled = !deletion.isDeleting) { Text("Cancel") }
-        },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton(
+            if (deletion.isDeleting) "Deleting…" else "Delete",
+            actions::confirmDelete,
+            enabled = !deletion.isDeleting,
+            destructive = true,
+        ),
+        dismiss = LettaPaneButton("Cancel", actions::cancelDelete, enabled = !deletion.isDeleting),
     )
+    LettaAlertPane(LettaAlertSpec("Delete “${deletion.ref.label}”?", buttons), actions::cancelDelete) {
+        Text(
+            "The block is removed from this agent's memory and the change is committed. " +
+                "The agent stops seeing it on its next turn.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        deletion.error?.let { MemoryDialogError(it) }
+    }
 }
 
 @Composable
