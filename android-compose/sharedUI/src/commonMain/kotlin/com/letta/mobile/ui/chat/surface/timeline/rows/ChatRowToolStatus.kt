@@ -50,6 +50,7 @@ import org.jetbrains.compose.resources.stringResource
  * letta-mobile-bglj6.1.23: a tool call's state as the legacy Android cards showed it
  * (ChatToolCallCards' collapsed line; ProjectedToolTimeline's sheet rows): a status glyph at the
  * end of the line, an outcome row over the output, and a shimmering "Executing ..." while it runs.
+ * letta-mobile-ckmub.1.2: the line's glyph is the run's shared [RunStatusGlyph] now, leading the step row.
  */
 
 /** The glyph, its tint and its spoken name for a settled state; null while running or waiting. */
@@ -74,39 +75,12 @@ private fun warningTint(): Color {
     return if (warning == Color.Unspecified) MaterialTheme.colorScheme.tertiary else warning
 }
 
-/**
- * The glyph at the end of a tool's line: a turning refresh while it runs (still under reduced
- * motion), then a check, a warning or an error. Nothing while it waits on an approval.
- */
+/** A tool step's state in words, for its status glyph: "Running", "Awaiting approval", "Succeeded", ... */
 @Composable
-internal fun ToolStatusGlyph(state: ToolTimelineState) {
-    val size = Modifier.size(LettaDimens.Control.iconSm).testTag(ChatRowTestTags.TOOL_STATUS_GLYPH)
-    if (state == ToolTimelineState.Running) {
-        val angle = rememberSpinAngle(enabled = !LocalReducedMotion.current)
-        Icon(
-            imageVector = LettaIcons.Refresh,
-            contentDescription = stringResource(Res.string.rows_tool_status_running),
-            modifier = size.graphicsLayer { rotationZ = angle() },
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        return
-    }
-    val outcome = toolOutcome(state) ?: return
-    Icon(imageVector = outcome.icon, contentDescription = stringResource(outcome.label), modifier = size, tint = outcome.tint)
-}
-
-/** One turn every [SPIN_MILLIS] (the legacy 1200 ms), or 0 when [enabled] is false. Read in the draw phase. */
-@Composable
-private fun rememberSpinAngle(enabled: Boolean): () -> Float {
-    if (!enabled) return { 0f }
-    val transition = rememberInfiniteTransition(label = "toolStatusSpin")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = FULL_TURN,
-        animationSpec = infiniteRepeatable(tween(SPIN_MILLIS, easing = LinearEasing)),
-        label = "toolStatusSpinAngle",
-    )
-    return { angle }
+internal fun toolStateLabel(state: ToolTimelineState): String = when (state) {
+    ToolTimelineState.Running -> stringResource(Res.string.rows_tool_status_running)
+    ToolTimelineState.AwaitingApproval -> stringResource(Res.string.rows_tool_awaiting_approval)
+    else -> toolOutcome(state)?.let { stringResource(it.label) }.orEmpty()
 }
 
 /** The outcome over a settled tool's output: "Succeeded", "Failed", "Rejected" or "Warning", with its glyph. */
@@ -186,8 +160,6 @@ internal fun LiveStatusText(text: String, style: TextStyle, modifier: Modifier =
     )
 }
 
-private const val FULL_TURN = 360f
-private const val SPIN_MILLIS = 1_200
 private const val SHIMMER_MILLIS = 1_600
 private const val SHIMMER_BAND_FRACTION = 0.4f
 private val SHIMMER_MIN_BAND = 60.dp

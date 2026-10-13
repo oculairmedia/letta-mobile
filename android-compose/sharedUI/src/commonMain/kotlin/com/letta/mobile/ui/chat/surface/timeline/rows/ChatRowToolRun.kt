@@ -1,21 +1,15 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,9 +37,6 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.rows_command_count
-import com.letta.mobile.sharedui.resources.rows_step_done
-import com.letta.mobile.sharedui.resources.rows_step_failed
-import com.letta.mobile.sharedui.resources.rows_step_running
 import com.letta.mobile.sharedui.resources.rows_tool_run_approval
 import com.letta.mobile.sharedui.resources.rows_tool_run_default_name
 import com.letta.mobile.sharedui.resources.rows_tool_run_failed
@@ -57,10 +48,8 @@ import com.letta.mobile.sharedui.resources.rows_tool_run_show
 import com.letta.mobile.sharedui.resources.rows_tool_run_state
 import com.letta.mobile.sharedui.resources.rows_tool_run_summary
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
-import com.letta.mobile.ui.chat.surface.touchStyle
 import com.letta.mobile.ui.components.ChevronIndication
 import com.letta.mobile.ui.components.DisclosureChevron
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.host.InspectorPane
@@ -80,13 +69,13 @@ import kotlin.time.Clock
  * letta-mobile-bglj6.1: a run's (or a message's) tool calls as ONE quiet summary line, as the
  * Android timeline draws them (feature-chat ProjectedToolTimelineGroupCard / ToolRunSummaryRow):
  * "Ran 2 commands", "2 ran - 1 failed" in the error tint, "Running Bash - 1 command - 0:12" while
- * one runs. Tapping it shows each call as a full [ToolCard] (command, output, copy): in a bottom
+ * one runs. Tapping it shows each call as its step row ([ToolStepList]; command, output): in a bottom
  * sheet on a touch host ([ChatToolDetails.Sheet]), or expanded in place under the line, as a
  * disclosure, on a pointer host ([ChatToolDetails.Inline]). Approvals that wait on the user show
  * their controls under the line.
  *
- * letta-mobile-ckmub.1 (hard cut S4): the line sits on its own under the run's header, as the
- * legacy RunBlock draws it (the header is the run's, see [RunBlockRow]).
+ * letta-mobile-ckmub.1.2: this line is a lone tool-calling message's (outside a run block). Inside a
+ * run the calls list as step rows straight under the run's summary line ([RunToolSteps]).
  *
  * letta-mobile-sieej: an approval the run waits on (a runtime question, or a permission gate parked
  * under "Ask"/"Strict", relayed or local) is never folded into the line's disclosure: its card,
@@ -124,7 +113,7 @@ internal fun ToolRunGroup(
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (inline) ToolRunInlineCards(visible = detailsOpen, ToolRunDetails(toolCalls), callbacks)
+        if (inline) ToolRunInlineCards(visible = detailsOpen, ToolRunDetails(calls), callbacks)
         // Each request keeps its own slot, so answering one folds its card away (animated) in place.
         approvals.forEach { approval ->
             key(approval.requestId) {
@@ -133,14 +122,14 @@ internal fun ToolRunGroup(
         }
     }
     if (detailsOpen && !inline) {
-        val sheet = ToolRunSheetContent(ToolRunDetails(toolCalls), ToolRunLine(summary, startedAtEpochMs))
+        val sheet = ToolRunSheetContent(ToolRunDetails(calls), ToolRunLine(summary, startedAtEpochMs))
         ToolRunDetailsSheet(sheet, callbacks) { detailsOpen = false }
     }
 }
 
 /** What the line's disclosure opens: the calls in full (a waiting approval is never in here). */
 @Immutable
-private class ToolRunDetails(val toolCalls: ImmutableList<UiToolCall>)
+private class ToolRunDetails(val calls: ToolRunCalls)
 
 /** The touch host's sheet: the line's [details] under a title that says what the line says. */
 @Immutable
@@ -178,7 +167,7 @@ private fun ColumnScope.ToolRunInlineCards(
             modifier = Modifier.testTag(ChatRowTestTags.TOOL_RUN_INLINE).padding(bottom = LettaDimens.Space.xs),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            ToolRunCards(toolCalls = details.toolCalls, callbacks = callbacks)
+            ToolStepList(details.calls, callbacks)
         }
     }
 }
@@ -206,10 +195,7 @@ internal data class ToolRunSummary(
 )
 
 internal fun summarizeToolRun(toolCalls: List<UiToolCall>, approvals: List<UiApprovalRequest> = emptyList()): ToolRunSummary {
-    val states = toolCalls.map { call ->
-        val request = approvals.firstOrNull { request -> request.toolCalls.any { it.toolCallId == call.toolCallId } }
-        call to call.runState(request, toolCalls)
-    }
+    val states = toolCalls.map { call -> call to call.runState(approvals.requestFor(call), toolCalls) }
     return ToolRunSummary(
         toolCount = toolCalls.size,
         failureCount = states.count { (_, state) -> state == ToolTimelineState.Failed || state == ToolTimelineState.Rejected },
@@ -219,12 +205,16 @@ internal fun summarizeToolRun(toolCalls: List<UiToolCall>, approvals: List<UiApp
     )
 }
 
+/** The request (if any) that carries [call]. */
+internal fun List<UiApprovalRequest>.requestFor(call: UiToolCall): UiApprovalRequest? =
+    firstOrNull { request -> request.toolCalls.any { it.toolCallId == call.toolCallId } }
+
 /**
  * letta-mobile-sieej: a call a parked permission gate holds reads "awaiting approval", not
  * "running": the shared classifier only knows runtime questions, since a gate is only parked while
  * the request carries the host's control request ([isWaitingOn]).
  */
-private fun UiToolCall.runState(request: UiApprovalRequest?, toolCalls: List<UiToolCall>): ToolTimelineState {
+internal fun UiToolCall.runState(request: UiApprovalRequest?, toolCalls: List<UiToolCall>): ToolTimelineState {
     val state = classifyToolCallState(this, request)
     val parked = request != null && result == null && approvalDecision == null && request.isWaitingOn(toolCalls)
     return if (parked && state == ToolTimelineState.Running) ToolTimelineState.AwaitingApproval else state
@@ -293,7 +283,7 @@ private fun toolRunColor(summary: ToolRunSummary, lifted: Boolean): Color {
 }
 
 @Composable
-private fun toolRunLabel(summary: ToolRunSummary, elapsedSeconds: Long): String {
+internal fun toolRunLabel(summary: ToolRunSummary, elapsedSeconds: Long): String {
     val commands = pluralStringResource(Res.plurals.rows_command_count, summary.toolCount, summary.toolCount)
     return when {
         summary.awaitingApprovalCount > 0 -> stringResource(Res.string.rows_tool_run_approval, commands)
@@ -325,7 +315,7 @@ private fun elapsedSecondsSince(startedAtEpochMs: Long?): Long? =
 private const val ELAPSED_TICK_MILLIS = 1_000L
 
 /**
- * The run's calls in full, one [ToolCard] each, led by its step status: in the window's inspector
+ * The calls in full, one step row ([ToolStepList]) each: in the window's inspector
  * (docked when wide, a sheet when compact; letta-mobile-ckmub.3.15), titled with the run's line.
  */
 @Composable
@@ -349,52 +339,7 @@ private fun ToolRunDetailsSheet(
                 .padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, bottom = LettaDimens.Space.xxl),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
-            ToolRunCards(details.toolCalls, callbacks)
-        }
-    }
-}
-
-/** Each call as a full [ToolCard], led by its step status: the sheet's body, or the inline disclosure's. */
-@Composable
-private fun ToolRunCards(toolCalls: ImmutableList<UiToolCall>, callbacks: ChatRowCallbacks, modifier: Modifier = Modifier) {
-    // On a phone each row carries its own status glyph (letta-mobile-bglj6.1.23): no leading step circle.
-    val stepCircles = !touchStyle()
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
-        toolCalls.forEachIndexed { index, call ->
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs)) {
-                if (stepCircles) Box(modifier = Modifier.padding(top = LettaDimens.Space.sm)) { StepStatusCircle(call.stepState()) }
-                Box(modifier = Modifier.weight(1f)) {
-                    ToolCard(call, call.disclosureKey().ifBlank { "sheet:$index" }, callbacks)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun StepStatusCircle(state: StepState) {
-    val accent = MaterialTheme.colorScheme.primary
-    val size = Modifier.size(LettaDimens.Control.iconSm)
-    when (state) {
-        StepState.Done -> Box(size.background(accent, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = LettaIcons.Check,
-                contentDescription = stringResource(Res.string.rows_step_done),
-                modifier = size,
-                tint = MaterialTheme.colorScheme.onPrimary,
-            )
-        }
-        StepState.Running -> {
-            val label = stringResource(Res.string.rows_step_running)
-            Box(size.border(LettaDimens.Stroke.hairline, accent, CircleShape).semantics { contentDescription = label })
-        }
-        StepState.Error -> Box(size.background(MaterialTheme.colorScheme.error, CircleShape), contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = LettaIcons.Close,
-                contentDescription = stringResource(Res.string.rows_step_failed),
-                modifier = size,
-                tint = MaterialTheme.colorScheme.onError,
-            )
+            ToolStepList(details.calls, callbacks)
         }
     }
 }

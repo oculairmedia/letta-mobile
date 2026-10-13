@@ -45,6 +45,10 @@ import kotlinx.collections.immutable.toImmutableList
  * default, working or settled alike: only its prose shows under the line. Opening the line lists the
  * work steps indented under it, each with its own disclosure. A request waiting on the person holds
  * the run open (letta-mobile-sieej).
+ *
+ * letta-mobile-ckmub.1.2: one disclosure per level. The run's tool calls list as step rows
+ * ([RunToolSteps]: LettaListRow, the summary line's own status glyph, one chevron per step with
+ * details) straight under the summary line; there is no intermediate "Ran 2 commands" row.
  */
 @Composable
 internal fun RunBlockRow(
@@ -335,7 +339,7 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
         is RunStep.Message -> Box(modifier = modifier.fillMaxWidth()) {
             ChatMessageRow(step.message, row.context, row.callbacks, positioned.position)
         }
-        is RunStep.ToolCalls -> ToolRunGroup(
+        is RunStep.ToolCalls -> RunToolSteps(
             calls = step.calls,
             context = row.context,
             callbacks = row.callbacks,
@@ -368,7 +372,7 @@ internal sealed interface RunStep {
         override val key: String = message.id
     }
 
-    /** Every tool call of the run, in one summary at the first tool call's position. */
+    /** Every tool call of the run, listed as step rows at the first tool call's position. */
     @Immutable
     data class ToolCalls(
         val firstMessageId: String,

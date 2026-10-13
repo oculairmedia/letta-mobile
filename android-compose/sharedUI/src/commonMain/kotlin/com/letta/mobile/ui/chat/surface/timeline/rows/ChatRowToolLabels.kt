@@ -32,15 +32,6 @@ internal fun isToolStatusDone(status: String?): Boolean =
 
 private val DONE_STATUSES = listOf("completed", "success", "ok")
 
-/** Lifecycle state of a tool step, driving the leading status circle. */
-internal enum class StepState { Done, Running, Error }
-
-internal fun UiToolCall.stepState(): StepState = when {
-    isToolStatusError(status) -> StepState.Error
-    status == null || settled || isToolStatusDone(status) -> StepState.Done
-    else -> StepState.Running
-}
-
 internal fun UiToolCall.isErrorStatus(): Boolean = isToolStatusError(status)
 
 /**
@@ -52,12 +43,6 @@ internal fun UiToolCall.shouldInitiallyExpand(): Boolean =
 
 internal fun UiToolCall.disclosureKey(): String =
     toolCallId?.takeIf { it.isNotBlank() } ?: "$name:${arguments.hashCode()}"
-
-internal fun UiToolCall.copyPayload(): String =
-    listOfNotNull(
-        arguments.takeIf { it.isNotBlank() },
-        result?.takeIf { it.isNotBlank() },
-    ).joinToString("\n\n").ifBlank { name }
 
 /** A friendly verb + short target ("Ran ./gradlew …"), resolved to text in composition. */
 @Immutable

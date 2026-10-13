@@ -84,26 +84,31 @@ class ChatRowRunAlignmentUiTest {
         val prose = proseLeft()
         val row = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
         val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
-        assertTrue(abs(row.left - prose) < TOLERANCE_PX, "the run header row is inset:  vs the prose at ")
-        assertTrue(label.left > prose + TOLERANCE_PX, "the header's label lost the legacy inset:  vs ")
-        assertTrue(tools.top >= label.bottom - TOLERANCE_PX, "the tool summary is not below the header:  vs ")
+        val tools = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().first().boundsInRoot
+        assertTrue(abs(row.left - prose) < TOLERANCE_PX, "the run header row is inset: $row vs the prose at $prose")
+        assertTrue(label.left > prose + TOLERANCE_PX, "the header's label lost the legacy inset: $label vs $prose")
+        assertTrue(tools.top >= label.bottom - TOLERANCE_PX, "the first tool step is not below the header: $tools vs $label")
     }
 
     @Test
-    fun aRunWithToolsHasOneToolChevronOnEveryHost() {
+    fun aRunWithToolsListsOneStepRowPerCallOnEveryHost() {
         for (details in ChatToolDetails.entries) {
             for (width in WIDTHS_DP) {
                 runComposeUiTest {
                     show(run, newest = "b", details = details, widthDp = width)
-                    assertEquals(1, onAllNodesWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNodes().size, "$details @ $width")
-                    assertEquals(1, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")
-                    val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
+                    // ckmub.1.2: no group line; each call is a step row of its own under the summary.
+                    assertEquals(0, onAllNodesWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNodes().size, "$details @ $width")
+                    assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")
+                    val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
+                    assertEquals(2, steps.size, "$details @ $width")
                     val block = onNodeWithTag(ChatRowTestTags.RUN_BLOCK).fetchSemanticsNode().boundsInRoot
                     val label = onNodeWithText("Worked", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                    // The chevron ends at the run's right edge; the step sits indented under the summary's label.
-                    assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the chevron is inset: ${tools.right} vs ${block.right}")
-                    assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")
+                    steps.forEach { step ->
+                        val tools = step.boundsInRoot
+                        // The row ends at the run's right edge; the step sits indented under the summary's label.
+                        assertTrue(abs(tools.right - block.right) < TOLERANCE_PX, "the step row is inset: ${tools.right} vs ${block.right}")
+                        assertTrue(abs(tools.left - label.left) < TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")
+                    }
                 }
             }
         }

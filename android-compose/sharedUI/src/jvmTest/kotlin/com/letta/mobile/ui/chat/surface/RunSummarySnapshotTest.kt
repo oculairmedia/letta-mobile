@@ -13,10 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.model.UiMessage
@@ -28,7 +25,6 @@ import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
-import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import java.io.File
 import javax.imageio.ImageIO
@@ -125,10 +121,7 @@ class RunSummarySnapshotTest {
             }
         }
         repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
-        if (shot.expandTools) {
-            onNode(hasTestTag(ChatRowTestTags.TOOL_RUN_SUMMARY) and hasText("4 commands", substring = true)).performClick()
-            repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
-        }
+        // ckmub.1.2: an opened run lists its tool steps straight under its line; nothing more to tap.
         val image = onRoot().captureToImage().toAwtImage()
         val out = File("build/chat-surface-snapshots").apply { mkdirs() }.resolve("${shot.name}.png")
         ImageIO.write(image, "png", out)

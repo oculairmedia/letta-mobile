@@ -39,10 +39,11 @@ class TouchToolRowTest {
     )
 
     @Test
-    fun aSettledCallShowsItsEmojiAndASuccessGlyph() = runComposeUiTest {
+    fun aSettledCallLeadsWithTheSharedSuccessGlyph() = runComposeUiTest {
         setContent { TouchCard(call(status = "success", result = "a.txt")) }
-        onNodeWithTag(ChatRowTestTags.TOOL_EMOJI, useUnmergedTree = true).assertTextEquals("⚡")
-        onNodeWithContentDescription("Succeeded").assertExists()
+        // ckmub.1.2: the phone's step row is the shared one: the run's glyph leads, no emoji.
+        onNodeWithTag(ChatRowTestTags.TOOL_STATUS_GLYPH, useUnmergedTree = true).assertExists()
+        onNodeWithContentDescription("Succeeded", useUnmergedTree = true).assertExists()
         // Open, it heads the output with its outcome.
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         onNodeWithTag(ChatRowTestTags.TOOL_OUTCOME).assertExists()
@@ -51,7 +52,7 @@ class TouchToolRowTest {
     @Test
     fun aRunningCallTurnsItsGlyphAndSaysItIsExecuting() = runComposeUiTest {
         setContent { TouchCard(call(status = null, result = null)) }
-        onNodeWithContentDescription("Running").assertExists()
+        onNodeWithContentDescription("Running", useUnmergedTree = true).assertExists()
         onNodeWithTag(ChatRowTestTags.TOOL_EXECUTING).assertTextEquals("Executing Bash…")
     }
 

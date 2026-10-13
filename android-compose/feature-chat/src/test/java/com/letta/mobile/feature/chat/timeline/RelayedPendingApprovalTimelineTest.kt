@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.model.AppTheme
@@ -76,20 +79,45 @@ class RelayedPendingApprovalTimelineTest {
             }
         }
         composeRule.mainClock.advanceTimeBy(SETTLE_MILLIS)
+        awaitText("Approval requested")
 
+        // The card and its controls show without a tap.
+        composeRule.onNodeWithTag(APPROVAL_SLOT).assertIsDisplayed()
         composeRule.onNodeWithText("Approval requested").assertIsDisplayed()
         composeRule.onNodeWithText("Approve").assertIsDisplayed()
         composeRule.onNodeWithText("Reject").assertIsDisplayed()
-        composeRule.onNodeWithText("Approval needed - 1 command").assertIsDisplayed()
+        // ckmub.1.2: the parked call is one step row straight under the run's line (its glyph says it
+        // waits), not an "Approval needed - 1 command" group line.
+        composeRule.onAllNodesWithTag(STEP_ROW).assertCountEquals(1)
+        composeRule.onNodeWithTag(STEP_ROW).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Awaiting approval", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag(GROUP_LINE).assertDoesNotExist()
         // The run's header says it waits, and so does the composer's token (not "Thinking…").
         composeRule.onNodeWithText("Waiting for your approval").assertIsDisplayed()
         composeRule.onNodeWithText("Thinking", substring = true).assertDoesNotExist()
         composeRule.onAllNodesWithText("Waiting for your approval", substring = true).assertCountEquals(2)
     }
 
+    /** Steps the manual clock until [text] is in the settled tree (markdown parses off the UI thread). */
+    private fun awaitText(text: String) {
+        val deadline = System.nanoTime() + AWAIT_TIMEOUT_NANOS
+        while (composeRule.onAllNodesWithText(text, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+            check(System.nanoTime() < deadline) { "\"$text\" never reached the semantics tree" }
+            composeRule.mainClock.advanceTimeByFrame()
+            Thread.sleep(2)
+        }
+    }
+
     private companion object {
         const val RUN_ID = "run-strict"
         const val CALL_ID = "call-bash-1"
         const val SETTLE_MILLIS = 1_500L
+        const val AWAIT_TIMEOUT_NANOS = 30_000_000_000L
+
+        // sharedUI's ChatRowTestTags (internal to that module): the step row, the approval card's
+        // slot and the run-level tool line the rebuild removed.
+        const val STEP_ROW = "tool-card-toggle"
+        const val APPROVAL_SLOT = "chat-approval-slot"
+        const val GROUP_LINE = "tool-run-summary-row"
     }
 }

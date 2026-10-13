@@ -4,6 +4,9 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -64,7 +67,10 @@ class ChatRowLegacyParityUiTest {
         val opened = rowContext(itemState = renderState(collapsedRunIds = setOf("run-1")), newestMessageId = "a")
         setContent { MaterialTheme { RenderRow(runOf(reasoning, tools, reply), opened) } }
         awaitText("Fixed it.")
-        onNodeWithText("2 ran - 1 failed").assertExists()
+        // ckmub.1.2: the calls list as step rows under the line (no "2 ran - 1 failed" group row).
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
+        assertEquals(2, onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().size)
+        onNodeWithContentDescription("Failed", useUnmergedTree = true).assertExists()
         onNodeWithText("Fixed it.", substring = true).assertExists()
     }
 
@@ -108,11 +114,12 @@ class ChatRowLegacyParityUiTest {
         }
         onNodeWithText("Approval requested").assertExists()
         onNodeWithText("Approve").assertExists()
-        onNodeWithText("Approval needed - 1 command").assertExists()
-        // Opening the line's disclosure shows the calls, never a second card.
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).performClick()
+        // ckmub.1.2: the call is a step row straight under the run's line; opening it shows the
+        // call's details, never a second card.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
         waitForIdle()
-        onNodeWithText("Approval requested").assertExists()
+        assertEquals(1, onAllNodesWithText("Approval requested").fetchSemanticsNodes().size)
     }
 
     @Test

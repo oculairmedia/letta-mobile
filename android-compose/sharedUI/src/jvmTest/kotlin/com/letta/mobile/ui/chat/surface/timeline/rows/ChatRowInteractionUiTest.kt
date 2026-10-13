@@ -123,10 +123,11 @@ class ChatRowInteractionUiTest {
         setContent { MaterialTheme { ToolCard(tool, tool.status.orEmpty(), rowCallbacks()) } }
 
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
-        onNodeWithTag("tool-failure-badge", useUnmergedTree = true).assertDoesNotExist()
+        // ckmub.1.2: a failure reads in the step's leading glyph, not a trailing badge.
+        onNodeWithContentDescription("Failed", useUnmergedTree = true).assertDoesNotExist()
         runOnIdle { tool = toolCall(status = "failed", result = "boom") }
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertExists()
-        onNodeWithTag("tool-failure-badge", useUnmergedTree = true).assertExists()
+        onNodeWithContentDescription("Failed", useUnmergedTree = true).assertExists()
     }
 
     @Test

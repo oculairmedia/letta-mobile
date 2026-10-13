@@ -1,25 +1,17 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -31,33 +23,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import com.composables.icons.lucide.ArrowUpRight
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Terminal
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.classifyToolCallState
 import com.letta.mobile.data.chat.projection.extractSubagentNotification
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
-import com.letta.mobile.data.messaging.AgentMessageProvenance
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.sharedui.resources.Res
-import com.letta.mobile.sharedui.resources.rows_agent_message_state
-import com.letta.mobile.sharedui.resources.rows_collapse
 import com.letta.mobile.sharedui.resources.rows_copy_output
-import com.letta.mobile.sharedui.resources.rows_copy_tool_call
-import com.letta.mobile.sharedui.resources.rows_expand
-import com.letta.mobile.sharedui.resources.rows_state_collapsed
-import com.letta.mobile.sharedui.resources.rows_state_expanded
 import com.letta.mobile.sharedui.resources.rows_tool_argument_line
 import com.letta.mobile.sharedui.resources.rows_tool_done
 import com.letta.mobile.sharedui.resources.rows_tool_executing
@@ -65,16 +40,13 @@ import com.letta.mobile.sharedui.resources.rows_tool_output
 import com.letta.mobile.sharedui.resources.rows_tool_result_preview
 import com.letta.mobile.sharedui.resources.rows_tool_status_duration
 import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
-import com.letta.mobile.ui.chat.render.ToolEmojis
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.chat.surface.touchStyle
-import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
 import com.letta.mobile.ui.shell.pages.workspace.ToolCallFileLink
-import com.letta.mobile.ui.theme.ChatRowDimens
 import com.letta.mobile.ui.theme.ChatRowMotion
-import com.letta.mobile.ui.theme.ChatRowType
+import com.letta.mobile.ui.theme.ChatRowSpacing
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlinx.collections.immutable.toImmutableList
@@ -83,10 +55,16 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * letta-mobile-bglj6.1: one tool call, lifted from desktop's ToolCard.
  *
- * Chrome-less when it succeeds (a one-line activity row); failures keep an outlined card so
- * they are noticed. Completed tools start collapsed; failures, running and image tools start
- * expanded. The disclosure is keyed on [disclosureKey], not on the call's status, so a manual
- * collapse survives the running -> completed refresh.
+ * letta-mobile-ckmub.1.2: one step row on every host, built from the shared primitives
+ * ([RunStepListRow]: a [com.letta.mobile.ui.components.LettaListRow] led by the run's
+ * [RunStatusGlyph], the tool's name, a one-line preview of its command, and the shared
+ * [com.letta.mobile.ui.components.DisclosureChevron] only when it has details). Success, failure and
+ * running read in the glyph alone: no outlined card, no emoji, no trailing badge. Open, its details
+ * (the command and the output) read in [ToolOutputBlock] under the row, flush with its title.
+ *
+ * Completed tools start collapsed; failures, running and image tools start expanded (a call parked
+ * on an approval does not: its card shows the command). The disclosure is keyed on [disclosureKey],
+ * not on the call's status, so a manual collapse survives the running -> completed refresh.
  *
  * Android behaviour added: a subagent dispatch renders as [SubagentDispatchCard], and
  * expanding a call whose result is a truncated preview asks the owner for the full body
@@ -97,50 +75,38 @@ internal fun ToolCard(
     toolCall: UiToolCall,
     disclosureKey: String,
     callbacks: ChatRowCallbacks,
+    /** The call's state read with the run's approvals; classified from the call alone when null. */
+    state: ToolTimelineState? = null,
 ) {
     val dispatch = toolCall.subagentDispatch
     if (dispatch != null) {
         SubagentDispatchCard(dispatch = dispatch, toolCall = toolCall, callbacks = callbacks)
         return
     }
-    var expanded by remember(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
+    val classified = remember(toolCall) { classifyToolCallState(toolCall) }
+    val view = ToolCardView(toolCall, state ?: classified, touchStyle())
+    var expanded by remember(disclosureKey) { mutableStateOf(view.startsExpanded) }
     RequestFullResultOnExpand(toolCall, expanded, callbacks)
-    val isError = toolCall.isErrorStatus()
     val haptics = LocalHaptics.current
-    val toggle = {
-        haptics.play(LettaHapticCue.SegmentTick)
-        expanded = !expanded
-    }
     val reducedMotion = LocalReducedMotion.current
-    // letta-mobile-bglj6.1.23: the phone draws the legacy status row (emoji, status glyph, 48dp
-    // header, outcome row); its glyph marks a failure, so the row needs no outlined card.
-    val touch = touchStyle()
-    val view = ToolCardView(toolCall, remember(toolCall) { classifyToolCallState(toolCall) }, touch)
-    val body: @Composable () -> Unit = {
-        Column {
-            ToolCardHeader(view, ToolDisclosure(expanded) { toggle() }, callbacks)
-            // letta-mobile-bglj6.1.19: the body unfurls from the leading edge (legacy
-            // ChatToolCallCards / LettaMotion.unfurlEnter, 190 ms in, 130 ms out).
-            AnimatedVisibility(
-                visible = expanded,
-                enter = ChatRowMotion(reducedMotion).unfurlEnter(),
-                exit = ChatRowMotion(reducedMotion).unfurlExit(),
-                label = "toolCardBody",
-            ) {
-                ToolCardBody(view, isError, callbacks)
-            }
-        }
-    }
-    if (isError && !touch) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(LettaDimens.Radius.sm),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.error),
-            content = body,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        RunStepListRow(
+            spec = toolStepRowSpec(view, callbacks),
+            disclosure = RunStepDisclosure(expanded) {
+                haptics.play(LettaHapticCue.SegmentTick)
+                expanded = !expanded
+            }.takeIf { view.hasDetails },
         )
-    } else {
-        Box(modifier = Modifier.fillMaxWidth()) { body() }
+        // letta-mobile-bglj6.1.19: the body unfurls from the leading edge (legacy
+        // ChatToolCallCards / LettaMotion.unfurlEnter, 190 ms in, 130 ms out).
+        AnimatedVisibility(
+            visible = expanded && view.hasDetails,
+            enter = ChatRowMotion(reducedMotion).unfurlEnter(),
+            exit = ChatRowMotion(reducedMotion).unfurlExit(),
+            label = "toolCardBody",
+        ) {
+            ToolCardBody(view, toolCall.isErrorStatus(), callbacks)
+        }
     }
 }
 
@@ -153,202 +119,58 @@ private fun RequestFullResultOnExpand(toolCall: UiToolCall, expanded: Boolean, c
     }
 }
 
-/** One tool call as a card draws it: the call, its classified state, and whether the host is a phone. */
+/** One tool call as a step draws it: the call, its state, and whether the host is a phone. */
 @Immutable
 private class ToolCardView(val toolCall: UiToolCall, val state: ToolTimelineState, val touch: Boolean) {
     /** A phone heads a settled call's output with its outcome row instead of "Output". */
     val headsOutputWithOutcome: Boolean
         get() = touch && state !in UnsettledStates
+
+    /** A call parked on an approval starts closed: the approval card under the steps shows its command. */
+    val startsExpanded: Boolean
+        get() = state != ToolTimelineState.AwaitingApproval && toolCall.shouldInitiallyExpand()
+
+    /** Something to open: the command, the output, images, the run time or an agent message. */
+    val hasDetails: Boolean
+        get() = toolCall.arguments.isNotBlank() ||
+            !toolCall.result.isNullOrBlank() ||
+            toolCall.generatedImageAttachments.isNotEmpty() ||
+            toolCall.executionTimeMs != null ||
+            toolCall.agentMessageProvenance != null ||
+            (touch && state == ToolTimelineState.Running)
 }
 
 private val UnsettledStates = setOf(ToolTimelineState.Running, ToolTimelineState.AwaitingApproval)
 
-@Composable
-private fun ToolCardHeader(
-    view: ToolCardView,
-    disclosure: ToolDisclosure,
-    callbacks: ChatRowCallbacks,
-) {
-    val provenance = view.toolCall.agentMessageProvenance
-    when {
-        provenance != null -> ToolCardProvenanceHeader(provenance, disclosure.expanded, callbacks, disclosure.onToggle)
-        view.touch -> ToolCardTouchHeader(view, disclosure)
-        else -> ToolCardGenericHeader(view.toolCall, disclosure.expanded, disclosure.onToggle)
-    }
-}
-
-/** A card's disclosure: whether it is open, and how to flip it. */
-@Immutable
-private class ToolDisclosure(val expanded: Boolean, val onToggle: () -> Unit)
-
 /**
- * letta-mobile-bglj6.1.23: the legacy status row (CollapsibleStatusRow + ChatToolCallCards'
- * collapsed line): a 48dp header with the tool's emoji, its name in the section title, the
- * call's gist while closed, its status (duration, "Failed", ...) right-aligned while open, and
- * the status glyph: turning while it runs, then a check, a warning or an error.
+ * What the step row says: the tool's name over a one-line preview of its command (or its result's
+ * first short line); `agent_message_send` reads as an agent message (sender -> recipient) over its
+ * delivery state.
  */
 @Composable
-private fun ToolCardTouchHeader(view: ToolCardView, disclosure: ToolDisclosure) {
+private fun toolStepRowSpec(view: ToolCardView, callbacks: ChatRowCallbacks): RunStepRowSpec {
     val toolCall = view.toolCall
-    val expanded = disclosure.expanded
-    val label = remember(toolCall) { toolCall.stepLabel() }
-    val labelText = label.text()
-    val collapsedSummary = labelText.takeUnless { it == toolCall.name } ?: toolCall.stepSummary()
-    val disclosureState = stringResource(if (expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
-            .clickable(onClick = disclosure.onToggle, role = Role.Button)
-            .semantics { stateDescription = disclosureState }
-            .heightIn(min = ChatRowDimens.toolHeaderMinHeight)
-            .padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Text(
-            text = ToolEmojis.forTool(toolCall.name),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.testTag(ChatRowTestTags.TOOL_EMOJI),
+    val provenance = toolCall.agentMessageProvenance
+    if (provenance != null) {
+        val failed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
+        val stateLabel = provenance.deliveryState.displayLabel()
+        return RunStepRowSpec(
+            title = provenance.compactLabel(callbacks.resolveAgentName),
+            subtitle = stateLabel,
+            tone = if (failed) RunSummaryTone.Failed else view.state.glyphTone(),
+            glyphLabel = stateLabel,
         )
-        Text(
-            text = toolCall.name,
-            style = ChatRowType.sectionTitle,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        val trailing = if (expanded) toolStatusLabel(view.state, toolCall.executionTimeMs) else collapsedSummary.takeIf { it.isNotBlank() }
-        Text(
-            text = trailing.orEmpty(),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (expanded) toolStatusColor(view.state) else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = if (expanded) TextAlign.End else TextAlign.Start,
-            modifier = Modifier.weight(1f),
-        )
-        ToolStatusGlyph(view.state)
-        ToolDisclosureIcon(expanded)
     }
-}
-
-/** `agent_message_send` reads as an agent message (sender -> recipient), not a tool name. */
-@Composable
-private fun ToolCardProvenanceHeader(
-    provenance: AgentMessageProvenance,
-    expanded: Boolean,
-    callbacks: ChatRowCallbacks,
-    onToggle: () -> Unit,
-) {
-    val isFailed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
-    val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-    val stateColor = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-    val label = provenance.compactLabel(callbacks.resolveAgentName)
-    val stateLabel = provenance.deliveryState.displayLabel()
-    val description = stringResource(Res.string.rows_agent_message_state, label, stateLabel.lowercase())
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
-            .clickable(onClick = onToggle)
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs)
-            .semantics { contentDescription = description },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = Lucide.ArrowUpRight,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-            tint = tint,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Text(text = stateLabel, style = MaterialTheme.typography.labelSmall, color = stateColor)
-        ToolDisclosureIcon(expanded)
-    }
-}
-
-@Composable
-private fun ToolDisclosureIcon(expanded: Boolean) {
-    DisclosureChevron(
-        expanded = expanded,
-        compact = true,
-        contentDescription = stringResource(if (expanded) Res.string.rows_collapse else Res.string.rows_expand),
-    )
-}
-
-@Composable
-private fun ToolCardGenericHeader(
-    toolCall: UiToolCall,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-) {
     // stepLabel parses the arguments JSON; remembered so a streamed token does not re-parse
-    // every visible card.
+    // every visible step.
     val label = remember(toolCall) { toolCall.stepLabel() }
-    val labelText = label.text()
-    val stepSummary = toolCall.stepSummary()
-    val collapsedSummary = labelText.takeUnless { it == toolCall.name } ?: stepSummary
-    val hoverSource = remember { MutableInteractionSource() }
-    val hovered by hoverSource.collectIsHoveredAsState()
-    val disclosureState = stringResource(if (expanded) Res.string.rows_state_expanded else Res.string.rows_state_collapsed)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ChatRowTestTags.TOOL_CARD_TOGGLE)
-            .clickable(onClick = onToggle, role = Role.Button)
-            .semantics { stateDescription = disclosureState }
-            .hoverable(hoverSource)
-            .padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-    ) {
-        Icon(
-            imageVector = Lucide.Terminal,
-            contentDescription = null,
-            modifier = Modifier.size(LettaDimens.Control.iconSm),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = toolCall.name,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (!expanded && collapsedSummary.isNotBlank()) {
-            Text(
-                text = collapsedSummary,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        ToolFailureBadge(toolCall.status)
-        if (expanded) {
-            Spacer(Modifier.weight(1f))
-            // Only offered while open: a copy hit target in every collapsed row would undo
-            // the compact activity-log rhythm.
-            CopyIconButton(
-                CopyAction(
-                    text = toolCall.copyPayload(),
-                    contentDescription = stringResource(Res.string.rows_copy_tool_call),
-                    visible = hovered,
-                ),
-            )
-        }
-        ToolDisclosureIcon(expanded)
-    }
+    val preview = label.target.ifBlank { toolCall.stepSummary() }
+    return RunStepRowSpec(
+        title = toolCall.name,
+        subtitle = preview.takeIf { it.isNotBlank() },
+        tone = view.state.glyphTone(),
+        glyphLabel = toolStateLabel(view.state),
+    )
 }
 
 @Composable
@@ -359,8 +181,8 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
         modifier = Modifier
             .testTag(ChatRowTestTags.TOOL_CARD_BODY)
             .padding(
-                start = LettaDimens.Space.xxl,
-                end = LettaDimens.Space.md,
+                start = ChatRowSpacing.runStepDetailIndent,
+                end = LettaDimens.Space.sm,
                 top = LettaDimens.Space.hair,
                 bottom = LettaDimens.Space.sm,
             ),
@@ -380,7 +202,7 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
                 modifier = Modifier.testTag(ChatRowTestTags.TOOL_EXECUTING),
             )
         }
-        toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolArgumentLine(it) }
+        toolCall.arguments.takeIf { it.isNotBlank() }?.let { ToolCommandBlock(it) }
         ToolCallFileLink(toolCall.arguments, toolName = toolCall.name)
         toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolResultSection(view, it, isError, callbacks) }
         ToolGeneratedImages(toolCall, callbacks)
@@ -388,7 +210,14 @@ private fun ToolCardBody(view: ToolCardView, isError: Boolean, callbacks: ChatRo
     }
 }
 
-/** A call's primary argument, monospace ("> echo hello"); also the Touch approval card's body. */
+/** An open step's command ("$ echo hello"), in the shared monospace [ToolOutputBlock]. */
+@Composable
+private fun ToolCommandBlock(arguments: String) {
+    val primary = remember(arguments) { primaryToolArgument(arguments) }
+    ToolOutputBlock(stringResource(Res.string.rows_tool_argument_line, primary))
+}
+
+/** A call's primary argument, monospace ("$ echo hello"): the Touch approval card's body. */
 @Composable
 internal fun ToolArgumentLine(arguments: String) {
     val primary = remember(arguments) { primaryToolArgument(arguments) }
