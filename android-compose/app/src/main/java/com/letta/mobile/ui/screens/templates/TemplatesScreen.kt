@@ -17,7 +17,7 @@ import com.letta.mobile.ui.shell.header.HeaderControls
 import com.letta.mobile.ui.shell.header.HeaderNav
 import com.letta.mobile.ui.shell.header.HeaderTitle
 import com.letta.mobile.ui.shell.header.ShellHeader
-import com.letta.mobile.ui.shell.pages.templates.TemplatesPageActions
+import com.letta.mobile.ui.shell.pages.templates.templatesPageActions
 import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.shell.shellTemplatesPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
@@ -33,12 +33,7 @@ fun TemplatesScreen(
     viewModel: TemplatesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val actions = remember(viewModel, onNavigateToAgent) {
-        TemplatesPageActions(
-            onCreate = { templateId -> viewModel.controller.create(templateId, onNavigateToAgent) },
-            onDismissError = viewModel.controller::clearError,
-        )
-    }
+    val actions = remember(viewModel, onNavigateToAgent) { viewModel.controller.templatesPageActions(onNavigateToAgent) }
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
@@ -48,10 +43,7 @@ fun TemplatesScreen(
             )
         },
     ) { paddingValues ->
-        ShellPage(
-            destination = ShellDestination.Templates,
-            deps = ShellPageDeps(admin = ShellAdminPages(templates = shellTemplatesPage(state, actions))),
-            modifier = Modifier.padding(paddingValues),
-        )
+        val page = ShellAdminPages(templates = shellTemplatesPage(state, actions))
+        ShellPage(ShellDestination.Templates, ShellPageDeps(admin = page), Modifier.padding(paddingValues))
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.projects.ProjectDraft
 import com.letta.mobile.data.projects.ProjectKey
+import com.letta.mobile.data.projects.ProjectsPageController
 import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -93,6 +94,39 @@ data class ProjectsPageActions(
     val list: ProjectsListActions = ProjectsListActions(),
     val detail: ProjectDetailActions = ProjectDetailActions(),
     val editor: ProjectEditorActions = ProjectEditorActions(),
+)
+
+/**
+ * The page's actions over the shared [ProjectsPageController] (letta-mobile-ckmub.2.6): every host binds
+ * the catalog the same way and only says where a project's chat opens ([onOpenChat]; null hides it).
+ */
+fun ProjectsPageController.projectsPageActions(onOpenChat: ((ProjectSummary, ProjectChatIntent) -> Unit)?) = ProjectsPageActions(
+    list = ProjectsListActions(
+        onRefresh = ::refresh,
+        onQueryChange = ::setQuery,
+        onSelect = ::select,
+        onTogglePinned = ::togglePinned,
+        onStartCreate = editor::startCreate,
+        onDismissNotice = ::dismissNotice,
+        onOpenChat = onOpenChat?.let { open ->
+            { project, intent ->
+                select(null)
+                open(project, intent)
+            }
+        },
+    ),
+    detail = ProjectDetailActions(
+        onStartEdit = editor::startEdit,
+        onSync = ::sync,
+        onProvisionBeads = ::provisionBeadsRemote,
+        onArchive = ::archive,
+        onDelete = ::delete,
+    ),
+    editor = ProjectEditorActions(
+        onDraftChange = editor::updateDraft,
+        onSubmit = editor::submit,
+        onClose = editor::close,
+    ),
 )
 
 /**

@@ -31,9 +31,9 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScre
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScreenDrawer.kt 146 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt 86 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 145 container
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeScreen.kt 95 container
+android-compose/app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeScreen.kt 66 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/providers/ProviderAdminScreen.kt 51 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorScreen.kt 66 container
+android-compose/app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorScreen.kt 52 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/schedules/ScheduleListScreen.kt 75 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/skills/SkillsScreen.kt 84 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/systemaccess/SystemAccessDashboardScreen.kt 630 legacy-pending(ckmub.2)
@@ -93,6 +93,7 @@ android-compose/designsystem/src/main/java/com/letta/mobile/ui/text/ChatTextGeom
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/ChatTheme.kt 257 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/Theme.kt 509 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/theme/TopBarTheme.kt 22 legacy-pending(ckmub.2)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopAdminPages.kt 137 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopAgentContextCard.kt 94 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopAppBootstrap.kt 504 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopAppOverlays.kt 129 legacy-pending(ckmub.3)
