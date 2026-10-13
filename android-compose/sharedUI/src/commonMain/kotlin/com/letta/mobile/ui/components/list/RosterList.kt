@@ -67,7 +67,7 @@ fun <T> RosterList(
     spec: RosterSpec<T>,
     modifier: Modifier = Modifier,
     state: RosterListState = rememberRosterListState(),
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     val base = remember(spec.sections, spec.options.columns) { RosterLayout.of(spec.sections, spec.options.columns, spec.key) }
     val drag = remember { RosterDrag() }
@@ -87,7 +87,7 @@ fun <T> RosterList(
         contentPadding = spec.options.contentPadding,
         verticalArrangement = Arrangement.spacedBy(spec.options.spacing),
     ) {
-        if (layout.isEmpty && (spec.options.loading || spec.empty != null)) {
+        if (layout.isEmpty && spec.hasEmptyState()) {
             item(key = "roster-state") { RosterEmptyState(spec.options, spec.empty) }
         } else {
             rosterLines(roster, row)
@@ -97,7 +97,7 @@ fun <T> RosterList(
 
 private fun <T> LazyListScope.rosterLines(
     roster: RosterScope<T>,
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     items(roster.layouts.shown.lines, key = { it.key }) { line -> RosterLineContent(line, roster, row) }
 }
@@ -106,7 +106,7 @@ private fun <T> LazyListScope.rosterLines(
 private fun <T> LazyItemScope.RosterLineContent(
     line: RosterLine<T>,
     roster: RosterScope<T>,
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     when (line) {
         is RosterLine.Header -> RosterHeader(line.section, roster.options.testTag)
@@ -121,7 +121,7 @@ private fun <T> LazyItemScope.RosterLineContent(
 private fun <T> LazyItemScope.RosterDraggableItem(
     line: RosterLine.Row<T>,
     roster: RosterScope<T>,
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     val drag = roster.focus.drag
     val dragging = drag.key == line.key
@@ -141,7 +141,7 @@ private fun <T> LazyItemScope.RosterDraggableItem(
 private fun <T> RosterCells(
     line: RosterLine.Cells<T>,
     roster: RosterScope<T>,
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     val columns = roster.options.columns
     Row(horizontalArrangement = Arrangement.spacedBy(roster.options.spacing)) {
@@ -152,8 +152,10 @@ private fun <T> RosterCells(
 
 /** A row's placement motion: displaced rows glide to their new places. Off under reduced motion. */
 @Composable
-fun LazyItemScope.rosterRowMotion(): Modifier =
-    if (LocalReducedMotion.current) Modifier else Modifier.animateItem()
+fun LazyItemScope.rosterRowMotion(): Modifier {
+    if (LocalReducedMotion.current) return Modifier
+    return Modifier.animateItem()
+}
 
 /** The host's layout and the one on screen (the host's, with a dragged row in its preview place). */
 private class RosterLayouts<T>(val base: RosterLayout<T>, val shown: RosterLayout<T>)
@@ -190,8 +192,25 @@ private class RosterScope<T>(
 
     fun canRename(line: RosterLine.Row<T>): Boolean = actions.rename?.canRename?.invoke(line.item) == true
 
+    /** What [line]'s row is right now: selection, the keyboard cursor, hover, its click, rename and drag. */
+    fun rowState(line: RosterLine.Row<T>, interaction: MutableInteractionSource, hovered: Boolean): RosterRowState {
+        val startRename: (() -> Unit)? = if (canRename(line)) ({ state.startRename(line.key) }) else null
+        return RosterRowState(
+            selected = selection.isSelected(line.item),
+            highlighted = state.cursor == line.key,
+            hovered = hovered,
+            onClick = { activate(line) },
+            startRename = startRename,
+            interaction = interaction,
+            dragging = focus.drag.key == line.key,
+        )
+    }
+
     /** A row drags when the host reorders, its section has somewhere to go, and the list is not a grid. */
-    fun canDrag(line: RosterLine.Row<T>): Boolean = actions.reorder != null && options.columns == 1 && line.sectionSize > 1
+    fun canDrag(line: RosterLine.Row<T>): Boolean {
+        val listReorders = actions.reorder != null && options.columns == 1
+        return listReorders && line.sectionSize > 1
+    }
 
     private fun moveCursor(index: Int, delta: Int): Boolean {
         val next = RosterKeys.move(index, delta, layout.rows.size)
@@ -231,13 +250,14 @@ private class RosterScope<T>(
     }
 
     /** The row menu: the caller's entries, then rename, the touch-only quick actions, and the moves. */
-    fun menu(line: RosterLine.Row<T>, row: RosterRowState, touch: Boolean): List<LettaMenuItem> = buildList {
-        addAll(actions.menu(line.item, row))
+    fun menu(line: RosterLine.Row<T>, row: RosterRowState, touch: Boolean): List<LettaMenuItem> {
+        val items = actions.menu(line.item, row).toMutableList()
         val renameLabel = actions.rename?.menuLabel
         val startRename = row.startRename
-        if (renameLabel != null && startRename != null) add(LettaMenuItem(renameLabel, onClick = startRename))
-        if (touch) actions.quick(line.item).forEach { add(LettaMenuItem(it.label, it.icon, onClick = it.onClick)) }
-        if (actions.reorder != null) addAll(moveItems(line))
+        if (renameLabel != null && startRename != null) items += LettaMenuItem(renameLabel, onClick = startRename)
+        if (touch) items += actions.quick(line.item).map { LettaMenuItem(it.label, it.icon, onClick = it.onClick) }
+        if (actions.reorder != null) items += moveItems(line)
+        return items
     }
 
     private fun moveItems(line: RosterLine.Row<T>): List<LettaMenuItem> = listOfNotNull(
@@ -254,7 +274,7 @@ private const val MOVE_DOWN = "Move down"
 private fun <T> RosterItem(
     line: RosterLine.Row<T>,
     roster: RosterScope<T>,
-    row: @Composable (item: T, row: RosterRowState) -> Unit,
+    row: RosterRowContent<T>,
 ) {
     val rename = roster.actions.rename
     if (rename != null && roster.state.renaming == line.key) {
@@ -269,40 +289,49 @@ private fun <T> RosterItem(
         )
         return
     }
+    RosterRowChrome(line, roster, row)
+}
+
+/** A row at rest: hover, the keyboard cursor's ring, selection, the drag, the menu, then the caller's [row]. */
+@Composable
+private fun <T> RosterRowChrome(
+    line: RosterLine.Row<T>,
+    roster: RosterScope<T>,
+    row: RosterRowContent<T>,
+) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val highlighted = roster.state.cursor == line.key
-    val rowState = RosterRowState(
-        selected = roster.selection.isSelected(line.item),
-        highlighted = highlighted,
-        hovered = hovered,
-        onClick = { roster.activate(line) },
-        startRename = if (roster.canRename(line)) ({ roster.state.startRename(line.key) }) else null,
-        interaction = interaction,
-        dragging = roster.focus.drag.key == line.key,
-    )
-    val host = LocalLettaHost.current
-    val touch = host.input == LettaInput.Touch
-    val menu = roster.menu(line, rowState, touch)
+    val rowState = roster.rowState(line, interaction, hovered)
+    val touch = LocalLettaHost.current.input == LettaInput.Touch
     val tag = roster.options.testTag.row(line.key)
-    val canDrag = roster.canDrag(line)
-    val rowDrag = remember { RosterRowDrag() }
-    val callbacks = roster.dragCallbacks(line)
-    SideEffect { rowDrag.callbacks = callbacks }
+    val drag = rememberRosterRowDrag(roster, line, touch)
     Box(
         Modifier
             .hoverable(interaction)
-            .cursorRing(highlighted && roster.focus.focused)
-            .rosterPointerDrag(enabled = canDrag && !touch, drag = rowDrag)
+            .cursorRing(rowState.highlighted && roster.focus.focused)
+            .rosterPointerDrag(enabled = drag.pointer, drag = drag.row)
             .semantics { selected = rowState.selected }
             .testTag(tag.value),
     ) {
-        RosterRowMenu(menu, holdDrag = rowDrag.takeIf { canDrag && touch }) {
+        RosterRowMenu(roster.menu(line, rowState, touch), holdDrag = drag.hold) {
             RosterGestures(RosterGestureSpec(tag, touch, hovered, roster.actions.swipe(line.item), roster.actions.quick(line.item))) {
                 row(line.item, rowState)
             }
         }
     }
+}
+
+/** A row's drag and how it starts: a mouse drag ([pointer]) or a touch hold ([hold], null when the row does not drag by hold). */
+private class RosterRowDragInput(val row: RosterRowDrag, val pointer: Boolean, val hold: RosterRowDrag?)
+
+/** [line]'s drag, fed the list's latest callbacks after each composition. */
+@Composable
+private fun <T> rememberRosterRowDrag(roster: RosterScope<T>, line: RosterLine.Row<T>, touch: Boolean): RosterRowDragInput {
+    val rowDrag = remember { RosterRowDrag() }
+    val callbacks = roster.dragCallbacks(line)
+    SideEffect { rowDrag.callbacks = callbacks }
+    val canDrag = roster.canDrag(line)
+    return RosterRowDragInput(rowDrag, pointer = canDrag && !touch, hold = if (canDrag && touch) rowDrag else null)
 }
 
 /**
@@ -321,8 +350,10 @@ private fun RosterRowMenu(menu: List<LettaMenuItem>, holdDrag: RosterRowDrag?, c
 
 /** The keyboard cursor's ring, drawn only while the list has focus. */
 @Composable
-private fun Modifier.cursorRing(show: Boolean): Modifier =
-    if (show) border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = CURSOR_ALPHA), MaterialTheme.shapes.small) else this
+private fun Modifier.cursorRing(show: Boolean): Modifier {
+    if (!show) return this
+    return border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = CURSOR_ALPHA), MaterialTheme.shapes.small)
+}
 
 private const val CURSOR_ALPHA = 0.6f
 

@@ -115,6 +115,12 @@ class RosterSpec<T>(
     val empty: (@Composable () -> Unit)? = null,
 )
 
+/** Whether an empty list shows a state of its own: the loading bar, or the host's [RosterSpec.empty]. */
+internal fun RosterSpec<*>.hasEmptyState(): Boolean = options.loading || empty != null
+
+/** How a [RosterList] draws one of its items, given the row's [RosterRowState]. */
+typealias RosterRowContent<T> = @Composable (item: T, row: RosterRowState) -> Unit
+
 /** The optional parts of a [RosterListRow]: drawn where the icon goes, and after the trailing label. */
 @Immutable
 class RosterRowSlots(
