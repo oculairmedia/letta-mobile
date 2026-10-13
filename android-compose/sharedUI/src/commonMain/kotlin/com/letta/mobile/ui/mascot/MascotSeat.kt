@@ -63,6 +63,23 @@ private fun seatOccupancy(agentId: String?, stage: MascotStage, identity: Mascot
     return SeatOccupancy(shown, available, standsHere)
 }
 
+/**
+ * Whether [agentId]'s character is drawn at [stage]'s seat (or is on its way there): the host can
+ * draw it, and either there is no transport layer (each seat draws its own) or the layer has it
+ * standing at [stage], or at no seat yet. False while another seat holds it (the agent pane's
+ * hero) or the host cannot bring up its scene: a place that must never stand empty draws a
+ * stand-in then (letta-mobile-8kpk7).
+ */
+@Composable
+fun mascotDrawnAt(agentId: String?, stage: MascotStage): Boolean {
+    val occupancy = seatOccupancy(agentId, stage, identity = null)
+    if (agentId == null || !occupancy.available) return false
+    val transport = LocalMascotTransport.current
+    if (!transport.layerMounted) return true
+    val active = transport.activeStage(agentId)
+    return active == null || active == stage
+}
+
 /** Why a seat draws [MascotSeat]'s `empty` content instead of the character. */
 enum class MascotSeatVacancy {
     /** The agent has no mascot the host can draw here: show a stand-in (an orb, a sphere). */
