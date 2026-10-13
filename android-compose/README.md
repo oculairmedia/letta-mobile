@@ -1,39 +1,74 @@
 # Android Compose App
 
-This directory contains the production Letta Mobile Android app.
+This directory is the whole Gradle build: the production Letta Mobile Android app **and** its
+Compose Desktop and browser (WASM) siblings. The name is historical — the shared modules here
+power all three clients, and `app/` is only the Android host.
 
 ## Modules
 
+Every module below is declared in `settings.gradle.kts`.
+
 | Module | Purpose | Required / additive tests |
 | --- | --- | --- |
-| `app` | Screens, navigation, Hilt wiring, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
+| `sharedLogic` | Platform-neutral domain, repositories, timeline reducer, and App Server transport | `:sharedLogic:jvmTest` plus host-native and wasmJs compile (required `shared-multiplatform`) |
+| `sharedUI` | Shared Compose UI for Android, desktop and browser: shell, chat, agent editor, memory, providers, schedules, canvas, search, settings, A2UI rendering | compiles for every host target in `shared-multiplatform`; wasmJs compile catches JVM-only calls |
+| `sharedUI-devfixtures` | Deterministic fixtures for `sharedUI` previews and tests | covered by `sharedUI` builds |
+| `app` | Android host: navigation graph, Hilt wiring, ViewModels, thin containers around shared pages, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
+| `desktop` | Compose Desktop host (JVM): entry point, single-instance/OS lock, bundled JBR, installers | `:desktop:test` (additive in `test` when desktop changes) |
+| `web` | Browser client (Kotlin/WASM, Compose for Web) | `web-wasm` job (advisory); wasmJs compile is in required `shared-multiplatform` |
 | `core/android-data` | Android data bindings, Ktor wiring, Room, mappers | `:core:android-data:testDebugUnitTest` (required `test` job) |
-| `sharedLogic` | Platform-neutral repositories, timeline, and transport | `:sharedLogic:jvmTest` plus host-native compile (required `shared-multiplatform`) |
-| `designsystem` | Android Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
-| `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
-| `sharedUI` | Shared Android/Desktop Compose chat and A2UI rendering | covered by host builds |
-| `desktop` | Compose Desktop host (Windows) | `:desktop:test` (additive in `test` when desktop changes) |
-| `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, probes, and Iroh server wrapper | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |
+| `core/runtime` | Turn engine, runtime event fanout | covered by host builds |
+| `core/ids` | Shared identifiers (`core/schemas/` holds wire schemas as source packages, not a module) | covered by host builds |
+| `core/testutil` | Shared test doubles and harnesses | test-only |
+| `designsystem` | Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
+| `feature-chat` | Chat feature UI, presentation state and coordination (the `AdminChatViewModel` stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
+| `drawbox` | Vendored canvas editor behind the shared canvas workspace (`drawbox/VENDORED.md`) | covered by `sharedUI` builds |
+| `plugin-api` / `plugin-api-testkit` / `plugin-view` | The Kotlin SPI a JVM-runtime canvas plugin implements (LCP wire shapes; `:sharedLogic` depends on it), the conformance test kit, and the WebView host that renders a plugin's UI | additive on path change |
+| `avatar/core` / `avatar/renderer-rive` | Avatar models and Rive rendering | additive on path change |
+| `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, App Server contract probes, and the Iroh server wrapper (`meridian-iroh-wrapper`) | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |
+| `architecture-tests` / `quality/detekt-rules` | Module-boundary tests and custom static-analysis rules | `detekt` job (advisory) |
+| `macrobenchmark` / `baselineprofile` / `perf` / `native` | Performance infrastructure and native libraries | `perf-gate` (required) |
+| `build-logic` | Convention plugins, e.g. `com.letta.mobile.android.library` | build-time only |
 
 **Ownership rule:** portable feature *logic* lives in `sharedLogic/commonMain`, shared
-Compose UI in `sharedUI`, and host-specific integration in `app/` and `desktop/`
+Compose UI in `sharedUI`, and host-specific integration in `app/`, `desktop/` and `web/`
 (see root `AGENTS.md`).
 
 ## Chat architecture
 
-Chat is split by responsibility, not by two separate client implementations:
+Chat is split by responsibility, not by separate per-client implementations:
 
-- `:feature-chat` contains the chat feature UI and presentation state.
-- `:sharedUI` hosts Compose chat components shared by Android and desktop.
+- `:feature-chat` contains the chat feature UI, presentation state and coordination.
+- `:sharedUI` hosts the Compose chat components shared by Android, desktop and browser.
 - `:sharedLogic` owns portable conversation/message repositories, the timeline
-  reducer, and transport behavior used by both clients.
+  reducer, and transport behavior used by every client.
 - `:app` wires Android navigation, lifecycle, and dependency injection; `:desktop`
-  supplies the desktop host bindings.
+  and `:web` supply their own host bindings.
 
 For chat changes, put timeline/state and transport logic in `sharedLogic`, reusable
 Compose presentation in `sharedUI`, feature-specific UI in `feature-chat`, and
 Android-only integration in `app`. There is no `:chat` Gradle module or separate
 `LettaChatClient` in this tree.
+
+## Deleted Android screens
+
+`main` advances by hard cuts: when a page moves to `sharedUI`, the Android screen it replaces is
+deleted in the same PR, guarded by the `row-parity` harness and the `platform-ui-gate` ratchet.
+`app/`'s surviving screens are thin containers plus navigation, DI and ViewModels — when a page
+seems to be missing from `app/`, look in `sharedUI/` first (for example `memory/MemoryPage`,
+`modelcontrol/ProviderSettingsPages`, `agenteditor/`).
+
+Two categories were removed, and they are not the same:
+
+- **Moved to shared UI** — the agent editor (`feature-editagent` is gone), memory, providers and
+  model control, templates, runs, projects, schedules, channels and skills. For these, `app/` keeps
+  only a thin `*Screen` + `*ViewModel` container around the shared page. `telemetry` and
+  `systemaccess` are still Android-only.
+- **Deleted outright** — archival passages, block library, MCP servers, tool editor, model browser
+  and usage. These were REST-only screens with no App Server route behind them, so they were
+  removed when the HTTP/REST backend went away. Their repositories survive in `sharedLogic` only
+  where a shared surface still uses them. Do not restore one of these screens without an App
+  Server route to back it.
 
 ## Prerequisites
 
@@ -72,19 +107,26 @@ Run Gradle commands from this directory.
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest
 ./gradlew :app:assembleRootDebug
-./gradlew installRootDebug
+./gradlew :app:installRootDebug
 ./gradlew detekt
 ```
 
-## Windows desktop preview
+## Desktop client
 
-The first Windows desktop variant lives in `:desktop` and uses Compose
-Multiplatform for Desktop on the JVM. It starts as a desktop shell that depends
-on `:sharedLogic`, so the app boots on Windows while Android-only navigation,
-Hilt wiring, DataStore, notifications, and foreground-service behavior are
-extracted behind portable boundaries.
+`:desktop` is a full Compose Multiplatform client, not a preview. It depends on both `:sharedLogic`
+and `:sharedUI`, so it renders the same shared pages the Android app does, and supplies only its own
+host bindings: window and single-instance handling, notifications, launcher integration and a
+bundled JBR 25 runtime. Android-only navigation, Hilt wiring, DataStore and foreground-service
+behavior stay behind portable boundaries in `sharedLogic`.
 
-Run it locally from Windows:
+Run it locally:
+
+```bash
+export JAVA_HOME="/path/to/jdk-26"
+./gradlew :desktop:run
+```
+
+On Windows:
 
 ```powershell
 $env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26"
@@ -92,11 +134,16 @@ $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 .\gradlew.bat :desktop:run
 ```
 
-Build Windows packages:
+Package installers. CI (`desktop.yml`, job `windows-installer` on `windows-latest`) uses the
+host-agnostic task:
 
-```powershell
-.\gradlew.bat :desktop:packageMsi :desktop:packageExe
+```bash
+./gradlew :desktop:packageDistributionForCurrentOS
 ```
+
+Windows-specific tasks (`:desktop:packageMsi`, `:desktop:packageExe`) also work from a Windows
+host. `:desktop:test` is additive in the required `test` job when desktop files change — it is
+deliberately **not** part of `shared-multiplatform`, where it has a history of hanging.
 
 ## Distribution flavors
 
@@ -165,20 +212,31 @@ For normal application changes:
 ./gradlew :app:testRootDebugUnitTest
 ```
 
-For shared model / repository / serialization changes, it is safer to verify the full stack in order:
+For shared model / repository / serialization changes, verify the shared stack in the order CI
+does — shared logic first, then the hosts that consume it:
 
 ```bash
-./gradlew clean :core:compileDebugKotlin
+./gradlew :sharedLogic:jvmTest
+./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileKotlinWasmJs
+./gradlew :core:android-data:testDebugUnitTest
 ./gradlew :designsystem:compileDebugKotlin
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest
 ```
 
+`:sharedUI:jvmTest` and `:desktop:test` run as additive tasks in the required `test` job when their
+trees change. There is no `:core` Gradle module — the modules are `:core:ids`, `:core:runtime`,
+`:core:android-data` and `:core:testutil`.
+
 Run those commands sequentially. KSP state can become unreliable if you try to overlap Gradle work.
+
+Do **not** substitute `./gradlew :sharedLogic:allTests`: its `hostNativeTest` phase hangs, which is
+why the required `shared-multiplatform` job runs bounded `:sharedLogic:jvmTest` plus the native and
+wasmJs *compiles* instead. The compiles are what catch JVM-only API leaks in `commonMain`.
 
 ## Troubleshooting
 
-- If Gradle reports missing Android SDK components, install Platform 36 and Build-Tools 36 in Android Studio.
+- If Gradle reports missing Android SDK components, install Platform 37 and Build-Tools 36+ in Android Studio (`compileSdk` is 37; see `gradle/libs.versions.toml`).
 - If Gradle reports missing `JAVA_COMPILER`, make sure `JAVA_HOME` points to a full JDK/JBR, not a JRE.
 - If Gradle cannot find the SDK, verify `local.properties` contains the correct `sdk.dir` for your machine.
 - If Kotlin or KSP behaves inconsistently after dependency or generated-code changes, rerun with `clean` before compiling again.

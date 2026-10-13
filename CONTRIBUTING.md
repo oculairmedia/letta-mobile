@@ -48,7 +48,7 @@ The repo admin runs this once to apply / re-apply branch protection on the remot
 ## Local Android setup
 
 1. Create `android-compose/local.properties` with your Android SDK path.
-2. Point `JAVA_HOME` at a full JDK 26 for parity with CI. Gradle 9.4.1 can still
+2. Point `JAVA_HOME` at a full JDK 26 for parity with CI. Gradle 9.6.1 can still
    run on JDK 17-26, so Android Studio's bundled JBR remains acceptable for
    local builds when it falls in that supported range.
 
@@ -102,18 +102,25 @@ Run these from `android-compose/` before pushing when you have the resources (CI
 ./gradlew :app:testRootDebugUnitTest
 ```
 
-If you touched `sharedLogic/` (KMP common code), also run the all-target gate locally —
-commonMain/commonTest must stay platform-neutral (no JVM-only APIs) and this is what
-the required `shared-multiplatform` CI check runs:
+If you touched `sharedLogic/` or `sharedUI/` (KMP common code), also run what the required
+`shared-multiplatform` CI check actually runs. `commonMain`/`commonTest` must stay platform-neutral
+(no JVM-only APIs); the native and wasmJs **compiles** are what catch a leak:
 
 ```bash
-./gradlew :sharedLogic:allTests :desktop:test
+./gradlew :sharedLogic:jvmTest
+./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
+./gradlew :sharedLogic:compileKotlinWasmJs :sharedUI:compileKotlinWasmJs
 ```
 
-Device install:
+Do **not** run `./gradlew :sharedLogic:allTests` as your gate. Its `hostNativeTest` phase hangs,
+which is exactly why `shared-multiplatform` runs bounded `:sharedLogic:jvmTest` plus the compiles
+instead. `:desktop:test` is likewise excluded from that job (it has a history of consuming the
+whole timeout) and runs as an additive task in the required `test` job when desktop files change.
+
+Device install (the app has `play`/`sideload`/`root` distribution flavors, so name one):
 
 ```bash
-./gradlew installDebug
+./gradlew :app:installRootDebug
 ```
 
 ## Pre-push PR readiness
@@ -122,9 +129,11 @@ CI takes ~20 minutes per iteration, and the most common reason PRs loop through 
 
 ## Required vs advisory CI
 
-Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, `codecov`.
+Required (blocks merge — exactly these four, from branch protection): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`.
 
-Advisory only (does **not** block merge): `qodana`, `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing.
+`codecov` is **not** a required check: coverage uploads run on `main` via `codecov.yml`, not on PRs.
+
+Advisory only (does **not** block merge): `qodana`, `detekt`, CodeScene Code Health Review, `agents-policy`, `row-parity`, `platform-ui-gate`, `iroh-probe-gate` (with `probe-unit`/`probe-hermetic`/`probe-red-path`), `architecture-graph`, `web-wasm`, `shared-multiplatform-pass`, `build-iroh-wrapper-pass`, `desktop-installer-pass`, and the scheduled `appserver-contract-baseline`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing — though `row-parity` and `platform-ui-gate` guard the hard cuts and are worth reading before you merge.
 
 ## Releases
 
@@ -158,7 +167,16 @@ git tag -a v0.1.0 -m "release: 0.1.0"
 git push origin v0.1.0
 ```
 
-The `.github/workflows/release.yml` workflow fires on the tag push, builds the signed `play-release` APK, creates a GitHub Release with auto-generated notes diffed against the previous tag, and attaches `letta-mobile-v0.1.0.apk` as a release asset.
+The `.github/workflows/release.yml` workflow fires on the tag push and publishes one GitHub Release with auto-generated notes diffed against the previous tag. Its assets are:
+
+| Asset | What it is |
+|---|---|
+| `letta-mobile-<tag>-prod.apk` | The signed `play-release` APK with the embedded runtime (package `com.letta.mobile`). This **is** the prod artifact; the old `-embedded` name is gone. |
+| `exe/*.exe`, `msi/*.msi` | Windows desktop installers |
+| `*.tar` | The Linux Iroh wrapper distribution (`meridian-iroh-wrapper`) that the server binaries ship from |
+| `*.yml` | Installer manifest with per-file `sha512` and size |
+
+The workflow verifies the embedded runtime is present in the APK, and checks Automerge JNI and 16 KiB ELF LOAD alignment, before attaching anything. Do not separately upload a locally built APK or create a second release.
 
 **Pre-releases**: append a hyphen suffix to the tag — `v0.2.0-rc.1`, `v1.0.0-beta` — and `softprops/action-gh-release` auto-marks the GitHub Release as a pre-release. `versionCode` ignores the suffix, so a `v0.2.0-rc.1` build has the same `versionCode` as `v0.2.0`. Tag the GA release `v0.2.0` separately to bump `versionCode` to the next tier.
 
