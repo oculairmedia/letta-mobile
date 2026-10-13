@@ -16,19 +16,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.data.subagents.projectSubagentRoster
 import com.letta.mobile.feature.chat.screen.ChatScreenNavigationCallbacks
 import com.letta.mobile.feature.chat.screen.ChatScreenSubagentBarState
-import com.letta.mobile.feature.chat.subagent.ActiveSubagent
-import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
-import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
-import com.letta.mobile.feature.chat.subagent.SubagentTodoSheet
-import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
-import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
-import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
-import com.letta.mobile.ui.chat.subagents.SubagentRosterList
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
+import com.letta.mobile.ui.chat.subagents.ActiveSubagentRings
+import com.letta.mobile.ui.chat.subagents.LocalSubagentTodoSheetOpener
+import com.letta.mobile.ui.chat.subagents.SubagentRoster
+import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
+import com.letta.mobile.ui.chat.subagents.SubagentTodoSheetHost
+import com.letta.mobile.ui.chat.subagents.SubagentTodoSheetTarget
+import com.letta.mobile.ui.chat.subagents.conversation
+import com.letta.mobile.ui.chat.subagents.openWith
+import com.letta.mobile.ui.chat.subagents.sheetTarget
 import com.letta.mobile.ui.host.LocalOverlayHost
 import com.letta.mobile.ui.host.Overlay
 import com.letta.mobile.ui.host.OverlayPresentation
@@ -156,20 +157,6 @@ internal fun SharedChatSubagentRings(
     }
 }
 
-/** The sheet's (agent id, conversation id) to offer, or null while either is unknown. */
-private fun SubagentTodoSheetTarget.conversation(): Pair<String, String>? {
-    val agentId = subagentAgentId?.takeIf { it.isNotBlank() } ?: return null
-    val conversationId = subagentNavigationConversationId ?: return null
-    return agentId to conversationId
-}
-
-private fun ActiveSubagent.sheetTarget() = SubagentTodoSheetTarget(
-    toolCallId = id,
-    description = description,
-    subagentAgentId = subagentAgentId,
-    subagentConversationId = subagentConversationId,
-)
-
 /**
  * letta-mobile-ckmub.3.15 (S13): the banner at the top of the window, shown for a few seconds when
  * a ring's subagent conversation cannot be opened yet, through the window's overlay queue.
@@ -197,21 +184,19 @@ internal fun SharedChatSubagentSheet(
     navigation: ChatScreenNavigationCallbacks,
 ) {
     val sheetTarget = state.target ?: return
-    var todoState by remember(sheetTarget.toolCallId) {
-        mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
-    }
-    LaunchedEffect(inputs.source, inputs.selfTodoSource, sheetTarget.toolCallId, currentConversationId) {
-        val todos = if (sheetTarget.toolCallId == ActiveSubagent.SELF_ID) {
-            Result.success(inputs.selfTodoSource.todos(currentConversationId.orEmpty()))
-        } else {
-            inputs.source.todos(sheetTarget.toolCallId)
+    val loader = remember(inputs.source, inputs.selfTodoSource, currentConversationId) {
+        SubagentTodoLoader { target ->
+            if (target.toolCallId == ActiveSubagent.SELF_ID) {
+                Result.success(inputs.selfTodoSource.todos(currentConversationId.orEmpty()))
+            } else {
+                inputs.source.todos(target.toolCallId)
+            }
         }
-        todoState = subagentTodoSheetStateFrom(todos)
     }
     val conversation = sheetTarget.conversation()
-    SubagentTodoSheet(
-        description = sheetTarget.description,
-        state = todoState,
+    SubagentTodoSheetHost(
+        target = sheetTarget,
+        loader = loader,
         onDismiss = state::dismiss,
         onViewConversation = navigation.onViewSubagentConversation?.let { open ->
             conversation?.let { (agentId, conversationId) ->
@@ -236,23 +221,15 @@ private fun SharedChatSubagentRoster(
     onLeaveSheet: () -> Unit,
 ) {
     val entries by source.rosterEntries.collectAsStateWithLifecycle()
-    var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val roster = remember(entries, clearedKeys) {
-        projectSubagentRoster(entries, System.currentTimeMillis(), clearedKeys)
-    }
-    val openConversation = navigation.onViewSubagentConversation
-    SubagentRosterList(
-        roster = roster,
-        onOpenConversation = openConversation?.let { open ->
+    SubagentRoster(
+        entries = entries,
+        onOpenConversation = navigation.onViewSubagentConversation?.let { open ->
             { item ->
-                val agentId = item.childAgentId
-                val conversationId = item.childConversationId
-                if (agentId != null && conversationId != null) {
+                item.openWith { agentId, conversationId ->
                     onLeaveSheet()
                     open(agentId, conversationId)
                 }
             }
         },
-        onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
     )
 }

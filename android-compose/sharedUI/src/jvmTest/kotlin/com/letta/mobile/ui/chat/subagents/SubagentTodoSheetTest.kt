@@ -1,11 +1,8 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import com.letta.mobile.data.model.SubagentTodo
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
-
-@Tag("unit")
+import kotlin.test.assertEquals
+import kotlin.test.Test
 class SubagentTodoSheetTest {
 
     @Test

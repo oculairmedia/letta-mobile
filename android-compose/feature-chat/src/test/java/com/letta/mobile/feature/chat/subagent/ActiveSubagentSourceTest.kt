@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

@@ -1,10 +1,11 @@
 package com.letta.mobile.feature.chat.subagent
 
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
+import com.letta.mobile.ui.chat.subagents.toActiveSubagent
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -170,65 +171,7 @@ class WsActiveSubagentSource(
         }
     }
 
-    companion object {
-        private const val STOP_TIMEOUT_MS = 5_000L
-
-        internal fun SubagentEntry.toActiveSubagent(): ActiveSubagent = ActiveSubagent(
-            id = toolCallId.takeIf { it.isNotBlank() }
-                ?: taskId?.takeIf { it.isNotBlank() }
-                ?: "subagent-${hashCode()}",
-            description = description,
-            subagentType = subagentType,
-            status = status.toActiveSubagentStatus(),
-            // letta-mobile-pvrrm: a registry entry that arrives WITHOUT a
-            // tool_call_id but WITH a task_id is a background tool task
-            // (run_in_background), not a dispatched subagent — render it with
-            // the background-task glyph/label. FOLLOW-UP: the shim should emit
-            // an explicit `kind` (and todo `progress`) per entry; until then we
-            // infer the kind from the correlation keys.
-            kind = if (toolCallId.isBlank() && !taskId.isNullOrBlank()) {
-                ActiveSubagent.Kind.BACKGROUND_TASK
-            } else {
-                ActiveSubagent.Kind.SUBAGENT
-            },
-            subagentAgentId = subagentAgentId?.takeIf { it.isNotBlank() },
-            subagentConversationId = subagentConversationId?.takeIf { it.isNotBlank() },
-            // letta-mobile-i2f23: map the wire `todo_progress` snapshot
-            // ({ completed, total }) into the UI-facing progress model so the
-            // ring can render determinate fill. Absent / null → ring shows
-            // a sliver (no todos yet).
-            progress = todoProgress?.let {
-                SubagentTodoProgress(completed = it.completed, total = it.total)
-            },
-            // letta-mobile-ulcg6 (RC4): the stuck baseline is the host's last
-            // observed PROGRESS (a new tool call or lifecycle change), never
-            // the start time - seeding from startedAt made every run longer
-            // than the threshold read as stuck. A host that does not report
-            // it leaves the baseline unknown, which reads as not stuck.
-            lastUpdateAt = lastActivityAtMs,
-            terminalAt = terminalAtEpochMs,
-        )
-
-        /**
-         * letta-mobile-al6q5: canonicalize through the SHARED vocabulary before
-         * mapping. This used to match the four [SubagentStatus] constants
-         * literally, so the App Server's real terminal value `success` matched
-         * nothing and fell through to the forward-compat `else` below — a
-         * subagent that had SUCCEEDED rendered as perpetually RUNNING.
-         */
-        internal fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (SubagentStatus.normalize(this) ?: this) {
-            SubagentStatus.RUNNING -> ActiveSubagent.Status.RUNNING
-            SubagentStatus.COMPLETED -> ActiveSubagent.Status.COMPLETED
-            SubagentStatus.FAILED -> ActiveSubagent.Status.FAILED
-            // letta-mobile-drv4a: `cancelled` (killed / evicted / orphaned /
-            // TaskStop'd / process gone) is a TERMINAL outcome — map it to
-            // FAILED so the chip renders a failed-styled outcome and lingers
-            // then dismisses (29h9u), instead of being treated as still-running
-            // by the forward-compat fallback below and getting stuck forever.
-            SubagentStatus.CANCELLED -> ActiveSubagent.Status.FAILED
-            // Forward-compat: an unrecognized status keeps the chip visible
-            // (treated as still-running) rather than being filtered out.
-            else -> ActiveSubagent.Status.RUNNING
-        }
+    private companion object {
+        const val STOP_TIMEOUT_MS = 5_000L
     }
 }

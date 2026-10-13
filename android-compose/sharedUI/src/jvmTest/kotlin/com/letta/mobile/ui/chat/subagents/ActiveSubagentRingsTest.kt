@@ -1,12 +1,11 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import kotlinx.collections.immutable.persistentListOf
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 /**
  * letta-mobile-w8mog + i2f23: unit tests for ActiveSubagentRings lifecycle,
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test
  * OVERFLOW TESTS:
  *  - >3 rings -> show 3 + count badge
  */
-@Tag("unit")
 class ActiveSubagentRingsTest {
 
     private fun running(

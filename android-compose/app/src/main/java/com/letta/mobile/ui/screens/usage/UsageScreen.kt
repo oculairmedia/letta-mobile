@@ -16,18 +16,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -45,10 +39,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ErrorContent
+import com.letta.mobile.ui.components.LettaRefreshAction
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.customColors
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -63,7 +65,6 @@ import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UsageScreen(
     onNavigateBack: () -> Unit,
@@ -71,51 +72,41 @@ fun UsageScreen(
     viewModel: UsageViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.screen_usage_title)) },
-                colors = LettaTopBarDefaults.largeTopAppBarColors(),
-                scrollBehavior = scrollBehavior,
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
-                    }
-                },
+        header = {
+            // letta-mobile-ckmub.3.25: the shared header; touch pulls the page to reload it (ckmub.3.23).
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_usage_title)),
+                controls = HeaderControls(
+                    nav = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back)),
+                    actions = listOf(HeaderAction.Custom { LettaRefreshAction(refreshing = false, onRefresh = viewModel::refresh) }),
+                ),
             )
         },
     ) { paddingValues ->
-        when (val state = uiState) {
-            is UiState.Loading -> {
-                Column(modifier = Modifier.padding(paddingValues).padding(LettaDimens.Space.lg)) {
-                    ShimmerCard(modifier = Modifier.fillMaxWidth())
+        LettaRefreshable(refreshing = false, onRefresh = viewModel::refresh, modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            when (val state = uiState) {
+                is UiState.Loading -> {
+                    Column(modifier = Modifier.padding(LettaDimens.Space.lg)) {
+                        ShimmerCard(modifier = Modifier.fillMaxWidth())
+                    }
                 }
-            }
-            is UiState.Error -> {
-                ErrorContent(
-                    message = state.message,
-                    onRetry = { viewModel.refresh() },
-                    modifier = Modifier.padding(paddingValues),
-                )
-            }
-            is UiState.Success -> {
-                UsageContent(
-                    state = state.data,
-                    onTimeRangeSelected = viewModel::selectTimeRange,
-                    onNavigateToRuns = onNavigateToRuns,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                )
+                is UiState.Error -> {
+                    ErrorContent(
+                        message = state.message,
+                        onRetry = { viewModel.refresh() },
+                    )
+                }
+                is UiState.Success -> {
+                    UsageContent(
+                        state = state.data,
+                        onTimeRangeSelected = viewModel::selectTimeRange,
+                        onNavigateToRuns = onNavigateToRuns,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }

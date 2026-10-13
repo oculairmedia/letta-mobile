@@ -1,40 +1,38 @@
 @file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
-package com.letta.mobile.desktop
+package com.letta.mobile.ui.components.tabs
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.center
-import com.letta.mobile.ui.search.SearchFieldTestTag
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.material3.MaterialTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class DesktopConversationTabsUiTest {
+class LettaTabStripTest {
     private val threeTabs = listOf(
-        DesktopConversationTab("conversation-1", "First", "Ada"),
-        DesktopConversationTab("conversation-2", "Second", "Grace"),
-        DesktopConversationTab("conversation-3", "Third", "Alan"),
+        LettaTab("conversation-1", "First", "Ada"),
+        LettaTab("conversation-2", "Second", "Grace"),
+        LettaTab("conversation-3", "Third", "Alan"),
     )
 
     @Test
     fun activeTabExposesCloseActionWithoutPointerHover() = runComposeUiTest {
         var closedId: String? = null
         setContent {
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
-                    tabs = listOf(DesktopConversationTab("conversation-1", "First", "Ada")),
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
+            MaterialTheme {
+                LettaTabStrip(
+                    tabs = listOf(LettaTab("conversation-1", "First", "Ada")),
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
                         onSelect = {},
                         onClose = { closedId = it },
                     ),
@@ -55,12 +53,13 @@ class DesktopConversationTabsUiTest {
     fun plusStartsANewConversation() = runComposeUiTest {
         var newConversations = 0
         setContent {
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
-                    tabs = listOf(DesktopConversationTab("conversation-1", "First", "Ada")),
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
-                        onNewConversation = { newConversations++ },
+            MaterialTheme {
+                LettaTabStrip(
+                    tabs = listOf(LettaTab("conversation-1", "First", "Ada")),
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
+                        onNew = { newConversations++ },
+                        newLabel = "New conversation tab",
                     ),
                 )
             }
@@ -74,11 +73,11 @@ class DesktopConversationTabsUiTest {
     fun plainClickStillSelectsTab() = runComposeUiTest {
         var selectedId: String? = null
         setContent {
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
+            MaterialTheme {
+                LettaTabStrip(
                     tabs = threeTabs,
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
                         onSelect = { selectedId = it },
                         onClose = {},
                     ),
@@ -89,6 +88,9 @@ class DesktopConversationTabsUiTest {
         onNodeWithText("Second").performClick()
 
         assertEquals("conversation-2", selectedId)
+        // letta-mobile-ckmub.3.25: the open tab reads selected to assistive tech.
+        onNodeWithTag(LettaTabStripTags.tab("conversation-1")).assertIsSelected()
+        onNodeWithTag(LettaTabStripTags.tab("conversation-2")).assertIsNotSelected()
     }
 
     @Test
@@ -96,11 +98,11 @@ class DesktopConversationTabsUiTest {
         var reorderedId: String? = null
         var reorderedTarget: Int? = null
         setContent {
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
+            MaterialTheme {
+                LettaTabStrip(
                     tabs = threeTabs,
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
                         onSelect = {},
                         onClose = {},
                         onReorder = { conversationId, targetIndex ->
@@ -130,7 +132,7 @@ class DesktopConversationTabsUiTest {
         assertEquals(
             "conversation-1",
             reorderedId,
-            "drag gesture never invoked onReorder — the gesture is not reaching DesktopConversationTabRow at all",
+            "drag gesture never invoked onReorder: the gesture is not reaching LettaTabStrip at all",
         )
         assertEquals(1, reorderedTarget)
     }
@@ -139,11 +141,11 @@ class DesktopConversationTabsUiTest {
     fun shortDragThatDoesNotCrossNeighborIsNoOp() = runComposeUiTest {
         var reorderCalled = false
         setContent {
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
+            MaterialTheme {
+                LettaTabStrip(
                     tabs = threeTabs,
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
                         onSelect = {},
                         onClose = {},
                         onReorder = { _, _ -> reorderCalled = true },

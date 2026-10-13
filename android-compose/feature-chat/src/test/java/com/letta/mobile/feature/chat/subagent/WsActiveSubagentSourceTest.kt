@@ -1,5 +1,10 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
+import com.letta.mobile.ui.chat.subagents.RingState
+import com.letta.mobile.ui.chat.subagents.toActiveSubagent
+import com.letta.mobile.ui.chat.subagents.toActiveSubagentStatus
+import com.letta.mobile.ui.chat.subagents.withLingeringTerminals
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
@@ -7,8 +12,6 @@ import com.letta.mobile.data.model.SubagentTodoProgressWire
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
-import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource.Companion.toActiveSubagent
-import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource.Companion.toActiveSubagentStatus
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi

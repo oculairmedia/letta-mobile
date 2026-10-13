@@ -17,6 +17,8 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.components.tabs.LettaTab
+import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
@@ -93,11 +95,14 @@ private fun DesktopShellHeaderChrome(
         sidebarOverflow = desktopSidebarOverflow(context, frame),
         conversationTabs = rememberOpenTabs(tabs.value, frame.chatState.conversations),
         activeConversationId = frame.chatState.selectedConversationId,
-        onSelectConversationTab = { router.openConversation(ConversationId(it)) },
-        onCloseConversationTab = { router.closeConversationTab(tabs, ConversationId(it)) },
-        onReorderConversationTab = { id, index -> tabs.value = ConversationTabsReducer.reorder(tabs.value, id, index) },
-        // Browser-style "+" on the strip: a new chat with the focused agent.
-        onNewConversationTab = { context.openNewChatForFocusedAgent(frame.focus) },
+        conversationTabActions = LettaTabStripActions(
+            onSelect = { router.openConversation(ConversationId(it)) },
+            onClose = { router.closeConversationTab(tabs, ConversationId(it)) },
+            onReorder = { id, index -> tabs.value = ConversationTabsReducer.reorder(tabs.value, id, index) },
+            // Browser-style "+" on the strip: a new chat with the focused agent.
+            onNew = { context.openNewChatForFocusedAgent(frame.focus) },
+            newLabel = "New conversation tab",
+        ),
         search = rememberDesktopShellSearch(context, frame),
     )
     SideEffect { onHeaderChromeChange(headerChrome) }
@@ -141,11 +146,11 @@ private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopSh
 
 /** The open tabs, in strip order, for the conversations the chat surface still knows. */
 @Composable
-private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<DesktopConversationTab> {
+private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<LettaTab> {
     val byId = remember(conversations) { conversations.associateBy { it.id } }
     return remember(tabs, byId) {
         tabs.openConversationIds.mapNotNull { id ->
-            byId[id]?.let { DesktopConversationTab(conversationId = it.id, title = it.displayTitle(), agentName = it.agentName) }
+            byId[id]?.let { LettaTab(key = it.id, title = it.displayTitle(), subtitle = it.agentName) }
         }
     }
 }

@@ -17,22 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -47,7 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.time.ZoneId
@@ -66,72 +64,35 @@ import com.letta.mobile.ui.theme.LettaDimens
  *  - Clear the buffer
  *  - Filter by tag (Http, TimelineSync, AdminChatVM, etc.)
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TelemetryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val events by Telemetry.events.collectAsStateWithLifecycle()
 
     var tagFilter by remember { mutableStateOf<String?>(null) }
-    var filterMenuOpen by remember { mutableStateOf(false) }
 
     val allTags = remember(events) { events.map { it.tag }.distinct().sorted() }
     val visibleEvents = remember(events, tagFilter) {
         if (tagFilter == null) events else events.filter { it.tag == tagFilter }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Telemetry")
-                        Text(
-                            "${visibleEvents.size} / ${events.size} events" +
-                                (tagFilter?.let { " · tag=$it" } ?: ""),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    Box {
-                        TextButton(onClick = { filterMenuOpen = true }) {
-                            Text(tagFilter ?: "All tags")
-                        }
-                        DropdownMenu(
-                            expanded = filterMenuOpen,
-                            onDismissRequest = { filterMenuOpen = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("All tags") },
-                                onClick = {
-                                    tagFilter = null
-                                    filterMenuOpen = false
-                                },
-                            )
-                            allTags.forEach { tag ->
-                                DropdownMenuItem(
-                                    text = { Text(tag) },
-                                    onClick = {
-                                        tagFilter = tag
-                                        filterMenuOpen = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    IconButton(onClick = { copyToClipboard(context) }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy all")
-                    }
-                    IconButton(onClick = { Telemetry.clear() }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear")
-                    }
-                },
+    // letta-mobile-ckmub.3.25: the shared header; the event count sits under the title.
+    LettaPageScaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        header = {
+            ShellHeader(
+                title = HeaderTitle.Text(
+                    title = "Telemetry",
+                    subtitle = "${visibleEvents.size} / ${events.size} events" + (tagFilter?.let { " · tag=$it" } ?: ""),
+                ),
+                controls = HeaderControls(
+                    nav = HeaderNav.Back(onBack),
+                    actions = listOf(
+                        HeaderAction.Custom { TelemetryTagFilter(tagFilter, allTags) { tagFilter = it } },
+                        HeaderAction.Icon(LettaIcons.Copy, "Copy all") { copyToClipboard(context) },
+                        HeaderAction.Icon(LettaIcons.Delete, "Clear") { Telemetry.clear() },
+                    ),
+                ),
             )
         },
     ) { padding ->
@@ -139,6 +100,26 @@ fun TelemetryScreen(onBack: () -> Unit) {
             TimelineDumpToggleRow()
             HorizontalDivider()
             TelemetryEventList(visibleEvents = visibleEvents, modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+/** The header's tag filter: the current tag, opening every tag seen. */
+@Composable
+private fun TelemetryTagFilter(tagFilter: String?, allTags: List<String>, onFilter: (String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(tagFilter ?: "All tags") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            (listOf<String?>(null) + allTags).forEach { tag ->
+                DropdownMenuItem(
+                    text = { Text(tag ?: "All tags") },
+                    onClick = {
+                        onFilter(tag)
+                        open = false
+                    },
+                )
+            }
         }
     }
 }

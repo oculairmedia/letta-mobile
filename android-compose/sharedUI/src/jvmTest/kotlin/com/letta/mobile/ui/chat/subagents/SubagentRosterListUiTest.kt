@@ -95,6 +95,22 @@ class SubagentRosterListUiTest {
         onNodeWithTag(SubagentRosterTag.OPEN.of("toolu_done")).assertDoesNotExist()
     }
 
+    /** letta-mobile-ckmub.3.17: ended rows are the shared roster's rows; the row itself opens its conversation. */
+    @Test
+    fun anEndedRowIsARosterRowThatOpensItsConversation() = runComposeUiTest {
+        val opened = mutableListOf<String?>()
+        setContent {
+            MaterialTheme {
+                SubagentRoster(entries = entries, onOpenConversation = { opened += it.childAgentId }, now = { now })
+            }
+        }
+        onNodeWithText("FINISHED · 1").assertExists()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).performClick()
+        assertEquals(listOf<String?>("agent-local-b"), opened)
+        onNodeWithText("Clear").performClick()
+        onNodeWithTag(SubagentRosterTag.ENDED.of("toolu_done")).assertDoesNotExist()
+    }
+
     @Test
     fun clearHidesFinishedRows() = runComposeUiTest {
         setContent {
