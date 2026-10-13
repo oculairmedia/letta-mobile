@@ -1,30 +1,32 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import ca.oculair.meridian.BuildConfig
+import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
-import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
-import com.letta.mobile.ui.screens.archival.ArchivalScreen
-import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
-import com.letta.mobile.ui.screens.mcp.McpScreen
-import com.letta.mobile.ui.screens.mcp.McpServerToolsScreen
+import com.letta.mobile.ui.screens.dashboard.HomeBackendLabel
+import com.letta.mobile.ui.screens.dashboard.HomeChatRoutes
+import com.letta.mobile.ui.screens.dashboard.HomeNavigationCallbacks
+import com.letta.mobile.ui.screens.dashboard.HomeScreen
+import com.letta.mobile.ui.screens.dashboard.HomeScreenSpec
 import com.letta.mobile.ui.screens.memory.MemoryOverviewScreen
-import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
 import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
-import com.letta.mobile.ui.screens.templates.TemplatesScreen
-import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
-import com.letta.mobile.ui.screens.usage.UsageScreen
+import com.letta.mobile.ui.screens.templates.TemplatesScreen
 
+/**
+ * The Admin tab's routes. letta-mobile-ckmub.2.5 (hard cut S17): Templates and Runs are the shared
+ * pages in thin containers; the REST-only admin screens (archival passages, block library, MCP
+ * servers, tool editor, model browser, usage) were deleted with no App Server route behind them.
+ */
 fun NavGraphBuilder.adminGraph(
     navController: NavHostController,
     activeBackendLabel: String?,
@@ -33,55 +35,79 @@ fun NavGraphBuilder.adminGraph(
 ) {
     composable<AdminRoute> {
         HomeScreen(
-            onNavigateToAgents = { navController.navigate(AgentListRoute()) },
-            onNavigateToConversations = { navController.navigate(ConversationsRoute) },
-            onNavigateToTools = { navController.navigate(AllToolsRoute) },
-            onNavigateToBlocks = { navController.navigate(BlocksRoute) },
-            onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-            onNavigateToChat = { agentId, agentName, initialMessage ->
-                navController.navigate(
-                    AgentChatRoute(
-                        agentId = agentId,
-                        agentName = agentName,
-                        initialMessage = initialMessage,
-                    )
-                )
-            },
-            onNavigateToChatMessage = { agentId, conversationId, messageId ->
-                navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId))
-            },
-            onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
-            onNavigateToConversation = { agentId, conversationId -> navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId)) },
-            onNavigateToUsage = { navController.navigate(UsageRoute) },
-            onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
-            onNavigateToProviders = { navController.navigate(ProvidersRoute) },
-            onNavigateToSchedules = { navController.navigate(SchedulesRoute()) },
-            onNavigateToRuns = { navController.navigate(RunsRoute) },
-            onNavigateToMcp = { navController.navigate(McpRoute) },
-            onNavigateToAbout = { navController.navigate(AboutRoute) },
-            onNavigateToTelemetry = { navController.navigate(TelemetryRoute) },
-            onNavigateToSystemAccess = { navController.navigate(SystemAccessRoute) },
-            onNavigateToBotSettings = { },
-            onNavigateToProjects = { navController.navigate(HomeRoute) },
-            onNavigateToModels = { navController.navigate(ModelsRoute) },
-            activeBackendLabel = activeBackendLabel,
-            onNavigateToBackendSwitcher = openBackendSwitcher,
-            title = "Admin",
+            HomeScreenSpec(
+                navigation = adminHomeNavigation(navController),
+                routes = HomeChatRoutes(
+                    onNavigateToChatMessage = { agentId, conversationId, messageId ->
+                        val route = AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId)
+                        navController.navigate(route)
+                    },
+                    onNavigateToConversation = { agentId, conversationId ->
+                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
+                    },
+                    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+                ),
+                backend = HomeBackendLabel(activeBackendLabel, openBackendSwitcher),
+                title = "Admin",
+            ),
         )
     }
 
-    composable<UsageRoute>(
+    adminToolRoutes(navController)
+
+    pairingRoutes(navController)
+
+    composable<TemplatesRoute>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) {
-        UsageScreen(
+        TemplatesScreen(
             onNavigateBack = { navController.popBackStack() },
-            onNavigateToRuns = { navController.navigate(RunsRoute) },
+            onNavigateToAgent = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
         )
     }
 
+    composable<ProvidersRoute> {
+        ProviderAdminScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<SchedulesRoute> {
+        ScheduleListScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<MemoryRoute> {
+        MemoryOverviewScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<RunsRoute> {
+        RunMonitorScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onOpenConversation = { agentId, conversationId ->
+                navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
+            },
+        )
+    }
+
+    composable<AboutRoute> {
+        AboutScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onLogout = {
+                clearAllData()
+                navController.navigate(ConfigRoute()) {
+                    popUpTo(0) { inclusive = true }
+                }
+            },
+            appVersion = BuildConfig.VERSION_NAME,
+        )
+    }
+
+    skillsGraph(navController)
+}
+
+/** Telemetry and the system-access dashboard: local diagnostics, kept as they are. */
+private fun NavGraphBuilder.adminToolRoutes(navController: NavHostController) {
     composable<TelemetryRoute>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,
@@ -103,119 +129,24 @@ fun NavGraphBuilder.adminGraph(
             onNavigateToPairDevice = { navController.navigate(PairingInviteRoute) },
         )
     }
-
-    pairingRoutes(navController)
-
-    composable<TemplatesRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        TemplatesScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onNavigateToAgent = { agentId ->
-                navController.navigate(AgentChatRoute(agentId = agentId))
-            },
-            onNavigateToAgentList = {
-                navController.navigate(AgentListRoute())
-            },
-        )
-    }
-
-
-
-
-    composable<ProvidersRoute> {
-        ProviderAdminScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<BlocksRoute> {
-        BlockLibraryScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-
-    composable<SchedulesRoute> {
-        ScheduleListScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<MemoryRoute> {
-        MemoryOverviewScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<RunsRoute> {
-        RunMonitorScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-
-
-    composable<McpRoute> {
-        McpScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onNavigateToServerTools = { serverId ->
-                navController.navigate(McpServerToolsRoute(serverId))
-            }
-        )
-    }
-
-    composable<McpServerToolsRoute> {
-        McpServerToolsScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<AboutRoute> {
-        AboutScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onLogout = {
-                clearAllData()
-                navController.navigate(ConfigRoute()) {
-                    popUpTo(0) { inclusive = true }
-                }
-            },
-            appVersion = BuildConfig.VERSION_NAME,
-        )
-    }
-
-    skillsGraph(navController)
-
-    @OptIn(ExperimentalSharedTransitionApi::class)
-    composable<ToolDetailRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-            ToolDetailScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-    }
-
-    composable<ModelsRoute> {
-        ModelBrowserScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onModelSelected = { modelId ->
-                navController.previousBackStackEntry?.savedStateHandle?.set("selectedModel", modelId)
-                navController.popBackStack()
-            }
-        )
-    }
-
-    composable<ArchivalRoute> {
-        ArchivalScreen(
-            onNavigateBack = { navController.popBackStack() }
-        )
-    }
 }
+
+/** Where the Admin home's shortcuts, drawer rows and search hits lead. */
+private fun adminHomeNavigation(navController: NavHostController) = HomeNavigationCallbacks(
+    onNavigateToAgents = { navController.navigate(AgentListRoute()) },
+    onNavigateToConversations = { navController.navigate(ConversationsRoute) },
+    onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
+    onNavigateToMemory = { navController.navigateTo(ShellDestination.Memory()) },
+    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+    onNavigateToChat = { agentId, agentName, initialMessage ->
+        navController.navigate(AgentChatRoute(agentId = agentId, agentName = agentName, initialMessage = initialMessage))
+    },
+    onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+    onNavigateToProviders = { navController.navigateTo(ShellDestination.Providers) },
+    onNavigateToSchedules = { navController.navigate(SchedulesRoute()) },
+    onNavigateToRuns = { navController.navigate(RunsRoute) },
+    onNavigateToAbout = { navController.navigate(AboutRoute) },
+    onNavigateToTelemetry = { navController.navigate(TelemetryRoute) },
+    onNavigateToSystemAccess = { navController.navigate(SystemAccessRoute) },
+    onNavigateToProjects = { navController.navigate(HomeRoute) },
+)

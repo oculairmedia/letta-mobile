@@ -73,7 +73,7 @@ class AndroidShellRoutesTest {
     fun routesOutsideTheSharedShellHaveNoDestination() {
         assertNull(shellDestinationOf(RunsRoute))
         assertNull(shellDestinationOf(PairingScanRoute))
-        assertNull(shellDestinationOf(ArchivalRoute("agent-1")))
+        assertNull(shellDestinationOf(TemplatesRoute))
         assertNull(shellDestinationOf(HomeRoute))
     }
 }

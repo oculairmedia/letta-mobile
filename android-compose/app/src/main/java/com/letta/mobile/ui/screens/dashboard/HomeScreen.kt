@@ -8,7 +8,6 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -33,74 +32,29 @@ import kotlinx.coroutines.launch
 /** The phone presentation of the shared Home page: the shell header and drawer carry title and search. */
 private val AndroidHomeOptions = HomePageOptions(showTitle = false, showSearch = false, touch = true)
 
+/** The backend label under the Home title and the switcher it opens, when this host can switch. */
+internal data class HomeBackendLabel(val label: String?, val onOpenSwitcher: (() -> Unit)?)
+
+/** What a Home host passes: where everything leads, the backend label and the title. */
+internal data class HomeScreenSpec(
+    val navigation: HomeNavigationCallbacks,
+    val routes: HomeChatRoutes,
+    val backend: HomeBackendLabel = HomeBackendLabel(null, null),
+    val title: String = "Letta",
+)
+
 /**
  * The Admin tab's home: the shared shell header (search, backend label, settings) and admin drawer around
  * the shared Home page (letta-mobile-c3np7.3.11.1).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(
-    onNavigateToAgents: () -> Unit,
-    onNavigateToConversations: () -> Unit,
-    onNavigateToTools: () -> Unit,
-    onNavigateToBlocks: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToChat: (agentId: String, agentName: String?, initialMessage: String?) -> Unit,
-    onNavigateToChatMessage: (agentId: String, conversationId: String, messageId: String) -> Unit,
-    onNavigateToEditAgent: (agentId: String) -> Unit,
-    onNavigateToUsage: () -> Unit,
-    onNavigateToConversation: (agentId: String, conversationId: String) -> Unit = { agentId, _ ->
-        onNavigateToChat(agentId, null, null)
-    },
-    onNavigateToTemplates: () -> Unit = {},
-    onNavigateToProviders: () -> Unit = {},
-    onNavigateToSchedules: () -> Unit = {},
-    onNavigateToRuns: () -> Unit = {},
-    onNavigateToMcp: () -> Unit = {},
-    onNavigateToAbout: () -> Unit = {},
-    onNavigateToTelemetry: () -> Unit = {},
-    onNavigateToSystemAccess: () -> Unit = {},
-    onNavigateToBotSettings: () -> Unit = {},
-    onNavigateToProjects: () -> Unit = {},
-    onNavigateToModels: () -> Unit = {},
-    activeBackendLabel: String? = null,
-    onNavigateToBackendSwitcher: (() -> Unit)? = null,
-    title: String = "Letta",
-    viewModel: DashboardViewModel = hiltViewModel(),
-) {
+internal fun HomeScreen(spec: HomeScreenSpec, viewModel: DashboardViewModel = hiltViewModel()) {
+    val (navigation, routes, backend, title) = spec
     val state by viewModel.state.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-
-    val navigation = remember(
-        onNavigateToAgents, onNavigateToConversations, onNavigateToTools, onNavigateToBlocks,
-        onNavigateToSettings, onNavigateToChat, onNavigateToUsage, onNavigateToTemplates,
-        onNavigateToProviders, onNavigateToSchedules, onNavigateToRuns,
-        onNavigateToMcp, onNavigateToAbout, onNavigateToTelemetry,
-        onNavigateToSystemAccess, onNavigateToBotSettings, onNavigateToProjects, onNavigateToModels,
-    ) {
-        HomeNavigationCallbacks(
-            onNavigateToAgents = onNavigateToAgents,
-            onNavigateToConversations = onNavigateToConversations,
-            onNavigateToTools = onNavigateToTools,
-            onNavigateToBlocks = onNavigateToBlocks,
-            onNavigateToSettings = onNavigateToSettings,
-            onNavigateToChat = onNavigateToChat,
-            onNavigateToUsage = onNavigateToUsage,
-            onNavigateToTemplates = onNavigateToTemplates,
-            onNavigateToProviders = onNavigateToProviders,
-            onNavigateToSchedules = onNavigateToSchedules,
-            onNavigateToRuns = onNavigateToRuns,
-            onNavigateToMcp = onNavigateToMcp,
-            onNavigateToAbout = onNavigateToAbout,
-            onNavigateToTelemetry = onNavigateToTelemetry,
-            onNavigateToSystemAccess = onNavigateToSystemAccess,
-            onNavigateToBotSettings = onNavigateToBotSettings,
-            onNavigateToProjects = onNavigateToProjects,
-            onNavigateToModels = onNavigateToModels,
-        )
-    }
-    val routes = HomeChatRoutes(onNavigateToChatMessage, onNavigateToConversation, onNavigateToEditAgent)
+    val onNavigateToSettings = navigation.onNavigateToSettings
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -132,7 +86,7 @@ fun HomeScreen(
             header = {
                 ShellHeader(
                     // The backend label under the title opens the switcher, when this host can switch.
-                    title = HeaderTitle.Text(title, activeBackendLabel, onSubtitleClick = onNavigateToBackendSwitcher),
+                    title = HeaderTitle.Text(title, backend.label, onSubtitleClick = backend.onOpenSwitcher),
                     search = search,
                     controls = HeaderControls(
                         nav = HeaderNav.Menu(onClick = { scope.launch { drawerState.open() } }),

@@ -206,20 +206,13 @@ internal fun TopLevelDestination.isSelected(currentDestination: NavDestination?)
             ConfigListRoute::class,
             TemplatesRoute::class,
             ProvidersRoute::class,
-            BlocksRoute::class,
             SchedulesRoute::class,
             RunsRoute::class,
-            McpRoute::class,
-            McpServerToolsRoute::class,
             AboutRoute::class,
-            ModelsRoute::class,
             AllToolsRoute::class,
             SkillsRoute::class,
-            UsageRoute::class,
             SystemAccessRoute::class,
             EditAgentRoute::class,
-            ToolDetailRoute::class,
-            ArchivalRoute::class,
         )
     }
     return currentDestination.hierarchy.any { destination ->

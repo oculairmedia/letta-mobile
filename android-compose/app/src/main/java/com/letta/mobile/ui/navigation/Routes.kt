@@ -20,26 +20,20 @@ import kotlinx.serialization.Serializable
 @Serializable data object ConfigListRoute
 @Serializable data object TemplatesRoute
 @Serializable data object ProvidersRoute
-@Serializable data object BlocksRoute
 @Serializable data class SchedulesRoute(val agentId: String? = null)
 @Serializable data object ChannelsRoute
 @Serializable data object RunsRoute
-@Serializable data object McpRoute
 @Serializable data object AboutRoute
-@Serializable data object ModelsRoute
 @Serializable data object AllToolsRoute
 /** letta-mobile-zxk2n.32: the shared Skills page; [agentId] is whose skills install / remove act on. */
 @Serializable data class SkillsRoute(val agentId: String? = null)
 @Serializable data class MemoryRoute(val agentId: String? = null)
-@Serializable data object UsageRoute
 @Serializable data class ShareToAgentRoute(val sharedText: String)
 @Serializable data object ProjectsRoute
-@Serializable data object CreateProjectRoute
 @Serializable data object TelemetryRoute
 @Serializable data object SystemAccessRoute
 @Serializable data object PairingScanRoute
 @Serializable data object PairingInviteRoute
-@Serializable data object VibesyncDebugRoute
 @Serializable data object CanvasDebugRoute
 @Serializable
 data class CanvasRoute(
@@ -50,26 +44,3 @@ data class CanvasRoute(
     /** The chat screen a share lands in; without one there is nowhere to share to. */
     val shareRecipient: String? = null,
 )
-@Serializable
-data class ProjectIssuesRoute(
-    val projectId: String,
-    val projectName: String? = null,
-)
-
-@Serializable
-data class ProjectIssueDetailRoute(
-    val projectId: String,
-    val issueId: String,
-    val projectName: String? = null,
-)
-
-@Serializable
-data class McpServerToolsRoute(val serverId: String)
-
-
-
-@Serializable
-data class ToolDetailRoute(val toolId: String)
-
-@Serializable
-data class ArchivalRoute(val agentId: String)

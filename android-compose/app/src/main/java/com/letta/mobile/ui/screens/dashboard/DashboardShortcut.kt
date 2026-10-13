@@ -6,7 +6,8 @@ import ca.oculair.meridian.R
 import com.letta.mobile.ui.icons.LettaIcons
 
 /**
- * Every destination reachable from the Home drawer.
+ * Every destination reachable from the Home drawer. letta-mobile-ckmub.2.5 (S17): MCP servers and
+ * usage left with their screens (no App Server route); Blocks open Memory and Models open Providers.
  *
  * Enum ordinal determines default drawer order.
  * [group] controls divider placement (matches existing drawer layout).
@@ -31,12 +32,10 @@ enum class DashboardShortcut(
     PROVIDERS(LettaIcons.Cloud, R.string.screen_nav_providers, Group.SECONDARY, R.string.widget_desc_providers),
     SCHEDULES(LettaIcons.AccessTime, R.string.screen_nav_schedules, Group.SECONDARY, R.string.widget_desc_schedules),
     RUNS(LettaIcons.ChatOutline, R.string.screen_nav_runs, Group.SECONDARY, R.string.widget_desc_runs),
-    MCP_SERVERS(LettaIcons.Cloud, R.string.screen_nav_mcp_servers, Group.SECONDARY, R.string.widget_desc_mcp_servers),
     BOT_SETTINGS(LettaIcons.Agent, R.string.screen_nav_bot_settings, Group.SECONDARY, R.string.widget_desc_bot_settings),
     PROJECTS(LettaIcons.Apps, R.string.screen_projects_title, Group.SECONDARY, R.string.widget_desc_projects),
     MODELS(LettaIcons.Sparkles, R.string.screen_models_title, Group.SECONDARY, R.string.widget_desc_models),
 
-    USAGE(LettaIcons.Database, R.string.screen_nav_usage, Group.SECONDARY, R.string.widget_desc_usage),
     FAVORITE_AGENT(LettaIcons.Star, R.string.screen_nav_favorite_agent, Group.SECONDARY, R.string.widget_desc_favorite_agent),
 
     // --- Group UTILITY (below second divider) ---

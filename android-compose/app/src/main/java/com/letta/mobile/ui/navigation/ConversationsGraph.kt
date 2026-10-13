@@ -113,7 +113,6 @@ private fun ConversationsDetailHost(
             AgentScaffold(
                 onNavigateBack = onClose,
                 onNavigateToSettings = { agentId -> outer.navigateTo(ShellDestination.AgentEditor(agentId)) },
-                onNavigateToArchival = { agentId -> outer.navigate(ArchivalRoute(agentId)) },
                 onNavigateToTools = { outer.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
                 onNavigateToSkills = { agentId -> outer.navigateTo(ShellDestination.Skills(agentId)) },
                 onNavigateToMemory = { agentId -> outer.navigateTo(ShellDestination.Memory(agentId)) },

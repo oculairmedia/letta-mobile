@@ -58,6 +58,7 @@ fun SkillsPage(
     var query by rememberSaveable { mutableStateOf("") }
     var assignedOnly by rememberSaveable { mutableStateOf(false) }
     var selectedSkillName by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedToolId by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).testTag(SkillsPageTags.PAGE)) {
@@ -77,11 +78,18 @@ fun SkillsPage(
                 onAssignedOnlyChange = { assignedOnly = it },
                 onSelectSkill = { selectedSkillName = it },
                 onJumpTo = { section -> scope.jumpTo(listState, rows, section) },
+                onSelectTool = { tool ->
+                    selectedToolId = tool.id.value
+                    actions.onToolClick?.invoke(tool)
+                },
             ),
             selectedSkill = selectedSkillName?.let { name -> state.skillNamed(name) },
         )
         InitialSectionJump(page)
         if (wide) WideSkillsLayout(page) else CompactSkillsLayout(page)
+    }
+    selectedToolId?.let { id -> state.tools.tools.firstOrNull { it.id.value == id } }?.let { tool ->
+        ToolDetailPane(tool, onClose = { selectedToolId = null })
     }
 }
 
@@ -105,8 +113,9 @@ data class SkillsPageState(
 }
 
 /**
- * What the page reports back. [onToolClick] null leaves tool cards inert; [onAddTool] null hides
- * the Tools section's create button (a host that cannot create tools).
+ * What the page reports back. A tool card always opens the tool's read-only detail; [onToolClick]
+ * also tells the host. [onAddTool] null hides the Tools section's create button (every App Server
+ * host: letta-code tools are code-defined).
  */
 @Immutable
 data class SkillsPageActions(
@@ -146,6 +155,7 @@ object SkillsPageTags {
     const val ASSIGNED_ONLY = "skills_assigned_only"
     const val ALL_SKILLS = "skills_all"
     const val LOAD_MORE_TOOLS = "skills_load_more_tools"
+    const val TOOL_DETAIL = "skills_tool_detail"
 
     fun section(section: SkillsPageSection): String = "skills_section_${section.name}"
 
@@ -167,6 +177,8 @@ internal class SkillsPageControls(
     val onAssignedOnlyChange: (Boolean) -> Unit,
     val onSelectSkill: (String?) -> Unit,
     val onJumpTo: (SkillsPageSection) -> Unit,
+    /** Opens a tool's read-only detail (and tells the host, through [SkillsPageActions.onToolClick]). */
+    val onSelectTool: (Tool) -> Unit = {},
 )
 
 internal class SkillsPageScope(

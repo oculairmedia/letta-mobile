@@ -1,12 +1,9 @@
 package com.letta.mobile.ui.screens.skills
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -15,7 +12,6 @@ import ca.oculair.meridian.R
 import com.letta.mobile.data.skills.SkillsCatalogState
 import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.ui.screens.tools.AllToolsViewModel
-import com.letta.mobile.ui.screens.tools.CreateToolDialog
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.ShellPage
 import com.letta.mobile.ui.shell.ShellPageDeps
@@ -31,12 +27,12 @@ import com.letta.mobile.ui.shell.shellSkillsPage
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 /**
- * Android host for the shared Skills page (letta-mobile-zxk2n.32): top bar, back and the create
- * tool dialog only; the page is the shared ShellPage for [destination] (letta-mobile-ckmub.3.4).
+ * Android host for the shared Skills page (letta-mobile-zxk2n.32): top bar and back only; the page
+ * is the shared ShellPage for [destination] (letta-mobile-ckmub.3.4), and a tool opens its read-only
+ * detail inside it (letta-mobile-ckmub.2.5: tools are letta-code's own catalog, with no CRUD route).
  * The Skills route opens it on Skills; the standalone Tools route on its Tools anchor.
  * The shared page frame owns the system bars and keyboard, so the page sits inside them edge to edge.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(
     navigation: SkillsScreenNavigation,
@@ -46,10 +42,7 @@ fun SkillsScreen(
 ) {
     val catalog by skillsViewModel.state.collectAsStateWithLifecycle()
     val tools by toolsViewModel.toolState.collectAsStateWithLifecycle()
-    var showCreateDialog by remember { mutableStateOf(false) }
-    val actions = remember(skillsViewModel, toolsViewModel, navigation) {
-        skillsPageActions(skillsViewModel, toolsViewModel, navigation) { showCreateDialog = true }
-    }
+    val actions = remember(skillsViewModel, toolsViewModel) { skillsPageActions(skillsViewModel, toolsViewModel) }
     LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         header = {
@@ -66,29 +59,12 @@ fun SkillsScreen(
             modifier = Modifier.padding(paddingValues),
         )
     }
-    if (showCreateDialog) {
-        CreateToolDialog(
-            onDismiss = { showCreateDialog = false },
-            onCreate = { sourceCode ->
-                toolsViewModel.createTool(sourceCode)
-                showCreateDialog = false
-            },
-        )
-    }
 }
 
-/** Where the Skills screen leaves to: back, and a tool's detail page. */
-data class SkillsScreenNavigation(
-    val onNavigateBack: () -> Unit,
-    val onNavigateToToolDetail: (toolId: String) -> Unit = {},
-)
+/** Where the Skills screen leaves to: back. */
+data class SkillsScreenNavigation(val onNavigateBack: () -> Unit)
 
-private fun skillsPageActions(
-    skills: SkillsViewModel,
-    tools: AllToolsViewModel,
-    navigation: SkillsScreenNavigation,
-    onAddTool: () -> Unit,
-): SkillsPageActions = SkillsPageActions(
+private fun skillsPageActions(skills: SkillsViewModel, tools: AllToolsViewModel): SkillsPageActions = SkillsPageActions(
     onRefreshSkills = skills::refresh,
     onInstallSkill = skills::install,
     onUninstallSkill = skills::uninstall,
@@ -96,8 +72,6 @@ private fun skillsPageActions(
     onToolTagToggled = tools::toggleTag,
     onClearToolTags = tools::clearTags,
     onLoadMoreTools = tools::loadMoreTools,
-    onToolClick = { tool -> navigation.onNavigateToToolDetail(tool.id.value) },
-    onAddTool = onAddTool,
 )
 
 internal fun skillsPageState(catalog: SkillsCatalogState, tools: ToolLibraryState): SkillsPageState = SkillsPageState(

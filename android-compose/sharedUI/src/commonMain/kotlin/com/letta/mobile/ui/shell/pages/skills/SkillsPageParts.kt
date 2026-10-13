@@ -202,7 +202,7 @@ private fun ToolCard(tool: Tool, page: SkillsPageScope, modifier: Modifier) {
         title = tool.name,
         description = tool.description,
         accent = SkillCategories.categorize(tool.name, tool.tags).accentColor(),
-        onClick = { page.actions.onToolClick?.invoke(tool) },
+        onClick = { page.controls.onSelectTool(tool) },
         modifier = modifier.testTag(SkillsPageTags.tool(tool.id.value)),
         trailing = { tool.toolType?.takeIf { it.isNotBlank() }?.let { LettaPill(it, MaterialTheme.colorScheme.onSurfaceVariant) } },
     )

@@ -3,11 +3,11 @@ package com.letta.mobile.ui.navigation
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
-import com.letta.mobile.ui.screens.projects.CreateProjectScreen
-import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
-import com.letta.mobile.ui.screens.projects.ProjectIssuesScreen
 
+/**
+ * letta-mobile-ckmub.2.5 (hard cut S17): the Home tab's projects catalog (the shared Projects page)
+ * and the same page pushed from elsewhere. Project issues have no App Server route and were deleted.
+ */
 fun NavGraphBuilder.projectsGraph(
     navController: NavHostController,
     activeBackendLabel: String?,
@@ -20,47 +20,9 @@ fun NavGraphBuilder.projectsGraph(
         }
         ProjectHomeRouteScreen(
             navController = navController,
-            projectWorkSupported = capabilities.projectWorkSupported,
             onNavigateBack = null,
-            activeBackendLabel = activeBackendLabel,
-            onNavigateToBackendSwitcher = openBackendSwitcher,
+            backend = ProjectsBackendLabel(activeBackendLabel, openBackendSwitcher),
         )
-    }
-
-    composable<ProjectIssuesRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) { backStackEntry ->
-        if (!rememberProjectWorkSupportedOrPopBack(navController)) {
-            return@composable
-        }
-        val route = backStackEntry.toRoute<ProjectIssuesRoute>()
-        ProjectIssuesScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onNavigateToIssue = { issueId ->
-                navController.navigate(
-                    ProjectIssueDetailRoute(
-                        projectId = route.projectId,
-                        issueId = issueId,
-                        projectName = route.projectName,
-                    )
-                )
-            },
-        )
-    }
-
-    composable<ProjectIssueDetailRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        if (!rememberProjectWorkSupportedOrPopBack(navController)) {
-            return@composable
-        }
-        ProjectIssueDetailScreen(onNavigateBack = { navController.popBackStack() })
     }
 
     composable<ProjectsRoute>(
@@ -78,25 +40,7 @@ fun NavGraphBuilder.projectsGraph(
         }
         ProjectHomeRouteScreen(
             navController = navController,
-            projectWorkSupported = capabilities.projectWorkSupported,
             onNavigateBack = { navController.popBackStack() },
-        )
-    }
-
-    composable<CreateProjectRoute>(
-        enterTransition = drillInEnter,
-        exitTransition = drillInExit,
-        popEnterTransition = drillInPopEnter,
-        popExitTransition = drillInPopExit,
-    ) {
-        CreateProjectScreen(
-            onNavigateBack = { navController.popBackStack() },
-            onProjectCreated = { _ ->
-                navController.previousBackStackEntry
-                    ?.savedStateHandle
-                    ?.set(PROJECT_CREATED_REFRESH_KEY, true)
-                navController.popBackStack()
-            },
         )
     }
 }
