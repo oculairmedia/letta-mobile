@@ -93,10 +93,7 @@ internal data class DesktopHeaderChromeState(
     val search: SearchSlot? = null,
     val conversationTabs: List<LettaTab> = emptyList(),
     val activeConversationId: String? = null,
-    val onSelectConversationTab: (String) -> Unit = {},
-    val onCloseConversationTab: (String) -> Unit = {},
-    val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
-    val onNewConversationTab: (() -> Unit)? = null,
+    val conversationTabActions: LettaTabStripActions = LettaTabStripActions(),
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -304,13 +301,7 @@ private fun desktopHeaderTitle(title: String, header: DesktopHeaderChromeState):
             LettaTabStrip(
                 tabs = header.conversationTabs,
                 activeKey = header.activeConversationId,
-                actions = LettaTabStripActions(
-                    onSelect = header.onSelectConversationTab,
-                    onClose = header.onCloseConversationTab,
-                    onReorder = header.onReorderConversationTab,
-                    onNew = header.onNewConversationTab,
-                    newLabel = "New conversation tab",
-                ),
+                actions = header.conversationTabActions,
                 dragLaneWidth = MinimumTitleBarDragWidth,
                 modifier = Modifier.fillMaxHeight(),
             )
