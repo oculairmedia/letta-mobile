@@ -4,26 +4,13 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSearchMatcher
-import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
-import com.letta.mobile.data.model.ModelSettings
-import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.runtime.local.EmbeddedLettaCodeModelSelection
-import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
-import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
-import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -38,48 +25,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
-@androidx.compose.runtime.Immutable
-enum class AgentCreateRuntimeOption {
-    REMOTE,
-    LOCAL_LETTACODE,
-}
-
-data class LocalLettaCodeCreateReadiness(
-    val runtimeEnabled: Boolean = false,
-    val modelSelected: Boolean = false,
-    val modelDownloaded: Boolean = false,
-    val activeConfigIsLocal: Boolean = false,
-) {
-    val ready: Boolean
-        get() = runtimeEnabled && modelSelected && modelDownloaded && activeConfigIsLocal
-
-    val setupMessage: String?
-        get() = when {
-            !runtimeEnabled -> "This build does not include the embedded Local LettaCode runtime."
-            !activeConfigIsLocal -> "Enable Local LettaCode in Settings to create agents that run on this device."
-            !modelDownloaded -> "Download or import a model in Settings before creating a local agent."
-            !modelSelected -> "Choose which downloaded model Local LettaCode should use."
-            else -> null
-        }
-
-    val setupActionLabel: String
-        get() = when {
-            !activeConfigIsLocal -> "Enable Local LettaCode"
-            !modelDownloaded -> "Browse local models"
-            !modelSelected -> "Choose model"
-            else -> "Open Local LettaCode settings"
-        }
-}
-
+/**
+ * The agent list's state. Creating an agent is the shared agent editor's new-agent flow
+ * (letta-mobile-ckmub.3.24); importing one from a file stays here.
+ */
 data class AgentListUiState(
     val agents: ImmutableList<Agent> = persistentListOf(),
-    val availableTools: ImmutableList<Tool> = persistentListOf(),
-    val llmModels: ImmutableList<LlmModel> = persistentListOf(),
-    val embeddingModels: ImmutableList<EmbeddingModel> = persistentListOf(),
-    val localLettaCodeReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
     val favoriteAgentId: AgentId? = null,
     val pinnedAgentIds: Set<AgentId> = emptySet(),
     val searchQuery: String = "",
@@ -88,10 +41,8 @@ data class AgentListUiState(
     val isLoading: Boolean = true,
     val isHydrating: Boolean = false,
     val isRefreshing: Boolean = false,
-    val isCreating: Boolean = false,
     val error: String? = null,
     // Dialog state (hoisted from composable)
-    val showCreateDialog: Boolean = false,
     val showImportDialog: Boolean = false,
     val isSearchExpanded: Boolean = false,
     val showGrid: Boolean = false,
@@ -104,133 +55,70 @@ data class AgentListUiState(
 class AgentListViewModel @Inject constructor(
     private val agentRepository: IAgentRepository,
     private val settingsRepository: ISettingsRepository,
-    private val toolRepository: IToolRepository,
-    private val modelRepository: IModelRepository,
-    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
-    private val embeddedModelRepository: EmbeddedModelRepository,
 ) : ViewModel() {
     companion object {
         private const val LIST_CACHE_TTL_MS = 30_000L
+        private const val STATE_STOP_TIMEOUT_MS = 5_000L
     }
 
-        private data class TransientState(
-            val searchQuery: String = "",
-            val selectedTags: Set<String> = emptySet(),
-            val isLoading: Boolean = true,
-            val isHydrating: Boolean = false,
-            val isRefreshing: Boolean = false,
-            val isCreating: Boolean = false,
-            val isImporting: Boolean = false,
-            val error: String? = null,
-            // Dialog state (hoisted from composable)
-            val showCreateDialog: Boolean = false,
-            val showImportDialog: Boolean = false,
-            val isSearchExpanded: Boolean = false,
-            val showGrid: Boolean = false,
-            val pendingImportName: String? = null,
-            val pendingImportOverrideTools: Boolean = true,
-            val pendingImportStripMessages: Boolean = false,
-            val shareNavigationConsumed: Boolean = false,
-        )
+    private data class TransientState(
+        val searchQuery: String = "",
+        val selectedTags: Set<String> = emptySet(),
+        val isLoading: Boolean = true,
+        val isHydrating: Boolean = false,
+        val isRefreshing: Boolean = false,
+        val isImporting: Boolean = false,
+        val error: String? = null,
+        // Dialog state (hoisted from composable)
+        val showImportDialog: Boolean = false,
+        val isSearchExpanded: Boolean = false,
+        val showGrid: Boolean = false,
+        val pendingImportName: String? = null,
+        val pendingImportOverrideTools: Boolean = true,
+        val pendingImportStripMessages: Boolean = false,
+    )
 
     private val _transient = MutableStateFlow(
         TransientState(isLoading = agentRepository.agents.value.isEmpty())
     )
 
-    /** Pre-combine models + transient into a single flow to stay within combine()'s 5-param limit. */
-    private data class Overlay(
-        val llm: List<LlmModel>,
-        val emb: List<EmbeddingModel>,
-        val localReadiness: LocalLettaCodeCreateReadiness,
-        val activeConfigIsLocalRuntime: Boolean,
-        val transient: TransientState,
-    )
-
-    private val overlay = combine(
-        modelRepository.llmModels,
-        modelRepository.embeddingModels,
-        settingsRepository.activeConfig,
-        embeddedModelRepository.catalog,
-        _transient,
-    ) { llm, emb, activeConfig, catalog, transient ->
-        Overlay(
-            llm = llm,
-            emb = emb,
-            localReadiness = activeConfig.localLettaCodeCreateReadiness(
-                runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
-                downloadedModelHandles = catalog.downloadedModelHandles(),
-            ),
-            activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(activeConfig),
-            transient = transient,
-        )
-    }
-
     val uiState: StateFlow<AgentListUiState> = combine(
         agentRepository.agents,
         settingsRepository.favoriteAgentId,
         settingsRepository.getPinnedAgentIds(),
-        toolRepository.getTools(),
-        overlay,
-    ) { agents, favId, pinnedIds, tools, overlay ->
-        val displayAgents = if (overlay.activeConfigIsLocalRuntime) {
+        settingsRepository.activeConfig,
+        _transient,
+    ) { agents, favId, pinnedIds, activeConfig, transient ->
+        val displayAgents = if (AgentRuntimeBinding.isLocalRuntime(activeConfig)) {
             agents.filter(AgentRuntimeBinding::isLocalBound)
         } else {
             agents
         }
         AgentListUiState(
             agents = displayAgents.toImmutableList(),
-            availableTools = tools.toImmutableList(),
-            llmModels = overlay.llm.toImmutableList(),
-            embeddingModels = overlay.emb.toImmutableList(),
-            localLettaCodeReadiness = overlay.localReadiness,
             favoriteAgentId = favId?.let { AgentId(it) },
             pinnedAgentIds = pinnedIds.map { AgentId(it) }.toSet(),
-            searchQuery = overlay.transient.searchQuery,
-            selectedTags = overlay.transient.selectedTags,
-            isLoading = overlay.transient.isLoading && agents.isEmpty(),
-            isHydrating = overlay.transient.isHydrating,
-            isRefreshing = overlay.transient.isRefreshing,
-            isCreating = overlay.transient.isCreating,
-            isImporting = overlay.transient.isImporting,
-            error = overlay.transient.error,
-            showCreateDialog = overlay.transient.showCreateDialog,
-            showImportDialog = overlay.transient.showImportDialog,
-            isSearchExpanded = overlay.transient.isSearchExpanded,
-            showGrid = overlay.transient.showGrid,
-            pendingImportName = overlay.transient.pendingImportName,
-            pendingImportOverrideTools = overlay.transient.pendingImportOverrideTools,
-            pendingImportStripMessages = overlay.transient.pendingImportStripMessages,
+            searchQuery = transient.searchQuery,
+            selectedTags = transient.selectedTags,
+            isLoading = transient.isLoading && agents.isEmpty(),
+            isHydrating = transient.isHydrating,
+            isRefreshing = transient.isRefreshing,
+            isImporting = transient.isImporting,
+            error = transient.error,
+            showImportDialog = transient.showImportDialog,
+            isSearchExpanded = transient.isSearchExpanded,
+            showGrid = transient.showGrid,
+            pendingImportName = transient.pendingImportName,
+            pendingImportOverrideTools = transient.pendingImportOverrideTools,
+            pendingImportStripMessages = transient.pendingImportStripMessages,
         )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, AgentListUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STATE_STOP_TIMEOUT_MS), AgentListUiState())
 
     init {
         loadAgents()
-        loadAvailableTools()
-        loadAvailableModels()
         // letta-mobile-ze5l: refetch on backend switch.
         viewModelScope.launch {
             settingsRepository.activeConfigChanges.collect { refresh() }
-        }
-    }
-
-    fun loadAvailableTools() {
-        viewModelScope.launch {
-            try {
-                toolRepository.refreshToolsIfStale(LIST_CACHE_TTL_MS)
-            } catch (_: Exception) {
-                Log.w("AgentListViewModel", "Failed to load available tools")
-            }
-        }
-    }
-
-    fun loadAvailableModels() {
-        viewModelScope.launch {
-            try {
-                modelRepository.refreshLlmModels()
-                modelRepository.refreshEmbeddingModels()
-            } catch (_: Exception) {
-                Log.w("AgentListViewModel", "Failed to load available models")
-            }
         }
     }
 
@@ -250,13 +138,14 @@ class AgentListViewModel @Inject constructor(
                         .let { agents ->
                             _transient.update { it.copy(isLoading = false) }
                             Log.i("AgentListViewModel", "AgentList first-page ready count=${agents.size}")
-                            Log.i("AgentListViewModel", "AgentList hydrated count=${agents.size}")
                         }
                 }
                 agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
                 firstPageMarker.cancel()
                 _transient.update { it.copy(isLoading = false, isHydrating = false) }
                 Log.i("AgentListViewModel", "AgentList hydrated count=${agentRepository.agents.value.size}")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w("AgentListViewModel", "AgentList hydrate failed", e)
                 _transient.update {
@@ -278,6 +167,8 @@ class AgentListViewModel @Inject constructor(
             try {
                 agentRepository.refreshAgents()
                 _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _transient.update {
                     it.copy(
@@ -341,6 +232,8 @@ class AgentListViewModel @Inject constructor(
                     settingsRepository.setFavoriteAgentId(null)
                 }
                 onComplete()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _transient.update { it.copy(error = e.message ?: "Failed to delete agent") }
             }
@@ -357,54 +250,6 @@ class AgentListViewModel @Inject constructor(
         viewModelScope.launch {
             val isPinned = agentId in uiState.value.pinnedAgentIds
             settingsRepository.setAgentPinned(agentId.value, !isPinned)
-        }
-    }
-
-    fun createAgent(
-        params: AgentCreateParams,
-        runtimeOption: AgentCreateRuntimeOption = AgentCreateRuntimeOption.REMOTE,
-        onSuccess: (AgentId) -> Unit,
-    ) {
-        viewModelScope.launch {
-            _transient.update { it.copy(isCreating = true, error = null) }
-            try {
-                val localCreate = runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
-                val createParams = when (runtimeOption) {
-                    AgentCreateRuntimeOption.REMOTE -> params
-                    AgentCreateRuntimeOption.LOCAL_LETTACODE -> {
-                        val activeConfig = settingsRepository.activeConfig.value
-                        val readiness = activeConfig.localLettaCodeCreateReadiness(
-                            runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
-                            downloadedModelHandles = embeddedModelRepository.catalog.value.downloadedModelHandles(),
-                        )
-                        val setupMessage = readiness.setupMessage
-                        if (setupMessage != null || activeConfig == null) {
-                            _transient.update {
-                                it.copy(isCreating = false, error = setupMessage ?: "Enable Local LettaCode in Settings before creating a local agent.")
-                            }
-                            return@launch
-                        }
-                        params.withLocalLettaCodeRuntimeBinding(activeConfig)
-                    }
-                }
-                val agent = if (localCreate) {
-                    agentRepository.createLocalAgent(createParams)
-                } else {
-                    agentRepository.createAgent(createParams)
-                }
-                _transient.update { it.copy(isCreating = false) }
-                if (!localCreate) {
-                    agentRepository.refreshAgents()
-                }
-                onSuccess(agent.id)
-            } catch (e: Exception) {
-                _transient.update {
-                    it.copy(
-                        isCreating = false,
-                        error = mapErrorToUserMessage(e, "Failed to create agent"),
-                    )
-                }
-            }
         }
     }
 
@@ -430,6 +275,8 @@ class AgentListViewModel @Inject constructor(
                 )
                 _transient.update { it.copy(isImporting = false) }
                 onSuccess(response)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _transient.update {
                     it.copy(
@@ -442,14 +289,6 @@ class AgentListViewModel @Inject constructor(
     }
 
     // Dialog state management (hoisted from composable)
-    fun showCreateDialog() {
-        _transient.update { it.copy(showCreateDialog = true) }
-    }
-
-    fun hideCreateDialog() {
-        _transient.update { it.copy(showCreateDialog = false) }
-    }
-
     fun showImportDialog() {
         _transient.update { it.copy(showImportDialog = true) }
     }
@@ -477,67 +316,4 @@ class AgentListViewModel @Inject constructor(
     fun setPendingImportStripMessages(strip: Boolean) {
         _transient.update { it.copy(pendingImportStripMessages = strip) }
     }
-}
-internal fun LettaConfig?.localLettaCodeCreateReadiness(
-    runtimeRunnable: Boolean,
-    downloadedModelHandles: Set<String>,
-): LocalLettaCodeCreateReadiness {
-    val config = this
-    val activeConfigIsLocal = AgentRuntimeBinding.isLocalRuntime(config)
-    // A custom OpenAI-compatible endpoint replaces the on-device model
-    // entirely (letta-mobile-3icw7) — no download/import required.
-    val customProviderConfigured = config?.localProviderBaseUrl?.trim()?.takeIf { it.isNotBlank() } != null
-    val selectedModel = config?.selectedLocalModelHandle()
-    val selectedImportedPath = config?.localModelPath?.trim()?.takeIf { it.isNotBlank() }
-    val modelDownloaded = customProviderConfigured ||
-        selectedImportedPath != null ||
-        (selectedModel != null && selectedModel in downloadedModelHandles)
-    return LocalLettaCodeCreateReadiness(
-        runtimeEnabled = runtimeRunnable,
-        modelSelected = customProviderConfigured || (selectedModel != null && modelDownloaded),
-        modelDownloaded = modelDownloaded,
-        activeConfigIsLocal = activeConfigIsLocal,
-    )
-}
-
-private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
-    ?.trim()
-    ?.takeIf { it.isNotBlank() && it != EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE }
-
-internal fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem>.downloadedModelHandles(): Set<String> =
-    mapNotNull { item ->
-        item.entry.modelId.takeIf { item.state is EmbeddedModelDownloadState.Downloaded }
-    }.toSet()
-
-private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConfig): AgentCreateParams {
-    val selection = EmbeddedLettaCodeModelSelection.from(config)
-    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }
-    val effectiveModel = pickedModel ?: selection.modelHandle
-    val localMetadata = mapOf(
-        LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-        LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-        LocalAgentRuntimeMetadata.RUNTIME_ID_KEY to JsonPrimitive("${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:${config.id}"),
-        // Track the effective model, not the config default — otherwise the
-        // agent record's model and its metadata handle disagree and the
-        // per-agent override could be lost on later reads (CodeRabbit).
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY to JsonPrimitive(effectiveModel),
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY to JsonPrimitive(selection.runtime),
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY to JsonPrimitive(selection.accelerator),
-    )
-    return copy(
-        model = effectiveModel,
-        modelSettings = (modelSettings ?: ModelSettings()).copy(
-            providerType = LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
-            parallelToolCalls = false,
-            maxOutputTokens = selection.maxTokens,
-        ),
-        metadata = metadata.orEmpty() + localMetadata,
-        toolIds = null,
-        tools = null,
-        enableSleeptime = false,
-        includeBaseTools = false,
-        includeMultiAgentTools = false,
-        includeBaseToolRules = false,
-        parallelToolCalls = false,
-    )
 }

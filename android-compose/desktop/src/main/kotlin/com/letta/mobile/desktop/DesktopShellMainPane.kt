@@ -103,7 +103,7 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
             canvasStore = core.canvasShell.store,
             chatScope = core.chatScope,
             onNavigate = { navigator.selectedDestination = it },
-            onCreateAgent = { context.overlays.newAgent = true },
+            onCreateAgent = navigator::openNewAgent,
             onEditAgent = { navigator.editAgentId = it },
             onCanvasSessionChange = { core.canvasShell.activeSession = it },
             showDockedCanvas = showDockedCanvas,
@@ -154,20 +154,14 @@ private fun desktopMainContentInputs(
     host: DesktopShellChatHost,
 ): DesktopMainContentInputs {
     val core = context.core
-    val panels = context.panels
     val navigator = context.navigator
     return DesktopMainContentInputs(
-        editingAgentId = navigator.editAgentId,
+        agentEditor = navigator.agentEditor,
+        agentEditorPage = context.agentEditorPage(),
         selectedDestination = navigator.selectedDestination,
         pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination(),
-        modelOptions = frame.lists.modelOptions,
-        agentRepository = core.bootstrap.dataBindings.sessionGraphProvider.current.agentRepository,
-        blockApi = panels.httpApis.blockApi,
-        secureSettingsStore = core.bootstrap.secureSettingsStore,
-        chatScope = core.chatScope,
         selectedConversationId = frame.chatState.selectedConversationId,
         destinationInputs = destinationContentInputs(context, frame),
-        subagentRepository = panels.subagents.repository,
         activeCanvasSession = core.canvasShell.activeSession,
         dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
         chatPage = desktopSharedChatPage(context, frame, host),
@@ -222,10 +216,6 @@ private fun desktopMainContentActions(context: DesktopShellContext, frame: Deskt
     val navigator = context.navigator
     return DesktopMainContentActions(
         onEditAgentClose = { navigator.editAgentId = null },
-        onEditAgentSaved = { identity, nameChanged ->
-            navigator.recordSavedIdentity(identity)
-            if (nameChanged) chatController.retryConnection()
-        },
         onCloseCanvas = canvasShell::close,
         onShareCanvasToChat = { bytes, mimeType ->
             handleDesktopShareCanvasToChat(bytes, mimeType, chatController) {

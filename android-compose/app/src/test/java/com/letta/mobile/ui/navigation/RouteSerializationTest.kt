@@ -2,7 +2,6 @@ package com.letta.mobile.ui.navigation
 
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.chat.route.ProjectChatStartAction
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -31,9 +30,9 @@ class RouteSerializationTest {
         verifyIdempotent(ConversationsRoute)
 
     @Test
-    fun `AgentListRoute serializes and deserializes`() {
-        verifyRoundTrip(AgentListRoute())
-        verifyRoundTrip(AgentListRoute(openCreate = true))
+    fun `AgentListRoute and the new-agent route serialize and deserialize`() {
+        verifyRoundTrip(AgentListRoute)
+        verifyRoundTrip(EditAgentRoute())
     }
 
     @Test

@@ -399,15 +399,6 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
 }
 
 /** Model/embedding defaults for a new agent, copied from the focused agent. */
-internal fun resolveNewAgentDefaults(
-    agentRepository: IAgentRepository,
-    templateAgentId: String?,
-    modelValue: String?,
-): Pair<String?, String?> {
-    val template = templateAgentId?.let { agentRepository.getCachedAgent(it) }
-    return (modelValue ?: template?.model) to template?.embedding
-}
-
 internal fun conversationRecency(label: String): java.time.Instant =
     runCatching { java.time.Instant.parse(label) }.getOrNull()
         ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
@@ -515,9 +506,10 @@ internal data class CreateDesktopOverlayActionsParams(
     val chatController: DesktopChatController,
     val onSelectDestination: (DesktopDestination) -> Unit,
     val onOpenAgent: (String) -> Unit,
-    /** The agent repository (new-agent defaults) and the host's model control live here. */
+    /** The host's model control lives here. */
     val dataBindings: DesktopDataBindings,
-    val selectedAgentId: String?,
+    /** Opens the shared agent editor's new-agent flow (letta-mobile-ckmub.3.24). */
+    val onNewAgent: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
 )
@@ -539,15 +531,7 @@ internal fun createDesktopOverlayActions(
     onOpenAgent = params.onOpenAgent,
     onNavigate = params.onSelectDestination,
     onNewCanvas = params.onNewCanvas,
-    onCreateAgent = { name, modelValue ->
-        val (model, embedding) = resolveNewAgentDefaults(
-            agentRepository = params.dataBindings.sessionGraphProvider.current.agentRepository,
-            templateAgentId = params.selectedAgentId,
-            modelValue = modelValue,
-        )
-        params.chatController.createAgent(name = name, model = model, embedding = embedding)
-        params.onSelectDestination(DesktopDestination.Conversations)
-    },
+    onNewAgent = params.onNewAgent,
     onIrohIdentityReset = params.onIrohIdentityReset,
 )
 

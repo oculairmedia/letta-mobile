@@ -27,7 +27,6 @@ architecture docs live in [`scripts/`](scripts/) and [`docs/`](docs/).
 |---|---|
 | `app/` | Android app: screens, navigation, ViewModels, Hilt DI |
 | `feature-chat/` | Chat screens, presenters |
-| `feature-editagent/` | Agent editor |
 | `core/android-data/` | Repositories, Room database, data sources |
 | `core/runtime/` | Turn engine, runtime event fanout |
 | `core/ids/` | Shared identifiers; wire schemas are source packages, not a `:core:schemas` Gradle module |

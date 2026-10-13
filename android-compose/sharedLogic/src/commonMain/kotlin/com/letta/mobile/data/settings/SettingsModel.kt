@@ -85,7 +85,7 @@ sealed interface SettingsRow {
     /**
      * A text field. With [onChange] the field shows [value] and reports every edit (the platform
      * holds the form); without it the field keeps its own draft, seeded from [value], for an
-     * [Actions] row to read.
+     * [Actions] row to read. [lines] above one makes it a multi-line field that tall at least (a prompt).
      */
     data class Text(
         override val key: String,
@@ -96,6 +96,7 @@ sealed interface SettingsRow {
         val secret: Boolean = false,
         val numeric: Boolean = false,
         val problem: ((String) -> String?)? = null,
+        val lines: Int = 1,
         val onChange: ((String) -> Unit)? = null,
     ) : SettingsRow
 

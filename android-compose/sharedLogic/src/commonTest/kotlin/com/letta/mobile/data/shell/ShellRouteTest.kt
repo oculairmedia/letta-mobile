@@ -28,7 +28,6 @@ class ShellRouteTest {
     @Test
     fun malformedRoutesDecodeToNull() {
         assertNull(ShellRoute.decode("nowhere"))
-        assertNull(ShellRoute.decode("agent-editor"))
         assertNull(ShellRoute.decode("skills?section=gadgets"))
         assertNull(ShellRoute.decode("settings?section=unknown"))
         assertNull(ShellRoute.decode("chat?agent=%ZZ"))
@@ -109,6 +108,7 @@ object ShellDestinationSamples {
         ShellDestination.Settings(),
         ShellDestination.Settings(ShellSettingsSection.Pairing),
         ShellDestination.AgentEditor("agent-1"),
+        ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
     )

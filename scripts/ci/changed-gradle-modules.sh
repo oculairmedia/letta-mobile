@@ -48,7 +48,6 @@ while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   case "$file" in
     android-compose/feature-chat/*) TASKS[":feature-chat:testDebugUnitTest"]=1 ;;
-    android-compose/feature-editagent/*) TASKS[":feature-editagent:testDebugUnitTest"]=1 ;;
     android-compose/designsystem/*) TASKS[":designsystem:testDebugUnitTest"]=1 ;;
     android-compose/sharedUI/*) TASKS[":sharedUI:jvmTest"]=1 ;;
     # sharedUI renders the canvas through DrawBox and checks its pixels: a DrawBox change re-runs those too.
@@ -67,7 +66,6 @@ done <<<"$DIFF_FILES"
 
 ORDERED=(
   ":feature-chat:testDebugUnitTest"
-  ":feature-editagent:testDebugUnitTest"
   ":designsystem:testDebugUnitTest"
   ":drawbox:jvmTest"
   ":sharedUI:jvmTest"

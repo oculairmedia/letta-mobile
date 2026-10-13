@@ -13,6 +13,7 @@ import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -117,11 +118,7 @@ class DesktopCreateAgentRoutingTest {
     ) {
         controller.start()
         runCurrent()
-        controller.createAgent(
-            name = params.name.orEmpty(),
-            model = params.model,
-            embedding = params.embedding,
-        )
+        backgroundScope.launch { controller.createAgentAndOpen(params) }
         runCurrent()
     }
 }

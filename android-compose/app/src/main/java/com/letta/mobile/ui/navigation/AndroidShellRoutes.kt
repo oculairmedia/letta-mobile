@@ -7,7 +7,6 @@ import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import kotlin.reflect.KClass
 
 /**
@@ -37,7 +36,7 @@ private val AndroidRouteOfKind: Map<ShellPageKind, (ShellDestination) -> Any> = 
     ShellPageKind.Settings to { d ->
         if ((d as ShellDestination.Settings).section == ShellSettingsSection.Pairing) PairingInviteRoute else ConfigRoute()
     },
-    ShellPageKind.AgentEditor to { d -> EditAgentRoute(d.agentId.orEmpty()) },
+    ShellPageKind.AgentEditor to { d -> EditAgentRoute(d.agentId) },
     ShellPageKind.Providers to { _ -> ProvidersRoute },
     ShellPageKind.Overview to { _ -> AboutRoute },
 )

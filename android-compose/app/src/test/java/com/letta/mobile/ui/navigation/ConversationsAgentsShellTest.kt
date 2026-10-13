@@ -168,11 +168,11 @@ class ConversationsAgentsShellTest {
 
     @Test
     fun agentListAndChatWithoutAgentDeepLinksLandOnTheSharedPages() {
-        assertEquals(AgentListRoute(), resolveStartDestination(true, AgentListLaunchTarget, null, null))
+        assertEquals(AgentListRoute, resolveStartDestination(true, AgentListLaunchTarget, null, null))
         lateinit var nav: NavHostController
         compose.setLettaTestContent {
             nav = rememberNavController()
-            NavHost(nav, startDestination = AgentListRoute()) {
+            NavHost(nav, startDestination = AgentListRoute) {
                 composable<AgentListRoute> { AgentListRouteContent(AgentsPageState(agents = AGENTS), ShellAgentRailActions(), AgentListChrome()) }
                 composable<ConversationsRoute> { ConversationsRouteContent(page()) }
             }

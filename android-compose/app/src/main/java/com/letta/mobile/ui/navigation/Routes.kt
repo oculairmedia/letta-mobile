@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object HomeRoute
 @Serializable data object AdminRoute
 @Serializable data object ConversationsRoute
-@Serializable data class AgentListRoute(val openCreate: Boolean = false)
+@Serializable data object AgentListRoute
+/** letta-mobile-ckmub.3.24: the shared agent editor for [agentId]; without one, the new-agent flow. */
+@Serializable data class EditAgentRoute(val agentId: String? = null)
 @Serializable data class ConfigRoute(
     /**
      * When true, the screen opens with an empty form and saves as a brand-new

@@ -54,7 +54,6 @@ SCAN_ROOTS = [
     "desktop/src/main",
     "app/src/main",
     "feature-chat/src/main",
-    "feature-editagent/src/main",
     "designsystem/src/main",
 ]
 

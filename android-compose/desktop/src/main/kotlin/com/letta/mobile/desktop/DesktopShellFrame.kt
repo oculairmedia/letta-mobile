@@ -22,7 +22,6 @@ import com.letta.mobile.data.presence.presenceByAgent
 import com.letta.mobile.data.presence.withDreaming
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.storage.SecureSettingsStore
-import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -82,7 +81,6 @@ internal data class DesktopShellLists(
     val archivedAgentConversations: List<DesktopConversationSummary> = emptyList(),
     val mentionables: List<Mentionable>,
     val paletteItems: List<PaletteItem>,
-    val modelOptions: List<Pair<String, String>>,
 )
 
 /** letta-mobile-bglj6.1.10: the state the shell derives on each composition, for its pieces to draw. */
@@ -157,7 +155,7 @@ private fun rememberCachedIdentities(
     return remember(railAgents, rosterAgents) {
         val rosterById = rosterAgents.associateBy { it.id.value }
         (railAgents.map { it.first } + rosterById.keys).distinct().associateWith { id ->
-            resolveMascotIdentity(id, rosterById[id], store.getString(agentAvatarStyleKey(id)))
+            resolveMascotIdentity(id, rosterById[id], store.getString(com.letta.mobile.ui.mascot.mascotIdentitySettingsKey(id)))
         }
     }
 }
@@ -242,7 +240,6 @@ private fun rememberDesktopShellLists(
     val chatController = context.core.chatController
     val activeSubagents = context.panels.subagents.activeSubagents.value
     val archiveFilter by chatController.archiveFilter.collectAsState()
-    val availableModels by chatController.availableModels.collectAsState()
     val workPlayMode = context.navigator.workPlayMode
     val conversations = chatState.conversations
     val selectedConversationId = chatState.selectedConversationId
@@ -275,7 +272,6 @@ private fun rememberDesktopShellLists(
         paletteItems = remember(conversations, focus.railAgents, workPlayMode) {
             buildPaletteItems(conversations, focus.railAgents, workPlayMode)
         },
-        modelOptions = remember(availableModels) { buildModelOptions(availableModels) },
     )
 }
 

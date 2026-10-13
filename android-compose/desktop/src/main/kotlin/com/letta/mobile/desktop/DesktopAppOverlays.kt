@@ -30,7 +30,6 @@ internal class DesktopOverlayVisibility : DesktopModelSurfaces {
     override var modelsEditor by mutableStateOf(false)
     var commandPalette by mutableStateOf(false)
     var newConversation by mutableStateOf(false)
-    var newAgent by mutableStateOf(false)
     var irohResetConfirm by mutableStateOf(false)
 
     /** letta-mobile-zxk2n.5: `/rename`'s dialog for the open chat. */
@@ -40,7 +39,6 @@ internal class DesktopOverlayVisibility : DesktopModelSurfaces {
 @Immutable
 internal data class DesktopOverlayData(
     val composerModelLabel: String,
-    val modelOptions: List<Pair<String, String>>,
     val paletteItems: List<PaletteItem>,
     val railAgents: List<Pair<String, String>>,
     val rosterAgents: List<Agent>,
@@ -55,15 +53,16 @@ internal data class DesktopOverlayActions(
     val onSelectConversation: (String) -> Unit,
     val onOpenAgent: (String) -> Unit,
     val onNavigate: (DesktopDestination) -> Unit,
-    val onCreateAgent: (name: String, modelValue: String?) -> Unit,
+    /** Opens the shared agent editor's new-agent flow (letta-mobile-ckmub.3.24). */
+    val onNewAgent: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val onNewCanvas: () -> Unit = {},
 )
 
 /**
  * The app-level overlay stack: model picker, New Conversation directory,
- * command palette, drag-drop hint, destructive-action confirmations, and the
- * new-agent dialog. Render order is z-order (later draws on top).
+ * command palette, drag-drop hint and destructive-action confirmations. Render order is z-order (later draws on top).
+ * A new agent is the shared agent editor beside the chat, not an overlay.
  */
 @Composable
 internal fun DesktopAppOverlays(
@@ -91,7 +90,7 @@ internal fun DesktopAppOverlays(
                 },
                 onCreateNewAgent = {
                     visibility.newConversation = false
-                    visibility.newAgent = true
+                    actions.onNewAgent()
                 },
                 onDismiss = { visibility.newConversation = false },
                 onNewCanvas = {
@@ -131,19 +130,6 @@ internal fun DesktopAppOverlays(
                 actions.onIrohIdentityReset()
             },
             onDismiss = { visibility.irohResetConfirm = false },
-        )
-    }
-    // Edit agent is a full-page surface (DesktopEditAgentSurface), not a modal.
-    if (visibility.newAgent) {
-        NewAgentDialog(
-            NewAgentDialogParams(
-                modelOptions = data.modelOptions,
-                onDismiss = { visibility.newAgent = false },
-                onCreate = { name, modelValue ->
-                    visibility.newAgent = false
-                    actions.onCreateAgent(name, modelValue)
-                },
-            ),
         )
     }
 }

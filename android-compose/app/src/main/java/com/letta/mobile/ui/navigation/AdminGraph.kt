@@ -7,7 +7,6 @@ import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.dashboard.HomeBackendLabel
 import com.letta.mobile.ui.screens.dashboard.HomeChatRoutes
@@ -133,7 +132,7 @@ private fun NavGraphBuilder.adminToolRoutes(navController: NavHostController) {
 
 /** Where the Admin home's shortcuts, drawer rows and search hits lead. */
 private fun adminHomeNavigation(navController: NavHostController) = HomeNavigationCallbacks(
-    onNavigateToAgents = { navController.navigate(AgentListRoute()) },
+    onNavigateToAgents = { navController.navigate(AgentListRoute) },
     onNavigateToConversations = { navController.navigate(ConversationsRoute) },
     onNavigateToTools = { navController.navigateTo(ShellDestination.Skills(section = ShellSkillsSection.Tools)) },
     onNavigateToMemory = { navController.navigateTo(ShellDestination.Memory()) },

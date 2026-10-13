@@ -27,7 +27,6 @@ private val UI_PATH_MARKERS = listOf(
     "/desktop/src/main/",
     "/app/src/main/",
     "/feature-chat/src/main/",
-    "/feature-editagent/src/main/",
     "/designsystem/src/main/",
 )
 

@@ -9,7 +9,7 @@ import com.letta.mobile.data.pairing.PairLink
  *
  * ```
  * home | chat?agent=a&conversation=c | canvas?id=b | memory?agent=a | schedules?agent=a | channels
- * skills?agent=a&section=tools | settings?section=pairing | agent-editor?agent=a | providers | overview
+ * skills?agent=a&section=tools | settings?section=pairing | agent-editor?agent=a | agent-editor (a new agent) | providers | overview
  * ```
  *
  * [decode] is the inverse of [encode]; anything else (an unknown name, a missing required id, an
@@ -40,7 +40,7 @@ object ShellRoute {
         ShellPageKind.Settings to { q ->
             if (q[SECTION] == null) ShellDestination.Settings() else section<ShellSettingsSection>(q)?.let(ShellDestination::Settings)
         },
-        ShellPageKind.AgentEditor to { q -> q[AGENT]?.let(ShellDestination::AgentEditor) },
+        ShellPageKind.AgentEditor to { q -> ShellDestination.AgentEditor(q[AGENT]) },
         ShellPageKind.Providers to { _ -> ShellDestination.Providers },
         ShellPageKind.Overview to { _ -> ShellDestination.Overview },
     )

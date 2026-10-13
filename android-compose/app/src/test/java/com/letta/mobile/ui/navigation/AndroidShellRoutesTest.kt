@@ -4,7 +4,6 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.feature.chat.route.AgentChatRoute
-import com.letta.mobile.feature.editagent.EditAgentRoute
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -28,6 +27,7 @@ class AndroidShellRoutesTest {
         ShellDestination.Settings(),
         ShellDestination.Settings(ShellSettingsSection.Pairing),
         ShellDestination.AgentEditor("agent-1"),
+        ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
     )
@@ -54,6 +54,7 @@ class AndroidShellRoutesTest {
             ShellDestination.Chat("agent-1", "conv-1").toAndroidRoute(),
         )
         assertEquals(EditAgentRoute("agent-1"), ShellDestination.AgentEditor("agent-1").toAndroidRoute())
+        assertEquals(EditAgentRoute(), ShellDestination.AgentEditor().toAndroidRoute())
         // A chat route opened from a notification keeps its target conversation.
         assertEquals(
             ShellDestination.Chat("agent-1", "conv-9"),

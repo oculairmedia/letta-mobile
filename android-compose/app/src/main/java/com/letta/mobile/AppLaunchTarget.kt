@@ -4,6 +4,7 @@ import android.content.Intent
 import com.letta.mobile.ui.navigation.AgentListRoute
 
 sealed interface AppLaunchTarget {
+    @Suppress("NoAnyType") // Navigation routes are typed objects of unrelated classes (see AndroidShellRoutes).
     fun toRoute(): Any
 
     companion object {
@@ -18,7 +19,8 @@ sealed interface AppLaunchTarget {
 data object AgentListLaunchTarget : AppLaunchTarget {
     private const val EXTRA_OPEN_AGENT_LIST = "automation_open_agent_list"
 
-    override fun toRoute(): Any = AgentListRoute()
+    @Suppress("NoAnyType") // A typed navigation route object.
+    override fun toRoute(): Any = AgentListRoute
 
     fun fromIntent(intent: Intent?): AgentListLaunchTarget? {
         return if (intent?.getBooleanExtra(EXTRA_OPEN_AGENT_LIST, false) == true) {

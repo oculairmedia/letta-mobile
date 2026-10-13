@@ -224,7 +224,6 @@ private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShe
         visibility = context.overlays,
         data = DesktopOverlayData(
             composerModelLabel = frame.chatState.composerModelLabel,
-            modelOptions = frame.lists.modelOptions,
             paletteItems = frame.lists.paletteItems,
             railAgents = focus.railAgents,
             rosterAgents = focus.rosterAgents,
@@ -238,7 +237,7 @@ private fun DesktopShellOverlays(context: DesktopShellContext, frame: DesktopShe
                 onOpenAgent = { context.router.openAgent(AgentId(it)) },
                 onNewCanvas = { core.canvasShell.createNew(focus.selectedAgentId) },
                 dataBindings = core.bootstrap.dataBindings,
-                selectedAgentId = focus.selectedAgentId,
+                onNewAgent = context.navigator::openNewAgent,
                 onIrohIdentityReset = {
                     DesktopIrohIdentity.reset()
                     core.bootstrap.applyConfig(core.bootstrap.activeConfig)

@@ -18,7 +18,6 @@ class SharedUiIsolationTest {
             ":core:domain",
             ":designsystem",
             ":feature-chat",
-            ":feature-editagent",
             ":desktop",
             ":web",
             // :plugin-view hosts live plugin pages on top of this module; the reverse edge would be a cycle.

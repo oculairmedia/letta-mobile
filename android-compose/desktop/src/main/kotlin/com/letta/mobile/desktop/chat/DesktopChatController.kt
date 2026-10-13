@@ -720,47 +720,29 @@ class DesktopChatController(
     }
 
     /**
-     * Create a new agent from pre-resolved model defaults, open a conversation
-     * for it, and select it. [onCreated] reports the new agent id so the UI can
-     * refresh.
+     * letta-mobile-ckmub.3.24: the shared agent editor's create on the desktop. Creates [params]'
+     * agent routed over the chat's model catalog (with a starting human and persona block when it
+     * brings none), opens its first conversation and selects it. Throws what the backend answered, so
+     * the editor shows it.
      */
-    fun createAgent(
-        name: String,
-        model: String?,
-        embedding: String?,
-        onCreated: (String) -> Unit = {},
-    ) {
-        if (closed) return
-        val agentName = name.ifBlank { "New agent" }
-        scope.launch {
-            try {
-                val gw = gatewayExtras ?: return@launch
-                val catalogModel = model?.let {
-                    modelCatalogHelper.requireCatalogModel(gw, _availableModels.value, it)
-                }
-                val agent = gw.createAgent(
-                    AgentCreateParams(
-                        name = agentName,
-                        model = catalogModel?.selectionValue,
-                        embedding = embedding,
-                        includeBaseTools = true,
-                        memoryBlocks = persistentListOf(
-                            BlockCreateParams(label = "human", value = "The user has not shared details yet."),
-                            BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
-                        ),
-                    ).withCatalogModelRouting(catalogModel?.models.orEmpty()),
-                )
-                onCreated(agent.id.value)
-                val conversation = gw.createConversation(agent.id.value)
-                reloadConversationsAndSelect(preferConversationId = conversation.id.value)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                _state.update {
-                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create agent")
-                }
-            }
-        }
+    suspend fun createAgentAndOpen(params: AgentCreateParams): com.letta.mobile.data.agenteditor.AgentCreated {
+        val gw = gatewayExtras.takeUnless { closed } ?: error("Not connected to a backend")
+        val agentName = params.name?.ifBlank { null } ?: "New agent"
+        val catalogModel = params.model?.let { modelCatalogHelper.requireCatalogModel(gw, _availableModels.value, it) }
+        val agent = gw.createAgent(
+            params.copy(
+                name = agentName,
+                model = catalogModel?.selectionValue ?: params.model,
+                includeBaseTools = params.includeBaseTools ?: true,
+                memoryBlocks = params.memoryBlocks ?: persistentListOf(
+                    BlockCreateParams(label = "human", value = "The user has not shared details yet."),
+                    BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
+                ),
+            ).withCatalogModelRouting(catalogModel?.models.orEmpty()),
+        )
+        val conversation = gw.createConversation(agent.id.value)
+        reloadConversationsAndSelect(preferConversationId = conversation.id.value)
+        return com.letta.mobile.data.agenteditor.AgentCreated(agent.id.value, conversation.id.value)
     }
 
     /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */

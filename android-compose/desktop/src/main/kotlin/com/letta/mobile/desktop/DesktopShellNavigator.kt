@@ -39,8 +39,21 @@ internal class DesktopShellNavigator(
     /** Spotify-style library toggle: icon rail or expanded names-and-spaces list. */
     var railExpanded: Boolean by railExpandedState
 
-    /** The agent whose editor is open beside the chat, if any. */
-    var editAgentId: String? by mutableStateOf<String?>(null)
+    /** The agent editor open beside the chat, if any: an agent's, or the new-agent flow (letta-mobile-ckmub.3.24). */
+    var agentEditor: ShellDestination.AgentEditor? by mutableStateOf<ShellDestination.AgentEditor?>(null)
+
+    /** The agent whose editor is open; null closes any editor, the new-agent flow too. */
+    var editAgentId: String?
+        get() = agentEditor?.agentId
+        set(value) {
+            agentEditor = value?.let { ShellDestination.AgentEditor(it) }
+        }
+
+    /** Opens the new-agent flow beside the chat. */
+    fun openNewAgent() {
+        agentEditor = ShellDestination.AgentEditor()
+        selectedDestination = DesktopDestination.Conversations
+    }
 
     /**
      * Avatar styles chosen via the editor this session, applied immediately to the orbs
@@ -67,7 +80,7 @@ internal class DesktopShellNavigator(
 
     /** Leaves any agent editor, then shows [destination]. */
     fun navigate(destination: DesktopDestination) {
-        editAgentId = null
+        agentEditor = null
         skillsSection = ShellSkillsSection.Skills
         settingsSection = null
         selectedDestination = destination
@@ -82,7 +95,7 @@ internal class DesktopShellNavigator(
         navigate(route.destination)
         skillsSection = route.skillsSection
         settingsSection = route.settingsSection
-        editAgentId = route.editAgentId
+        agentEditor = route.agentEditor
     }
 
     /** The desktop route on screen, refined by the chat's selection and the focused agent. */
@@ -90,15 +103,14 @@ internal class DesktopShellNavigator(
         destination = selectedDestination,
         agentId = focusedAgentId,
         conversationId = selectedConversationId,
-        editAgentId = editAgentId,
+        agentEditor = agentEditor,
         skillsSection = skillsSection,
         settingsSection = settingsSection,
     )
 
-    /** The editor saved [identity] for the agent it had open: show it at once, and close the editor. */
+    /** The editor picked [identity] for the agent it has open: show it on the orbs at once. */
     fun recordSavedIdentity(identity: MascotIdentity) {
         avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to identity)
-        editAgentId = null
     }
 }
 
