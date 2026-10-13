@@ -6,7 +6,6 @@ import androidx.navigation.compose.composable
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.SettingsDestinations
 import com.letta.mobile.ui.screens.config.SettingsScreen
-import com.letta.mobile.ui.screens.config.VibesyncDebugScreen
 
 fun NavGraphBuilder.configGraph(
     navController: NavHostController,
@@ -26,15 +25,10 @@ fun NavGraphBuilder.configGraph(
             destinations = SettingsDestinations(
                 onConfigList = { navController.navigate(ConfigListRoute) },
                 onSystemAccess = { navController.navigate(SystemAccessRoute) },
-                onVibesyncDebug = { navController.navigate(VibesyncDebugRoute) },
                 onCanvasDebug = { navController.navigate(CanvasDebugRoute) },
                 onProviders = { navController.navigate(ProvidersRoute) },
             ),
         )
-    }
-
-    composable<VibesyncDebugRoute> {
-        VibesyncDebugScreen(onNavigateBack = { navController.popBackStack() })
     }
 
     composable<CanvasDebugRoute> {

@@ -3,7 +3,6 @@ package com.letta.mobile.ui.screens.tools
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Tool
-import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.tools.ToolLibraryController
@@ -14,12 +13,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
@@ -36,7 +33,7 @@ data class AllToolsUiState(
 
 @HiltViewModel
 class AllToolsViewModel @Inject constructor(
-    private val toolRepository: IToolRepository,
+    toolRepository: IToolRepository,
     mcpServerRepository: IMcpServerRepository,
 ) : ViewModel() {
     private val controller = ToolLibraryController(
@@ -67,19 +64,6 @@ class AllToolsViewModel @Inject constructor(
 
     fun loadMoreTools() {
         controller.loadMoreTools()
-    }
-
-    fun createTool(sourceCode: String) {
-        viewModelScope.launch {
-            try {
-                toolRepository.upsertTool(ToolCreateParams(sourceCode = sourceCode))
-                controller.loadTools()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                controller.showError(mapErrorToUserMessage(e, "Failed to create tool"))
-            }
-        }
     }
 
     fun updateSearchQuery(query: String) {

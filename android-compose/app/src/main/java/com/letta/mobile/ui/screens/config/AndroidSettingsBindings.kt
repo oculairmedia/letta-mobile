@@ -27,7 +27,6 @@ import com.letta.mobile.util.Telemetry
 data class SettingsDestinations(
     val onConfigList: () -> Unit = {},
     val onSystemAccess: () -> Unit = {},
-    val onVibesyncDebug: () -> Unit = {},
     val onCanvasDebug: () -> Unit = {},
     val onProviders: () -> Unit = {},
 )
@@ -53,7 +52,7 @@ internal fun androidSettingsContributions(state: UiState<ConfigUiState>, inputs:
     }
     val vm = inputs.viewModel
     val destinations = inputs.destinations
-    val debug = if (BuildConfig.DEBUG) DeveloperDestinations(destinations.onVibesyncDebug, destinations.onCanvasDebug) else null
+    val debug = if (BuildConfig.DEBUG) DeveloperDestinations(destinations.onCanvasDebug) else null
     return listOfNotNull(
         form.refreshError?.let { SettingsContribution(SettingsGroup.Backend, loadFailedSection(it, vm::loadConfig)) },
         SettingsContribution(

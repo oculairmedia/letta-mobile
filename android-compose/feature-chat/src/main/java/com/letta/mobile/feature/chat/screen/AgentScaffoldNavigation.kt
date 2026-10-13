@@ -4,7 +4,6 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 internal data class AgentScaffoldNavigationCallbacks(
     val onNavigateBack: () -> Unit,
     val onNavigateToSettings: (String) -> Unit,
-    val onNavigateToArchival: ((String) -> Unit)? = null,
     val onNavigateToTools: (() -> Unit)? = null,
     val onNavigateToMemory: ((String) -> Unit)? = null,
     val onSwitchConversation: ((String, String?, String?) -> Unit)? = null,

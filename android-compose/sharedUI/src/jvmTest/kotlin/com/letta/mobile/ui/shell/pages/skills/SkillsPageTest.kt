@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
@@ -20,6 +22,11 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.tools.ToolLibraryState
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.LettaPaneDefaults
+import com.letta.mobile.ui.host.LocalLettaHost
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -37,16 +44,23 @@ class SkillsPageTest {
         tools = ToolLibraryState(tools = listOf(gitStatus, sendEmail), isLoading = false, hasMorePages = false),
     )
 
+    /** The test window: its width, and pointer containers (dialogs) for a test that opens a pane. */
+    private data class TestFrame(val width: Dp = WIDE, val pointer: Boolean = false)
+
     private fun ComposeUiTest.show(
         state: SkillsPageState,
         actions: SkillsPageActions = SkillsPageActions(),
-        width: Dp = WIDE,
         options: SkillsPageOptions = SkillsPageOptions(),
+        frame: TestFrame = TestFrame(),
     ) {
         setContent {
             MaterialTheme {
-                Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    SkillsPage(state = state, actions = actions, options = options)
+                // Pointer containers (dialogs) when the test opens a pane: the test draws no window insets.
+                val host = if (frame.pointer) LettaHost.Pointer.copy(sheet = LettaPaneDefaults.Dialog) else LocalLettaHost.current
+                CompositionLocalProvider(LocalLettaHost provides host) {
+                    Box(Modifier.width(frame.width).height(PAGE_HEIGHT)) {
+                        SkillsPage(state = state, actions = actions, options = options)
+                    }
                 }
             }
         }
@@ -65,7 +79,7 @@ class SkillsPageTest {
 
     @Test
     fun oneSearchNarrowsSkillsAndTools() = runComposeUiTest {
-        show(state(), width = COMPACT)
+        show(state(), frame = TestFrame(width = COMPACT))
         onNodeWithTag(SkillsPageTags.SEARCH).performTextInput("git")
         onNodeWithTag(SkillsPageTags.skill("github")).assertExists()
         onNodeWithTag(SkillsPageTags.skill("notion")).assertDoesNotExist()
@@ -99,12 +113,30 @@ class SkillsPageTest {
             onToolClick = { calls += "tool:${it.id.value}" },
             onAddTool = { calls += "add-tool" },
         )
-        show(state(), actions)
+        show(state(), actions, frame = TestFrame(pointer = true))
         onNodeWithTag(SkillsPageTags.skillToggle("github")).performClick()
         onNodeWithTag(SkillsPageTags.skillToggle("notion")).performClick()
-        onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
         onNodeWithTag(SkillsPageTags.ADD_TOOL).performClick()
-        assertEquals(listOf("install:github", "uninstall:notion", "tool:tool-git", "add-tool"), calls)
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
+        assertEquals(listOf("install:github", "uninstall:notion", "add-tool", "tool:tool-git"), calls)
+    }
+
+    @Test
+    fun aToolOpensItsReadOnlyDetail() = runComposeUiTest {
+        val withSource = gitStatus.copy(sourceCode = "def git_status():\n    return run('git status')", tags = listOf("git"))
+        show(state().copy(tools = ToolLibraryState(tools = listOf(withSource), isLoading = false, hasMorePages = false)), frame = TestFrame(pointer = true))
+        onNodeWithTag(SkillsPageTags.TOOL_DETAIL).assertDoesNotExist()
+        onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
+        onNodeWithTag(SkillsPageTags.TOOL_DETAIL).assertExists()
+        onNodeWithText("Source").assertExists()
+        onNodeWithText("Tools are part of letta-code; they are read-only here.").assertExists()
+    }
+
+    @Test
+    fun aToolWithoutSourceShowsItsSchema() {
+        val schema = buildJsonObject { put("name", "git_status") }
+        assertEquals("Schema", toolSource(gitStatus.copy(jsonSchema = schema))?.first)
+        assertEquals(null, toolSource(gitStatus))
     }
 
     @Test
@@ -125,7 +157,7 @@ class SkillsPageTest {
     @Test
     fun theToolsRouteOpensScrolledToTools() = runComposeUiTest {
         val many = (1..30).map { Skill(name = "skill-$it", description = "Skill number $it") }
-        show(state(skills = many, installed = emptySet()), width = COMPACT, options = SkillsPageOptions(initialSection = SkillsPageSection.Tools))
+        show(state(skills = many, installed = emptySet()), options = SkillsPageOptions(initialSection = SkillsPageSection.Tools), frame = TestFrame(width = COMPACT))
         waitForIdle()
         onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Tools)).assertIsDisplayed()
         onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Skills)).assertDoesNotExist()

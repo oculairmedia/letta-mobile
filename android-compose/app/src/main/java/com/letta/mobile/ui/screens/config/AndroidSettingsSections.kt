@@ -229,7 +229,7 @@ internal fun androidAboutSection(versionName: String, status: EmbeddedLettaCodeR
 )
 
 /** Where the developer section's debug entries lead; null leaves them out (release builds). */
-internal class DeveloperDestinations(val onVibesyncDebug: () -> Unit, val onCanvasDebug: () -> Unit)
+internal class DeveloperDestinations(val onCanvasDebug: () -> Unit)
 
 /** Preview features, and the debug tools of a debug build (Developer group). */
 internal fun developerSection(state: ConfigUiState, vm: ConfigViewModel, debug: DeveloperDestinations?) = SettingsSectionModel(
@@ -249,10 +249,7 @@ internal fun developerSection(state: ConfigUiState, vm: ConfigViewModel, debug: 
             add(
                 SettingsRow.Actions(
                     "dev-debug",
-                    listOf(
-                        SettingsAction("dev-vibesync", "Vibesync debug") { destinations.onVibesyncDebug() },
-                        SettingsAction("dev-canvas", "Canvas debug") { destinations.onCanvasDebug() },
-                    ),
+                    listOf(SettingsAction("dev-canvas", "Canvas debug") { destinations.onCanvasDebug() }),
                 ),
             )
         }
