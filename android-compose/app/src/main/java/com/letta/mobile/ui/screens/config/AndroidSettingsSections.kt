@@ -6,6 +6,7 @@ import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsSectionModel
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
+import com.letta.mobile.data.transport.appserver.LettaCodeContract
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
@@ -74,7 +75,18 @@ private fun runtimeStatusRows(status: EmbeddedLettaCodeRuntimeStatus): List<Sett
             },
         ),
     ),
+    SettingsRow.Note("runtime-dev-only", SettingsStatus(EMBEDDED_RUNTIME_DEV_ONLY_NOTE, SettingsTone.Warning)),
 )
+
+/**
+ * letta-mobile-ckmub.5: the embedded runtime is for development. It is letta-code
+ * [LettaCodeContract.ANDROID_EMBEDDED_VERSION] (nodejs-mobile, Node 18), below the
+ * [LettaCodeContract.VERSION] contract, so features verified against the contract are remote-only.
+ */
+internal val EMBEDDED_RUNTIME_DEV_ONLY_NOTE: String =
+    "For development only. The on-phone runtime is letta-code ${LettaCodeContract.ANDROID_EMBEDDED_VERSION}, " +
+        "older than the ${LettaCodeContract.VERSION} the app is built for, so newer features are missing. " +
+        "For everyday use, connect to a desktop or remote host."
 
 private fun catalogRows(state: ConfigUiState, vm: ConfigViewModel): List<SettingsRow> {
     if (state.embeddedModelCatalog.isEmpty()) {
