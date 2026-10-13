@@ -21,6 +21,7 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
 import com.letta.mobile.ui.host.LocalRowHoldDrag
+import com.letta.mobile.ui.host.RowDragTracker
 import com.letta.mobile.ui.host.RowHoldDrag
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailEntry
@@ -187,23 +188,13 @@ fun Modifier.shellLongPress(enabled: Boolean, press: ShellHold): Modifier =
 
 /** After the long-press: consumes the gesture, dragging through [hold] once it moves past [slop]. True when it dragged. */
 private suspend fun AwaitPointerEventScope.followHold(down: PointerInputChange, slop: Float, hold: RowHoldDrag): Boolean {
-    var dragging = false
+    val tracker = RowDragTracker(down.position, slop, hold)
     do {
         val event = awaitPointerEvent(PointerEventPass.Initial)
-        val change = event.changes.firstOrNull { it.id == down.id }
-        if (change != null && change.pressed) {
-            val step = change.position.y - change.previousPosition.y
-            if (!dragging && (change.position - down.position).getDistance() > slop) {
-                dragging = true
-                hold.onStart()
-            } else if (dragging) {
-                hold.onDrag(step)
-            }
-        }
+        event.changes.firstOrNull { it.id == down.id && it.pressed }?.let(tracker::follow)
         event.changes.forEach { it.consume() }
     } while (event.changes.any { it.pressed })
-    if (dragging) hold.onEnd()
-    return dragging
+    return tracker.finish()
 }
 
 /** Waits, without consuming, until [down]'s pointer lifts or moves past [slop]. */

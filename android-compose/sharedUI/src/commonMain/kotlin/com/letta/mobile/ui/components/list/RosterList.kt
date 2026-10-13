@@ -99,13 +99,20 @@ private fun <T> LazyListScope.rosterLines(
     roster: RosterScope<T>,
     row: @Composable (item: T, row: RosterRowState) -> Unit,
 ) {
-    items(roster.layouts.shown.lines, key = { it.key }) { line ->
-        when (line) {
-            is RosterLine.Header -> RosterHeader(line.section, roster.options.testTag)
-            is RosterLine.Hint -> LettaEmptyHint(line.text)
-            is RosterLine.Row -> RosterDraggableItem(line, roster, row)
-            is RosterLine.Cells -> Box(rosterRowMotion()) { RosterCells(line, roster, row) }
-        }
+    items(roster.layouts.shown.lines, key = { it.key }) { line -> RosterLineContent(line, roster, row) }
+}
+
+@Composable
+private fun <T> LazyItemScope.RosterLineContent(
+    line: RosterLine<T>,
+    roster: RosterScope<T>,
+    row: @Composable (item: T, row: RosterRowState) -> Unit,
+) {
+    when (line) {
+        is RosterLine.Header -> RosterHeader(line.section, roster.options.testTag)
+        is RosterLine.Hint -> LettaEmptyHint(line.text)
+        is RosterLine.Row -> RosterDraggableItem(line, roster, row)
+        is RosterLine.Cells -> Box(rosterRowMotion()) { RosterCells(line, roster, row) }
     }
 }
 
@@ -205,15 +212,22 @@ private class RosterScope<T>(
     }
 
     /** The drag callbacks of [line]'s row. */
-    fun dragCallbacks(line: RosterLine.Row<T>): RosterDragCallbacks {
-        val drag = focus.drag
-        return RosterDragCallbacks(
-            onStart = { layouts.base.rows.firstOrNull { it.key == line.key }?.let { drag.start(it, layouts.base) } },
-            onDrag = { delta -> drag.dragBy(delta, layout, state.lazy, focus.gap) },
-            onEnd = {
-                drag.drop(layouts.base)?.let { (row, target) -> actions.reorder?.onMove?.invoke(row.item, target) }
-            },
-        )
+    fun dragCallbacks(line: RosterLine.Row<T>): RosterDragCallbacks = RosterDragCallbacks(
+        onStart = { startDrag(line) },
+        onDrag = { delta -> focus.drag.dragBy(delta, layout, state.lazy, focus.gap) },
+        onEnd = ::endDrag,
+    )
+
+    private fun startDrag(line: RosterLine.Row<T>) {
+        val base = layouts.base
+        base.rows.firstOrNull { it.key == line.key }?.let { focus.drag.start(it, base) }
+    }
+
+    /** Drops the dragged row and tells the host where it went, once. */
+    private fun endDrag() {
+        val hook = actions.reorder
+        val (row, target) = focus.drag.drop(layouts.base) ?: return
+        hook?.onMove(row.item, target)
     }
 
     /** The row menu: the caller's entries, then rename, the touch-only quick actions, and the moves. */
@@ -283,17 +297,25 @@ private fun <T> RosterItem(
             .semantics { selected = rowState.selected }
             .testTag(tag.value),
     ) {
-        val content: @Composable () -> Unit = {
+        RosterRowMenu(menu, holdDrag = rowDrag.takeIf { canDrag && touch }) {
             RosterGestures(RosterGestureSpec(tag, touch, hovered, roster.actions.swipe(line.item), roster.actions.quick(line.item))) {
                 row(line.item, rowState)
             }
         }
-        when {
-            menu.isEmpty() -> content()
-            // On touch the hold that opens the menu turns into a drag once the finger moves on.
-            canDrag && touch -> CompositionLocalProvider(LocalRowHoldDrag provides rowDrag) { host.rowMenu(menu, content) }
-            else -> host.rowMenu(menu, content)
-        }
+    }
+}
+
+/**
+ * [content] inside the host's row menu (none without entries). With a [holdDrag] (a touch row that
+ * reorders), the hold that opens the menu turns into a drag once the finger moves on.
+ */
+@Composable
+private fun RosterRowMenu(menu: List<LettaMenuItem>, holdDrag: RosterRowDrag?, content: @Composable () -> Unit) {
+    val host = LocalLettaHost.current
+    when {
+        menu.isEmpty() -> content()
+        holdDrag != null -> CompositionLocalProvider(LocalRowHoldDrag provides holdDrag) { host.rowMenu(menu, content) }
+        else -> host.rowMenu(menu, content)
     }
 }
 

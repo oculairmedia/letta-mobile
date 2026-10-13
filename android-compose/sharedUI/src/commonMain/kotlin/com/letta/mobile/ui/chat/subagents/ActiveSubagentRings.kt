@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
@@ -265,43 +266,32 @@ private fun ActivityRing(
             .testTag(ActiveSubagentRingsTags.ring(subagent.id)),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(
-            modifier = Modifier.size(ringSize),
-        ) {
-            val strokePx = strokeWidth.toPx()
-            val inset = strokePx / 2f
-            val arcSize = Size(
-                size.width - strokePx,
-                size.height - strokePx,
-            )
-            val topLeft = Offset(inset, inset)
-
-            // Track ring (faint outline)
-            drawArc(
-                color = color.copy(alpha = 0.25f),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round),
-            )
-
-            // Determinate / sliver arc — drawn from 12 o'clock (-90°) with
-            // the animated/pulsing sweep angle. No graphicsLayer rotation.
-            drawArc(
-                color = color,
-                startAngle = -90f, // 12 o'clock
-                sweepAngle = drawSweep,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = Stroke(width = strokePx, cap = StrokeCap.Round),
-            )
-        }
-
+        RingCanvas(color = color, sweep = drawSweep, modifier = Modifier.size(ringSize), strokeWidth = strokeWidth)
     }
 }
+
+/**
+ * The ring itself: a faint full track, then the [sweep] arc from 12 o'clock (-90°). The sweep is
+ * drawn, not rotated: no graphicsLayer rotation, no allocation beyond the draw.
+ */
+@Composable
+private fun RingCanvas(color: Color, sweep: Float, modifier: Modifier, strokeWidth: Dp) {
+    Canvas(modifier = modifier) {
+        val strokePx = strokeWidth.toPx()
+        val inset = strokePx / 2f
+        val arcSize = Size(size.width - strokePx, size.height - strokePx)
+        val topLeft = Offset(inset, inset)
+        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round)
+        drawArc(color = color.copy(alpha = TRACK_ALPHA), startAngle = 0f, sweepAngle = COMPLETED_SWEEP, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+        drawArc(color = color, startAngle = TWELVE_O_CLOCK, sweepAngle = sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)
+    }
+}
+
+/** The faint track under the arc. */
+private const val TRACK_ALPHA = 0.25f
+
+/** Where the arc starts: 12 o'clock. */
+private const val TWELVE_O_CLOCK = -90f
 
 /**
  * letta-mobile-w8mog: overflow count badge shown when >3 rings are active.

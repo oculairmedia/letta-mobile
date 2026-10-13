@@ -38,7 +38,7 @@ data class SubagentRingsState(
 fun rememberSubagentRingsState(snapshot: ImmutableList<ActiveSubagent>, self: ActiveSubagent? = null): SubagentRingsState {
     var tick by remember { mutableLongStateOf(nowMillis()) }
     LaunchedEffect(snapshot) {
-        while (snapshot.any { !it.isHiddenReflection() && (it.isTerminal || it.isActive) }) {
+        while (snapshot.any(ActiveSubagent::keepsRingsTicking)) {
             tick = nowMillis()
             delay(1.seconds)
         }

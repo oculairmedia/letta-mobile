@@ -68,62 +68,53 @@ private fun VibesyncDebugContent(uiState: UiState<VibesyncDebugUiState>, viewMod
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg),
             verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.lg),
         ) {
-            val statusText = state.data.health?.status
-                ?: if (state.data.stats != null) {
-                    stringResource(R.string.screen_vibesync_debug_status_stats_available)
-                } else {
-                    state.data.healthError.orEmpty()
-                }
-            val uptimeText = (state.data.health?.uptime ?: state.data.stats?.uptime).toVibesyncDisplayText("human")
-            val databaseText = (state.data.health?.database ?: state.data.stats?.database).toVibesyncDisplayText()
-            CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_status_section)) }) {
-                item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_status_label)) }, supportingContent = { Text(statusText) })
-                item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = { Text(uptimeText) })
-                item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_sse_clients_label)) }, supportingContent = { Text(state.data.stats?.sseClients?.toString().orEmpty()) })
-                item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_database_label)) }, supportingContent = { Text(databaseText) })
-            }
-            CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_section)) }) {
-                val actionsEnabled = !state.data.isRefreshingAgentsMd
-                item(
-                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_refresh)) },
-                    supportingContent = {
-                        val summary = state.data.refreshSummary
-                        if (summary != null) {
-                            Text(
-                                stringResource(
-                                    R.string.screen_vibesync_debug_refresh_summary,
-                                    summary.total,
-                                    summary.updated,
-                                    summary.skipped,
-                                    summary.errors,
-                                )
-                            )
-                        } else {
-                            Text("")
-                        }
-                    },
-                    leadingContent = { Icon(LettaIcons.Refresh, contentDescription = null) },
-                )
-                item(
-                    onClick = if (actionsEnabled) {
-                        { viewModel.refreshAgentsMd(dryRun = true) }
-                    } else {
-                        null
-                    },
-                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_dry_run)) },
-                    leadingContent = { Icon(LettaIcons.Play, contentDescription = null) },
-                )
-                item(
-                    onClick = if (actionsEnabled) {
-                        { viewModel.refreshAgentsMd(dryRun = false) }
-                    } else {
-                        null
-                    },
-                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_apply)) },
-                    leadingContent = { Icon(LettaIcons.Check, contentDescription = null) },
-                )
-            }
+            VibesyncStatusCard(state.data)
+            VibesyncAgentsMdCard(state.data, viewModel)
         }
+    }
+}
+
+@Composable
+private fun VibesyncStatusCard(data: VibesyncDebugUiState) {
+    val statusText = data.health?.status
+        ?: if (data.stats != null) {
+            stringResource(R.string.screen_vibesync_debug_status_stats_available)
+        } else {
+            data.healthError.orEmpty()
+        }
+    val uptimeText = (data.health?.uptime ?: data.stats?.uptime).toVibesyncDisplayText("human")
+    val databaseText = (data.health?.database ?: data.stats?.database).toVibesyncDisplayText()
+    CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_status_section)) }) {
+        item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_status_label)) }, supportingContent = { Text(statusText) })
+        item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = { Text(uptimeText) })
+        item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_sse_clients_label)) }, supportingContent = { Text(data.stats?.sseClients?.toString().orEmpty()) })
+        item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_database_label)) }, supportingContent = { Text(databaseText) })
+    }
+}
+
+@Composable
+private fun VibesyncAgentsMdCard(data: VibesyncDebugUiState, viewModel: VibesyncDebugViewModel) {
+    val actionsEnabled = !data.isRefreshingAgentsMd
+    val summary = data.refreshSummary
+    val summaryText = summary?.let {
+        stringResource(R.string.screen_vibesync_debug_refresh_summary, it.total, it.updated, it.skipped, it.errors)
+    }.orEmpty()
+    CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_section)) }) {
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_refresh)) },
+            supportingContent = { Text(summaryText) },
+            leadingContent = { Icon(LettaIcons.Refresh, contentDescription = null) },
+        )
+        item(
+            onClick = { viewModel.refreshAgentsMd(dryRun = true) }.takeIf { actionsEnabled },
+            headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_dry_run)) },
+            leadingContent = { Icon(LettaIcons.Play, contentDescription = null) },
+        )
+        item(
+            onClick = { viewModel.refreshAgentsMd(dryRun = false) }.takeIf { actionsEnabled },
+            headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_apply)) },
+            leadingContent = { Icon(LettaIcons.Check, contentDescription = null) },
+        )
     }
 }
 

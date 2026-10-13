@@ -63,10 +63,10 @@ internal class RosterLayout<T> private constructor(
         line.key == rowKey || (line is RosterLine.Cells && line.rows.any { it.key == rowKey })
     }
 
-    /** This layout with [rowKey]'s row moved to [toIndex] in its own section; unchanged when it is not here. */
-    fun moved(rowKey: String, toIndex: Int): RosterLayout<T> {
-        val row = rows.firstOrNull { it.key == rowKey } ?: return this
-        val target = toIndex.coerceIn(0, row.sectionSize - 1)
+    /** This layout with [move]'s row in its new place in its own section; unchanged when the row is not here. */
+    fun moved(move: RosterMove): RosterLayout<T> {
+        val row = rows.firstOrNull { it.key == move.rowKey } ?: return this
+        val target = move.toIndex.coerceIn(0, row.sectionSize - 1)
         if (target == row.indexInSection) return this
         val next = sections.map { section ->
             if (section.key != row.sectionKey) return@map section

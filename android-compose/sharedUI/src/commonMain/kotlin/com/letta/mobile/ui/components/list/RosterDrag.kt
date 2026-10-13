@@ -4,10 +4,10 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -16,15 +16,22 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
+import com.letta.mobile.ui.host.RowDragTracker
 import com.letta.mobile.ui.host.RowHoldDrag
-import kotlin.math.abs
+
+/** A row moved within its own section: the row (by key) and its new place there. */
+@Immutable
+internal data class RosterMove(val rowKey: String, val toIndex: Int)
+
+/** Where a dragged row is laid out ([self]) and the neighbour it moves towards ([other], one place in [direction]). */
+private class RosterDragStep(val self: LazyListItemInfo, val other: LazyListItemInfo, val row: RosterLine.Row<*>, val direction: Int)
 
 /**
  * A row being dragged to a new place in its section (letta-mobile-ckmub.3.25). The row follows the
  * pointer ([offset], drawn as a translation); each time its centre crosses a neighbour's, the list
- * swaps the two in a preview order ([previewKey] at [previewIndex]) and its siblings glide aside.
- * On release the host's [RosterReorder] hears the move once; the preview stays drawn until the
- * host's sections change, so the row never jumps back while the new order is being saved.
+ * swaps the two in a preview order ([preview]) and its siblings glide aside. On release the host's
+ * [RosterReorder] hears the move once; the preview stays drawn until the host's sections change, so
+ * the row never jumps back while the new order is being saved.
  */
 @Stable
 internal class RosterDrag {
@@ -36,24 +43,21 @@ internal class RosterDrag {
     var offset by mutableFloatStateOf(0f)
         private set
 
-    private var previewKey by mutableStateOf<String?>(null)
-    private var previewIndex by mutableIntStateOf(0)
+    private var preview by mutableStateOf<RosterMove?>(null)
 
     /** The rows the preview was made against; the preview is dropped once the host's rows differ. */
     private var previewBase by mutableStateOf<List<String>?>(null)
 
     /** [base] with the dragged (or just dropped) row in its preview place. */
     fun <T> layoutOver(base: RosterLayout<T>): RosterLayout<T> {
-        val moved = previewKey ?: return base
-        if (previewBase != base.signature) return base
-        return base.moved(moved, previewIndex)
+        val move = preview?.takeIf { previewBase == base.signature } ?: return base
+        return base.moved(move)
     }
 
     fun start(row: RosterLine.Row<*>, base: RosterLayout<*>) {
         key = row.key
         offset = 0f
-        previewKey = row.key
-        previewIndex = row.indexInSection
+        preview = RosterMove(row.key, row.indexInSection)
         previewBase = base.signature
     }
 
@@ -65,23 +69,26 @@ internal class RosterDrag {
     fun dragBy(delta: Float, shown: RosterLayout<*>, list: LazyListState, gap: Float) {
         val dragged = key ?: return
         offset += delta
-        val line = shown.lineOf(dragged)
-        val items = list.layoutInfo.visibleItemsInfo
-        val self = items.firstOrNull { it.key == dragged }?.takeIf { it.index == line } ?: return
-        val direction = if (offset > 0f) 1 else -1
-        val row = shown.lines.getOrNull(line) as? RosterLine.Row<*> ?: return
-        val neighbour = shown.lines.getOrNull(line + direction) as? RosterLine.Row<*> ?: return
-        if (neighbour.sectionKey != row.sectionKey) return
-        val other = items.firstOrNull { it.index == line + direction } ?: return
-        if (!crosses(self, other, direction)) return
-        previewIndex = row.indexInSection + direction
-        offset -= direction * (other.size + gap)
+        val step = stepTowards(dragged, shown, list.layoutInfo.visibleItemsInfo)?.takeIf(::crosses) ?: return
+        preview = RosterMove(dragged, step.row.indexInSection + step.direction)
+        offset -= step.direction * (step.other.size + gap)
     }
 
-    private fun crosses(self: LazyListItemInfo, other: LazyListItemInfo, direction: Int): Boolean {
-        val centre = self.offset + offset + self.size / 2f
-        val otherCentre = other.offset + other.size / 2f
-        return if (direction > 0) centre > otherCentre else centre < otherCentre
+    /** The dragged row's layout and the neighbour it is heading for, when both are laid out in its section. */
+    private fun stepTowards(dragged: String, shown: RosterLayout<*>, items: List<LazyListItemInfo>): RosterDragStep? {
+        val line = shown.lineOf(dragged)
+        val self = items.firstOrNull { it.key == dragged }?.takeIf { it.index == line } ?: return null
+        val direction = if (offset > 0f) 1 else -1
+        val row = shown.lines.getOrNull(line) as? RosterLine.Row<*> ?: return null
+        val neighbour = (shown.lines.getOrNull(line + direction) as? RosterLine.Row<*>)?.takeIf { it.sectionKey == row.sectionKey } ?: return null
+        val other = items.firstOrNull { it.index == line + direction && it.key == neighbour.key } ?: return null
+        return RosterDragStep(self, other, row, direction)
+    }
+
+    private fun crosses(step: RosterDragStep): Boolean {
+        val centre = step.self.offset + offset + step.self.size / 2f
+        val otherCentre = step.other.offset + step.other.size / 2f
+        return if (step.direction > 0) centre > otherCentre else centre < otherCentre
     }
 
     /** Ends the drag; returns the dragged row and its new place when it moved, for the host. */
@@ -89,10 +96,15 @@ internal class RosterDrag {
         val dragged = key ?: return null
         key = null
         offset = 0f
-        val from = base.rows.firstOrNull { it.key == dragged }
-        val move = from?.let { it to previewIndex }?.takeIf { previewIndex != it.first.indexInSection && previewBase == base.signature }
-        if (move == null) previewKey = null
+        val move = movedRow(dragged, base)
+        if (move == null) preview = null
         return move
+    }
+
+    private fun <T> movedRow(dragged: String, base: RosterLayout<T>): Pair<RosterLine.Row<T>, Int>? {
+        val target = preview?.toIndex?.takeIf { previewBase == base.signature } ?: return null
+        val from = base.rows.firstOrNull { it.key == dragged } ?: return null
+        return (from to target).takeIf { target != from.indexInSection }
     }
 }
 
@@ -135,27 +147,17 @@ internal fun Modifier.rosterPointerDrag(enabled: Boolean, drag: RosterRowDrag): 
         this.pointerInput(drag) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (down.type == PointerType.Mouse) followMouseDrag(down, viewConfiguration.touchSlop, drag)
+                if (down.type == PointerType.Mouse) followMouseDrag(RowDragTracker(down.position, viewConfiguration.touchSlop, drag), down)
             }
         }
     }
 
-/** Follows [down]'s pointer until it lifts: a drag through [drag] once it has moved past [slop]. */
-private suspend fun AwaitPointerEventScope.followMouseDrag(down: PointerInputChange, slop: Float, drag: RowHoldDrag) {
-    var dragging = false
-    var travelled = 0f
+/** Follows [down]'s pointer until it lifts, claiming each step once [tracker] is dragging. */
+private suspend fun AwaitPointerEventScope.followMouseDrag(tracker: RowDragTracker, down: PointerInputChange) {
     while (true) {
-        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id } ?: break
-        if (!change.pressed) break
-        val step = change.position.y - change.previousPosition.y
-        travelled += step
-        if (!dragging && abs(travelled) > slop) {
-            dragging = true
-            drag.onStart()
-        } else if (dragging) {
-            drag.onDrag(step)
-        }
-        if (dragging) change.consume()
+        val change = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == down.id }?.takeIf { it.pressed } ?: break
+        tracker.follow(change)
+        if (tracker.dragging) change.consume()
     }
-    if (dragging) drag.onEnd()
+    tracker.finish()
 }

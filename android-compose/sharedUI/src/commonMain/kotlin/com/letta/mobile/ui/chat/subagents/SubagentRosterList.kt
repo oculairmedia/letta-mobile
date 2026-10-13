@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -78,10 +77,9 @@ fun SubagentRosterList(
     onOpenConversation: OpenSubagentConversation?,
     onClearFinished: () -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(),
 ) {
     if (roster.isEmpty) {
-        EmptyRoster(modifier.padding(contentPadding))
+        EmptyRoster(modifier)
         return
     }
     var backgroundShown by rememberSaveable { mutableStateOf(false) }
@@ -91,7 +89,7 @@ fun SubagentRosterList(
             sections = sections,
             key = { it.item.key },
             selection = RosterSelection(onSelect = { line -> if (line.item.canOpenConversation) onOpenConversation?.invoke(line.item) }),
-            options = RosterOptions(testTag = SUBAGENT_ROSTER_LIST, spacing = LettaDimens.Space.sm, contentPadding = contentPadding),
+            options = RosterOptions(testTag = SUBAGENT_ROSTER_LIST, spacing = LettaDimens.Space.sm),
         ),
         modifier = modifier.fillMaxWidth(),
     ) { line, row ->
@@ -108,7 +106,6 @@ fun SubagentRoster(
     entries: List<SubagentEntry>,
     onOpenConversation: OpenSubagentConversation?,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(),
     now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -120,7 +117,6 @@ fun SubagentRoster(
         onOpenConversation = onOpenConversation,
         onClearFinished = { clearedKeys = clearedKeys + roster.finished.map { it.key } },
         modifier = modifier,
-        contentPadding = contentPadding,
     )
 }
 

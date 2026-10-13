@@ -91,11 +91,11 @@ class RosterListTest {
     @Test
     fun aMovedLayoutPutsTheRowInItsNewPlaceWithinItsSection() {
         val layout = RosterLayout.of(listOf(RosterSection("a", listOf(apple)), RosterSection("fruit", listOf(banana, cherry, apple)))) { it.id }
-        val moved = layout.moved("fruit:banana", 2)
+        val moved = layout.moved(RosterMove("fruit:banana", 2))
         assertEquals(listOf("a:apple", "fruit:cherry", "fruit:apple", "fruit:banana"), moved.signature)
         assertEquals(listOf(0, 0, 1, 2), moved.rows.map { it.indexInSection })
-        assertEquals(layout.signature, layout.moved("fruit:banana", 0).signature)
-        assertEquals(layout.signature, layout.moved("missing", 1).signature)
+        assertEquals(layout.signature, layout.moved(RosterMove("fruit:banana", 0)).signature)
+        assertEquals(layout.signature, layout.moved(RosterMove("missing", 1)).signature)
     }
 
     // --- composed ----------------------------------------------------------------------------

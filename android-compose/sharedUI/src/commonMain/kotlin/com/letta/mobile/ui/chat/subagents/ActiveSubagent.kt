@@ -291,6 +291,12 @@ fun ActiveSubagent.isHiddenReflection(): Boolean =
     SubagentKind.fromWire(subagentType).isBackground
 
 /**
+ * Whether this entry keeps the rings' clock ticking: a visible run that is still going or still
+ * lingering after it ended. A hidden reflection never does (letta-mobile-l3j5l).
+ */
+fun ActiveSubagent.keepsRingsTicking(): Boolean = !isHiddenReflection() && (isTerminal || isActive)
+
+/**
  * Whether the active-subagent bar should reserve layout: self plan and/or any
  * non-reflection dispatched entry. An all-reflection snapshot must hide the
  * bar entirely (no empty LazyRow padding).
