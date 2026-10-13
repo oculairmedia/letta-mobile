@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -97,7 +98,10 @@ class ChatRowPendingApprovalUiTest {
     private fun ComposeUiTest.assertCardShownAndActionable(actions: RecordingChatActions) {
         // No tap on the line first: the card is already there, under it.
         onNodeWithText("Waiting for your approval").assertIsDisplayed()
-        onNodeWithText("Approval needed - 1 command").assertIsDisplayed()
+        // ckmub.1.2: the parked call is a step row straight under the line, its glyph saying it waits.
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertIsDisplayed()
+        onNodeWithContentDescription("Awaiting approval", useUnmergedTree = true).assertExists()
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
         onNodeWithText("Approval requested").assertIsDisplayed()
         onNodeWithText("Reject").assertIsDisplayed()
         onNodeWithText("Always allow Bash(ls:*)").assertIsDisplayed()

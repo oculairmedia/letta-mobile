@@ -1,21 +1,12 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.RunActivityProjection
 import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.sharedui.resources.Res
@@ -43,11 +33,9 @@ import com.letta.mobile.sharedui.resources.rows_run_tool_count
 import com.letta.mobile.sharedui.resources.rows_run_worked
 import com.letta.mobile.sharedui.resources.rows_run_working
 import com.letta.mobile.sharedui.resources.run_status_approval
-import com.letta.mobile.ui.chat.surface.ambient.LocalChatWorkingCueAnimated
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatRowAlpha
 import com.letta.mobile.ui.theme.ChatRowMotion
 import com.letta.mobile.ui.theme.ChatRowSpacing
@@ -62,8 +50,9 @@ import org.jetbrains.compose.resources.stringResource
  * Perplexity ("1 step completed ›") and v0 (glyph + "Explored project structure ›") draw an agent's
  * work: a small status glyph, one muted label ("Worked · 10.8s · 1 tool", "Working…", "Failed · 1 of 3",
  * "Waiting for your approval") and, when the run folds, a single trailing chevron. The whole line is
- * the hit target. The run's steps (its reasoning and its "Ran 1 command" line) list under it only
+ * the hit target. The run's steps (its reasoning and its tool step rows) list under it only
  * once it is opened, so a folded run never shows a second stray line with a chevron of its own.
+ * Its glyph is the shared [RunStatusGlyph], the same component and size every step row leads with.
  */
 @Composable
 internal fun RunSummaryLine(state: RunHeaderState) {
@@ -93,7 +82,7 @@ internal fun RunSummaryLine(state: RunHeaderState) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
-        RunSummaryGlyph(tone, reducedMotion)
+        RunStatusGlyph(tone, Modifier.testTag(ChatRowTestTags.RUN_GLYPH))
         RunSummaryTitleText(runSummaryTitle(state.activity, tone), runSummaryColor(tone), reducedMotion, Modifier.weight(1f))
         if (fold != null) DisclosureChevron(expanded = !fold.collapsed)
     }
@@ -197,42 +186,3 @@ private fun RunSummaryTitleText(title: String, color: Color, reducedMotion: Bool
         )
     }
 }
-
-/**
- * The line's leading glyph, in a fixed slot so a run settling (spinner to check) never moves the
- * label. Decorative: the line's state description and words carry the state.
- */
-@Composable
-private fun RunSummaryGlyph(tone: RunSummaryTone, reducedMotion: Boolean) {
-    Crossfade(
-        targetState = tone,
-        animationSpec = if (reducedMotion) snap() else tween(RUN_GLYPH_FADE_MILLIS),
-        modifier = Modifier.size(ChatRowSpacing.runGlyphSize).testTag(ChatRowTestTags.RUN_GLYPH),
-        label = "runSummaryGlyph",
-    ) { shown ->
-        val glyph = Modifier.size(ChatRowSpacing.runGlyphSize)
-        when (shown) {
-            RunSummaryTone.Working -> WorkingGlyph(reducedMotion, glyph)
-            RunSummaryTone.Attention -> Icon(LettaIcons.Warning, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.secondary)
-            RunSummaryTone.Failed -> Icon(LettaIcons.Error, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.error)
-            RunSummaryTone.Done -> Icon(LettaIcons.Check, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-/**
- * A small spinner while the run works; a still ring under reduced motion, or docked over the canvas
- * where the panel's ambient glow is the working cue.
- */
-@Composable
-private fun WorkingGlyph(reducedMotion: Boolean, modifier: Modifier) {
-    val tint = MaterialTheme.colorScheme.tertiary
-    if (reducedMotion || !LocalChatWorkingCueAnimated.current) {
-        Box(modifier.border(RUN_GLYPH_STROKE, tint, CircleShape))
-    } else {
-        CircularProgressIndicator(modifier = modifier, color = tint, strokeWidth = RUN_GLYPH_STROKE)
-    }
-}
-
-private val RUN_GLYPH_STROKE = 1.5.dp
-private const val RUN_GLYPH_FADE_MILLIS = 150

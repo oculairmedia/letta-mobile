@@ -33,6 +33,33 @@ class SharedUiDisclosureChevronContractTest {
             """import\s+com\.composables\.icons\.lucide\.Chevron(Down|Up)""",
         )
 
+        /**
+         * letta-mobile-ckmub.1.2: the run block's files (its summary line, its step rows, the tool
+         * line, the reasoning row) draw their disclosure only through [DisclosureChevron]: no chevron
+         * or arrow glyph of their own, and nothing rotated by hand.
+         */
+        val RUN_BLOCK_FILES = setOf(
+            "ChatRowRunBlock.kt",
+            "ChatRowRunSummary.kt",
+            "ChatRowRunStep.kt",
+            "ChatRowToolRun.kt",
+            "ChatRowToolCard.kt",
+            "ChatRowToolStatus.kt",
+            "ChatRowReasoning.kt",
+        )
+
+        private val RUN_BLOCK_ARROW_PATTERN = Regex(
+            """(LettaIcons|Lucide|Icons\.[A-Za-z]+)\.(Chevron|Arrow|Expand|KeyboardArrow|NavigateNext)[A-Za-z]*""",
+        )
+
+        private val RUN_BLOCK_ARROW_IMPORT = Regex("""import\s+com\.composables\.icons\.lucide\.(Chevron|Arrow)[A-Za-z]*""")
+
+        private val HAND_ROTATION = Regex("""\.rotate\(""")
+
+        fun findRunBlockViolations(content: String): List<String> =
+            listOf(RUN_BLOCK_ARROW_PATTERN, RUN_BLOCK_ARROW_IMPORT, HAND_ROTATION)
+                .flatMap { pattern -> pattern.findAll(content).map { it.value.trim() } }
+
         fun findViolationsInSource(content: String): List<String> {
             val iconViolations = LEGACY_ICON_PATTERN.findAll(content).map { it.value.trim() }.toList()
             val importViolations = DIRECT_LUCIDE_CHEVRON_IMPORT.findAll(content).map { it.value.trim() }.toList()
@@ -82,6 +109,33 @@ class SharedUiDisclosureChevronContractTest {
             "Invariant I1 violated! Found direct disclosure Icon usages outside DisclosureChevron.kt:\n" +
                 violations.joinToString("\n"),
         )
+    }
+
+    @Test
+    fun `no run block file draws a chevron or arrow of its own`() {
+        val rows = locateSharedUiDir().resolve("src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/rows")
+        val violations = RUN_BLOCK_FILES.flatMap { name ->
+            val file = rows.resolve(name)
+            assertTrue(file.isRegularFile(), "run block file moved: $name (update RUN_BLOCK_FILES)")
+            findRunBlockViolations(file.readText()).map { "$name: $it" }
+        }
+        assertTrue(
+            violations.isEmpty(),
+            "Run block files must disclose only through DisclosureChevron:\n" + violations.joinToString("\n"),
+        )
+    }
+
+    @Test
+    fun `run block scan fails on planted chevrons and arrows`() {
+        listOf(
+            """Icon(LettaIcons.ChevronRight, contentDescription = null)""",
+            """Icon(Lucide.ArrowUpRight, contentDescription = null)""",
+            """import com.composables.icons.lucide.ChevronRight""",
+            """Icon(Icons.Default.KeyboardArrowDown, null)""",
+            """Modifier.rotate(180f)""",
+        ).forEach { planted ->
+            assertFalse(findRunBlockViolations(planted).isEmpty(), "run block scan missed:\n$planted")
+        }
     }
 
     @Test

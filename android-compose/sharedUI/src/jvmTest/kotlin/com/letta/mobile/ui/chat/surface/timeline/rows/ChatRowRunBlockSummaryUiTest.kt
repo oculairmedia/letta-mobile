@@ -18,6 +18,7 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -95,12 +96,16 @@ class ChatRowRunBlockSummaryUiTest {
         show(run, opened = true)
         awaitText("Fixed it.")
 
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
-        onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertExists()
-        assertEquals(1, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
+        // ckmub.1.2: the steps list straight under the line; no "Ran 2 commands" group row.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
+        onNodeWithText("Ran 2 commands", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size)
+        val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes()
+        assertEquals(2, steps.size)
         val header = onNodeWithTag(ChatRowTestTags.RUN_HEADER).fetchSemanticsNode().boundsInRoot
-        val tools = onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).fetchSemanticsNode().boundsInRoot
-        assertTrue(tools.left > header.left, "the steps are not indented under the line ($tools vs $header)")
+        steps.forEach { step ->
+            assertTrue(step.boundsInRoot.left > header.left, "the steps are not indented under the line (${step.boundsInRoot} vs $header)")
+        }
     }
 
     @Test
@@ -126,7 +131,10 @@ class ChatRowRunBlockSummaryUiTest {
         onNodeWithText("Waiting for your approval", useUnmergedTree = true).assertExists()
         onNodeWithText("Approval requested").assertExists()
         onNodeWithText("Approve").assertExists()
-        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertExists()
+        // The parked call is a step row of the open run, its glyph saying it waits.
+        onNodeWithTag(ChatRowTestTags.TOOL_RUN_SUMMARY).assertDoesNotExist()
+        onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).assertExists()
+        onNodeWithContentDescription("Awaiting approval", useUnmergedTree = true).assertExists()
     }
 
     @Test

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,12 @@ data class LettaListRowSpec(
     /** A disabled row draws but takes no click (a conversation being deleted). */
     val enabled: Boolean = true,
 )
+
+/** Test hooks for [LettaListRow]. */
+object LettaListRowDefaults {
+    /** On every row's title block, so a test can tell a row is built on [LettaListRow]. */
+    const val TitleTestTag: String = "letta_list_row_title"
+}
 
 /** A compact selectable row rendering a [LettaListRowSpec]; every roster row is one (see RosterList). */
 @Composable
@@ -112,7 +119,7 @@ fun LettaListRow(
 @Composable
 private fun RowTitle(spec: LettaListRowSpec, modifier: Modifier) {
     val subtitle = spec.subtitle
-    Column(modifier) {
+    Column(modifier.testTag(LettaListRowDefaults.TitleTestTag)) {
         Text(
             text = spec.title,
             style = MaterialTheme.typography.bodyMedium,

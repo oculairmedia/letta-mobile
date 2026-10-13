@@ -84,10 +84,9 @@ internal object ChatRowTestTags {
     const val FORK_REPLY = "fork-reply"
     const val TOOL_CARD_TOGGLE = "tool-card-toggle"
     const val TOOL_CARD_BODY = "tool-card-body"
-    const val TOOL_FAILURE_BADGE = "tool-failure-badge"
+    /** A tool step's leading status glyph: the same [RunStatusGlyph] as the run summary line's. */
     const val TOOL_STATUS_GLYPH = "tool-status-glyph"
     const val TOOL_OUTCOME = "tool-outcome"
-    const val TOOL_EMOJI = "tool-emoji"
     const val TOOL_EXECUTING = "tool-executing"
     const val TOOL_OUTPUT = "tool-output"
     const val TOOL_RESULT_PREVIEW = "tool-result-preview"
@@ -114,6 +113,10 @@ internal object ChatRowTestTags {
     const val RUN_GLYPH = "chat-run-glyph"
     /** One work step (a reasoning or the tool line) listed under an expanded run's summary. */
     const val RUN_WORK_STEP = "chat-run-work-step"
+    /** An expanded run's tool steps, listed straight under its summary line (no group row). */
+    const val RUN_TOOL_STEPS = "chat-run-tool-steps"
+    /** The plain, non-disclosing subheader over a run's tool steps of more than one kind. */
+    const val RUN_STEP_SUBHEADER = "chat-run-step-subheader"
     const val APPROVAL_REASON = "chat-approval-reason"
     const val APPROVAL_REJECT_DIALOG = "chat-approval-reject-dialog"
     const val APPROVAL_REJECT_CONFIRM = "chat-approval-reject-confirm"

@@ -98,6 +98,12 @@ object ChatRowSpacing {
      */
     val runStepIndent: Dp = runHeaderHorizontal + runGlyphSize + LettaDimens.Space.sm
 
+    /**
+     * An open tool step's details sit flush with its title: past the step row's (LettaListRow's)
+     * start padding, its status glyph and the gap after it.
+     */
+    val runStepDetailIndent: Dp = LettaDimens.Space.sm + runGlyphSize + LettaDimens.Space.sm
+
     /** The thinking row's reserved height and its text's floor. */
     val thinkingRowHeight: Dp = LettaDimens.Space.xxl
     val thinkingTextMinHeight: Dp = LettaDimens.Space.xl

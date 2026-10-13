@@ -7,7 +7,6 @@
     <string name="rows_copied">Copied</string>
     <string name="rows_copy_message">Copy message</string>
     <string name="rows_copy_response">Copy response</string>
-    <string name="rows_copy_tool_call">Copy tool call</string>
     <string name="rows_copy_output">Copy output</string>
     <string name="rows_message_actions">Message actions</string>
     <string name="rows_send_again">Send again</string>
@@ -89,9 +88,6 @@
     <string name="rows_role_tool_output">Tool output</string>
     <string name="rows_role_tool_activity">Tool activity</string>
     <string name="rows_role_not_sent">%1$s · Not sent</string>
-    <string name="rows_step_done">done</string>
-    <string name="rows_step_failed">failed</string>
-    <string name="rows_step_running">running</string>
 
     <!-- Tool cards -->
     <string name="rows_tool_output">Output</string>
@@ -115,7 +111,6 @@
     <string name="rows_tool_output_truncated">Showing %1$d of %2$d lines · Copy includes all output</string>
     <string name="rows_tool_output_scroll_hint">Tool output. Use left and right arrow keys to scroll horizontally.</string>
     <string name="rows_tool_result_preview">Showing a preview · loading the full output…</string>
-    <string name="rows_agent_message_state">%1$s, %2$s</string>
 
     <!-- Approvals -->
     <string name="rows_approval_requested">Approval requested</string>

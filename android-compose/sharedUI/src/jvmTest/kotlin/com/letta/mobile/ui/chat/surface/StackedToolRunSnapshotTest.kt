@@ -12,6 +12,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
@@ -31,6 +33,7 @@ import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbient
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import java.io.File
 import javax.imageio.ImageIO
+import com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowTestTags
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -42,7 +45,7 @@ import kotlinx.coroutines.flow.StateFlow
 /**
  * letta-mobile-bglj6.1: a coding agent mid-run, four Bash rounds in, each round under its own App
  * Server run id and the fourth still running. The page draws ONE run: "Working" leading
- * one "Running Bash · 4 commands" group, with the page's glow up. Writes PNGs to
+ * the four rounds' step rows (the last one spinning), with the page's glow up. Writes PNGs to
  * build/chat-surface-snapshots for review.
  */
 class StackedToolRunSnapshotTest {
@@ -124,11 +127,12 @@ class StackedToolRunSnapshotTest {
             }
         }
         repeat(SETTLE_FRAMES) { mainClock.advanceTimeBy(FRAME_MILLIS) }
-        // One run, not one per round: one "Working" label leading one group that holds them all.
+        // One run, not one per round: one "Working" label over the four rounds' step rows
+        // (ckmub.1.2: listed straight under it, no "Running Bash · 4 commands" group row).
         assertEquals(1, onAllNodesWithText("Working", substring = true).fetchSemanticsNodes().size)
-        assertEquals(1, onAllNodesWithText("4 commands", substring = true).fetchSemanticsNodes().size)
-        assertEquals(0, onAllNodesWithText("1 command", substring = true).fetchSemanticsNodes().size)
-        assertTrue(onAllNodesWithText("Running Bash", substring = true).fetchSemanticsNodes().isNotEmpty())
+        assertEquals(4, onAllNodesWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).fetchSemanticsNodes().size)
+        assertEquals(0, onAllNodesWithText("4 commands", substring = true).fetchSemanticsNodes().size)
+        assertEquals(1, onAllNodesWithContentDescription("Running", useUnmergedTree = true).fetchSemanticsNodes().size)
         val image = onRoot().captureToImage().toAwtImage()
         val out = File("build/chat-surface-snapshots").apply { mkdirs() }.resolve("$name.png")
         ImageIO.write(image, "png", out)

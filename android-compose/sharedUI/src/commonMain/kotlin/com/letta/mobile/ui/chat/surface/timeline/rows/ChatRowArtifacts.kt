@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +26,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -114,29 +112,6 @@ internal fun ArtifactCard(
             }
             content()
         }
-    }
-}
-
-/** Tool cards are quiet on success; only failures carry a persistent badge. */
-@Composable
-internal fun ToolFailureBadge(status: String?) {
-    if (!isToolStatusError(status)) return
-    val color = MaterialTheme.colorScheme.error
-    Surface(
-        modifier = Modifier.testTag(ChatRowTestTags.TOOL_FAILURE_BADGE),
-        shape = RoundedCornerShape(LettaDimens.Radius.sm),
-        color = Color.Transparent,
-        contentColor = color,
-        border = BorderStroke(LettaDimens.Stroke.hairline, color),
-    ) {
-        Text(
-            text = status.orEmpty(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.hair),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
