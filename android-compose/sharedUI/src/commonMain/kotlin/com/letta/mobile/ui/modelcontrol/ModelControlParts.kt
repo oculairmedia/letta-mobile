@@ -3,11 +3,9 @@ package com.letta.mobile.ui.modelcontrol
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -17,6 +15,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.ui.text.font.FontWeight
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.transport.appserver.AppServerToolset
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Small pieces the model-control surfaces share (letta-mobile-w4q4p). */
@@ -46,13 +46,12 @@ internal fun ModelControlNotice(error: String?, message: String?) {
 
 @Composable
 internal fun DisconnectConfirmDialog(provider: ConnectableProvider, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Disconnect ${provider.displayName}?") },
-        text = { Text("Its models disappear from every app's model picker until you connect it again.") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Disconnect") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    val request = LettaConfirmRequest(
+        title = "Disconnect ${provider.displayName}?",
+        message = "Its models disappear from every app's model picker until you connect it again.",
+        confirmLabel = "Disconnect",
     )
+    LettaConfirmPane(request, onConfirm = onConfirm, onDismiss = onDismiss)
 }
 
 /**

@@ -13,16 +13,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
@@ -36,6 +33,8 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_actions_title
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.ChatExpressiveMotion
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
@@ -48,24 +47,19 @@ internal class TouchSheetItem(val label: String, val icon: ImageVector, val onCl
 
 /**
  * letta-mobile-bglj6.1.9: the "+" sheet, "Add to message". A port of the legacy Android composer's
- * ChatComposerActionSheet on designsystem's ActionSheet: a modal bottom sheet with a title, a
+ * ChatComposerActionSheet on designsystem's ActionSheet: the host's sheet pane with a title, a
  * divider and one tonal row per action, each closing the sheet before it acts.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TouchComposerActionSheet(items: List<TouchSheetItem>, onDismiss: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
-        modifier = Modifier.testTag(ComposerTestTags.TOUCH_SHEET),
+    LettaPane(
+        LettaPaneKind.Sheet,
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.composer_actions_title),
+        testTag = ComposerTestTags.TOUCH_SHEET,
     ) {
         Column(Modifier.fillMaxWidth().padding(bottom = LettaDimens.Space.xxl)) {
-            Text(
-                text = stringResource(Res.string.composer_actions_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.sm),
-            )
-            HorizontalDivider(Modifier.padding(vertical = LettaDimens.Space.sm))
+            HorizontalDivider(Modifier.padding(bottom = LettaDimens.Space.sm))
             Column(Modifier.heightIn(max = TouchComposerDimens.sheetListMaxHeight).verticalScroll(rememberScrollState())) {
                 items.forEach { item ->
                     TouchSheetRow(item) {

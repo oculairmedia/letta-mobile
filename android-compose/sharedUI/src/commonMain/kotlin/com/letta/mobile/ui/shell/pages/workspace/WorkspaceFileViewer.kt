@@ -4,14 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -21,12 +17,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +30,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.data.workspace.WorkspaceFileContent
 import com.letta.mobile.data.workspace.WorkspaceFileViewerActions
 import com.letta.mobile.data.workspace.WorkspaceFileViewerState
@@ -48,6 +39,9 @@ import com.letta.mobile.ui.chat.render.ToolOutputHighlightMode
 import com.letta.mobile.ui.chat.render.ToolOutputSyntaxColors
 import com.letta.mobile.ui.chat.render.cachedToolOutputHighlightSpans
 import com.letta.mobile.ui.chat.render.toolOutputSyntaxColors
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
+import com.letta.mobile.ui.host.PaneSize
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -55,35 +49,20 @@ import com.letta.mobile.ui.theme.LettaDimens
  * file with line numbers and syntax colours, or why it cannot be shown (binary, too large,
  * unreadable). It draws nothing while [state] has no file open.
  *
- * In a wide window ([LettaDimens.Pane.wideBreakpoint] and up) it is a dialog over the page; on a
- * phone, a bottom sheet.
+ * It opens in the host's modal pane: a dialog on a pointer or in a wide window, a bottom sheet on a
+ * phone.
  */
 @Composable
 fun WorkspaceFileViewer(
     state: WorkspaceFileViewerState,
     actions: WorkspaceFileViewerActions,
     modifier: Modifier = Modifier,
-    options: WorkspaceFileViewerOptions = WorkspaceFileViewerOptions(),
 ) {
     if (!state.isOpen) return
-    BoxWithConstraints(modifier) {
-        if (maxWidth >= LettaDimens.Pane.wideBreakpoint && !options.forceSheet) {
-            Dialog(onDismissRequest = actions::close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                Surface(
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.widthIn(max = DialogMaxWidth).heightIn(max = DialogMaxHeight).padding(LettaDimens.Space.xl),
-                ) { FileViewerContent(state, actions) }
-            }
-        } else {
-            ModalBottomSheet(onDismissRequest = actions::close) { FileViewerContent(state, actions) }
-        }
+    LettaPane(LettaPaneKind.Modal, onDismiss = actions::close, size = PaneSize(ViewerMaxWidth, ViewerMaxHeight), modifier = modifier) {
+        FileViewerContent(state, actions)
     }
 }
-
-/** Host presentation choices: [forceSheet] uses the sheet even in a wide window. */
-@Immutable
-data class WorkspaceFileViewerOptions(val forceSheet: Boolean = false)
 
 /** Test tags for the shared file viewer. */
 object WorkspaceFileViewerTags {
@@ -200,5 +179,5 @@ private const val JSON_HINT = "json"
 private const val CLOSE_LABEL = "Close file"
 private const val RETRY_LABEL = "Try again"
 private const val BINARY_MESSAGE = "This file is not text, so it can't be shown here."
-private val DialogMaxWidth = LettaDimens.Pane.sidePanelWidth * 2
-private val DialogMaxHeight = LettaDimens.Pane.sidePanelWidth * 2
+private val ViewerMaxWidth = LettaDimens.Pane.sidePanelWidth * 2
+private val ViewerMaxHeight = LettaDimens.Pane.sidePanelWidth * 2

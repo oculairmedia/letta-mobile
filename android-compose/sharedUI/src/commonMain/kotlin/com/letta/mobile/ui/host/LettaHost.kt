@@ -50,7 +50,10 @@ sealed interface LettaPaneKind {
     /** Sheet on touch, popover on pointer: detail that belongs to a control (the agent context card). */
     data class Adaptive(val anchor: PaneAnchor = PaneAnchor.BelowStart) : LettaPaneKind
 
-    /** Sheet on touch, dialog on pointer: a task that takes over the page (the model picker). */
+    /**
+     * A task that takes over the page (the model picker): a dialog on a pointer or in a wide window
+     * (a tablet, an unfolded phone), a sheet on a compact touch screen.
+     */
     data object Modal : LettaPaneKind
 }
 
@@ -96,6 +99,15 @@ data class LettaConfirmRequest(
     val message: String,
     val confirmLabel: String,
     val dismissLabel: String = "Cancel",
+    val tags: LettaConfirmTags = LettaConfirmTags(),
+)
+
+/** Test tags a confirmation keeps from the dialog it replaced. */
+@Immutable
+data class LettaConfirmTags(
+    val pane: String = LettaPaneTags.CONFIRM,
+    val confirm: String? = null,
+    val dismiss: String? = null,
 )
 
 /**
@@ -119,10 +131,13 @@ class LettaHost(
     val rowMenu: @Composable (items: List<LettaMenuItem>, content: @Composable () -> Unit) -> Unit =
         { items, content -> ShellLongPressMenu(items, content) },
 ) {
-    /** The concrete kind an intent becomes on this host. */
-    fun resolve(kind: LettaPaneKind): LettaPaneKind = when (kind) {
+    /**
+     * The concrete kind an intent becomes on this host, in a window of [windowClass]: a modal is a
+     * sheet only on a compact touch window; everywhere else it is a dialog.
+     */
+    fun resolve(kind: LettaPaneKind, windowClass: PaneWindowClass = PaneWindowClass.Compact): LettaPaneKind = when (kind) {
         is LettaPaneKind.Adaptive -> if (input == LettaInput.Touch) LettaPaneKind.Sheet else LettaPaneKind.Popover(kind.anchor)
-        LettaPaneKind.Modal -> if (input == LettaInput.Touch) LettaPaneKind.Sheet else LettaPaneKind.Dialog
+        LettaPaneKind.Modal -> if (input == LettaInput.Touch && windowClass == PaneWindowClass.Compact) LettaPaneKind.Sheet else LettaPaneKind.Dialog
         else -> kind
     }
 

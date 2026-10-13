@@ -18,12 +18,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +39,11 @@ import com.letta.mobile.data.secrets.AgentVaultLoad
 import com.letta.mobile.data.secrets.AgentVaultState
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshable
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
+import com.letta.mobile.ui.host.LettaConfirmTags
+import com.letta.mobile.ui.host.LettaPane
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -50,7 +53,7 @@ import com.letta.mobile.ui.theme.LettaDimens
  * again when it leaves the screen.
  *
  * At or above [LettaDimens.Pane.wideBreakpoint] the editor docks beside the list; below it the
- * editor rises as a bottom sheet.
+ * editor opens as the host's modal pane (a sheet on a phone).
  */
 @Composable
 fun AgentVaultPage(
@@ -131,7 +134,7 @@ private fun CompactVaultLayout(page: AgentVaultPageScope) {
         VaultBody(page)
     }
     page.state.draft?.let { draft ->
-        ModalBottomSheet(onDismissRequest = page.actions::cancelDraft) { SecretEditor(draft, page) }
+        LettaPane(LettaPaneKind.Modal, onDismiss = page.actions::cancelDraft) { SecretEditor(draft, page) }
     }
 }
 
@@ -218,17 +221,14 @@ private fun VaultMessage(message: String, modifier: Modifier, actions: @Composab
 @Composable
 private fun DeleteSecretDialog(page: AgentVaultPageScope) {
     val key = page.state.pendingDelete ?: return
-    AlertDialog(
-        onDismissRequest = page.actions::cancelDelete,
-        title = { Text("Delete $key?") },
-        text = { Text(DELETE_MESSAGE) },
-        confirmButton = {
-            TextButton(onClick = page.actions::confirmDelete, modifier = Modifier.testTag(AgentVaultPageTags.DELETE_CONFIRM)) {
-                Text(DELETE_LABEL, color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = { TextButton(onClick = page.actions::cancelDelete) { Text(CANCEL_LABEL) } },
+    val request = LettaConfirmRequest(
+        title = "Delete $key?",
+        message = DELETE_MESSAGE,
+        confirmLabel = DELETE_LABEL,
+        dismissLabel = CANCEL_LABEL,
+        tags = LettaConfirmTags(confirm = AgentVaultPageTags.DELETE_CONFIRM),
     )
+    LettaConfirmPane(request, onConfirm = page.actions::confirmDelete, onDismiss = page.actions::cancelDelete)
 }
 
 private const val PAGE_TITLE = "Secrets"

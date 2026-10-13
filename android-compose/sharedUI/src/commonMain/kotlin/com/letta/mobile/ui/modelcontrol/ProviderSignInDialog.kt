@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -16,7 +15,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +31,11 @@ import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.repository.modelcontrol.ConnectableProvider
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInController
 import com.letta.mobile.data.repository.modelcontrol.ProviderSignInState
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -90,32 +93,37 @@ fun ProviderSignInDialog(state: ProviderSignInState, actions: ProviderSignInActi
         copy = { text -> clipboard.setText(AnnotatedString(text)) },
     )
     val finished = state is ProviderSignInState.Connected || state is ProviderSignInState.Failed
-    AlertDialog(
-        // A stray tap outside or Back must not drop a running sign-in; Cancel does that explicitly.
-        onDismissRequest = { if (finished) actions.onClose() },
-        icon = { Icon(provider.logoOrNull() ?: LettaIcons.AccountCircle, contentDescription = null) },
-        title = { Text(provider.signInTitle) },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
-                modifier = Modifier.fillMaxWidth().testTag(ProviderSignInTags.SHEET),
-            ) { SignInBody(state, actions, platform) }
-        },
-        confirmButton = { ConfirmButton(state, actions) },
-        dismissButton = {
-            TextButton(
-                onClick = actions.onClose,
-                enabled = state !is ProviderSignInState.Connecting,
-                modifier = Modifier.testTag(ProviderSignInTags.CLOSE),
-            ) {
-                Text(if (finished) ModelControlStrings.CLOSE else ModelControlStrings.CANCEL)
-            }
-        },
+    val buttons = LettaPaneButtons(
+        confirm = signInConfirm(state, actions),
+        dismiss = LettaPaneButton(
+            label = if (finished) ModelControlStrings.CLOSE else ModelControlStrings.CANCEL,
+            onClick = actions.onClose,
+            enabled = state !is ProviderSignInState.Connecting,
+            testTag = ProviderSignInTags.CLOSE,
+        ),
     )
+    val spec = LettaAlertSpec(
+        title = provider.signInTitle,
+        buttons = buttons,
+        kind = LettaPaneKind.Dialog,
+        icon = provider.logoOrNull() ?: LettaIcons.AccountCircle,
+        testTag = ProviderSignInTags.SHEET,
+    )
+    // A stray tap outside or Back must not drop a running sign-in; Cancel does that explicitly.
+    LettaAlertPane(spec, onDismiss = { if (finished) actions.onClose() }) { SignInBody(state, actions, platform) }
 }
 
 /** The browser and clipboard of the host the sheet is shown on. */
 private class SignInPlatform(val openUrl: (String) -> Unit, val copy: (String) -> Unit)
+
+/** The step's forward action: submit the pasted code, try again, or done; none while waiting. */
+private fun signInConfirm(state: ProviderSignInState, actions: ProviderSignInActions): LettaPaneButton? = when (state) {
+    is ProviderSignInState.AwaitingCode ->
+        LettaPaneButton(ModelControlStrings.SIGN_IN_CONNECT, actions.onSubmitCode, enabled = state.canSubmit, testTag = ProviderSignInTags.SUBMIT)
+    is ProviderSignInState.Failed -> LettaPaneButton(ModelControlStrings.SIGN_IN_TRY_AGAIN, actions.onRetry, testTag = ProviderSignInTags.RETRY)
+    is ProviderSignInState.Connected -> LettaPaneButton(ModelControlStrings.SIGN_IN_DONE, actions.onClose)
+    else -> null
+}
 
 @Composable
 private fun SignInBody(state: ProviderSignInState, actions: ProviderSignInActions, platform: SignInPlatform) {
@@ -127,23 +135,6 @@ private fun SignInBody(state: ProviderSignInState, actions: ProviderSignInAction
         is ProviderSignInState.Connecting -> Progress(ModelControlStrings.SIGN_IN_CONNECTING)
         is ProviderSignInState.Connected -> Outcome(LettaIcons.CheckCircle, state.provider.signInConnected, error = false)
         is ProviderSignInState.Failed -> Outcome(LettaIcons.Error, state.message, error = true)
-    }
-}
-
-@Composable
-private fun ConfirmButton(state: ProviderSignInState, actions: ProviderSignInActions) {
-    when (state) {
-        is ProviderSignInState.AwaitingCode -> Button(
-            onClick = actions.onSubmitCode,
-            enabled = state.canSubmit,
-            modifier = Modifier.testTag(ProviderSignInTags.SUBMIT),
-        ) { Text(ModelControlStrings.SIGN_IN_CONNECT) }
-        is ProviderSignInState.Failed -> Button(
-            onClick = actions.onRetry,
-            modifier = Modifier.testTag(ProviderSignInTags.RETRY),
-        ) { Text(ModelControlStrings.SIGN_IN_TRY_AGAIN) }
-        is ProviderSignInState.Connected -> Button(onClick = actions.onClose) { Text(ModelControlStrings.SIGN_IN_DONE) }
-        else -> Unit
     }
 }
 

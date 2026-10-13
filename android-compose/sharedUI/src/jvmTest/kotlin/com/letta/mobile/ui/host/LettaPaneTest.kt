@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +20,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
@@ -28,6 +30,7 @@ import com.letta.mobile.ui.context.AgentContextCardDeps
 import com.letta.mobile.ui.context.AgentContextCardHost
 import com.letta.mobile.ui.context.AgentContextFocus
 import com.letta.mobile.ui.context.AgentContextTags
+import com.letta.mobile.ui.theme.LettaDimens
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -39,9 +42,35 @@ class LettaPaneTest {
         assertEquals(LettaPaneKind.Popover(PaneAnchor.BelowEnd), LettaHost.Pointer.resolve(LettaPaneKind.Adaptive(PaneAnchor.BelowEnd)))
         assertEquals(LettaPaneKind.Sheet, LettaHost.Touch.resolve(LettaPaneKind.Modal))
         assertEquals(LettaPaneKind.Dialog, LettaHost.Pointer.resolve(LettaPaneKind.Modal))
+        // letta-mobile-ckmub.3.3: a wide touch window (a tablet) shows a modal as a dialog too.
+        assertEquals(LettaPaneKind.Dialog, LettaHost.Touch.resolve(LettaPaneKind.Modal, PaneWindowClass.Wide))
+        assertEquals(LettaPaneKind.Dialog, LettaHost.Pointer.resolve(LettaPaneKind.Modal, PaneWindowClass.Compact))
+        assertEquals(LettaPaneKind.Sheet, LettaHost.Touch.resolve(LettaPaneKind.Adaptive(), PaneWindowClass.Wide))
         // A concrete kind is the surface's explicit choice on every host.
         assertEquals(LettaPaneKind.Alert, LettaHost.Touch.resolve(LettaPaneKind.Alert))
         assertEquals(LettaPaneKind.Dialog, LettaHost.Touch.resolve(LettaPaneKind.Dialog))
+    }
+
+    @Test
+    fun theWindowClassFollowsTheShellBreakpoint() {
+        assertEquals(PaneWindowClass.Compact, PaneWindowClass.of(LettaDimens.Pane.wideBreakpoint - 1.dp))
+        assertEquals(PaneWindowClass.Wide, PaneWindowClass.of(LettaDimens.Pane.wideBreakpoint))
+    }
+
+    @Test
+    fun aModalPaneIsASheetOnACompactTouchWindowAndADialogOnAWideOne() = runComposeUiTest {
+        var windowClass by mutableStateOf(PaneWindowClass.Compact)
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalPaneWindowClass provides windowClass) {
+                    ProvideLettaHost(LettaHost.Touch) { Pane(LettaPaneKind.Modal) }
+                }
+            }
+        }
+        onNodeWithTag(LettaPaneTags.SHEET).assertExists()
+        windowClass = PaneWindowClass.Wide
+        onNodeWithTag(LettaPaneTags.DIALOG).assertExists()
+        onNodeWithTag(LettaPaneTags.SHEET).assertDoesNotExist()
     }
 
     @Test
@@ -140,7 +169,8 @@ class LettaPaneTest {
 
     @Composable
     private fun Host(host: LettaHost, content: @Composable () -> Unit) {
-        MaterialTheme { ProvideLettaHost(host, content) }
+        // A phone-sized window, so a modal resolves by input alone.
+        MaterialTheme { CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) { ProvideLettaHost(host, content) } }
     }
 
     @Composable

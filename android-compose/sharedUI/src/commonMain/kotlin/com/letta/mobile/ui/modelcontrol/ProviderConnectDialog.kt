@@ -6,14 +6,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +24,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.letta.mobile.data.repository.modelcontrol.ProviderConnectForm
 import com.letta.mobile.data.repository.modelcontrol.ProviderField
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
@@ -42,25 +45,14 @@ data class ProviderFormActions(
  */
 @Composable
 fun ProviderConnectDialog(form: ProviderConnectForm, busy: Boolean, actions: ProviderFormActions) {
-    AlertDialog(
-        onDismissRequest = actions.onDismiss,
-        icon = form.provider.logoOrNull()?.let { logo -> { Icon(logo, contentDescription = null) } },
-        title = { Text("Connect ${form.provider.displayName}") },
-        text = { ProviderFormBody(form, actions.onChange) },
-        confirmButton = {
-            TextButton(
-                onClick = actions.onSubmit,
-                enabled = form.canSubmit && !busy,
-                modifier = Modifier.testTag(ProviderPaneTags.SUBMIT),
-            ) { Text("Connect") }
-        },
-        dismissButton = { TextButton(onClick = actions.onDismiss) { Text("Cancel") } },
+    val buttons = LettaPaneButtons(
+        confirm = LettaPaneButton("Connect", actions.onSubmit, enabled = form.canSubmit && !busy, testTag = ProviderPaneTags.SUBMIT),
+        dismiss = LettaPaneButton("Cancel", actions.onDismiss),
     )
-}
-
-@Composable
-private fun ProviderFormBody(form: ProviderConnectForm, onChange: (ProviderConnectForm) -> Unit) {
-    ProviderFormFields(form, onChange, modifier = Modifier.verticalScroll(rememberScrollState()))
+    val spec = LettaAlertSpec("Connect ${form.provider.displayName}", buttons, kind = LettaPaneKind.Dialog, icon = form.provider.logoOrNull())
+    LettaAlertPane(spec, actions.onDismiss) {
+        ProviderFormFields(form, actions.onChange, modifier = Modifier.verticalScroll(rememberScrollState()))
+    }
 }
 
 /** The form's method chips and fields; the dialog scrolls them, the settings pages show them inline. */
