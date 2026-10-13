@@ -146,26 +146,24 @@ private fun rememberShellAttentionBindings(context: DesktopShellContext): Deskto
 }
 
 /**
- * Publishes palette data + routing into the application-scoped quick-query window. Selecting an
- * item mirrors the in-app command palette; free text goes to the selected conversation and raises
+ * Publishes the unified search + routing into the application-scoped quick-query window. Picking a
+ * result mirrors the in-app command palette; free text goes to the selected conversation and raises
  * the main window to show the streaming response.
  */
 @Composable
 private fun DesktopShellQuickQueryBridge(context: DesktopShellContext, frame: DesktopShellFrame) {
     val quickQuery = context.shell.quickQuery
-    val window = context.shell.window
-    val router = context.router
-    val sources = frame.lists.search
-    LaunchedEffect(sources) { quickQuery.sources.value = sources }
+    // The bar searches the window's own unified search.
+    LaunchedEffect(frame.lists.search) { quickQuery.sources.value = frame.lists.search }
     SideEffect {
         quickQuery.actions.value = DesktopQuickQueryActions(
             onOpen = { hit ->
-                activateDesktopWindow(window)
-                router.openSearchHit(hit)
+                activateDesktopWindow(context.shell.window)
+                context.router.openSearchHit(hit)
             },
             onSubmitPrompt = { text, ambientContext ->
-                router.sendToSelectedConversation(quickQueryPrompt(text, ambientContext))
-                activateDesktopWindow(window)
+                context.router.sendToSelectedConversation(quickQueryPrompt(text, ambientContext))
+                activateDesktopWindow(context.shell.window)
                 context.navigator.navigate(DesktopDestination.Conversations)
             },
         )
