@@ -146,6 +146,33 @@ jobs:
           if (-not $dll) { throw "rive_desktop_bridge.dll is missing from the packaged app resources" }
           Write-Host "Packaged $($dll.FullName) ($($dll.Length) bytes)"
 
+      - name: Verify the installers carry only Windows x64 native code and stay in budget
+        # letta-mobile-szx7v: npm 11 once installed sharp's prebuilt libvips for every platform,
+        # growing the v0.23.0 MSI from 292 to 462 MB without failing anything. Fail the build
+        # instead: no sharp package for another platform may reach the app image, and neither
+        # installer may pass the ceiling (v0.22.0 was about 295 MB).
+        shell: pwsh
+        run: |
+          $resources = Get-ChildItem 'D:\l\compose\binaries\main\app\*\app\resources' -Directory | Select-Object -First 1
+          if (-not $resources) { throw "Packaged app resources not found" }
+          $foreign = @(Get-ChildItem -LiteralPath $resources.FullName -Recurse -Directory -Force -Filter 'sharp-*' | Where-Object {
+            $_.Parent.Name -eq '@img' -and @('sharp-win32-x64', 'sharp-libvips-win32-x64') -notcontains $_.Name
+          })
+          if ($foreign.Count -gt 0) {
+            $foreign | ForEach-Object { Write-Host "  $($_.FullName)" }
+            throw "$($foreign.Count) sharp packages for other platforms reached the app image"
+          }
+          $ceilingMb = 360
+          $installers = @(Get-ChildItem 'D:\l\compose\binaries\main\exe\*.exe', 'D:\l\compose\binaries\main\msi\*.msi')
+          if ($installers.Count -eq 0) { throw "No installers found" }
+          $tooLarge = $false
+          foreach ($installer in $installers) {
+            $mb = [math]::Round($installer.Length / 1MB, 1)
+            Write-Host "$($installer.Name): $mb MB (ceiling $ceilingMb MB)"
+            if ($mb -gt $ceilingMb) { $tooLarge = $true }
+          }
+          if ($tooLarge) { throw "An installer is over the $ceilingMb MB ceiling" }
+
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
