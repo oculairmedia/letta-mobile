@@ -47,6 +47,47 @@ pub fn encode_frame(payload: &str) -> Result<Vec<u8>, FrameError> {
     Ok(frame)
 }
 
+/// Encodes [payload] as one plain frame when it fits in [`MAX_FRAME_BYTES`], or as an ordered list
+/// of `frame_part`s otherwise (the inverse of [`FrameDecoder`], matching
+/// `IrohFrameCodec.encodeFrameParts`). Only send parts to a server whose `auth_response`
+/// advertised `frame_part`; any other server rejects the sentinel as an oversized frame.
+pub fn encode_frame_parts(payload: &str) -> Result<Vec<Vec<u8>>, FrameError> {
+    let bytes = payload.as_bytes();
+    if bytes.len() <= MAX_FRAME_BYTES {
+        return encode_frame(payload).map(|frame| vec![frame]);
+    }
+    if bytes.len() > MAX_REASSEMBLED_BYTES {
+        return Err(FrameError::TooLarge {
+            size: bytes.len(),
+            maximum: MAX_REASSEMBLED_BYTES,
+        });
+    }
+    let chunks: Vec<&[u8]> = bytes.chunks(MAX_FRAME_BYTES).collect();
+    let last = chunks.len() - 1;
+    chunks
+        .iter()
+        .enumerate()
+        .map(|(index, chunk)| encode_part(index, index == last, chunk))
+        .collect()
+}
+
+fn encode_part(index: usize, fin: bool, payload: &[u8]) -> Result<Vec<u8>, FrameError> {
+    // Both fit in u32: index < MAX_REASSEMBLED_BYTES / MAX_FRAME_BYTES and a part is <= 1 MiB.
+    let too_large = |_| FrameError::TooLarge {
+        size: payload.len(),
+        maximum: MAX_FRAME_BYTES,
+    };
+    let index = u32::try_from(index).map_err(too_large)?;
+    let length = u32::try_from(payload.len()).map_err(too_large)?;
+    let mut part = Vec::with_capacity(HEADER_BYTES + PART_HEADER_BYTES + payload.len());
+    part.extend_from_slice(&PART_SENTINEL.to_be_bytes());
+    part.push(if fin { PART_FLAG_FIN } else { 0 });
+    part.extend_from_slice(&index.to_be_bytes());
+    part.extend_from_slice(&length.to_be_bytes());
+    part.extend_from_slice(payload);
+    Ok(part)
+}
+
 /// Decodes plain frames and reassembles `frame_part` sequences (see `IrohFrameCodec` for the
 /// wire format). Parts of one logical frame are strictly sequential on a stream, so any plain
 /// frame or out-of-order index mid-sequence is a protocol error.
