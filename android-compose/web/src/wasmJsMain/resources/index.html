@@ -6,6 +6,11 @@
     <meta name="description" content="Manage Letta agents and conversations from the browser.">
     <title>Letta Web</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="theme-color" content="#00897B">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Letta">
     <style>
         html, body {
             width: 100%;
@@ -90,6 +95,22 @@
             await Promise.allSettled(session.drains);
             session.native.free();
         };
+    </script>
+    <script>
+        // letta-mobile-2cson: installable PWA. Relative path, so it works under /letta-mobile/ too.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => navigator.serviceWorker.ready)
+                    .then((registration) => registration.active?.postMessage({
+                        type: 'cache-loaded-files',
+                        urls: [location.href, ...performance.getEntriesByType('resource').map((entry) => entry.name)],
+                    }))
+                    .catch((error) => {
+                        console.warn('Letta Web service worker was not registered', error);
+                    });
+            });
+        }
     </script>
 </head>
 <body>
