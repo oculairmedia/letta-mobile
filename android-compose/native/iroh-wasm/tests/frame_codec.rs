@@ -1,5 +1,6 @@
 use letta_iroh_wasm::frame::{
     FrameDecoder, FrameError, MAX_FRAME_BYTES, MAX_REASSEMBLED_BYTES, encode_frame,
+    encode_frame_parts,
 };
 
 #[test]
@@ -227,4 +228,60 @@ fn decoder_reports_a_stream_that_ends_mid_sequence_as_truncated() {
         .expect("non-final part should buffer");
 
     assert_eq!(decoder.finish(), Err(FrameError::Truncated));
+}
+
+#[test]
+fn part_encoder_leaves_a_frame_that_fits_plain() {
+    let encoded = encode_frame_parts("hello").expect("small payload should encode");
+
+    assert_eq!(
+        encoded,
+        vec![encode_frame("hello").expect("plain frame should encode")]
+    );
+}
+
+#[test]
+fn part_encoder_writes_the_native_wire_layout() {
+    // One byte over a frame: a full first part and a one-byte FIN part.
+    let payload = "x".repeat(MAX_FRAME_BYTES + 1);
+
+    let encoded = encode_frame_parts(&payload).expect("payload should split");
+
+    assert_eq!(encoded.len(), 2);
+    assert_eq!(
+        encoded[0],
+        part(0, false, &payload.as_bytes()[..MAX_FRAME_BYTES])
+    );
+    assert_eq!(encoded[1], part(1, true, b"x"));
+}
+
+#[test]
+fn part_encoder_round_trips_through_the_decoder() {
+    let payload = format!("{{\"text\":\"{}é\"}}", "a".repeat(2 * MAX_FRAME_BYTES + 7));
+    let mut decoder = FrameDecoder::new();
+
+    let decoded = decoder
+        .push(
+            &encode_frame_parts(&payload)
+                .expect("payload should split")
+                .concat(),
+        )
+        .expect("parts should reassemble");
+
+    assert_eq!(decoded, vec![payload]);
+    decoder
+        .finish()
+        .expect("decoder should end at a frame boundary");
+}
+
+#[test]
+fn part_encoder_rejects_payloads_past_the_reassembly_cap() {
+    let payload = "x".repeat(MAX_REASSEMBLED_BYTES + 1);
+
+    let error = encode_frame_parts(&payload).expect_err("oversized payload must fail");
+
+    assert!(matches!(
+        error,
+        FrameError::TooLarge { maximum, .. } if maximum == MAX_REASSEMBLED_BYTES
+    ));
 }

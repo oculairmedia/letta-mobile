@@ -72,10 +72,10 @@
             return id;
         };
 
-        window.irohSendControl = (id, payload) => {
+        window.irohSendControl = (id, payload, allowFrameParts) => {
             const session = sessions.get(id);
             if (!session || session.state !== 'connected') throw new Error('Iroh session is not connected');
-            return session.native.send_control(payload);
+            return session.native.send_control(payload, allowFrameParts);
         };
         window.irohPollControl = (id) => sessions.get(id)?.control.shift() ?? null;
         window.irohPollStream = (id) => sessions.get(id)?.stream.shift() ?? null;

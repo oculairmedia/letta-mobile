@@ -13,7 +13,7 @@ use tokio::sync::Mutex;
 use wasm_bindgen::{JsError, JsValue, prelude::wasm_bindgen};
 use wasm_streams::ReadableStream;
 
-use crate::frame::{FrameDecoder, encode_frame};
+use crate::frame::{FrameDecoder, encode_frame, encode_frame_parts};
 
 const APP_SERVER_ALPN: &[u8] = b"/letta/appserver/0";
 const READ_CHUNK_BYTES: usize = 64 * 1024;
@@ -75,14 +75,27 @@ impl IrohAppServerSession {
         })
     }
 
-    pub async fn send_control(&self, payload: &str) -> Result<(), JsError> {
-        let frame = encode_frame(payload).map_err(|error| JsError::new(&error.to_string()))?;
-        self.control_send
-            .lock()
-            .await
-            .write_all(&frame)
-            .await
-            .map_err(|error| js_error("writing control frame", error))
+    /// Writes [payload] as one control frame. With [allow_frame_parts] (the server's
+    /// `auth_response` advertised `frame_part`) a payload over 1 MiB goes out as ordered parts,
+    /// all under one lock so no other frame lands between them.
+    pub async fn send_control(
+        &self,
+        payload: &str,
+        allow_frame_parts: bool,
+    ) -> Result<(), JsError> {
+        let frames = if allow_frame_parts {
+            encode_frame_parts(payload)
+        } else {
+            encode_frame(payload).map(|frame| vec![frame])
+        }
+        .map_err(|error| JsError::new(&error.to_string()))?;
+        let mut send = self.control_send.lock().await;
+        for frame in frames {
+            send.write_all(&frame)
+                .await
+                .map_err(|error| js_error("writing control frame", error))?;
+        }
+        Ok(())
     }
 
     pub fn take_control_events(&mut self) -> Result<web_sys::ReadableStream, JsError> {

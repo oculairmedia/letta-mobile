@@ -9,8 +9,9 @@ import kotlinx.coroutines.await
 internal class IrohWasmBridge private constructor(
     private val sessionId: Int,
 ) {
-    suspend fun sendControl(payload: String) {
-        callSendControl(sessionId, payload).await()
+    /** With [allowFrameParts], a payload over 1 MiB is split into `frame_part`s instead of rejected. */
+    suspend fun sendControl(payload: String, allowFrameParts: Boolean) {
+        callSendControl(sessionId, payload, allowFrameParts).await()
     }
 
     fun pollControl(): String? = callPollControl(sessionId)?.toString()
@@ -46,8 +47,8 @@ internal class IrohWasmBridge private constructor(
 private fun callConnect(ticket: String): kotlin.js.Promise<JsNumber> =
     js("window.irohConnect(ticket)")
 
-private fun callSendControl(sessionId: Int, payload: String): kotlin.js.Promise<JsAny?> =
-    js("window.irohSendControl(sessionId, payload)")
+private fun callSendControl(sessionId: Int, payload: String, allowFrameParts: Boolean): kotlin.js.Promise<JsAny?> =
+    js("window.irohSendControl(sessionId, payload, allowFrameParts)")
 
 private fun callPollControl(sessionId: Int): JsString? =
     js("window.irohPollControl(sessionId)")
