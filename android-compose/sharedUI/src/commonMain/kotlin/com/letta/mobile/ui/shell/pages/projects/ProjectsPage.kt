@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.projects.ProjectDraft
 import com.letta.mobile.data.projects.ProjectKey
+import com.letta.mobile.data.projects.ProjectsPageController
 import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -50,6 +51,7 @@ object ProjectsPageTags {
     const val RETRY = "projects-page-retry"
     const val DETAIL = "projects-page-detail"
     const val EDITOR = "projects-page-editor"
+    const val UNAVAILABLE = "projects-page-unavailable"
     val LIST = RosterListTag("projects-page-list")
 }
 
@@ -92,6 +94,39 @@ data class ProjectsPageActions(
     val list: ProjectsListActions = ProjectsListActions(),
     val detail: ProjectDetailActions = ProjectDetailActions(),
     val editor: ProjectEditorActions = ProjectEditorActions(),
+)
+
+/**
+ * The page's actions over the shared [ProjectsPageController] (letta-mobile-ckmub.2.6): every host binds
+ * the catalog the same way and only says where a project's chat opens ([onOpenChat]; null hides it).
+ */
+fun ProjectsPageController.projectsPageActions(onOpenChat: ((ProjectSummary, ProjectChatIntent) -> Unit)?) = ProjectsPageActions(
+    list = ProjectsListActions(
+        onRefresh = ::refresh,
+        onQueryChange = ::setQuery,
+        onSelect = ::select,
+        onTogglePinned = ::togglePinned,
+        onStartCreate = editor::startCreate,
+        onDismissNotice = ::dismissNotice,
+        onOpenChat = onOpenChat?.let { open ->
+            { project, intent ->
+                select(null)
+                open(project, intent)
+            }
+        },
+    ),
+    detail = ProjectDetailActions(
+        onStartEdit = editor::startEdit,
+        onSync = ::sync,
+        onProvisionBeads = ::provisionBeadsRemote,
+        onArchive = ::archive,
+        onDelete = ::delete,
+    ),
+    editor = ProjectEditorActions(
+        onDraftChange = editor::updateDraft,
+        onSubmit = editor::submit,
+        onClose = editor::close,
+    ),
 )
 
 /**
@@ -193,9 +228,29 @@ private fun ProjectsNotice(message: String, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * letta-mobile-ckmub.2.6: the Projects destination on a backend that has no projects. Projects ride
+ * an Iroh host's `project.*` relay; a direct App Server has none, so the page says so instead of an
+ * empty list or a failed load. [onOpenSettings] offers the way to another backend, when the host has one.
+ */
+@Composable
+fun ProjectsUnavailable(onOpenSettings: (() -> Unit)?, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(LettaDimens.Space.lg).testTag(ProjectsPageTags.UNAVAILABLE),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+    ) {
+        Text(UNAVAILABLE_TITLE, style = MaterialTheme.typography.titleMedium)
+        Text(UNAVAILABLE_BODY, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        onOpenSettings?.let { open -> TextButton(onClick = open) { Text(OPEN_SETTINGS) } }
+    }
+}
+
 internal const val PIN = "Pin to top"
 internal const val UNPIN = "Unpin from top"
 private const val SEARCH_PLACEHOLDER = "Search projects"
 private const val NEW_PROJECT = "New project"
 private const val RETRY = "Retry"
 private const val DISMISS = "Dismiss"
+internal const val UNAVAILABLE_TITLE = "Projects need an Iroh host"
+private const val UNAVAILABLE_BODY = "Projects come from a VibeSync host relayed over Iroh. This backend has none: connect to an Iroh host to see its projects."
+private const val OPEN_SETTINGS = "Open Settings"

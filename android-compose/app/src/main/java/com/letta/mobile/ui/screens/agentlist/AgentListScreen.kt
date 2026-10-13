@@ -98,7 +98,7 @@ fun AgentListScreen(
             onBack = navigation.onNavigateBack,
             onImport = viewModel::showImportDialog.takeUnless { isShareMode },
             onCreate = navigation.onNavigateToNewAgent.takeUnless { isShareMode },
-            onRetry = viewModel::loadAgents,
+            onReload = viewModel::loadAgents,
         ),
     )
     AgentListImportDialogHost(uiState = uiState, viewModel = viewModel, onImport = onImportLaunch)
@@ -109,7 +109,7 @@ internal data class AgentListChrome(
     val onBack: () -> Unit = {},
     val onImport: (() -> Unit)? = null,
     val onCreate: (() -> Unit)? = null,
-    val onRetry: () -> Unit = {},
+    val onReload: () -> Unit = {},
 )
 
 /** The route's layout, without a view model: the shared header and agents page in the page frame. */
@@ -134,7 +134,7 @@ internal fun AgentListRouteContent(state: AgentsPageState, actions: ShellAgentRa
             }
         },
     ) { padding ->
-        AgentsPage(state = state, actions = actions, modifier = Modifier.padding(padding), onRetry = chrome.onRetry)
+        AgentsPage(state = state, actions = actions, modifier = Modifier.padding(padding), onReload = chrome.onReload)
     }
 }
 

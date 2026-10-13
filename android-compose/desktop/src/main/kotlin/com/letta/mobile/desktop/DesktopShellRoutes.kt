@@ -44,6 +44,9 @@ private val DesktopDestinationByKind: Map<ShellPageKind, DesktopDestination> = m
     ShellPageKind.Settings to DesktopDestination.Settings,
     ShellPageKind.Providers to DesktopDestination.Providers,
     ShellPageKind.Overview to DesktopDestination.Overview,
+    ShellPageKind.Runs to DesktopDestination.Runs,
+    ShellPageKind.Templates to DesktopDestination.Templates,
+    ShellPageKind.Projects to DesktopDestination.Projects,
 )
 
 /** The desktop route that shows [this]. */
@@ -72,6 +75,9 @@ private val ShellDestinationOfDesktop: Map<DesktopDestination, (DesktopShellRout
     DesktopDestination.Providers to { _ -> ShellDestination.Providers },
     DesktopDestination.Conversations to ::conversationsDestination,
     DesktopDestination.Settings to { r -> ShellDestination.Settings(r.settingsSection) },
+    DesktopDestination.Runs to { _ -> ShellDestination.Runs },
+    DesktopDestination.Templates to { _ -> ShellDestination.Templates },
+    DesktopDestination.Projects to { _ -> ShellDestination.Projects },
 )
 
 private fun conversationsDestination(route: DesktopShellRoute): ShellDestination {

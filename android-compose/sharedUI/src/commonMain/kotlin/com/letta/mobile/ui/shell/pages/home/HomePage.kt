@@ -32,6 +32,7 @@ import com.letta.mobile.data.home.HomeShortcut
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.components.LettaRefreshable
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -145,8 +146,22 @@ internal class HomePageScope(
     fun offers(shortcut: HomeShortcut): Boolean = shortcut in state.availableShortcuts
 }
 
+/**
+ * The page reloads through [LettaRefreshable] (letta-mobile-ckmub.3.22): a pull on touch, the header's
+ * refresh on a pointer host. The controller reports no refresh in progress, so the pull springs back.
+ */
+@Composable
+private fun HomeRefreshable(page: HomePageScope, modifier: Modifier, content: @Composable () -> Unit) {
+    LettaRefreshable(refreshing = false, onRefresh = page.actions::refresh, modifier = modifier) { content() }
+}
+
 @Composable
 private fun WideHomeLayout(page: HomePageScope) {
+    HomeRefreshable(page, Modifier.fillMaxSize()) { WideHomeList(page) }
+}
+
+@Composable
+private fun WideHomeList(page: HomePageScope) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
@@ -165,13 +180,15 @@ private fun WideHomeLayout(page: HomePageScope) {
 @Composable
 private fun CompactHomeLayout(page: HomePageScope) {
     Column(Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
-            contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
-        ) {
-            if (page.hasCompactHeader) item { HomeHeader(page) }
-            if (page.state.search.isActive) homeSearchResults(page) else homeCompactDashboard(page)
+        HomeRefreshable(page, Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
+                contentPadding = PaddingValues(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.lg),
+            ) {
+                if (page.hasCompactHeader) item { HomeHeader(page) }
+                if (page.state.search.isActive) homeSearchResults(page) else homeCompactDashboard(page)
+            }
         }
         if (!page.state.search.isActive) {
             HomeComposer(page, Modifier.padding(horizontal = page.horizontalPadding, vertical = LettaDimens.Space.sm))

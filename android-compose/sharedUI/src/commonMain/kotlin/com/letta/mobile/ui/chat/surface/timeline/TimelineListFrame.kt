@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.chat.surface.timeline
 
-
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -141,6 +141,10 @@ internal fun TimelineListFrame(
                     top = ChatRowSpacing.listEdge + overlays.topReserve,
                     bottom = ChatRowSpacing.listEdge + overlays.bottomReserve,
                 ),
+                // letta-mobile-ckmub.10: a chat shorter than the screen reads from the top, as the
+                // legacy Android list did; the reversed list's default would sink it onto the composer.
+                // Once the rows overflow, the newest edge still rests at the bottom.
+                verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally,
                 content = content,
             )

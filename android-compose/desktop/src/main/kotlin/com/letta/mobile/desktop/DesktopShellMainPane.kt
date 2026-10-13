@@ -165,6 +165,7 @@ private fun desktopMainContentInputs(
         activeCanvasSession = core.canvasShell.activeSession,
         dockedCanvasId = context.sharedChat.dockedCanvas.dockedCanvasId,
         chatPage = desktopSharedChatPage(context, frame, host),
+        adminPages = desktopAdminPages(rememberDesktopAdminBinding(context)),
     )
 }
 

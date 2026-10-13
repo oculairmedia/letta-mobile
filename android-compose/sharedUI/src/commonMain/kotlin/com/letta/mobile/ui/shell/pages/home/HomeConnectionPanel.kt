@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +23,6 @@ import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaDimens
 
 /** Test tags for [HomeConnectionPanel]. */
@@ -84,8 +82,8 @@ fun HomeConnectionPanel(
                     enabled = !state.loading,
                     modifier = Modifier.testTag(HomeConnectionPanelTags.RETRY),
                 ) {
-                    Icon(LettaIcons.Refresh, contentDescription = null)
-                    Text("Retry connection", modifier = Modifier.padding(start = LettaDimens.Space.sm))
+                    // A call to action that redials the backend, not a list reload: no refresh glyph.
+                    Text("Retry connection")
                 }
             }
         }

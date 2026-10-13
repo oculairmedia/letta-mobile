@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.runs.RunFormat
+import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.runs.RunMonitorState
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -74,6 +75,24 @@ data class RunsPageActions(
     val onDeleteRun: (String) -> Unit = {},
     val onDismissError: () -> Unit = {},
     val onOpenConversation: ((agentId: String, conversationId: String) -> Unit)? = null,
+)
+
+/**
+ * The page's actions over the shared [RunMonitorController] (letta-mobile-ckmub.2.6): every host binds
+ * the monitor the same way and only says where a run's conversation opens.
+ */
+fun RunMonitorController.runsPageActions(
+    onOpenConversation: ((agentId: String, conversationId: String) -> Unit)?,
+) = RunsPageActions(
+    onRefresh = ::refresh,
+    onQueryChange = ::setQuery,
+    onActiveOnlyChange = ::setActiveOnly,
+    onOpenRun = ::open,
+    onCloseRun = ::closeDetail,
+    onCancelRun = ::cancel,
+    onDeleteRun = ::delete,
+    onDismissError = ::clearOperationError,
+    onOpenConversation = onOpenConversation,
 )
 
 /**

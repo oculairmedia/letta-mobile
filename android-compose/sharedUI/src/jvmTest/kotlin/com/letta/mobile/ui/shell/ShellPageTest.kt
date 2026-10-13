@@ -14,12 +14,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellSettingsSection
 import com.letta.mobile.data.shell.ShellSkillsSection
+import com.letta.mobile.ui.shell.pages.projects.ProjectsPageTags
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
@@ -41,6 +44,9 @@ class ShellPageTest {
         ShellDestination.AgentEditor("agent-1"),
         ShellDestination.Providers,
         ShellDestination.Overview,
+        ShellDestination.Runs,
+        ShellDestination.Templates,
+        ShellDestination.Projects,
     )
 
     /** Fake pages: each tags itself with its kind and records the destination it was handed. */
@@ -68,6 +74,11 @@ class ShellPageTest {
             settings = page(ShellPageKind.Settings),
             agentEditor = page(ShellPageKind.AgentEditor),
             providers = page(ShellPageKind.Providers),
+            admin = ShellAdminPages(
+                runs = page(ShellPageKind.Runs),
+                templates = page(ShellPageKind.Templates),
+                projects = page(ShellPageKind.Projects),
+            ),
             fallback = fallback,
         )
     }
@@ -115,6 +126,18 @@ class ShellPageTest {
     fun withNoFallbackAnUnboundDestinationIsAnEmptyPage() = runComposeUiTest {
         setContent { MaterialTheme { ShellPage(ShellDestination.Overview, ShellPageDeps()) } }
         onNodeWithTag(ShellPageTags.EMPTY).assertExists()
+    }
+
+    /** letta-mobile-ckmub.2.6: a backend without projects says so on the Projects destination. */
+    @Test
+    fun theProjectsUnavailableBindingExplainsAndOffersSettings() = runComposeUiTest {
+        var opened = 0
+        val deps = ShellPageDeps(admin = ShellAdminPages(projects = shellProjectsUnavailablePage(onOpenSettings = { opened++ })))
+        setContent { MaterialTheme { ShellPage(ShellDestination.Projects, deps, Modifier.width(400.dp).height(600.dp)) } }
+        onNodeWithTag(ProjectsPageTags.UNAVAILABLE).assertExists()
+        onNodeWithText("Projects need an Iroh host").assertExists()
+        onNodeWithText("Open Settings").performClick()
+        assertEquals(1, opened)
     }
 
     @Test

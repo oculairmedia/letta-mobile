@@ -48,7 +48,8 @@ data class ConversationsPageState(
  */
 data class ConversationsPageActions(
     val conversations: ShellAgentPanelActions = ShellAgentPanelActions(),
-    val onRetry: () -> Unit = {},
+    /** Reloads the conversations: the error's Retry, the pull on touch, the refresh on a pointer host. */
+    val onReload: () -> Unit = {},
     val onCreateAgent: (() -> Unit)? = null,
     val rowMenu: (ShellConversationRowModel) -> List<LettaMenuItem> = { emptyList() },
 )

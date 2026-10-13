@@ -12,10 +12,12 @@ import com.letta.mobile.data.agenteditor.AgentEditorController
 import com.letta.mobile.data.channel.ChannelsPageActions
 import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.home.HomePageState
+import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.shell.ShellSettingsSection
+import com.letta.mobile.data.templates.AgentTemplatesState
 import com.letta.mobile.ui.agenteditor.AgentEditorPage
 import com.letta.mobile.ui.agenteditor.AgentEditorPageOptions
 import com.letta.mobile.ui.settings.SettingsPage
@@ -23,6 +25,7 @@ import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPage
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
+import com.letta.mobile.ui.shell.pages.channels.ChannelsPageSlots
 import com.letta.mobile.ui.shell.pages.conversations.ConversationsPage
 import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageActions
 import com.letta.mobile.ui.shell.pages.conversations.ConversationsPageState
@@ -31,6 +34,12 @@ import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspaceBinding
 import com.letta.mobile.ui.shell.pages.memory.MemoryWorkspacePage
+import com.letta.mobile.ui.shell.pages.projects.ProjectsPage
+import com.letta.mobile.ui.shell.pages.projects.ProjectsPageActions
+import com.letta.mobile.ui.shell.pages.projects.ProjectsUnavailable
+import com.letta.mobile.ui.shell.pages.runs.RunsPage
+import com.letta.mobile.ui.shell.pages.runs.RunsPageActions
+import com.letta.mobile.ui.shell.pages.runs.RunsPageState
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPage
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageActions
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageOptions
@@ -40,6 +49,8 @@ import com.letta.mobile.ui.shell.pages.skills.SkillsPageActions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageOptions
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageSection
 import com.letta.mobile.ui.shell.pages.skills.SkillsPageState
+import com.letta.mobile.ui.shell.pages.templates.TemplatesPage
+import com.letta.mobile.ui.shell.pages.templates.TemplatesPageActions
 
 /** Draws the page for one kind of destination. */
 fun interface ShellPageContent<in D : ShellDestination> {
@@ -53,7 +64,7 @@ fun interface ShellPageContent<in D : ShellDestination> {
  * A host fills only the pages it can show right now (Android builds one per nav entry, the desktop
  * and web all of theirs); a destination without one goes to [fallback].
  *
- * - The shared pages ([home], [channels], [skills], [schedules], [memory], [settings]) are built from the shared
+ * - The shared pages ([home], [channels], [skills], [schedules], [memory], [settings], and the [admin] pages) are built from the shared
  *   page bindings below ([shellHomePage], ...), so the page itself is always the sharedUI one.
  * - [chat] is the platform's chat-page container: it binds the shared ChatSurface to the platform's
  *   session port (DesktopSharedChatPage, SharedChatPage, WebSharedChatPage). It stays a slot.
@@ -72,6 +83,7 @@ class ShellPageDeps(
     settings: ShellPageContent<ShellDestination.Settings>? = null,
     agentEditor: ShellPageContent<ShellDestination.AgentEditor>? = null,
     providers: ShellPageContent<ShellDestination.Providers>? = null,
+    admin: ShellAdminPages = ShellAdminPages(),
     val fallback: ShellPageContent<ShellDestination> = EmptyShellPage,
 ) {
     // Each page is registered under the kind of the destination type it was typed for above, so
@@ -87,6 +99,9 @@ class ShellPageDeps(
         ShellPageKind.Settings to settings,
         ShellPageKind.AgentEditor to agentEditor,
         ShellPageKind.Providers to providers,
+        ShellPageKind.Runs to admin.runs,
+        ShellPageKind.Templates to admin.templates,
+        ShellPageKind.Projects to admin.projects,
     ).mapNotNull { (kind, page) -> page?.let { kind to it } }.toMap()
 
     /**
@@ -106,6 +121,16 @@ class ShellPageDeps(
             ?: overview?.takeIf { destination.kind == ShellPageKind.Overview }
             ?: fallback
 }
+
+/**
+ * letta-mobile-ckmub.2.6: the fleet's admin pages (the run monitor, the starter templates, the projects
+ * catalog), built from [shellRunsPage], [shellTemplatesPage] and [shellProjectsPage].
+ */
+class ShellAdminPages(
+    val runs: ShellPageContent<ShellDestination.Runs>? = null,
+    val templates: ShellPageContent<ShellDestination.Templates>? = null,
+    val projects: ShellPageContent<ShellDestination.Projects>? = null,
+)
 
 object ShellPageTags {
     const val EMPTY = "shell_page_empty"
@@ -210,6 +235,39 @@ fun shellAgentEditorPage(binding: AgentEditorBinding) = ShellPageContent<ShellDe
     val state by controller.state.collectAsState()
     AgentEditorPage(state = state, actions = controller, options = binding.options(destination.agentId, controller), modifier = modifier)
 }
+
+/** The shared run monitor (letta-mobile-ckmub.2.5); [slots] are the host's search field and refresh. */
+fun shellRunsPage(
+    state: RunsPageState,
+    actions: RunsPageActions,
+    slots: ChannelsPageSlots = ChannelsPageSlots(),
+) = ShellPageContent<ShellDestination.Runs> { _, modifier ->
+    RunsPage(state = state, actions = actions, modifier = modifier, slots = slots)
+}
+
+/** The shared starter templates (letta-mobile-ckmub.2.5). */
+fun shellTemplatesPage(state: AgentTemplatesState, actions: TemplatesPageActions) =
+    ShellPageContent<ShellDestination.Templates> { _, modifier ->
+        TemplatesPage(state = state, actions = actions, modifier = modifier)
+    }
+
+/**
+ * The shared projects catalog (letta-mobile-ckmub.2.5). Projects ride an Iroh host's relay: a host
+ * whose backend cannot list them binds [shellProjectsUnavailablePage] instead.
+ */
+fun shellProjectsPage(
+    state: ProjectsPageState,
+    actions: ProjectsPageActions,
+    slots: ChannelsPageSlots = ChannelsPageSlots(),
+) = ShellPageContent<ShellDestination.Projects> { _, modifier ->
+    ProjectsPage(state = state, actions = actions, modifier = modifier, slots = slots)
+}
+
+/** The Projects destination on a backend without projects: says so, and why (letta-mobile-ckmub.2.6). */
+fun shellProjectsUnavailablePage(onOpenSettings: (() -> Unit)? = null) =
+    ShellPageContent<ShellDestination.Projects> { _, modifier ->
+        ProjectsUnavailable(onOpenSettings = onOpenSettings, modifier = modifier)
+    }
 
 fun ShellSkillsSection.toPageSection(): SkillsPageSection = when (this) {
     ShellSkillsSection.Skills -> SkillsPageSection.Skills

@@ -57,6 +57,7 @@ import com.letta.mobile.data.home.HomeStatTile
 import com.letta.mobile.data.home.relativeAgeLabel
 import com.letta.mobile.data.home.statTiles
 import com.letta.mobile.data.home.subtitle
+import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.home.FleetBarSpark
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.mascot.AgentAvatar
@@ -77,6 +78,7 @@ internal fun HomeHeader(page: HomePageScope) {
                 }
             }
             if (page.wide && page.options.showSearch) HomeSearchField(page, Modifier.width(WideSearchWidth))
+            LettaRefreshAction(refreshing = false, onRefresh = page.actions::refresh, modifier = Modifier.testTag(HomePageTags.REFRESH))
             page.options.headerActions?.invoke(this)
         }
         if (!page.wide && page.options.showSearch) HomeSearchField(page, Modifier.fillMaxWidth())

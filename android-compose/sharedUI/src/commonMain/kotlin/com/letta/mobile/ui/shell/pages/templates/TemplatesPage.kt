@@ -13,6 +13,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.templates.AgentTemplatesController
 import com.letta.mobile.data.templates.AgentTemplatesState
 import com.letta.mobile.data.templates.StarterAgentTemplate
 import com.letta.mobile.ui.components.LettaEmptyHint
@@ -40,6 +41,12 @@ object TemplatesPageTags {
 data class TemplatesPageActions(
     val onCreate: (templateId: String) -> Unit = {},
     val onDismissError: () -> Unit = {},
+)
+
+/** The page's actions over the shared [AgentTemplatesController]; [onCreated] opens the new agent. */
+fun AgentTemplatesController.templatesPageActions(onCreated: (agentId: String) -> Unit) = TemplatesPageActions(
+    onCreate = { templateId -> create(templateId, onCreated) },
+    onDismissError = ::clearError,
 )
 
 /**

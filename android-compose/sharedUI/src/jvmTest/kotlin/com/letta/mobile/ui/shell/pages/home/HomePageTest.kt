@@ -12,6 +12,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
@@ -43,6 +45,9 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.ui.components.LettaRefreshTags
+import com.letta.mobile.ui.host.LettaHost
+import com.letta.mobile.ui.host.ProvideLettaHost
 import com.letta.mobile.ui.mascot.AgentAvatarTestTag
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -96,14 +101,40 @@ class HomePageTest {
         show(state, HomePageOptions(document = document), width)
     }
 
-    private fun ComposeUiTest.show(state: HomePageState, options: HomePageOptions, width: Dp = WIDE) {
+    private fun ComposeUiTest.show(
+        state: HomePageState,
+        options: HomePageOptions,
+        width: Dp = WIDE,
+        host: LettaHost = LettaHost.Touch,
+    ) {
         setContent {
             MaterialTheme {
-                Box(Modifier.width(width).height(PAGE_HEIGHT)) {
-                    HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = options)
+                ProvideLettaHost(host) {
+                    Box(Modifier.width(width).height(PAGE_HEIGHT)) {
+                        HomePage(state = state, callbacks = HomePageCallbacks(actions, navigation.navigation), options = options)
+                    }
                 }
             }
         }
+    }
+
+    /** letta-mobile-ckmub.3.22: a pull reloads the page on touch, and there is no refresh button. */
+    @Test
+    fun onTouchAPullRefreshesTheDashboard() = runComposeUiTest {
+        show(baseState(), HomePageOptions(), width = COMPACT)
+        onNodeWithTag(HomePageTags.REFRESH).assertDoesNotExist()
+        onNodeWithTag(LettaRefreshTags.PULL).performTouchInput { swipeDown(startY = top + 10f, endY = bottom, durationMillis = 600) }
+        waitForIdle()
+        assertEquals(listOf("refresh"), actions.events)
+    }
+
+    /** On a pointer host the header's refresh reloads it instead. */
+    @Test
+    fun onPointerTheHeaderRefreshReloadsTheDashboard() = runComposeUiTest {
+        show(baseState(), HomePageOptions(), host = LettaHost.Pointer)
+        onNodeWithTag(LettaRefreshTags.PULL).assertDoesNotExist()
+        onNodeWithTag(HomePageTags.REFRESH).performClick()
+        assertEquals(listOf("refresh"), actions.events)
     }
 
     @Test

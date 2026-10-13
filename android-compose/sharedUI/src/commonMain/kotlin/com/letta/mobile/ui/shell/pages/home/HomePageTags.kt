@@ -20,6 +20,9 @@ object HomePageTags {
     const val STATS = "home_stats"
     const val ERROR = "home_error"
 
+    /** The header's refresh, on pointer hosts only (touch pulls the page instead). */
+    const val REFRESH = "home_refresh"
+
     /** Compact Home (phone): the one-line "running now" strip, recents, the agent avatar row and the stats strip. */
     const val NOW_STRIP = "home_now_strip"
     const val RECENTS = "home_recents"

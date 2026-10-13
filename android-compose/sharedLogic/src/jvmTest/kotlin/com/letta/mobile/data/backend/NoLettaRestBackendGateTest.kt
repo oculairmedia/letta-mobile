@@ -128,12 +128,9 @@ class NoLettaRestBackendGateTest {
         /**
          * Known remainders; each is a detector or a probe, never a client for a Letta server's data.
          * - The Cloud-config migration recognises Letta Cloud's hosts to drop their saved key.
-         * - Server health dot: a `/v1/health/` reachability probe, to become an App Server probe
-         *   (letta-mobile-ckmub.11).
          */
         val ALLOWLIST: List<Pair<String, String>> = listOf(
             "cloud-host" to "sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/LettaConfigMigration.kt",
-            "rest-path" to "core/android-data/src/main/java/com/letta/mobile/data/health/ServerHealthRepository.kt",
         )
     }
 }

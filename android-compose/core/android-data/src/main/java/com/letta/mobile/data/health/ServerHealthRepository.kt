@@ -2,50 +2,18 @@ package com.letta.mobile.data.health
 
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerProbe
 import com.letta.mobile.util.Telemetry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
-/**
- * letta-mobile-qmxn: per-config wake test for the backend pickers.
- *
- * Pings each configured backend with a short timeout and exposes the
- * result as a [ServerHealthState] flag the UI can render as a green/red dot beside
- * the row in [BackendSwitcherSheet] / [ConfigListScreen]. A row that
- * comes back [ServerHealthState.OFFLINE] is the picker's signal to refuse the tap
- * (the row's own composable runs the shake-and-flash refusal animation).
- *
- * The probe is intentionally cheap and tolerant: any HTTP response from
- * `/v1/health/` is treated as ONLINE because the server is at least answering.
- *
- * Re-probing fires (a) automatically whenever the set of configured IDs
- * changes, and (b) on demand via [refreshAll] from picker UIs that want
- * fresh state on open. There is no periodic background poll — the user
- * explicitly opted out of that on letta-mobile-qmxn.
- */
 /**
  * Long-lived scope ServerHealthRepository uses for its config-observer
  * coroutine: the process lifecycle's scope (the repository is an app-wide
@@ -55,22 +23,40 @@ import javax.inject.Singleton
  */
 internal fun defaultServerHealthScope(): CoroutineScope = ProcessLifecycleOwner.get().lifecycleScope
 
+/**
+ * letta-mobile-qmxn: the online dots of the backend pickers ([BackendSwitcherSheet] /
+ * [ConfigListScreen]); an OFFLINE row refuses the tap with its shake-and-flash.
+ *
+ * letta-mobile-ckmub.11: the Android binding of the shared [ServerHealthTracker]. Each saved
+ * backend is asked by the shared [ServerHealthProbe]: an App Server's `/app-server-info` (the Letta
+ * REST `/v1/health/` route is gone with that backend), never a dial of an `iroh://` host.
+ */
 @Singleton
-class ServerHealthRepository(
-    private val settingsRepository: SettingsRepository,
-    scope: CoroutineScope,
-) : IServerHealthRepository {
+class ServerHealthRepository private constructor(
+    tracker: ServerHealthTracker,
+) : IServerHealthRepository by tracker {
+    constructor(settingsRepository: SettingsRepository, scope: CoroutineScope) : this(
+        ServerHealthTracker(
+            configs = settingsRepository.configs,
+            probe = ServerHealthProbe(appServerReachability()),
+            scope = scope,
+            context = Dispatchers.IO,
+            listener = { config, health ->
+                Telemetry.event("Health", "probe.result", "configId" to config.id, "result" to health.name)
+            },
+        ),
+    )
+
     /** Hilt-friendly constructor — uses [defaultServerHealthScope]. */
     @Inject
-    constructor(settingsRepository: SettingsRepository) :
-        this(settingsRepository, defaultServerHealthScope())
+    constructor(settingsRepository: SettingsRepository) : this(settingsRepository, defaultServerHealthScope())
+}
 
-    private val _states = MutableStateFlow<Map<String, ServerHealthState>>(emptyMap())
-    override val states: StateFlow<Map<String, ServerHealthState>> = _states.asStateFlow()
+private const val PROBE_TIMEOUT_MS = 3_000L
 
-    private val refreshMutex = Mutex()
-
-    private val probeClient: HttpClient by lazy {
+/** The shared App Server probe over a short-timeout client that classifies every status itself. */
+private fun appServerReachability(): AppServerReachability {
+    val client by lazy {
         HttpClient(OkHttp) {
             install(HttpTimeout) {
                 requestTimeoutMillis = PROBE_TIMEOUT_MS
@@ -80,106 +66,6 @@ class ServerHealthRepository(
             expectSuccess = false
         }
     }
-
-    init {
-        scope.launch(Dispatchers.IO) {
-            // First probe runs as soon as any configs are visible. Re-probe
-            // only when the set of IDs actually changes — purely renaming an
-            // entry shouldn't burn another network round-trip.
-            settingsRepository.configs
-                .map { configs -> configs.map { it.id }.toSet() to configs }
-                .distinctUntilChanged { old, new -> old.first == new.first }
-                .collect { (_, configs) -> refreshAllInternal(configs) }
-        }
-    }
-
-    /** Public re-probe trigger for picker UIs. Safe to call from main thread. */
-    override suspend fun refreshAll() {
-        refreshAllInternal(settingsRepository.configs.value)
-    }
-
-    private suspend fun refreshAllInternal(configs: List<LettaConfig>) {
-        if (configs.isEmpty()) {
-            _states.value = emptyMap()
-            return
-        }
-        refreshMutex.withLock {
-            // Drop entries for configs that no longer exist; mark all live
-            // ones PROBING so the dot shows a transient state instead of
-            // flipping straight from a stale ONLINE/OFFLINE.
-            val liveIds = configs.map { it.id }.toSet()
-            _states.update { current ->
-                val pruned = current.filterKeys { it in liveIds }
-                pruned + configs.associate { config ->
-                    config.id to if (config.mode == LettaConfig.Mode.LOCAL) {
-                        ServerHealthState.ONLINE
-                    } else {
-                        ServerHealthState.PROBING
-                    }
-                }
-            }
-
-            coroutineScope {
-                configs.filterNot { it.mode == LettaConfig.Mode.LOCAL }.map { config ->
-                    async { probe(config) }
-                }.awaitAll()
-            }
-        }
-    }
-
-    private suspend fun probe(config: LettaConfig) {
-        val baseUrl = config.serverUrl.trim().trimEnd('/')
-        // Skip non-HTTP URLs (e.g. iroh://) — they have no HTTP health
-        // endpoint and probing them would fail DNS/resolution, marking
-        // a valid transport config as OFFLINE. isIrohUrl() is checked first
-        // (and mirrors the LettaApiClient choke point) because a corrupted
-        // `https://iroh://<ticket>` config startsWith "https://" yet is an Iroh
-        // endpoint — probing it over HTTP would resolve the bogus host and
-        // misclassify a valid Iroh backend as OFFLINE.
-        if (IrohChannelTransport.isIrohUrl(baseUrl) ||
-            (!baseUrl.startsWith("http://", ignoreCase = true) &&
-                !baseUrl.startsWith("https://", ignoreCase = true))) {
-            // Non-HTTP transport (e.g. iroh://) — no HTTP health endpoint.
-            // Mark ONLINE because the transport itself is valid; the QUIC
-            // connection state is the real health signal, not HTTP.
-            _states.update { it + (config.id to ServerHealthState.ONLINE) }
-            return
-        }
-        val target = "$baseUrl/v1/health/"
-        // Bare try/catch (not runCatching) so a CancellationException
-        // — e.g. parent scope cancelled while a probe is mid-flight —
-        // propagates up instead of being misclassified as OFFLINE.
-        val outcome: Result<io.ktor.client.statement.HttpResponse> = try {
-            Result.success(
-                probeClient.get(target) {
-                    val token = config.accessToken?.trim()
-                    if (!token.isNullOrEmpty()) {
-                        header("Authorization", "Bearer $token")
-                    }
-                }
-            )
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (t: Throwable) {
-            Result.failure(t)
-        }
-        val statusCode = outcome.getOrNull()?.status?.value
-        val health = if (outcome.isSuccess) {
-            ServerHealthState.ONLINE
-        } else {
-            ServerHealthState.OFFLINE
-        }
-        _states.update { it + (config.id to health) }
-        Telemetry.event(
-            "Health", "probe.result",
-            "configId" to config.id,
-            "url" to baseUrl,
-            "status" to (statusCode ?: -1),
-            "result" to health.name,
-        )
-    }
-
-    companion object {
-        private const val PROBE_TIMEOUT_MS = 3_000L
-    }
+    val probe by lazy { AppServerProbe(client, timeout = PROBE_TIMEOUT_MS.milliseconds) }
+    return AppServerReachability { baseUrl, token -> probe.probe(baseUrl, token) }
 }

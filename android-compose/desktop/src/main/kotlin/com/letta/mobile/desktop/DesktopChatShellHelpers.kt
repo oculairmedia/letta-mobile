@@ -266,7 +266,8 @@ internal fun buildMentionables(params: BuildMentionablesParams): List<Mentionabl
 
 /**
  * The pages the command palette and the quick-query bar can go to; conversations, message text and
- * agents come from the unified search's own sources (letta-mobile-ckmub.3.9).
+ * agents come from the unified search's own sources (letta-mobile-ckmub.3.9). The lens's sections,
+ * then the fleet's admin pages, which no lens section opens (letta-mobile-ckmub.2.6).
  */
 internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedSearchDestination> =
     WorkPlayLens.navDestinations(workPlayMode)
@@ -274,8 +275,11 @@ internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedS
             val target = lensNavTarget(workPlayMode, lensDestination)
             UnifiedSearchDestination(id = target.first.name, label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination))
         }
+        .plus(PaletteAdminDestinations.map { UnifiedSearchDestination(id = it.name, label = it.label) })
         // Picker rows are keyed by id: a page reached through two lens entries is listed once.
         .distinctBy { it.id }
+
+private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects)
 
 /**
  * The window's one unified search, shared by the header, the command palette and the quick-query bar:

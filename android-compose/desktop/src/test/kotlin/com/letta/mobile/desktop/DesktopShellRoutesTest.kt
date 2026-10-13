@@ -28,6 +28,9 @@ class DesktopShellRoutesTest {
         ShellDestination.AgentEditor(),
         ShellDestination.Providers,
         ShellDestination.Overview,
+        ShellDestination.Runs,
+        ShellDestination.Templates,
+        ShellDestination.Projects,
     )
 
     @Test

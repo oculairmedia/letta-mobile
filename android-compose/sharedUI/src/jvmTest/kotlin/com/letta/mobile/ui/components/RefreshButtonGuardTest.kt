@@ -20,7 +20,6 @@ class RefreshButtonGuardTest {
         val ALLOWLIST: Map<String, String> = mapOf(
             "MessageMenu.kt" to "the message menu's \"Rerun in fork\" item: a rerun, not a reload",
             "A2uiBasicWidgets.kt" to "the A2UI icon catalog maps the agent-authored name \"Refresh\" to the glyph",
-            "HomeConnectionPanel.kt" to "Home's \"Retry connection\" is the failed-connection hero's call to action: it redials the backend, and there is no list to pull",
             "ModelPickerContent.kt" to "the model picker's \"Refresh Models\" footer lives in a sheet whose drag dismisses it",
         )
 

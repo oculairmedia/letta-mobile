@@ -19,6 +19,7 @@ import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
 import com.letta.mobile.ui.shell.pages.channels.ChannelsPageOptions
@@ -107,19 +108,26 @@ internal data class DestinationContentActions(
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
 )
 
+/** The desktop's own page containers for the shared switch: its chat page and the admin pages' bindings. */
+internal data class DesktopHostPages(
+    val chat: ShellPageContent<ShellDestination.Chat>,
+    val admin: ShellAdminPages = ShellAdminPages(),
+)
+
 /**
  * letta-mobile-ckmub.3.4: the desktop's pages for the shared ShellPage switch. The shared pages
  * (Home, Memory, Schedules, Channels, Skills, Settings) are the sharedUI bindings over the desktop's
- * controllers; Overview is the shared Settings page on its About section (S10, ckmub.3.12); [chat]
- * is the desktop chat container and Providers the desktop binding of the shared ProviderSettingsPane.
+ * controllers; Overview is the shared Settings page on its About section (S10, ckmub.3.12); the chat
+ * page is the desktop chat container and Providers the desktop binding of the shared
+ * ProviderSettingsPane; Runs, Templates and Projects are [DesktopHostPages.admin] (letta-mobile-ckmub.2.6).
  */
 internal fun desktopShellPageDeps(
     inputs: DestinationContentInputs,
     actions: DestinationContentActions,
-    chat: ShellPageContent<ShellDestination.Chat>,
+    pages: DesktopHostPages,
 ): ShellPageDeps = ShellPageDeps(
     home = desktopHomePage(inputs, actions),
-    chat = chat,
+    chat = pages.chat,
     memory = desktopMemoryPage(inputs.memoryState, actions),
     schedules = shellSchedulesPage(inputs.schedule, actions.schedules),
     channels = shellChannelsPage(inputs.channels, actions.channels, ChannelsPageOptions(slots = DesktopChannelsPageSlots)),
@@ -128,6 +136,7 @@ internal fun desktopShellPageDeps(
     providers = inputs.state.modelControl?.let { session ->
         ShellPageContent { _, modifier -> ProvidersDestinationContent(session = session, modifier = modifier) }
     },
+    admin = pages.admin,
 )
 
 /** Home waits behind the connection panel until the backend is there. */
@@ -200,8 +209,8 @@ private fun desktopSkillsPage(
     )
 }
 
-/** The desktop's compact Jewel search field and icon-only refresh in the shared Channels header. */
-private val DesktopChannelsPageSlots = ChannelsPageSlots(
+/** The desktop's compact Jewel search field and icon-only refresh in the shared pages' headers. */
+internal val DesktopChannelsPageSlots = ChannelsPageSlots(
     searchField = ChannelsSearchFieldSlot { query, onQueryChange, placeholder, modifier ->
         DesktopTextField(value = query, onValueChange = onQueryChange, placeholder = placeholder, modifier = modifier)
     },

@@ -88,10 +88,27 @@ sealed interface ShellDestination {
     data object Overview : ShellDestination {
         override val kind get() = ShellPageKind.Overview
     }
+
+    /** The run monitor: every agent's runs, active ones first (letta-mobile-ckmub.2.6). */
+    data object Runs : ShellDestination {
+        override val kind get() = ShellPageKind.Runs
+    }
+
+    /** The starter templates a new agent is made from (letta-mobile-ckmub.2.6). */
+    data object Templates : ShellDestination {
+        override val kind get() = ShellPageKind.Templates
+    }
+
+    /** The projects catalog; projects ride an Iroh host's `project.*` relay (letta-mobile-ckmub.2.6). */
+    data object Projects : ShellDestination {
+        override val kind get() = ShellPageKind.Projects
+    }
 }
 
 /** One per [ShellDestination] subtype: the page that draws it. */
-enum class ShellPageKind { Home, Chat, Canvas, Memory, Schedules, Channels, Skills, Settings, AgentEditor, Providers, Overview }
+enum class ShellPageKind {
+    Home, Chat, Canvas, Memory, Schedules, Channels, Skills, Settings, AgentEditor, Providers, Overview, Runs, Templates, Projects,
+}
 
 /** Where the Skills page opens. */
 enum class ShellSkillsSection { Skills, Tools }
