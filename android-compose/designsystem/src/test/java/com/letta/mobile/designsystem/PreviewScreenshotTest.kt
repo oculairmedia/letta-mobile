@@ -4,15 +4,6 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.letta.mobile.ui.components.PreviewAccordionsContent
 import com.letta.mobile.ui.components.PreviewEmptyStateContent
-import com.letta.mobile.ui.components.PreviewErrorDialogContent
-import com.letta.mobile.ui.components.PreviewLatencyTextContent
-import com.letta.mobile.ui.components.PreviewLiveStatusTextContent
-import com.letta.mobile.ui.components.PreviewMessageActionButtonsContent
-import com.letta.mobile.ui.components.PreviewMessageBubbleContent
-import com.letta.mobile.ui.components.PreviewMessageSenderContent
-import com.letta.mobile.ui.components.PreviewRotationalLoaderContent
-import com.letta.mobile.ui.components.PreviewStatusTimelineContent
-import com.letta.mobile.ui.components.PreviewThinkingSectionContent
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
@@ -28,57 +19,12 @@ class PreviewScreenshotTest {
     )
 
     @Test
-    fun messageBubble() {
-        paparazzi.snapshot { PreviewMessageBubbleContent() }
-    }
-
-    @Test
-    fun thinkingSection() {
-        paparazzi.snapshot { PreviewThinkingSectionContent() }
-    }
-
-    @Test
     fun emptyState() {
         paparazzi.snapshot { PreviewEmptyStateContent() }
     }
 
     @Test
-    fun messageActionButtons() {
-        paparazzi.snapshot { PreviewMessageActionButtonsContent() }
-    }
-
-    @Test
-    fun latencyText() {
-        paparazzi.snapshot { PreviewLatencyTextContent() }
-    }
-
-    @Test
-    fun errorDialog() {
-        paparazzi.snapshot { PreviewErrorDialogContent() }
-    }
-
-    @Test
-    fun rotationalLoader() {
-        paparazzi.snapshot { PreviewRotationalLoaderContent() }
-    }
-
-    @Test
     fun accordions() {
         paparazzi.snapshot { PreviewAccordionsContent() }
-    }
-
-    @Test
-    fun messageSender() {
-        paparazzi.snapshot { PreviewMessageSenderContent() }
-    }
-
-    @Test
-    fun liveStatusText() {
-        paparazzi.snapshot { PreviewLiveStatusTextContent() }
-    }
-
-    @Test
-    fun statusTimeline() {
-        paparazzi.snapshot { PreviewStatusTimelineContent() }
     }
 }

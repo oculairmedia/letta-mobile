@@ -10,6 +10,3 @@ val LocalWindowSizeClass = staticCompositionLocalOf<WindowSizeClass> {
 
 val WindowSizeClass.isExpandedWidth: Boolean
     get() = widthSizeClass != WindowWidthSizeClass.Compact
-
-val WindowSizeClass.isWideWidth: Boolean
-    get() = widthSizeClass == WindowWidthSizeClass.Expanded
