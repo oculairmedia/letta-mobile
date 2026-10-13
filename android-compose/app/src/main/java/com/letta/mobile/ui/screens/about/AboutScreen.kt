@@ -6,15 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,15 +21,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import ca.oculair.meridian.R
 import com.letta.mobile.ui.components.ConfirmDialog
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.sectionTitle
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(
     onNavigateBack: () -> Unit,
@@ -44,17 +42,12 @@ fun AboutScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     val libraries by produceLibraries(R.raw.aboutlibraries)
 
-    Scaffold(
+    LettaPageScaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.screen_about_title)) },
-                colors = LettaTopBarDefaults.topAppBarColors(),
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
+        header = {
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_about_title)),
+                controls = HeaderControls(nav = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back))),
             )
         },
     ) { paddingValues ->

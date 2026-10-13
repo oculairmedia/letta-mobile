@@ -1,10 +1,9 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 /**
  * letta-mobile-dvobc / xrth2 / pvrrm: pure unit coverage for the chip-model
@@ -13,7 +12,6 @@ import org.junit.jupiter.api.Test
  * the unambiguous copy/state mapping, and the unified `kind` taxonomy. No
  * Android/Compose deps so these run fast on the JVM.
  */
-@Tag("unit")
 class ActiveSubagentRingTest {
 
     private fun running(

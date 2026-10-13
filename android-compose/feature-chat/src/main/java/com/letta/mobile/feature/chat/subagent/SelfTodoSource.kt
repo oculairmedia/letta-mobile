@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.ui.chat.subagents.ActiveSubagent
+import com.letta.mobile.ui.chat.subagents.SubagentTodoProgress
 import com.letta.mobile.data.model.SelfTodoSnapshot
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.model.toActivePlanState
@@ -22,7 +24,7 @@ import kotlinx.coroutines.flow.map
  * Contract:
  *  - [selfEntry] emits a synthetic [ActiveSubagent] (id = [ActiveSubagent.SELF_ID],
  *    `isSelf = true`) while the main agent has an ACTIVE plan (at least one
- *    todo that is not completed), else `null`. Snapshot-by-replacement —
+ *    todo that is not completed), else `null`. Snapshot-by-replacement â€”
  *    every emission is the full current state.
  *  - [todos] returns the latest checklist for the tap-to-todolist sheet.
  */
@@ -36,7 +38,7 @@ interface SelfTodoSource {
  * Map a TodoWrite snapshot to the synthetic self [ActiveSubagent], or null
  * when there is no active plan. A plan is "active" when it has at least one
  * item that is not yet completed; an all-completed plan stops pinning the
- * chip (the work is done) — matching the active-only visibility the bar
+ * chip (the work is done) â€” matching the active-only visibility the bar
  * applies to subagents.
  *
  * The description is a compact progress label ("N/M done") so the chip reads
@@ -51,7 +53,7 @@ internal fun SelfTodoSnapshot.toSelfEntry(
     val plan = toActivePlanState() ?: return null
     return ActiveSubagent(
         id = ActiveSubagent.SELF_ID,
-        description = "Your plan · ${plan.completed}/${plan.total} done",
+        description = "Your plan Â· ${plan.completed}/${plan.total} done",
         subagentType = "self",
         status = ActiveSubagent.Status.RUNNING,
         isSelf = true,

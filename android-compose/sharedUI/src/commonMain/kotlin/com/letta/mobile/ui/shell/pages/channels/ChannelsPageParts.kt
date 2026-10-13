@@ -39,6 +39,7 @@ import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaPill
 import com.letta.mobile.ui.components.LettaRefreshAction
 import com.letta.mobile.ui.components.LettaRefreshIconButton
+import com.letta.mobile.ui.components.list.RosterRowState
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -140,14 +141,14 @@ private fun ChannelsFilterChips(page: ChannelsPageScope) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ChannelCard(channel: ChannelDisplayItem, page: ChannelsPageScope, modifier: Modifier) {
+internal fun ChannelCard(channel: ChannelDisplayItem, page: ChannelsPageScope, row: RosterRowState, modifier: Modifier) {
     val accent = channel.status.accent()
     val pills: @Composable () -> Unit = { ChannelPills(channel, accent) }
     LettaCatalogCard(
         title = channel.title,
         description = channel.cardDescription(),
         accent = accent,
-        onClick = { page.onCardClick(channel) },
+        onClick = row.onClick,
         modifier = modifier.testTag(ChannelsPageTags.card(channel.id)),
         // A phone card is too narrow for the pills beside the text, so they wrap under it.
         footer = { if (!page.wide) PillFlow { pills() } },

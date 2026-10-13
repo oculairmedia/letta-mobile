@@ -12,27 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -49,11 +41,16 @@ import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.pageFilterSearchSlot
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.util.formatRelativeTime
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArchivalScreen(
     onNavigateBack: () -> Unit,
@@ -61,49 +58,24 @@ fun ArchivalScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Passage?>(null) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    LettaPageScaffold(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
-                title = {
-                    ExpandableTitleSearch(
-                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                        onQueryChange = viewModel::search,
-                        onClear = { viewModel.search("") },
-                        expanded = isSearchExpanded,
-                        onExpandedChange = { isSearchExpanded = it },
-                        placeholder = stringResource(R.string.screen_archival_search_hint),
-                        openSearchContentDescription = stringResource(R.string.action_search),
-                        closeSearchContentDescription = stringResource(R.string.action_close),
-                        titleContent = { Text(stringResource(R.string.screen_archival_title)) },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
-                scrollBehavior = scrollBehavior,
+        header = {
+            // letta-mobile-ckmub.3.25: the shared header; its search filters the passages in place.
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_archival_title)),
+                search = pageFilterSearchSlot(
+                    query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                    onQuery = viewModel::search,
+                    placeholder = stringResource(R.string.screen_archival_search_hint),
+                ),
+                controls = HeaderControls(nav = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back))),
             )
-            ExpandableSearchField(
-                query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                onQueryChange = viewModel::search,
-                onClear = { viewModel.search("") },
-                expanded = isSearchExpanded,
-                placeholder = stringResource(R.string.screen_archival_search_hint),
-            )
-            }
         },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+        floatingAction = {
+            FloatingActionButton(onClick = { showAddDialog = true }, modifier = Modifier.padding(LettaDimens.Space.lg)) {
                 Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_archival_add_action))
             }
         },

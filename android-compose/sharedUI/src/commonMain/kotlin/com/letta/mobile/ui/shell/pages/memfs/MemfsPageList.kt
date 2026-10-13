@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,11 +34,16 @@ import com.letta.mobile.data.memory.memfs.MemfsFile
 import com.letta.mobile.data.memory.memfs.MemfsFileKind
 import com.letta.mobile.data.memory.memfs.MemfsLoad
 import com.letta.mobile.data.memory.memfs.MemfsTab
-import com.letta.mobile.ui.components.LettaListRow
 import com.letta.mobile.ui.components.LettaListRowSpec
 import com.letta.mobile.ui.components.LettaRefreshAction
-import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.components.isPointerHost
+import com.letta.mobile.ui.components.list.RosterList
+import com.letta.mobile.ui.components.list.RosterListRow
+import com.letta.mobile.ui.components.list.RosterListTag
+import com.letta.mobile.ui.components.list.RosterOptions
+import com.letta.mobile.ui.components.list.RosterSection
+import com.letta.mobile.ui.components.list.RosterSelection
+import com.letta.mobile.ui.components.list.RosterSpec
 import com.letta.mobile.ui.theme.LettaDimens
 
 /**
@@ -115,35 +117,37 @@ internal fun MemfsFileList(page: MemfsPageScope) {
     when {
         load is MemfsLoad.Failed -> MemfsErrorState(load.message, page)
         empty != null -> MemfsEmptyState(empty, page)
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize().testTag(MemfsPageTags.LIST),
-            contentPadding = ListPadding,
-            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
-        ) {
-            fileSection(SYSTEM_SECTION, state.systemFiles, page)
-            fileSection(EXTERNAL_SECTION, state.externalFiles, page)
+        // letta-mobile-ckmub.3.25: the files are the shared roster (System, then External); the open
+        // file reads selected, and the keyboard moves through them.
+        else -> RosterList(
+            spec = RosterSpec(
+                sections = listOfNotNull(
+                    fileSection(SYSTEM_SECTION, state.systemFiles),
+                    fileSection(EXTERNAL_SECTION, state.externalFiles),
+                ),
+                key = MemfsFile::path,
+                selection = RosterSelection(isSelected = { it.path == state.editor?.path }, onSelect = { page.actions.openFile(it.path) }),
+                options = RosterOptions(testTag = RosterListTag(MemfsPageTags.LIST), contentPadding = ListPadding),
+            ),
+            modifier = Modifier.fillMaxSize(),
+        ) { file, row ->
+            val rowModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
+            RosterListRow(
+                spec = LettaListRowSpec(
+                    // The section already says "System", so its files drop the folder.
+                    title = if (file.isSystem) file.path.removePrefix(SYSTEM_PREFIX) else file.path,
+                    icon = if (file.kind == MemfsFileKind.Image) Icons.Outlined.Image else Icons.Outlined.Description,
+                    trailing = formatSize(file.sizeBytes),
+                ),
+                row = row,
+                modifier = rowModifier.testTag(MemfsPageTags.file(file.path)),
+            )
         }
     }
 }
 
-private fun LazyListScope.fileSection(title: String, files: List<MemfsFile>, page: MemfsPageScope) {
-    if (files.isEmpty()) return
-    item(key = "section_$title") { LettaSectionLabel(title) }
-    items(files, key = { it.path }) { file ->
-        val rowModifier = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
-        LettaListRow(
-            spec = LettaListRowSpec(
-                // The section already says "System", so its files drop the folder.
-                title = if (file.isSystem) file.path.removePrefix(SYSTEM_PREFIX) else file.path,
-                icon = if (file.kind == MemfsFileKind.Image) Icons.Outlined.Image else Icons.Outlined.Description,
-                trailing = formatSize(file.sizeBytes),
-                selected = page.state.editor?.path == file.path,
-            ),
-            onClick = { page.actions.openFile(file.path) },
-            modifier = rowModifier.testTag(MemfsPageTags.file(file.path)),
-        )
-    }
-}
+private fun fileSection(title: String, files: List<MemfsFile>): RosterSection<MemfsFile>? =
+    files.takeIf { it.isNotEmpty() }?.let { RosterSection(key = title, items = it, title = title) }
 
 @Composable
 private fun MemfsEmptyState(reason: MemfsEmptyReason, page: MemfsPageScope) {

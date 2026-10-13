@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,37 +20,47 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaSectionLabel
 import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.LocalLettaHost
+import com.letta.mobile.ui.host.LocalRowHoldDrag
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 
 /**
  * letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): the one sectioned, selectable list. Every
  * roster in the shell (the agent panel's chats and canvases, the rail's agent library, the archived
- * chats, the schedules rail) is this list with its own [row]s; a plain row is [RosterListRow].
+ * chats, the schedules rail, memory files, channel cards, the background tasks) is this list with
+ * its own [row]s; a plain row is [RosterListRow].
  *
  * It owns what every list needs: section headers and empty hints, selection, the row menu through
  * the host (right-click on pointer, long-press on touch), hover buttons on pointer and a swipe on
- * touch, inline rename, a reorder hook, loading and empty states, and the keyboard: Up / Down move a
- * cursor, Enter opens, F2 renames, Alt+Up / Alt+Down reorder, Escape leaves the cursor.
+ * touch, inline rename, reorder (the keyboard, the menu's moves and a drag: a pointer drags a row,
+ * a touch holds and then drags it), loading and empty states, an optional grid
+ * ([RosterOptions.columns]) and the keyboard: Up / Down move a cursor, Enter opens, F2 renames,
+ * Alt+Up / Alt+Down reorder, Escape leaves the cursor.
  */
 @Composable
 fun <T> RosterList(
@@ -58,10 +69,13 @@ fun <T> RosterList(
     state: RosterListState = rememberRosterListState(),
     row: @Composable (item: T, row: RosterRowState) -> Unit,
 ) {
-    val layout = remember(spec.sections) { RosterLayout.of(spec.sections, spec.key) }
+    val base = remember(spec.sections, spec.options.columns) { RosterLayout.of(spec.sections, spec.options.columns, spec.key) }
+    val drag = remember { RosterDrag() }
+    val layout = drag.layoutOver(base)
     val listState = state.lazy
     var focused by remember { mutableStateOf(false) }
-    val roster = RosterScope(layout, spec, state, focused)
+    val gap = with(LocalDensity.current) { spec.options.spacing.toPx() }
+    val roster = RosterScope(RosterLayouts(base, layout), spec, state, RosterFocus(focused, drag, gap))
     RevealCursor(state.cursor, layout, listState)
     LazyColumn(
         state = listState,
@@ -70,27 +84,62 @@ fun <T> RosterList(
             .onPreviewKeyEvent(roster::onKey)
             .focusable()
             .testTag(spec.options.testTag.value),
-        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.hair),
+        contentPadding = spec.options.contentPadding,
+        verticalArrangement = Arrangement.spacedBy(spec.options.spacing),
     ) {
         if (layout.isEmpty && (spec.options.loading || spec.empty != null)) {
             item(key = "roster-state") { RosterEmptyState(spec.options, spec.empty) }
         } else {
-            rosterLines(layout, roster, row)
+            rosterLines(roster, row)
         }
     }
 }
 
 private fun <T> LazyListScope.rosterLines(
-    layout: RosterLayout<T>,
     roster: RosterScope<T>,
     row: @Composable (item: T, row: RosterRowState) -> Unit,
 ) {
-    items(layout.lines, key = { it.key }) { line ->
+    items(roster.layouts.shown.lines, key = { it.key }) { line ->
         when (line) {
             is RosterLine.Header -> RosterHeader(line.section, roster.options.testTag)
             is RosterLine.Hint -> LettaEmptyHint(line.text)
-            is RosterLine.Row -> Box(rosterRowMotion()) { RosterItem(line, roster, row) }
+            is RosterLine.Row -> RosterDraggableItem(line, roster, row)
+            is RosterLine.Cells -> Box(rosterRowMotion()) { RosterCells(line, roster, row) }
         }
+    }
+}
+
+/** A list row: it glides when displaced, and while dragged it follows the pointer above its siblings. */
+@Composable
+private fun <T> LazyItemScope.RosterDraggableItem(
+    line: RosterLine.Row<T>,
+    roster: RosterScope<T>,
+    row: @Composable (item: T, row: RosterRowState) -> Unit,
+) {
+    val drag = roster.focus.drag
+    val dragging = drag.key == line.key
+    val motion = if (dragging) {
+        Modifier
+            .zIndex(1f)
+            .graphicsLayer { translationY = drag.offset }
+            .shadow(LettaDimens.Space.xs, MaterialTheme.shapes.small)
+    } else {
+        rosterRowMotion()
+    }
+    Box(motion) { RosterItem(line, roster, row) }
+}
+
+/** One grid line: its rows side by side, the last line padded out so every cell keeps its width. */
+@Composable
+private fun <T> RosterCells(
+    line: RosterLine.Cells<T>,
+    roster: RosterScope<T>,
+    row: @Composable (item: T, row: RosterRowState) -> Unit,
+) {
+    val columns = roster.options.columns
+    Row(horizontalArrangement = Arrangement.spacedBy(roster.options.spacing)) {
+        line.rows.forEach { cell -> Box(Modifier.weight(1f)) { RosterItem(cell, roster, row) } }
+        repeat(columns - line.rows.size) { Spacer(Modifier.weight(1f)) }
     }
 }
 
@@ -99,16 +148,23 @@ private fun <T> LazyListScope.rosterLines(
 fun LazyItemScope.rosterRowMotion(): Modifier =
     if (LocalReducedMotion.current) Modifier else Modifier.animateItem()
 
+/** The host's layout and the one on screen (the host's, with a dragged row in its preview place). */
+private class RosterLayouts<T>(val base: RosterLayout<T>, val shown: RosterLayout<T>)
+
+/** Whether the list has focus (the cursor ring shows), its drag, and the gap between rows in pixels. */
+private class RosterFocus(val focused: Boolean, val drag: RosterDrag, val gap: Float)
+
 /** Everything a row needs from its list, built once per composition. */
 private class RosterScope<T>(
-    val layout: RosterLayout<T>,
+    val layouts: RosterLayouts<T>,
     spec: RosterSpec<T>,
     val state: RosterListState,
-    val focused: Boolean,
+    val focus: RosterFocus,
 ) {
     val selection: RosterSelection<T> = spec.selection
     val actions: RosterActions<T> = spec.actions
     val options: RosterOptions = spec.options
+    private val layout: RosterLayout<T> get() = layouts.shown
 
     fun onKey(event: KeyEvent): Boolean {
         // The rename field owns the keyboard while it is open.
@@ -127,6 +183,9 @@ private class RosterScope<T>(
 
     fun canRename(line: RosterLine.Row<T>): Boolean = actions.rename?.canRename?.invoke(line.item) == true
 
+    /** A row drags when the host reorders, its section has somewhere to go, and the list is not a grid. */
+    fun canDrag(line: RosterLine.Row<T>): Boolean = actions.reorder != null && options.columns == 1 && line.sectionSize > 1
+
     private fun moveCursor(index: Int, delta: Int): Boolean {
         val next = RosterKeys.move(index, delta, layout.rows.size)
         state.cursor = layout.rows.getOrNull(next)?.key
@@ -143,6 +202,18 @@ private class RosterScope<T>(
         val target = RosterKeys.reorderTarget(line, delta) ?: return true
         hook.onMove(line.item, target)
         return true
+    }
+
+    /** The drag callbacks of [line]'s row. */
+    fun dragCallbacks(line: RosterLine.Row<T>): RosterDragCallbacks {
+        val drag = focus.drag
+        return RosterDragCallbacks(
+            onStart = { layouts.base.rows.firstOrNull { it.key == line.key }?.let { drag.start(it, layouts.base) } },
+            onDrag = { delta -> drag.dragBy(delta, layout, state.lazy, focus.gap) },
+            onEnd = {
+                drag.drop(layouts.base)?.let { (row, target) -> actions.reorder?.onMove?.invoke(row.item, target) }
+            },
+        )
     }
 
     /** The row menu: the caller's entries, then rename, the touch-only quick actions, and the moves. */
@@ -164,7 +235,7 @@ private class RosterScope<T>(
 private const val MOVE_UP = "Move up"
 private const val MOVE_DOWN = "Move down"
 
-/** One row with its chrome: the rename field while renaming, else the menu, swipe and hover around [row]. */
+/** One row with its chrome: the rename field while renaming, else the menu, drag, swipe and hover around [row]. */
 @Composable
 private fun <T> RosterItem(
     line: RosterLine.Row<T>,
@@ -194,15 +265,21 @@ private fun <T> RosterItem(
         onClick = { roster.activate(line) },
         startRename = if (roster.canRename(line)) ({ roster.state.startRename(line.key) }) else null,
         interaction = interaction,
+        dragging = roster.focus.drag.key == line.key,
     )
     val host = LocalLettaHost.current
     val touch = host.input == LettaInput.Touch
     val menu = roster.menu(line, rowState, touch)
     val tag = roster.options.testTag.row(line.key)
+    val canDrag = roster.canDrag(line)
+    val rowDrag = remember { RosterRowDrag() }
+    val callbacks = roster.dragCallbacks(line)
+    SideEffect { rowDrag.callbacks = callbacks }
     Box(
         Modifier
             .hoverable(interaction)
-            .cursorRing(highlighted && roster.focused)
+            .cursorRing(highlighted && roster.focus.focused)
+            .rosterPointerDrag(enabled = canDrag && !touch, drag = rowDrag)
             .semantics { selected = rowState.selected }
             .testTag(tag.value),
     ) {
@@ -211,7 +288,12 @@ private fun <T> RosterItem(
                 row(line.item, rowState)
             }
         }
-        if (menu.isEmpty()) content() else host.rowMenu(menu, content)
+        when {
+            menu.isEmpty() -> content()
+            // On touch the hold that opens the menu turns into a drag once the finger moves on.
+            canDrag && touch -> CompositionLocalProvider(LocalRowHoldDrag provides rowDrag) { host.rowMenu(menu, content) }
+            else -> host.rowMenu(menu, content)
+        }
     }
 }
 

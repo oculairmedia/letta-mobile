@@ -20,6 +20,7 @@ import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
+import com.letta.mobile.desktop.chat.DesktopChatSubagents
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
 import com.letta.mobile.desktop.chat.DesktopContextWindowSources
@@ -31,6 +32,7 @@ import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.data.schedules.ScheduleLibraryState
 import com.letta.mobile.ui.shell.pages.schedules.SchedulesPageState
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksToggle
+import com.letta.mobile.ui.chat.subagents.SubagentTodoLoader
 import com.letta.mobile.ui.shell.pages.home.HomePageCallbacks
 import com.letta.mobile.ui.shell.pages.home.HomePageNavigation
 import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
@@ -334,6 +336,7 @@ private fun DesktopShellSharedChatPage(
             dockGeometry = context.panels.chatDockGeometry,
             canvasHeaderTrailing = backgroundTasksHeaderToggle(context, frame),
             dockedCanvas = context.sharedChat.dockedCanvas,
+            subagents = rememberDesktopChatSubagents(context, frame),
         ),
         navigation = DesktopSharedChatPageNavigation(
             openCanvas = { page.host.openConversationCanvas() },
@@ -348,6 +351,17 @@ private fun DesktopShellSharedChatPage(
         ),
         modifier = modifier,
     )
+}
+
+/**
+ * The conversation's subagents for the shared rings over the full-screen chat (letta-mobile-ckmub.3.19):
+ * a ring's todos come from the registry; none without one.
+ */
+@Composable
+private fun rememberDesktopChatSubagents(context: DesktopShellContext, frame: DesktopShellFrame): DesktopChatSubagents? {
+    val repository = context.panels.subagents.repository
+    val loader = remember(repository) { repository?.let { repo -> SubagentTodoLoader { target -> repo.todos(target.toolCallId) } } }
+    return loader?.let { DesktopChatSubagents(frame.lists.activeSubagents, it) }
 }
 
 /**

@@ -30,6 +30,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.LettaListRowSpec
@@ -38,6 +39,7 @@ import com.letta.mobile.ui.host.LettaInput
 import com.letta.mobile.ui.host.ProvideLettaHost
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): the one sectioned, selectable list. */
 class RosterListTest {
@@ -77,7 +79,108 @@ class RosterListTest {
         assertEquals(1, RosterKeys.reorderTarget(first, 1))
     }
 
+    @Test
+    fun aGridLaysEachSectionsRowsOutInCellsAndKeepsTheReadingOrder() {
+        val layout = RosterLayout.of(listOf(RosterSection("fruit", listOf(apple, banana, cherry), title = "Fruit")), columns = 2) { it.id }
+        assertEquals(listOf("section:fruit", "cells:fruit:apple", "cells:fruit:cherry"), layout.lines.map { it.key })
+        assertEquals(listOf("fruit:apple", "fruit:banana", "fruit:cherry"), layout.signature)
+        assertEquals(1, layout.lineOf("fruit:banana"))
+        assertEquals(2, layout.lineOf("fruit:cherry"))
+    }
+
+    @Test
+    fun aMovedLayoutPutsTheRowInItsNewPlaceWithinItsSection() {
+        val layout = RosterLayout.of(listOf(RosterSection("a", listOf(apple)), RosterSection("fruit", listOf(banana, cherry, apple)))) { it.id }
+        val moved = layout.moved("fruit:banana", 2)
+        assertEquals(listOf("a:apple", "fruit:cherry", "fruit:apple", "fruit:banana"), moved.signature)
+        assertEquals(listOf(0, 0, 1, 2), moved.rows.map { it.indexInSection })
+        assertEquals(layout.signature, layout.moved("fruit:banana", 0).signature)
+        assertEquals(layout.signature, layout.moved("missing", 1).signature)
+    }
+
     // --- composed ----------------------------------------------------------------------------
+
+    @Test
+    fun aPointerDragsARowToANewPlaceAndTellsTheHostOnceOnRelease() = runComposeUiTest {
+        val moves = mutableListOf<String>()
+        setContent {
+            ProvideLettaHost(LettaHost.Pointer) {
+                Roster(
+                    sections = listOf(RosterSection("fruit", listOf(apple, banana, cherry))),
+                    actions = RosterActions(reorder = RosterReorder { item, to -> moves += "${item.id}:$to" }),
+                )
+            }
+        }
+        val dragged = onNodeWithTag(row("fruit", apple).value)
+        val step = dragged.fetchSemanticsNode().size.height / DRAG_STEPS_PER_ROW
+        dragged.performMouseInput {
+            moveTo(center)
+            press()
+        }
+        repeat(DRAG_STEPS) {
+            dragged.performMouseInput { moveBy(Offset(0f, step)) }
+            waitForIdle()
+            assertEquals(emptyList(), moves)
+        }
+        dragged.performMouseInput { release() }
+        runOnIdle { assertEquals(listOf("apple:2"), moves) }
+        // The dropped order stays drawn while the host saves it: apple is now under cherry.
+        val apples = onNodeWithTag(row("fruit", apple).value).fetchSemanticsNode().boundsInRoot.top
+        val cherries = onNodeWithTag(row("fruit", cherry).value).fetchSemanticsNode().boundsInRoot.top
+        assertTrue(apples > cherries)
+    }
+
+    @Test
+    fun aTouchHoldsARowThenDragsItAndAHoldAloneOpensTheMenu() = runComposeUiTest {
+        val moves = mutableListOf<String>()
+        setContent {
+            ProvideLettaHost(LettaHost.Touch) {
+                Roster(
+                    sections = listOf(RosterSection("fruit", listOf(apple, banana, cherry))),
+                    actions = RosterActions(reorder = RosterReorder { item, to -> moves += "${item.id}:$to" }),
+                )
+            }
+        }
+        val dragged = onNodeWithTag(row("fruit", apple).value)
+        val step = dragged.fetchSemanticsNode().size.height / DRAG_STEPS_PER_ROW
+        // A move before the hold is a scroll, not a drag: nothing reorders.
+        dragged.performTouchInput { swipeDown(startY = centerY, endY = centerY + step * DRAG_STEPS, durationMillis = 200) }
+        runOnIdle { assertEquals(emptyList(), moves) }
+
+        dragged.performTouchInput { down(center) }
+        mainClock.advanceTimeBy(HOLD_MILLIS)
+        repeat(DRAG_STEPS) {
+            dragged.performTouchInput { moveBy(Offset(0f, step)) }
+            waitForIdle()
+        }
+        dragged.performTouchInput { up() }
+        runOnIdle { assertEquals(listOf("apple:2"), moves) }
+
+        val held = onNodeWithTag(row("fruit", banana).value)
+        held.performTouchInput { down(center) }
+        mainClock.advanceTimeBy(HOLD_MILLIS)
+        held.performTouchInput { up() }
+        onNodeWithText("Move down").assertExists()
+        runOnIdle { assertEquals(listOf("apple:2"), moves) }
+    }
+
+    @Test
+    fun aGridRosterDrawsItsCellsAndSelectsAClickedOne() = runComposeUiTest {
+        val picked = mutableListOf<String>()
+        setContent {
+            Roster(
+                sections = listOf(RosterSection("fruit", listOf(apple, banana, cherry), title = "Fruit")),
+                selection = RosterSelection(onSelect = { picked += it.id }),
+                options = RosterOptions(columns = 2),
+            )
+        }
+        val apples = onNodeWithTag(row("fruit", apple).value).fetchSemanticsNode().boundsInRoot
+        val bananas = onNodeWithTag(row("fruit", banana).value).fetchSemanticsNode().boundsInRoot
+        assertEquals(apples.top, bananas.top)
+        assertTrue(bananas.left > apples.left)
+        onNodeWithText("Cherry").performClick()
+        assertEquals(listOf("cherry"), picked)
+    }
 
     @Test
     fun drawsSectionsHeadersSelectionAndEmptyHints() = runComposeUiTest {
@@ -253,3 +356,10 @@ class RosterListTest {
 }
 
 private const val ROW_Y = 10f
+
+/** A drag moves a quarter of a row per step, four rows in all: past both neighbours of the first row. */
+private const val DRAG_STEPS_PER_ROW = 4f
+private const val DRAG_STEPS = 16
+
+/** Longer than the long-press timeout, so the touch holds the row. */
+private const val HOLD_MILLIS = 800L

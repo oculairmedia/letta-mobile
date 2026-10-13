@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
@@ -37,15 +37,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
-import com.letta.mobile.ui.theme.LettaDimens
+import kotlin.time.Clock
 
 /**
  * letta-mobile-w8mog + i2f23: CIRCULAR progress rings stacked on the RIGHT
@@ -86,7 +86,7 @@ fun ActiveSubagentRings(
     modifier: Modifier = Modifier,
     onRingClick: (ActiveSubagent) -> Unit = {},
     onViewConversation: (ActiveSubagent) -> Unit = {},
-    now: Long = System.currentTimeMillis(),
+    now: Long = Clock.System.now().toEpochMilliseconds(),
 ) {
     // letta-mobile-i2f23: briefly hold COMPLETED rings so the fill animates
     // to 100% (~300ms tween) before the ring collapses away. RUNNING and
@@ -135,8 +135,8 @@ fun ActiveSubagentRings(
         modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.padding(LettaSpacing.SM),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
+            modifier = Modifier.padding(LettaDimens.Space.sm).testTag(ActiveSubagentRingsTags.RINGS),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
             horizontalAlignment = Alignment.End,
         ) {
             // letta-mobile-w8mog: overflow constraint — >3 rings → show 3 + a
@@ -185,7 +185,7 @@ private fun ActivityRing(
     onClick: () -> Unit = {},
     onLongClick: () -> Unit = {},
 ) {
-    val reducedMotion = rememberReducedMotionEnabled()
+    val reducedMotion = LocalReducedMotion.current
     val ringState = subagent.ringState(now)
     val color = ringColor(ringState)
 
@@ -261,7 +261,8 @@ private fun ActivityRing(
             )
             .semantics {
                 contentDescription = subagent.chipSemanticLabel()
-            },
+            }
+            .testTag(ActiveSubagentRingsTags.ring(subagent.id)),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
@@ -353,6 +354,13 @@ private fun ringColor(state: RingState): Color = when (state) {
  */
 private fun ActiveSubagent.chipSemanticLabel(): String =
     "${statusLabel}: ${description.ifBlank { "(no description)" }}"
+
+/** Test tags of the rings (both clients' UI tests). */
+object ActiveSubagentRingsTags {
+    const val RINGS = "active-subagent-rings"
+
+    fun ring(id: String): String = "active-subagent-ring-$id"
+}
 
 // ── i2f23 constants ──────────────────────────────────────────────────────
 

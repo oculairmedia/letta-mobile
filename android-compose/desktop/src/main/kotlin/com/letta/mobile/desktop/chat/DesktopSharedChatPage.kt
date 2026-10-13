@@ -61,6 +61,7 @@ import com.letta.mobile.ui.chat.surface.ChatSurface
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatSurfacePlatform
 import com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions
+import com.letta.mobile.ui.chat.subagents.SubagentRingsOverlay
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 
@@ -128,6 +129,8 @@ internal data class DesktopSharedChatPageState(
      * until the saved placement is read, and the page draws no dock until then.
      */
     val dockGeometry: MutableState<ChatDockGeometry?>,
+    /** The conversation's subagents, drawn as the shared rings over the full-screen page; null draws none. */
+    val subagents: DesktopChatSubagents? = null,
 )
 
 /**
@@ -186,7 +189,7 @@ internal fun DesktopSharedChatPage(
                     collapse
                 },
             appearance = phone.chatAppearance(rememberDesktopChatAppearance(displayOptions)),
-            platform = rememberDesktopChatPlatform(ambientStatus, frame),
+            platform = rememberDesktopChatPlatform(ambientStatus, frame, state.subagents),
             pagedTimeline = state.pagedTimeline,
             canvas = { actions ->
                 if (hasConversation) {
@@ -221,16 +224,17 @@ private fun rememberDesktopChatAppearance(displayOptions: ChatDisplayOptions): C
     }
 }
 
-/** The ambient glow behind the page, and what the host's [frame] asks of it (the phone's top chrome). */
+/** The ambient glow, what the host's [frame] asks (the phone's top chrome), and the subagent rings (ckmub.3.19). */
 @Composable
-private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, frame: ChatPageFrame): ChatSurfacePlatform =
-    remember(ambientStatus, frame) {
+private fun rememberDesktopChatPlatform(ambientStatus: AmbientMotionStatus, frame: ChatPageFrame, subagents: DesktopChatSubagents?): ChatSurfacePlatform =
+    remember(ambientStatus, frame, subagents) {
         ChatSurfacePlatform(
             pageBackground = { content ->
                 DesktopAmbientChatBackground(status = ambientStatus, modifier = Modifier.fillMaxSize()) { content() }
             },
             showKeyboardHints = frame.showKeyboardHints,
             topChromeInset = frame.topChromeInset,
+            timelineOverlay = subagents?.let { rings -> { SubagentRingsOverlay(rings.entries, rings.loader) } },
         )
     }
 

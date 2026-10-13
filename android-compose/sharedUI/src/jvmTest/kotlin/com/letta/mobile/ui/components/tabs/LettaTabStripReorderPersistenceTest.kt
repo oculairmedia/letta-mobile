@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
 
-package com.letta.mobile.desktop
+package com.letta.mobile.ui.components.tabs
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
+import androidx.compose.material3.MaterialTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,27 +25,27 @@ import kotlin.test.assertTrue
 // briefly renders, then visually snaps back to where the drag started) went
 // uncaught. This reproduces the real production wiring pattern (a
 // reducer-backed state var feeding `tabs` back into
-// DesktopConversationTabRow, exactly like
+// LettaTabStrip, exactly like
 // LettaDesktopApp.reorderConversationTab / conversationTabsState) and
 // asserts on rendered tab *position* after the drop, not just the callback.
-class DesktopConversationTabsReorderPersistenceTest {
+class LettaTabStripReorderPersistenceTest {
     @Test
     fun committedReorderIsReflectedInRenderedOrder() = runComposeUiTest {
         val idToTab = mapOf(
-            "conversation-1" to DesktopConversationTab("conversation-1", "First", "Ada"),
-            "conversation-2" to DesktopConversationTab("conversation-2", "Second", "Grace"),
-            "conversation-3" to DesktopConversationTab("conversation-3", "Third", "Alan"),
+            "conversation-1" to LettaTab("conversation-1", "First", "Ada"),
+            "conversation-2" to LettaTab("conversation-2", "Second", "Grace"),
+            "conversation-3" to LettaTab("conversation-3", "Third", "Alan"),
         )
         setContent {
             var state by remember {
                 mutableStateOf(ConversationTabsState(idToTab.keys.toList()))
             }
             val tabs = state.openConversationIds.mapNotNull { idToTab[it] }
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
+            MaterialTheme {
+                LettaTabStrip(
                     tabs = tabs,
-                    activeConversationId = "conversation-1",
-                    actions = DesktopConversationTabActions(
+                    activeKey = "conversation-1",
+                    actions = LettaTabStripActions(
                         onSelect = {},
                         onClose = {},
                         onReorder = { conversationId, targetIndex ->
@@ -93,16 +94,16 @@ class DesktopConversationTabsReorderPersistenceTest {
         val ids = (1..5).map { "conversation-$it" }
         val idToTab = ids.associateWith { id ->
             val n = id.removePrefix("conversation-")
-            DesktopConversationTab(id, "Tab $n", "Agent $n")
+            LettaTab(id, "Tab $n", "Agent $n")
         }
         setContent {
             var state by remember { mutableStateOf(ConversationTabsState(ids)) }
             val tabs = state.openConversationIds.mapNotNull { idToTab[it] }
-            DesktopMaterialTheme {
-                DesktopConversationTabRow(
+            MaterialTheme {
+                LettaTabStrip(
                     tabs = tabs,
-                    activeConversationId = ids.first(),
-                    actions = DesktopConversationTabActions(
+                    activeKey = ids.first(),
+                    actions = LettaTabStripActions(
                         onSelect = {},
                         onClose = {},
                         onReorder = { conversationId, targetIndex ->

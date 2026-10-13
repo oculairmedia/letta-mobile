@@ -58,6 +58,9 @@ sealed interface HeaderNav {
 
     data class Menu(val onClick: () -> Unit, val contentDescription: String = "Menu") : HeaderNav
 
+    /** Leaves a mode or a full-screen dialog (a selection, an editor) rather than the page. */
+    data class Close(val onClick: () -> Unit, val contentDescription: String = "Close") : HeaderNav
+
     /** Desktop's sidebar toggle and its collapsed-sidebar overflow. */
     class Custom(val content: @Composable RowScope.() -> Unit) : HeaderNav
 }
@@ -163,6 +166,7 @@ private fun RowScope.HeaderNavSlot(nav: HeaderNav) {
         HeaderNav.None -> Box(Modifier.width(LettaDimens.Space.lg))
         is HeaderNav.Back -> HeaderIconButton(LettaIcons.ArrowBack, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
         is HeaderNav.Menu -> HeaderIconButton(LettaIcons.Menu, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
+        is HeaderNav.Close -> HeaderIconButton(LettaIcons.Close, nav.contentDescription, nav.onClick, ShellHeaderTags.NAV)
         is HeaderNav.Custom -> nav.content(this)
     }
 }

@@ -26,6 +26,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.ui.canvas.LocalCanvasPenTarget
 import com.letta.mobile.ui.components.LocalMenuActionScope
+import com.letta.mobile.ui.components.tabs.LettaTab
+import com.letta.mobile.ui.components.tabs.LettaTabStrip
+import com.letta.mobile.ui.components.tabs.LettaTabStripActions
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.desktopPointer
@@ -88,7 +91,7 @@ internal data class DesktopHeaderChromeState(
     val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
     /** The shared shell header's one search (letta-mobile-ckmub.3.5). */
     val search: SearchSlot? = null,
-    val conversationTabs: List<DesktopConversationTab> = emptyList(),
+    val conversationTabs: List<LettaTab> = emptyList(),
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
@@ -298,14 +301,15 @@ private fun desktopHeaderTitle(title: String, header: DesktopHeaderChromeState):
     val identity = header.identity
     return when {
         header.conversationTabs.isNotEmpty() -> HeaderTitle.Custom(fill = true) {
-            DesktopConversationTabRow(
+            LettaTabStrip(
                 tabs = header.conversationTabs,
-                activeConversationId = header.activeConversationId,
-                actions = DesktopConversationTabActions(
+                activeKey = header.activeConversationId,
+                actions = LettaTabStripActions(
                     onSelect = header.onSelectConversationTab,
                     onClose = header.onCloseConversationTab,
                     onReorder = header.onReorderConversationTab,
-                    onNewConversation = header.onNewConversationTab,
+                    onNew = header.onNewConversationTab,
+                    newLabel = "New conversation tab",
                 ),
                 dragLaneWidth = MinimumTitleBarDragWidth,
                 modifier = Modifier.fillMaxHeight(),

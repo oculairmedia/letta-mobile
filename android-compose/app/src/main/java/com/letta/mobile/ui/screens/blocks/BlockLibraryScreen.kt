@@ -24,29 +24,20 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
@@ -71,10 +62,16 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderAction
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.pageFilterSearchSlot
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockLibraryScreen(
     onNavigateBack: () -> Unit,
@@ -85,75 +82,28 @@ fun BlockLibraryScreen(
     val isSelectionMode = selectedIds.isNotEmpty()
 
     var inspectTarget by remember { mutableStateOf<Block?>(null) }
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Block?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var manageAgentsTarget by remember { mutableStateOf<Block?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    LettaPageScaffold(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
-                title = {
-                    if (isSelectionMode) {
-                        Text(pluralStringResource(R.plurals.screen_blocks_selected_count, selectedIds.size, selectedIds.size))
-                    } else {
-                        ExpandableTitleSearch(
-                            query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                            onQueryChange = viewModel::updateSearchQuery,
-                            onClear = { viewModel.updateSearchQuery("") },
-                            expanded = isSearchExpanded,
-                            onExpandedChange = { isSearchExpanded = it },
-                            placeholder = stringResource(R.string.screen_blocks_search_hint),
-                            openSearchContentDescription = stringResource(R.string.action_search),
-                            closeSearchContentDescription = stringResource(R.string.action_close),
-                            titleContent = { Text(stringResource(R.string.screen_blocks_title)) },
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (isSelectionMode) viewModel.clearSelection() else onNavigateBack()
-                    }) {
-                        Icon(
-                            if (isSelectionMode) LettaIcons.Close else LettaIcons.ArrowBack,
-                            stringResource(R.string.action_back),
-                        )
-                    }
-                },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    if (isSelectionMode) {
-                        IconButton(onClick = { showDeleteConfirm = true }) {
-                            Icon(
-                                LettaIcons.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                },
+        header = {
+            BlockLibraryHeader(
+                selectedCount = selectedIds.size,
+                searchQuery = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                actions = BlockLibraryHeaderActions(
+                    onSearch = viewModel::updateSearchQuery,
+                    onBack = onNavigateBack,
+                    onClearSelection = viewModel::clearSelection,
+                    onDeleteSelected = { showDeleteConfirm = true },
+                ),
             )
-            if (!isSelectionMode) {
-                ExpandableSearchField(
-                    query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                    onQueryChange = viewModel::updateSearchQuery,
-                    onClear = { viewModel.updateSearchQuery("") },
-                    expanded = isSearchExpanded,
-                    placeholder = stringResource(R.string.screen_blocks_search_hint),
-                )
-            }
-            }
         },
-        floatingActionButton = {
+        floatingAction = {
             if (!isSelectionMode) {
-                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                FloatingActionButton(onClick = { showCreateDialog = true }, modifier = Modifier.padding(LettaDimens.Space.lg)) {
                     Icon(LettaIcons.Add, stringResource(R.string.screen_blocks_create_title))
                 }
             }
@@ -311,6 +261,37 @@ fun BlockLibraryScreen(
                     manageAgentsTarget = null
                 }
             },
+        )
+    }
+}
+
+/** What the library's header can do: filter, leave the page, leave selection, delete the selection. */
+private class BlockLibraryHeaderActions(
+    val onSearch: (String) -> Unit,
+    val onBack: () -> Unit,
+    val onClearSelection: () -> Unit,
+    val onDeleteSelected: () -> Unit,
+)
+
+/**
+ * letta-mobile-ckmub.3.25: the shared header. Browsing, it titles the library and filters it in
+ * place; while blocks are selected it counts them, closes the selection and deletes it.
+ */
+@Composable
+private fun BlockLibraryHeader(selectedCount: Int, searchQuery: String, actions: BlockLibraryHeaderActions) {
+    if (selectedCount > 0) {
+        ShellHeader(
+            title = HeaderTitle.Text(pluralStringResource(R.plurals.screen_blocks_selected_count, selectedCount, selectedCount)),
+            controls = HeaderControls(
+                nav = HeaderNav.Close(actions.onClearSelection, stringResource(R.string.action_close)),
+                actions = listOf(HeaderAction.Icon(LettaIcons.Delete, stringResource(R.string.action_delete), actions.onDeleteSelected)),
+            ),
+        )
+    } else {
+        ShellHeader(
+            title = HeaderTitle.Text(stringResource(R.string.screen_blocks_title)),
+            search = pageFilterSearchSlot(searchQuery, actions.onSearch, stringResource(R.string.screen_blocks_search_hint)),
+            controls = HeaderControls(nav = HeaderNav.Back(actions.onBack, stringResource(R.string.action_back))),
         )
     }
 }

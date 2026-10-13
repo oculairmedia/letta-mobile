@@ -1,10 +1,8 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,33 +14,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentTodo
-import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.host.InspectorPane
-import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaChatTheme
-import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LettaDimens
+import com.letta.mobile.ui.theme.LocalReducedMotion
 
 @Immutable
 data class SubagentTodoSheetTarget(
@@ -64,15 +64,22 @@ data class SubagentTodoSheetTarget(
         get() = subagentConversationId?.takeIf { it.isNotBlank() }
 }
 
+/** The sheet a ring (or a dispatch row) opens. */
+fun ActiveSubagent.sheetTarget(): SubagentTodoSheetTarget = SubagentTodoSheetTarget(
+    toolCallId = id,
+    description = description,
+    subagentAgentId = subagentAgentId,
+    subagentConversationId = subagentConversationId,
+)
+
 val LocalSubagentTodoSheetOpener = staticCompositionLocalOf<(SubagentTodoSheetTarget) -> Unit> {
     {}
 }
 
 /**
  * letta-mobile-73o2h.3: pure, UI-agnostic state model for the tap-to-todolist
- * bottom sheet. Kept free of Compose types so the load -> map -> render
- * pipeline (and the progress meter math) is unit-testable without a Compose
- * harness.
+ * sheet. Kept free of Compose types so the load -> map -> render pipeline (and
+ * the progress meter math) is unit-testable without a Compose harness.
  */
 sealed interface SubagentTodoSheetState {
     /** The `subagent_todos` round-trip is in flight. */
@@ -161,12 +168,40 @@ fun subagentTodoSheetStateFrom(result: Result<List<SubagentTodo>>): SubagentTodo
         },
     )
 
+/** Where an open sheet's checklist comes from: one round-trip per opened target. */
+fun interface SubagentTodoLoader {
+    suspend fun todos(target: SubagentTodoSheetTarget): Result<List<SubagentTodo>>
+}
+
 /**
- * letta-mobile-73o2h.3: the tap-to-todolist bottom sheet. Opens when a chip
- * in [ActiveSubagentBar] is tapped. Renders the tapped subagent's
- * [description] as the header plus its TodoWrite checklist (per-item status
- * icon) and a "N/M done" progress meter, with explicit loading / error /
- * empty states.
+ * letta-mobile-ckmub.3.19: an open [target]'s sheet, the same on every client: it loads the
+ * target's todos once through [loader] (Loading until they arrive) and draws [SubagentTodoSheet].
+ */
+@Composable
+fun SubagentTodoSheetHost(
+    target: SubagentTodoSheetTarget,
+    loader: SubagentTodoLoader,
+    onDismiss: () -> Unit,
+    onViewConversation: (() -> Unit)? = null,
+    roster: (@Composable () -> Unit)? = null,
+) {
+    var state by remember(target.toolCallId) { mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading) }
+    LaunchedEffect(loader, target.toolCallId) {
+        state = subagentTodoSheetStateFrom(loader.todos(target))
+    }
+    SubagentTodoSheet(
+        description = target.description,
+        state = state,
+        onDismiss = onDismiss,
+        onViewConversation = onViewConversation,
+        roster = roster,
+    )
+}
+
+/**
+ * letta-mobile-73o2h.3: the tap-to-todolist sheet. Opens when a ring is tapped. Renders the tapped
+ * subagent's [description] as the header plus its TodoWrite checklist (per-item status icon) and a
+ * "N/M done" progress meter, with explicit loading / error / empty states.
  *
  * Perf / motion notes (do NOT regress rmzmo):
  *  - The sheet is only composed while open (the call site gates on a nullable
@@ -190,7 +225,7 @@ fun SubagentTodoSheet(
     // one's todos - the phone's view of the shared roster the desktop pane shows.
     roster: (@Composable () -> Unit)? = null,
 ) {
-    val reducedMotion = rememberReducedMotionEnabled()
+    val reducedMotion = LocalReducedMotion.current
 
     // letta-mobile-ckmub.3.15 (S13): the window's inspector, docked when wide and a sheet when
     // compact; it draws the description as its title, with "view conversation" beside close.
@@ -198,6 +233,7 @@ fun SubagentTodoSheet(
         title = description.ifBlank { "Subagent" },
         onClose = onDismiss,
         modifier = modifier,
+        testTag = SubagentTodoSheetTags.SHEET,
         actions = {
             if (onViewConversation != null) {
                 ViewConversationButton(
@@ -211,15 +247,15 @@ fun SubagentTodoSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    start = LettaSpacing.LG,
-                    end = LettaSpacing.LG,
-                    bottom = LettaSpacing.XXL,
+                    start = LettaDimens.Space.lg,
+                    end = LettaDimens.Space.lg,
+                    bottom = LettaDimens.Space.xxl,
                 ),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.MD),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.md),
         ) {
             Crossfade(
                 targetState = state,
-                animationSpec = tween(durationMillis = if (reducedMotion) 0 else 200),
+                animationSpec = tween(durationMillis = if (reducedMotion) 0 else STATE_FADE_MS),
                 label = "subagentTodoSheetState",
             ) { current ->
                 when (current) {
@@ -237,19 +273,21 @@ fun SubagentTodoSheet(
             }
             roster?.let { section ->
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = LettaDimens.Pane.editorMinHeight * ROSTER_MAX_HEIGHT_SCALE)
-                        .verticalScroll(rememberScrollState()),
-                ) { section() }
+                // The roster is a list of its own: bounded, so the todos above stay in view.
+                Box(Modifier.fillMaxWidth().heightIn(max = SheetListMaxHeight)) { section() }
             }
         }
     }
 }
 
-/** The roster scrolls inside the sheet past this many editor-heights, so the todos stay in view. */
-private const val ROSTER_MAX_HEIGHT_SCALE = 2
+/** Test tags of the todo sheet. */
+object SubagentTodoSheetTags {
+    const val SHEET = "subagent-todo-sheet"
+}
+
+/** The checklist and the roster each scroll inside the sheet past this height. */
+private val SheetListMaxHeight = LettaDimens.Pane.editorMinHeight * 2
+private const val STATE_FADE_MS = 200
 
 /**
  * letta-mobile-vo9y1: header action that jumps from the todo sheet to the
@@ -264,17 +302,17 @@ private fun ViewConversationButton(
 ) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(LettaSpacing.BUBBLE_RADIUS))
+            .clip(RoundedCornerShape(LettaDimens.Radius.md))
             .clickable(onClick = onClick)
-            .padding(horizontal = LettaSpacing.SM, vertical = LettaSpacing.XS)
+            .padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)
             .semantics { contentDescription = "View conversation: $description" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
     ) {
         Icon(
             imageVector = LettaIcons.ExternalLink,
             contentDescription = null,
-            modifier = Modifier.size(LettaIconSizing.Inline),
+            modifier = Modifier.size(LettaDimens.Control.icon),
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
@@ -291,11 +329,11 @@ private fun SubagentTodoLoading() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = LettaSpacing.XL),
+            .padding(vertical = LettaDimens.Space.xl),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(LettaIconSizing.Toolbar),
+            modifier = Modifier.size(LettaDimens.Space.xl),
             strokeWidth = LettaDimens.Space.hair,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -303,11 +341,11 @@ private fun SubagentTodoLoading() {
 }
 
 @Composable
-private fun SubagentTodoMessage(text: String, color: androidx.compose.ui.graphics.Color) {
+private fun SubagentTodoMessage(text: String, color: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = LettaSpacing.XL),
+            .padding(vertical = LettaDimens.Space.xl),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -322,13 +360,13 @@ private fun SubagentTodoMessage(text: String, color: androidx.compose.ui.graphic
 private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
     // Progress meter: "N/M done" + a thin bar.
     val progress = content.progress
-    Column(verticalArrangement = Arrangement.spacedBy(LettaSpacing.SM)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = "Progress: ${progress.label}" },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
+            horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
         ) {
             LinearProgressIndicator(
                 progress = { progress.fraction },
@@ -346,9 +384,9 @@ private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 360.dp),
-            contentPadding = PaddingValues(vertical = LettaSpacing.XS),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
+                .heightIn(max = SheetListMaxHeight),
+            contentPadding = PaddingValues(vertical = LettaDimens.Space.xs),
+            verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
         ) {
             items(items = content.items) { item ->
                 SubagentTodoRow(item)
@@ -365,14 +403,14 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
             .fillMaxWidth()
             .semantics { contentDescription = "$accessibilityStatus: ${item.label}" },
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier
-                .padding(top = LettaSpacing.XXXS)
-                .size(LettaIconSizing.Status),
+                .padding(top = LettaDimens.Space.hair)
+                .size(LettaDimens.Space.lg),
             tint = tint,
         )
         Text(
@@ -394,7 +432,7 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
 
 /** Per-status icon + tint + accessibility label. Composable for theme colors. */
 @Composable
-private fun SubagentTodoStatus.rowVisuals(): Triple<ImageVector, androidx.compose.ui.graphics.Color, String> =
+private fun SubagentTodoStatus.rowVisuals(): Triple<ImageVector, Color, String> =
     when (this) {
         SubagentTodoStatus.COMPLETED -> Triple(
             LettaIcons.CheckCircle,
@@ -412,22 +450,3 @@ private fun SubagentTodoStatus.rowVisuals(): Triple<ImageVector, androidx.compos
             "Pending",
         )
     }
-
-@Preview(name = "Todo sheet content")
-@Composable
-private fun SubagentTodoSheetContentPreview() {
-    LettaChatTheme {
-        val todos = listOf(
-            SubagentTodo(content = "Read the bead", status = "completed", activeForm = "Reading the bead"),
-            SubagentTodo(content = "Build the sheet", status = "completed", activeForm = "Building the sheet"),
-            SubagentTodo(content = "Wire onChipClick", status = "in_progress", activeForm = "Wiring onChipClick"),
-            SubagentTodo(content = "Run the build", status = "pending", activeForm = "Running the build"),
-            SubagentTodo(content = "Open the PR", status = "pending", activeForm = "Opening the PR"),
-        )
-        SubagentTodoSheet(
-            description = "Investigating the streaming jank regression",
-            state = subagentTodoSheetStateFrom(Result.success(todos)),
-            onDismiss = {},
-        )
-    }
-}

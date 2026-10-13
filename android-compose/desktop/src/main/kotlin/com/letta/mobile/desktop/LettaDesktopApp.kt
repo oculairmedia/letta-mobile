@@ -17,6 +17,7 @@ import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.components.tabs.LettaTab
 import com.letta.mobile.ui.shell.header.SearchSlot
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
@@ -141,11 +142,11 @@ private fun desktopHeaderIdentity(context: DesktopShellContext, frame: DesktopSh
 
 /** The open tabs, in strip order, for the conversations the chat surface still knows. */
 @Composable
-private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<DesktopConversationTab> {
+private fun rememberOpenTabs(tabs: ConversationTabsState, conversations: List<DesktopConversationSummary>): List<LettaTab> {
     val byId = remember(conversations) { conversations.associateBy { it.id } }
     return remember(tabs, byId) {
         tabs.openConversationIds.mapNotNull { id ->
-            byId[id]?.let { DesktopConversationTab(conversationId = it.id, title = it.displayTitle(), agentName = it.agentName) }
+            byId[id]?.let { LettaTab(key = it.id, title = it.displayTitle(), subtitle = it.agentName) }
         }
     }
 }

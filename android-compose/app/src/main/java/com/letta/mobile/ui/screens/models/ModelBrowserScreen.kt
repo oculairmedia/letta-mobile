@@ -23,24 +23,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.components.ConfirmDialog
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,9 +48,14 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.shell.header.HeaderControls
+import com.letta.mobile.ui.shell.header.HeaderNav
+import com.letta.mobile.ui.shell.header.HeaderTitle
+import com.letta.mobile.ui.shell.header.ShellHeader
+import com.letta.mobile.ui.shell.header.pageFilterSearchSlot
+import com.letta.mobile.ui.shell.scaffold.LettaPageScaffold
 import com.letta.mobile.ui.theme.LettaDimens
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelBrowserScreen(
     onNavigateBack: () -> Unit,
@@ -67,45 +63,20 @@ fun ModelBrowserScreen(
     viewModel: ModelBrowserViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isSearchExpanded = rememberSaveable { mutableStateOf(false) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+    LettaPageScaffold(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
-                title = {
-                    ExpandableTitleSearch(
-                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        expanded = isSearchExpanded.value,
-                        onExpandedChange = { isSearchExpanded.value = it },
-                        placeholder = stringResource(R.string.screen_models_search_hint),
-                        openSearchContentDescription = stringResource(R.string.action_search),
-                        closeSearchContentDescription = stringResource(R.string.action_close),
-                        titleContent = { Text(stringResource(R.string.screen_models_title)) },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
-                scrollBehavior = scrollBehavior,
+        header = {
+            // letta-mobile-ckmub.3.25: the shared header; its search filters the models in place.
+            ShellHeader(
+                title = HeaderTitle.Text(stringResource(R.string.screen_models_title)),
+                search = pageFilterSearchSlot(
+                    query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                    onQuery = viewModel::updateSearchQuery,
+                    placeholder = stringResource(R.string.screen_models_search_hint),
+                ),
+                controls = HeaderControls(nav = HeaderNav.Back(onNavigateBack, stringResource(R.string.action_back))),
             )
-            ExpandableSearchField(
-                query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                onQueryChange = viewModel::updateSearchQuery,
-                onClear = { viewModel.updateSearchQuery("") },
-                expanded = isSearchExpanded.value,
-                placeholder = stringResource(R.string.screen_models_search_hint),
-            )
-            }
         },
     ) { paddingValues ->
         when (val state = uiState) {

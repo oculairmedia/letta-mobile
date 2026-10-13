@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +20,8 @@ import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.ui.components.LettaMenuItem
 import com.letta.mobile.ui.components.LettaPopupMenu
+import com.letta.mobile.ui.host.LocalRowHoldDrag
+import com.letta.mobile.ui.host.RowHoldDrag
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellRailEntry
 
@@ -108,20 +111,26 @@ object ShellRowMenuTags {
 /**
  * The touch row menu, [com.letta.mobile.ui.host.LettaHost.rowMenu]'s default: a long-press on [content] (with a
  * haptic tick) opens the [items] as a popup anchored to the row. A plain tap still reaches the row.
- * No items, no gesture.
+ * No items, no gesture. When the row can be dragged ([LocalRowHoldDrag], a reordering RosterList),
+ * the hold only lifts the row (the tick): moving the finger on drags it, and letting go without
+ * moving opens the menu. The menu waits for the release so it never covers, or takes, the drag.
  */
 @Composable
 fun ShellLongPressMenu(items: List<LettaMenuItem>, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
-    val onLongPress = remember(haptics) {
+    val hold = LocalRowHoldDrag.current
+    val openMenu = remember { { open = true } }
+    val onLongPress = remember(haptics, hold) {
         {
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-            open = true
+            if (hold == null) open = true
         }
     }
-    Box(Modifier.shellLongPress(enabled = items.isNotEmpty(), onLongPress = onLongPress)) {
-        content()
+    val press = ShellHold(onLongPress, hold, onHeldRelease = openMenu)
+    Box(Modifier.shellLongPress(enabled = items.isNotEmpty(), press = press)) {
+        // The drag is this row's alone: a row menu nested in the content does not drag it too.
+        CompositionLocalProvider(LocalRowHoldDrag provides null) { content() }
         LettaPopupMenu(
             expanded = open && items.isNotEmpty(),
             onDismiss = { open = false },
@@ -132,30 +141,70 @@ fun ShellLongPressMenu(items: List<LettaMenuItem>, content: @Composable () -> Un
 }
 
 /**
- * Calls [onLongPress] when a pointer is held still for the long-press timeout. It watches the
- * Initial pass, so it sees the press before a clickable child takes it; once it fires it consumes
- * the rest of the gesture, so the child's click does not also land. A tap, or a drag past the touch
- * slop (a scroll), leaves everything to the child.
+ * What a held row does: [onLongPress] when the hold registers; with a [hold] drag, a hold that then
+ * travels drags through it, and one let go without moving calls [onHeldRelease].
  */
+data class ShellHold(
+    val onLongPress: () -> Unit,
+    val hold: RowHoldDrag? = null,
+    val onHeldRelease: () -> Unit = {},
+)
+
+/** [shellLongPress] for a hold with no drag. */
 fun Modifier.shellLongPress(enabled: Boolean, onLongPress: () -> Unit): Modifier =
+    shellLongPress(enabled, ShellHold(onLongPress))
+
+/**
+ * Calls [ShellHold.onLongPress] when a pointer is held still for the long-press timeout. It watches
+ * the Initial pass, so it sees the press before a clickable child takes it; once it fires it consumes
+ * the rest of the gesture, so the child's click does not also land. A tap, or a drag past the touch
+ * slop (a scroll), leaves everything to the child. With a [ShellHold.hold], a held pointer that then
+ * travels past the slop drags: [RowHoldDrag.onStart], each vertical step, then [RowHoldDrag.onEnd].
+ */
+fun Modifier.shellLongPress(enabled: Boolean, press: ShellHold): Modifier =
     if (!enabled) {
         this
     } else {
         this.then(
-            Modifier.pointerInput(onLongPress) {
+            Modifier.pointerInput(press) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     val released = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                         awaitReleaseOrSlop(down, viewConfiguration.touchSlop)
                     }
                     if (released == null) {
-                        onLongPress()
-                        consumeUntilAllUp()
+                        press.onLongPress()
+                        val hold = press.hold
+                        when {
+                            hold == null -> consumeUntilAllUp()
+                            !followHold(down, viewConfiguration.touchSlop, hold) -> press.onHeldRelease()
+                        }
                     }
                 }
             },
         )
     }
+
+/** After the long-press: consumes the gesture, dragging through [hold] once it moves past [slop]. True when it dragged. */
+private suspend fun AwaitPointerEventScope.followHold(down: PointerInputChange, slop: Float, hold: RowHoldDrag): Boolean {
+    var dragging = false
+    do {
+        val event = awaitPointerEvent(PointerEventPass.Initial)
+        val change = event.changes.firstOrNull { it.id == down.id }
+        if (change != null && change.pressed) {
+            val step = change.position.y - change.previousPosition.y
+            if (!dragging && (change.position - down.position).getDistance() > slop) {
+                dragging = true
+                hold.onStart()
+            } else if (dragging) {
+                hold.onDrag(step)
+            }
+        }
+        event.changes.forEach { it.consume() }
+    } while (event.changes.any { it.pressed })
+    if (dragging) hold.onEnd()
+    return dragging
+}
 
 /** Waits, without consuming, until [down]'s pointer lifts or moves past [slop]. */
 private suspend fun AwaitPointerEventScope.awaitReleaseOrSlop(down: PointerInputChange, slop: Float) {

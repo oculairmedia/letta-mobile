@@ -1,7 +1,11 @@
-package com.letta.mobile.feature.chat.subagent
+package com.letta.mobile.ui.chat.subagents
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentKind
+import com.letta.mobile.data.model.SubagentStatus
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 /**
  * letta-mobile-73o2h.2: clean UI-facing data model for a single
@@ -283,7 +287,7 @@ data class ActiveSubagent(
  * letta-mobile-fxoew.4: delegates to [SubagentKind] so the host's
  * "Reflection" / "Reflection integration" labels are hidden too.
  */
-internal fun ActiveSubagent.isHiddenReflection(): Boolean =
+fun ActiveSubagent.isHiddenReflection(): Boolean =
     SubagentKind.fromWire(subagentType).isBackground
 
 /**
@@ -291,8 +295,79 @@ internal fun ActiveSubagent.isHiddenReflection(): Boolean =
  * non-reflection dispatched entry. An all-reflection snapshot must hide the
  * bar entirely (no empty LazyRow padding).
  */
-internal fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
+fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
     any { it.isSelf || !it.isHiddenReflection() }
+
+/**
+ * letta-mobile-29h9u: the LINGERING-terminal visibility rule.
+ *
+ * Pure, testable transform over a snapshot of subagents (which may carry both
+ * running and recently-terminal entries, each terminal one stamped with
+ * [ActiveSubagent.terminalAt]). It relaxes the strict active-only rule so a
+ * just-completed/failed chip stays reviewable for a short dwell instead of
+ * vanishing instantly:
+ *
+ *  - Still-running chips ([ActiveSubagent.isActive]) always pass — the
+ *    unchanged active-only behaviour.
+ *  - Terminal chips pass only while inside their linger window, i.e. until
+ *    `terminalAt + `[ActiveSubagent.TERMINAL_LINGER_MS]` <= now`. After that
+ *    they are dropped (dismissed).
+ *  - A terminal chip with no [ActiveSubagent.terminalAt] stamp is treated as
+ *    expired and dropped — a defensive fallback so an unstamped terminal can
+ *    never linger forever.
+ *
+ * Input order is kept and only filtering happens, so the rings reduce by
+ * simple replacement. [now] is injected (wall-clock epoch-ms) so the rule is
+ * deterministic under test.
+ */
+fun ImmutableList<ActiveSubagent>.withLingeringTerminals(now: Long): ImmutableList<ActiveSubagent> =
+    filter { entry ->
+        when {
+            entry.isActive -> true
+            entry.isTerminal -> {
+                val stampedAt = entry.terminalAt ?: return@filter false
+                now - stampedAt < ActiveSubagent.TERMINAL_LINGER_MS
+            }
+            else -> true
+        }
+    }.toImmutableList()
+
+/**
+ * letta-mobile-73o2h.3 (shared in letta-mobile-ckmub.3.19): one registry entry as the UI's
+ * [ActiveSubagent], the same on every client. The id is the `toolCallId`, else the `taskId`
+ * (a background dispatch), else a synthetic key so the ring keeps a stable slot.
+ *  - letta-mobile-pvrrm: an entry with a `taskId` but no `toolCallId` is a background tool task.
+ *  - letta-mobile-vo9y1 / r2sh2: the subagent's agent and conversation ids are carried when present;
+ *    the conversation is never guessed.
+ *  - letta-mobile-i2f23: the wire `todo_progress` drives the ring's determinate fill.
+ *  - letta-mobile-ulcg6 (RC4): the stuck baseline is the host's last observed progress, never the start.
+ */
+fun SubagentEntry.toActiveSubagent(): ActiveSubagent = ActiveSubagent(
+    id = toolCallId.takeIf { it.isNotBlank() }
+        ?: taskId?.takeIf { it.isNotBlank() }
+        ?: "subagent-${hashCode()}",
+    description = description,
+    subagentType = subagentType,
+    status = status.toActiveSubagentStatus(),
+    kind = if (toolCallId.isBlank() && !taskId.isNullOrBlank()) ActiveSubagent.Kind.BACKGROUND_TASK else ActiveSubagent.Kind.SUBAGENT,
+    subagentAgentId = subagentAgentId?.takeIf { it.isNotBlank() },
+    subagentConversationId = subagentConversationId?.takeIf { it.isNotBlank() },
+    progress = todoProgress?.let { SubagentTodoProgress(completed = it.completed, total = it.total) },
+    lastUpdateAt = lastActivityAtMs,
+    terminalAt = terminalAtEpochMs,
+)
+
+/**
+ * letta-mobile-al6q5: canonicalize through the SHARED vocabulary before mapping, so the App Server's
+ * terminal `success` reads as finished. letta-mobile-drv4a: `cancelled` is terminal and maps to
+ * FAILED. An unrecognized status keeps the ring visible (treated as still running).
+ */
+fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (SubagentStatus.normalize(this) ?: this) {
+    SubagentStatus.RUNNING -> ActiveSubagent.Status.RUNNING
+    SubagentStatus.COMPLETED -> ActiveSubagent.Status.COMPLETED
+    SubagentStatus.FAILED, SubagentStatus.CANCELLED -> ActiveSubagent.Status.FAILED
+    else -> ActiveSubagent.Status.RUNNING
+}
 
 /**
  * letta-mobile-dvobc: the COLOR/semantic state of a chip's progress ring,

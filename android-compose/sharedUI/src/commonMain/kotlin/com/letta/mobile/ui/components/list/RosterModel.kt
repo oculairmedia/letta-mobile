@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.components.list
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -11,8 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import kotlin.jvm.JvmInline
 import com.letta.mobile.ui.components.LettaMenuItem
+import com.letta.mobile.ui.theme.LettaDimens
 
 /**
  * letta-mobile-ckmub.3.10 (hard cut S7, primitive P4): one titled group of a [RosterList]. A null
@@ -75,8 +78,10 @@ class RosterRename<T>(
 
 /**
  * The reorder hook: [onMove] asks the host to move an item to [toIndex] within its section; the
- * host persists the order and hands back new sections. Alt+Up / Alt+Down on the keyboard cursor and
- * the row menu's Move up / Move down call it.
+ * host persists the order and hands back new sections. Alt+Up / Alt+Down on the keyboard cursor,
+ * the row menu's Move up / Move down and a drag call it: a pointer drags a row straight away, a
+ * touch holds it first (the hold that opens the row menu) and then drags. A drag calls [onMove]
+ * once, on release; until the host's new sections arrive the list shows the dropped order.
  */
 @Immutable
 class RosterReorder<T>(val onMove: (item: T, toIndex: Int) -> Unit)
@@ -126,12 +131,20 @@ class RosterRenameRequest(
     val placeholder: String = "Name",
 )
 
-/** How the list is drawn: its loading state, its root tag (rows and headers are tagged under it). */
+/**
+ * How the list is drawn: its loading state, its root tag (rows and headers are tagged under it),
+ * how many [columns] a section's rows sit in (a card grid: Channels on a wide window), the gap
+ * between rows and cells ([spacing]) and the list's [contentPadding].
+ */
 @Immutable
 data class RosterOptions(
     /** Shows a progress bar while every section is still empty. */
     val loading: Boolean = false,
     val testTag: RosterListTag = RosterListTags.LIST,
+    /** One is a list; more lays each section's rows out as a grid, reading order left to right. */
+    val columns: Int = 1,
+    val spacing: Dp = LettaDimens.Space.hair,
+    val contentPadding: PaddingValues = PaddingValues(),
 )
 
 /** What one row is when its content draws: selection, the keyboard cursor, hover, and its click. */
@@ -145,6 +158,8 @@ class RosterRowState(
     /** Opens the inline rename field; null when the roster offers no rename. */
     val startRename: (() -> Unit)? = null,
     val interaction: MutableInteractionSource? = null,
+    /** The row is being dragged to a new place. */
+    val dragging: Boolean = false,
 )
 
 /** The list's own state: its scroll, the keyboard cursor and the row being renamed (both by row key). */
