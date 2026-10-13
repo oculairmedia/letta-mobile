@@ -90,15 +90,11 @@ internal fun rememberDesktopWorkingDirectoryPicker(onChosen: (String) -> Unit): 
     }
 }
 
-/** Draws [picker] while it is open. */
+/** Draws [picker] while it is open, in the window's modal pane (a sheet in the touch phone preview). */
 @Composable
-internal fun DesktopWorkingDirectoryPickerHost(picker: DesktopWorkingDirectoryPicker, forceSheet: Boolean = false) {
+internal fun DesktopWorkingDirectoryPickerHost(picker: DesktopWorkingDirectoryPicker) {
     val state by picker.controller.state.collectAsState()
-    WorkingDirectoryPicker(
-        state = state,
-        actions = picker.controller,
-        host = if (forceSheet) picker.host.copy(forceSheet = true) else picker.host,
-    )
+    WorkingDirectoryPicker(state = state, actions = picker.controller, host = picker.host)
 }
 
 /** Creates folders on this computer: only bound while the App Server is the bundled local child. */

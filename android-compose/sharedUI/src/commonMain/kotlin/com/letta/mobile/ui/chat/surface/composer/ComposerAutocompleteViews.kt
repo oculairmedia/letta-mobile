@@ -36,7 +36,6 @@ import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_command_options
 import com.letta.mobile.sharedui.resources.composer_uninstall_command
 import com.letta.mobile.ui.chat.ChatColumnMaxWidth
-import com.letta.mobile.ui.chat.MentionPopup
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
@@ -80,7 +79,7 @@ internal fun ComposerSuggestions(
     }
     val mentionToken = autocomplete.mentionToken ?: return
     if (autocomplete.mentionGroups.isEmpty()) return
-    MentionPopup(
+    ComposerMentionPicker(
         groups = autocomplete.mentionGroups,
         onSelect = { mention -> actions.updateComposerText(draftAfterMention(composer.text, mentionToken, mention)) },
     )

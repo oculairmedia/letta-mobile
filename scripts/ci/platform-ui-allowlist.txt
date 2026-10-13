@@ -39,7 +39,6 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/skills/SkillsScree
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/systemaccess/SystemAccessDashboardScreen.kt 630 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/telemetry/TelemetryScreen.kt 354 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/templates/TemplatesScreen.kt 49 container
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/tools/ToolPickerDialog.kt 144 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/Accordions.kt 91 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/ActionSheet.kt 167 legacy-pending(ckmub.2)
 android-compose/designsystem/src/main/java/com/letta/mobile/ui/components/AdaptiveDialog.kt 82 legacy-pending(ckmub.2)
@@ -115,7 +114,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopLocalRun
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMainContentPane.kt 117 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotCursor.kt 34 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopMascotStage.kt 29 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNewConversationSurface.kt 180 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNowActiveBar.kt 125 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopNucleusEffects.kt 510 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopProvidersDestination.kt 29 legacy-pending(ckmub.3)

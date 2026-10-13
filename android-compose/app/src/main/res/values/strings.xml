@@ -328,7 +328,6 @@
         <item quantity="one">%1$d discovered tool</item>
         <item quantity="other">%1$d discovered tools</item>
     </plurals>
-    <string name="screen_tools_empty_attached">No tools attached</string>
     <string name="screen_blocks_empty_available">No reusable blocks available</string>
     <string name="common_max_output_tokens">Max Output Tokens</string>
     <string name="common_parallel_tool_calls">Parallel Tool Calls</string>

@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +27,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.data.memory.memfs.MemfsEditor
 import com.letta.mobile.data.memory.memfs.MemfsNavigation
+import com.letta.mobile.ui.host.LettaConfirmPane
+import com.letta.mobile.ui.host.LettaConfirmRequest
+import com.letta.mobile.ui.host.LettaConfirmTags
 import com.letta.mobile.ui.theme.LettaDimens
 import com.letta.mobile.ui.theme.customColors
 
@@ -122,22 +124,14 @@ private fun ConflictBanner(page: MemfsPageScope) {
 @Composable
 internal fun DiscardChangesDialog(page: MemfsPageScope) {
     val pending = page.state.pendingNavigation ?: return
-    AlertDialog(
-        onDismissRequest = page.actions::cancelDiscard,
-        title = { Text(DISCARD_TITLE) },
-        text = { Text(discardMessage(page.state.editor?.path, pending)) },
-        confirmButton = {
-            TextButton(onClick = page.actions::confirmDiscard, modifier = Modifier.testTag(MemfsPageTags.DISCARD_CONFIRM)) {
-                Text(DISCARD_LABEL, color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = page.actions::cancelDiscard, modifier = Modifier.testTag(MemfsPageTags.DISCARD_CANCEL)) {
-                Text(KEEP_EDITING_LABEL)
-            }
-        },
-        modifier = Modifier.testTag(MemfsPageTags.DISCARD_DIALOG),
+    val request = LettaConfirmRequest(
+        title = DISCARD_TITLE,
+        message = discardMessage(page.state.editor?.path, pending),
+        confirmLabel = DISCARD_LABEL,
+        dismissLabel = KEEP_EDITING_LABEL,
+        tags = LettaConfirmTags(pane = MemfsPageTags.DISCARD_DIALOG, confirm = MemfsPageTags.DISCARD_CONFIRM, dismiss = MemfsPageTags.DISCARD_CANCEL),
     )
+    LettaConfirmPane(request, onConfirm = page.actions::confirmDiscard, onDismiss = page.actions::cancelDiscard)
 }
 
 private fun discardMessage(path: String?, pending: MemfsNavigation): String {

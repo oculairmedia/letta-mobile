@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -75,7 +76,14 @@ class InspectorPaneTest {
     @Test
     fun withoutAFrameTheInspectorIsTheHostsModal() = runComposeUiTest {
         val containers = recordingSheets()
-        setContent { MaterialTheme { ProvideLettaHost(containers.host) { Detail(onClose = {}) } } }
+        // A phone page: the window is compact too (a wide touch window's modal is a dialog: LettaPaneTest).
+        setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) {
+                    ProvideLettaHost(containers.host) { Detail(onClose = {}) }
+                }
+            }
+        }
         onNodeWithTag(BODY).assertExists()
         assertEquals(listOf("sheet"), containers.opened.distinct())
     }

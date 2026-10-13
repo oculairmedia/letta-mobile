@@ -11,12 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,13 +22,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasCheckpoint
 import com.letta.mobile.data.canvas.CanvasDeletedElement
+import com.letta.mobile.ui.host.LettaAlertPane
+import com.letta.mobile.ui.host.LettaAlertSpec
+import com.letta.mobile.ui.host.LettaPaneButton
+import com.letta.mobile.ui.host.LettaPaneButtons
+import com.letta.mobile.ui.host.LettaPaneKind
 import com.letta.mobile.ui.theme.LettaDimens
 
 internal data class CanvasHistoryDialogState(
     val show: Boolean,
     val checkpoints: List<CanvasCheckpoint>,
     val deletedElements: List<CanvasDeletedElement> = emptyList(),
-    val compact: Boolean = false,
 )
 
 @Composable
@@ -41,23 +43,10 @@ internal fun CanvasHistoryDialog(
     onRestoreElement: (CanvasDeletedElement) -> Unit = {},
 ) {
     if (!state.show) return
-    if (state.compact) {
-        ModalBottomSheet(onDismissRequest = onDismiss) {
-            Column(modifier = Modifier.fillMaxWidth().padding(LettaDimens.Space.md)) {
-                Text("Revision History", style = MaterialTheme.typography.titleMedium)
-                CanvasHistoryContent(state.checkpoints, onRestore, state.deletedElements, onRestoreElement)
-            }
-        }
-        return
+    val spec = LettaAlertSpec("Revision History", LettaPaneButtons(confirm = LettaPaneButton("Close", onDismiss)), kind = LettaPaneKind.Modal)
+    LettaAlertPane(spec, onDismiss) {
+        CanvasHistoryContent(state.checkpoints, onRestore, state.deletedElements, onRestoreElement)
     }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Revision History", style = MaterialTheme.typography.titleMedium) },
-        text = { CanvasHistoryContent(state.checkpoints, onRestore, state.deletedElements, onRestoreElement) },
-        confirmButton = {
-            Button(onClick = onDismiss) { Text("Close") }
-        },
-    )
 }
 
 @Composable

@@ -259,7 +259,6 @@ private fun CanvasBoardHistory(board: CanvasBoard) {
             show = ui.showHistoryDialog && session != null,
             checkpoints = board.flows.sharing.checkpoints.value,
             deletedElements = board.kept.deletedHistory,
-            compact = board.view.compact,
         ),
         onRestoreElement = { element -> board.restoreElement(element) },
         onDismiss = { ui.showHistoryDialog = false },

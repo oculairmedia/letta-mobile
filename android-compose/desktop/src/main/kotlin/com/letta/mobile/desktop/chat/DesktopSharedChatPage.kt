@@ -203,7 +203,7 @@ internal fun DesktopSharedChatPage(
             recents = navigation.recentInteractions,
         )
     }
-    DesktopWorkingDirectoryPickerHost(directoryPicker, forceSheet = phone != null)
+    DesktopWorkingDirectoryPickerHost(directoryPicker)
 }
 
 /**
