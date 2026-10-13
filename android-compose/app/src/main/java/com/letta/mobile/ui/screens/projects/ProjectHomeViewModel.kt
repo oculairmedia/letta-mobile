@@ -2,9 +2,11 @@ package com.letta.mobile.ui.screens.projects
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.projects.ProjectFailureWords
 import com.letta.mobile.data.projects.ProjectsPageController
 import com.letta.mobile.data.projects.ProjectsPageSources
 import com.letta.mobile.data.projects.ProjectsPageState
+import com.letta.mobile.data.projects.RepositoryProjectsBackend
 import com.letta.mobile.data.projects.SettingsProjectPinStore
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -26,12 +28,12 @@ class ProjectHomeViewModel @Inject constructor(
 ) : ViewModel() {
     val controller = ProjectsPageController(
         sources = ProjectsPageSources(
-            repository = projectRepository,
+            backend = RepositoryProjectsBackend(projectRepository),
             pins = SettingsProjectPinStore(settingsRepository),
             reloads = settingsRepository.activeConfigChanges.map { },
         ),
         scope = viewModelScope,
-        errorMessageMapper = ::mapErrorToUserMessage,
+        words = ProjectFailureWords.of(::mapErrorToUserMessage),
     )
 
     val state: StateFlow<ProjectsPageState> = controller.state

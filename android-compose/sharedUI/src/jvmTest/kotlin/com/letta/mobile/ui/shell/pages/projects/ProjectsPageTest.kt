@@ -24,6 +24,7 @@ import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.projects.ProjectDraft
 import com.letta.mobile.data.projects.ProjectEditor
 import com.letta.mobile.data.projects.ProjectsPageState
+import com.letta.mobile.data.projects.key
 import com.letta.mobile.ui.host.LettaHost
 import com.letta.mobile.ui.host.LettaPaneDefaults
 import com.letta.mobile.ui.host.LocalLettaHost
@@ -74,8 +75,8 @@ class ProjectsPageTest {
     fun pinnedProjectsComeFirstUnderTheirHeader() = runComposeUiTest {
         val calls = mutableListOf<String>()
         show(
-            loaded(alpha, beta).copy(pinnedIds = setOf("beta")),
-            ProjectsPageActions(list = ProjectsListActions(onSelect = { calls += "select:$it" }, onQueryChange = { calls += "query:$it" }, onStartCreate = { calls += "create" })),
+            loaded(alpha, beta).copy(pinned = setOf(beta.key)),
+            ProjectsPageActions(list = ProjectsListActions(onSelect = { calls += "select:${it?.value}" }, onQueryChange = { calls += "query:$it" }, onStartCreate = { calls += "create" })),
         )
         onNodeWithTag(ProjectsPageTags.LIST.header("projects-pinned")).assertExists()
         onNodeWithTag(ProjectsPageTags.LIST.row("projects-pinned:beta").value).performClick()
@@ -90,9 +91,9 @@ class ProjectsPageTest {
         val calls = mutableListOf<String>()
         val actions = ProjectsPageActions(
             list = ProjectsListActions(onOpenChat = { project, intent -> calls += "${project.identifier}:$intent" }),
-            detail = ProjectDetailActions(onSync = { calls += "sync:$it" }, onDelete = { calls += "delete:$it" }),
+            detail = ProjectDetailActions(onSync = { calls += "sync:${it.value}" }, onDelete = { calls += "delete:${it.value}" }),
         )
-        show(loaded(alpha).copy(selectedId = "alpha", beadsStatus = mapOf("alpha" to BeadsRemoteStatus(status = "provisioned"))), actions)
+        show(loaded(alpha).copy(selectedKey = alpha.key, beadsStatus = mapOf(alpha.key to BeadsRemoteStatus(status = "provisioned"))), actions)
         onNodeWithTag(ProjectsPageTags.DETAIL).assertExists()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.PROVISION).assertDoesNotExist()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.BUG_REPORT).performScrollTo().performClick()
@@ -104,7 +105,7 @@ class ProjectsPageTest {
 
     @Test
     fun aProjectWithoutAnAgentCannotOpenAChat() = runComposeUiTest {
-        show(loaded(beta).copy(selectedId = "beta"), ProjectsPageActions(list = ProjectsListActions(onOpenChat = { _, _ -> })))
+        show(loaded(beta).copy(selectedKey = beta.key), ProjectsPageActions(list = ProjectsListActions(onOpenChat = { _, _ -> })))
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.OPEN_CHAT).assertIsNotEnabled()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.BUG_REPORT).assertDoesNotExist()
         onNodeWithTag(SettingsSectionTags.ROW_PREFIX + ProjectDetailKeys.PROVISION).assertExists()
@@ -124,7 +125,7 @@ class ProjectsPageTest {
 
     @Test
     fun factsAndActionsFollowTheHost() {
-        val state = loaded(alpha).copy(syncingId = "alpha")
+        val state = loaded(alpha).copy(syncing = alpha.key)
         val facts = projectFacts(alpha, state).map { it.key }
         assertEquals(listOf("project-id", "project-path"), facts)
         val sync = projectActions(alpha, state, ProjectsPageActions()).first { it.key == ProjectDetailKeys.SYNC }

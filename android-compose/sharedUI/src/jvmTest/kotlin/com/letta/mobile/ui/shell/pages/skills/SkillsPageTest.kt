@@ -44,19 +44,21 @@ class SkillsPageTest {
         tools = ToolLibraryState(tools = listOf(gitStatus, sendEmail), isLoading = false, hasMorePages = false),
     )
 
+    /** The test window: its width, and pointer containers (dialogs) for a test that opens a pane. */
+    private data class TestFrame(val width: Dp = WIDE, val pointer: Boolean = false)
+
     private fun ComposeUiTest.show(
         state: SkillsPageState,
         actions: SkillsPageActions = SkillsPageActions(),
-        width: Dp = WIDE,
         options: SkillsPageOptions = SkillsPageOptions(),
-        pointer: Boolean = false,
+        frame: TestFrame = TestFrame(),
     ) {
         setContent {
             MaterialTheme {
                 // Pointer containers (dialogs) when the test opens a pane: the test draws no window insets.
-                val host = if (pointer) LettaHost.Pointer.copy(sheet = LettaPaneDefaults.Dialog) else LocalLettaHost.current
+                val host = if (frame.pointer) LettaHost.Pointer.copy(sheet = LettaPaneDefaults.Dialog) else LocalLettaHost.current
                 CompositionLocalProvider(LocalLettaHost provides host) {
-                    Box(Modifier.width(width).height(PAGE_HEIGHT)) {
+                    Box(Modifier.width(frame.width).height(PAGE_HEIGHT)) {
                         SkillsPage(state = state, actions = actions, options = options)
                     }
                 }
@@ -77,7 +79,7 @@ class SkillsPageTest {
 
     @Test
     fun oneSearchNarrowsSkillsAndTools() = runComposeUiTest {
-        show(state(), width = COMPACT)
+        show(state(), frame = TestFrame(width = COMPACT))
         onNodeWithTag(SkillsPageTags.SEARCH).performTextInput("git")
         onNodeWithTag(SkillsPageTags.skill("github")).assertExists()
         onNodeWithTag(SkillsPageTags.skill("notion")).assertDoesNotExist()
@@ -111,7 +113,7 @@ class SkillsPageTest {
             onToolClick = { calls += "tool:${it.id.value}" },
             onAddTool = { calls += "add-tool" },
         )
-        show(state(), actions, pointer = true)
+        show(state(), actions, frame = TestFrame(pointer = true))
         onNodeWithTag(SkillsPageTags.skillToggle("github")).performClick()
         onNodeWithTag(SkillsPageTags.skillToggle("notion")).performClick()
         onNodeWithTag(SkillsPageTags.ADD_TOOL).performClick()
@@ -122,7 +124,7 @@ class SkillsPageTest {
     @Test
     fun aToolOpensItsReadOnlyDetail() = runComposeUiTest {
         val withSource = gitStatus.copy(sourceCode = "def git_status():\n    return run('git status')", tags = listOf("git"))
-        show(state().copy(tools = ToolLibraryState(tools = listOf(withSource), isLoading = false, hasMorePages = false)), pointer = true)
+        show(state().copy(tools = ToolLibraryState(tools = listOf(withSource), isLoading = false, hasMorePages = false)), frame = TestFrame(pointer = true))
         onNodeWithTag(SkillsPageTags.TOOL_DETAIL).assertDoesNotExist()
         onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
         onNodeWithTag(SkillsPageTags.TOOL_DETAIL).assertExists()
@@ -155,7 +157,7 @@ class SkillsPageTest {
     @Test
     fun theToolsRouteOpensScrolledToTools() = runComposeUiTest {
         val many = (1..30).map { Skill(name = "skill-$it", description = "Skill number $it") }
-        show(state(skills = many, installed = emptySet()), width = COMPACT, options = SkillsPageOptions(initialSection = SkillsPageSection.Tools))
+        show(state(skills = many, installed = emptySet()), options = SkillsPageOptions(initialSection = SkillsPageSection.Tools), frame = TestFrame(width = COMPACT))
         waitForIdle()
         onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Tools)).assertIsDisplayed()
         onNodeWithTag(SkillsPageTags.section(SkillsPageSection.Skills)).assertDoesNotExist()

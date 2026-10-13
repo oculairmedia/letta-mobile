@@ -14,6 +14,7 @@ import com.letta.mobile.data.projects.ProjectEditor
 import com.letta.mobile.data.projects.ProjectPathCheck
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.data.projects.isProvisioned
+import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.settings.SettingsConfirmText
 import com.letta.mobile.data.settings.SettingsRow
 import com.letta.mobile.data.settings.SettingsStatus
@@ -63,7 +64,7 @@ internal fun ProjectDetailPane(project: ProjectSummary, state: ProjectsPageState
 
 /** The project's facts as rows, leaving out what the host did not report. */
 internal fun projectFacts(project: ProjectSummary, state: ProjectsPageState): List<SettingsRow.Info> {
-    val beads = state.beadsStatus[project.identifier] ?: project.beadsRemote
+    val beads = state.beadsOf(project)
     return listOfNotNull(
         SettingsRow.Info("project-id", "Identifier", project.identifier),
         project.filesystemPath?.let { SettingsRow.Info("project-path", "Path", it) },
@@ -76,18 +77,18 @@ internal fun projectFacts(project: ProjectSummary, state: ProjectsPageState): Li
 
 /** What the open project offers, in order: chat, sync, Beads, pin, edit, archive, delete. */
 internal fun projectActions(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsPageActions): List<SettingsRow.Link> {
-    val id = project.identifier
-    val pinned = id in state.pinnedIds
-    val beads = state.beadsStatus[id] ?: project.beadsRemote
+    val id = project.key
+    val pinned = state.isPinned(project)
+    val beads = state.beadsOf(project)
     return projectChatActions(project, actions.list) + listOfNotNull(
-        SettingsRow.Link(ProjectDetailKeys.SYNC, "Sync now", enabled = state.syncingId != id, value = if (state.syncingId == id) "Syncing…" else null) {
+        SettingsRow.Link(ProjectDetailKeys.SYNC, "Sync now", enabled = state.syncing != id, value = if (state.syncing == id) "Syncing…" else null) {
             actions.detail.onSync(id)
         },
         SettingsRow.Link(
             ProjectDetailKeys.PROVISION,
             "Provision Beads remote",
             supporting = beads?.error,
-            enabled = state.provisioningId != id,
+            enabled = state.provisioning != id,
             confirm = SettingsConfirmText("Provision Beads remote?", "This creates the remote backing store for ${project.name}.", "Provision"),
         ) { actions.detail.onProvisionBeads(id) }.takeUnless { beads?.isProvisioned == true },
         SettingsRow.Link(ProjectDetailKeys.PIN, if (pinned) UNPIN else PIN) { actions.list.onTogglePinned(id) },

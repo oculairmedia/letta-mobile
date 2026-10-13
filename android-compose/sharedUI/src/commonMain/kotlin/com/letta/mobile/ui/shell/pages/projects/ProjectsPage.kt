@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.projects.ProjectDraft
+import com.letta.mobile.data.projects.ProjectKey
+import com.letta.mobile.data.projects.key
 import com.letta.mobile.data.projects.ProjectsPageState
 import com.letta.mobile.ui.components.LettaEmptyHint
 import com.letta.mobile.ui.components.LettaListRowSpec
@@ -59,8 +61,8 @@ enum class ProjectChatIntent { Chat, BugReport }
 data class ProjectsListActions(
     val onRefresh: () -> Unit = {},
     val onQueryChange: (String) -> Unit = {},
-    val onSelect: (String?) -> Unit = {},
-    val onTogglePinned: (String) -> Unit = {},
+    val onSelect: (ProjectKey?) -> Unit = {},
+    val onTogglePinned: (ProjectKey) -> Unit = {},
     val onStartCreate: () -> Unit = {},
     val onDismissNotice: () -> Unit = {},
     /** Null hides the detail's chat actions (a host with no chat page). */
@@ -70,11 +72,11 @@ data class ProjectsListActions(
 /** The open project's actions. */
 @Immutable
 data class ProjectDetailActions(
-    val onStartEdit: (String) -> Unit = {},
-    val onSync: (String) -> Unit = {},
-    val onProvisionBeads: (String) -> Unit = {},
-    val onArchive: (String) -> Unit = {},
-    val onDelete: (String) -> Unit = {},
+    val onStartEdit: (ProjectKey) -> Unit = {},
+    val onSync: (ProjectKey) -> Unit = {},
+    val onProvisionBeads: (ProjectKey) -> Unit = {},
+    val onArchive: (ProjectKey) -> Unit = {},
+    val onDelete: (ProjectKey) -> Unit = {},
 )
 
 /** The create / edit form's actions. */
@@ -145,9 +147,9 @@ private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: Projec
     LettaRefreshable(state.refreshing, actions.onRefresh, Modifier.fillMaxWidth().weight(1f)) {
         RosterList(
             RosterSpec(
-                sections = RosterSections.pinnedFirst(section) { it.identifier in state.pinnedIds },
+                sections = RosterSections.pinnedFirst(section, state::isPinned),
                 key = ProjectSummary::identifier,
-                selection = RosterSelection(isSelected = { it.identifier == state.selectedId }, onSelect = { actions.onSelect(it.identifier) }),
+                selection = RosterSelection(isSelected = { it.key == state.selectedKey }, onSelect = { actions.onSelect(it.key) }),
                 actions = RosterActions(menu = { project, _ -> listOf(pinMenuItem(project, state, actions)) }),
                 options = RosterOptions(loading = state.loading && state.projects.isEmpty(), testTag = ProjectsPageTags.LIST),
                 empty = { LettaEmptyHint(emptyHint(state), Modifier.padding(LettaDimens.Space.md)) },
@@ -159,7 +161,7 @@ private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: Projec
                     title = project.name,
                     subtitle = project.filesystemPath ?: project.identifier,
                     trailing = project.status,
-                    emphasized = project.identifier == state.selectedId,
+                    emphasized = project.key == state.selectedKey,
                 ),
                 row,
             )
@@ -168,8 +170,8 @@ private fun ColumnScope.ProjectsRoster(state: ProjectsPageState, actions: Projec
 }
 
 private fun pinMenuItem(project: ProjectSummary, state: ProjectsPageState, actions: ProjectsListActions): LettaMenuItem {
-    val pinned = project.identifier in state.pinnedIds
-    return LettaMenuItem(label = if (pinned) UNPIN else PIN, onClick = { actions.onTogglePinned(project.identifier) })
+    val pinned = state.isPinned(project)
+    return LettaMenuItem(label = if (pinned) UNPIN else PIN, onClick = { actions.onTogglePinned(project.key) })
 }
 
 private fun emptyHint(state: ProjectsPageState): String =

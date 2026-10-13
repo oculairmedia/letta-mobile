@@ -26,7 +26,7 @@ android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/HealthIndic
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/config/SettingsScreen.kt 117 container
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/conversations/ConversationAdminDialog.kt 421 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/conversations/ConversationsScreen.kt 295 legacy-pending(ckmub.2)
-android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScreen.kt 103 legacy-pending(ckmub.2)
+android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScreen.kt 106 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/dashboard/HomeScreenDrawer.kt 146 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt 86 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/screens/pairing/QrScanScreen.kt 145 container

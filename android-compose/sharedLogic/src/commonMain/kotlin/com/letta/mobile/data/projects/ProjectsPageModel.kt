@@ -3,22 +3,6 @@ package com.letta.mobile.data.projects
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectSummary
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import kotlinx.coroutines.flow.Flow
-
-/** Where the user's pinned projects are kept (Android: the settings repository). */
-interface ProjectPinStore {
-    val pinnedIds: Flow<Set<String>>
-
-    suspend fun setPinned(projectId: String, pinned: Boolean)
-}
-
-/** The settings repository's project pins as a [ProjectPinStore]. */
-class SettingsProjectPinStore(private val settings: ISettingsRepository) : ProjectPinStore {
-    override val pinnedIds: Flow<Set<String>> get() = settings.getPinnedProjectIds()
-
-    override suspend fun setPinned(projectId: String, pinned: Boolean) = settings.setProjectPinned(projectId, pinned)
-}
 
 /** How a project's filesystem path reads: the host needs an absolute path it can reach. */
 enum class ProjectPathCheck { Missing, MustBeAbsolute, Valid }
@@ -37,24 +21,28 @@ data class ProjectDraft(
             else -> ProjectPathCheck.Valid
         }
 
+    /** The git URL to send: none when the field is blank. */
+    val gitUrlOrNull: String? get() = gitUrl.takeIf { it.isNotBlank() }
+
     fun normalized(): ProjectDraft = ProjectDraft(name.trim(), filesystemPath.trim(), gitUrl.trim())
 
     /** Ready to send: a new project needs a name, both need a valid path. */
     fun isReady(creating: Boolean): Boolean = pathCheck == ProjectPathCheck.Valid && (!creating || name.isNotBlank())
 
     companion object {
-        fun of(project: ProjectSummary): ProjectDraft = ProjectDraft(project.name, project.filesystemPath.orEmpty(), project.gitUrl.orEmpty())
+        fun of(project: ProjectSummary): ProjectDraft =
+            ProjectDraft(project.name, project.filesystemPath.orEmpty(), project.gitUrl.orEmpty())
     }
 }
 
-/** The open form: a new project, or the settings of [identifier]. */
+/** The open form: a new project, or the settings of [target]. */
 @Immutable
 data class ProjectEditor(
     val draft: ProjectDraft = ProjectDraft(),
-    val identifier: String? = null,
+    val target: ProjectKey? = null,
     val submitting: Boolean = false,
 ) {
-    val creating: Boolean get() = identifier == null
+    val creating: Boolean get() = target == null
 }
 
 /**
@@ -68,33 +56,40 @@ data class ProjectsPageState(
     val loading: Boolean = true,
     val error: String? = null,
     val query: String = "",
-    val pinnedIds: Set<String> = emptySet(),
-    val selectedId: String? = null,
-    val beadsStatus: Map<String, BeadsRemoteStatus> = emptyMap(),
-    val syncingId: String? = null,
-    val provisioningId: String? = null,
+    val pinned: Set<ProjectKey> = emptySet(),
+    val selectedKey: ProjectKey? = null,
+    val beadsStatus: Map<ProjectKey, BeadsRemoteStatus> = emptyMap(),
+    val syncing: ProjectKey? = null,
+    val provisioning: ProjectKey? = null,
     val editor: ProjectEditor? = null,
     val notice: String? = null,
 ) {
     /** The projects matching [query] (name, identifier, path), pinned first then the most recent. */
-    val visibleProjects: List<ProjectSummary> get() = ProjectOrdering.visible(projects, pinnedIds, query)
+    val visibleProjects: List<ProjectSummary> get() = ProjectOrdering.visible(this)
 
-    val selected: ProjectSummary? get() = selectedId?.let { id -> projects.firstOrNull { it.identifier == id } }
+    val selected: ProjectSummary? get() = selectedKey?.let(::projectOf)
 
     val refreshing: Boolean get() = loading && projects.isNotEmpty()
 
     /** Paths of the known projects: what a new project's path field suggests. */
     val knownPaths: List<String>
         get() = projects.mapNotNull { it.filesystemPath?.trim()?.takeIf(String::isNotEmpty) }.distinct().sorted()
+
+    fun projectOf(key: ProjectKey): ProjectSummary? = projects.firstOrNull { it.key == key }
+
+    fun isPinned(project: ProjectSummary): Boolean = project.key in pinned
+
+    /** The Beads remote status read for [project], else the one its summary carried. */
+    fun beadsOf(project: ProjectSummary): BeadsRemoteStatus? = beadsStatus[project.key] ?: project.beadsRemote
 }
 
 /** The page's order and search. */
 object ProjectOrdering {
-    fun visible(projects: List<ProjectSummary>, pinnedIds: Set<String>, query: String): List<ProjectSummary> {
-        val needle = query.trim().lowercase()
-        val matching = if (needle.isEmpty()) projects else projects.filter { it.matches(needle) }
+    fun visible(state: ProjectsPageState): List<ProjectSummary> {
+        val needle = state.query.trim().lowercase()
+        val matching = if (needle.isEmpty()) state.projects else state.projects.filter { it.matches(needle) }
         return matching.sortedWith(
-            compareByDescending<ProjectSummary> { it.identifier in pinnedIds }
+            compareByDescending<ProjectSummary> { state.isPinned(it) }
                 .thenByDescending { it.lastActivity() }
                 .thenBy { it.name.lowercase() },
         )

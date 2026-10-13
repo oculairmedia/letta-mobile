@@ -13,6 +13,7 @@ import com.letta.mobile.ui.screens.dashboard.HomeBackendLabel
 import com.letta.mobile.ui.screens.dashboard.HomeChatRoutes
 import com.letta.mobile.ui.screens.dashboard.HomeNavigationCallbacks
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
+import com.letta.mobile.ui.screens.dashboard.HomeScreenSpec
 import com.letta.mobile.ui.screens.memory.MemoryOverviewScreen
 import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
@@ -34,19 +35,21 @@ fun NavGraphBuilder.adminGraph(
 ) {
     composable<AdminRoute> {
         HomeScreen(
-            navigation = adminHomeNavigation(navController),
-            routes = HomeChatRoutes(
-                onNavigateToChatMessage = { agentId, conversationId, messageId ->
-                    val route = AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId)
-                    navController.navigate(route)
-                },
-                onNavigateToConversation = { agentId, conversationId ->
-                    navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
-                },
-                onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+            HomeScreenSpec(
+                navigation = adminHomeNavigation(navController),
+                routes = HomeChatRoutes(
+                    onNavigateToChatMessage = { agentId, conversationId, messageId ->
+                        val route = AgentChatRoute(agentId = agentId, conversationId = conversationId, scrollToMessageId = messageId)
+                        navController.navigate(route)
+                    },
+                    onNavigateToConversation = { agentId, conversationId ->
+                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
+                    },
+                    onNavigateToEditAgent = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+                ),
+                backend = HomeBackendLabel(activeBackendLabel, openBackendSwitcher),
+                title = "Admin",
             ),
-            backend = HomeBackendLabel(activeBackendLabel, openBackendSwitcher),
-            title = "Admin",
         )
     }
 

@@ -35,19 +35,22 @@ private val AndroidHomeOptions = HomePageOptions(showTitle = false, showSearch =
 /** The backend label under the Home title and the switcher it opens, when this host can switch. */
 internal data class HomeBackendLabel(val label: String?, val onOpenSwitcher: (() -> Unit)?)
 
+/** What a Home host passes: where everything leads, the backend label and the title. */
+internal data class HomeScreenSpec(
+    val navigation: HomeNavigationCallbacks,
+    val routes: HomeChatRoutes,
+    val backend: HomeBackendLabel = HomeBackendLabel(null, null),
+    val title: String = "Letta",
+)
+
 /**
  * The Admin tab's home: the shared shell header (search, backend label, settings) and admin drawer around
  * the shared Home page (letta-mobile-c3np7.3.11.1).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun HomeScreen(
-    navigation: HomeNavigationCallbacks,
-    routes: HomeChatRoutes,
-    backend: HomeBackendLabel = HomeBackendLabel(null, null),
-    title: String = "Letta",
-    viewModel: DashboardViewModel = hiltViewModel(),
-) {
+internal fun HomeScreen(spec: HomeScreenSpec, viewModel: DashboardViewModel = hiltViewModel()) {
+    val (navigation, routes, backend, title) = spec
     val state by viewModel.state.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
