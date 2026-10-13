@@ -59,7 +59,7 @@ class WasmAppServerClientGateway(
                     AppServerCommand.Auth(
                         requestId = nextRequestId("auth"),
                         token = config.accessToken.orEmpty(),
-                        capabilities = null,
+                        capabilities = authCapabilitiesFor(config.serverUrl),
                     ),
                 )
             }

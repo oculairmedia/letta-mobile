@@ -1,9 +1,21 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.model.isIrohBackendUrl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+
+/** Auth capability the browser Iroh binding honours by reassembling `frame_part` sequences. */
+internal const val FRAME_PART_CAPABILITY = "frame_part"
+
+/**
+ * The transport capabilities to advertise on auth for [serverUrl] (letta-mobile-yhq16). Over Iroh a
+ * reply larger than 1 MiB, such as a full agent list, only arrives when the server may split it into
+ * parts, which the browser binding reassembles. The WebSocket transport has no such framing.
+ */
+internal fun authCapabilitiesFor(serverUrl: String): List<String>? =
+    if (isIrohBackendUrl(serverUrl)) listOf(FRAME_PART_CAPABILITY) else null
 
 internal fun resolveWebSocketUrl(serverUrl: String): String {
     val trimmed = serverUrl.trim().removeSuffix("/")
