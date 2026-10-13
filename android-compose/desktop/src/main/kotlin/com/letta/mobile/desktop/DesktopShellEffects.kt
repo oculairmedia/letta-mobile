@@ -153,7 +153,6 @@ private fun rememberShellAttentionBindings(context: DesktopShellContext): Deskto
 @Composable
 private fun DesktopShellQuickQueryBridge(context: DesktopShellContext, frame: DesktopShellFrame) {
     val quickQuery = context.shell.quickQuery
-    // The bar searches the window's own unified search.
     LaunchedEffect(frame.lists.search) { quickQuery.sources.value = frame.lists.search }
     SideEffect {
         quickQuery.actions.value = DesktopQuickQueryActions(
