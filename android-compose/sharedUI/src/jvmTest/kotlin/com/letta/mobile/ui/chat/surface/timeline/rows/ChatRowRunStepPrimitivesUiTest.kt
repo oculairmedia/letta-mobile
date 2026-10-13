@@ -41,8 +41,15 @@ import kotlin.test.assertTrue
  * size, with one DisclosureChevron only when it has details, and its details read in ToolOutputBlock.
  */
 class ChatRowRunStepPrimitivesUiTest {
-    private fun call(id: String, name: String = "Bash", command: String = "ls", status: String? = "success", result: String? = "ok") =
-        UiToolCall(name = name, arguments = """{"command":"$command"}""", result = result, status = status, toolCallId = id)
+    /** A call that ran (its output "ok"), failed (its output "boom") or, with a null [status], still runs. */
+    private fun call(id: String, name: String = "Bash", command: String = "ls", status: String? = "success") =
+        UiToolCall(name = name, arguments = """{"command":"$command"}""", result = outputOf(status), status = status, toolCallId = id)
+
+    private fun outputOf(status: String?): String? = when (status) {
+        null -> null
+        "error" -> "boom"
+        else -> "ok"
+    }
 
     private fun runOf(vararg calls: UiToolCall) = ChatRenderItem.RunBlock(
         runId = RUN_ID,
@@ -114,7 +121,7 @@ class ChatRowRunStepPrimitivesUiTest {
 
     @Test
     fun theStepGlyphIsTheSummaryGlyphAtTheSameSize() = runComposeUiTest {
-        showOpened(runOf(call("c1"), call("c2", status = "error", result = "boom")))
+        showOpened(runOf(call("c1"), call("c2", status = "error")))
 
         val summary = onNodeWithTag(ChatRowTestTags.RUN_GLYPH, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val steps = onAllNodesWithTag(ChatRowTestTags.TOOL_STATUS_GLYPH, useUnmergedTree = true).fetchSemanticsNodes()
@@ -127,7 +134,7 @@ class ChatRowRunStepPrimitivesUiTest {
 
     @Test
     fun anOpenStepReadsItsDetailsInAToolOutputBlock() = runComposeUiTest {
-        showOpened(runOf(call("c1", command = "echo hello", result = "hello")))
+        showOpened(runOf(call("c1", command = "echo hello")))
 
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_BODY).assertDoesNotExist()
         onNodeWithTag(ChatRowTestTags.TOOL_CARD_TOGGLE).performClick()
@@ -135,7 +142,7 @@ class ChatRowRunStepPrimitivesUiTest {
         // The command and the output, each in the shared monospace block.
         assertEquals(2, count(hasTestTag(ChatRowTestTags.TOOL_OUTPUT) and under(ChatRowTestTags.TOOL_CARD_BODY)))
         assertEquals(1, count(hasText("$ echo hello") and under(ChatRowTestTags.TOOL_OUTPUT)))
-        assertEquals(1, count(hasText("hello") and under(ChatRowTestTags.TOOL_OUTPUT)))
+        assertEquals(1, count(hasText("ok") and under(ChatRowTestTags.TOOL_OUTPUT)))
     }
 
     @Test
@@ -149,7 +156,7 @@ class ChatRowRunStepPrimitivesUiTest {
 
     @Test
     fun aStepRowKeepsItsHeightAsItSettles() = runComposeUiTest {
-        var item by mutableStateOf(runOf(call("c1", status = null, result = null)))
+        var item by mutableStateOf(runOf(call("c1", status = null)))
         setContent {
             MaterialTheme {
                 Box(Modifier.width(400.dp)) {
