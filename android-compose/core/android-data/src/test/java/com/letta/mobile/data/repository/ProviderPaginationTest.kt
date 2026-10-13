@@ -1,9 +1,9 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.ProviderApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderId
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -70,7 +70,7 @@ class ProviderPaginationTest {
 
     private class PaginatingProviderApi(
         private val providers: List<Provider>,
-    ) : ProviderApi(mockk(relaxed = true)) {
+    ) : ProviderRemoteSource by noAppServerRoute<ProviderRemoteSource>() {
         val observedAfters = mutableListOf<String?>()
         val observedLimits = mutableListOf<Int?>()
 

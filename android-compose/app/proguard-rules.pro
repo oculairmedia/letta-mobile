@@ -32,6 +32,13 @@
 }
 
 # ---------------------------------------------------------------------------
+# Backend seam (letta-mobile-ckmub.4). Production binds the remote-source interfaces to
+# java.lang.reflect.Proxy instances (noAppServerRoute / SessionRemoteSources.None) and has no other
+# implementation, so R8 full mode would treat them as uninstantiated: keep them and their members.
+# ---------------------------------------------------------------------------
+-keep interface com.letta.mobile.data.repository.api.*RemoteSource { *; }
+
+# ---------------------------------------------------------------------------
 # OkHttp — keep public API + TLS internals; let R8 shrink implementation.
 # The blanket `keep class okhttp3.** { *; }` prevented R8 from eliminating
 # dead OkHttp code (~300 kB of bytecode in practice).

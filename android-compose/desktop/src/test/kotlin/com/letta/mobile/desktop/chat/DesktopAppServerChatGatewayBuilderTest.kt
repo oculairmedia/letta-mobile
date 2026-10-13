@@ -69,7 +69,7 @@ class DesktopAppServerChatGatewayBuilderTest {
             val build = buildScope.async {
                 DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
                     lettaConfig = localConfig(),
-                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                    appServerConfig = DesktopAppServerRuntimeConfig(serverUrl = server.url),
                 )
             }
 
@@ -97,7 +97,7 @@ class DesktopAppServerChatGatewayBuilderTest {
             val build = buildScope.async {
                 DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
                     lettaConfig = localConfig(),
-                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                    appServerConfig = DesktopAppServerRuntimeConfig(serverUrl = server.url),
                 )
             }
 
@@ -131,7 +131,7 @@ class DesktopAppServerChatGatewayBuilderTest {
             val build = buildScope.async {
                 DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
                     lettaConfig = localConfig(),
-                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                    appServerConfig = DesktopAppServerRuntimeConfig(serverUrl = server.url),
                 )
             }
 

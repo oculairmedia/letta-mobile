@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.branch
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -19,7 +20,7 @@ private const val NO_CREATE = "This backend can't start a new conversation, so t
  * Android's canonical transport (local runtime, Iroh admin_rpc, or REST).
  */
 suspend fun TimelineTransport.branchHistory(conversationId: String): BranchHistory {
-    val newest = listConversationMessages(conversationId, limit = BRANCH_HISTORY_WINDOW, after = null, order = "desc")
+    val newest = listConversationMessages(ConversationId(conversationId), limit = BRANCH_HISTORY_WINDOW, after = null, order = "desc")
     return BranchHistory(newest.asReversed().map(BranchMessage::of), complete = newest.size < BRANCH_HISTORY_WINDOW)
 }
 

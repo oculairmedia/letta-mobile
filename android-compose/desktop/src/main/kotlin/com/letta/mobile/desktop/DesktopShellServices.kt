@@ -198,7 +198,7 @@ private fun rememberShellChatController(
 internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: DesktopChatSurfaceState): DesktopShellPanels {
     val chatScope = core.chatScope
     val sessionGraph = core.sessionGraph.value
-    val httpApis = rememberDesktopHttpApis(core.bootstrap.activeConfig, core.iroh.transport != null, core.iroh.agentDirectory)
+    val httpApis = rememberDesktopHttpApis(core.iroh.transport != null, core.iroh.agentDirectory)
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
     val skills = remember(httpApis.skillApi) { SkillsCatalogController(httpApis.skillApi, chatScope) }
     DisposableEffect(skills) { onDispose { skills.close() } }

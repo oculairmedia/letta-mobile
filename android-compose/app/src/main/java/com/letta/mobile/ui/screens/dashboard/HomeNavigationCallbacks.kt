@@ -14,15 +14,9 @@ internal data class HomeNavigationCallbacks(
     val onNavigateToChat: (agentId: String, agentName: String?, initialMessage: String?) -> Unit,
     val onNavigateToUsage: () -> Unit,
     val onNavigateToTemplates: () -> Unit = {},
-    val onNavigateToArchives: () -> Unit = {},
-    val onNavigateToFolders: () -> Unit = {},
-    val onNavigateToGroups: () -> Unit = {},
     val onNavigateToProviders: () -> Unit = {},
-    val onNavigateToIdentities: () -> Unit = {},
     val onNavigateToSchedules: () -> Unit = {},
     val onNavigateToRuns: () -> Unit = {},
-    val onNavigateToJobs: () -> Unit = {},
-    val onNavigateToMessageBatches: () -> Unit = {},
     val onNavigateToMcp: () -> Unit = {},
     val onNavigateToAbout: () -> Unit = {},
     val onNavigateToTelemetry: () -> Unit = {},
@@ -37,15 +31,9 @@ internal data class HomeNavigationCallbacks(
         DashboardShortcut.TOOLS -> onNavigateToTools
         DashboardShortcut.BLOCKS -> onNavigateToBlocks
         DashboardShortcut.TEMPLATES -> onNavigateToTemplates
-        DashboardShortcut.ARCHIVES -> onNavigateToArchives
-        DashboardShortcut.FOLDERS -> onNavigateToFolders
-        DashboardShortcut.GROUPS -> onNavigateToGroups
         DashboardShortcut.PROVIDERS -> onNavigateToProviders
-        DashboardShortcut.IDENTITIES -> onNavigateToIdentities
         DashboardShortcut.SCHEDULES -> onNavigateToSchedules
         DashboardShortcut.RUNS -> onNavigateToRuns
-        DashboardShortcut.JOBS -> onNavigateToJobs
-        DashboardShortcut.MESSAGE_BATCHES -> onNavigateToMessageBatches
         DashboardShortcut.MCP_SERVERS -> onNavigateToMcp
         DashboardShortcut.BOT_SETTINGS -> onNavigateToBotSettings
         DashboardShortcut.PROJECTS -> onNavigateToProjects

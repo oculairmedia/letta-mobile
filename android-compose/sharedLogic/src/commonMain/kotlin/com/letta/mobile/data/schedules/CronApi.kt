@@ -1,52 +1,22 @@
 package com.letta.mobile.data.schedules
 
-import com.letta.mobile.data.model.LettaConfig
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.delete
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Platform-neutral cron/schedule API. This Letta server exposes scheduled work
- * at `/v1/crons` (the REST `/v1/agents/{id}/schedule` path 404s here). Lives in
- * commonMain; the platform supplies the Ktor [HttpClient].
+ * The cron task operations a backend offers to the desktop cron panel. letta-mobile-ckmub.4 removed
+ * the Letta REST implementation (`/v1/crons`); the App Server's `cron_*` commands are the
+ * replacement (wired by the shared Schedules page, ckmub S14). Until then the panel shows as
+ * unavailable unless an Iroh host relays schedules.
  */
-class CronApi(
-    private val config: LettaConfig,
-    private val httpClient: HttpClient,
-) : AutoCloseable {
-    private val baseUrl = config.serverUrl.trimEnd('/')
+interface CronApi : AutoCloseable {
+    suspend fun listCrons(): List<CronTask>
 
-    suspend fun listCrons(): List<CronTask> {
-        val response = httpClient.get("$baseUrl/v1/crons") { applyAuth() }
-        response.requireSuccess()
-        return response.body<CronsResponse>().tasks
-    }
+    suspend fun deleteCron(id: String)
 
-    suspend fun deleteCron(id: String) {
-        val response = httpClient.delete("$baseUrl/v1/crons/$id") { applyAuth() }
-        response.requireSuccess()
-    }
+    suspend fun pauseCron(id: String)
 
-    suspend fun pauseCron(id: String) {
-        val response = httpClient.post("$baseUrl/v1/crons/$id/pause") { applyAuth() }
-        response.requireSuccess()
-    }
-
-    suspend fun resumeCron(id: String) {
-        val response = httpClient.post("$baseUrl/v1/crons/$id/resume") { applyAuth() }
-        response.requireSuccess()
-    }
+    suspend fun resumeCron(id: String)
 
     /** Create a recurring cron task for [agentId]. */
     suspend fun createCron(
@@ -57,38 +27,9 @@ class CronApi(
         cron: String,
         timezone: String,
         recurring: Boolean = true,
-    ) {
-        val response = httpClient.post("$baseUrl/v1/crons") {
-            applyAuth()
-            contentType(ContentType.Application.Json)
-            setBody(
-                CreateCronRequest(
-                    agentId = agentId,
-                    name = name,
-                    description = description,
-                    prompt = prompt,
-                    cron = cron,
-                    timezone = timezone,
-                    recurring = recurring,
-                ),
-            )
-        }
-        response.requireSuccess()
-    }
+    )
 
-    override fun close() {
-        httpClient.close()
-    }
-
-    private fun HttpRequestBuilder.applyAuth() {
-        config.accessToken?.trim()?.takeIf { it.isNotBlank() }?.let(::bearerAuth)
-    }
-
-    private suspend fun HttpResponse.requireSuccess() {
-        if (status.value !in 200..299) {
-            throw IllegalStateException("Cron API ${status.value}: ${bodyAsText()}")
-        }
-    }
+    override fun close() = Unit
 }
 
 @Serializable
@@ -102,20 +43,4 @@ data class CronTask(
     val timezone: String? = null,
     val recurring: Boolean = false,
     val prompt: String? = null,
-)
-
-@Serializable
-private data class CronsResponse(
-    val tasks: List<CronTask> = emptyList(),
-)
-
-@Serializable
-private data class CreateCronRequest(
-    @SerialName("agent_id") val agentId: String,
-    val name: String,
-    val description: String,
-    val prompt: String,
-    val cron: String,
-    val timezone: String,
-    val recurring: Boolean,
 )

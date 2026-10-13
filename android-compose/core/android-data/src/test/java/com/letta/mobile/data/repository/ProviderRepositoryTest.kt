@@ -1,6 +1,6 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderId
@@ -43,23 +43,26 @@ class ProviderRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `refreshProviders in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+    @Test
+    fun `refreshProviders in iroh mode without source throws NoAppServerRouteException`() = runTest {
+        val failure = runCatching {
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeProviderApi() {
-            override suspend fun listProviders(before: String?, after: String?, limit: Int?, order: String?, name: String?, providerType: String?): List<Provider> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeProviderApi() {
+                override suspend fun listProviders(before: String?, after: String?, limit: Int?, order: String?, name: String?, providerType: String?): List<Provider> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
-        }
-        val repo = ProviderRepository(apiThatThrows)
-        repo.refreshProviders(name = null, providerType = null)
+            val repo = ProviderRepository(apiThatThrows)
+            repo.refreshProviders(name = null, providerType = null)
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test
@@ -99,7 +102,7 @@ class ProviderRepositoryTest {
         val irohSource = IrohAdminRpcProviderSource(transport, settings)
         val apiThatThrows = object : FakeProviderApi() {
             override suspend fun listProviders(before: String?, after: String?, limit: Int?, order: String?, name: String?, providerType: String?): List<Provider> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = ProviderRepository(apiThatThrows, irohSource)

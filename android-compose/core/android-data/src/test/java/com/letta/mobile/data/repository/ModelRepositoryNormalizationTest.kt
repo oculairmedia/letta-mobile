@@ -16,7 +16,7 @@ class ModelRepositoryNormalizationTest {
             llmModels += model("lmstudio/MiniMax-M3")
             llmModels += model("openai/MiniMax-M3")
         }
-        val repository = ModelRepository(modelApi = api)
+        val repository = ModelRepository(remote = api)
 
         repository.refreshLlmModels()
 
@@ -29,7 +29,7 @@ class ModelRepositoryNormalizationTest {
 
     @Test
     fun httpCatalogRetainsAllModelsWithoutProviderFiltering() = runTest {
-        val repository = ModelRepository(modelApi = defaultCatalogApi())
+        val repository = ModelRepository(remote = defaultCatalogApi())
 
         repository.refreshLlmModels()
 
@@ -47,7 +47,7 @@ class ModelRepositoryNormalizationTest {
             )
         }
         val repository = ModelRepository(
-            modelApi = FakeModelApi(),
+            remote = FakeModelApi(),
             irohModelSource = irohSource,
         )
 

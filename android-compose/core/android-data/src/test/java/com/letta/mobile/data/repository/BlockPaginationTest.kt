@@ -1,13 +1,13 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.BlockApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.BlockRemoteSource
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockAgentsListParams
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockListParams
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -52,7 +52,7 @@ class BlockPaginationTest {
     private class PaginatingBlockApi(
         private val blocks: List<Block>,
         private val agents: List<Agent> = emptyList(),
-    ) : BlockApi(mockk(relaxed = true)) {
+    ) : BlockRemoteSource by noAppServerRoute<BlockRemoteSource>() {
         val observedOffsets = mutableListOf<Int?>()
         val observedLimits = mutableListOf<Int?>()
         val observedAftersForAgents = mutableListOf<String?>()

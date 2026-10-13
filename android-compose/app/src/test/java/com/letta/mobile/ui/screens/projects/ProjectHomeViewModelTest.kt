@@ -1,8 +1,9 @@
 package com.letta.mobile.ui.screens.projects
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
@@ -11,7 +12,6 @@ import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -654,7 +654,7 @@ class ProjectHomeViewModelTest {
         return ProjectHomeViewModel(repository, settingsRepository, viewModelScope)
     }
 
-    private class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {
+    private class FakeProjectApi : ProjectRemoteSource by noAppServerRoute<ProjectRemoteSource>() {
         var projects = mutableListOf<ProjectSummary>()
         var shouldFail = false
         var createShouldFail = false
@@ -676,7 +676,8 @@ class ProjectHomeViewModelTest {
                 ?: throw ApiException(404, "Not found")
         }
 
-        override suspend fun createProject(request: com.letta.mobile.data.api.ProjectCreateRequest): ProjectSummary {
+        override suspend fun createProject(name: String?, filesystemPath: String, gitUrl: String?): ProjectSummary {
+            val request = com.letta.mobile.data.api.ProjectCreateRequest(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl)
             calls.add("createProject:${request.name}:${request.filesystemPath}:${request.gitUrl}")
             if (createShouldFail) throw ApiException(400, "Create failed")
             val created = ProjectSummary(
@@ -692,8 +693,10 @@ class ProjectHomeViewModelTest {
 
         override suspend fun updateProject(
             identifier: String,
-            request: com.letta.mobile.data.api.ProjectUpdateRequest,
+            filesystemPath: String?,
+            gitUrl: String?,
         ): ProjectSummary {
+            val request = com.letta.mobile.data.api.ProjectUpdateRequest(filesystemPath = filesystemPath, gitUrl = gitUrl)
             calls.add("updateProject:$identifier:${request.filesystemPath}:${request.gitUrl}")
             if (updateShouldFail) throw ApiException(400, "Update failed")
             val index = projects.indexOfFirst { it.identifier == identifier }

@@ -1,8 +1,9 @@
 package com.letta.mobile.channel
 
-import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,9 @@ import javax.inject.Singleton
 @Singleton
 class ChatPushServiceDependencies @Inject constructor(
     val timelineRepository: TimelineRepository,
-    val conversationApi: ConversationApi,
+    /** letta-mobile-ckmub.4: conversations come from the active backend's repositories, not REST. */
+    val conversationRepository: IConversationRepository,
+    val allConversationsRepository: IAllConversationsRepository,
     val agentRepository: IAgentRepository,
     val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
     val channelNotificationPublisher: ChannelNotificationPublisher,

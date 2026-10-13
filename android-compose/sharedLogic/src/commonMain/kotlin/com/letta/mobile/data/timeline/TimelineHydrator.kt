@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -123,7 +124,7 @@ internal class TimelineHydrator(
 
     private suspend fun fetchChronologicalMessages(limit: Int) = normalizeHydratedMessageOrder(
         messageApi.listConversationMessages(
-            conversationId = conversationId,
+            conversationId = ConversationId(conversationId),
             limit = hydrateRawFetchLimit(limit),
             order = "desc",
         ).reversed()

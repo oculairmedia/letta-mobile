@@ -1,7 +1,8 @@
 package com.letta.mobile.data.capability
 
 import android.util.Log
-import com.letta.mobile.data.api.ProjectApi
+import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.ProjectListLimit
@@ -11,8 +12,6 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,16 +27,16 @@ import javax.inject.Singleton
  * that have nothing to call.
  *
  * Exposes [projectsSupported] (project list/CRUD) and [projectWorkSupported]
- * (issues / ready-work over HTTP). On iroh:// backends project list may work
- * via admin_rpc while project work still has no admin_rpc path.
+ * (issues / ready-work). Projects are served only by an Iroh host's admin_rpc
+ * relay (VibeSync); project work has no route on any backend since the Letta
+ * REST client was removed (letta-mobile-ckmub.4), so it is never supported.
  *
  * The probe is fired once per active-config identity with a definitive result.
  * Inconclusive Iroh probes — e.g. when [SessionManager] has not rebuilt the
  * Iroh transport yet — are not cached; [observeSessionForRetry] re-probes after
  * the session graph switches.
  */
-internal fun defaultCapabilityScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+internal fun defaultCapabilityScope(): CoroutineScope = ProcessLifecycleOwner.get().lifecycleScope
 
 private sealed class ProbeOutcome {
     data class Definitive(val supported: Boolean) : ProbeOutcome()
@@ -47,7 +46,6 @@ private sealed class ProbeOutcome {
 @Singleton
 class CapabilityRepository(
     private val settingsRepository: ISettingsRepository,
-    private val projectApi: ProjectApi,
     private val irohProjectSource: IrohAdminRpcProjectSource?,
     private val sessionManager: SessionManager?,
     private val scope: CoroutineScope,
@@ -56,22 +54,20 @@ class CapabilityRepository(
     @Inject
         constructor(
             settingsRepository: ISettingsRepository,
-            projectApi: ProjectApi,
             irohProjectSource: IrohAdminRpcProjectSource,
             sessionManager: SessionManager,
-        ) : this(settingsRepository, projectApi, irohProjectSource, sessionManager, defaultCapabilityScope())
+        ) : this(settingsRepository, irohProjectSource, sessionManager, defaultCapabilityScope())
 
     private val _projectsSupported = MutableStateFlow(true)
     val projectsSupported: StateFlow<Boolean> = _projectsSupported.asStateFlow()
 
-    private val _projectWorkSupported = MutableStateFlow(true)
+    private val _projectWorkSupported = MutableStateFlow(false)
     val projectWorkSupported: StateFlow<Boolean> = _projectWorkSupported.asStateFlow()
 
     constructor(
         settingsRepository: ISettingsRepository,
-        projectApi: ProjectApi,
         scope: CoroutineScope,
-    ) : this(settingsRepository, projectApi, null, null, scope)
+    ) : this(settingsRepository, null, null, scope)
 
     private var lastProbedConfigId: String? = null
 
@@ -90,10 +86,8 @@ class CapabilityRepository(
                     if (config.mode == LettaConfig.Mode.LOCAL) {
                         lastProbedConfigId = config.id
                         setProjectsUnsupported(config.id, "local-runtime")
-                        syncProjectWorkSupported(config)
                         return@collect
                     }
-                    syncProjectWorkSupported(config)
                     applyProbeOutcome(config, probeProjects(config.id))
                 }
         }
@@ -118,7 +112,6 @@ class CapabilityRepository(
             is ProbeOutcome.Definitive -> {
                 lastProbedConfigId = config.id
                 _projectsSupported.value = outcome.supported
-                syncProjectWorkSupported(config)
             }
             ProbeOutcome.Inconclusive -> Unit
         }
@@ -135,7 +128,8 @@ class CapabilityRepository(
             if (source != null && source.shouldUseIroh()) {
                 probeIrohProjects(source)
             } else {
-                ProbeOutcome.Definitive(projectApi.probeAvailability())
+                // Only an Iroh host relays projects; no other backend has a route.
+                ProbeOutcome.Definitive(false)
             }
         } catch (ce: CancellationException) {
             throw ce
@@ -175,11 +169,6 @@ class CapabilityRepository(
         }
     }
 
-    private fun syncProjectWorkSupported(config: LettaConfig) {
-        val workViaHttp = config.mode != LettaConfig.Mode.LOCAL && !config.activeBackendIsIroh()
-        _projectWorkSupported.value = _projectsSupported.value && workViaHttp
-    }
-
     private fun setProjectsUnsupported(configId: String, reason: String) {
         _projectsSupported.value = false
         Telemetry.event(
@@ -189,9 +178,6 @@ class CapabilityRepository(
             "reason" to reason,
         )
     }
-
-    private fun LettaConfig.activeBackendIsIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(serverUrl)
 
     private fun isTransportNotReady(error: Throwable): Boolean {
         if (error is UnsupportedOperationException) return true

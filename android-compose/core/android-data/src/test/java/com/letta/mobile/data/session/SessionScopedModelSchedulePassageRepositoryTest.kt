@@ -1,6 +1,6 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.api.LettaApiClient
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -15,12 +15,7 @@ import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeFolderApi
-import com.letta.mobile.testutil.FakeGroupApi
-import com.letta.mobile.testutil.FakeIdentityApi
-import com.letta.mobile.testutil.FakeJobApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi
@@ -110,9 +105,9 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val passages = passageProxy.getPassages("agent-1")
+        val passages = passageProxy.getPassages(AgentId("agent-1"))
 
-        passageProxy.refreshPassages("agent-1")
+        passageProxy.refreshPassages(AgentId("agent-1"))
         advanceUntilIdle()
         assertEquals(listOf("passage-a"), passages.value.map { it.id })
 
@@ -125,8 +120,8 @@ class SessionScopedModelSchedulePassageRepositoryTest {
 
         assertEquals(emptyList<String>(), passages.value.map { it.id })
 
-        val rebuiltPassages = passageProxy.getPassages("agent-1")
-        passageProxy.refreshPassages("agent-1")
+        val rebuiltPassages = passageProxy.getPassages(AgentId("agent-1"))
+        passageProxy.refreshPassages(AgentId("agent-1"))
         advanceUntilIdle()
 
         assertEquals(listOf("passage-b"), rebuiltPassages.value.map { it.id })

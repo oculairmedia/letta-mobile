@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
@@ -17,10 +18,15 @@ import kotlinx.coroutines.sync.withLock
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.ToolUnavailableException
 import kotlinx.coroutines.CancellationException
-import javax.inject.Inject
 
-open class ToolRepository @Inject constructor(
-    private val toolApi: ToolApi,
+/**
+ * The tool library: served by an Iroh host's `admin_rpc` relay (`tool.list` / `tool.get`).
+ * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
+ * route (the Letta REST backend was removed), so without an Iroh host tool calls fail with a
+ * no-route error.
+ */
+open class ToolRepository(
+    private val remote: ToolRemoteSource = noAppServerRoute(),
     private val irohToolSource: IrohAdminRpcToolSource? = null,
 ) : IToolRepository {
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
@@ -35,9 +41,8 @@ open class ToolRepository @Inject constructor(
     }
 
     /**
-     * HTTP backends answer from `/v1/tools/count`. admin_rpc has no count method, so on an iroh://
-     * backend the count is the size of the `tool.list` catalog (refreshed when stale) instead of an
-     * HTTP call the iroh guard rejects.
+     * admin_rpc has no count method, so on an iroh:// backend the count is the size of the
+     * `tool.list` catalog (refreshed when stale).
      */
     override suspend fun countTools(): Int {
         val irohSource = irohToolSource
@@ -45,7 +50,7 @@ open class ToolRepository @Inject constructor(
             refreshToolsIfStale(IROH_COUNT_MAX_AGE_MS)
             return _tools.value.size
         }
-        return toolApi.countTools()
+        return remote.countTools()
     }
 
     override suspend fun refreshTools() = refreshMutex.withLock {
@@ -59,7 +64,7 @@ open class ToolRepository @Inject constructor(
             lastRefreshAtMillis = System.currentTimeMillis()
             return
         }
-        _tools.update { toolApi.listTools() }
+        _tools.update { remote.listTools() }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
@@ -78,17 +83,16 @@ open class ToolRepository @Inject constructor(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.listTools(limit = limit, offset = offset)
         }
-        return toolApi.listTools(limit = limit, offset = offset)
+        return remote.listTools(limit = limit, offset = offset)
     }
 
     /**
-     * HTTP backends read `GET /v1/tools/{id}`. Under iroh:// that route has no admin_rpc path (the
-     * guard rejects it), so the tool comes from `tool.get`, falling back to the cached `tool.list`
-     * catalog when the host does not expose it. A miss is a typed NOT_FOUND, not a generic failure.
+     * Under iroh:// the tool comes from `tool.get`, falling back to the cached `tool.list` catalog
+     * when the host does not expose it. A miss is a typed NOT_FOUND, not a generic failure.
      */
     override suspend fun getTool(toolId: String): Tool {
         val irohSource = irohToolSource
-        if (irohSource == null || !irohSource.shouldUseIroh()) return toolApi.getTool(toolId)
+        if (irohSource == null || !irohSource.shouldUseIroh()) return remote.getTool(ToolId(toolId))
         // tool.get first so a tool changed/deleted since the catalog loaded is not served stale;
         // the cached catalog is only the fallback for hosts without tool.get.
         return irohGetOrNull(irohSource, toolId)
@@ -126,7 +130,7 @@ open class ToolRepository @Inject constructor(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.attachTool(agentId, toolId)
         } else {
-            toolApi.attachTool(agentId.value, toolId.value)
+            remote.attachTool(agentId, toolId)
         }
         val tool = _tools.value.find { it.id == toolId }
         if (tool != null) {
@@ -142,7 +146,7 @@ open class ToolRepository @Inject constructor(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.detachTool(agentId, toolId)
         } else {
-            toolApi.detachTool(agentId.value, toolId.value)
+            remote.detachTool(agentId, toolId)
         }
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     val existing = get(agentId.value) ?: emptyList()
@@ -155,7 +159,7 @@ open class ToolRepository @Inject constructor(
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.createTool(params)
         } else {
-            toolApi.upsertTool(params)
+            remote.upsertTool(params)
         }
         _tools.update { current ->
             val index = current.indexOfFirst { it.id == tool.id }
@@ -169,7 +173,7 @@ open class ToolRepository @Inject constructor(
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.updateTool(toolId, params)
         } else {
-            toolApi.updateTool(toolId.value, params)
+            remote.updateTool(toolId, params)
         }
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
@@ -187,7 +191,7 @@ open class ToolRepository @Inject constructor(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteTool(toolId)
         } else {
-            toolApi.deleteTool(toolId.value)
+            remote.deleteTool(toolId)
         }
         _tools.update { current -> current.filterNot { it.id == toolId } }
         _toolsByAgent.update { current ->

@@ -1,59 +1,23 @@
 package com.letta.mobile.data.commands
 
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Platform-neutral slash-command API. The server exposes per-agent slash
- * commands at `GET /v1/agents/{id}/slash-commands` (builtins like `/goal` plus
- * any installed skill's commands). Selecting one fills the composer with its
- * command text so the user can add args and send.
+ * Platform-neutral slash-command API: an agent's slash commands. Selecting one fills the composer
+ * with its command text so the user can add args and send.
  *
- * Lives in commonMain; HTTP hosts use [SlashCommandApi], iroh:// hosts use
- * [com.letta.mobile.data.repository.iroh.IrohSlashCommandApi].
+ * A direct App Server uses [AppServerSlashCommandApi] (its supported `execute_command` ids);
+ * iroh:// hosts use [com.letta.mobile.data.repository.iroh.IrohSlashCommandApi]. letta-mobile-ckmub.4
+ * removed the Letta REST implementation (`/v1/agents/{id}/slash-commands`).
  */
 interface SlashCommandsApi : AutoCloseable {
     suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand>
     override fun close() = Unit
-}
-
-class SlashCommandApi(
-    private val config: LettaConfig,
-    private val httpClient: HttpClient,
-) : SlashCommandsApi {
-    private val baseUrl = config.serverUrl.trimEnd('/')
-
-    override suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
-        val response = httpClient.get("$baseUrl/v1/agents/$agentId/slash-commands") { applyAuth() }
-        response.requireSuccess()
-        return response.body<SlashCommandsResponse>().commands
-    }
-
-    override fun close() {
-        httpClient.close()
-    }
-
-    private fun HttpRequestBuilder.applyAuth() {
-        config.accessToken?.trim()?.takeIf { it.isNotBlank() }?.let(::bearerAuth)
-    }
-
-    private suspend fun HttpResponse.requireSuccess() {
-        if (status.value !in 200..299) {
-            throw IllegalStateException("Slash command API ${status.value}: ${bodyAsText()}")
-        }
-    }
 }
 
 @Serializable

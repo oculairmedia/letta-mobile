@@ -1,5 +1,7 @@
 ﻿package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
@@ -118,15 +120,15 @@ class DesktopChatControllerSnapshotTest {
                     progress: com.letta.mobile.data.timeline.TimelinePageProgress?,
                 ) = error("Presentation must not eagerly fetch")
                 override suspend fun sendConversationMessage(
-                    conversationId: String,
+                    conversationId: ConversationId,
                     request: com.letta.mobile.data.model.MessageCreateRequest,
                 ) = error("No send")
-                override suspend fun streamConversation(conversationId: String) = error("No stream")
+                override suspend fun streamConversation(conversationId: ConversationId) = error("No stream")
                 override suspend fun listConversationMessages(
-                    conversationId: String, limit: Int?, after: String?, order: String?,
+                    conversationId: ConversationId, limit: Int?, after: String?, order: String?,
                 ) = error("No legacy hydration")
                 override suspend fun listAgentMessages(
-                    agentId: String, limit: Int?, order: String?, conversationId: String?,
+                    agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
                 ) = error("No legacy hydration")
             },
         )
@@ -204,7 +206,7 @@ class DesktopChatControllerSnapshotTest {
         val hydrationStarted = CompletableDeferred<Unit>()
 
         override suspend fun listConversationMessages(
-            conversationId: String,
+            conversationId: ConversationId,
             limit: Int?,
             after: String?,
             order: String?,

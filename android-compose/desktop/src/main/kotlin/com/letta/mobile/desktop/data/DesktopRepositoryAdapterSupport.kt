@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.data
 
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -40,19 +39,7 @@ internal fun buildIrohRepositories(
     )
 }
 
-internal fun buildHttpAdminRepositories(
-    config: LettaConfig?,
-    irohMode: Boolean,
-): DesktopLettaHttpAdminRepositories? =
-    config
-        ?.takeIf { it.serverUrl.isNotBlank() && !irohMode }
-        ?.let(::DesktopLettaHttpAdminRepositories)
-
-internal inline fun <reified T : Any> selectIrohOrHttp(
-    iroh: T?,
-    http: T?,
-): T = iroh ?: http ?: unavailableRepository()
-
+@Suppress("NoAnyType") // java.lang.reflect.Proxy is typed on Any.
 internal inline fun <reified T : Any> unavailableRepository(): T {
     val contract = T::class.java
     val handler = UnavailableRepositoryInvocationHandler(contract.simpleName)
@@ -63,6 +50,7 @@ internal inline fun <reified T : Any> unavailableRepository(): T {
     ) as T
 }
 
+@Suppress("NoAnyType") // InvocationHandler's signature and the defaults it returns are untyped by design.
 internal class UnavailableRepositoryInvocationHandler(
     private val contractName: String,
 ) : InvocationHandler {

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -88,13 +90,13 @@ class TimelineRemotePageContractTest {
     fun `default before rejection performs no legacy request`() = runTest {
         var calls = 0
         val transport = object : TimelineTransport {
-            override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
-            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
+            override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+            override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = emptyFlow()
+            override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> {
                 calls++
                 return emptyList()
             }
-            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
+            override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<LettaMessage> = emptyList()
         }
 
         assertFailsWith<TimelineRemotePageException.InvalidRequest> { transport.listConversationMessagePage(request) }
@@ -106,17 +108,17 @@ class TimelineRemotePageContractTest {
         var tailCalls = 0
         var olderRequest: List<Any?>? = null
         val transport = object : TimelineTransport {
-            override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
-            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
+            override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+            override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = emptyFlow()
+            override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> {
                 tailCalls++
                 return emptyList()
             }
-            override suspend fun listConversationMessagesBefore(conversationId: String, limit: Int, before: String, order: String): List<LettaMessage> {
-                olderRequest = listOf(conversationId, limit, before, order)
+            override suspend fun listConversationMessagesBefore(conversationId: ConversationId, limit: Int, before: String, order: String): List<LettaMessage> {
+                olderRequest = listOf(conversationId.value, limit, before, order)
                 return listOf(message("old-1", "2026-01-01T00:00:01Z"), message("old-0", "2026-01-01T00:00:00Z"))
             }
-            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
+            override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<LettaMessage> = emptyList()
         }
 
         val page = assertIs<TimelineRemotePageResult.Page>(transport.listConversationMessagePage(request))

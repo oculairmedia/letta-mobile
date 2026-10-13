@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ToolCall
@@ -244,7 +245,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
         private val afterToolCall: suspend () -> Unit = {},
     ) : TimelineTransport by EmptyTimelineTransport {
         override suspend fun sendConversationMessage(
-            conversationId: String,
+            conversationId: ConversationId,
             request: MessageCreateRequest,
         ): Flow<LettaMessage> = flow {
             emit(

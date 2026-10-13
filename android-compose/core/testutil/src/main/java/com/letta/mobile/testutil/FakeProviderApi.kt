@@ -1,15 +1,15 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProviderApi
+import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCheckParams
 import com.letta.mobile.data.model.ProviderCreateParams
 import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
-import io.mockk.mockk
 
-class FakeProviderApi : ProviderApi(mockk(relaxed = true)) {
+open class FakeProviderApi : ProviderRemoteSource by noAppServerRoute<ProviderRemoteSource>() {
     var providers = mutableListOf<Provider>()
     var shouldFail = false
     val calls = mutableListOf<String>()

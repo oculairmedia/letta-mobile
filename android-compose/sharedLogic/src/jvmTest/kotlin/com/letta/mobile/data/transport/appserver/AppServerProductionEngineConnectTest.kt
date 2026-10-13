@@ -80,8 +80,8 @@ class AppServerProductionEngineConnectTest {
     }
 
     @Test
-    fun desktopLettaHttpClientCompletesARealFrameExchange() {
-        assertRealConnectSucceeds(desktopLettaHttpClient())
+    fun desktopAppServerHttpClientCompletesARealFrameExchange() {
+        assertRealConnectSucceeds(desktopAppServerHttpClient())
     }
 
     @Test
@@ -180,7 +180,7 @@ class AppServerProductionEngineConnectTest {
     private fun productionClients(): List<Pair<String, () -> HttpClient>> = listOf(
         "iroh-wrapper-cli live controller" to ::irohWrapperLiveControllerClient,
         "iroh-wrapper-cli stub controller" to ::irohWrapperStubControllerClient,
-        "desktop createDesktopLettaHttpClient" to ::desktopLettaHttpClient,
+        "desktop createDesktopAppServerHttpClient" to ::desktopAppServerHttpClient,
         "appserver-cli restart-replay probe" to ::appServerCliProbeClient,
     )
 
@@ -209,13 +209,13 @@ class AppServerProductionEngineConnectTest {
 
     /**
      * SOURCE: `desktop/src/main/kotlin/com/letta/mobile/desktop/chat/
-     * DesktopChatGateway.kt` — `createDesktopLettaHttpClient`. The desktop
+     * DesktopChatGateway.kt` — `createDesktopAppServerHttpClient`. The desktop
      * `engine { https { trustManager = NativeTrustManager.trustManager } }`
      * block is deliberately omitted: it is desktop-only wiring that affects TLS
      * trust, not the WebSocket handshake this test guards. Everything that
      * touches engine/plugin compatibility is mirrored.
      */
-    private fun desktopLettaHttpClient(): HttpClient = HttpClient(ClientCIO) {
+    private fun desktopAppServerHttpClient(): HttpClient = HttpClient(ClientCIO) {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = true }) }
         install(ClientWebSockets) { applyAppServerFrameLimits() }
         install(HttpTimeout) {

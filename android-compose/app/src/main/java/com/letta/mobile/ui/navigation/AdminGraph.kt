@@ -10,17 +10,11 @@ import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
-import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
-import com.letta.mobile.ui.screens.folders.FolderAdminScreen
-import com.letta.mobile.ui.screens.groups.GroupAdminScreen
-import com.letta.mobile.ui.screens.identities.IdentityListScreen
-import com.letta.mobile.ui.screens.jobs.JobMonitorScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.mcp.McpServerToolsScreen
 import com.letta.mobile.ui.screens.memory.MemoryOverviewScreen
-import com.letta.mobile.ui.screens.messagebatches.MessageBatchMonitorScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
@@ -60,15 +54,9 @@ fun NavGraphBuilder.adminGraph(
             onNavigateToConversation = { agentId, conversationId -> navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId)) },
             onNavigateToUsage = { navController.navigate(UsageRoute) },
             onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
-            onNavigateToArchives = { navController.navigate(ArchivesRoute) },
-            onNavigateToFolders = { navController.navigate(FoldersRoute) },
-            onNavigateToGroups = { navController.navigate(GroupsRoute) },
             onNavigateToProviders = { navController.navigate(ProvidersRoute) },
-            onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
             onNavigateToSchedules = { navController.navigate(SchedulesRoute()) },
             onNavigateToRuns = { navController.navigate(RunsRoute) },
-            onNavigateToJobs = { navController.navigate(JobsRoute) },
-            onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
             onNavigateToMcp = { navController.navigate(McpRoute) },
             onNavigateToAbout = { navController.navigate(AboutRoute) },
             onNavigateToTelemetry = { navController.navigate(TelemetryRoute) },
@@ -135,23 +123,8 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
-    composable<ArchivesRoute> {
-        ArchiveAdminScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
-    composable<FoldersRoute> {
-        FolderAdminScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
-    composable<GroupsRoute> {
-        GroupAdminScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
     composable<ProvidersRoute> {
         ProviderAdminScreen(
@@ -165,11 +138,6 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
-    composable<IdentitiesRoute> {
-        IdentityListScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
     composable<SchedulesRoute> {
         ScheduleListScreen(
@@ -189,17 +157,7 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
-    composable<JobsRoute> {
-        JobMonitorScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
-    composable<MessageBatchesRoute> {
-        MessageBatchMonitorScreen(
-            onNavigateBack = { navController.popBackStack() },
-        )
-    }
 
     composable<McpRoute> {
         McpScreen(

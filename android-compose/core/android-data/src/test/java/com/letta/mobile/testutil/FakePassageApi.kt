@@ -1,12 +1,12 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.PassageApi
+import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
-import io.mockk.mockk
 
-class FakePassageApi : PassageApi(mockk(relaxed = true)) {
+open class FakePassageApi : PassageRemoteSource by noAppServerRoute<PassageRemoteSource>() {
     private val passagesByAgent = mutableMapOf<String, MutableList<Passage>>()
     var shouldFail = false
     val calls = mutableListOf<String>()

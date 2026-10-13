@@ -1,7 +1,8 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.McpServerApi
+import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerId
@@ -10,13 +11,12 @@ import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
-import io.mockk.mockk
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
+open class FakeMcpServerApi : McpServerRemoteSource by noAppServerRoute<McpServerRemoteSource>() {
     var servers = mutableListOf<McpServer>()
     var serverTools = mutableMapOf<String, List<Tool>>()
     var resyncResults = mutableMapOf<String, McpServerResyncResult>()

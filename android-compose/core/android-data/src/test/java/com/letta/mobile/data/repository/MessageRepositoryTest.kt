@@ -2,9 +2,6 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.BatchMessageRequest
-import com.letta.mobile.data.model.CreateBatchMessagesRequest
-import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.model.UserMessage
@@ -128,45 +125,18 @@ class MessageRepositoryTest {
     }
 
     @Test
-    fun `search and batch operations delegate exact request objects`() = runTest {
+    fun `search delegates the exact request object`() = runTest {
         val searchRequest = MessageSearchRequest(query = "needle", roles = listOf("assistant"), limit = 3)
         val searchResult = MessageSearchResult(
             embeddedText = "needle result",
             message = JsonObject(mapOf("id" to JsonPrimitive("msg-1"))),
         )
         fakeApi.searchResults.add(searchResult)
-        fakeApi.batches.add(Job(id = "job-1", status = "pending"))
-        val batchRequest = CreateBatchMessagesRequest(
-            requests = listOf(BatchMessageRequest(agentId = "agent-1", messages = emptyList())),
-        )
 
         val search = repository.searchMessages(searchRequest)
-        val batch = repository.createBatch(batchRequest)
 
         assertEquals(listOf(searchResult), search)
         assertSame(searchRequest, fakeApi.lastSearchRequest)
-        assertEquals("job-1", batch.id)
-        assertSame(batchRequest, fakeApi.lastCreateBatchRequest)
-    }
-
-    @Test
-    fun `batch listing and cancellation preserve batch id and optional agent filter`() = runTest {
-        fakeApi.batches.add(Job(id = "job-1", status = "running"))
-        fakeApi.batchMessagesByBatchId["job-1"] = listOf(
-            com.letta.mobile.data.model.BatchMessage(id = "m1", agentId = "agent-1"),
-            com.letta.mobile.data.model.BatchMessage(id = "m2", agentId = "agent-2"),
-        )
-
-        val batches = repository.listBatches()
-        val messages = repository.listBatchMessages("job-1", agentId = "agent-1")
-        repository.cancelBatch("job-1")
-
-        assertEquals(listOf("job-1"), batches.map { it.id })
-        assertEquals(listOf("m1"), messages.messages.map { it.id })
-        assertEquals("cancelled", fakeApi.batches.single().status)
-        assertTrue(fakeApi.calls.contains("listBatches"))
-        assertTrue(fakeApi.calls.contains("listBatchMessages:job-1:agent-1"))
-        assertTrue(fakeApi.calls.contains("cancelBatch:job-1"))
     }
 
     @Test
@@ -181,11 +151,14 @@ class MessageRepositoryTest {
         assertEquals(1, fakeApi.calls.count { it == "resetMessages:agent-1" })
     }
 
-    @Test(expected = ApiException::class)
+    @Test
     fun `fetchOlderMessages propagates api failures for explicit pagination`() = runTest {
-        fakeApi.shouldFail = true
+        val failure = runCatching {
+            fakeApi.shouldFail = true
 
-        repository.fetchOlderMessages("agent-1", "conv-1", "before-1")
+            repository.fetchOlderMessages("agent-1", "conv-1", "before-1")
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected ApiException, got $failure", failure is ApiException)
     }
 
     @Test

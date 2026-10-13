@@ -3,10 +3,7 @@ package com.letta.mobile.data.repository.api
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.model.BatchMessagesResponse
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.CreateBatchMessagesRequest
-import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import kotlinx.coroutines.flow.Flow
@@ -82,12 +79,6 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     suspend fun cancelMessage(agentId: AgentId, runIds: List<String>? = null): Map<String, String>
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> = cancelMessage(AgentId(agentId), runIds)
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult>
-    suspend fun createBatch(request: CreateBatchMessagesRequest): Job
-    suspend fun retrieveBatch(batchId: String): Job
-    suspend fun listBatches(): List<Job>
-    suspend fun listBatchMessages(batchId: String, agentId: AgentId? = null): BatchMessagesResponse
-    suspend fun listBatchMessages(batchId: String, agentId: String?): BatchMessagesResponse = listBatchMessages(batchId, agentId?.let(::AgentId))
-    suspend fun cancelBatch(batchId: String)
 
     suspend fun submitApproval(
         agentId: AgentId,

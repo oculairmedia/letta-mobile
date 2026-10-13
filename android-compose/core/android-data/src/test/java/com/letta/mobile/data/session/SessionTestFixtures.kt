@@ -1,17 +1,11 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.testutil.FakeAgentApi
-import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
-import com.letta.mobile.testutil.FakeFolderApi
-import com.letta.mobile.testutil.FakeGroupApi
-import com.letta.mobile.testutil.FakeIdentityApi
-import com.letta.mobile.testutil.FakeJobApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi
@@ -35,8 +29,6 @@ import org.junit.Assert.assertEquals
 // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because the
 // production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
 private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
-
-internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
 internal data class ProxySwitchScenario<T, R>(
     val setupGraph: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit,
@@ -112,18 +104,12 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
     var conversationDao: dagger.Lazy<ConversationDao> = lazyOf(FakeConversationDao()),
-    var archiveApi: FakeArchiveApi = FakeArchiveApi(),
-    var folderApi: FakeFolderApi = FakeFolderApi(),
-    var groupApi: FakeGroupApi = FakeGroupApi(),
-    var identityApi: FakeIdentityApi = FakeIdentityApi(),
-    var lettaApiClient: LettaApiClient = fakeLettaApiClient(),
     var mcpServerApi: FakeMcpServerApi = FakeMcpServerApi(),
     var modelApi: FakeModelApi = FakeModelApi(),
     var passageApi: FakePassageApi = FakePassageApi(),
     var projectApi: FakeProjectApi = FakeProjectApi(),
     var projectWorkApi: FakeProjectWorkApi = FakeProjectWorkApi(),
     var runApi: FakeRunApi = FakeRunApi(),
-    var jobApi: FakeJobApi = FakeJobApi(),
     var providerApi: FakeProviderApi = FakeProviderApi(),
     var scheduleApi: FakeScheduleApi = FakeScheduleApi(),
     var stepApi: FakeStepApi = FakeStepApi(),
@@ -133,28 +119,27 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var appContext: android.content.Context = mockk(relaxed = true),
     var cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
 ) {
+    /** The fakes stand in for a non-App-Server backend through the letta-mobile-ckmub.4 seam. */
+    private fun remoteSources() = SessionRemoteSources(
+        agents = agentApi,
+        conversations = conversationApi,
+        mcpServers = mcpServerApi,
+        models = modelApi,
+        passages = passageApi,
+        projects = projectApi,
+        projectWork = projectWorkApi,
+        providers = providerApi,
+        runs = runApi,
+        schedules = scheduleApi,
+        steps = stepApi,
+        tools = toolApi,
+    )
+
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(
         assembler = SessionGraphAssembler(
-            agentApi = agentApi,
             agentDao = agentDao,
-            conversationApi = conversationApi,
             conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
+            remoteSources = remoteSources(),
         ),
         channelTransportFactory = SessionChannelTransportFactory(appContext = appContext),
         settingsRepository = settingsRepository,

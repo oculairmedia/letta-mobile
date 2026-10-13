@@ -1,7 +1,8 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.RunApi
+import com.letta.mobile.data.repository.api.RunRemoteSource
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.Run
@@ -9,9 +10,8 @@ import com.letta.mobile.data.model.RunMetrics
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.UsageStatistics
-import io.mockk.mockk
 
-class FakeRunApi : RunApi(mockk(relaxed = true)) {
+open class FakeRunApi : RunRemoteSource by noAppServerRoute<RunRemoteSource>() {
     var runs = mutableListOf<Run>()
     var runMessages = mutableMapOf<String, List<LettaMessage>>()
     var runUsage = mutableMapOf<String, UsageStatistics>()

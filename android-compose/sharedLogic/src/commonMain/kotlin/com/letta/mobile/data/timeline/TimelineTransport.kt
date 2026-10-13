@@ -1,19 +1,22 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.model.MessageCreateRequest
 import kotlinx.coroutines.flow.Flow
 
 interface TimelineTransport {
     suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage>
 
-    suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame>
+    suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame>
 
     suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int? = null,
         after: String? = null,
         order: String? = null,
@@ -25,7 +28,7 @@ interface TimelineTransport {
      * which would silently re-serve the newest page as "older history".
      */
     suspend fun listConversationMessagesBefore(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int,
         before: String,
         order: String,
@@ -37,22 +40,22 @@ interface TimelineTransport {
     ): TimelineRemotePageResult {
         val page = TimelineRemotePageAdapter.load(request) { limit, before, after, order ->
             if (before != null) {
-                listConversationMessagesBefore(request.scope.conversationId, limit, before, order)
+                listConversationMessagesBefore(ConversationId(request.scope.conversationId), limit, before, order)
                     ?: throw TimelineRemotePageException.InvalidRequest(
                         "this transport does not implement before-continuation pages",
                     )
             } else {
-                listConversationMessages(request.scope.conversationId, limit, after, order)
+                listConversationMessages(ConversationId(request.scope.conversationId), limit, after, order)
             }
         }
         return progress?.let { TimelineRemotePageProgressClassifier.classify(request, page, it) } ?: page
     }
 
     suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int? = null,
         order: String? = null,
-        conversationId: String? = null,
+        conversationId: ConversationId? = null,
     ): List<LettaMessage>
 
     /**
@@ -62,8 +65,8 @@ interface TimelineTransport {
      * responses (plain HTTP) and therefore has nothing to hydrate.
      */
     suspend fun getToolReturn(
-        conversationId: String,
-        messageId: String,
+        conversationId: ConversationId,
+        messageId: MessageId,
     ): LettaMessage? = null
 }
 

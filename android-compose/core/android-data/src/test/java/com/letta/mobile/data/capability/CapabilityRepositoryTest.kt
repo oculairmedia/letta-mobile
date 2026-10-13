@@ -1,8 +1,5 @@
 package com.letta.mobile.data.capability
 
-import com.letta.mobile.data.api.AdminApiUnavailableForLocalRuntimeException
-import com.letta.mobile.data.api.LettaApiClient
-import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
@@ -32,49 +29,30 @@ class CapabilityRepositoryTest {
     @Test
     fun `local runtime config skips project probe and defaults unsupported`() = runTest {
         val settings = FakeSettingsRepository(initialActiveConfig = localConfig())
-        val projectApi = FakeProjectApi { error("local config must not probe Admin API") }
-        val repository = repository(settings, projectApi)
+        val repository = repository(settings)
         advanceUntilIdle()
 
         assertFalse(repository.projectsSupported.value)
         assertFalse(repository.projectWorkSupported.value)
-        assertEquals(0, projectApi.probeCount)
     }
 
+    /** letta-mobile-ckmub.4: only an Iroh host relays projects; a non-Iroh remote has no route. */
     @Test
-    fun `remote config still probes project capability`() = runTest {
+    fun `non-iroh remote config has no project route`() = runTest {
         val settings = FakeSettingsRepository(initialActiveConfig = remoteConfig())
-        val projectApi = FakeProjectApi { true }
-        val repository = repository(settings, projectApi)
-        advanceUntilIdle()
-
-        assertTrue(repository.projectsSupported.value)
-        assertTrue(repository.projectWorkSupported.value)
-        assertEquals(1, projectApi.probeCount)
-    }
-
-    @Test
-    fun `probe exception marks projects unsupported without escaping collector`() = runTest {
-        val settings = FakeSettingsRepository(initialActiveConfig = remoteConfig(id = "remote-1"))
-        val projectApi = FakeProjectApi { throw AdminApiUnavailableForLocalRuntimeException() }
-        val repository = repository(settings, projectApi)
-        advanceUntilIdle()
-        settings.activeConfigState.value = remoteConfig(id = "remote-2")
+        val repository = repository(settings)
         advanceUntilIdle()
 
         assertFalse(repository.projectsSupported.value)
         assertFalse(repository.projectWorkSupported.value)
-        assertEquals(2, projectApi.probeCount)
     }
 
     @Test
     fun `iroh config keeps projects probe but disables project work`() = runTest {
         val settings = irohSettings()
-        val projectApi = noHttpProbeProjectApi()
         val irohSource = emptyCatalogIrohSource(settings)
         val repository = irohRepository(
             settings = settings,
-            projectApi = projectApi,
             irohSource = irohSource,
             sessionManager = sessionManagerWithTransport(irohChannelTransport()),
         )
@@ -82,14 +60,12 @@ class CapabilityRepositoryTest {
 
         assertTrue(repository.projectsSupported.value)
         assertFalse(repository.projectWorkSupported.value)
-        assertEquals(0, projectApi.probeCount)
         assertEquals(1, irohSource.probeCount)
     }
 
     @Test
     fun `iroh probe defers when transport is not ready and retries after session rebuild`() = runTest {
         val settings = irohSettings()
-        val projectApi = noHttpProbeProjectApi()
         val staleTransport = mockk<IChannelTransport>(relaxed = true)
         val irohTransport = irohChannelTransport()
         val graphFlow = MutableStateFlow(sessionGraph(id = 1L, transport = staleTransport))
@@ -100,7 +76,6 @@ class CapabilityRepositoryTest {
         val irohSource = emptyCatalogIrohSource(settings)
         val repository = irohRepository(
             settings = settings,
-            projectApi = projectApi,
             irohSource = irohSource,
             sessionManager = sessionManager,
         )
@@ -124,33 +99,20 @@ class CapabilityRepositoryTest {
 
     private fun TestScope.testScope() = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
 
-    private fun TestScope.repository(
-        settings: FakeSettingsRepository,
-        projectApi: FakeProjectApi,
-    ) = CapabilityRepository(
-        settings,
-        projectApi,
-        testScope(),
-    )
+    private fun TestScope.repository(settings: FakeSettingsRepository) = CapabilityRepository(settings, testScope())
 
     private fun TestScope.irohRepository(
         settings: FakeSettingsRepository,
-        projectApi: FakeProjectApi,
         irohSource: FakeIrohProjectSource,
         sessionManager: SessionManager,
     ) = CapabilityRepository(
         settingsRepository = settings,
-        projectApi = projectApi,
         irohProjectSource = irohSource,
         sessionManager = sessionManager,
         scope = testScope(),
     )
 
     private fun irohSettings() = FakeSettingsRepository(initialActiveConfig = irohConfig())
-
-    private fun noHttpProbeProjectApi() = FakeProjectApi {
-        error("HTTP probe must not run for iroh backend")
-    }
 
     private fun emptyCatalogIrohSource(settings: ISettingsRepository) = FakeIrohProjectSource(
         settings = settings,
@@ -177,17 +139,6 @@ class CapabilityRepositoryTest {
             every { this@mockk.id } returns id
             every { channelTransport } returns transport
         }
-
-    private class FakeProjectApi(
-        private val probeResult: suspend () -> Boolean,
-    ) : ProjectApi(apiClient = mockk<LettaApiClient>()) {
-        var probeCount = 0
-
-        override suspend fun probeAvailability(): Boolean {
-            probeCount += 1
-            return probeResult()
-        }
-    }
 
     private class FakeIrohProjectSource(
         settings: ISettingsRepository,

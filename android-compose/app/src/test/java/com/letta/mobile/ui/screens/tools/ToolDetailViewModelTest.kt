@@ -55,7 +55,7 @@ class ToolDetailViewModelTest {
         val tool = TestData.tool(id = "t1", name = "my_tool", description = "Does things")
         fakeToolApi.tools.add(tool.copy(toolType = "custom", sourceCode = "def my_tool():\n    return 'ok'"))
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
         val state = awaitToolSuccess(viewModel)
         assertEquals("my_tool", state.name)
         assertEquals("Does things", state.description)
@@ -65,14 +65,14 @@ class ToolDetailViewModelTest {
     fun `loadTool sets Error on failure`() = runTest {
         fakeToolApi.shouldFail = true
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
         assertTrue(viewModel.uiState.first { it is UiState.Error } is UiState.Error)
     }
 
     @Test
     fun `loadTool sets Error for missing tool`() = runTest {
         val savedState = SavedStateHandle(mapOf("toolId" to "nonexistent"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
         assertTrue(viewModel.uiState.first { it is UiState.Error } is UiState.Error)
     }
 
@@ -87,7 +87,7 @@ class ToolDetailViewModelTest {
                 return tool
             }
         }
-        val viewModel = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "t1")), api, repo, agentRepository)
+        val viewModel = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "t1")), repo, agentRepository)
         assertEquals("my_tool", awaitToolSuccess(viewModel).name)
         assertEquals(listOf("t1"), requested)
         assertTrue(api.calls.none { it.startsWith("getTool") })
@@ -95,7 +95,7 @@ class ToolDetailViewModelTest {
 
     @Test
     fun `loadTool missing tool surfaces a not found message and retry refetches`() = runTest {
-        val vm = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "nonexistent")), fakeToolApi, toolRepository, agentRepository)
+        val vm = ToolDetailViewModel(SavedStateHandle(mapOf("toolId" to "nonexistent")), toolRepository, agentRepository)
         val error = vm.uiState.first { it is UiState.Error } as UiState.Error
         assertTrue(error.message, error.message.contains("Not found"))
         fakeToolApi.tools.add(TestData.tool(id = "nonexistent"))
@@ -112,7 +112,7 @@ class ToolDetailViewModelTest {
             )
         )
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
         awaitToolSuccess(viewModel)
 
         viewModel.updateTool(
@@ -122,9 +122,10 @@ class ToolDetailViewModelTest {
         )
 
         val state = awaitToolSuccess(viewModel)
-        assertEquals("my_tool_v2", state.name)
         assertEquals("Updated", state.description)
-        assertTrue(fakeToolApi.calls.contains("generateJsonSchema:python"))
+        assertEquals("def my_tool_v2():\n    return 'updated'", state.sourceCode)
+        // letta-mobile-ckmub.4: the schema is no longer generated client-side through the REST server.
+        assertTrue(fakeToolApi.calls.none { it.startsWith("generateJsonSchema") })
     }
 
     @Test
@@ -133,7 +134,7 @@ class ToolDetailViewModelTest {
             TestData.tool(id = "t1", name = "my_tool").copy(toolType = "custom", sourceCode = "def my_tool():\n    return 'ok'")
         )
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
 
         viewModel.deleteTool()
 
@@ -144,7 +145,7 @@ class ToolDetailViewModelTest {
     fun `deleteTool sets error on failure`() = runTest {
         fakeToolApi.shouldFail = true
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepository, agentRepository)
 
         viewModel.deleteTool()
 
@@ -156,7 +157,7 @@ class ToolDetailViewModelTest {
         fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
         val toolRepo = FakeToolRepository(fakeToolApi)
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepo, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepo, agentRepository)
 
         viewModel.attachToAgent("a1")
 
@@ -168,7 +169,7 @@ class ToolDetailViewModelTest {
         fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
         val toolRepo = FakeToolRepository(fakeToolApi)
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepo, agentRepository)
+        val viewModel = ToolDetailViewModel(savedState, toolRepo, agentRepository)
 
         viewModel.detachFromAgent("a1")
 

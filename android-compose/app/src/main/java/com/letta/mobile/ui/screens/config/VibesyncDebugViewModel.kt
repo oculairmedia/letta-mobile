@@ -1,20 +1,15 @@
 package com.letta.mobile.ui.screens.config
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.api.VibesyncAdminApi
-import com.letta.mobile.data.api.VibesyncDebugApi
 import com.letta.mobile.data.model.AgentsMdRefreshSummary
 import com.letta.mobile.data.model.VibesyncHealthResponse
 import com.letta.mobile.data.model.VibesyncStatsResponse
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.util.runCatchingCancellable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 data class VibesyncDebugUiState(
     val health: VibesyncHealthResponse? = null,
@@ -24,51 +19,28 @@ data class VibesyncDebugUiState(
     val isRefreshingAgentsMd: Boolean = false,
 )
 
+/**
+ * The VibeSync debug page. letta-mobile-ckmub.4: its health, stats and AGENTS.md refresh calls went
+ * over the Letta REST client to the admin shim, which is gone, and no App Server or Iroh route
+ * carries them; the page reports that instead of reaching for another server. The page itself is
+ * triaged by the Android admin-screen slice (ckmub S17).
+ */
 @HiltViewModel
-class VibesyncDebugViewModel @Inject constructor(
-    private val debugApi: VibesyncDebugApi,
-    private val adminApi: VibesyncAdminApi,
-) : ViewModel() {
-    private val _uiState = MutableStateFlow<UiState<VibesyncDebugUiState>>(UiState.Loading)
+class VibesyncDebugViewModel @Inject constructor() : ViewModel() {
+    private val _uiState = MutableStateFlow<UiState<VibesyncDebugUiState>>(UiState.Error(UNAVAILABLE))
     val uiState: StateFlow<UiState<VibesyncDebugUiState>> = _uiState.asStateFlow()
 
-    init { refresh() }
-
     fun refresh() {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            val healthResult = runCatchingCancellable { debugApi.getHealth() }
-            val statsResult = runCatchingCancellable { debugApi.getStats() }
-            val health = healthResult.getOrNull()
-            val stats = statsResult.getOrNull()
-            if (health != null || stats != null) {
-                _uiState.value = UiState.Success(
-                    VibesyncDebugUiState(
-                        health = health,
-                        stats = stats,
-                        healthError = healthResult.exceptionOrNull()?.message,
-                    )
-                )
-            } else {
-                val error = statsResult.exceptionOrNull() ?: healthResult.exceptionOrNull()
-                _uiState.value = UiState.Error(error?.message ?: "Failed to load vibesync status")
-            }
-        }
+        _uiState.value = UiState.Error(UNAVAILABLE)
     }
 
+    /** The AGENTS.md refresh has no route either; the page reports which request it could not make. */
     fun refreshAgentsMd(dryRun: Boolean = true) {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(isRefreshingAgentsMd = true))
-        viewModelScope.launch {
-            runCatchingCancellable { adminApi.refreshAgentsMd(dryRun = dryRun) }
-                .onSuccess { summary -> updateSuccess { it.copy(refreshSummary = summary) } }
-                .onFailure { _uiState.value = UiState.Error(it.message ?: "Failed to refresh AGENTS.md") }
-            updateSuccess { it.copy(isRefreshingAgentsMd = false) }
-        }
+        val request = if (dryRun) "AGENTS.md dry run" else "AGENTS.md refresh"
+        _uiState.value = UiState.Error("$request is not available: no App Server or Iroh route serves it.")
     }
 
-    private inline fun updateSuccess(transform: (VibesyncDebugUiState) -> VibesyncDebugUiState) {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(transform(current))
+    private companion object {
+        const val UNAVAILABLE = "VibeSync debug is not available: no App Server or Iroh route serves it."
     }
 }

@@ -8,17 +8,23 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import java.util.UUID
 
-internal data class DesktopLocalRepositoryBundle(
+internal data class DesktopAppServerRepositoryBundle(
     val agentRepository: IAgentRepository,
     val blockRepository: IAgentBlockRepository,
 )
 
-internal fun buildDesktopLocalRepositories(): DesktopLocalRepositoryBundle {
+/**
+ * Agents and memory blocks read over the App Server session [registry] holds: the bundled runtime's
+ * (`shared`) or any directly dialled App Server's (`direct`).
+ */
+internal fun buildDesktopAppServerRepositories(
+    registry: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry.shared,
+): DesktopAppServerRepositoryBundle {
     val transport = DefaultAppServerLocalRepositoryTransport(
-        clientProvider = DesktopLocalAppServerClientRegistry.shared::currentClient,
+        clientProvider = registry::currentClient,
         requestId = { operation -> "desktop-local-$operation-${UUID.randomUUID()}" },
     )
-    return DesktopLocalRepositoryBundle(
+    return DesktopAppServerRepositoryBundle(
         agentRepository = AppServerAgentRepository(transport),
         blockRepository = AppServerAgentBlockRepository(transport),
     )

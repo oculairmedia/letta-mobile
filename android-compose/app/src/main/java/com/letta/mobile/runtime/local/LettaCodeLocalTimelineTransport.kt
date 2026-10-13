@@ -1,5 +1,8 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.model.MessageId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -22,12 +25,12 @@ class LettaCodeLocalTimelineTransport @Inject constructor(
     private val store: LettaCodeLocalBackendStore,
 ) : TimelineTransport {
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> =
         error("Local-runtime sends route through the embedded runtime coordinator, not the timeline transport.")
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = flow {
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = flow {
         // Stay "connected" silently: completing would put the persistent
         // stream subscriber into a reconnect loop, and local frames arrive
         // via the embedded runtime coordinator instead.
@@ -35,23 +38,23 @@ class LettaCodeLocalTimelineTransport @Inject constructor(
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
     ): List<LettaMessage> {
-        val messages = store.readTranscript(agentIdFromLocalConversationId(conversationId))
+        val messages = store.readTranscript(agentIdFromLocalConversationId(conversationId.value))
         val limited = if (limit != null && messages.size > limit) messages.takeLast(limit) else messages
         return if (order == "desc") limited.reversed() else limited
     }
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
-        val messages = store.readTranscript(agentId)
+        val messages = store.readTranscript(agentId.value)
         val limited = if (limit != null && messages.size > limit) messages.takeLast(limit) else messages
         return if (order == "desc") limited.reversed() else limited
     }
@@ -89,34 +92,34 @@ class LocalRoutingTimelineTransport(
         if (LettaCodeLocalTimelineTransport.isLocalConversationId(conversationId)) local else remote
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
-    ): Flow<LettaMessage> = transportFor(conversationId).sendConversationMessage(conversationId, request)
+    ): Flow<LettaMessage> = transportFor(conversationId.value).sendConversationMessage(conversationId, request)
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        transportFor(conversationId).streamConversation(conversationId)
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> =
+        transportFor(conversationId.value).streamConversation(conversationId)
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = transportFor(conversationId).listConversationMessages(conversationId, limit, after, order)
+    ): List<LettaMessage> = transportFor(conversationId.value).listConversationMessages(conversationId, limit, after, order)
 
     override suspend fun listAgentMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> =
-        if (LettaCodeLocalTimelineTransport.isLocalAgentId(agentId)) {
+        if (LettaCodeLocalTimelineTransport.isLocalAgentId(agentId.value)) {
             local.listAgentMessages(agentId, limit, order, conversationId)
         } else {
             remote.listAgentMessages(agentId, limit, order, conversationId)
         }
 
     override suspend fun getToolReturn(
-        conversationId: String,
-        messageId: String,
-    ): LettaMessage? = transportFor(conversationId).getToolReturn(conversationId, messageId)
+        conversationId: ConversationId,
+        messageId: MessageId,
+    ): LettaMessage? = transportFor(conversationId.value).getToolReturn(conversationId, messageId)
 }

@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineBodyPointer
@@ -68,13 +70,13 @@ internal object NoTimelineTransport : TimelineTransport {
         request: com.letta.mobile.data.timeline.TimelineRemotePageRequest,
         progress: com.letta.mobile.data.timeline.TimelinePageProgress?,
     ) = error("Presentation must not eagerly fetch")
-    override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> =
+    override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> =
         error("No send")
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = error("No stream")
+    override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = error("No stream")
     override suspend fun listConversationMessages(
-        conversationId: String, limit: Int?, after: String?, order: String?,
+        conversationId: ConversationId, limit: Int?, after: String?, order: String?,
     ): List<LettaMessage> = error("No legacy hydration")
     override suspend fun listAgentMessages(
-        agentId: String, limit: Int?, order: String?, conversationId: String?,
+        agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
     ): List<LettaMessage> = error("No legacy hydration")
 }

@@ -1,20 +1,21 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.LettaApiClient
-import com.letta.mobile.data.api.SlashCommandApi
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Android binding for [CachedSlashCommandRepository]. Phase 5o. */
+/**
+ * Android binding for [CachedSlashCommandRepository]: slash commands over an Iroh host.
+ * letta-mobile-ckmub.4: the Letta REST source is gone, so the remote seam binds no route.
+ */
 @Singleton
 class SlashCommandRepository @Inject constructor(
-    apiClient: LettaApiClient,
     settingsRepository: ISettingsRepository,
     channelTransport: IChannelTransport,
 ) : CachedSlashCommandRepository(
-    remote = SlashCommandApi(apiClient),
+    remote = noAppServerRoute(),
     irohSource = IrohAdminRpcSlashCommandSource(
         channelTransport = channelTransport,
         settingsRepository = settingsRepository,

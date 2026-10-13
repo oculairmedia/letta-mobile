@@ -19,7 +19,6 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleLibraryController
-import com.letta.mobile.data.repository.http.LettaHttpAdminRepositoryException
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.home.DesktopHome
 import com.letta.mobile.data.home.HomePageController
@@ -164,7 +163,10 @@ internal fun rememberDesktopLibraryControllers(
     return DesktopLibraryControllers(memory, schedules, channels, tools, home, memfs)
 }
 
-/** The shared schedule library over the session graph; a 404/405/501 from the native route means "not served here". */
+/**
+ * The shared schedule library over the session graph. letta-mobile-ckmub.4: only an Iroh host relays
+ * schedules today, so the unavailable repository bound for other backends means "not served here".
+ */
 private fun desktopScheduleLibraryController(
     sessionGraphProvider: DesktopSessionGraphProvider,
     scope: CoroutineScope,
@@ -180,13 +182,9 @@ private fun desktopScheduleLibraryController(
                 else -> throwable.message ?: throwable::class.simpleName ?: fallback
             }
         },
-        scheduleAdminUnavailableMatcher = { throwable ->
-            throwable is LettaHttpAdminRepositoryException && throwable.code in ScheduleAdminUnavailableCodes
-        },
+        scheduleAdminUnavailableMatcher = { throwable -> throwable is DesktopRepositoryUnavailableException },
     )
 }
-
-private val ScheduleAdminUnavailableCodes = setOf(404, 405, 501)
 
 private fun desktopMemoryErrorMessage(throwable: Throwable): String =
     when (throwable) {

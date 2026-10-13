@@ -3,11 +3,9 @@ package com.letta.mobile.ui.screens.schedules
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ScheduleApi
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
-import com.letta.mobile.data.schedules.CronScheduleSource
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleLibraryState
@@ -21,7 +19,6 @@ class ScheduleListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     agentRepository: IAgentRepository,
     scheduleRepository: IScheduleRepository,
-    scheduleApi: ScheduleApi,
 ) : ViewModel() {
     // When Schedules is opened FROM A CHAT, SchedulesRoute carries the agent
     // the user was chatting with so the Agents dropdown pre-selects it.
@@ -41,11 +38,6 @@ class ScheduleListViewModel @Inject constructor(
                 ?: fallback
         },
         scheduleAdminUnavailableMatcher = { throwable -> throwable.isScheduleAdminUnavailable() },
-        // Cron-backed fallback: when the native /v1/agents/{id}/schedule
-        // route is unavailable (404/405/501), list crons via /v1/crons so
-        // mobile reaches parity with the desktop schedules surface instead
-        // of dead-ending on "Schedule admin isn't available".
-        cronSource = CronScheduleSource { agentId -> scheduleApi.listCrons(agentId) },
     )
 
     /** The shared Schedules page's library state (letta-mobile-ckmub.3.16). */
@@ -77,6 +69,5 @@ class ScheduleListViewModel @Inject constructor(
     }
 }
 
-private fun Throwable.isScheduleAdminUnavailable(): Boolean {
-    return this is ApiException && code in setOf(404, 405, 501)
-}
+/** letta-mobile-ckmub.4: schedules have a route only through an Iroh host's `schedule.*` relay. */
+private fun Throwable.isScheduleAdminUnavailable(): Boolean = this is NoAppServerRouteException

@@ -1,17 +1,24 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.ScheduleApi
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IScheduleRepository
+import com.letta.mobile.data.repository.api.ScheduleRemoteSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
+/**
+ * Per-agent schedules for a backend without the Iroh `schedule.*` relay. letta-mobile-ckmub.4:
+ * [remote] is the seam for a non-App-Server backend; production binds no route (the Letta REST
+ * backend was removed), so these calls fail with a no-route error. Iroh hosts use
+ * [com.letta.mobile.data.repository.iroh.IrohScheduleRepository].
+ */
 open class ScheduleRepository(
-    private val scheduleApi: ScheduleApi,
+    private val remote: ScheduleRemoteSource = noAppServerRoute(),
 ) : IScheduleRepository {
     private val _schedules = MutableStateFlow<Map<String, List<ScheduledMessage>>>(emptyMap())
 
@@ -20,7 +27,7 @@ open class ScheduleRepository(
     }
 
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
-        val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
+        val response = remote.listSchedules(agentId = agentId, limit = limit, after = after)
         val schedules = response.scheduledMessages
         _schedules.update { current ->
             current.toMutableMap().apply { put(agentId, schedules) }
@@ -28,17 +35,17 @@ open class ScheduleRepository(
     }
 
     override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
-        return scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
+        return remote.retrieveSchedule(agentId, scheduledMessageId)
     }
 
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val schedule = scheduleApi.createSchedule(agentId, params)
+        val schedule = remote.createSchedule(agentId, params)
         refreshSchedules(agentId)
         return schedule
     }
 
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
-        scheduleApi.deleteSchedule(agentId, scheduledMessageId)
+        remote.deleteSchedule(agentId, scheduledMessageId)
         _schedules.update { current ->
             current.toMutableMap().apply {
                 val existing = get(agentId) ?: emptyList()

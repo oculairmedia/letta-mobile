@@ -66,7 +66,6 @@ internal data class EditAgentUiState(
     val modelToolCallParser: String = "",
     val modelAnthropicEffort: String = "",
     val contextWindow: Int = 0,
-    val enableSleeptime: Boolean = false,
     val agentType: String = "",
     val embeddingDim: Int? = null,
     val embeddingChunkSize: Int? = null,

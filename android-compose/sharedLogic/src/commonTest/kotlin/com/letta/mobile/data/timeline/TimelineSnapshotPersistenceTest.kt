@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -288,7 +289,7 @@ class TimelineSnapshotPersistenceTest {
         val streamStopped = CompletableDeferred<Unit>()
         val transport = object : TimelineTransport by EmptyTimelineTransport {
             override suspend fun sendConversationMessage(
-                conversationId: String,
+                conversationId: ConversationId,
                 request: com.letta.mobile.data.model.MessageCreateRequest,
             ) = kotlinx.coroutines.flow.flow<com.letta.mobile.data.model.LettaMessage> {
                 streamStarted.complete(Unit)

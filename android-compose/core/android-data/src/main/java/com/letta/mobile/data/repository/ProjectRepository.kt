@@ -1,17 +1,18 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 
 /**
- * Android binding for [CachedProjectRepository]: HTTP [ProjectApi] + optional Iroh source.
+ * Android binding for [CachedProjectRepository]. Projects over an Iroh host's `admin_rpc` (VibeSync).
  *
- * Phase 5n — cache/refresh/sanitize/Iroh routing live in sharedLogic; this type keeps
- * the historical constructor for session wiring and existing unit tests.
+ * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
+ * route (the Letta REST backend was removed).
  */
 open class ProjectRepository(
-    projectApi: ProjectApi,
+    remote: ProjectRemoteSource = noAppServerRoute(),
     irohProjectSource: IrohAdminRpcProjectSource? = null,
 ) : CachedProjectRepository(
-    remote = projectApi,
+    remote = remote,
     irohProjectSource = irohProjectSource,
 )

@@ -1,12 +1,12 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ModelApi
+import com.letta.mobile.data.repository.api.ModelRemoteSource
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
-import io.mockk.mockk
 
-class FakeModelApi : ModelApi(mockk(relaxed = true)) {
+open class FakeModelApi : ModelRemoteSource by noAppServerRoute<ModelRemoteSource>() {
     var llmModels = mutableListOf<LlmModel>()
     var embeddingModels = mutableListOf<EmbeddingModel>()
     var shouldFail = false

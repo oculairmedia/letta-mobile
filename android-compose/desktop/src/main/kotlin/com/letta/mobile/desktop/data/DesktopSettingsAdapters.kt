@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-private const val DEFAULT_DESKTOP_LETTA_URL = "http://localhost:8283"
 
 class DesktopInMemorySecureSettingsStore(
     initialValues: Map<String, String> = emptyMap(),
@@ -275,11 +274,15 @@ class DesktopLettaConfigStore(
     }
 }
 
+/**
+ * A fresh desktop runs the bundled letta-code App Server (letta-mobile-ckmub.4): the old default,
+ * a Letta REST server at `http://localhost:8283`, is no longer a backend the app can talk to.
+ */
 fun defaultDesktopLettaConfig(): LettaConfig =
     LettaConfig(
         id = "desktop-local",
-        mode = LettaConfig.Mode.SELF_HOSTED,
-        serverUrl = DEFAULT_DESKTOP_LETTA_URL,
+        mode = LettaConfig.Mode.LOCAL,
+        serverUrl = "",
         accessToken = null,
     )
 

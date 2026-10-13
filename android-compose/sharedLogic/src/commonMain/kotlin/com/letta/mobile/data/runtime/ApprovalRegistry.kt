@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * The two by-tool-call-id lookups ([approvalIdFor], [clearIfMatches]) scan every
  * key on purpose — tool_call_ids are globally unique, and the submit path
- * (DefaultAppServerController / DesktopHybridAppServerChatGateway) knows the
+ * (DefaultAppServerController / DesktopAppServerChatGateway) knows the
  * tool_call_id but not the runtime key.
  *
  * Extracted from `AppServerTurnEngine` + `TurnLeaseSlot.approvalIds` with no

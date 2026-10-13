@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
@@ -218,13 +220,13 @@ class TimelineRecentMessagesReconcilerTest {
     private class RecordingTimelineTransport : TimelineTransport {
         var listCalls = 0
         var onListEntered: suspend () -> Unit = {}
-        override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
-        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
+        override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
+        override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = emptyFlow()
+        override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> {
             listCalls += 1
             onListEntered()
             return listOf(UserMessage(id = "m-1", contentRaw = JsonPrimitive("hello")))
         }
-        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
+        override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<LettaMessage> = emptyList()
     }
 }

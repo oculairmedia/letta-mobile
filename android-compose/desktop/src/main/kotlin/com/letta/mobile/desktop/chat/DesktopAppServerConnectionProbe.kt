@@ -22,7 +22,7 @@ internal val defaultDesktopAppServerProbe = DesktopAppServerProbe { serverUrl, a
         null
     } else {
         withContext(Dispatchers.IO) {
-            createDesktopLettaHttpClient().use { http -> AppServerProbe(http).probe(serverUrl, accessToken) }
+            createDesktopAppServerHttpClient().use { http -> AppServerProbe(http).probe(serverUrl, accessToken) }
         }
     }
 }

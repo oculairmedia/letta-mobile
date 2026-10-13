@@ -2,13 +2,8 @@ package com.letta.mobile.data.session
 
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
-import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
-import com.letta.mobile.data.repository.api.IFolderRepository
-import com.letta.mobile.data.repository.api.IGroupRepository
-import com.letta.mobile.data.repository.api.IIdentityRepository
-import com.letta.mobile.data.repository.api.IJobRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IPassageRepository
@@ -48,17 +43,12 @@ interface SessionRepositoryGraph {
     val channelTransport: IChannelTransport
     val conversationRepository: IConversationRepository
     val cronRepository: ICronRepository
-    val archiveRepository: IArchiveRepository
-    val folderRepository: IFolderRepository
-    val groupRepository: IGroupRepository
-    val identityRepository: IIdentityRepository
     val mcpServerRepository: IMcpServerRepository
     val modelRepository: IModelRepository
     val passageRepository: IPassageRepository
     val projectRepository: IProjectRepository
     val projectWorkRepository: IProjectWorkRepository
     val runRepository: IRunRepository
-    val jobRepository: IJobRepository
     val providerRepository: IProviderRepository
     val scheduleRepository: IScheduleRepository
     val selfTodoRepository: ISelfTodoRepository

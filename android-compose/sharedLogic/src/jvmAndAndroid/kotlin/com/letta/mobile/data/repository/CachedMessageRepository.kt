@@ -3,10 +3,7 @@ package com.letta.mobile.data.repository
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.model.BatchMessagesResponse
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.CreateBatchMessagesRequest
-import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
@@ -89,52 +86,6 @@ open class CachedMessageRepository(
 
     override suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> =
         remote.searchMessages(request)
-
-    override suspend fun createBatch(request: CreateBatchMessagesRequest): Job =
-        remote.createBatch(request)
-
-    override suspend fun retrieveBatch(batchId: String): Job =
-        remote.retrieveBatch(batchId)
-
-    override suspend fun listBatches(): List<Job> =
-        exhaustCursorPages(
-            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
-            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listBatches(
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
-                )
-            },
-            extractCursor = { job -> job.id },
-            dedupKey = { job -> job.id },
-        )
-
-    override suspend fun listBatchMessages(batchId: String, agentId: AgentId?): BatchMessagesResponse {
-        val messages = exhaustCursorPages(
-            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
-            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listBatchMessages(
-                    batchId = batchId,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
-                    agentId = agentId?.value,
-                ).messages
-            },
-            extractCursor = { message -> message.id },
-            dedupKey = { message -> message.id },
-        )
-        return BatchMessagesResponse(messages = messages)
-    }
-
-    override suspend fun cancelBatch(batchId: String) {
-        remote.cancelBatch(batchId)
-    }
 
     override suspend fun fetchConversationInspectorMessages(conversationId: ConversationId): List<ConversationInspectorMessage> =
         remote.listConversationMessages(conversationId, limit = 200, after = null, order = "asc")

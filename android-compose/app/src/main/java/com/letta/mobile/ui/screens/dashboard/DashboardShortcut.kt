@@ -28,15 +28,9 @@ enum class DashboardShortcut(
 
     // --- Group SECONDARY (between dividers) ---
     TEMPLATES(LettaIcons.Dashboard, R.string.screen_nav_templates, Group.SECONDARY, R.string.widget_desc_templates),
-    ARCHIVES(LettaIcons.Storage, R.string.screen_nav_archives, Group.SECONDARY, R.string.widget_desc_archives),
-    FOLDERS(LettaIcons.ManageSearch, R.string.screen_nav_folders, Group.SECONDARY, R.string.widget_desc_folders),
-    GROUPS(LettaIcons.ForkRight, R.string.screen_nav_groups, Group.SECONDARY, R.string.widget_desc_groups),
     PROVIDERS(LettaIcons.Cloud, R.string.screen_nav_providers, Group.SECONDARY, R.string.widget_desc_providers),
-    IDENTITIES(LettaIcons.AccountCircle, R.string.screen_nav_identities, Group.SECONDARY, R.string.widget_desc_identities),
     SCHEDULES(LettaIcons.AccessTime, R.string.screen_nav_schedules, Group.SECONDARY, R.string.widget_desc_schedules),
     RUNS(LettaIcons.ChatOutline, R.string.screen_nav_runs, Group.SECONDARY, R.string.widget_desc_runs),
-    JOBS(LettaIcons.AccessTime, R.string.screen_nav_jobs, Group.SECONDARY, R.string.widget_desc_jobs),
-    MESSAGE_BATCHES(LettaIcons.ChatOutline, R.string.screen_nav_message_batches, Group.SECONDARY, R.string.widget_desc_message_batches),
     MCP_SERVERS(LettaIcons.Cloud, R.string.screen_nav_mcp_servers, Group.SECONDARY, R.string.widget_desc_mcp_servers),
     BOT_SETTINGS(LettaIcons.Agent, R.string.screen_nav_bot_settings, Group.SECONDARY, R.string.widget_desc_bot_settings),
     PROJECTS(LettaIcons.Apps, R.string.screen_projects_title, Group.SECONDARY, R.string.widget_desc_projects),

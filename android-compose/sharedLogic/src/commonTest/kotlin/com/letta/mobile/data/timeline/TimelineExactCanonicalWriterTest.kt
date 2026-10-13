@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.ReasoningMessage
@@ -1404,10 +1406,10 @@ class TimelineExactCanonicalWriterTest {
             barrier()
             return TimelineRemotePageResult.Page(request.requestId, request.selectionGeneration, records(), null, false, 0)
         }
-        override suspend fun sendConversationMessage(conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
-        override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> = error("unexpected stream")
-        override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
-        override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
+        override suspend fun sendConversationMessage(conversationId: ConversationId, request: com.letta.mobile.data.model.MessageCreateRequest): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
+        override suspend fun streamConversation(conversationId: ConversationId): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> = error("unexpected stream")
+        override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
+        override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?): List<com.letta.mobile.data.model.LettaMessage> = error("legacy hydration")
     }
 
 
@@ -1454,18 +1456,18 @@ private class RepairOnlyTransport(
     }
 
     override suspend fun sendConversationMessage(
-        conversationId: String, request: com.letta.mobile.data.model.MessageCreateRequest,
+        conversationId: ConversationId, request: com.letta.mobile.data.model.MessageCreateRequest,
     ): kotlinx.coroutines.flow.Flow<com.letta.mobile.data.model.LettaMessage> = error("unexpected send")
 
-    override suspend fun streamConversation(conversationId: String): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
+    override suspend fun streamConversation(conversationId: ConversationId): kotlinx.coroutines.flow.Flow<TimelineStreamFrame> =
         error("ownership must not open transport")
 
     override suspend fun listConversationMessages(
-        conversationId: String, limit: Int?, after: String?, order: String?,
+        conversationId: ConversationId, limit: Int?, after: String?, order: String?,
     ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
 
     override suspend fun listAgentMessages(
-        agentId: String, limit: Int?, order: String?, conversationId: String?,
+        agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
     ): List<com.letta.mobile.data.model.LettaMessage> = error("unexpected legacy hydration")
 }
 

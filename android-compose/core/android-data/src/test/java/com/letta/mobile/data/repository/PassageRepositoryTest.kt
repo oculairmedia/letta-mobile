@@ -1,15 +1,16 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.backend.noAppServerRoute
 import app.cash.turbine.test
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.PassageApi
+import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -35,11 +36,11 @@ class PassageRepositoryTest {
     fun `getPassages emits refresh updates`() = runTest {
         val passage = Passage(id = "p1", text = "Some knowledge", agentId = "a1")
 
-        repository.getPassages("a1").test {
+        repository.getPassages(AgentId("a1")).test {
             assertEquals(emptyList<Passage>(), awaitItem())
 
             fakeApi.setPassages("a1", listOf(passage))
-            repository.refreshPassages("a1")
+            repository.refreshPassages(AgentId("a1"))
 
             assertEquals(listOf(passage), awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -48,10 +49,10 @@ class PassageRepositoryTest {
 
     @Test
     fun `createPassage emits refreshed cache`() = runTest {
-        repository.getPassages("a1").test {
+        repository.getPassages(AgentId("a1")).test {
             assertEquals(emptyList<Passage>(), awaitItem())
 
-            val created = repository.createPassage("a1", "New passage")
+            val created = repository.createPassage(AgentId("a1"), "New passage")
 
             assertEquals("New passage", created.text)
             assertEquals(listOf(created), awaitItem())
@@ -72,12 +73,12 @@ class PassageRepositoryTest {
             }
         }
         val irohRepository = PassageRepository(
-            passageApi = fakeApi,
+            remote = fakeApi,
             irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
         )
 
-        val created = irohRepository.createPassage("agent-1", "New passage")
-        irohRepository.deletePassage("agent-1", "passage-1")
+        val created = irohRepository.createPassage(AgentId("agent-1"), "New passage")
+        irohRepository.deletePassage(AgentId("agent-1"), "passage-1")
 
         assertTrue(fakeApi.calls.none { it.startsWith("createPassage") || it.startsWith("deletePassage") })
         assertEquals(listOf("passage.create", "passage.delete"), transport.adminRpcCalls.map { it.method })
@@ -100,12 +101,12 @@ class PassageRepositoryTest {
         val first = Passage(id = "p1", text = "First", agentId = "a1")
         val second = Passage(id = "p2", text = "Second", agentId = "a1")
         fakeApi.setPassages("a1", listOf(first, second))
-        repository.refreshPassages("a1")
+        repository.refreshPassages(AgentId("a1"))
 
-        repository.getPassages("a1").test {
+        repository.getPassages(AgentId("a1")).test {
             assertEquals(listOf(first, second), awaitItem())
 
-            repository.deletePassage("a1", "p1")
+            repository.deletePassage(AgentId("a1"), "p1")
 
             assertEquals(listOf(second), awaitItem())
             cancelAndIgnoreRemainingEvents()
@@ -114,15 +115,18 @@ class PassageRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
-    fun `refreshPassages in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
-        val apiThatThrows = object : FakePassageApi() {
-            override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+    @Test
+    fun `refreshPassages in iroh mode without source throws NoAppServerRouteException`() = runTest {
+        val failure = runCatching {
+            val apiThatThrows = object : FakePassageApi() {
+                override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
+                    throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
-        }
-        val repo = PassageRepository(apiThatThrows)
-        repo.refreshPassages("a1")
+            val repo = PassageRepository(apiThatThrows)
+            repo.refreshPassages(AgentId("a1"))
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
     }
 
     @Test
@@ -151,19 +155,19 @@ class PassageRepositoryTest {
         val irohSource = IrohAdminRpcPassageSource(transport, settings)
         val apiThatThrows = object : FakePassageApi() {
             override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = PassageRepository(apiThatThrows, irohSource)
-        repo.refreshPassages("a1")
-        repo.getPassages("a1").test {
+        repo.refreshPassages(AgentId("a1"))
+        repo.getPassages(AgentId("a1")).test {
             assertEquals(1, awaitItem().size)
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    private class FakePassageApi : PassageApi(mockk(relaxed = true)) {
+    private open class FakePassageApi : PassageRemoteSource by noAppServerRoute<PassageRemoteSource>() {
         private val passagesByAgent = mutableMapOf<String, MutableList<Passage>>()
         var shouldFail = false
         val calls = mutableListOf<String>()

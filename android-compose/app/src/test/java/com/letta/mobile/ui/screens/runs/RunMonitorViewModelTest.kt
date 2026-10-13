@@ -192,7 +192,7 @@ class RunMonitorViewModelTest {
             override suspend fun getRunSteps(runId: String) = listOf(fakeStepApi.sampleStep("step-1"))
         }
         val irohRepository = com.letta.mobile.data.repository.CachedRunRepository(fakeApi, irohSource)
-        val irohStepRepository = StepRepository(fakeStepApi, isIrohBackend = { true })
+        val irohStepRepository = StepRepository()
         fakeApi.calls.clear()
         fakeStepApi.calls.clear()
         viewModel = RunMonitorViewModel(irohRepository, irohStepRepository)

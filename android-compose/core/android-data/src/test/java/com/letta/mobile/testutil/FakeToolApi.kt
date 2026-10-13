@@ -1,13 +1,13 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolSchemaGenerateParams
 import com.letta.mobile.data.model.ToolUpdateParams
-import io.mockk.mockk
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 import kotlin.time.Duration.Companion.milliseconds
-class FakeToolApi : ToolApi(mockk(relaxed = true)) {
+open class FakeToolApi : ToolRemoteSource {
     var tools = mutableListOf<Tool>()
     var agentTools = mutableMapOf<String, MutableList<Tool>>()
     var shouldFail = false
@@ -36,23 +36,23 @@ class FakeToolApi : ToolApi(mockk(relaxed = true)) {
         return result
     }
 
-    override suspend fun attachTool(agentId: String, toolId: String) {
-        calls.add("attachTool:$agentId:$toolId")
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
+        calls.add("attachTool:${agentId.value}:${toolId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val tool = tools.find { it.id == ToolId(toolId) } ?: throw ApiException(404, "Tool not found")
-        agentTools.getOrPut(agentId) { mutableListOf() }.add(tool)
+        val tool = tools.find { it.id == toolId } ?: throw ApiException(404, "Tool not found")
+        agentTools.getOrPut(agentId.value) { mutableListOf() }.add(tool)
     }
 
-    override suspend fun detachTool(agentId: String, toolId: String) {
-        calls.add("detachTool:$agentId:$toolId")
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
+        calls.add("detachTool:${agentId.value}:${toolId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        agentTools[agentId]?.removeAll { it.id == ToolId(toolId) }
+        agentTools[agentId.value]?.removeAll { it.id == toolId }
     }
 
-    override suspend fun getTool(toolId: String): Tool {
-        calls.add("getTool:$toolId")
+    override suspend fun getTool(toolId: ToolId): Tool {
+        calls.add("getTool:${toolId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        return tools.find { it.id == ToolId(toolId) } ?: throw ApiException(404, "Not found")
+        return tools.find { it.id == toolId } ?: throw ApiException(404, "Not found")
     }
 
     override suspend fun countTools(): Int {
@@ -61,10 +61,10 @@ class FakeToolApi : ToolApi(mockk(relaxed = true)) {
         return tools.size
     }
 
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
-        calls.add("updateTool:$toolId")
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
+        calls.add("updateTool:${toolId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = tools.indexOfFirst { it.id == ToolId(toolId) }
+        val index = tools.indexOfFirst { it.id == toolId }
         if (index == -1) throw ApiException(404, "Not found")
         val current = tools[index]
         val updatedName = params.jsonSchema?.schemaName() ?: current.name
@@ -80,12 +80,12 @@ class FakeToolApi : ToolApi(mockk(relaxed = true)) {
         return updated
     }
 
-    override suspend fun deleteTool(toolId: String) {
-        calls.add("deleteTool:$toolId")
+    override suspend fun deleteTool(toolId: ToolId) {
+        calls.add("deleteTool:${toolId.value}")
         if (shouldFail) throw ApiException(500, "Server error")
-        if (tools.none { it.id == ToolId(toolId) }) throw ApiException(404, "Not found")
-        tools.removeAll { it.id == ToolId(toolId) }
-        agentTools.replaceAll { _, toolList -> toolList.filterNot { it.id == ToolId(toolId) }.toMutableList() }
+        if (tools.none { it.id == toolId }) throw ApiException(404, "Not found")
+        tools.removeAll { it.id == toolId }
+        agentTools.replaceAll { _, toolList -> toolList.filterNot { it.id == toolId }.toMutableList() }
     }
 
     override suspend fun upsertTool(params: ToolCreateParams): Tool {

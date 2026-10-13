@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.archival
 
+import com.letta.mobile.data.model.AgentId
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Passage
@@ -166,23 +167,23 @@ class ArchivalViewModelTest {
             flowForAgent(agentId).value = passages
         }
 
-        override fun getPassages(agentId: String): StateFlow<List<Passage>> {
-            return flowForAgent(agentId)
+        override fun getPassages(agentId: AgentId): StateFlow<List<Passage>> {
+            return flowForAgent(agentId.value)
         }
-        override suspend fun refreshPassages(agentId: String) {
+        override suspend fun refreshPassages(agentId: AgentId) {
             if (shouldFail) throw Exception("Failed")
-            flowForAgent(agentId).value = _passages[agentId].orEmpty()
+            flowForAgent(agentId.value).value = _passages[agentId.value].orEmpty()
         }
-        override suspend fun createPassage(agentId: String, text: String): Passage {
+        override suspend fun createPassage(agentId: AgentId, text: String): Passage {
             createCalls.add("$agentId:$text")
             val p = Passage(id = "new-${createCalls.size}", text = text)
-            setPassages(agentId, _passages[agentId].orEmpty() + p)
+            setPassages(agentId.value, _passages[agentId.value].orEmpty() + p)
             return p
         }
-        override suspend fun deletePassage(agentId: String, passageId: String) {
-            setPassages(agentId, _passages[agentId].orEmpty().filter { it.id != passageId })
+        override suspend fun deletePassage(agentId: AgentId, passageId: String) {
+            setPassages(agentId.value, _passages[agentId.value].orEmpty().filter { it.id != passageId })
         }
-        override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
+        override suspend fun searchArchival(agentId: AgentId, query: String): List<Passage> {
             return searchResults
         }
 

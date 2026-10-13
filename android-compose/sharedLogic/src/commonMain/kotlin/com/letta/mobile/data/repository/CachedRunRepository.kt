@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -47,35 +48,35 @@ open class CachedRunRepository(
         return remote.listRuns(recentParams)
     }
 
-    override suspend fun getRun(runId: String): Run {
+    override suspend fun getRun(runId: RunId): Run {
         val irohSource = irohRunSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.getRun(runId)
+            return irohSource.getRun(runId.value)
         }
-        return remote.retrieveRun(runId)
+        return remote.retrieveRun(runId.value)
     }
 
-    override suspend fun getRunMessages(runId: String): List<LettaMessage> {
+    override suspend fun getRunMessages(runId: RunId): List<LettaMessage> {
         if (!supportsRunDetail) irohUnsupported("run.messages($runId)")
-        return remote.listRunMessages(runId = runId, order = "asc")
+        return remote.listRunMessages(runId = runId.value, order = "asc")
     }
 
-    override suspend fun getRunUsage(runId: String): UsageStatistics {
+    override suspend fun getRunUsage(runId: RunId): UsageStatistics {
         if (!supportsRunDetail) irohUnsupported("run.usage($runId)")
-        return remote.retrieveRunUsage(runId)
+        return remote.retrieveRunUsage(runId.value)
     }
 
-    override suspend fun getRunMetrics(runId: String): RunMetrics {
+    override suspend fun getRunMetrics(runId: RunId): RunMetrics {
         if (!supportsRunDetail) irohUnsupported("run.metrics($runId)")
-        return remote.retrieveRunMetrics(runId)
+        return remote.retrieveRunMetrics(runId.value)
     }
 
-    override suspend fun getRunSteps(runId: String): List<Step> {
+    override suspend fun getRunSteps(runId: RunId): List<Step> {
         val irohSource = irohRunSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.getRunSteps(runId)
+            return irohSource.getRunSteps(runId.value)
         }
-        return remote.listRunSteps(runId = runId, order = "desc")
+        return remote.listRunSteps(runId = runId.value, order = "desc")
     }
 
     override suspend fun cancelRun(run: Run): Run {
@@ -86,10 +87,10 @@ open class CachedRunRepository(
         return refreshed
     }
 
-    override suspend fun deleteRun(runId: String) {
+    override suspend fun deleteRun(runId: RunId) {
         if (!supportsRunDetail) irohUnsupported("run.delete($runId)")
-        remote.deleteRun(runId)
-        _runs.update { current -> current.filterNot { it.id == runId } }
+        remote.deleteRun(runId.value)
+        _runs.update { current -> current.filterNot { it.id == runId.value } }
     }
 
     private fun irohUnsupported(operation: String): Nothing =

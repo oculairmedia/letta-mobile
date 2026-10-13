@@ -1,14 +1,14 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
-import io.mockk.mockk
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {
+open class FakeProjectApi : ProjectRemoteSource by noAppServerRoute<ProjectRemoteSource>() {
     var projects = mutableListOf<ProjectSummary>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

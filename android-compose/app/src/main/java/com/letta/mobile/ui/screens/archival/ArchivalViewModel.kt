@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.archival
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.ui.common.UiState
@@ -10,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,9 +34,11 @@ class ArchivalViewModel @Inject constructor(
     private val passageRepository: IPassageRepository,
 ) : ViewModel() {
 
-    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
-        "Missing agentId in ArchivalViewModel navigation arguments"
-    }
+    private val agentId = AgentId(
+        requireNotNull(savedStateHandle.get<String>("agentId")) {
+            "Missing agentId in ArchivalViewModel navigation arguments"
+        },
+    )
 
     private val _uiState = MutableStateFlow<UiState<ArchivalUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ArchivalUiState>> = _uiState.asStateFlow()
@@ -50,6 +54,8 @@ class ArchivalViewModel @Inject constructor(
                 passageRepository.refreshPassages(agentId)
                 val passages = passageRepository.getPassages(agentId).value
                 _uiState.value = UiState.Success(ArchivalUiState(passages = passages.toImmutableList()))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 android.util.Log.w("ArchivalVM", "Failed to load passages", e)
                 _uiState.value = UiState.Success(ArchivalUiState(passages = persistentListOf()))
@@ -70,6 +76,8 @@ class ArchivalViewModel @Inject constructor(
                 _uiState.value = UiState.Success(current.copy(
                     passages = results.toImmutableList(), searchQuery = query, isSearching = false
                 ))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(current.copy(isSearching = false))
             }
@@ -81,6 +89,8 @@ class ArchivalViewModel @Inject constructor(
             try {
                 passageRepository.createPassage(agentId, text)
                 loadPassages()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to add passage"))
             }
@@ -98,6 +108,8 @@ class ArchivalViewModel @Inject constructor(
                         selectedPassage = if (current.selectedPassage?.id == passageId) null else current.selectedPassage,
                     )
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to delete passage"))
             }

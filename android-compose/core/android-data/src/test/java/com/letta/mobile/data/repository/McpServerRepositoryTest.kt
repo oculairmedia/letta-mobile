@@ -1,6 +1,6 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerId
@@ -43,23 +43,26 @@ class McpServerRepositoryTest {
 
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `refreshServers in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
+    @Test
+    fun `refreshServers in iroh mode without source throws NoAppServerRouteException`() = runTest {
+        val failure = runCatching {
+            val settings = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "test",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://test-node",
+                    accessToken = "token",
+                )
             )
-        )
-        val apiThatThrows = object : FakeMcpServerApi() {
-            override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            val apiThatThrows = object : FakeMcpServerApi() {
+                override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
+                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                }
             }
-        }
-        val repo = McpServerRepository(apiThatThrows)
-        repo.refreshServers()
+            val repo = McpServerRepository(apiThatThrows)
+            repo.refreshServers()
+        }.exceptionOrNull()
+        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
     }
 
     @Test
@@ -99,7 +102,7 @@ class McpServerRepositoryTest {
         val irohSource = IrohAdminRpcMcpSource(transport, settings)
         val apiThatThrows = object : FakeMcpServerApi() {
             override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+                throw NoAppServerRouteException("Raw HTTP forbidden")
             }
         }
         val repo = McpServerRepository(apiThatThrows, irohSource)

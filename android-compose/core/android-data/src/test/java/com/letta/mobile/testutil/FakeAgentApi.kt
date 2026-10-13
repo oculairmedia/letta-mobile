@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.api.AgentApi
+import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -10,11 +11,10 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
-import io.mockk.mockk
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
+open class FakeAgentApi : AgentRemoteSource by noAppServerRoute<AgentRemoteSource>() {
     var agents = mutableListOf<Agent>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

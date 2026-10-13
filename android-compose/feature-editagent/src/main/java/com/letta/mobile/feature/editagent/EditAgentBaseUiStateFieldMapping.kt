@@ -26,7 +26,6 @@ internal fun EditAgentMapperInput.baseUiState(): EditAgentUiState {
         toolEnvironmentVariables = agent.toolExecEnvironmentVariables.toEditableEnvironmentVariables(),
         providerType = normalizedProviderType,
         contextWindow = agent.contextWindowLimit ?: agent.llmConfig?.contextWindow ?: 0,
-        enableSleeptime = agent.enableSleeptime ?: false,
         agentType = agent.agentType ?: "",
         embeddingDim = agent.embeddingConfig?.embeddingDim,
         embeddingChunkSize = agent.embeddingConfig?.embeddingChunkSize,

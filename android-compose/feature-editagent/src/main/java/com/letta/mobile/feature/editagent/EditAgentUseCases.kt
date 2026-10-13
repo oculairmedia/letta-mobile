@@ -114,7 +114,6 @@ internal class EditAgentUseCases(
                     embedding = if (embeddingChanged) state.embedding.ifBlank { null } else null,
                     system = state.systemPrompt,
                     tags = state.tags,
-                    enableSleeptime = state.enableSleeptime,
                     contextWindowLimit = state.contextWindow.takeIf { it > 0 },
                     modelSettings = state.toModelSettings(resolvedProviderType),
                     secrets = state.toAgentSecretsMap(),

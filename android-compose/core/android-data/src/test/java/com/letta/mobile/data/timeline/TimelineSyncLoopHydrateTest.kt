@@ -1,7 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.testutil.TestMessageSource
 import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
@@ -15,7 +15,6 @@ import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.writeStringUtf8
-import io.mockk.mockk
 import kotlin.random.Random
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred

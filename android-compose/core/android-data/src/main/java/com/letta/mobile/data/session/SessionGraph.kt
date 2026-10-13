@@ -5,14 +5,9 @@ import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
-import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.CronRepository
-import com.letta.mobile.data.repository.FolderRepository
-import com.letta.mobile.data.repository.GroupRepository
-import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.PassageRepository
@@ -45,17 +40,12 @@ class SessionGraph internal constructor(
     override val channelTransport: IChannelTransport,
     override val conversationRepository: ConversationRepository,
     override val cronRepository: CronRepository,
-    override val archiveRepository: ArchiveRepository,
-    override val folderRepository: FolderRepository,
-    override val groupRepository: GroupRepository,
-    override val identityRepository: IdentityRepository,
     override val mcpServerRepository: McpServerRepository,
     override val modelRepository: ModelRepository,
     override val passageRepository: PassageRepository,
     override val projectRepository: ProjectRepository,
     override val projectWorkRepository: ProjectWorkRepository,
     override val runRepository: RunRepository,
-    override val jobRepository: JobRepository,
     override val providerRepository: ProviderRepository,
     override val scheduleRepository: IScheduleRepository,
     override val selfTodoRepository: SelfTodoRepository,

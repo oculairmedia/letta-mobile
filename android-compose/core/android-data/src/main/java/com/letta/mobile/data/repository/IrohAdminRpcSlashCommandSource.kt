@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonObject
 /**
  * Slash commands over the Iroh admin_rpc control channel.
  *
- * Phase 5o — mirrors [com.letta.mobile.data.api.SlashCommandApi]'s HTTP surface
+ * Phase 5o — mirrors the removed Letta REST `SlashCommandApi`'s surface
  * without falling back to raw HTTP in iroh:// mode.
  */
 open class IrohAdminRpcSlashCommandSource(

@@ -1,10 +1,7 @@
 package com.letta.mobile.data.repository.api
 
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.BatchMessagesResponse
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.CreateBatchMessagesRequest
-import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -44,28 +41,6 @@ interface MessageRemoteSource {
     suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String>
 
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult>
-
-    suspend fun createBatch(request: CreateBatchMessagesRequest): Job
-
-    suspend fun retrieveBatch(batchId: String): Job
-
-    suspend fun listBatches(
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-    ): List<Job>
-
-    suspend fun listBatchMessages(
-        batchId: String,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-        agentId: String?,
-    ): BatchMessagesResponse
-
-    suspend fun cancelBatch(batchId: String)
 
     suspend fun resetMessages(agentId: AgentId)
 }

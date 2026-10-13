@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import kotlinx.coroutines.CancellationException
@@ -16,21 +18,21 @@ class GenerationTimelineTransportTest {
         val entered = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<Unit>()
         val remote = object : TimelineTransport {
-            override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
+            override suspend fun listConversationMessages(conversationId: ConversationId, limit: Int?, after: String?, order: String?): List<LettaMessage> {
                 entered.complete(Unit)
                 try { CompletableDeferred<Unit>().await() } finally { cancelled.complete(Unit) }
                 return emptyList()
             }
-            override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?) = emptyList<LettaMessage>()
-            override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = error("unused")
-            override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = error("unused")
+            override suspend fun listAgentMessages(agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?) = emptyList<LettaMessage>()
+            override suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): Flow<LettaMessage> = error("unused")
+            override suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> = error("unused")
         }
         val transport = GenerationTimelineTransport(remote, this)
-        val rpc = async { transport.listConversationMessages("conversation") }
+        val rpc = async { transport.listConversationMessages(ConversationId("conversation")) }
         entered.await()
         transport.retire()
         assertTrue(cancelled.isCompleted)
         assertFailsWith<CancellationException> { rpc.await() }
-        assertFailsWith<CancellationException> { transport.listConversationMessages("conversation") }
+        assertFailsWith<CancellationException> { transport.listConversationMessages(ConversationId("conversation")) }
     }
 }

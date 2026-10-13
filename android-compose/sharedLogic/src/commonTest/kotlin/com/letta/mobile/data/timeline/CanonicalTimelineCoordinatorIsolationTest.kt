@@ -1,5 +1,7 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.test.runTest
@@ -23,15 +25,15 @@ class CanonicalTimelineCoordinatorIsolationTest {
                 remote[request.scope.conversationId].orEmpty(), null, false, 0,
             )
             override suspend fun sendConversationMessage(
-                conversationId: String,
+                conversationId: ConversationId,
                 request: com.letta.mobile.data.model.MessageCreateRequest,
             ) = error("send")
-            override suspend fun streamConversation(conversationId: String) = error("stream")
+            override suspend fun streamConversation(conversationId: ConversationId) = error("stream")
             override suspend fun listConversationMessages(
-                conversationId: String, limit: Int?, after: String?, order: String?,
+                conversationId: ConversationId, limit: Int?, after: String?, order: String?,
             ) = error("legacy hydration")
             override suspend fun listAgentMessages(
-                agentId: String, limit: Int?, order: String?, conversationId: String?,
+                agentId: AgentId, limit: Int?, order: String?, conversationId: ConversationId?,
             ) = error("legacy hydration")
         }
         val coordinator = CanonicalTimelineCoordinator(store, transport)

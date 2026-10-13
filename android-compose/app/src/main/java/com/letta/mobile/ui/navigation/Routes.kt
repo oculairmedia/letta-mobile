@@ -19,17 +19,11 @@ import kotlinx.serialization.Serializable
 )
 @Serializable data object ConfigListRoute
 @Serializable data object TemplatesRoute
-@Serializable data object ArchivesRoute
-@Serializable data object FoldersRoute
-@Serializable data object GroupsRoute
 @Serializable data object ProvidersRoute
 @Serializable data object BlocksRoute
-@Serializable data object IdentitiesRoute
 @Serializable data class SchedulesRoute(val agentId: String? = null)
 @Serializable data object ChannelsRoute
 @Serializable data object RunsRoute
-@Serializable data object JobsRoute
-@Serializable data object MessageBatchesRoute
 @Serializable data object McpRoute
 @Serializable data object AboutRoute
 @Serializable data object ModelsRoute
