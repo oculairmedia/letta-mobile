@@ -10,7 +10,7 @@ import androidx.room.Query
  * instead of a shape change the reader discovers at runtime (`NoSelectStarInRoomDao`).
  */
 private const val CANVAS_OP_COLUMNS =
-    "opId, canvasId, lamport, actorId, opType, payloadJson, createdAtEpochMs"
+    "opId, canvasId, lamport, actorId, opType, payloadJson, createdAtEpochMs, settled"
 
 @Dao
 interface CanvasOpDao {
@@ -25,6 +25,13 @@ interface CanvasOpDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM canvas_ops WHERE opId = :opId)")
     suspend fun hasOpId(opId: String): Boolean
+
+    /** Ops the stored document may not hold yet, in the order they were appended (rowid). */
+    @Query("SELECT $CANVAS_OP_COLUMNS FROM canvas_ops WHERE canvasId = :canvasId AND settled = 0 ORDER BY rowid ASC")
+    suspend fun getUnsettled(canvasId: String): List<CanvasOpEntity>
+
+    @Query("UPDATE canvas_ops SET settled = 1 WHERE canvasId = :canvasId AND opId IN (:opIds)")
+    suspend fun settle(canvasId: String, opIds: List<String>)
 
     @Query("SELECT COUNT(*) FROM canvas_ops WHERE canvasId = :canvasId")
     suspend fun countForCanvas(canvasId: String): Int
