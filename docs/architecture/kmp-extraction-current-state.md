@@ -1,5 +1,7 @@
 # KMP Extraction Current State
 
+> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `ChannelTransport.kt`. Read references to them as historical; current code is the source of truth.
+
 Last updated: 2026-06-06 on branch `codex/windows-chat-ui-decision`.
 
 ## Goal

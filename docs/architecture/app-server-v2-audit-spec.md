@@ -1,5 +1,7 @@
 # App Server v2 and Meridian State Audit Specification
 
+> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `AdminHandlers.kt`, `AppServerContextWindowPreflight.kt`. Read references to them as historical; current code is the source of truth.
+
 Status: implemented-system snapshot for audit
 
 Snapshot date: 2026-07-29

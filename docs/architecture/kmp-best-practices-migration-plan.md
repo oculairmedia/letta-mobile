@@ -1,5 +1,7 @@
 # KMP Best-Practices Migration Plan
 
+> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `ConversationStateHolder.kt`. Read references to them as historical; current code is the source of truth.
+
 Status: draft architecture plan
 Created: 2026-05-25
 Tracking bead: `letta-mobile-45eyc`
@@ -259,7 +261,6 @@ Included modules:
 :sharedLogic
 :designsystem
 :feature-chat
-:feature-editagent
 :desktop
 :cli
 :macrobenchmark
@@ -274,8 +275,8 @@ Current characteristics:
   repository/session contracts, chat projection models, A2UI contracts, and
   cross-platform design tokens.
 - `:desktop` is a JVM Compose Desktop preview module for Windows.
-- `:core`, `:designsystem`, `:feature-chat`, and `:feature-editagent` are
-  Android library modules.
+- `:core`, `:designsystem`, and `:feature-chat` are Android library modules
+  (`:feature-editagent` has since been removed).
 - Android packaging, signing, flavors, Sentry, baseline profile consumption,
   manifest placeholders, and version derivation live in `:app`.
 - Some shared runtime concepts are still implemented in Android modules:
@@ -700,7 +701,6 @@ The Android Compose-bearing modules currently have compiler reports configured:
 :app
 :designsystem
 :feature-chat
-:feature-editagent
 ```
 
 Each uses:
@@ -933,7 +933,7 @@ Recommended near-term PR:
 
 ```text
 Add a small script or Gradle convention that gathers compose_compiler reports
-from :app, :designsystem, :feature-chat, :feature-editagent, and future
+from :app, :designsystem, :feature-chat, and future
 :sharedUI into one reviewable artifact.
 ```
 
