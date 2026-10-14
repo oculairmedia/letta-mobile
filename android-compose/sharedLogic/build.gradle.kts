@@ -86,8 +86,6 @@ kotlin {
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))
-                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26): KMP -> KMP.
-                api(project(":plugin-api"))
                 api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api(libs.kotlinx.serialization.json)
@@ -160,6 +158,10 @@ kotlin {
         getByName("jvmMain") {
             dependsOn(jvmAndAndroid)
             dependencies {
+                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26). Host-only: the
+                // plugin host (data/plugin/wire) runs on jvm, so Android/wasm/native don't ship it
+                // (letta-mobile-cdgpr.1).
+                api(project(":plugin-api"))
                 implementation(libs.iroh)
                 // PNG rendering (QrRenderer.kt) needs ZXing javase — jvmMain only.
                 implementation(libs.zxing.javase)
