@@ -6,12 +6,6 @@ android {
     namespace = "com.letta.mobile.core.testutil"
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
 dependencies {
     api(project(":core:android-data"))
     api(project(":sharedLogic"))
