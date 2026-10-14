@@ -64,7 +64,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
             uiState = uiState,
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
-            backendKind = { BackendKind.REST },
+            backendKind = { BackendKind.DIRECT_WS },
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,

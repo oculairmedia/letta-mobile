@@ -238,7 +238,6 @@ internal class AdminChatComposerCoordinator(
     }
 
     fun chatSendContext() = ChatSendContext(
-        isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
         backendKind = backendKind(),
         isLocalRuntime = LocalRuntimeRouting.shouldUseLocalRuntime(

@@ -140,7 +140,7 @@ class TimelineChatSessionPort(
             isActiveRunStreaming = false,
             ownAgentId = target.agentId,
         )
-        val presentation = presenter.present(projection, IdlePresenceSignals, prior.isStreaming, prior.isAgentTyping)
+        val presentation = presenter.present(projection, IdlePresenceSignals)
         return timelineChatUiState(target, presentation, inputs.run, inputs.local)
     }
 

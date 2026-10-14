@@ -15,14 +15,17 @@ package com.letta.mobile.data.model
  * Routing decisions must key on this enum, not on URL string sniffing spread
  * across modules.
  *
- * letta-mobile-ckmub.9 — the backend seam. Letta Cloud is not offered for now (no
- * Settings mode, no cloud URL default, no cloud API-key field), but this enum stays
- * the one place a new backend family plugs in, so the shared shell never changes for
- * it. Adding one back means: a [LettaConfig.Mode] value (the Settings page lists
- * `Mode.entries`), a kind here returned by [backendKind], and a gateway bound for that
- * kind in the session graph factories (Android `DefaultSessionRepositoryGraphFactory`,
- * desktop `DesktopAppServerChatGatewayBuilder`, web `WasmAppServerClientGateway`). Nothing in
- * sharedUI keys on the backend family.
+ * letta-mobile-ckmub.9 — the backend seam. Letta Cloud is not offered for now (no Settings mode,
+ * no cloud URL default, no cloud API-key field). There is no single registration point for a
+ * backend family: a new one needs a [LettaConfig.Mode] value (the Settings page lists
+ * `Mode.entries`), a kind here returned by [backendKind], and then each place that binds a
+ * transport or picks a send path for it:
+ *  - Android: [com.letta.mobile.data.session.sessionBackendBinding] (session graph assembly and
+ *    `SessionChannelTransportFactory`) and the chat `ChatSendStrategySelector`;
+ *  - desktop: `sessionBackendBinding` in `DesktopRepositoryAdapters`, and
+ *    `DesktopAppServerChatGateways.createDefault`, which chooses on mode and address;
+ *  - web: `WasmAppServerSession`, which still chooses on [isIrohBackendUrl] directly.
+ * Nothing in sharedUI keys on the backend family.
  */
 enum class BackendKind {
     /** On-device embedded runtime — no network transport at all. */
@@ -32,17 +35,17 @@ enum class BackendKind {
     IROH,
 
     /**
-     * A remote host reached over plain HTTP/WebSocket (an App Server's ws:// address, or a legacy
-     * REST server until letta-mobile-ckmub.4 removes that path).
+     * A remote App Server dialled directly over its WebSocket address (`ws://…` / `wss://…`): a
+     * Settings "Remote host" whose address is not an `iroh://` node. Also the kind of a missing
+     * config. letta-mobile-by4vm.26: was `REST`, named for the Letta REST server that
+     * letta-mobile-ckmub.4 removed. The kind is derived from [LettaConfig] on every read and never
+     * persisted, so the rename needs no settings migration.
      */
-    REST;
+    DIRECT_WS;
 
     /**
      * True when this backend is served by an [com.letta.mobile.data.transport.api.IChannelTransport]
-     * (a duplex frame channel) rather than by REST polling.
-     *
-     * g70jb.4: only Iroh does now. The legacy shim WS backend kind is gone, so
-     * a leftover shim-era config classifies as [REST].
+     * (a duplex frame channel). Only Iroh is.
      */
     val usesChannelTransport: Boolean
         get() = this == IROH
@@ -76,5 +79,5 @@ fun isIrohBackendUrl(url: String?): Boolean {
 fun LettaConfig.backendKind(forceIroh: Boolean = false): BackendKind = when {
     mode == LettaConfig.Mode.LOCAL -> BackendKind.LOCAL_RUNTIME
     forceIroh || isIrohBackend() -> BackendKind.IROH
-    else -> BackendKind.REST
+    else -> BackendKind.DIRECT_WS
 }
