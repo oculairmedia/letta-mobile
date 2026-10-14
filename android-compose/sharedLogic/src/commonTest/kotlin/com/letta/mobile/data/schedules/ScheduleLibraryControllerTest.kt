@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -398,11 +399,30 @@ class ScheduleLibraryControllerTest {
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
     }
 
+    /**
+     * letta-mobile-by4vm.13: when the session's capabilities say it serves no schedule route, the
+     * page opens on "admin unavailable" without the doomed native round-trip.
+     */
+    @Test
+    fun aSessionWithoutTheScheduleRouteNeverCallsIt() = runTest {
+        val schedules = FakeScheduleRepository()
+        val controller = controller(scheduleRepository = schedules, nativeScheduleRoute = false)
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(0, schedules.refreshScheduleCallCount)
+        assertEquals(0, schedules.getSchedulesCallCount)
+        assertFalse(controller.state.value.scheduleAdminAvailable)
+        assertEquals("a1", controller.state.value.selectedAgentId)
+    }
+
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
         cronSource: CronScheduleSource? = null,
         initialAgentId: String? = null,
+        nativeScheduleRoute: Boolean = true,
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
@@ -410,6 +430,7 @@ class ScheduleLibraryControllerTest {
         scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
         cronSource = cronSource,
         initialAgentId = initialAgentId,
+        nativeScheduleRoute = nativeScheduleRoute,
     )
 
     private class RouteUnavailableException : RuntimeException("route unavailable")

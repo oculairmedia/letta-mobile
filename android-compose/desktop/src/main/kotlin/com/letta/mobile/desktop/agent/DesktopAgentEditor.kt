@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.agent
 
+import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,7 +75,13 @@ private fun rememberDesktopAgentEditor(agentId: String?, deps: DesktopAgentEdito
     val graph = deps.sessionGraph
     val chat = deps.chatController
     return remember(agentId, graph, chat) {
-        val repositories = AgentEditorRepositories(graph.agentRepository, graph.toolRepository, graph.modelRepository, modelCatalog = chat.availableModels)
+        // letta-mobile-by4vm.13: a route the session does not serve is absent, not a throwing stub.
+        val repositories = AgentEditorRepositories(
+            agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository },
+            tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository },
+            models = graph.ifSupported(SessionRoute.MODELS) { modelRepository },
+            modelCatalog = chat.availableModels,
+        )
         AgentEditorController(
             backend = RepositoryAgentEditorBackend(repositories, AgentCreator { params -> chat.createAgentAndOpen(params) }),
             scope = scope,

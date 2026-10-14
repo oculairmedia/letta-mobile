@@ -19,10 +19,13 @@ package com.letta.mobile.data.model
  * Settings mode, no cloud URL default, no cloud API-key field), but this enum stays
  * the one place a new backend family plugs in, so the shared shell never changes for
  * it. Adding one back means: a [LettaConfig.Mode] value (the Settings page lists
- * `Mode.entries`), a kind here returned by [backendKind], and a gateway bound for that
- * kind in the session graph factories (Android `DefaultSessionRepositoryGraphFactory`,
- * desktop `DesktopAppServerChatGatewayBuilder`, web `WasmAppServerClientGateway`). Nothing in
- * sharedUI keys on the backend family.
+ * `Mode.entries`) and a kind here returned by [backendKind].
+ *
+ * letta-mobile-by4vm.13: the compiler and the matrix tests then say what else to do. Every row of
+ * [com.letta.mobile.data.backend.SessionRouteMatrix] is an exhaustive `when` over this enum, so a new
+ * kind does not build until each platform (Android, desktop, web) decides which
+ * [com.letta.mobile.data.backend.SessionRoute]s it serves; each platform's matrix test then fails
+ * until its session factory binds exactly that row. Nothing in sharedUI keys on the backend family.
  */
 enum class BackendKind {
     /** On-device embedded runtime — no network transport at all. */

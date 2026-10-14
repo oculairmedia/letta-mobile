@@ -1,5 +1,7 @@
 package com.letta.mobile.data.runs
 
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -87,9 +89,12 @@ private const val ERROR_STATUS = "error"
 /**
  * The run monitor shared by every host (letta-mobile-ckmub.2.5): lists the host's runs, filters them
  * and opens one. Cancel and delete exist only where [IRunRepository.supportsRunDetail] is true.
+ *
+ * letta-mobile-by4vm.13: a null [runRepository] is a session that serves no runs; the page shows the
+ * host's "not served here" reason instead of calling it.
  */
 class RunMonitorController(
-    private val runRepository: IRunRepository,
+    private val runRepository: IRunRepository?,
     private val scope: CoroutineScope,
     private val errorMessageMapper: (Throwable, String) -> String = { throwable, fallback -> throwable.message ?: fallback },
 ) {
@@ -97,7 +102,7 @@ class RunMonitorController(
     val state: StateFlow<RunMonitorState> = stateFlow
 
     /** Whether runs can be cancelled and deleted on this host. */
-    val canManageRuns: Boolean get() = runRepository.supportsRunDetail
+    val canManageRuns: Boolean get() = runRepository?.supportsRunDetail == true
 
     private var loadJob: Job? = null
     private var detailJob: Job? = null
@@ -107,11 +112,14 @@ class RunMonitorController(
     /** Reloads the list; a newer reload supersedes one in flight. */
     fun refresh() {
         loadJob?.cancel()
+        val runs = runRepository ?: return stateFlow.update {
+            it.copy(loading = false, error = errorMessageMapper(AppServerRouteUnavailable(SessionRoute.RUNS), LOAD_FAILED))
+        }
         stateFlow.update { it.copy(loading = true) }
         loadJob = scope.launch {
             val activeOnly = stateFlow.value.activeOnly
-            runCatchingCancellable { runRepository.refreshRuns(RunListParams(active = activeOnly.takeIf { it })) }
-                .onSuccess { stateFlow.update { it.copy(runs = runRepository.runs.value, loading = false, error = null) } }
+            runCatchingCancellable { runs.refreshRuns(RunListParams(active = activeOnly.takeIf { it })) }
+                .onSuccess { stateFlow.update { it.copy(runs = runs.runs.value, loading = false, error = null) } }
                 .onFailure { e -> stateFlow.update { it.copy(loading = false, error = errorMessageMapper(e, LOAD_FAILED)) } }
         }
     }
@@ -147,7 +155,7 @@ class RunMonitorController(
         val run = stateFlow.value.runs.firstOrNull { it.id == runId } ?: stateFlow.value.detail?.run?.takeIf { it.id == runId } ?: return
         if (!canManageRuns) return
         scope.launch {
-            runCatchingCancellable { runRepository.cancelRun(run) }
+            runCatchingCancellable { servedRuns().cancelRun(run) }
                 .onSuccess { updated -> stateFlow.update { it.replacing(updated) } }
                 .onFailure { e -> stateFlow.update { it.copy(operationError = errorMessageMapper(e, CANCEL_FAILED)) } }
         }
@@ -157,17 +165,21 @@ class RunMonitorController(
     fun delete(runId: String) {
         if (!canManageRuns) return
         scope.launch {
-            runCatchingCancellable { runRepository.deleteRun(RunId(runId)) }
+            runCatchingCancellable { servedRuns().deleteRun(RunId(runId)) }
                 .onSuccess { stateFlow.update { it.removing(runId) } }
                 .onFailure { e -> stateFlow.update { it.copy(operationError = errorMessageMapper(e, DELETE_FAILED)) } }
         }
     }
 
+    /** The served run repository; the backstop when a page calls past an absent route. */
+    private fun servedRuns(): IRunRepository = runRepository ?: throw AppServerRouteUnavailable(SessionRoute.RUNS)
+
     private suspend fun loadDetail(runId: RunId): RunDetail {
-        val run = runRepository.getRun(runId)
-        val steps = runRepository.getRunSteps(runId)
-        if (!runRepository.supportsRunDetail) return RunDetail(run = run, steps = steps)
-        return RunDetail(run = run, steps = steps, usage = runRepository.getRunUsage(runId), full = true)
+        val runs = servedRuns()
+        val run = runs.getRun(runId)
+        val steps = runs.getRunSteps(runId)
+        if (!runs.supportsRunDetail) return RunDetail(run = run, steps = steps)
+        return RunDetail(run = run, steps = steps, usage = runs.getRunUsage(runId), full = true)
     }
 
     private fun RunMonitorState.replacing(run: Run): RunMonitorState = copy(

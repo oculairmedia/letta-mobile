@@ -1,5 +1,7 @@
 package com.letta.mobile.data.home
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
@@ -124,9 +126,30 @@ class SessionHomePageSourceTest {
         assertFalse(stats.loading)
     }
 
+    /**
+     * letta-mobile-by4vm.13: a figure whose route the session does not serve is never asked for, so
+     * it neither fails nor raises the banner (these fakes would fail every figure if asked).
+     */
+    @Test
+    fun figuresOutsideTheSessionCapabilitiesAreNeverAsked() = runTest {
+        val stats = loadedStats(
+            tools = FakeTools(Result.failure(IrohGuardException())),
+            runs = FakeRuns(failure = IrohGuardException()),
+            capabilities = SessionCapabilities(setOf(SessionRoute.AGENTS)),
+        )
+
+        assertNull(stats.error, "no figure was asked for, so none failed")
+        assertNull(stats.toolCount)
+        assertNull(stats.usage)
+    }
+
     /** Stats once every figure has settled, from a source over an iroh-style graph. */
-    private fun TestScope.loadedStats(tools: IToolRepository, runs: IRunRepository = FakeRuns()): HomeStats {
-        val graph = HomeGraph(tools = tools, runs = runs)
+    private fun TestScope.loadedStats(
+        tools: IToolRepository,
+        runs: IRunRepository = FakeRuns(),
+        capabilities: SessionCapabilities = SessionCapabilities(SessionRoute.entries.toSet()),
+    ): HomeStats {
+        val graph = HomeGraph(tools = tools, runs = runs, capabilities = capabilities)
         val source = SessionHomePageSource(sessionGraphProvider = FixedGraphProvider(graph), scope = backgroundScope)
         source.start()
         runCurrent()
@@ -148,7 +171,7 @@ class SessionHomePageSourceTest {
         )
     }
 
-    /** Stand-in for the Android repositories' no-route failure (NoAppServerRouteException). */
+    /** Stand-in for a route failure the session's capabilities did not predict (a host-side guard). */
     private class IrohGuardException : IllegalStateException(
         "Admin API call attempted while the active backend is an Iroh endpoint (iroh://node). This route has no admin_rpc path",
     )
@@ -164,6 +187,8 @@ class SessionHomePageSourceTest {
     private class HomeGraph(
         tools: IToolRepository = FakeTools(),
         runs: IRunRepository = FakeRuns(),
+        /** Every route by default (an Iroh session); letta-mobile-by4vm.13 tests narrow it. */
+        override val capabilities: SessionCapabilities = SessionCapabilities(SessionRoute.entries.toSet()),
     ) : SessionRepositoryGraph {
         override val id: Long = 1
         override val toolRepository: IToolRepository = tools

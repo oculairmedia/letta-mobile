@@ -1,5 +1,7 @@
 package com.letta.mobile.data.home
 
+import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
@@ -86,9 +88,13 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
         statsJob = null
     }
 
+    /** letta-mobile-by4vm.13: a catalog the session does not serve is empty, never asked for. */
     private suspend fun followCatalog(graph: Graph) {
-        val agents = graph.agentRepository
-        combine(agents.agents, agents.isRefreshing, graph.toolRepository.getTools(), blocks) { agentList, refreshing, tools, blockList ->
+        val agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository }
+        val roster = agents?.agents ?: MutableStateFlow(emptyList())
+        val settling = agents?.isRefreshing ?: MutableStateFlow(false)
+        val toolCatalog = graph.ifSupported(SessionRoute.TOOLS) { toolRepository.getTools() } ?: MutableStateFlow(emptyList())
+        combine(roster, settling, toolCatalog, blocks) { agentList, refreshing, tools, blockList ->
             HomeSearchCatalog(agents = agentList, tools = tools, blocks = blockList, agentsSettled = !refreshing)
         }.collect { catalogFlow.value = it }
     }
@@ -110,12 +116,15 @@ class SessionHomePageSource<Graph : SessionRepositoryGraph>(
             return
         }
         statsFlow.value = HomeStats(loading = true)
-        val blockRepository = graph.blockRepository as? IBlockRepository
+        // letta-mobile-by4vm.13: a figure the session does not serve is not asked for; its tile drops out.
+        val tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository }
+        val blockRepository = graph.ifSupported(SessionRoute.BLOCKS) { blockRepository } as? IBlockRepository
+        val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }
         val failures = coroutineScope {
             listOfNotNull(
-                async { record(attempt { graph.toolRepository.countTools() }) { stats, count -> stats.copy(toolCount = count) } },
+                tools?.let { repo -> async { record(attempt { repo.countTools() }) { stats, count -> stats.copy(toolCount = count) } } },
                 blockRepository?.let { async { record(attempt { loadBlocks(it) }) { stats, count -> stats.copy(blockCount = count) } } },
-                async { record(attempt { loadUsage(graph.runRepository) }) { stats, usage -> stats.copy(usage = usage) } },
+                runs?.let { repo -> async { record(attempt { loadUsage(repo) }) { stats, usage -> stats.copy(usage = usage) } } },
             ).awaitAll()
         }
         val error = failures.takeIf { results -> results.all { it != null } }?.firstNotNullOfOrNull { it?.message }

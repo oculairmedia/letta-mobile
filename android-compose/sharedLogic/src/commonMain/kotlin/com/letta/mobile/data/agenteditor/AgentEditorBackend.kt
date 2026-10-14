@@ -1,5 +1,7 @@
 package com.letta.mobile.data.agenteditor
 
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -49,51 +51,62 @@ fun interface AgentCreator {
 /**
  * The session repositories the editor works over. [modelCatalog] replaces [models]' list where the
  * host already holds the models its chat offers (the desktop's chat controller).
+ *
+ * letta-mobile-by4vm.13: a null repository is a route the session does not serve (the desktop's tools
+ * and models off Iroh): its catalog reads empty and its writes fail with that reason.
  */
 class AgentEditorRepositories(
-    val agents: IAgentRepository,
-    val tools: IToolRepository,
-    val models: IModelRepository,
+    val agents: IAgentRepository?,
+    val tools: IToolRepository?,
+    val models: IModelRepository?,
     val modelCatalog: StateFlow<List<LlmModel>>? = null,
 )
 
 /**
- * The editor over the session's agent, tool and model repositories. A repository a backend does not
- * bind (the desktop's tools off Iroh) reads as an empty catalog, and its writes fail with the reason.
+ * The editor over the session's agent, tool and model repositories. A repository the session does not
+ * serve (null in [AgentEditorRepositories]) reads as an empty catalog, and its writes fail with the
+ * reason ([AppServerRouteUnavailable]).
  */
 class RepositoryAgentEditorBackend(
     repositories: AgentEditorRepositories,
-    private val creator: AgentCreator = AgentCreator { params -> AgentCreated(repositories.agents.createAgent(params).id.value) },
+    private val creator: AgentCreator = AgentCreator { params ->
+        AgentCreated(served(repositories.agents, SessionRoute.AGENTS).createAgent(params).id.value)
+    },
 ) : AgentEditorBackend {
     private val agentRepository = repositories.agents
     private val toolRepository = repositories.tools
     private val modelRepository = repositories.models
 
-    override val agents: StateFlow<List<Agent>> = catalogOrEmpty { agentRepository.agents }
-    override val models: StateFlow<List<LlmModel>> = repositories.modelCatalog ?: catalogOrEmpty { modelRepository.llmModels }
-    override val tools: StateFlow<List<Tool>> = catalogOrEmpty { toolRepository.getTools() }
+    override val agents: StateFlow<List<Agent>> = agentRepository?.agents ?: MutableStateFlow(emptyList())
+    override val models: StateFlow<List<LlmModel>> =
+        repositories.modelCatalog ?: modelRepository?.llmModels ?: MutableStateFlow(emptyList())
+    override val tools: StateFlow<List<Tool>> = toolRepository?.getTools() ?: MutableStateFlow(emptyList())
 
     // The first emission, never the last: Android's session-scoped repository flat-maps getAgent over
     // the live session graph, so its flow never completes and waiting for its last value hangs.
-    override suspend fun load(agentId: AgentId): Agent = agentRepository.getAgent(agentId).first()
+    override suspend fun load(agentId: AgentId): Agent = servedAgents().getAgent(agentId).first()
 
     override suspend fun refreshCatalogs() {
-        refreshQuietly { agentRepository.refreshAgentsIfStale(CATALOG_MAX_AGE_MS) }
-        refreshQuietly { modelRepository.refreshLlmModels() }
-        refreshQuietly { toolRepository.refreshToolsIfStale(CATALOG_MAX_AGE_MS) }
+        agentRepository?.let { refreshQuietly { it.refreshAgentsIfStale(CATALOG_MAX_AGE_MS) } }
+        modelRepository?.let { refreshQuietly { it.refreshLlmModels() } }
+        toolRepository?.let { refreshQuietly { it.refreshToolsIfStale(CATALOG_MAX_AGE_MS) } }
     }
 
     override suspend fun create(params: AgentCreateParams): AgentCreated = creator.create(params)
 
     override suspend fun update(agentId: AgentId, params: AgentUpdateParams) {
-        agentRepository.updateAgent(agentId, params)
+        servedAgents().updateAgent(agentId, params)
     }
 
-    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = toolRepository.attachTool(agentId, toolId)
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = servedTools().attachTool(agentId, toolId)
 
-    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = toolRepository.detachTool(agentId, toolId)
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = servedTools().detachTool(agentId, toolId)
 
-    override suspend fun delete(agentId: AgentId) = agentRepository.deleteAgent(agentId)
+    override suspend fun delete(agentId: AgentId) = servedAgents().deleteAgent(agentId)
+
+    private fun servedAgents(): IAgentRepository = served(agentRepository, SessionRoute.AGENTS)
+
+    private fun servedTools(): IToolRepository = served(toolRepository, SessionRoute.TOOLS)
 
     override fun reasoningEffortsFor(handle: String): List<String> {
         val model = models.value.firstOrNull { it.handle == handle || it.id == handle } ?: return emptyList()
@@ -106,12 +119,8 @@ class RepositoryAgentEditorBackend(
     }
 }
 
-/** [read]'s catalog, or an empty one where the backend does not bind that repository. */
-private fun <T> catalogOrEmpty(read: () -> StateFlow<List<T>>): StateFlow<List<T>> = try {
-    read()
-} catch (_: UnsupportedOperationException) {
-    MutableStateFlow(emptyList())
-}
+/** [repository] when the session serves [route]; the backstop [AppServerRouteUnavailable] when not. */
+private fun <T : Any> served(repository: T?, route: SessionRoute): T = repository ?: throw AppServerRouteUnavailable(route)
 
 /** Runs [block], rethrowing cancellation and swallowing anything else (a refresh that may fail). */
 private suspend fun refreshQuietly(block: suspend () -> Unit) {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.LettaConfig
@@ -53,6 +54,7 @@ class SessionGraph internal constructor(
     override val subagentRepository: SubagentRepository,
     override val toolRepository: ToolRepository,
     override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
+    override val capabilities: SessionCapabilities,
     override val blockRepository: BlockRepository? = null,
     val conversationCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
     /** Configuration captured at creation, never resolved from mutable settings. */

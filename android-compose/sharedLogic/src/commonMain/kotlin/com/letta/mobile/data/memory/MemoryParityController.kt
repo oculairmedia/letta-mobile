@@ -1,5 +1,8 @@
 package com.letta.mobile.data.memory
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.session.SessionRepositoryGraph
@@ -79,7 +82,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             selectedAgentDetail = null
             selectedAgentGraphId = graph.id
         }
-        val roster = sectionReader.read("roster") {
+        val roster = sectionReader.read("roster", SessionRoute.AGENTS, graph.capabilities) {
             graph.agentRepository.refreshAgentsIfStale(maxAgeMs = maxAgeMs)
             graph.agentRepository.agents.value
         }
@@ -92,7 +95,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         }
 
         val globalTools = if (roster.loaded && selectedAgent == null) {
-            sectionReader.read("tools") {
+            sectionReader.read("tools", SessionRoute.TOOLS, graph.capabilities) {
                 graph.toolRepository.refreshToolsIfStale(maxAgeMs = maxAgeMs)
                 graph.toolRepository.getTools().value
             }
@@ -106,7 +109,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         val skillsLoaded = if (selectedAgent == null) globalTools.loaded else agentSnapshotLoaded
         val blocks = selectedAgent?.let { agent ->
             graph.blockRepository?.let { repository ->
-                sectionReader.read("blocks") { repository.getBlocks(agent.id.value) }
+                sectionReader.read("blocks", SessionRoute.BLOCKS, graph.capabilities) { repository.getBlocks(agent.id.value) }
             } ?: MemoryParitySectionRead.Loaded(agent.coreBlocks)
         } ?: if (roster.loaded) {
             MemoryParitySectionRead.Loaded(emptyList())
@@ -114,7 +117,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
         }
         val schedules = selectedAgent?.id?.value?.let { agentId ->
-            sectionReader.read("schedules") {
+            sectionReader.read("schedules", SessionRoute.SCHEDULES, graph.capabilities) {
                 graph.scheduleRepository.refreshSchedules(agentId)
                 graph.scheduleRepository.getSchedules(agentId).first()
             }
@@ -124,7 +127,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
         }
         val context = selectedAgent?.id?.let { agentId ->
-            sectionReader.read("context") { graph.agentRepository.getContextWindow(agentId) }
+            sectionReader.read("context", SessionRoute.AGENTS, graph.capabilities) { graph.agentRepository.getContextWindow(agentId) }
         } ?: if (roster.loaded) {
             MemoryParitySectionRead.Loaded(null)
         } else {
@@ -195,6 +198,18 @@ class MemoryParitySectionReader(
             warn(section, t::class.simpleName ?: "Throwable")
             MemoryParitySectionRead.Unavailable(t)
         }
+
+    /**
+     * letta-mobile-by4vm.13: [read] when [capabilities] serve [route]; otherwise the section is
+     * unavailable for that reason without calling the session's stand-in for the route.
+     */
+    suspend fun <T> read(
+        section: String,
+        route: SessionRoute,
+        capabilities: SessionCapabilities,
+        block: suspend () -> T,
+    ): MemoryParitySectionRead<T> =
+        if (capabilities.supports(route)) read(section, block) else MemoryParitySectionRead.Unavailable(AppServerRouteUnavailable(route, section))
 }
 
 sealed interface MemoryParitySectionRead<out T> {
