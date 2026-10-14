@@ -1,5 +1,7 @@
 # Progressive Composer Affordances: Design & Migration Plan
 
+> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `SlashCommandProvider.kt`, `MentionProvider.kt`, `PromptTemplateProvider.kt`, `SlashCommandAutoComplete.kt`, `MentionAutoComplete.kt`, `ChatComposer.kt`, `SlashDropdown.kt`, `MentionDropdown.kt`, `ComposerModelBadge.kt`. Read references to them as historical; current code is the source of truth.
+
 Status: draft design spec
 Date: 2026-06-11
 Tracking beads: `letta-mobile-uyysi` (this spec), `letta-mobile-9nlvm` (headless PromptComposerState substrate)

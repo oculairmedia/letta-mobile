@@ -45,6 +45,20 @@ class IrohBearerAuthVerifierTest {
     }
 
     @Test
+    fun emptyAllowlistKeepsTheTokenValidFromAnyNodeId() {
+        val v = verifier()
+        assertEquals(IrohBearerAuthVerifier.Outcome.Authenticated, v.verify("peer-1", token))
+        assertEquals(IrohBearerAuthVerifier.Outcome.Authenticated, v.verify("peer-unlisted", token))
+    }
+
+    @Test
+    fun allowlistBindsTheTokenToListedNodeIds() {
+        val v = IrohBearerAuthVerifier(IrohAuthPolicy.BearerToken(token, setOf("peer-1")))
+        assertEquals(IrohBearerAuthVerifier.Outcome.Authenticated, v.verify("peer-1", token))
+        assertEquals(IrohBearerAuthVerifier.Outcome.Denied("peer_not_allowlisted"), v.verify("peer-2", token))
+    }
+
+    @Test
     fun policiesWithoutTokensAuthenticateWithoutRateTracking() {
         val anonymous = IrohBearerAuthVerifier(IrohAuthPolicy.InsecureAnonymousForTestOnly)
         val allowlist = IrohBearerAuthVerifier(IrohAuthPolicy.PeerAllowlist(setOf("peer-1")))
