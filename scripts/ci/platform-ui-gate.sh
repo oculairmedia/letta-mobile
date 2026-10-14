@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Platform UI gate (letta-mobile-ckmub.7, hard cut slice S0 = advisory ratchet).
+# Platform UI gate (letta-mobile-ckmub.7; enforced for new files by letta-mobile-by4vm.32).
 #
 # All UI is shared (sharedUI); platform modules are containers. A "platform UI
 # file" is any .kt file containing '@Composable' under one of the platform UI
@@ -7,13 +7,16 @@
 # legacy files may not grow. sharedUI/ and sharedLogic/ are never scanned.
 #
 # Stdout: SEVERITY|RULE|PATH|message, then a summary line.
-#   PUI001 error  new platform UI file not in the allowlist
-#   PUI002 error  allowlisted file grew beyond maxLines (+5 slack for legacy-pending)
+#   PUI001 error  new platform UI file not in the allowlist. Never overridden: a new
+#                 platform UI file is exactly what the ratchet exists to stop.
+#   PUI002 warn   allowlisted file grew beyond maxLines (+5 slack for legacy-pending).
+#                 A warning for now; it becomes an error once the legacy files settle.
 #   PUI003 warn   allowlisted file is gone or no longer has @Composable (ratchet down)
 #   PUI004 error  PR adds or raises an allowlist line (needs Platform-UI-Reason:)
 # A "Platform-UI-Reason: <why>" line in the PR body (env PR_BODY, or the GitHub
-# event at GITHUB_EVENT_PATH) or env PLATFORM_UI_REASON locally downgrades
-# every error to a warning.
+# event at GITHUB_EVENT_PATH) or env PLATFORM_UI_REASON locally downgrades PUI004
+# only: it is the reviewed justification for growing the allowlist. The only way
+# past PUI001 is an allowlist line (PUI004) carrying that reason.
 #
 # Usage: platform-ui-gate.sh [--diff-base REF] [--enforce] [--update]
 #                            [--root DIR] [--allowlist FILE]
@@ -139,8 +142,11 @@ in_scope() { [[ -z "$DIFF_BASE" || -n "${CHANGED[$1]+x}" ]]; }
 OUT="$(mktemp)"
 trap 'rm -f "$OUT"' EXIT
 errors=0
-emit_error() { # rule path message
-  if [[ -n "$REASON" ]]; then
+emit_warning() { # rule path message
+  echo "WARN|$1|$2|$3" >>"$OUT"
+}
+emit_error() { # rule path message; only PUI004 honours Platform-UI-Reason
+  if [[ -n "$REASON" && "$1" == PUI004 ]]; then
     echo "WARN|$1|$2|$3 (overridden by Platform-UI-Reason: $REASON)" >>"$OUT"
   else
     echo "ERROR|$1|$2|$3" >>"$OUT"
@@ -160,7 +166,7 @@ for path in "${!CURRENT[@]}"; do
   limit="$max"
   [[ "$kind" == legacy-pending* ]] && limit=$((max + LEGACY_SLACK))
   if ((lines > limit)); then
-    emit_error PUI002 "$path" "$kind file grew to $lines lines (allowlisted $max, limit $limit) - move the new UI to sharedUI"
+    emit_warning PUI002 "$path" "$kind file grew to $lines lines (allowlisted $max, limit $limit) - move the new UI to sharedUI"
   fi
 done
 

@@ -12,6 +12,13 @@ Tracks issue `letta-mobile-o7ob.4.1`.
   and fails the build when a metric regresses past tolerance.
 - `test_check_baselines.py` — regression tests for the parser and
   rebaseline flow.
+- `perf_control.py` (+ `test_perf_control.py`) — on a breach, renders this run
+  next to the last 5 main runs in the job summary. There is no automatic
+  retry; a human reruns only when that control shows the runner moved.
+
+The perf-gate job runs `python3 -m unittest discover -s perf -p 'test_*.py'`
+and `scripts/ci/baseline-profile-staleness.py` (warns when the committed
+Baseline Profile no longer resolves) on every run.
 
 ## Workflow
 

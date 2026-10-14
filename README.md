@@ -90,7 +90,8 @@ opening a PR.**
 - `perf-gate` — perf-budget benchmarks
 
 Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
-**Advisory only** (cannot block merge): `detekt`, `qodana`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
+**Not required, but honest** (red means a new problem): `detekt` (fails only on findings outside each module's `detekt-baseline.xml`), `Platform UI gate` (new platform `@Composable` files), `main module tests` (main pushes: `:sharedUI:jvmTest :desktop:test`).
+**Advisory only** (findings never fail): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Full table: "CI map" in [`AGENTS.md`](AGENTS.md).
 
 ## Releases
 

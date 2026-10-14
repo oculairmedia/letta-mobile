@@ -28,6 +28,8 @@ concurrency:
 
 permissions:
   contents: read
+  # The breach control lists and downloads earlier main runs' perf summaries.
+  actions: read
 
 jobs:
   perf-gate:
@@ -78,6 +80,31 @@ jobs:
           echo "run_benchmark=$run_benchmark" >> "$GITHUB_OUTPUT"
           echo "Macrobenchmark required: $run_benchmark" >> "$GITHUB_STEP_SUMMARY"
 
+      # The checker and the control renderer are the gate. Keep them tested so
+      # the gate itself cannot rot silently.
+      - name: Test perf gate scripts
+        run: python3 -m unittest discover -s perf -p 'test_*.py'
+
+      # letta-mobile-by4vm.32: a Baseline Profile whose classes no longer exist
+      # is silently ignored by ART, which shows up here as startup drift. Warn
+      # (never fail this required job) when too much of it no longer resolves.
+      - name: Check Baseline Profile freshness
+        run: |
+          status=0
+          python3 -u ../scripts/ci/baseline-profile-staleness.py --max-unresolved-pct 25 \
+            > baseline-profile-staleness.txt 2>&1 || status=$?
+          cat baseline-profile-staleness.txt
+          if [[ "$status" -ne 0 ]]; then
+            echo "::warning title=Stale Baseline Profile::$(grep -m1 '^unresolved:' baseline-profile-staleness.txt || tail -n 1 baseline-profile-staleness.txt) - regenerate it (docs/performance/perf-gate.md#baseline-profile-freshness)"
+          fi
+          {
+            echo "## Baseline Profile freshness"
+            echo
+            echo '```text'
+            cat baseline-profile-staleness.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Setup Java 26
         if: steps.classify.outputs.run_benchmark == 'true'
         uses: actions/setup-java@v4
@@ -99,7 +126,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run macrobenchmarks on API 33 emulator (attempt 1)
+      - name: Run macrobenchmarks on API 33 emulator
         if: steps.classify.outputs.run_benchmark == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -115,58 +142,63 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android-compose
           script: |
-            rm -rf "$PERF_SUMMARY_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-1"
+            rm -rf "$PERF_SUMMARY_DIR"; mkdir -p "$PERF_SUMMARY_DIR"
             FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
-      - name: Check perf baselines (attempt 1)
+      # One measurement decides (letta-mobile-by4vm.32). There is no automatic
+      # rerun: retrying until green is what the deflake rule forbids. On a
+      # breach the next step shows the control; a human decides whether to rerun.
+      - name: Check perf baselines
         if: steps.classify.outputs.run_benchmark == 'true'
-        id: check_perf_attempt_1
+        id: check_perf
         run: |
           set -euo pipefail
+          mode=()
           if [[ "$WORKFLOW_REBASELINE" == "true" ]] || [[ "$PR_TITLE" == *"[perf:rebaseline]"* ]]; then
-            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --rebaseline --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
-            echo "retry=false" >> "$GITHUB_OUTPUT"
-          else
-            set +e
-            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --retryable-single-startup-exit-code 3 --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
-            status=$?
-            set -e
-            if [[ "$status" -eq 3 ]]; then
-              echo "retry=true" >> "$GITHUB_OUTPUT"
-              echo "::warning::Exactly one startup metric exceeded the perf ceiling on attempt 1; rerunning the complete suite once to distinguish emulator noise from a repeatable regression."
-              exit 0
-            fi
-            echo "retry=false" >> "$GITHUB_OUTPUT"
-            exit "$status"
+            mode=(--rebaseline)
+          fi
+          python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" "${mode[@]}" \
+            --summary-json "$PERF_SUMMARY_DIR/perf-summary.json" \
+            --summary-md "$PERF_SUMMARY_DIR/perf-summary.md"
+
+      - name: Publish perf summary
+        if: always() && steps.classify.outputs.run_benchmark == 'true'
+        run: |
+          if [[ -f "$PERF_SUMMARY_DIR/perf-summary.md" ]]; then
+            cat "$PERF_SUMMARY_DIR/perf-summary.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Rerun macrobenchmarks after one retryable startup failure (attempt 2)
-        if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          cores: 4
-          ram-size: 4096M
-          heap-size: 512M
-          emulator-boot-timeout: 900
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          working-directory: android-compose
-          script: |
-            mkdir -p "$PERF_SUMMARY_DIR/attempt-1/results" "$PERF_SUMMARY_DIR/attempt-1/reports" "$PERF_SUMMARY_DIR/attempt-2"
-            cp -R "$PERF_OUTPUT_DIR"/. "$PERF_SUMMARY_DIR/attempt-1/results/"
-            if [[ -d "$PERF_REPORT_DIR" ]]; then cp -R "$PERF_REPORT_DIR"/. "$PERF_SUMMARY_DIR/attempt-1/reports/"; fi
-            rm -rf "$PERF_OUTPUT_DIR" "$PERF_REPORT_DIR"
-            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
-
-      - name: Check perf baselines after retry (attempt 2)
-        if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
+      - name: Show the control (last 5 main runs) on a breach
+        if: failure() && steps.check_perf.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_DIR: ${{ runner.temp }}/perf-control
         run: |
           set -euo pipefail
-          python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --summary-json "$PERF_SUMMARY_DIR/attempt-2/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-2/perf-summary.md"
+          mkdir -p "$CONTROL_DIR"
+          gh run list -R "$GITHUB_REPOSITORY" --workflow android-perf.yml --branch main \
+            --event push --status completed -L 20 \
+            --json databaseId,headSha,conclusion,createdAt,url \
+            | jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0:5]' \
+            > "$CONTROL_DIR/runs.json"
+          for id in $(jq -r '.[].databaseId' "$CONTROL_DIR/runs.json"); do
+            gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'android-perf-summary-*' -D "$CONTROL_DIR/$id" 2>/dev/null \
+              || gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'android-perf-results-*' -D "$CONTROL_DIR/$id" \
+              || echo "::warning::no perf artifact for main run $id"
+          done
+          python3 perf/perf_control.py --current "$PERF_SUMMARY_DIR/perf-summary.json" \
+            --runs "$CONTROL_DIR/runs.json" --control-dir "$CONTROL_DIR" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Small, separate artifact so a later breach's control step can fetch
+      # five summaries without pulling five sets of traces.
+      - name: Upload perf summary
+        if: always() && steps.classify.outputs.run_benchmark == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-perf-summary-${{ github.run_number }}
+          path: android-compose/${{ env.PERF_SUMMARY_DIR }}
+          if-no-files-found: warn
 
       - name: Upload perf benchmark results
         if: always() && steps.classify.outputs.run_benchmark == 'true'
