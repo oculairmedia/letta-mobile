@@ -441,6 +441,25 @@ object LettaDatabaseMigrations {
         }
     }
 
+    /**
+     * letta-mobile-by4vm.19: conversations gain epoch-millis copies of their ISO timestamps so the
+     * cached lists sort chronologically (the String columns mixed `Z`/`+00:00` and fraction
+     * precision, and fell back to sorting by id). Existing rows are backfilled in Kotlin with the
+     * same parser that new writes use; see [ConversationEpochBackfill].
+     */
+    val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `lastMessageAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `updatedAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `createdAtEpochMs` INTEGER")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_conversations_agentId_lastMessageAtEpochMs` " +
+                    "ON `conversations` (`agentId`, `lastMessageAtEpochMs`)",
+            )
+            ConversationEpochBackfill.run(db)
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -462,5 +481,6 @@ object LettaDatabaseMigrations {
         MIGRATION_18_19,
         MIGRATION_19_20,
         MIGRATION_20_21,
+        MIGRATION_21_22,
     )
 }
