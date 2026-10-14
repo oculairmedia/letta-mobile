@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import kotlinx.coroutines.delay
@@ -79,7 +80,7 @@ internal fun A2uiToolApprovalCard(
         } else if (props.risk == ToolApprovalRisk.Destructive) {
             A2uiHaptics.longPress(haptic)
         }
-                onAction(toolApprovalAction(surface, props.callId, next))
+        onAction(toolApprovalAction(surface, props.callId, next))
     }
 
     LaunchedEffect(component.id, props.callId, props.timeoutSeconds, result) {
@@ -285,6 +286,8 @@ internal fun toolApprovalAction(
         turnId = surface.turnId,
         actionId = callId,
         raw = raw,
+        // letta-mobile-by4vm.2: the one mark a server-authored Button cannot forge.
+        origin = A2uiActionOrigin.ToolApprovalCard,
     )
 }
 

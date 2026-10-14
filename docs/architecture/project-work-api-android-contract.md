@@ -44,11 +44,10 @@ Explicit tombstone records are not part of v1 incremental sync. Android must not
 
 The current Android data contract lives in:
 
-- `android-compose/core/src/main/java/com/letta/mobile/data/model/Project.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/model/ProjectWork.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/api/ProjectApi.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/api/ProjectWorkApi.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
+- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Project.kt`
+- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt`
+- ~~`ProjectApi.kt`~~, ~~`ProjectWorkApi.kt`~~ — removed with the Letta REST backend in the hard cut (letta-mobile-ckmub); no REST client remains
+- `android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
 
 Focused coverage lives in:
 
