@@ -3,6 +3,7 @@ package com.letta.mobile.architecture
 import com.lemonappdev.konsist.api.Konsist
 import com.lemonappdev.konsist.api.container.KoScope
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
+import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.invariantSeparatorsPathString
 
@@ -23,17 +24,18 @@ internal object KotlinSourcePolicy {
         "/ksp/",
     )
 
+    /**
+     * Every non-test source set directly under a module's `src/`: KMP `*Main` sets, intermediate
+     * sets that do not end in `Main` (sharedLogic's `jvmAndAndroid`), Android/JVM `main`, Android
+     * build-type and flavor sets (`debug`, `release`, `root`, `play`, `sideload`, ...) and
+     * desktop's `phonePlayground` (letta-mobile-by4vm.27). Matching only `*Main` used to skip all
+     * of those.
+     */
     fun productionScope(projectRoot: Path): KoScope {
         val roots = projectRoot.resolve("android-compose")
             .toFile()
             .walkTopDown()
-            .filter { file ->
-                file.isDirectory &&
-                    file.name.endsWith("Main") &&
-                    file.parentFile?.name == "src" &&
-                    file.parentFile?.parentFile?.name !in vendoredModules &&
-                    !isGenerated(file.toPath())
-            }
+            .filter(::isProductionSourceSet)
             .map { it.absolutePath }
             .toList()
 
@@ -55,6 +57,16 @@ internal object KotlinSourcePolicy {
             }
         }
     }
+
+    private fun isProductionSourceSet(dir: File): Boolean =
+        dir.isDirectory &&
+            dir.parentFile?.name == "src" &&
+            !isTestSourceSet(dir.name) &&
+            dir.parentFile?.parentFile?.name !in vendoredModules &&
+            !isGenerated(dir.toPath())
+
+    private fun isTestSourceSet(name: String): Boolean =
+        name.endsWith("test", ignoreCase = true) || name.contains("testFixtures", ignoreCase = true)
 
     private fun isCommonMain(file: KoFileDeclaration): Boolean {
         val path = file.path.replace('\\', '/')

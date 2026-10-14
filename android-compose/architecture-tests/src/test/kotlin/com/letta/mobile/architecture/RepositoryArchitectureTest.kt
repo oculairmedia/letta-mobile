@@ -19,6 +19,15 @@ class RepositoryArchitectureTest {
     }
 
     @Test
+    fun `production scope covers source sets whose names do not end in Main`() {
+        val paths = KotlinSourcePolicy.productionScope(projectRoot).files.map { it.path.replace('\\', '/') }
+        val required = listOf("/sharedLogic/src/jvmAndAndroid/", "/app/src/main/", "/app/src/debug/")
+        val missing = required.filter { segment -> paths.none { segment in it } }
+        check(missing.isEmpty()) { "productionScope skips $missing" }
+        check(paths.none { "/src/commonTest/" in it || "/src/test/" in it }) { "productionScope includes test sources" }
+    }
+
+    @Test
     fun `JVM core bytecode follows layer and cycle rules`() {
         val coreClasses = importCoreClasses(projectRoot)
         val violations = repositoryBytecodeRules()
