@@ -99,6 +99,8 @@ class RoomRuntimeEventOutboxTest {
                         draft(localMessageId = "local-2"),
                     ),
                 )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (caught: Throwable) {
                 failure = caught
             }

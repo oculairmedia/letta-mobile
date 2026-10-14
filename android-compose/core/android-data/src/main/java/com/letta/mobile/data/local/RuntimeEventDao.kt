@@ -14,7 +14,11 @@ interface RuntimeEventDao {
     @Query("SELECT MAX(eventOffset) FROM runtime_events")
     fun observeMaxOffset(): Flow<Long?>
 
-    @Query("SELECT * FROM runtime_events WHERE eventOffset > :afterOffset ORDER BY eventOffset ASC LIMIT :limit")
+    @Query(
+        "SELECT eventOffset, eventId, backendId, runtimeId, agentId, conversationId, runId, " +
+            "createdAtEpochMs, source, schemaVersion, payloadJson FROM runtime_events " +
+            "WHERE eventOffset > :afterOffset ORDER BY eventOffset ASC LIMIT :limit",
+    )
     suspend fun listAfterOffset(afterOffset: Long, limit: Int): List<RuntimeEventEntity>
 
     /**
