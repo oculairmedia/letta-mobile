@@ -17,10 +17,11 @@ import { pathToFileURL } from 'node:url';
 import { chartPng } from './png.mjs';
 
 export const CONTRACT_VERSIONS = [1];
-const BUILD = '1.0.0';
+const BUILD = '1.1.0';
 const CHUNK_BYTES = 1024 * 1024; // host.putAsset.chunk carries at most 1 MiB of raw bytes
 const MAX_POINTS = 24;
-const MAX_PROP_CHARS = 1024; // the props schema's maxLength for labels/values
+const MAX_LABEL_CHARS = 32; // the props schema's maxLength for one label
+export const KIND_VERSION = 2; // the chart kind's schemaVersion: v2 props carry real arrays
 
 /** The LCP error codes this plugin answers with (the table in the wire reference). */
 export const Code = Object.freeze({
@@ -47,29 +48,26 @@ const pointsInRange = ({ labels }) => labels.length >= 1 && labels.length <= MAX
 const INPUT_RULES = [
   [({ kind }) => kind === 'bar' || kind === 'line', 'kind is bar or line'],
   [({ title }) => typeof title === 'string' && title.length <= 120, 'title is a string of at most 120 characters'],
-  [({ labels }) => isArrayOf(labels, (l) => typeof l === 'string'), 'labels is an array of strings'],
+  [({ labels }) => isArrayOf(labels, (l) => typeof l === 'string' && l.length <= MAX_LABEL_CHARS), `labels is an array of strings of at most ${MAX_LABEL_CHARS} characters`],
   [({ values }) => isArrayOf(values, Number.isFinite), 'values is an array of finite numbers'],
   [(input) => sameLength(input) && pointsInRange(input), `labels and values have the same length, 1 to ${MAX_POINTS}`],
 ];
 
-/** Validates `plot` input (arrays) into flat element props (arrays as JSON text). */
+/** Validates `plot` input into the chart kind's v2 element props, which hold the same arrays. */
 export function propsFromInput(raw) {
   const input = { kind: 'bar', ...raw };
   const broken = INPUT_RULES.find(([holds]) => !holds(input));
   if (broken) throw actionFailed('invalid_input', broken[1]);
-  const props = { kind: input.kind, title: input.title, labels: JSON.stringify(input.labels), values: JSON.stringify(input.values) };
-  const tooLong = Math.max(props.labels.length, props.values.length) > MAX_PROP_CHARS;
-  if (tooLong) throw actionFailed('invalid_input', 'the chart data is too long');
-  return props;
+  return { kind: input.kind, title: input.title, labels: [...input.labels], values: [...input.values] };
 }
 
-/** The arrays inside flat props. */
-export const chartOf = (props) => ({ ...props, labels: JSON.parse(props.labels), values: JSON.parse(props.values) });
+/** A v1 element's props carried labels and values as JSON text; v2 carries arrays. Either reads as arrays. */
+const arrayOf = (value) => (typeof value === 'string' ? JSON.parse(value) : value);
 
-/** The props a page sent with `toggle`, when complete and well-formed; else null. */
+/** The props a page sent with `toggle` (v2, or a v1 element's JSON text), when complete and well-formed; else null. */
 function propsFromView(input) {
   try {
-    return propsFromInput(chartOf({ kind: input.kind, title: input.title, labels: input.labels, values: input.values }));
+    return propsFromInput({ kind: input.kind, title: input.title, labels: arrayOf(input.labels), values: arrayOf(input.values) });
   } catch {
     return null;
   }
@@ -79,7 +77,10 @@ function propsFromView(input) {
 const NO_ELEMENT = '(none)';
 const elementIdOf = (context) => context.elementId ?? context.origin?.elementId ?? NO_ELEMENT;
 
-const fallbackOf = (props) => ({ title: props.title, subtitle: `${props.kind} chart, ${JSON.parse(props.values).length} points`, icon: 'chart' });
+const fallbackOf = (props) => ({ title: props.title, subtitle: `${props.kind} chart, ${props.values.length} points`, icon: 'chart' });
+
+/** The host's token for the call (`context.callId`), echoed on every `host.emit` made for it so it lands on that call's board. */
+const callOf = (context) => (typeof context?.callId === 'string' ? { callId: context.callId } : {});
 
 /**
  * One LCP session over a line transport: [send] writes one message (an object) as one line,
@@ -121,12 +122,13 @@ export function createSession({ send, exit }) {
 
   const refusal = (receipt) => receipt?.refused?.[0]?.reason ?? 'the host placed nothing';
 
-  async function plot(input, work) {
+  async function plot(input, context, work) {
     const props = propsFromInput(input);
-    const ref = await upload(chartPng(chartOf(props)), work);
-    // host.emit {place:[{kind, v, props, fallback, snapshot}]} -> {receipt:{placed:[id], refused:[...]}}
+    const ref = await upload(chartPng(props), work);
+    // host.emit {place:[{kind, v, props, fallback, snapshot}], callId} -> {receipt:{placed:[id], refused:[...]}}
     const { receipt } = await call('host.emit', {
-      place: [{ kind: 'chart', v: 1, props, fallback: fallbackOf(props), snapshot: { type: 'asset', ref } }],
+      place: [{ kind: 'chart', v: KIND_VERSION, props, fallback: fallbackOf(props), snapshot: { type: 'asset', ref } }],
+      ...callOf(context),
     }, work);
     const elementId = receipt?.placed?.[0];
     if (!elementId) throw actionFailed('refused', refusal(receipt));
@@ -146,10 +148,11 @@ export function createSession({ send, exit }) {
     const elementId = elementIdOf(context);
     const current = chartToToggle(elementId, input);
     const props = { ...current, kind: current.kind === 'bar' ? 'line' : 'bar' };
-    const ref = await upload(chartPng(chartOf(props)), work);
-    // host.emit {update:[{elementId, props, fallback, snapshot}]}: only the given fields change.
+    const ref = await upload(chartPng(props), work);
+    // host.emit {update:[{elementId, props, fallback, snapshot}], callId}: only the given fields change.
     const { receipt } = await call('host.emit', {
       update: [{ elementId, props, fallback: fallbackOf(props), snapshot: { type: 'asset', ref } }],
+      ...callOf(context),
     }, work);
     if (receipt?.refused?.length) throw actionFailed('refused', refusal(receipt));
     charts.set(elementId, props);
@@ -181,7 +184,7 @@ export function createSession({ send, exit }) {
     'action.invoke': (params, work) => {
       if (state !== 'active') throw new RpcError(Code.SESSION_STATE, `action.invoke needs an active session (${state})`);
       if (typeof params.action !== 'string' || typeof params.context !== 'object') throw new RpcError(Code.INVALID_PARAMS, 'action.invoke needs action and context');
-      if (params.action === 'plot') return plot(params.input, work);
+      if (params.action === 'plot') return plot(params.input, params.context, work);
       if (params.action === 'toggle') return toggle(params.input, params.context, work);
       throw actionFailed('unknown_action', `letta.chart has no action ${params.action}`);
     },

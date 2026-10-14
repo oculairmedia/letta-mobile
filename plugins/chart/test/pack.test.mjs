@@ -26,7 +26,7 @@ const pack = () => {
 test('pack.sh is deterministic and packs the manifest, runtime files and page only', { skip: !hasZip && 'zip/unzip not installed' }, () => {
   const first = pack();
   const second = pack();
-  assert.match(first.path, /letta\.chart-1\.0\.0\.lcp$/);
+  assert.match(first.path, /letta\.chart-1\.1\.0\.lcp$/);
   assert.match(first.sha, /^sha256:[0-9a-f]{64}$/);
   assert.equal(first.sha, second.sha);
   assert.deepEqual(readFileSync(first.path), readFileSync(second.path));

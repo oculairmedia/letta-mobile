@@ -11,7 +11,7 @@ a plugin, copy this directory and start from it.
 | `server.mjs` | The runtime: LCP wire v1 over stdin/stdout, one JSON-RPC message per line |
 | `png.mjs` | A tiny indexed-PNG writer (`zlib.deflateSync` + CRC-32) and chart rasterizer |
 | `pages/chart.html` | The live view: an inline SVG chart and a Bar/Line toggle, through `window.lettaView` |
-| `pack.sh` | Builds `dist/letta.chart-1.0.0.lcp` deterministically and prints its sha256 |
+| `pack.sh` | Builds `dist/letta.chart-1.1.0.lcp` deterministically and prints its sha256 |
 | `test/` | `node --test` suites: PNG validity, wire framing, plot/toggle, cancel, pack determinism |
 
 ## What it does
@@ -33,28 +33,30 @@ a plugin, copy this directory and start from it.
 plugin keeps the props of the charts it placed in memory instead of reading the board. The page's
 CSP allowlists are empty. Everything in the page is inline and nothing is fetched.
 
-## Element props are flat
+## Element props
 
-A kind's props schema allows only strings, numbers, booleans and enums (`PluginContentRules`), and
-must be 4 KiB or less. Arrays are not allowed, so `labels` and `values` are stored as JSON text
-(`"[\"Q1\",\"Q2\"]"`, `"[3,5]"`). The `plot` action's input uses real arrays, because that is
-what the agent should write. The plugin converts between the two forms.
+A kind's props schema allows strings, numbers, booleans, enums and bounded arrays of those
+(`"type": "array"` with scalar `items` and a `maxItems` of at most 256; `PluginContentRules`), never
+objects, and must be 4 KiB or less; a placed element's props are held to 4 KiB as well. The
+`chart` kind (schema version 2) stores `labels` and `values` as real arrays, the same shape as the
+`plot` input. Version 1 stored them as JSON text (`"[3,5]"`); the page and `toggle` still read that
+form, and a toggle writes the element back as version 2 arrays.
 
 ## The wire, frame by frame
 
 ```
 host   {"id":1,"method":"plugin.initialize","params":{"contractVersions":[1],...}}
-plugin {"id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"build":"1.0.0"}}}
+plugin {"id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"build":"1.1.0"}}}
 host   {"id":2,"method":"plugin.activate","params":{}}
 plugin {"method":"host.log","params":{"level":"info","message":"chart plugin activated"}}
 plugin {"id":2,"result":{}}
-host   {"id":3,"method":"action.invoke","params":{"action":"plot","input":{...},"context":{...}}}
+host   {"id":3,"method":"action.invoke","params":{"action":"plot","input":{...},"context":{...,"callId":"c-1"}}}
 plugin {"id":"p-1","method":"host.putAsset.begin","params":{"mediaType":"image/png","byteSize":N}}
 host   {"id":"p-1","result":{"uploadId":"upload-1"}}
 plugin {"id":"p-2","method":"host.putAsset.chunk","params":{"uploadId":"upload-1","index":0,"base64":"..."}}
 plugin {"id":"p-3","method":"host.putAsset.end","params":{"uploadId":"upload-1","sha256":"<hex>"}}
 host   {"id":"p-3","result":{"ref":"sha256:<hex>"}}
-plugin {"id":"p-4","method":"host.emit","params":{"place":[{"kind":"chart","v":1,"props":{...},"snapshot":{"type":"asset","ref":"sha256:<hex>"},...}]}}
+plugin {"id":"p-4","method":"host.emit","params":{"place":[{"kind":"chart","v":2,"props":{...},"snapshot":{"type":"asset","ref":"sha256:<hex>"},...}],"callId":"c-1"}}
 host   {"id":"p-4","result":{"receipt":{"placed":["el-1"]}}}
 plugin {"id":3,"result":{"text":"Placed a bar chart \"Revenue\" (el-1)","structured":{"elementId":"el-1","kind":"bar"}}}
 ...    toggle: the same upload, then host.emit {update:[{elementId:"el-1", props:{kind:"line",...}, snapshot}]}
@@ -70,6 +72,8 @@ can differ between builds. The protocol reference is `docs/reference/canvas-plug
 
 Rules the runtime follows that are easy to get wrong:
 
+- Echo the call's `context.callId` on every `host.emit` made for it, so the element lands on the
+  board of the conversation that asked, even while another conversation's call is in flight.
 - Write only protocol messages to stdout. Diagnostics go to stderr or to `host.log`.
 - Before `plugin.initialize`, answer every request with `-32002`. Answer `action.invoke` with
   `-32003` unless the session is active.
@@ -84,6 +88,6 @@ Rules the runtime follows that are easy to get wrong:
 ```bash
 cd plugins/chart
 node --test test/*.test.mjs  # 14 tests; UPDATE_CHART_FIXTURE=1 rewrites the golden transcript
-./pack.sh                    # dist/letta.chart-1.0.0.lcp + sha256:<hex> (needs zip)
+./pack.sh                    # dist/letta.chart-1.1.0.lcp + sha256:<hex> (needs zip)
 open pages/chart.html        # without a host, the page draws a demo chart
 ```

@@ -18,8 +18,9 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * The drivers of the enabled plugins (letta-mobile-cdgpr.6), one per plugin id. Each gets a
  * [ProcessPluginSpec] from its manifest and the CONSENTED capabilities only, and [HostLcpHandlers]
- * placing through a [PlacementCompiler] on the board of its last agent caller. Every driver state
- * change after start is passed to [onState], which the runtime turns into registry transitions.
+ * placing through a [PlacementCompiler] on the board of the call each emit names ([CallerBoard]).
+ * Every driver state change after start is passed to [onState], which the runtime turns into
+ * registry transitions.
  */
 class PluginDriverHost(
     private val canvas: HostCanvasBackend,
@@ -27,12 +28,12 @@ class PluginDriverHost(
     private val kinds: PluginKindCatalog,
     private val options: ProcessDriverOptions,
     private val scope: CoroutineScope,
+    private val quota: PluginAssetQuota = PluginAssetQuota(),
 ) {
     private class Entry(val live: LivePlugin, var watcher: Job? = null)
 
     private val entries = ConcurrentHashMap<String, Entry>()
     private val limits = PluginRateLimits()
-    private val quota = PluginAssetQuota()
     val refusals = PluginRefusals()
 
     fun live(pluginId: String): LivePlugin? = entries[pluginId]?.live

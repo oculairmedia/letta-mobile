@@ -3,6 +3,9 @@ package com.letta.mobile.data.canvas.plugin
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.storage.AssetRefs
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -17,7 +20,7 @@ data class CanvasPluginLimit(val path: String, val max: Int)
  * (plan section 4.3, step 1), built in code like [com.letta.mobile.data.canvas.CanvasSceneSchema].
  *
  * It holds what every client relies on to place and draw the element without the plugin: a
- * namespaced type, a sane frame, small flat props, a snapshot that is an asset ref, and a fallback
+ * namespaced type, a sane frame, small props (scalars and arrays of scalars), a snapshot that is an asset ref, and a fallback
  * card with a title. What a kind's props mean is the kind's own schema ([PluginKindCatalog]).
  */
 object CanvasPluginElementSchema {
@@ -27,6 +30,9 @@ object CanvasPluginElementSchema {
     val ID = CanvasPluginLimit("/elementId", 128)
     val REF = CanvasPluginLimit("/ref", 512)
     val PROPS = CanvasPluginLimit("/props", 4 * 1024)
+
+    /** The most items an array in props may hold; arrays hold scalars only (letta-mobile-cdgpr.12). */
+    const val MAX_PROPS_ARRAY_ITEMS: Int = 256
     val META = CanvasPluginLimit("/meta", 1024)
     val TITLE = CanvasPluginLimit("/fallback/title", 120)
     val SUBTITLE = CanvasPluginLimit("/fallback/subtitle", 240)
@@ -45,7 +51,7 @@ object CanvasPluginElementSchema {
         addAll(version(op))
         addAll(frame(op))
         tooLong(REF, op.ref)?.let(::add)
-        op.props?.let { addAll(flat(PROPS, it)) }
+        op.props?.let { addAll(flat(PROPS, it, arrays = true)) }
         op.meta?.let { addAll(flat(META, it)) }
         op.snapshot?.let { addAll(snapshot(it)) }
         op.fallback?.let { addAll(fallback(it)) }
@@ -102,12 +108,22 @@ object CanvasPluginElementSchema {
         return corner + size
     }
 
-    /** An object of scalars only, at most [limit] bytes serialised. */
-    private fun flat(limit: CanvasPluginLimit, value: JsonObject): List<CanvasPluginProblem> {
-        val nested = value.filterValues { it !is JsonPrimitive }.keys
-            .map { CanvasPluginProblem("${limit.path}/$it", "is not a scalar: ${limit.path} is flat") }
+    /**
+     * An object of scalars (and, when [arrays], arrays of at most [MAX_PROPS_ARRAY_ITEMS] non-null
+     * scalars), at most [limit] bytes serialised.
+     */
+    private fun flat(limit: CanvasPluginLimit, value: JsonObject, arrays: Boolean = false): List<CanvasPluginProblem> {
+        val nested = value.mapNotNull { (key, field) -> nestedProblem(limit, key, field, arrays) }
         val bytes = value.toString().encodeToByteArray().size
         return nested + listOfNotNull(CanvasPluginProblem(limit.path, "is $bytes bytes, over ${limit.max}").takeIf { bytes > limit.max })
+    }
+
+    private fun nestedProblem(limit: CanvasPluginLimit, key: String, field: JsonElement, arrays: Boolean): CanvasPluginProblem? = when {
+        field is JsonPrimitive -> null
+        !arrays || field !is JsonArray -> CanvasPluginProblem("${limit.path}/$key", "is not a scalar: ${limit.path} is flat")
+        field.size > MAX_PROPS_ARRAY_ITEMS -> CanvasPluginProblem("${limit.path}/$key", "has ${field.size} items, over $MAX_PROPS_ARRAY_ITEMS")
+        field.any { it !is JsonPrimitive || it is JsonNull } -> CanvasPluginProblem("${limit.path}/$key", "is not an array of scalars")
+        else -> null
     }
 
     private fun snapshot(snapshot: CanvasPluginSnapshot): List<CanvasPluginProblem> {

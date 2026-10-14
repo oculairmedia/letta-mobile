@@ -27,7 +27,8 @@ class ChartPluginManifestTest {
     fun theManifestParsesAndAsksForCanvasAssetsAndPagesOnly() {
         val manifest = manifest()
         assertEquals("letta.chart", manifest.id)
-        assertEquals("1.0.0", manifest.version)
+        assertEquals("1.1.0", manifest.version)
+        assertEquals(2, manifest.elements.getValue("chart").schemaVersion)
         assertEquals(PluginRuntime.Process("node", listOf("server.mjs")), manifest.runtime)
         assertEquals(listOf(PluginCapability.CANVAS_PLACE, PluginCapability.ASSETS_WRITE, PluginCapability.UI_PAGES), manifest.capabilities)
         assertTrue(manifest.secrets.isEmpty() && manifest.net.connect.isEmpty() && manifest.settings.isEmpty())

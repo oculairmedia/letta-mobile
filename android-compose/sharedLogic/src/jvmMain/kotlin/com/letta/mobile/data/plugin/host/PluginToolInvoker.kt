@@ -1,9 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
-import com.letta.mobile.data.canvas.HostCanvasAccess
-import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.HostCanvasCaller
-import com.letta.mobile.data.canvas.HostCanvasEntry
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.plugin.PluginActionInvoker
@@ -19,23 +16,6 @@ import com.letta.mobile.plugin.api.EmitReceipt
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/**
- * The board a plugin's emits land on: the conversation canvas of the agent whose tool call last
- * reached the plugin, or the canvas an emit names when that caller may open it. A plugin nobody
- * has called yet has no board. v1 binds to the LAST caller: a plugin serving two conversations at
- * once places on the later one's board (the action result's own `emit` is applied right after
- * its call, so it lands correctly). TODO(letta-mobile-cdgpr.16): bind to the exact call.
- */
-class CallerBoard(private val backend: HostCanvasBackend) : PluginCanvasAccess {
-    @Volatile var caller: HostCanvasCaller? = null
-
-    override suspend fun boardFor(requestedCanvasId: String?): HostCanvasEntry? {
-        val who = caller ?: return null
-        val access = if (requestedCanvasId != null) backend.open(who, requestedCanvasId) else backend.ownConversation(who)
-        return (access as? HostCanvasAccess.Granted)?.entry
-    }
-}
-
 /** One running plugin: its driver, the handlers its calls reach, and the board those place on. */
 class LivePlugin(val driver: PluginDriver, val handlers: LcpHostHandlers, val board: CallerBoard)
 
@@ -48,18 +28,22 @@ class PluginToolInvoker(private val live: (String) -> LivePlugin?) : PluginActio
     override suspend fun invoke(definition: PluginToolDefinition, input: kotlinx.serialization.json.JsonObject, caller: ExternalToolCaller): ExternalToolResult {
         val plugin = live(definition.pluginId) ?: return ExternalToolResult.Error("${definition.pluginId} is not running; enable it on the host")
         val agentId = caller.agentId ?: UNKNOWN_AGENT
-        plugin.board.caller = HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId)
-        val call = ActionCall(definition.action, input, ActionContext(ActionOrigin.Agent(agentId, caller.conversationId, caller.toolCallId)))
+        val callId = plugin.board.begin(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId))
+        val origin = ActionOrigin.Agent(agentId, caller.conversationId, caller.toolCallId)
+        val call = ActionCall(definition.action, input, ActionContext(origin, callId = callId.value))
         return try {
-            answer(plugin, plugin.driver.invoke(call))
+            answer(plugin, plugin.driver.invoke(call), callId)
         } catch (e: LcpCallException) {
             ExternalToolResult.Error("${definition.name} failed: ${e.message}")
+        } finally {
+            plugin.board.end(callId)
         }
     }
 
-    private suspend fun answer(plugin: LivePlugin, result: ActionResult): ExternalToolResult = when (result) {
+    /** The answer for the agent; an `emit` in it is applied for this very call, whatever call it names. */
+    private suspend fun answer(plugin: LivePlugin, result: ActionResult, callId: PluginCallId): ExternalToolResult = when (result) {
         is ActionResult.Error -> ExternalToolResult.Error("${result.code}: ${result.message}")
-        is ActionResult.Ok -> ExternalToolResult.Success(content(result, result.emit?.let { plugin.handlers.emit(it) }))
+        is ActionResult.Ok -> ExternalToolResult.Success(content(result, result.emit?.let { plugin.handlers.emit(it.copy(callId = callId.value)) }))
     }
 
     private fun content(result: ActionResult.Ok, receipt: EmitReceipt?): String {

@@ -18,12 +18,17 @@ public data class ActionCall(
 /**
  * Where an [ActionCall] comes from: its [origin], the board it concerns ([canvasId], when there is
  * one) and the element it concerns ([elementId], when there is one).
+ *
+ * [callId] is the host's opaque token for this one call (SPI 1.1, letta-mobile-cdgpr.16). A
+ * plugin echoes it as [PluginEmit.callId] on every `host.emit` it makes for the call, so the host
+ * places on this call's board even while the plugin serves other conversations at once.
  */
 @Serializable
 public data class ActionContext(
     public val origin: ActionOrigin,
     public val canvasId: String? = null,
     public val elementId: String? = null,
+    public val callId: String? = null,
 )
 
 /** Who asked for an action; on the wire a `type`-tagged object (`agent`, `view` or `host`). */

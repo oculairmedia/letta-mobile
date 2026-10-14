@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.host
 
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -47,10 +48,8 @@ class PluginRateLimits(
  * [PluginRateLimit.amount] is refused and not remembered.
  */
 internal class SlidingWindowCounter(private val limit: PluginRateLimit, private val nowMs: () -> Long) {
-    private class Take(val atMs: Long, val weight: Long)
-
     private val lock = SynchronizedObject()
-    private val takes = mutableMapOf<String, ArrayDeque<Take>>()
+    private val takes = mutableMapOf<String, ArrayDeque<WindowTake>>()
     private val windowMs = limit.window.inWholeMilliseconds
 
     fun tryTake(key: String, weight: Long): Boolean = synchronized(lock) {
@@ -58,7 +57,7 @@ internal class SlidingWindowCounter(private val limit: PluginRateLimit, private 
         val history = takes.getOrPut(key) { ArrayDeque() }
         while (history.isNotEmpty() && history.first().atMs <= now - windowMs) history.removeFirst()
         if (history.sumOf { it.weight } + weight > limit.amount) return@synchronized false
-        history.addLast(Take(now, weight))
+        history.addLast(WindowTake(now, weight))
         true
     }
 
@@ -74,4 +73,24 @@ internal class SlidingWindowCounter(private val limit: PluginRateLimit, private 
         val now = nowMs()
         takes[key].orEmpty().filter { it.atMs > now - windowMs }.sumOf { it.weight }
     }
+
+    /** Every key's takes still inside the window, oldest first: what a restart must remember. */
+    fun snapshot(): Map<String, List<WindowTake>> = synchronized(lock) {
+        val since = nowMs() - windowMs
+        takes.mapValues { (_, history) -> history.filter { it.atMs > since } }.filterValues { it.isNotEmpty() }
+    }
+
+    /** Replaces every key's takes with [saved] (as [snapshot] answered it), dropping those already out of the window. */
+    fun restore(saved: Map<String, List<WindowTake>>): Unit = synchronized(lock) {
+        val since = nowMs() - windowMs
+        takes.clear()
+        saved.forEach { (key, history) ->
+            val kept = history.filter { it.atMs > since && it.weight >= 0 }.sortedBy { it.atMs }
+            if (kept.isNotEmpty()) takes[key] = ArrayDeque(kept)
+        }
+    }
 }
+
+/** One take a [SlidingWindowCounter] remembers: when ([atMs], epoch milliseconds) and how much ([weight]). */
+@Serializable
+internal data class WindowTake(val atMs: Long, val weight: Long)

@@ -13,9 +13,9 @@ import kotlinx.serialization.json.JsonObject
  *  - [type] is `ext:<pluginId>/<kind>` and [v] the kind's schema version the writer used.
  *  - [frame] is in world units, like a note's; [owner] says who decides it (EXPLICIT when a writer
  *    named it, USER once a person moved it).
- *  - [ref] is the plugin's own opaque reference (never a secret), [props] small flat scalars,
+ *  - [ref] is the plugin's own opaque reference (never a secret), [props] small scalars and arrays of scalars,
  *    [snapshot] an image in the asset store and [fallback] what every client can draw without the
- *    plugin. [meta] is host-written provenance (which plugin, which call), flat like [props].
+ *    plugin. [meta] is host-written provenance (which plugin, which call), flat scalars only.
  *
  * The board stores each entry with split provenance ([CanvasPluginElements]), so a person moving
  * the element and the plugin updating its state never overwrite each other.

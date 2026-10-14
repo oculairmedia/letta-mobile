@@ -59,7 +59,7 @@ data class PluginHealthSnapshot(
 
 /**
  * The host's plugin runtime (letta-mobile-cdgpr.6): the registry persisted at
- * `<pluginsDir>/plugins.json` ([PluginPackageStore]), every transition decided by
+ * `<pluginsDir>/plugins.json` ([PluginPackageStore]), the asset quota's usage beside it ([PluginAssetQuotaFile]), every transition decided by
  * [PluginRegistryReducer], one driver per enabled plugin ([PluginDriverHost]), and the enabled
  * plugins' agent actions published as tools into [toolSource] (register it with the live
  * `ExternalToolRegistry`).
@@ -77,7 +77,10 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** The installed plugins' element kinds, for the canvas backend's validator. */
     val kinds = PluginRegistryKinds { registry.value }
 
-    private val drivers = PluginDriverHost(config.backend, config.assets, kinds, config.driverOptions, scope)
+    /** Every plugin's asset bytes of the trailing day, kept at `<pluginsDir>/asset-quota.json` across restarts. */
+    private val quota = PluginAssetQuota(nowMs = config.nowMs, file = PluginAssetQuotaFile(config.pluginsDir.resolve(PluginAssetQuotaFile.FILE)))
+
+    private val drivers = PluginDriverHost(config.backend, config.assets, kinds, config.driverOptions, scope, quota)
     private val invoker = PluginToolInvoker(drivers::live)
 
     /** Every enabled plugin's agent tools; replaced whole on each change. */
@@ -85,9 +88,9 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
 
     val state: StateFlow<PluginRegistryState> = registry.asStateFlow()
 
-    /** Loads the registry and starts the driver of every plugin left enabled. */
+    /** Loads the registry and the asset quota's usage, and starts the driver of every plugin left enabled. */
     suspend fun start() = mutex.withLock {
-        registry.value = withContext(Dispatchers.IO) { store.load() }
+        registry.value = withContext(Dispatchers.IO) { store.load().also { quota.load() } }
         publishTools()
         registry.value.plugins.filter { it.state.advertises }.forEach { launch(it) }
     }
