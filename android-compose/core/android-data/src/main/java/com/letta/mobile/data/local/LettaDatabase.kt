@@ -34,7 +34,7 @@ import com.letta.mobile.data.model.DomainIdConverters
         CanvasDocumentEntity::class,
         CanvasOpEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)

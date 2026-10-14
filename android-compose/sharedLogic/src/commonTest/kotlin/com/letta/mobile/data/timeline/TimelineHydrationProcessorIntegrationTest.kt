@@ -208,7 +208,7 @@ class TimelineHydrationProcessorIntegrationTest {
     private class RecordingPendingStore(
         private val records: List<PendingLocalRecord>,
     ) : PendingLocalStore by NoOpPendingLocalStore {
-        override suspend fun load(conversationId: String): List<PendingLocalRecord> = records
+        override suspend fun load(scope: PendingLocalScope): List<PendingLocalRecord> = records
     }
 
     private class RecordingCursorStore(

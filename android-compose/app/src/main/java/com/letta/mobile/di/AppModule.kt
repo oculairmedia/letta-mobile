@@ -429,6 +429,14 @@ abstract class AppModule {
     @Singleton
     abstract fun bindTimelineBackendScopedCache(impl: TimelineRepository): BackendScopedCache
 
+    /** letta-mobile-by4vm.17: unsent messages are backend-owned too; drop them on a switch. */
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindPendingLocalBackendScopedCache(
+        impl: com.letta.mobile.data.local.RoomPendingLocalStore,
+    ): BackendScopedCache
+
     @Binds
     @Singleton
     abstract fun bindSystemAccessEnvironment(impl: AndroidSystemAccessEnvironment): SystemAccessEnvironment
