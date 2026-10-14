@@ -373,7 +373,7 @@ class IrohNodeConnection(
     private fun agentScopeViolation(frame: JsonObject): String? {
         val type = frame["type"]?.jsonPrimitive?.contentOrNull
         if (type !in AGENT_ADDRESSED_FRAME_TYPES || !authenticated.get()) return null
-        if (IrohPeerCapabilities.isAgentInScope(agentScope(), AgentScopeGuard.agentIdOf(frame))) return null
+        if (AgentScopeGuard.allowsParams(agentScope(), frame)) return null
         Telemetry.event("IrohNode", "authz.agent_scope_denied", "remoteEndpointId" to remoteEndpointId, "type" to type)
         val requestId = frame["request_id"]?.jsonPrimitive?.contentOrNull.orEmpty()
         return """{"type":"error","request_id":"$requestId","message":"forbidden","reason":"agent_scope"}"""
