@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.fanout
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -76,17 +77,14 @@ class RuntimeEventFanout(
         approvalReplayResponder.value = responder
     }
 
-    private val subscriberOverflowListener =
-        atomic<((com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) -> Unit)?>(null)
+    private val subscriberOverflowListener = atomic<SubscriberOverflowListener?>(null)
 
     /**
      * letta-mobile-by4vm.4: [listener] is told the runtime of every subscriber [route] detaches
      * for overflowing (see [RuntimeSubscriberOverflowCancellation]), so the owner can resync what
      * that subscriber missed. Called from [route]; must not block.
      */
-    fun bindSubscriberOverflowListener(
-        listener: (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) -> Unit,
-    ) {
+    fun bindSubscriberOverflowListener(listener: SubscriberOverflowListener) {
         subscriberOverflowListener.value = listener
     }
 
@@ -388,13 +386,6 @@ class RuntimeEventFanout(
         pendingControlFrames.size
     }
 
-    private class DeliveryOutcome(
-        /** At least one subscriber buffered the frame. */
-        val delivered: Boolean,
-        /** Subscribers whose buffer was full; already detached and closed. */
-        val overflowed: List<SubscriberSlot>,
-    )
-
     /**
      * letta-mobile-by4vm.4: offer [received] to each target without suspending. A
      * target whose buffer is full is detached on the spot: removed from
@@ -469,12 +460,7 @@ class RuntimeEventFanout(
         }
         val listener = subscriberOverflowListener.value ?: return
         outcome.overflowed.map { it.key }.distinct().forEach {
-            listener(
-                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
-                    agentId = it.agentId,
-                    conversationId = it.conversationId,
-                ),
-            )
+            listener(AppServerRuntimeScope(agentId = it.agentId, conversationId = it.conversationId))
         }
     }
 
@@ -607,6 +593,13 @@ class RuntimeEventFanout(
         }
     }
 
+    private class DeliveryOutcome(
+        /** At least one subscriber buffered the frame. */
+        val delivered: Boolean,
+        /** Subscribers whose buffer was full; already detached and closed. */
+        val overflowed: List<SubscriberSlot>,
+    )
+
     private class SubscriberSlot(
         val id: String,
         val key: RuntimeKey,
@@ -643,6 +636,9 @@ class RuntimeEventFanout(
             "subscriber-${nextSubscriberId.incrementAndGet()}"
     }
 }
+
+/** letta-mobile-by4vm.4: told the runtime of a subscriber detached for overflowing. */
+typealias SubscriberOverflowListener = (AppServerRuntimeScope) -> Unit
 
 /**
  * lgns8.22.4.1.3: external-tool registry identity is (request_id, tool_call_id).
