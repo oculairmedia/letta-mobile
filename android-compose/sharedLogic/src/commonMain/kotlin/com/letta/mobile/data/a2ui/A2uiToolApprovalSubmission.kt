@@ -13,8 +13,7 @@ const val A2UI_TOOL_APPROVAL_RESPONSE_ACTION = "tool_approval_response"
  * one into a submitted approval (letta-mobile-by4vm.2).
  */
 data class A2uiToolApprovalSubmission(
-    val approvalRequestId: String,
-    val callId: String,
+    val ref: ToolApprovalRef,
     val approve: Boolean,
     /** The card's scope (`once`, `session`, `forever`, `deny`, `timeout`). */
     val scope: String?,
@@ -27,12 +26,11 @@ val A2uiAction.isToolApprovalResponse: Boolean get() = name == A2UI_TOOL_APPROVA
 fun A2uiAction.toToolApprovalSubmission(): A2uiToolApprovalSubmission? {
     if (!isToolApprovalResponse) return null
 
-    val approvalRequestId = context.stringValue("approvalRequestId", "approval_request_id")
-        ?: raw.stringValue("approvalRequestId", "approval_request_id")
-        ?: return null
-    val callId = context.stringValue("callId", "toolCallId", "tool_call_id")
-        ?: actionId
-        ?: return null
+    val ref = ToolApprovalRef.of(
+        approvalRequestId = context.stringValue("approvalRequestId", "approval_request_id")
+            ?: raw.stringValue("approvalRequestId", "approval_request_id"),
+        callId = context.stringValue("callId", "toolCallId", "tool_call_id") ?: actionId,
+    ) ?: return null
     val approve = when (context.stringValue("decision")?.lowercase()) {
         "approve", "approved", "allow", "allowed", "accept", "accepted" -> true
         "deny", "denied", "reject", "rejected", "timeout" -> false
@@ -40,8 +38,7 @@ fun A2uiAction.toToolApprovalSubmission(): A2uiToolApprovalSubmission? {
     }
 
     return A2uiToolApprovalSubmission(
-        approvalRequestId = approvalRequestId,
-        callId = callId,
+        ref = ref,
         approve = approve,
         scope = context.stringValue("scope"),
         reason = context.stringValue("reason"),

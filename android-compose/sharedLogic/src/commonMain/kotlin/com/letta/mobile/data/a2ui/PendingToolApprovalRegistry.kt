@@ -1,8 +1,22 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.runtime.ToolApprovalId
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+
+/** One tool call of one approval request: the pair an A2UI answer must name. */
+data class ToolApprovalRef(val approvalId: ToolApprovalId, val callId: ToolCallId) {
+    companion object {
+        /** The ref for wire/timeline ids, or null when either is blank. */
+        fun of(approvalRequestId: String?, callId: String?): ToolApprovalRef? {
+            if (approvalRequestId.isNullOrBlank() || callId.isNullOrBlank()) return null
+            return ToolApprovalRef(ToolApprovalId(approvalRequestId), ToolCallId(callId))
+        }
+    }
+}
 
 /** A decision a pending approval accepts. */
 enum class ToolApprovalDecision {
@@ -41,10 +55,10 @@ enum class ToolApprovalRejection {
 
 /** What [PendingToolApprovalRegistry.admit] made of a `tool_approval_response`. */
 sealed interface ToolApprovalAdmission {
-    /** Submit [submission] to [conversationKey] (the conversation the client registered, not the action's own). */
+    /** Submit [submission] to [conversation] (the conversation the client registered, not the action's own). */
     data class Admitted(
         val submission: A2uiToolApprovalSubmission,
-        val conversationKey: String,
+        val conversation: ConversationId,
     ) : ToolApprovalAdmission
 
     data class Rejected(val reason: ToolApprovalRejection) : ToolApprovalAdmission
@@ -70,51 +84,46 @@ sealed interface ToolApprovalAdmission {
  * them.
  */
 class PendingToolApprovalRegistry(private val retiredCap: Int = MAX_RETIRED) {
-    private data class Key(val approvalRequestId: String, val callId: String)
-
-    private data class Entry(val conversationKey: String, val allowedDecisions: Set<ToolApprovalDecision>)
+    private data class Entry(val conversation: ConversationId, val allowedDecisions: Set<ToolApprovalDecision>)
 
     private val lock = SynchronizedObject()
-    private val pending = LinkedHashMap<Key, Entry>()
+    private val pending = LinkedHashMap<ToolApprovalRef, Entry>()
 
     /** Answered or expired pairs, by conversation; insertion-ordered so the oldest is evicted first. */
-    private val retired = LinkedHashMap<Key, String>()
+    private val retired = LinkedHashMap<ToolApprovalRef, ConversationId>()
 
     fun register(
-        conversationKey: String,
-        approvalRequestId: String,
-        callId: String,
+        conversation: ConversationId,
+        ref: ToolApprovalRef,
         allowedDecisions: Set<ToolApprovalDecision> = ToolApprovalDecision.All,
     ) = synchronized(lock) {
-        val key = Key(approvalRequestId, callId)
-        if (key !in retired) pending[key] = Entry(conversationKey, allowedDecisions)
+        if (ref !in retired) pending[ref] = Entry(conversation, allowedDecisions)
     }
 
     /**
-     * Makes [conversationKey]'s entries exactly [pendingCalls] (request id to its tool call ids),
-     * minus anything already retired; retired pairs no longer pending are forgotten.
+     * Makes [conversation]'s entries exactly [now], minus anything already retired; retired pairs
+     * no longer pending are forgotten.
      */
-    fun sync(conversationKey: String, pendingCalls: Map<String, Collection<String>>) = synchronized(lock) {
-        val now = pendingCalls.flatMap { (requestId, callIds) -> callIds.map { Key(requestId, it) } }.toSet()
-        pending.entries.removeAll { (key, entry) -> entry.conversationKey == conversationKey && key !in now }
-        retired.entries.removeAll { (key, conversation) -> conversation == conversationKey && key !in now }
+    fun sync(conversation: ConversationId, now: Set<ToolApprovalRef>) = synchronized(lock) {
+        pending.entries.removeAll { (ref, entry) -> entry.conversation == conversation && ref !in now }
+        retired.entries.removeAll { (ref, owner) -> owner == conversation && ref !in now }
         now.filter { it !in retired && it !in pending }
-            .forEach { pending[it] = Entry(conversationKey, ToolApprovalDecision.All) }
+            .forEach { pending[it] = Entry(conversation, ToolApprovalDecision.All) }
     }
 
-    /** Turn end: every pending approval in [conversationKey] can no longer be answered from A2UI. */
-    fun expire(conversationKey: String) = synchronized(lock) {
-        val ended = pending.filterValues { it.conversationKey == conversationKey }.keys
-        ended.forEach { retireLocked(it, conversationKey) }
+    /** Turn end: every pending approval in [conversation] can no longer be answered from A2UI. */
+    fun expire(conversation: ConversationId) = synchronized(lock) {
+        val ended = pending.filterValues { it.conversation == conversation }.keys
+        ended.forEach { retireLocked(it, conversation) }
     }
 
     /**
-     * Admits or refuses [action], answered while the client showed [conversationKey]; null when it
+     * Admits or refuses [action], answered while the client showed [conversation]; null when it
      * is not a `tool_approval_response` at all. Refusals are logged here.
      */
-    fun admit(action: A2uiAction, conversationKey: String?): ToolApprovalAdmission? {
+    fun admit(action: A2uiAction, conversation: ConversationId?): ToolApprovalAdmission? {
         if (!action.isToolApprovalResponse) return null
-        val admission = synchronized(lock) { admitLocked(action, conversationKey) }
+        val admission = synchronized(lock) { admitLocked(action, conversation) }
         when (admission) {
             is ToolApprovalAdmission.Rejected -> logRejection(action, admission.reason)
             is ToolApprovalAdmission.Admitted -> logUnpersistedScope(admission.submission)
@@ -122,35 +131,35 @@ class PendingToolApprovalRegistry(private val retiredCap: Int = MAX_RETIRED) {
         return admission
     }
 
-    private fun admitLocked(action: A2uiAction, conversationKey: String?): ToolApprovalAdmission {
+    private fun admitLocked(action: A2uiAction, conversation: ConversationId?): ToolApprovalAdmission {
         if (action.origin != A2uiActionOrigin.ToolApprovalCard) return rejected(ToolApprovalRejection.NotFromApprovalCard)
         val submission = action.toToolApprovalSubmission() ?: return rejected(ToolApprovalRejection.Malformed)
-        val key = Key(submission.approvalRequestId, submission.callId)
+        val key = submission.ref
         val entry = pending[key] ?: return rejected(missingReason(key))
         val reason = when {
-            entry.conversationKey != conversationKey -> ToolApprovalRejection.ConversationMismatch
+            entry.conversation != conversation -> ToolApprovalRejection.ConversationMismatch
             submission.decision !in entry.allowedDecisions -> ToolApprovalRejection.DecisionNotAllowed
             else -> null
         }
         if (reason != null) return rejected(reason)
-        retireLocked(key, entry.conversationKey)
-        return ToolApprovalAdmission.Admitted(submission, entry.conversationKey)
+        retireLocked(key, entry.conversation)
+        return ToolApprovalAdmission.Admitted(submission, entry.conversation)
     }
 
-    private fun missingReason(key: Key): ToolApprovalRejection = when {
+    private fun missingReason(key: ToolApprovalRef): ToolApprovalRejection = when {
         key in retired -> ToolApprovalRejection.Retired
-        pending.keys.any { it.approvalRequestId == key.approvalRequestId } -> ToolApprovalRejection.CallMismatch
+        pending.keys.any { it.approvalId == key.approvalId } -> ToolApprovalRejection.CallMismatch
         else -> ToolApprovalRejection.UnknownRequest
     }
 
-    private fun retireLocked(key: Key, conversationKey: String) {
+    private fun retireLocked(key: ToolApprovalRef, conversation: ConversationId) {
         pending.remove(key)
         retired.remove(key)
-        retired[key] = conversationKey
+        retired[key] = conversation
         while (retired.size > retiredCap) {
             val victim = retired.keys.first()
             retired.remove(victim)
-            Telemetry.event(TAG, "retired.evictedOverCap", "approvalRequestId" to victim.approvalRequestId, "cap" to retiredCap, level = Telemetry.Level.WARN)
+            Telemetry.event(TAG, "retired.evictedOverCap", "approvalRequestId" to victim.approvalId.value, "cap" to retiredCap, level = Telemetry.Level.WARN)
         }
     }
 
@@ -188,7 +197,7 @@ private fun logUnpersistedScope(submission: A2uiToolApprovalSubmission) {
     Telemetry.event(
         PendingToolApprovalRegistry.TAG, "approval.scopeAppliedOnce",
         "scope" to scope,
-        "approvalRequestId" to submission.approvalRequestId,
+        "approvalRequestId" to submission.ref.approvalId.value,
     )
 }
 

@@ -8,6 +8,8 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.PendingToolApprovalRegistry
 import com.letta.mobile.data.a2ui.ToolApprovalAdmission
+import com.letta.mobile.data.a2ui.ToolApprovalRef
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -118,7 +120,7 @@ internal class AdminChatA2uiCoordinator(
 
     fun ensureA2uiConversation(conversationId: String) {
         if (a2uiConversationId == conversationId) return
-        a2uiConversationId?.let(pendingToolApprovals::expire)
+        a2uiConversationId?.let { pendingToolApprovals.expire(ConversationId(it)) }
         a2uiConversationId = conversationId
         a2uiHistorySignature = null
         a2uiHistoryAppliedCount = 0
@@ -162,7 +164,7 @@ internal class AdminChatA2uiCoordinator(
         scope.launch {
             wsChatBridge.events.collect { event ->
                 // letta-mobile-by4vm.2: an approval cannot outlive its turn.
-                if (event is WsTimelineEvent.TurnDone) activeConversationId()?.let(pendingToolApprovals::expire)
+                if (event is WsTimelineEvent.TurnDone) activeConversation()?.let(pendingToolApprovals::expire)
                 val outcome = event as? WsTimelineEvent.UserActionOutcome ?: return@collect
                 handleA2uiActionOutcome(outcome)
             }
@@ -174,16 +176,19 @@ internal class AdminChatA2uiCoordinator(
         scope.launch {
             uiState
                 .map { state ->
-                    state.messages.mapNotNull { it.approvalRequest }
-                        .associate { request -> request.requestId to request.toolCalls.map { it.toolCallId } }
+                    state.messages.mapNotNull { it.approvalRequest }.flatMapTo(mutableSetOf()) { request ->
+                        request.toolCalls.mapNotNull { ToolApprovalRef.of(request.requestId, it.toolCallId) }
+                    }
                 }
                 .distinctUntilChanged()
                 .collect { pending ->
-                    val conversationId = activeConversationId() ?: return@collect
-                    pendingToolApprovals.sync(conversationId, pending)
+                    val conversation = activeConversation() ?: return@collect
+                    pendingToolApprovals.sync(conversation, pending)
                 }
         }
     }
+
+    private fun activeConversation(): ConversationId? = activeConversationId()?.takeIf { it.isNotBlank() }?.let(::ConversationId)
 
     private fun handleA2uiActionOutcome(outcome: WsTimelineEvent.UserActionOutcome) {
         val pending = pendingA2uiActions.remove(outcome.frameId)
@@ -301,17 +306,17 @@ internal class AdminChatA2uiCoordinator(
      * WS action path, where the server would match it against the pending approval unchecked.
      */
     private fun submitA2uiToolApprovalViaRest(action: A2uiAction): Boolean {
-        when (val admission = pendingToolApprovals.admit(action, activeConversationId()) ?: return false) {
+        when (val admission = pendingToolApprovals.admit(action, activeConversation()) ?: return false) {
             is ToolApprovalAdmission.Rejected ->
                 chatBannerController.showComposerError("This approval could not be verified, so it was not sent.")
             is ToolApprovalAdmission.Admitted -> {
                 val submission = admission.submission
                 chatApprovalController.submitApproval(
-                    requestId = submission.approvalRequestId,
-                    toolCallIds = listOf(submission.callId),
+                    requestId = submission.ref.approvalId.value,
+                    toolCallIds = listOf(submission.ref.callId.value),
                     approve = submission.approve,
                     reason = submission.reason,
-                    activeConversationIdOverride = admission.conversationKey,
+                    activeConversationIdOverride = admission.conversation.value,
                 )
             }
         }
