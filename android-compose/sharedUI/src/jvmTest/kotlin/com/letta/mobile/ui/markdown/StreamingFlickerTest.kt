@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -6,7 +6,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import org.junit.jupiter.api.Tag
 
 /**
  * letta-mobile-flk2 (debug suite): programmatic flicker simulator.
@@ -32,7 +31,6 @@ import org.junit.jupiter.api.Tag
  * If a test here fails, the flicker is reproducible without a device
  * and the failing prefix is the minimal repro.
  */
-@Tag("unit")
 class StreamingFlickerTest {
 
     /**

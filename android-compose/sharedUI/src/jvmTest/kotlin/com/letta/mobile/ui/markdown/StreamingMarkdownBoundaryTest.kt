@@ -1,8 +1,7 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import org.junit.jupiter.api.Tag
 
 /**
  * Tests for [findLastSafeBoundary] — the boundary detector that
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.Tag
  *
  * Coverage matrix mirrors the one captured on letta-mobile-c8of.5.
  */
-@Tag("unit")
 class StreamingMarkdownBoundaryTest {
 
     @Test

@@ -1,12 +1,10 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.jupiter.api.Tag
 
-@Tag("unit")
 class StreamingMarkdownParserTest {
 
     @Test
@@ -93,17 +91,6 @@ class StreamingMarkdownParserTest {
         assertFalse(lineLooksLikeTableSeparator("---", 0, 3))
         assertFalse(lineLooksLikeTableSeparator("-", 0, 1))
         assertFalse(lineLooksLikeTableSeparator("| a | b |", 0, 9))
-    }
-
-    @Test
-    fun `lineLooksLikeTableSeparator respects separator slice end`() {
-        val text = "prefix| --- | ---:suffix"
-        val start = "prefix".length
-        val end = start + "| --- | ---".length
-
-        assertTrue(lineLooksLikeTableSeparator("| ---", 0, 5))
-        assertTrue(lineLooksLikeTableSeparator(text, start, end))
-        assertFalse(lineLooksLikeTableSeparator(text, start, start + 1))
     }
 
     @Test

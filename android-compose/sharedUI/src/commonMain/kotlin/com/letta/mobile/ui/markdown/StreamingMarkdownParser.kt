@@ -56,7 +56,7 @@ internal fun StreamingMarkdownPartition.deferTrailingBoundaryCommit(displayed: S
     )
 }
 
-internal fun String.looksLikeMarkdownTable(): Boolean {
+fun String.looksLikeMarkdownTable(): Boolean {
     val lines = lineSequence().filter { it.isNotBlank() }.toList()
     if (lines.size < 2) return false
     if (!lines[0].contains('|')) return false
@@ -142,7 +142,7 @@ internal fun stableMarkdownTableRowKey(index: Int, cells: List<String>): String 
     return "row-$index-${cells.joinToString(separator = "\u001F").hashCode()}"
 }
 
-internal fun parseMarkdownTable(text: String): ParsedMarkdownTable? {
+fun parseMarkdownTable(text: String): ParsedMarkdownTable? {
     val lines = text
         .lineSequence()
         .map { it.trim() }

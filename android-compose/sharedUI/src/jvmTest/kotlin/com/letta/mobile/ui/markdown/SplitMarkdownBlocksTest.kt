@@ -1,10 +1,9 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.jupiter.api.Tag
 
 /**
  * Tests for [splitMarkdownBlocks] — the per-block prefix splitter that
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.Tag
  * of split(P1) by both `text` and `key`.** That stability is what lets
  * Compose skip-recompose unchanged blocks during streaming.
  */
-@Tag("unit")
 class SplitMarkdownBlocksTest {
 
     @Test
