@@ -117,7 +117,7 @@ class EmbeddedRuntimePlugin : Plugin<Project> {
             // Release builds run lint-vital, whose model/analyze tasks read the merged-assets output
             // (which includes the embedded LettaCode assets). Gradle's strict task-dependency
             // validation fails the build unless they also depend on the asset prep.
-            if ((name.startsWith("merge") && name.endsWith("Assets")) || isReleaseLintVital(name)) {
+            if (needsEmbeddedAssets(name)) {
                 dependsOn(assets)
             }
         }
@@ -128,11 +128,18 @@ class EmbeddedRuntimePlugin : Plugin<Project> {
 
     private fun wireNativeTasks(project: Project, nativeTasks: List<TaskProvider<out Task>>) {
         project.tasks.configureEach {
-            if (name.contains("CMake") || (name.startsWith("merge") && (name.endsWith("NativeLibs") || name.endsWith("JniLibFolders")))) {
+            if (needsEmbeddedNativeLibs(name)) {
                 nativeTasks.forEach { dependsOn(it) }
             }
         }
     }
+
+    private fun needsEmbeddedAssets(name: String): Boolean = isMergeTask(name, "Assets") || isReleaseLintVital(name)
+
+    private fun needsEmbeddedNativeLibs(name: String): Boolean =
+        name.contains("CMake") || isMergeTask(name, "NativeLibs") || isMergeTask(name, "JniLibFolders")
+
+    private fun isMergeTask(name: String, suffix: String): Boolean = name.startsWith("merge") && name.endsWith(suffix)
 
     private fun isReleaseLintVital(name: String): Boolean =
         (name.startsWith("lintVital") || (name.startsWith("generate") && name.contains("LintVital"))) &&
