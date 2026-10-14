@@ -6,6 +6,8 @@ import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.a2ui.PendingToolApprovalRegistry
+import com.letta.mobile.data.a2ui.ToolApprovalAdmission
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -17,6 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.contentOrNull
@@ -25,7 +29,6 @@ import com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi
 import com.letta.mobile.ui.chat.render.ChatSnackbarDuration
 import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
 
 import kotlin.time.Duration.Companion.milliseconds
 internal class AdminChatA2uiCoordinator(
@@ -44,6 +47,9 @@ internal class AdminChatA2uiCoordinator(
     }
 
     private val a2uiSurfaceManager = A2uiSurfaceManager()
+
+    /** letta-mobile-by4vm.2: the approvals this screen shows as pending; the only way an A2UI answer is submitted. */
+    private val pendingToolApprovals = PendingToolApprovalRegistry()
     private val pendingA2uiActions = mutableMapOf<String, PendingA2uiAction>()
     private var a2uiConversationId: String? = null
     private var a2uiHistorySignature: Int? = null
@@ -59,6 +65,7 @@ internal class AdminChatA2uiCoordinator(
         observeA2uiSurfaceState()
         observeA2uiEvents()
         observeA2uiActionOutcomes()
+        observePendingToolApprovals()
     }
 
     fun release() {
@@ -111,6 +118,7 @@ internal class AdminChatA2uiCoordinator(
 
     fun ensureA2uiConversation(conversationId: String) {
         if (a2uiConversationId == conversationId) return
+        a2uiConversationId?.let(pendingToolApprovals::expire)
         a2uiConversationId = conversationId
         a2uiHistorySignature = null
         a2uiHistoryAppliedCount = 0
@@ -153,9 +161,27 @@ internal class AdminChatA2uiCoordinator(
     private fun observeA2uiActionOutcomes() {
         scope.launch {
             wsChatBridge.events.collect { event ->
+                // letta-mobile-by4vm.2: an approval cannot outlive its turn.
+                if (event is WsTimelineEvent.TurnDone) activeConversationId()?.let(pendingToolApprovals::expire)
                 val outcome = event as? WsTimelineEvent.UserActionOutcome ?: return@collect
                 handleA2uiActionOutcome(outcome)
             }
+        }
+    }
+
+    /** Registers exactly the approvals the client projected from its own timeline as pending. */
+    private fun observePendingToolApprovals() {
+        scope.launch {
+            uiState
+                .map { state ->
+                    state.messages.mapNotNull { it.approvalRequest }
+                        .associate { request -> request.requestId to request.toolCalls.map { it.toolCallId } }
+                }
+                .distinctUntilChanged()
+                .collect { pending ->
+                    val conversationId = activeConversationId() ?: return@collect
+                    pendingToolApprovals.sync(conversationId, pending)
+                }
         }
     }
 
@@ -269,15 +295,26 @@ internal class AdminChatA2uiCoordinator(
         }
     }
 
+    /**
+     * letta-mobile-by4vm.2: any `tool_approval_response` ends here - submitted only when the shared
+     * registry admits it, otherwise dropped (logged by the registry). It never falls through to the
+     * WS action path, where the server would match it against the pending approval unchecked.
+     */
     private fun submitA2uiToolApprovalViaRest(action: A2uiAction): Boolean {
-        val submission = action.toToolApprovalSubmission() ?: return false
-        chatApprovalController.submitApproval(
-            requestId = submission.approvalRequestId,
-            toolCallIds = listOf(submission.callId),
-            approve = submission.approve,
-            reason = submission.reason,
-            activeConversationIdOverride = action.conversationId,
-        )
+        when (val admission = pendingToolApprovals.admit(action, activeConversationId()) ?: return false) {
+            is ToolApprovalAdmission.Rejected ->
+                chatBannerController.showComposerError("This approval could not be verified, so it was not sent.")
+            is ToolApprovalAdmission.Admitted -> {
+                val submission = admission.submission
+                chatApprovalController.submitApproval(
+                    requestId = submission.approvalRequestId,
+                    toolCallIds = listOf(submission.callId),
+                    approve = submission.approve,
+                    reason = submission.reason,
+                    activeConversationIdOverride = admission.conversationKey,
+                )
+            }
+        }
         return true
     }
 

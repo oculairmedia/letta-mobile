@@ -32,6 +32,7 @@ import com.letta.mobile.data.a2ui.A2uiProtocolJson
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiUpdateDataModelPayload
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
+import com.letta.mobile.data.a2ui.A2uiActionOrigin
 import com.letta.mobile.ui.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiRenderer
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
@@ -1969,6 +1970,7 @@ private fun List<A2uiAction>.assertToolApprovalAction(
     val action = single { it.context["callId"]!!.jsonPrimitive.content == callId }
     assertEquals("tool_approval_response", action.name)
     assertEquals("tool_approval_response", action.raw["actionName"]!!.jsonPrimitive.content)
+    assertEquals(A2uiActionOrigin.ToolApprovalCard, action.origin)
     assertEquals(SurfaceId, action.raw["surfaceId"]!!.jsonPrimitive.content)
     assertEquals(decision, action.context["decision"]!!.jsonPrimitive.content)
     assertEquals(scope, action.context["scope"]!!.jsonPrimitive.content)
