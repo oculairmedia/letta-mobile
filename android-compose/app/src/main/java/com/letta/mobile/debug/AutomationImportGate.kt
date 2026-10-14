@@ -15,8 +15,18 @@ import com.letta.mobile.util.Telemetry
  */
 object AutomationImportGate {
     private const val IMPORT_BUILD_TYPE = "benchmark"
+    private const val DEBUG_BUILD_TYPE = "debug"
 
     fun releaseImportEnabled(buildType: String): Boolean = buildType == IMPORT_BUILD_TYPE
+
+    /**
+     * letta-mobile-by4vm.31: raw automation launch extras (`automation_open_agent_list`,
+     * `notification_agent_id`/`notification_conversation_id`, used by device scripts) are
+     * honoured only where the automation payload is: debug builds and `benchmark`.
+     * Shipping build types ignore them; real notifications use [com.letta.mobile.NotificationLaunchTokens].
+     */
+    fun automationLaunchExtrasEnabled(buildType: String): Boolean =
+        buildType == DEBUG_BUILD_TYPE || releaseImportEnabled(buildType)
 
     /**
      * Reads and always clears the staged payload, so the `letta_automation`

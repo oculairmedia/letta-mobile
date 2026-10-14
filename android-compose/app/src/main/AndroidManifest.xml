@@ -104,14 +104,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="letta"
-                    android:host="agent" />
-            </intent-filter>
+            <!-- letta-mobile-by4vm.31: the dead `letta://agent` filter was removed; nothing
+                 generates those links and no launch target ever handled them. -->
             <!-- letta-mobile-dpv7m.3: scan-to-pair links from the camera or another app. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
