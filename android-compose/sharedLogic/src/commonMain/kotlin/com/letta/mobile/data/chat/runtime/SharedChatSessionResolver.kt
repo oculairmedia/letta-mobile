@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineCandidateListFreshness
@@ -212,6 +213,6 @@ class SharedChatSessionResolver(
         ?.value
 
     companion object {
-        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
+        const val DEFAULT_SHIM_CONVERSATION_PREFIX = IdFormats.DEFAULT_CONVERSATION_PREFIX
     }
 }

@@ -85,7 +85,7 @@ object DisplayNames {
         return (rest.ifEmpty { id }).take(length)
     }
 
-    private val KNOWN_PREFIXES = listOf("agent-", "local-", "conv-", "block-")
+    private val KNOWN_PREFIXES = listOf(IdFormats.AGENT_PREFIX, "local-", "conv-", "block-")
     private const val SHORT_ID_LENGTH = 8
 
     /**

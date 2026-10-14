@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreate
@@ -283,9 +284,7 @@ internal class TimelineOutboundSendProcessor(
         // cursor and do the no-cursor recent-refetch (order=desc) instead, exactly
         // as when liveCursor is null. Backend ids still page normally.
         val liveCursor = state.value.liveCursor
-        val afterCursor = liveCursor?.takeUnless {
-            it.startsWith("cm-") || it.startsWith("client-")
-        }
+        val afterCursor = liveCursor?.takeUnless { IdFormats.isOptimisticMessageId(it) }
         var lastError: Throwable? = null
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {

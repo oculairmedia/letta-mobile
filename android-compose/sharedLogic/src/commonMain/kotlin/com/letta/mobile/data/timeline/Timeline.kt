@@ -2,6 +2,7 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.messaging.AgentMessageClientId
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.util.Telemetry
@@ -737,7 +738,7 @@ internal fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
 }
 
 /** Generate a new client-side otid for outgoing messages. */
-fun newOtid(): String = "client-${newTimelineClientId()}"
+fun newOtid(): String = IdFormats.CLIENT_MESSAGE_PREFIX + newTimelineClientId()
 
 /** Current wall-clock instant — abstracted for test injection. */
 internal fun now(): TimelineInstant = timelineNow()

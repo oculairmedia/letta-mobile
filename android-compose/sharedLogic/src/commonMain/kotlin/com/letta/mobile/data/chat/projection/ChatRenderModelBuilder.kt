@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineInstant
@@ -538,10 +539,7 @@ fun dedupeGroupedMessagesForLazyKeys(
  * Anything bearing one of these prefixes is a candidate for fuzzy
  * collapse against an adjacent server-issued twin.
  */
-private val OptimisticIdPrefixes = listOf("client-", "cm-")
-
-private fun String.isOptimisticUiMessageId(): Boolean =
-    OptimisticIdPrefixes.any { startsWith(it) }
+private fun String.isOptimisticUiMessageId(): Boolean = IdFormats.isOptimisticMessageId(this)
 
 /**
  * Collapse adjacent (role, content)-identical pairs when at least one
