@@ -6,7 +6,7 @@ WebSocket server the host connects to) speak with the Letta host. It mirrors the
 runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
 (names, directions, SPI members, deadlines, size limits) and the message shapes are `:plugin-api`'s
 (`com.letta.mobile.plugin.api.LcpMethod` and its DTOs); the codec, framing, peer, session and
-guards are `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
+guards are `sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
 `LcpCalls`).
 
 The golden transcripts in
