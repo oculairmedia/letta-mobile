@@ -22,4 +22,19 @@ data class A2uiAction(
         turnId?.let { put("turnId", it) }
         actionId?.let { put("actionId", it) }
     },
+    /**
+     * letta-mobile-by4vm.2: which client code built this action. Never read from the wire: a
+     * server-authored component (a plain Button, say) can choose any [name] and [context], but it
+     * cannot choose this, so it is what tells a forged `tool_approval_response` from a real one.
+     */
+    val origin: A2uiActionOrigin = A2uiActionOrigin.SurfaceAuthored,
 )
+
+/** Who built an [A2uiAction]; see [A2uiAction.origin]. */
+enum class A2uiActionOrigin {
+    /** Name and context came from the server-authored surface (Button, form, list item, ...). */
+    SurfaceAuthored,
+
+    /** Built by the client's own ToolApprovalCard renderer from the user's tap on its affordances. */
+    ToolApprovalCard,
+}
