@@ -33,6 +33,11 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
 
+**Build logic** (all under `android-compose/`):
+- `gradle/libs.versions.toml` is the only place a dependency or plugin version lives — one version per library for every module (no per-module `-chat`-style forks; when versions disagree, use what `:app` resolves). The root `build.gradle.kts` applies plugins by `alias(libs.plugins.…)`.
+- `build-logic/` holds the convention plugins: `com.letta.mobile.android.library` (compileSdk/minSdk from the catalog, Java + Kotlin JVM 17 — modules applying it must not redeclare them), `com.letta.mobile.architecture-graph`, and `com.letta.mobile.embedded-runtime`.
+- The dev-only embedded letta-code runtime pipeline (npm install, nodejs-mobile libnode, NDK helpers, letta.js patches) is `com.letta.mobile.embedded-runtime`; its pins are `app/embedded-runtime/embedded-runtime.properties`, its letta.js patches `app/embedded-runtime/patches/*.mjs` (one per patch, rationale in each header), and its shipped polyfills `app/embedded-runtime/runtime/`. It only runs with `-PembedLettaCodeNative`/`-PembedLettaCodeAssets` (or the same keys in `local.properties`). Bump `assetRevision` when a patch or polyfill changes.
+
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
 For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.8`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.

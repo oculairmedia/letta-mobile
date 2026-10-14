@@ -3,8 +3,8 @@ import io.gitlab.arturbosch.detekt.Detekt
 
 plugins {
     id("com.letta.mobile.architecture-graph")
-    id("com.autonomousapps.dependency-analysis") version "3.5.1" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.9.8"
+    alias(libs.plugins.dependency.analysis) apply false
+    alias(libs.plugins.kover)
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.android.kmp.library) apply false
@@ -13,26 +13,26 @@ plugins {
     // Keep the project plugin on 1.10.0 for the shared macOS x64 target, which
     // Compose 1.11 no longer publishes. Nucleus upgrades only the desktop
     // runtime to 1.11.1; DesktopJewelTheme bridges Jewel's older text-menu ABI.
-    id("org.jetbrains.compose") version "1.10.0" apply false
-    id("dev.nucleusframework") version "2.1.5" apply false
+    alias(libs.plugins.compose.multiplatform) apply false
+    alias(libs.plugins.nucleus) apply false
     // Compose Hot Reload for the desktop phone preview (docs/development/phone-preview.md). Applied to
     // :desktop only when a hot task is requested, so ordinary and CI builds never see it.
-    id("org.jetbrains.compose.hot-reload") version "1.2.0" apply false
-    id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
-    id("io.github.takahirom.roborazzi") version "1.63.0" apply false
+    alias(libs.plugins.compose.hot.reload) apply false
+    alias(libs.plugins.paparazzi) apply false
+    alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.hilt.android) apply false
     alias(libs.plugins.ksp) apply false
-    id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
+    alias(libs.plugins.detekt) apply false
     alias(libs.plugins.kotlin.allopen) apply false
-    id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
-    id("io.sentry.android.gradle") version "6.8.1" apply false
-    id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
+    alias(libs.plugins.aboutlibraries.android) apply false
+    alias(libs.plugins.sentry.android) apply false
+    alias(libs.plugins.androidx.baselineprofile) apply false
     // Kotzilla observability — debug builds only (Android app module).
     // See docs/observability/kotzilla.md for the rationale on why we don't
     // ship the SDK in release APKs.
-    id("io.kotzilla.kotzilla-plugin") version "2.3.3" apply false
+    alias(libs.plugins.kotzilla) apply false
 }
 
 // Dependency Analysis is opt-in and advisory: AGP 9.2 is newer than the plugin's

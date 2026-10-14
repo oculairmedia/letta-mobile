@@ -1,0 +1,258 @@
+package com.letta.mobile.embedded
+
+import groovy.json.JsonSlurper
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
+import java.io.File
+import javax.inject.Inject
+
+/**
+ * Builds the on-device letta-code tree (`letta-code/nodejs-project`): npm-installs the pinned
+ * `@letta-ai/letta-code`, patches its minified `letta.js` for nodejs-mobile with the scripts in
+ * `app/embedded-runtime/patches/` (run in [LETTA_JS_PATCHES] order), and adds the shim modules,
+ * runtime polyfills, an on-device npm and a package.json.
+ */
+@DisableCachingByDefault(because = "Runs npm install against the registry.")
+abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
+    private val fileSystem: FileSystemOperations,
+) : DefaultTask() {
+    /** `src/main/embedded-lettacode`: shim modules copied verbatim into the asset tree. */
+    @get:InputDirectory
+    abstract val shimSources: DirectoryProperty
+
+    /** `embedded-runtime/patches`: letta.js patch scripts (inputs so an edited patch re-runs the task). */
+    @get:InputDirectory
+    abstract val patchesDirectory: DirectoryProperty
+
+    /** `embedded-runtime/runtime`: polyfills shipped next to letta.js. */
+    @get:InputDirectory
+    abstract val runtimeDirectory: DirectoryProperty
+
+    @get:Input
+    abstract val lettaCodeVersion: Property<String>
+
+    @get:Input
+    abstract val deviceNpmVersion: Property<String>
+
+    /** scripts/patch-embedded-letta-code-tool-groups.cjs (covered by testEmbeddedLettaCodeToolGroupPatch). */
+    @get:Internal
+    abstract val toolGroupPatchScript: RegularFileProperty
+
+    @get:Internal
+    abstract val npmWorkDirectory: DirectoryProperty
+
+    @get:Internal
+    abstract val npmStageDirectory: DirectoryProperty
+
+    /** Directory npm runs from (the app project dir). */
+    @get:Internal
+    abstract val npmInvocationDirectory: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun prepare() {
+        val npmWorkDir = npmWorkDirectory.get().asFile
+        val assetRoot = outputDirectory.get().asFile.resolve("letta-code/nodejs-project")
+        resetDirectory(npmWorkDir)
+        resetDirectory(assetRoot)
+        installNpmDependencies(npmWorkDir)
+
+        val lettaJs = npmWorkDir.resolve("node_modules/@letta-ai/letta-code/letta.js")
+        check(lettaJs.isFile) { "letta.js not found for unicode-property transform at ${lettaJs.absolutePath}" }
+        // Patch scripts run from the npm work dir so bare imports (@babel/core) resolve there.
+        fileSystem.copy {
+            from(patchesDirectory)
+            into(npmWorkDir)
+        }
+        LETTA_JS_PATCHES.forEach { patch -> runPatch(npmWorkDir, lettaJs, patch) }
+
+        syntaxCheck(npmWorkDir, assetRoot, lettaJs)
+        stageDeviceNpm(npmWorkDir)
+        copyNodeModules(npmWorkDir, assetRoot)
+        fileSystem.copy {
+            from(runtimeDirectory)
+            into(assetRoot)
+        }
+        nodeCheck(npmWorkDir, assetRoot.resolve("android-network-polyfill.cjs"))
+        writePackageJson(assetRoot)
+    }
+
+    private fun resetDirectory(dir: File) {
+        fileSystem.delete { delete(dir) }
+        dir.mkdirs()
+    }
+
+    private fun installNpmDependencies(npmWorkDir: File) {
+        npmInstall(
+            npmWorkDir,
+            "npm install for embedded LettaCode failed.",
+            "--ignore-scripts",
+            "@letta-ai/letta-code@${lettaCodeVersion.get()}",
+        )
+        // babel + regexpu-core power patches/transform-unicode-property.mjs; regexpu-core also ships
+        // for runtime/regexp-polyfill.cjs.
+        npmInstall(
+            npmWorkDir,
+            "npm install for babel transform failed.",
+            "@babel/core@7",
+            "@babel/plugin-transform-unicode-property-regex@7",
+            "regexpu-core@6",
+        )
+        installSharpWasm(npmWorkDir)
+    }
+
+    // sharp ships no android-arm64 native binary, so module load aborts with "Could not load the
+    // sharp module using the android-arm64 runtime". sharp's own loader falls back to the wasm32
+    // build when present — install it (version must match the sharp dependency in letta-code).
+    private fun installSharpWasm(npmWorkDir: File) {
+        val sharpVersion = npmWorkDir.resolve("node_modules/sharp/package.json")
+            .takeIf { it.isFile }
+            ?.let { JsonSlurper().parse(it) as Map<*, *> }
+            ?.get("version") as? String
+            ?: return
+        npmInstall(
+            npmWorkDir,
+            "npm install for @img/sharp-wasm32 failed.",
+            "--ignore-scripts",
+            // npm refuses cross-cpu installs (EBADPLATFORM) even with --cpu=wasm32 on this npm
+            // version; --force is the documented escape hatch for platform-package side-installs.
+            "--force",
+            "@img/sharp-wasm32@$sharpVersion",
+        )
+    }
+
+    private fun runPatch(npmWorkDir: File, lettaJs: File, patch: LettaJsPatch) {
+        when (patch) {
+            is LettaJsPatch.Script ->
+                run(npmWorkDir, patch.failure, listOf("node") + patch.nodeArgs + listOf(npmWorkDir.resolve(patch.file).absolutePath, lettaJs.absolutePath))
+            LettaJsPatch.ToolGroups ->
+                run(npmWorkDir, patch.failure, listOf("node", toolGroupPatchScript.get().asFile.absolutePath, lettaJs.absolutePath))
+            LettaJsPatch.CopyShimModules ->
+                fileSystem.copy {
+                    from(shimSources)
+                    into(outputDirectory.get().asFile.resolve("letta-code/nodejs-project"))
+                }
+        }
+    }
+
+    private fun syntaxCheck(npmWorkDir: File, assetRoot: File, lettaJs: File) {
+        listOf(
+            assetRoot.resolve("letta-mobile-runtime-introspection/store.js"),
+            assetRoot.resolve("letta-mobile-runtime-introspection/runtime-introspection.js"),
+            assetRoot.resolve("embedded-runtime-introspection-preload.cjs"),
+            lettaJs,
+        ).forEach { file -> nodeCheck(npmWorkDir, file) }
+    }
+
+    // Ship npm so the on-device node can install packages. npm is pure JS (npm-cli.js) and runs on
+    // the embedded node 18 runtime. Install it into a SEPARATE staging dir (installing npm into the
+    // same tree it's part of confuses dedup), then copy node_modules/npm into the embedded tree. An
+    // `npm` PATH wrapper (created at runtime) runs node npm-cli.js. See letta-mobile-iq24j.
+    private fun stageDeviceNpm(npmWorkDir: File) {
+        val npmStageDir = npmStageDirectory.get().asFile
+        resetDirectory(npmStageDir)
+        run(
+            npmStageDir,
+            "npm install for on-device npm failed.",
+            listOf(npmCommand(), "install", "--no-audit", "--no-fund", "--ignore-scripts", "--prefix", npmStageDir.absolutePath, "npm@${deviceNpmVersion.get()}"),
+        )
+        val stagedNpm = npmStageDir.resolve("node_modules/npm")
+        check(stagedNpm.resolve("bin/npm-cli.js").isFile) { "staged npm-cli.js missing at ${stagedNpm.absolutePath}" }
+        fileSystem.copy {
+            from(stagedNpm)
+            into(npmWorkDir.resolve("node_modules/npm"))
+        }
+    }
+
+    private fun copyNodeModules(npmWorkDir: File, assetRoot: File) {
+        fileSystem.copy {
+            from(npmWorkDir.resolve("node_modules"))
+            into(assetRoot.resolve("node_modules"))
+            // babel is a build-time tool only; don't ship it on device. regexpu-core (+ regenerate/
+            // regjs*/unicode-* data) IS shipped: runtime/regexp-polyfill.cjs needs it for dynamically
+            // constructed patterns that the static babel pass cannot reach.
+            exclude("@babel/**", ".bin/**", "@jridgewell/**", "browserslist/**", "caniuse-lite/**", "electron-to-chromium/**")
+        }
+    }
+
+    private fun writePackageJson(assetRoot: File) {
+        assetRoot.resolve("package.json").writeText(
+            """
+            {
+              "name": "letta-mobile-embedded-lettacode",
+              "private": true,
+              "type": "module",
+              "dependencies": {
+                "@letta-ai/letta-code": "${lettaCodeVersion.get()}"
+              }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    private fun npmInstall(npmWorkDir: File, failure: String, vararg args: String) {
+        val command = listOf(npmCommand(), "install", "--no-audit", "--no-fund", "--prefix", npmWorkDir.absolutePath) + args
+        run(npmInvocationDirectory.get().asFile, failure, command)
+    }
+
+    private fun nodeCheck(npmWorkDir: File, file: File) {
+        run(npmWorkDir, "${file.name} failed node --check.", listOf("node", "--check", file.absolutePath))
+    }
+
+    private fun run(workingDir: File, failure: String, command: List<String>) {
+        val process = ProcessBuilder(command).directory(workingDir).inheritIO().start()
+        check(process.waitFor() == 0) { failure }
+    }
+
+    private fun npmCommand(): String =
+        if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "npm.cmd" else "npm"
+}
+
+/** One step of the letta.js patch pipeline; see [LETTA_JS_PATCHES]. */
+internal sealed interface LettaJsPatch {
+    val failure: String
+
+    /** A script from `embedded-runtime/patches/`, run as `node <nodeArgs> <file> <letta.js>`. */
+    data class Script(
+        val file: String,
+        override val failure: String,
+        val nodeArgs: List<String> = emptyList(),
+    ) : LettaJsPatch
+
+    /** origin/main #478: keep tool-call groups intact during trimming (scripts/, has its own test). */
+    data object ToolGroups : LettaJsPatch {
+        override val failure = "Tool-call group trimming patch for letta.js failed."
+    }
+
+    /** Copies src/main/embedded-lettacode into the asset tree (the introspection patch targets it). */
+    data object CopyShimModules : LettaJsPatch {
+        override val failure = "Copying embedded LettaCode shim modules failed."
+    }
+}
+
+/** Order matters: it is the order the pipeline ran in when it lived in app/build.gradle.kts. */
+internal val LETTA_JS_PATCHES: List<LettaJsPatch> = listOf(
+    LettaJsPatch.Script(
+        "transform-unicode-property.mjs",
+        "Unicode property escape transform for letta.js failed.",
+        nodeArgs = listOf("--max-old-space-size=8192"),
+    ),
+    LettaJsPatch.Script("patch-vision-model-input.mjs", "Vision-model-input transform for letta.js failed."),
+    LettaJsPatch.Script("patch-image-url-shape.mjs", "image_url-shape transform for letta.js failed."),
+    LettaJsPatch.Script("bypass-image-resize.mjs", "Image-resize bypass transform for letta.js failed."),
+    LettaJsPatch.Script("patch-switch-session-control.mjs", "switch_session control transform for letta.js failed."),
+    LettaJsPatch.ToolGroups,
+    LettaJsPatch.CopyShimModules,
+    LettaJsPatch.Script("patch-runtime-introspection.mjs", "Failed to patch letta.js runtime-introspection turn boundary."),
+)

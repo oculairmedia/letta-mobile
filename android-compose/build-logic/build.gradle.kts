@@ -23,6 +23,10 @@ gradlePlugin {
             id = "com.letta.mobile.architecture-graph"
             implementationClass = "com.letta.mobile.architecture.ArchitectureGraphPlugin"
         }
+        create("embeddedRuntime") {
+            id = "com.letta.mobile.embedded-runtime"
+            implementationClass = "com.letta.mobile.embedded.EmbeddedRuntimePlugin"
+        }
     }
 }
 
