@@ -110,6 +110,8 @@ internal class ApprovalResponseSender(
             InputAcceptance.Started, InputAcceptance.Queued -> ApprovalSubmitResult.Accepted
             is InputAcceptance.Rejected -> ApprovalSubmitResult.Rejected(acceptance.error)
             is InputAcceptance.ConnectionLost -> ApprovalSubmitResult.Unacknowledged("connection_lost")
+            // Only the turn engine's own send path produces this; listed so the when stays exhaustive.
+            is InputAcceptance.SendFailed -> ApprovalSubmitResult.Unacknowledged(acceptance.kind)
             is InputAcceptance.Unacknowledged -> ApprovalSubmitResult.Unacknowledged(acceptance.reason)
         }
     }
