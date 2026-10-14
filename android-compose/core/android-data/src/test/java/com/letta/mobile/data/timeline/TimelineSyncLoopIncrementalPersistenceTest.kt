@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -1151,9 +1152,9 @@ class TimelineSyncLoopIncrementalPersistenceTest {
     fun localMutationsProduceNoWorkAndDoNotConsumeRevision() = runTest {
         val db = inMemoryDatabase()
         val scope = TimelineScope(backendId = "backend", conversationId = "conv-local-nowork", agentId = "agent")
-        val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeApi = FakeSyncApi()
-        val loop = newLoop(scope, RoomConfirmedTimelineStore(db), dispatcher, fakeApi)
+        val loopStore = CommitObservingStore(RoomConfirmedTimelineStore(db))
+        val loop = newLoop(scope, loopStore, StandardTestDispatcher(testScheduler), fakeApi)
 
         // Initial commit establishes the durable baseline at revision 1.
         loop.ingestStreamEvent(UserMessage(id = "msg-0", date = FIXTURE_DATE, contentRaw = JsonPrimitive("seed")))
@@ -1238,7 +1239,12 @@ class TimelineSyncLoopIncrementalPersistenceTest {
         // 5. Subsequent confirmed change persists cleanly as a delta
         com.letta.mobile.util.Telemetry.clear()
         fakeApi.sendResponseGate?.complete(Unit)
-        advanceUntilIdle()
+        // The confirmed change is persisted ONLY by the loop's background persist coroutine (no
+        // direct flushSnapshotNow() here), and Room commits on its own real Dispatchers.IO hop,
+        // which advanceUntilIdle() cannot drive: it returned while that commit was still in
+        // flight, so reading the revision raced the DB thread (CI #1943). Await the commit
+        // itself; runTest drives the test scheduler (send, debounce, persist) while suspended.
+        loopStore.committedRevision.first { it >= 2L }
 
         val afterConfirmed = store.readSnapshot(scope)
         assertNotNull(afterConfirmed)
