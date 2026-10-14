@@ -32,6 +32,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class MemoryRoute(val agentId: String? = null)
 @Serializable data class ShareToAgentRoute(val sharedText: String)
 @Serializable data object ProjectsRoute
+/** letta-mobile-cdgpr.9: the shared Plugins page (install with consent, enable, disable, remove). */
+@Serializable data object PluginsRoute
 @Serializable data object TelemetryRoute
 @Serializable data object SystemAccessRoute
 @Serializable data object PairingScanRoute

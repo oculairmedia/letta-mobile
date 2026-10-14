@@ -279,7 +279,7 @@ internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedS
         // Picker rows are keyed by id: a page reached through two lens entries is listed once.
         .distinctBy { it.id }
 
-private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects)
+private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects, DesktopDestination.Plugins)
 
 /**
  * The window's one unified search, shared by the header, the command palette and the quick-query bar:

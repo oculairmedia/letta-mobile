@@ -170,4 +170,35 @@ class PeerSessionAuthTest {
         assertFalse(unlisted.authenticated.get(), "admission for invite redemption is not authentication")
         assertDenied(unlisted.authenticate("", null), "pairing_required")
     }
+
+    @Test
+    fun allowlistedBearerTokenIsDeniedFromAnUnlistedNodeIdEvenWithPairingConfigured() {
+        val policy = IrohAuthPolicy.BearerToken(token, setOf(alice))
+        val verifier = IrohBearerAuthVerifier(policy, nowMs = { now })
+        assertDenied(session(mallory, policy, verifier).authenticate(token, null), "peer_not_allowlisted")
+        repeat(IrohBearerAuthVerifier.MAX_FAILURES_PER_WINDOW - 1) {
+            session(mallory, policy, verifier).authenticate(token, null)
+        }
+        assertTrue(verifier.isRateLimited(mallory), "allowlist denials count against the failure budget")
+        assertFalse(verifier.isRateLimited(alice))
+    }
+
+    @Test
+    fun allowlistedBearerTokenAuthenticatesTheListedNodeId() {
+        val policy = IrohAuthPolicy.BearerToken(token, setOf(alice))
+        val listed = session(alice, policy = policy)
+        assertEquals(PeerSessionAuth.Decision.Accepted("bootstrap"), listed.authenticate(token, null))
+        assertEquals(setOf(IrohPeerCapabilities.ADMIN_FULL), listed.effectiveCapabilities())
+    }
+
+    @Test
+    fun pairedPeerOutsideTheAllowlistStillAuthenticatesByNodeId() {
+        val policy = IrohAuthPolicy.BearerToken(token, setOf(alice))
+        val decision = session(mallory, policy = policy).authenticate(inviteToken(), null)
+        assertEquals(PeerSessionAuth.Decision.Accepted("invite_redeemed", newlyPaired = true), decision)
+        val redial = session(mallory, policy = policy)
+        assertTrue(redial.authenticated.get())
+        assertEquals(PeerSessionAuth.Decision.Accepted("paired_node_id"), redial.authenticate("", null))
+        assertEquals(IrohPeerCapabilities.CHAT_ROLE, redial.effectiveCapabilities())
+    }
 }

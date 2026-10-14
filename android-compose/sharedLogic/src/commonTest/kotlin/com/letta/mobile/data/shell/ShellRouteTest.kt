@@ -116,5 +116,6 @@ object ShellDestinationSamples {
         ShellDestination.Runs,
         ShellDestination.Templates,
         ShellDestination.Projects,
+        ShellDestination.Plugins,
     )
 }

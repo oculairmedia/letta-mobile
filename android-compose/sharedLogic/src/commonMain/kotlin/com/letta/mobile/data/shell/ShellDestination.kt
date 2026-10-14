@@ -103,11 +103,16 @@ sealed interface ShellDestination {
     data object Projects : ShellDestination {
         override val kind get() = ShellPageKind.Projects
     }
+
+    /** The host's plugins: install from a file with consent, enable, disable, remove (letta-mobile-cdgpr.9). */
+    data object Plugins : ShellDestination {
+        override val kind get() = ShellPageKind.Plugins
+    }
 }
 
 /** One per [ShellDestination] subtype: the page that draws it. */
 enum class ShellPageKind {
-    Home, Chat, Canvas, Memory, Schedules, Channels, Skills, Settings, AgentEditor, Providers, Overview, Runs, Templates, Projects,
+    Home, Chat, Canvas, Memory, Schedules, Channels, Skills, Settings, AgentEditor, Providers, Overview, Runs, Templates, Projects, Plugins,
 }
 
 /** Where the Skills page opens. */
