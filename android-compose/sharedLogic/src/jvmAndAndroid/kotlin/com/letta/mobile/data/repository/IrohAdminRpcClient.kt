@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -15,12 +16,7 @@ class IrohAdminRpcClient(
 ) {
     fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
 
-    @PublishedApi internal val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    }
+    @PublishedApi internal val json: Json = LettaJson.adminRpc
 
     suspend inline fun <reified T> call(method: String, path: String, body: String? = null): T {
         val r = channelTransport.adminRpc(method, path, body)

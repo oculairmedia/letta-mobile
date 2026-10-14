@@ -15,6 +15,8 @@ letta-mobile-guardrails:
     active: true
   CoroutineTestGuardrails:
     active: true
+  NoAdHocJsonInstance:
+    active: true
 
 letta-mobile-design-system:
   active: true

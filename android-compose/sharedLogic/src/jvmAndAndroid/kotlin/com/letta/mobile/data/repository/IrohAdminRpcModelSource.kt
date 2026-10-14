@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -23,12 +24,7 @@ class IrohAdminRpcModelSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
     // Match the raw API client Json config (explicit nulls coerced to defaults).
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.ModelIrohSource {
     override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()

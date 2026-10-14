@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -15,12 +16,7 @@ import kotlinx.serialization.json.Json
 class IrohAdminRpcProviderSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.ProviderIrohSource {
     override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
