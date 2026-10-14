@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,11 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 
 object AppServerProtocol {
-    val json: Json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    /** Alias of [LettaJson.wire]; see that instance for the flag rationale (letta-mobile-by4vm.20). */
+    val json: Json = LettaJson.wire
 
     /** Placeholder substituted for credential values in redacted diagnostics. */
     const val REDACTED_PLACEHOLDER: String = "<redacted>"
