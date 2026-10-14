@@ -1,6 +1,7 @@
 package com.letta.mobile.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -25,8 +26,17 @@ import androidx.room.PrimaryKey
  *   can be reconstructed offline. Keep an eye on row size — large images
  *   inflate the DB. If this grows problematic we'll switch to file storage
  *   keyed by hash.
+ * - [backendId] / [agentId] (schema v20, letta-mobile-by4vm.17): the owning
+ *   backend and agent. `conv-default-*` ids are shared by every agent and every
+ *   backend, so the conversation id alone is not an owner. Null means the writer
+ *   could not know it — every row migrated from v19 has both null. Reads treat a
+ *   null as "legacy, matches any"; [PendingLocalDao.deleteForBackend] purges legacy
+ *   rows on the next backend switch, so the leniency spans one backend session.
  */
-@Entity(tableName = "pending_local_messages")
+@Entity(
+    tableName = "pending_local_messages",
+    indices = [Index(value = ["backendId", "agentId", "conversationId"])],
+)
 data class PendingLocalEntity(
     @PrimaryKey val otid: String,
     val conversationId: String,
@@ -34,4 +44,6 @@ data class PendingLocalEntity(
     val attachmentsJson: String,
     val sentAtEpochMs: Long,
     val deliveryState: String,
+    val backendId: String? = null,
+    val agentId: String? = null,
 )

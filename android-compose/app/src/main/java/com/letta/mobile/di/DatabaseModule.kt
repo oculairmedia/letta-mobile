@@ -110,6 +110,18 @@ object DatabaseModule {
         return database.pendingLocalDao()
     }
 
+    /**
+     * letta-mobile-by4vm.17: pending (unsent) rows are backend-scoped; the store reads the
+     * active backend id lazily so a backend switch clears the outgoing backend's rows.
+     */
+    @Provides
+    @Singleton
+    fun provideRoomPendingLocalStore(
+        dao: PendingLocalDao,
+        settingsRepository: com.letta.mobile.data.repository.api.ISettingsRepository,
+    ): RoomPendingLocalStore =
+        RoomPendingLocalStore(dao, activeBackendId = { settingsRepository.activeConfig.value?.id ?: "default" })
+
     @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {
         return database.conversationDao()

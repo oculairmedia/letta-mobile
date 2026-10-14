@@ -168,7 +168,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta")), agents.single().tagsJson)
         assertEquals(listOf("alpha", "beta"), agents.single().toAgent().tags)
         assertTrue(db.bugReportDao().getRecentForProject("project-1", limit = 10).isEmpty())
-        assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.pendingLocalDao().listForScope(null, null, "conversation-1").isEmpty())
         assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
@@ -204,7 +204,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(1, reports.size)
         assertEquals(7L, reports.single().id)
         assertEquals("Bug title", reports.single().title)
-        assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.pendingLocalDao().listForScope(null, null, "conversation-1").isEmpty())
         assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
@@ -256,7 +256,7 @@ class LettaDatabaseMigrationTest {
 
         val db = openMigratedDatabase()
 
-        assertEquals(listOf(row), db.pendingLocalDao().listForConversation("conversation-1"))
+        assertEquals(listOf(row), db.pendingLocalDao().listForScope(null, null, "conversation-1"))
         val agent = db.agentDao().getAllOnce().single()
         assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta", "gamma")), agent.tagsJson)
         assertEquals(listOf("alpha", "beta", "gamma"), agent.toAgent().tags)
