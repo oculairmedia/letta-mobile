@@ -18,9 +18,10 @@ data class ConversationRecompileRequest(
 /**
  * letta-mobile-zxk2n.5 (G92): optional gateway capability behind `/recompile`: re-render the
  * agent's system prompt (its memory blocks) for a conversation. A direct App Server sends
- * `conversation_recompile`; a REST backend calls `POST /v1/conversations/{id}/recompile`. Iroh has
- * no route yet (the host needs a relay), so its gateway does not implement this. Callers probe with
- * `gateway as? ConversationRecompileGateway`, as they do for forks.
+ * `conversation_recompile`; a REST backend calls `POST /v1/conversations/{id}/recompile`; an Iroh
+ * host relays `conversation.recompile` to its App Server (letta-mobile-by4vm.51,
+ * [IrohConversationRecompileClient]). Callers probe with `gateway as? ConversationRecompileGateway`,
+ * as they do for forks.
  */
 interface ConversationRecompileGateway {
     /** Returns once the server has recompiled; throws with the server's reason when it refuses. */
@@ -112,8 +113,7 @@ class ConversationRecompileController(
     companion object {
         const val UNAVAILABLE_DEFAULT = "Recompile isn't available on this connection."
 
-        /** Iroh: the host has no `conversation_recompile` relay yet. */
-        const val UNAVAILABLE_OVER_IROH =
-            "Recompile isn't available over Iroh yet: the host needs a relay for it. Use a direct App Server or REST connection."
+        /** letta-mobile-by4vm.51: an Iroh host deployed before the `conversation.recompile` relay. */
+        const val UNAVAILABLE_HOST_OUTDATED = IrohConversationRecompileClient.HOST_NEEDS_UPDATE
     }
 }

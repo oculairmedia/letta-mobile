@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
+import com.letta.mobile.data.chat.recompile.IrohConversationRecompileClient
+import com.letta.mobile.data.chat.recompile.asAdminRpcLink
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -110,6 +112,12 @@ class IrohAdminRpcConversationListSource(
                 body = IrohConversationForkRpc.params(request).toString(),
             ),
         )
+
+    /**
+     * letta-mobile-by4vm.51: the host's `conversation.recompile` relay; [IrohConversationRecompileClient.supported]
+     * says whether the connected host advertises it.
+     */
+    val recompiler = IrohConversationRecompileClient(channelTransport.asAdminRpcLink())
 
     suspend fun deleteConversation(id: ConversationId) {
         // App Server v2 has no conversation_delete; archive is the supported lifecycle.

@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.MessageId
 import com.letta.mobile.data.chat.branch.ConversationForkGateway
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.chat.branch.IrohConversationForkRpc
+import com.letta.mobile.data.chat.recompile.asAdminRpcLink
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
@@ -79,6 +80,9 @@ class IrohAdminRpcChatGateway(
     ChatGatewayExtras,
     ConversationSummaryGateway,
     ConversationForkGateway,
+    // letta-mobile-by4vm.51: `/recompile` over the host's `conversation.recompile` relay.
+    com.letta.mobile.data.chat.recompile.ConversationRecompileGateway by
+    com.letta.mobile.data.chat.recompile.IrohConversationRecompileClient(transport.asAdminRpcLink()),
     ApprovalSubmittingGateway,
     com.letta.mobile.data.chat.runtime.PendingApprovalSource,
     com.letta.mobile.data.chat.runtime.ApprovalQueueSource,
