@@ -34,7 +34,7 @@ class LettaCodeVersionPinsTest {
         )!!
 
     private val embedded: String
-        get() = first(Regex("""embeddedLettaCodeVersion\s*=\s*"([^"]+)""""), read("app/build.gradle.kts"))!!
+        get() = first(Regex("""(?m)^lettaCodeVersion=(\S+)$"""), read("app/embedded-runtime/embedded-runtime.properties"))!!
 
     private val table: String
         get() = read("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md")
