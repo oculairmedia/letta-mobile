@@ -111,8 +111,7 @@ internal class TurnDraftProcessor(
     suspend fun process(incoming: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
         // letta-mobile-by4vm.7: completing no longer throws, so nothing after the turn's terminal
         // (a later draft of the same frame, a frame already in flight) may be processed.
-        if (isTurnOver()) return
-        val draft = identity.stampDraft(incoming) ?: return
+        val draft = stampWhileLive(incoming) ?: return
         flushClosedRoundTail(draft)
         if (emitAutoApproved(draft)) return
         callbacks.track(draft, ledger)
@@ -135,6 +134,9 @@ internal class TurnDraftProcessor(
         }
         callbacks.emit(draft)
     }
+
+    private fun stampWhileLive(incoming: RuntimeEventDraft): RuntimeEventDraft? =
+        if (isTurnOver()) null else identity.stampDraft(incoming)
 
     private fun isTurnOver(): Boolean = phase == TurnPhase.Terminal || callbacks.isComplete()
 
