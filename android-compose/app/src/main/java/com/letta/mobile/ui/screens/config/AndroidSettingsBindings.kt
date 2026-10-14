@@ -7,6 +7,7 @@ import androidx.activity.result.ActivityResultLauncher
 import ca.oculair.meridian.BuildConfig
 import ca.oculair.meridian.R
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.plugin.catalog.pluginsSettingsContribution
 import com.letta.mobile.data.settings.SettingsAction
 import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingsGroup
@@ -29,6 +30,7 @@ data class SettingsDestinations(
     val onSystemAccess: () -> Unit = {},
     val onCanvasDebug: () -> Unit = {},
     val onProviders: () -> Unit = {},
+    val onPlugins: () -> Unit = {},
 )
 
 /** Whether the app is exempt from battery optimization, and how to ask for the exemption. */
@@ -63,6 +65,7 @@ internal fun androidSettingsContributions(state: UiState<ConfigUiState>, inputs:
         SettingsContribution(SettingsGroup.Backend, savedBackendsSection(destinations.onConfigList)),
         SettingsContribution(SettingsGroup.Notifications, backgroundDeliverySection(inputs.battery.exempt, inputs.battery.requestExemption)),
         SettingsContribution(SettingsGroup.Providers, systemAccessSection(destinations.onSystemAccess)),
+        pluginsSettingsContribution(destinations.onPlugins),
         SettingsContribution(SettingsGroup.About, androidAboutSection(BuildConfig.VERSION_NAME, form.embeddedRuntimeStatus)),
         SettingsContribution(SettingsGroup.Developer, developerSection(form, vm, debug)),
     )

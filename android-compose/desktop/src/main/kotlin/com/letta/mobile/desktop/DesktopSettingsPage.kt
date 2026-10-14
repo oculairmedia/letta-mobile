@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalUriHandler
+import com.letta.mobile.data.plugin.catalog.pluginsSettingsContribution
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.ChatSettings
@@ -97,7 +98,7 @@ private fun desktopContributions(inputs: DestinationContentInputs, actions: Dest
         SettingsContribution(SettingsGroup.Appearance, railSection(inputs.railRecencyDays, actions.onRailRecencyDaysChange)),
         SettingsContribution(SettingsGroup.Appearance, rememberSystemAppearance()),
         SettingsContribution(SettingsGroup.Notifications, desktopNotificationsSection(nucleus, actions.nucleus.onTestNotification)),
-    ) + about.map { SettingsContribution(SettingsGroup.About, it) }
+    ) + about.map { SettingsContribution(SettingsGroup.About, it) } + pluginsSettingsContribution(actions.onOpenPlugins)
 }
 
 /** The bundled runtime's sections, with the two folder pickers they open. */

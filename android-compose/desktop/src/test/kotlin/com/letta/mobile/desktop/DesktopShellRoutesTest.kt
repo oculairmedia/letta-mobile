@@ -31,6 +31,7 @@ class DesktopShellRoutesTest {
         ShellDestination.Runs,
         ShellDestination.Templates,
         ShellDestination.Projects,
+        ShellDestination.Plugins,
     )
 
     @Test

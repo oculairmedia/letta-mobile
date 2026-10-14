@@ -47,6 +47,7 @@ class ShellPageTest {
         ShellDestination.Runs,
         ShellDestination.Templates,
         ShellDestination.Projects,
+        ShellDestination.Plugins,
     )
 
     /** Fake pages: each tags itself with its kind and records the destination it was handed. */
@@ -78,6 +79,7 @@ class ShellPageTest {
                 runs = page(ShellPageKind.Runs),
                 templates = page(ShellPageKind.Templates),
                 projects = page(ShellPageKind.Projects),
+                plugins = page(ShellPageKind.Plugins),
             ),
             fallback = fallback,
         )

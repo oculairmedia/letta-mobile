@@ -102,6 +102,7 @@ class ShellPageDeps(
         ShellPageKind.Runs to admin.runs,
         ShellPageKind.Templates to admin.templates,
         ShellPageKind.Projects to admin.projects,
+        ShellPageKind.Plugins to admin.plugins,
     ).mapNotNull { (kind, page) -> page?.let { kind to it } }.toMap()
 
     /**
@@ -130,6 +131,8 @@ class ShellAdminPages(
     val runs: ShellPageContent<ShellDestination.Runs>? = null,
     val templates: ShellPageContent<ShellDestination.Templates>? = null,
     val projects: ShellPageContent<ShellDestination.Projects>? = null,
+    /** The host's plugins (letta-mobile-cdgpr.9), built from [com.letta.mobile.ui.shell.pages.plugins.shellPluginsPage]. */
+    val plugins: ShellPageContent<ShellDestination.Plugins>? = null,
 )
 
 object ShellPageTags {

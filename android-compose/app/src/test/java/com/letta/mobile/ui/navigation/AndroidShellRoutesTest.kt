@@ -33,6 +33,7 @@ class AndroidShellRoutesTest {
         ShellDestination.Runs,
         ShellDestination.Templates,
         ShellDestination.Projects,
+        ShellDestination.Plugins,
     )
 
     @Test
@@ -84,6 +85,7 @@ class AndroidShellRoutesTest {
         assertEquals(RunsRoute, ShellDestination.Runs.toAndroidRoute())
         assertEquals(TemplatesRoute, ShellDestination.Templates.toAndroidRoute())
         assertEquals(ProjectsRoute, ShellDestination.Projects.toAndroidRoute())
+        assertEquals(PluginsRoute, ShellDestination.Plugins.toAndroidRoute())
         // The Home tab's root shows the same projects catalog.
         assertEquals(ShellDestination.Projects, shellDestinationOf(HomeRoute))
     }
