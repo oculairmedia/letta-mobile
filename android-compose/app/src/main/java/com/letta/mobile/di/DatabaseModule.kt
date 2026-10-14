@@ -19,6 +19,7 @@ import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.local.CanvasOpDao
 import com.letta.mobile.data.local.RoomCanvasOpLog
+import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -119,7 +120,10 @@ object DatabaseModule {
         dao: PendingLocalDao,
         settingsRepository: com.letta.mobile.data.repository.api.ISettingsRepository,
     ): RoomPendingLocalStore =
-        RoomPendingLocalStore(dao, activeBackendId = { settingsRepository.activeConfig.value?.id ?: "default" })
+        RoomPendingLocalStore(
+            dao,
+            activeBackendId = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
+        )
 
     @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {

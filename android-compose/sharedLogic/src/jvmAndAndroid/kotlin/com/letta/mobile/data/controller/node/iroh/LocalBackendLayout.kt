@@ -1,6 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
@@ -24,7 +26,7 @@ object LocalBackendLayout {
     const val CONVERSATION_FILE: String = "conversation.json"
     const val TRANSCRIPT_FILE: String = "messages.jsonl"
     const val SYSTEM_PROMPT_FILE: String = "system-prompt.json"
-    const val DEFAULT_CONVERSATION_ID: String = "default"
+    const val DEFAULT_CONVERSATION_ID: String = IdFormats.DEFAULT_CONVERSATION_ID
 
     fun b64UrlEncode(value: String): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(Charsets.UTF_8))
@@ -32,8 +34,12 @@ object LocalBackendLayout {
     fun b64UrlDecode(value: String): String =
         String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
 
-    fun conversationKey(conversationId: String, agentId: AgentId): String =
-        if (conversationId == DEFAULT_CONVERSATION_ID) "default:${agentId.value}" else "conversation:$conversationId"
+    fun conversationKey(conversationId: ConversationId, agentId: AgentId): String =
+        if (conversationId.value == DEFAULT_CONVERSATION_ID) {
+            "$DEFAULT_CONVERSATION_ID:${agentId.value}"
+        } else {
+            "conversation:${conversationId.value}"
+        }
 
     /** Where letta.js writes (and the embedded store seeds) an agent's record. */
     fun agentRecordFile(baseDir: File, agentId: AgentId): File =
@@ -44,11 +50,11 @@ object LocalBackendLayout {
         File(File(baseDir, AGENTS_DIR), "${agentId.value}.json").takeIf { it.isFile }
             ?: agentRecordFile(baseDir, agentId).takeIf { it.isFile }
 
-    fun conversationDir(baseDir: File, conversationId: String, agentId: AgentId): File =
+    fun conversationDir(baseDir: File, conversationId: ConversationId, agentId: AgentId): File =
         File(File(baseDir, CONVERSATIONS_DIR), b64UrlEncode(conversationKey(conversationId, agentId)))
 
     fun defaultConversationDir(baseDir: File, agentId: AgentId): File =
-        conversationDir(baseDir, DEFAULT_CONVERSATION_ID, agentId)
+        conversationDir(baseDir, ConversationId(DEFAULT_CONVERSATION_ID), agentId)
 
     /** True for a session-log v3 message envelope: `type == "message"` and `message` is an object. */
     fun isMessageEnvelope(row: JsonObject): Boolean =

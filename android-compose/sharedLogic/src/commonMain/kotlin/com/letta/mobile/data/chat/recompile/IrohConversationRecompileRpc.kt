@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.recompile
 
-import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.serialization.json.JsonElement
@@ -62,11 +61,9 @@ class IrohConversationRecompileClient(private val transport: IrohAdminRpcLink) :
     suspend fun recompile(request: ConversationRecompileRequest, dryRun: Boolean): String {
         if (!supported) throw UnsupportedOperationException(HOST_NEEDS_UPDATE)
         val response = transport.adminRpc(
-            AdminRpcCall(
-                method = IrohConversationRecompileRpc.METHOD,
-                path = IrohConversationRecompileRpc.path(request),
-                body = IrohConversationRecompileRpc.params(request, dryRun).toString(),
-            ),
+            method = IrohConversationRecompileRpc.METHOD,
+            path = IrohConversationRecompileRpc.path(request),
+            body = IrohConversationRecompileRpc.params(request, dryRun).toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc ${IrohConversationRecompileRpc.METHOD} failed")
         return IrohConversationRecompileRpc.promptOf(response.result)
@@ -77,16 +74,21 @@ class IrohConversationRecompileClient(private val transport: IrohAdminRpcLink) :
     }
 }
 
-/** The part of an Iroh connection [IrohConversationRecompileClient] uses: one admin RPC, and what the host advertised. */
+/**
+ * The part of an Iroh connection [IrohConversationRecompileClient] uses: one admin RPC, and what the
+ * host advertised. It mirrors [IChannelTransport.adminRpc] so this package does not depend on
+ * `repository.iroh` (letta-mobile-by4vm.27 layering ratchet: no mutually importing packages).
+ */
 interface IrohAdminRpcLink {
     val hostCapabilities: Set<String>
 
-    suspend fun adminRpc(call: AdminRpcCall): AppServerInboundFrame.AdminRpcResponse
+    suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse
 }
 
 /** This transport as an [IrohAdminRpcLink]. */
 fun IChannelTransport.asAdminRpcLink(): IrohAdminRpcLink = object : IrohAdminRpcLink {
     override val hostCapabilities: Set<String> get() = this@asAdminRpcLink.hostCapabilities
 
-    override suspend fun adminRpc(call: AdminRpcCall) = this@asAdminRpcLink.adminRpc(call.method, call.path, call.body)
+    override suspend fun adminRpc(method: String, path: String, body: String?) =
+        this@asAdminRpcLink.adminRpc(method, path, body)
 }

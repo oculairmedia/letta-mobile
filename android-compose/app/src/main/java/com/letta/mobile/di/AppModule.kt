@@ -65,6 +65,7 @@ import com.letta.mobile.data.session.SessionScopedSelfTodoRepository
 import com.letta.mobile.data.session.SessionScopedSubagentRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
+import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
@@ -273,7 +274,7 @@ abstract class AppModule {
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
-                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: "default" },
+                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
                 repositoryScope = ProcessLifecycleOwner.get().lifecycleScope,
             )
         }

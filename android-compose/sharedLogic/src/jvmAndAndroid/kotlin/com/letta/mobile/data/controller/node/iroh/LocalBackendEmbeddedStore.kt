@@ -4,7 +4,9 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.ImageBlobStore
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -25,7 +27,8 @@ class LocalBackendEmbeddedStore(private val baseDir: File) {
     // No whole-file cap: on-device transcripts are always read through BoundedTranscriptReader.
     private val contextReader =
         LocalBackendContextReader(support, LocalBackendMessageReader(support), maxTranscriptBytes = Long.MAX_VALUE)
-    private val overviewJson = Json { ignoreUnknownKeys = true }
+    // Decode-only reads of files letta.js wrote (letta-mobile-by4vm.20).
+    private val overviewJson: Json = LettaJson.persisted
 
     fun listAgents(): List<Agent> = records.listAgents()
 
@@ -70,7 +73,8 @@ class LocalBackendEmbeddedStore(private val baseDir: File) {
         const val DEFAULT_LOCAL_CONTEXT_WINDOW: Int = 128_000
 
         /** See [LocalBackendEmbeddedRecords.localConversationIdFor]. */
-        fun localConversationIdFor(agentId: String): String = LocalBackendEmbeddedRecords.localConversationIdFor(agentId)
+        fun localConversationIdFor(agentId: AgentId): ConversationId =
+            LocalBackendEmbeddedRecords.localConversationIdFor(agentId)
 
         private fun isoNow(): String = java.time.Instant.now().toString()
     }

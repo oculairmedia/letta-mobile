@@ -10,6 +10,12 @@ import com.letta.mobile.runtime.RuntimeId
 /** The label of a remote host with no address yet (letta-mobile-ckmub.9: no Letta Cloud default). */
 const val DEFAULT_REMOTE_BACKEND_LABEL = "Remote host"
 
+/**
+ * The backend scope key used while no server config is active (letta-mobile-by4vm.23): one named
+ * value for the descriptor id, the timeline's backend scope and the pending-row store.
+ */
+const val UNCONFIGURED_BACKEND_KEY = "default"
+
 /** Android remote descriptor id prefix (`remote-letta:<configId>`). */
 const val ANDROID_REMOTE_LETTA_ID_PREFIX = "remote-letta"
 
@@ -26,7 +32,7 @@ fun remoteLettaBackendDescriptor(
     idPrefix: String,
     defaultLabel: String = DEFAULT_REMOTE_BACKEND_LABEL,
 ): BackendDescriptor {
-    val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "default"
+    val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: UNCONFIGURED_BACKEND_KEY
     val label = config?.serverUrl?.trim()?.takeIf { it.isNotBlank() } ?: defaultLabel
     return BackendDescriptor(
         backendId = BackendId("$idPrefix:$backendKey"),

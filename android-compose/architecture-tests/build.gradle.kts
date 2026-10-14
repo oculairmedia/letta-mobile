@@ -54,6 +54,9 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     ).withPropertyName("scannedSources").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files("package-cycle-baseline.txt", "sharedlogic-ui-package-baseline.txt")
         .withPropertyName("layeringBaselines").withPathSensitivity(PathSensitivity.RELATIVE)
+    // TypedIdRepositoryArchitectureTest (letta-mobile-by4vm.23) reads the id ratchet baselines.
+    inputs.files("id-literal-baseline.txt", "raw-id-params-baseline.txt")
+        .withPropertyName("idRatchetBaselines").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }

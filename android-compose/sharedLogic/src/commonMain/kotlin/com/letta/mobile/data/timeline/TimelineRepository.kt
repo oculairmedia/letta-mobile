@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineReadResult
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -44,7 +45,7 @@ open class TimelineRepository(
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
     private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
-    private val backendIdProvider: () -> String = { "default" },
+    private val backendIdProvider: () -> String = { UNCONFIGURED_BACKEND_KEY },
     private val repositoryScope: CoroutineScope,
     private val startLoopStreamSubscribers: Boolean = true,
     /**

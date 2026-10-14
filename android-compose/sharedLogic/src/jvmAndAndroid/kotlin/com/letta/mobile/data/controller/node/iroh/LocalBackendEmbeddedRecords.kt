@@ -145,7 +145,7 @@ internal class LocalBackendEmbeddedRecords(private val baseDir: File) {
         val agentId = record.string("agent_id") ?: return null
         if (diskId != LocalBackendLayout.DEFAULT_CONVERSATION_ID) return null
         return Conversation(
-            id = ConversationId(localConversationIdFor(agentId)),
+            id = localConversationIdFor(AgentId(agentId)),
             agentId = AgentId(agentId),
             summary = record.string("summary"),
             createdAt = record.string("created_at"),
@@ -184,6 +184,6 @@ internal class LocalBackendEmbeddedRecords(private val baseDir: File) {
          * Every embedded session of an agent IS the same underlying letta.js conversation, so the
          * id must not vary per app session (random suffixes fragment the timeline).
          */
-        fun localConversationIdFor(agentId: String): String = "local-conv-$agentId"
+        fun localConversationIdFor(agentId: AgentId): ConversationId = ConversationId("local-conv-${agentId.value}")
     }
 }

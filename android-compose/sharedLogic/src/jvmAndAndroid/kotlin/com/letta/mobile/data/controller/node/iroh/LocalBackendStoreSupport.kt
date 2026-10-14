@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -30,7 +31,7 @@ internal class LocalBackendStoreSupport(
 
     // letta-mobile-by4vm.21: key naming and the base64url codec live in [LocalBackendLayout].
     fun conversationKey(conversationId: String, agentId: String): String =
-        LocalBackendLayout.conversationKey(conversationId, AgentId(agentId))
+        LocalBackendLayout.conversationKey(ConversationId(conversationId), AgentId(agentId))
 
     fun b64UrlEncode(value: String): String = LocalBackendLayout.b64UrlEncode(value)
 
@@ -91,7 +92,7 @@ internal class LocalBackendStoreSupport(
 
     /** Port of maxRealMessageTime: legacy _real-times.json map, then overlay _real-times.jsonl (later wins), max iso. */
     fun maxRealMessageTime(conversationId: String, agentId: String): String {
-        val dir = LocalBackendLayout.conversationDir(baseDir, conversationId, AgentId(agentId))
+        val dir = LocalBackendLayout.conversationDir(baseDir, ConversationId(conversationId), AgentId(agentId))
         val map = HashMap<String, String>()
         runCatching {
             File(dir, "_real-times.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }

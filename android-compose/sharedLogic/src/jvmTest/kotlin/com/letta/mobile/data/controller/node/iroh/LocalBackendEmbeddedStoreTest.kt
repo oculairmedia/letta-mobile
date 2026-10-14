@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.storage.ImageBlobStore
 import kotlinx.serialization.json.Json
@@ -45,8 +46,8 @@ class LocalBackendEmbeddedStoreTest {
     fun layoutCodecRoundTripsAndNamesDefaultConversations() {
         assertEquals("YWdlbnQtYQ", LocalBackendLayout.b64UrlEncode("agent-a"))
         assertEquals("agent-a", LocalBackendLayout.b64UrlDecode("YWdlbnQtYQ"))
-        assertEquals("default:agent-a", LocalBackendLayout.conversationKey("default", AgentId("agent-a")))
-        assertEquals("conversation:conv-1", LocalBackendLayout.conversationKey("conv-1", AgentId("agent-a")))
+        assertEquals("default:agent-a", LocalBackendLayout.conversationKey(ConversationId("default"), AgentId("agent-a")))
+        assertEquals("conversation:conv-1", LocalBackendLayout.conversationKey(ConversationId("conv-1"), AgentId("agent-a")))
         assertEquals(
             File(root, "conversations/${LocalBackendLayout.b64UrlEncode("default:agent-a")}"),
             LocalBackendLayout.defaultConversationDir(root, AgentId("agent-a")),
@@ -98,7 +99,7 @@ class LocalBackendEmbeddedStoreTest {
 
         assertEquals("lmstudio/m2", store.storedModelHandle(AgentId("agent-s")))
         val conversation = store.listConversations().single()
-        assertEquals(LocalBackendEmbeddedStore.localConversationIdFor("agent-s"), conversation.id.value)
+        assertEquals(LocalBackendEmbeddedStore.localConversationIdFor(AgentId("agent-s")), conversation.id)
         assertEquals("2026-05-05T05:05:05Z", conversation.createdAt)
         assertEquals("Letta Mobile", store.listAgents().single().name)
     }

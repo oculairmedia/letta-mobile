@@ -23,7 +23,6 @@ android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidEmbedded
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidLettaCodeRuntimeController.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/EndpointOpenAiModelCatalog.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/LettaCodeLocalBackendStore.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/LettaCodeStreamJsonMapper.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalConversationHealer.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalImageContextStripper.kt
@@ -113,8 +112,9 @@ android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/pr
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/ScannedInvite.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginManifestParser.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginRegistryState.kt
+# plugin admin_rpc wire, classDiscriminator="kind" + encodeDefaults=true: no LettaJson equivalent
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/catalog/PluginAdminRpc.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/ViewHostContext.kt
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/LcpWire.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedAgentRepository.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedSettingsRepository.kt
 android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedVibesyncEventStreamRepository.kt
@@ -148,6 +148,8 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/contr
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnection.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnectionSupport.kt
+# moved from app LettaCodeLocalBackendStore (by4vm.21); prettyPrint sidecar records, encodeDefaults=false
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendEmbeddedRecords.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendStoreSupport.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true ignoreUnknownKeys=true prettyPrint=true
