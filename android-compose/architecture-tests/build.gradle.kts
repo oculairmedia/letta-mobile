@@ -26,9 +26,12 @@ tasks.withType<Test>().configureEach {
     systemProperty("architecture.projectRoot", rootProject.projectDir.parentFile.absolutePath)
 }
 
+// Production scans run in architectureTest; both tasks run in the required CI `test` job.
+val productionScanTests = listOf("*RepositoryArchitectureTest", "*SharedLayeringTest")
+
 tasks.test {
     filter {
-        excludeTestsMatching("*RepositoryArchitectureTest")
+        productionScanTests.forEach { excludeTestsMatching(it) }
     }
 }
 
@@ -39,8 +42,34 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform()
     filter {
-        includeTestsMatching("*RepositoryArchitectureTest")
+        productionScanTests.forEach { includeTestsMatching(it) }
     }
+    // The scans read source and baselines straight off disk; declare them so an up-to-date or
+    // cached result is never reused after a baseline or scanned source changes.
+    inputs.files(
+        fileTree(rootProject.projectDir) {
+            include("*/src/**/*.kt", "*/*/src/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("scannedSources").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files("package-cycle-baseline.txt", "sharedlogic-ui-package-baseline.txt")
+        .withPropertyName("layeringBaselines").withPathSensitivity(PathSensitivity.RELATIVE)
+    // TypedIdRepositoryArchitectureTest (letta-mobile-by4vm.23) reads the id ratchet baselines.
+    inputs.files("id-literal-baseline.txt", "raw-id-params-baseline.txt")
+        .withPropertyName("idRatchetBaselines").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
+}
+
+// JsonInstanceRatchetTest (letta-mobile-by4vm.20) reads production sources and its baseline off
+// disk; declare them so an up-to-date `test` result is never reused after either changes.
+tasks.test {
+    inputs.files(
+        fileTree(rootProject.projectDir) {
+            include("**/src/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("jsonRatchetSources").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("json-instances-baseline.txt")
+        .withPropertyName("jsonRatchetBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
 }

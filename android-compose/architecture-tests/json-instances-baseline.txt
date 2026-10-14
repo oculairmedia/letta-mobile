@@ -1,0 +1,191 @@
+# Production Kotlin files that construct their own kotlinx Json { } configuration
+# (letta-mobile-by4vm.20). Frozen debt: this list may only shrink.
+#
+# - New code uses LettaJson.wire / LettaJson.adminRpc / LettaJson.persisted from
+#   sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt.
+# - JsonInstanceRatchetTest (:architecture-tests:test) fails on a file that is NOT listed here.
+# - A stale line (the file no longer builds a Json) does not fail; delete it whenever convenient.
+# - The NoAdHocJsonInstance detekt guardrail skips files listed here, so touching one of them
+#   for an unrelated change does not fail guardrailDetekt.
+# - Migrate a file only when its flags are identical to the target LettaJson instance; otherwise
+#   it is a behaviour change and needs its own bead. See docs/architecture/canonical-json.md.
+#
+# One repo-relative path per line, sorted (codepoint order), no duplicates. '#' lines are ignored.
+
+android-compose/app/src/debug/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt
+android-compose/app/src/debug/java/com/letta/mobile/runtime/mobileactions/MobileIntentActionsSelfTest.kt
+android-compose/app/src/debug/java/com/letta/mobile/runtime/sensors/DeviceSensorPipelineSelfTest.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionCommandCatalog.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionCommandRunner.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/actions/MobileActionRegistry.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/hardware/DeviceHardwareControlTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidEmbeddedLettaCodeLaunch.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidLettaCodeRuntimeController.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/EndpointOpenAiModelCatalog.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/LettaCodeStreamJsonMapper.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalConversationHealer.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalImageContextStripper.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceOpenAiBridge.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceToolCallProtocol.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelCatalog.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/AndroidProviderReadTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/MobileIntentActionTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/notifications/NotificationPollTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/screen/ScreenCaptureTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorGroundingWriter.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorReadTool.kt
+android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorSnapshotFormatter.kt
+android-compose/app/src/release/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt
+android-compose/appserver-cli/src/main/kotlin/com/letta/mobile/appservercli/AppServerRestartReplayEvidence.kt
+android-compose/appserver-cli/src/main/kotlin/com/letta/mobile/appservercli/AppServerRestartReplayProbe.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohDeviceGateCommand.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohProbeCommand.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/PeerCommands.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/ProfileCommands.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/StreamCommand.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/commands/TwoClientProbeReport.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/probe/ProbeStubStore.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliRestTransport.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliRuntime.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliSetup.kt
+android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/ReplayInteractiveShell.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/AgentEntity.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpEntity.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/ConversationEntity.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomMemFsStore.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomPendingLocalStore.kt
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomRuntimeEventOutbox.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcSlashCommandSource.kt
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/canvas/DesktopCanvasDocumentStore.kt
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatGateway.kt
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/runtime/DesktopListenerSpawnRegistry.kt
+android-compose/drawbox/src/commonMain/kotlin/io/ak1/drawbox/domain/model/Serialization.kt
+android-compose/plugin-api-testkit/src/jvmMain/kotlin/com/letta/mobile/plugin/testkit/ConformanceManifest.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiProtocol.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasAppDryRun.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasConnectBoard.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasDocumentText.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasExternalTools.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasLayout.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpDiffer.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpProjector.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasRelayProtocol.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneIndex.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneRead.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneRenderGuard.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneSchemaText.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneStateChecks.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneStateGuard.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneValidator.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSharedDocument.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasToolInputs.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasTools.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeContract.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeEmitter.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeExisting.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeReserveBlocks.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeSceneBounds.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/CanvasPluginElements.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindProps.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/approval/ApprovalOutbox.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/CanvasArtifactReceiptReading.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/meridian/MeridianText.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/compaction/AdminRpcCompactionRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/ContextReadingSnapshots.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/estimate/LocalTranscriptContext.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/limit/AdminRpcContextLimitRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/document/markdown/MarkdownDocument.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/dreaming/AdminRpcDreamingRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/meridian/MeridianShellAllowList.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/meridian/endpoint/MeridianShellCallSignal.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/meridian/endpoint/MeridianToolsWire.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/messaging/AgentMessageProvenanceProjection.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/AskUserQuestion.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ImmutableListJson.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/SkillArgumentNormalizer.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/provider/wire/ProviderManagementWireCodec.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/ScannedInvite.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginManifestParser.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginRegistryState.kt
+# plugin admin_rpc wire, classDiscriminator="kind" + encodeDefaults=true: no LettaJson equivalent
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/catalog/PluginAdminRpc.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/ViewHostContext.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedAgentRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedSettingsRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/CachedVibesyncEventStreamRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/LastChatSelectionStorage.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/LettaConfigPersistence.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/SelfTodoRepository.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/modelcontrol/OAuthWire.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/subagent/SubagentCorrelator.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/LocalRuntimeProviderAuthFile.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/TurnFailureNotice.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/stream/SseParser.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/system1/System1Client.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/TimelineRemotePage.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/headless/HeadlessTimelineReplay.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/headless/HeadlessTimelineStore.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline/snapshot/TimelineSnapshotCodec.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/tooloutput/ToolOutputParser.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=false
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/ToolArgumentsNormalizer.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/iroh/IrohStreamDeltaServerFrameMapper.kt
+android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/workspace/WorkspaceFileViewerController.kt
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/canvas/FileCanvasDeliveryStore.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRouter.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcStreamServer.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/HttpProxyClient.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnection.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnectionSupport.kt
+# moved from app LettaCodeLocalBackendStore (by4vm.21); prettyPrint sidecar records, encodeDefaults=false
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendEmbeddedRecords.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendStoreSupport.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true ignoreUnknownKeys=true prettyPrint=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ModelExposureStore.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true prettyPrint=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairedPeerStore.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairingAdminHandlers.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true prettyPrint=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/PairingInviteStore.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SubagentAdminHandlers.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher.kt
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/CachedMessageRepository.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/IrohAdminRpcApprovalSource.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/IrohAdminRpcConversationListSource.kt
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/subagents/FileSubagentRegistryStore.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAgentMessage.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCanvasPresenceTransport.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCanvasSyncTransport.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohChannelTransport.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCronRpcClient.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohObserverIngestor.kt
+# wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
+android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohSubagentRpcClient.kt
+android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileCanvasOpLog.kt
+android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileCanvasRelayStore.kt
+android-compose/sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/canvas/FileHostCanvasDirectory.kt
+android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/chat/surface/timeline/rows/ChatRowToolLabels.kt
+android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/skills/SkillsToolDetail.kt

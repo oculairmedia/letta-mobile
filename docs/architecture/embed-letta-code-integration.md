@@ -81,7 +81,7 @@ The embedded App Server wedge is currently version-blocked:
 | --- | --- | --- | --- |
 | `@letta-ai/letta-code@0.26.1` | `>=18` | `letta app-server --help` falls back to the normal CLI help; package tarball has no `app-server` or protocol-v2 assets. | Compatible with nodejs-mobile 18.20.4, but no App Server entrypoint. |
 | `@letta-ai/letta-code@0.27.15` | `>=22.19.0` | Host CLI exposes `app-server` and protocol-v2 assets; local loopback smoke reached `runtime_start -> input -> stream_delta -> sync -> abort_message` on Node v24.13.1. | App Server available for host adapters, but incompatible with the current Android nodejs-mobile 18.20.4 runtime. |
-| nodejs-mobile Android | 18.20.4 | Current pinned embedded libnode in `android-compose/app/build.gradle.kts`. | Blocks direct 0.27.x embedding. |
+| nodejs-mobile Android | 18.20.4 | Current pinned embedded libnode in `android-compose/app/embedded-runtime/embedded-runtime.properties`. | Blocks direct 0.27.x embedding. |
 
 Until this gate changes, Android must keep the stream-json path as the default
 embedded runtime transport. The shared App Server client can still be used for

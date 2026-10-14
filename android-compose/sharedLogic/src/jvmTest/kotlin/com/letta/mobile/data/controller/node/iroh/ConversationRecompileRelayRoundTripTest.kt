@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.chat.recompile.IrohAdminRpcLink
-import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.chat.recompile.IrohConversationRecompileClient
 import com.letta.mobile.data.chat.recompile.IrohConversationRecompileRpc
 import com.letta.mobile.data.transport.appserver.AppServerChannel
@@ -195,10 +194,10 @@ class ConversationRecompileRelayRoundTripTest {
     private class RelayTransport(private val host: HostCall, override val hostCapabilities: Set<String>) : IrohAdminRpcLink {
         val calls = mutableListOf<String>()
 
-        override suspend fun adminRpc(call: AdminRpcCall): AppServerInboundFrame.AdminRpcResponse {
-            calls += call.method
-            val params = call.body?.let { Json.parseToJsonElement(it).jsonObject } ?: JsonObject(emptyMap())
-            return host(call.method, params)
+        override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+            calls += method
+            val params = body?.let { Json.parseToJsonElement(it).jsonObject } ?: JsonObject(emptyMap())
+            return host(method, params)
         }
     }
 

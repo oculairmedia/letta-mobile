@@ -621,7 +621,8 @@ class ConversationRepositoryTest {
         val error = runCatching { repository.recompileConversation(ConversationId("conv-1"), true, AgentId("a1")) }.exceptionOrNull()
 
         assertEquals("recompile_failed: nope", error?.message)
-        assertEquals("true", Json.parseToJsonElement(transport.adminRpcCalls.single().body!!).jsonObject.getValue("dry_run").jsonPrimitive.content)
+        val params = Json.parseToJsonElement(transport.adminRpcCalls.single().body!!).jsonObject
+        assertEquals("true", params.getValue("dry_run").jsonPrimitive.content)
     }
 
     @Test

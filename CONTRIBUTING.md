@@ -102,12 +102,14 @@ Run these from `android-compose/` before pushing when you have the resources (CI
 ./gradlew :app:testRootDebugUnitTest
 ```
 
-If you touched `sharedLogic/` (KMP common code), also run the all-target gate locally —
-commonMain/commonTest must stay platform-neutral (no JVM-only APIs) and this is what
-the required `shared-multiplatform` CI check runs:
+If you touched `sharedLogic/` (KMP common code), also run its consumers locally —
+commonMain/commonTest must stay platform-neutral (no JVM-only APIs). The required
+`shared-multiplatform` check runs `:sharedLogic:jvmTest` and only *compiles* hostNative
+and wasmJs; on PRs `:sharedUI:jvmTest` / `:desktop:test` run only when their own trees
+change, and every main push runs them regardless:
 
 ```bash
-./gradlew :sharedLogic:allTests :desktop:test
+./gradlew :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
 ```
 
 Device install:
@@ -118,13 +120,15 @@ Device install:
 
 ## Pre-push PR readiness
 
-CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that Qodana flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
+CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
 
 ## Required vs advisory CI
 
-Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, `codecov`.
+Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`. (`codecov` runs on main pushes only.)
 
-Advisory only (does **not** block merge): `qodana`, `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing.
+Not required, but honest (red means a new problem in your diff — fix it): `detekt` (baselined per module), `Platform UI gate`, and on main pushes `main module tests`.
+
+Advisory only (findings never fail the job): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Required-gate failures come first. The full "CI map" is in [`AGENTS.md`](AGENTS.md).
 
 ## Releases
 

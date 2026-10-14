@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.wire
 
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.plugin.api.LcpMethod
 import com.letta.mobile.plugin.api.PluginApi
 import kotlinx.serialization.json.Json
@@ -48,11 +49,7 @@ object LcpWire {
      * add some), absent optional fields stay absent, sealed shapes are tagged by `type` (as
      * `:plugin-api`'s DTOs are; `plugin.health` by `status`).
      */
-    val json: Json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-        encodeDefaults = false
-    }
+    val json: Json = LettaJson.wire
 }
 
 /**

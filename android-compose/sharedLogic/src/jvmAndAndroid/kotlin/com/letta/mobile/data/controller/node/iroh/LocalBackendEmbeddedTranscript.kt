@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.storage.ImageBlobStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -38,7 +39,8 @@ data class StoredToolResult(
  * rows), so session-log v3 envelopes are skipped there, while [readToolResults] unwraps them.
  */
 internal class LocalBackendEmbeddedTranscript(private val baseDir: File) {
-    private val json = Json { ignoreUnknownKeys = true }
+    // Decode-only reads of the on-disk transcript (letta-mobile-by4vm.20).
+    private val json: Json = LettaJson.persisted
 
     fun readTranscript(agentId: AgentId, blobStoreFor: (File) -> ImageBlobStore): List<LettaMessage> {
         val conversationDir = LocalBackendLayout.defaultConversationDir(baseDir, agentId)

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
@@ -27,7 +28,7 @@ internal class TimelineHydrator(
         fallbackCursorSeq: Long? = null,
     ): TimelineHydrationOutcome {
         val timer = Telemetry.startTimer("TimelineSync", "hydrate")
-        if (conversationId.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)) return acceptDefaultShim(timer)
+        if (IdFormats.hasDefaultConversationPrefix(conversationId)) return acceptDefaultShim(timer)
 
         val generation = nextGeneration.incrementAndGet()
         val timelineBeforeFetch = timelineProcessor.state.value.timeline
@@ -182,10 +183,6 @@ internal class TimelineHydrator(
 
     private fun notifyHydrationCommitted() {
         onHydrationCommitted?.invoke()
-    }
-
-    private companion object {
-        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
     }
 
     private data class HydrationAckContext(

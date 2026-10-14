@@ -33,6 +33,11 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
 
+**Build logic** (all under `android-compose/`):
+- `gradle/libs.versions.toml` is the only place a dependency or plugin version lives — one version per library for every module (no per-module `-chat`-style forks; when versions disagree, use what `:app` resolves). The root `build.gradle.kts` applies plugins by `alias(libs.plugins.…)`.
+- `build-logic/` holds the convention plugins: `com.letta.mobile.android.library` (compileSdk/minSdk from the catalog, Java + Kotlin JVM 17 — modules applying it must not redeclare them), `com.letta.mobile.architecture-graph`, and `com.letta.mobile.embedded-runtime`.
+- The dev-only embedded letta-code runtime pipeline (npm install, nodejs-mobile libnode, NDK helpers, letta.js patches) is `com.letta.mobile.embedded-runtime`; its pins are `app/embedded-runtime/embedded-runtime.properties`, its letta.js patches `app/embedded-runtime/patches/*.mjs` (one per patch, rationale in each header), and its shipped polyfills `app/embedded-runtime/runtime/`. It only runs with `-PembedLettaCodeNative`/`-PembedLettaCodeAssets` (or the same keys in `local.properties`). Bump `assetRevision` when a patch or polyfill changes.
+
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
 For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.8`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
@@ -81,14 +86,22 @@ cd android-compose
 # If you touched sharedLogic/ (KMP common code). What CI actually runs (android.yml):
 #   `shared-multiplatform` — :sharedLogic:jvmTest, then only *compiles* hostNative
 #     and wasmJs (:sharedLogic:allTests is NOT run: hostNativeTest hangs).
-#   `test` — :app:testRootDebugUnitTest, :core:android-data:testDebugUnitTest, and
-#     :desktop:test only when android-compose/desktop/ changed
-#     (scripts/ci/changed-gradle-modules.sh).
-./gradlew --no-daemon :sharedLogic:jvmTest :desktop:test
+#   `test` — :app:testRootDebugUnitTest, :core:android-data:testDebugUnitTest, and on
+#     PRs :sharedUI:jvmTest / :desktop:test only when their own trees changed
+#     (scripts/ci/changed-gradle-modules.sh). Every main push runs both anyway
+#     (`main module tests`), so a skipped local run shows up red on main.
+./gradlew --no-daemon :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
 
-# Mechanical-debt preflight (advisory; do not lower thresholds):
-./gradlew --no-daemon :app:detekt    # must run on JDK 21
+# detekt — JDK 21. Same as the CI `detekt` job: findings already in a module's
+# detekt-baseline.xml are ignored, anything new fails. Do not lower thresholds.
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
 ```
+
+**CI at a glance** (full table: "CI map" in `AGENTS.md`):
+- **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`, `perf-gate` (one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry).
+- **Not required, but honest** (red = a new problem in your diff): `detekt` (baselined), `Platform UI gate` (`--enforce`: a new platform `@Composable` file fails), `main module tests` (main pushes only: `:sharedUI:jvmTest :desktop:test`).
+- **Advisory** (never fail): `Advisory AGENTS.md policy`, `row goldens (advisory)`, `Export architecture graph`; CodeScene is external and still expected green.
+- **Not run in CI:** `:sharedLogic:allTests`, the `app/src/androidTest` device tests. Qodana was removed (its license token had been declined since 2026-09).
 
 Before pushing, also run the **pre-push PR readiness checklist** in `AGENTS.md` — it covers scope audit, sensitive-path grep, stale-base detection, and the concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit.
 

@@ -1,0 +1,175 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:AdminChatViewModel.kt$AdminChatViewModel$private suspend fun beginTimelineObserver(conversationId: String)</ID>
+    <ID>CyclomaticComplexMethod:ChatConversationCoordinator.kt$ChatConversationCoordinator$private suspend fun resolveClientModeConversation(attempt: ResolutionAttempt): Boolean</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:RowParityImages.kt$Argb$val (_, r, g, b) = channels</ID>
+    <ID>FunctionOnlyReturningConstant:ChatConversationCoordinator.kt$ChatConversationCoordinator$private fun parentAgentIdForAttribution(): String?</ID>
+    <ID>InvalidPackageDeclaration:ChatPagingPresentationAdapterTest.kt$package com.letta.mobile.feature.chat.screen</ID>
+    <ID>LargeClass:A2uiRendererTest.kt$A2uiRendererTest</ID>
+    <ID>LargeClass:AdminChatViewModel.kt$AdminChatViewModel : ViewModel</ID>
+    <ID>LargeClass:ChatTimelineObserverTest.kt$ChatTimelineObserverTest</ID>
+    <ID>LargeClass:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest</ID>
+    <ID>LongMethod:AdminChatViewModel.kt$AdminChatViewModel$private suspend fun beginTimelineObserver(conversationId: String)</ID>
+    <ID>LongMethod:AgentScaffoldBodyState.kt$@Composable internal fun rememberAgentScaffoldRuntimeState(params: AgentScaffoldBodyParams): AgentScaffoldRuntimeState</ID>
+    <ID>LongMethod:AgentScaffoldDrawer.kt$@Composable internal fun ProjectAgentsCard( state: ProjectAgentsUiState, onRetry: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:AgentScaffoldDrawer.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ProjectBugReportSheet( state: ProjectBugReportUiState, onDismiss: () -&gt; Unit, onSubmit: (ProjectBugReportDraft) -&gt; Unit, )</ID>
+    <ID>LongMethod:AgentScaffoldDrawer.kt$@androidx.annotation.VisibleForTesting @Composable internal fun ProjectBriefCard( brief: ProjectBriefUiState, onRetry: () -&gt; Unit, onSaveSection: (ProjectBriefSectionKey, String) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:AgentScaffoldDrawer.kt$@androidx.annotation.VisibleForTesting @Composable internal fun ProjectContextCard( project: ProjectChatContext, expanded: Boolean, onExpandedChange: (Boolean) -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:ChatConversationCoordinator.kt$ChatConversationCoordinator$private suspend fun resolveClientModeConversation(attempt: ResolutionAttempt): Boolean</ID>
+    <ID>LongMethod:ChatScreen.kt$@Composable internal fun ChatScreen( modifier: Modifier = Modifier, contentPadding: PaddingValues = PaddingValues(), chatBackground: ChatBackground = ChatBackground.Default, chatMode: String = "simple", onBugCommand: (() -&gt; Unit)? = null, onViewSubagentConversation: ((String, String) -&gt; Unit)? = null, onOpenAgentPane: (() -&gt; Unit)? = null, onOpenCanvas: (() -&gt; Unit)? = null, onOpenAgentSwitcher: (() -&gt; Unit)? = null, /** letta-mobile-bzvro.15/.16: opens a conversation (agent id, conversation id); a fork opens here. */ onOpenConversation: ((String, String) -&gt; Unit)? = null, /** The shared page's canvas mode wants the board's top clear: true while the host's header should hide. */ onHostHeaderHiddenChange: ((Boolean) -&gt; Unit)? = null, /** letta-mobile-y5q9z: the agent's conversations for the shared page's canvas bubble "+". */ recentInteractions: com.letta.mobile.ui.chat.surface.recents.ChatRecentInteractions? = null, activeSubagentSource: ActiveSubagentSource? = null, selfTodoSource: SelfTodoSource? = null, viewModel: AdminChatViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:ChatTimelineObserver.kt$ChatTimelineObserver$private fun launchObserver( binding: TimelineObserverBinding, generation: ChatHydrationTrace.Generation?, ): Job</ID>
+    <ID>LongMethod:ChatTimelineObserverTest.kt$ChatTimelineObserverTest$@Test fun `historical a2ui blocks fold into one surface snapshot without rendering raw blocks`()</ID>
+    <ID>LongMethod:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$fun send( text: String, attachments: List&lt;MessageContentPart.Image&gt; = emptyList(), ): Job</ID>
+    <ID>LongMethod:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$private suspend fun handleRuntimeEvent( conversationId: String, otid: String, event: RuntimeEventEnvelope, ): Boolean</ID>
+    <ID>LongMethod:LocalRuntimeChatSendCoordinatorTest.kt$LocalRuntimeChatSendCoordinatorTest$@Test fun `send runs local backend and projects assistant frame into timeline`()</ID>
+    <ID>LongMethod:SelectedGenerationRetirementTest.kt$SelectedGenerationRetirementTest$@Test fun delayedCleanupAndInFlightSendCannotTouchReplacementGeneration()</ID>
+    <ID>LongMethod:SharedChatPage.kt$@Composable internal fun SharedChatPage(params: SharedChatPageParams, modifier: Modifier = Modifier)</ID>
+    <ID>LongMethod:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$@Test fun `deferred route send appends marks and reconciles on the legacy writer`()</ID>
+    <ID>LongMethod:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$@Test fun `runtime audit event families are recorded in one ordered batch`()</ID>
+    <ID>LongParameterList:AdminChatComposerCoordinator.kt$AdminChatComposerCoordinator$( private val scope: CoroutineScope, private val composerController: ChatComposerController, private val chatSendStrategySelector: ChatSendStrategySelector, private val chatBannerController: ChatBannerController, private val uiState: MutableStateFlow&lt;ChatUiState&gt;, private val agentId: AgentId, private val explicitConversationId: String?, private val backendKind: () -&gt; BackendKind, private val sessionManager: SessionManager, private val messageRepository: IMessageRepository, private val slashCommandRepository: ISlashCommandRepository, private val isStreaming: () -&gt; Boolean, private val pendingUserInput: () -&gt; PendingUserInput? = { null }, private val submitUserInput: (PendingUserInput, String) -&gt; Unit = { _, _ -&gt; }, private val projectContextAvailable: Boolean, private val nowMs: () -&gt; Long = { System.currentTimeMillis() }, )</ID>
+    <ID>LongParameterList:AdminChatSendPipeline.kt$AdminChatSendPipeline$( private val scope: CoroutineScope, private val agentId: AgentId, private val isFreshRoute: Boolean, private val explicitConversationId: String?, private val projectContextAvailable: Boolean, private val conversationRepository: IConversationRepository, private val timelineRepository: TimelineRepository, private val externalTimelineWriter: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter, private val settingsRepository: ISettingsRepository, private val sessionManager: SessionManager, private val messageRepository: MessageRepository, private val slashCommandRepository: com.letta.mobile.data.repository.api.ISlashCommandRepository, private val wsChatBridge: WsChatBridge, private val runtimeEventOutbox: RuntimeEventOutbox, private val clientVersionProvider: ChatClientVersionProvider, private val uiState: MutableStateFlow&lt;ChatUiState&gt;, private val composerController: ChatComposerController, private val chatBannerController: ChatBannerController, private val submitApproval: (String, List&lt;String&gt;, Boolean, String?) -&gt; Unit, private val backendKind: () -&gt; BackendKind, private val activeConversationId: () -&gt; String?, private val setActiveConversationId: (String?) -&gt; Unit, private val startTimelineObserver: (conversationId: String) -&gt; Unit, private val selectedOwner: SelectedChatSendOwner? = null, /** * Every runtime event this screen's transport produces, as it is recorded. The view model * folds these through the shared run-phase reducer so the registry carries honest phases; * the pipeline itself stays a wire and owns no presence logic. */ private val runtimeEventObserver: (List&lt;com.letta.mobile.runtime.RuntimeEventDraft&gt;) -&gt; Unit = {}, )</ID>
+    <ID>LongParameterList:ChatGraph.kt$( enterTransition: (AnimatedContentTransitionScope&lt;*&gt;.() -&gt; EnterTransition)? = null, exitTransition: (AnimatedContentTransitionScope&lt;*&gt;.() -&gt; ExitTransition)? = null, popEnterTransition: (AnimatedContentTransitionScope&lt;*&gt;.() -&gt; EnterTransition)? = null, popExitTransition: (AnimatedContentTransitionScope&lt;*&gt;.() -&gt; ExitTransition)? = null, onNavigateBack: () -&gt; Unit, onNavigateToSettings: (String) -&gt; Unit, onNavigateToTools: () -&gt; Unit, onNavigateToMemory: (String) -&gt; Unit, onNavigateToAdmin: () -&gt; Unit, onNavigateToSchedules: (String) -&gt; Unit, onNavigateToProjects: () -&gt; Unit, onNavigateToConversationList: () -&gt; Unit, onSwitchConversation: (AgentChatRoute) -&gt; Unit, onNavigateToCanvas: ((agentId: String, conversationId: String?, shareRecipient: String) -&gt; Unit)? = null, onNavigateToProviders: (() -&gt; Unit)? = null, onNavigateToAppSettings: (() -&gt; Unit)? = null, onOpenCanvas: ((canvasId: String) -&gt; Unit)? = null, onNavigateToChannels: (() -&gt; Unit)? = null, onNavigateToSkills: ((agentId: String) -&gt; Unit)? = null, )</ID>
+    <ID>LongParameterList:ChatSessionInitializer.kt$ChatSessionInitializer$( private val scope: CoroutineScope, private val agentId: String, private val isFreshRoute: Boolean, private val explicitNewChat: Boolean, private val resumeCacheMaxAgeMs: Long, @Suppress("UNUSED_PARAMETER") private val projectContext: ProjectChatContext?, private val settingsRepository: ISettingsRepository, private val sessionResolver: ChatSessionResolver, private val conversationCoordinator: ChatConversationCoordinator, private val runExpansionState: ChatRunExpansionState, private val currentConversationTracker: CurrentConversationTracker, private val bannerController: ChatBannerController, @Suppress("UNUSED_PARAMETER") private val setClientModeConversationId: (String?) -&gt; Unit, private val refreshAvailableAgents: () -&gt; Unit, private val observeLastChatSelection: () -&gt; Unit, private val seedAgentNameFromMemoryCache: () -&gt; Unit, private val observeAgentNameCache: () -&gt; Unit, @Suppress("UNUSED_PARAMETER") private val refreshClientModeLocation: () -&gt; Unit, private val loadProjectAgents: () -&gt; Unit, private val loadProjectBrief: () -&gt; Unit, private val loadRecentBugReports: () -&gt; Unit, private val resolveConversationAndLoad: (Boolean) -&gt; Unit, )</ID>
+    <ID>LongParameterList:ChatTimelineObserver.kt$ChatTimelineObserver$( private val scope: CoroutineScope, private val timelineRepository: TimelineRepository, private val currentConversationTracker: CurrentConversationTracker, private val activeReplyStreams: StateFlow&lt;Set&lt;String&gt;&gt;, private val uiState: MutableStateFlow&lt;ChatUiState&gt;, // letta-mobile-c4igq.7: transport-owned "a chat turn is in flight" signal // (true from turn start until the real terminal, across all tool rounds). // Holds presence across inter-round gaps so a multi-tool turn stays "working" // and does not flicker / look finished. Defaults to always-false so existing // callers/tests are unaffected until wired. private val hasActiveChatTurn: () -&gt; Boolean = { false }, private val a2uiThinkingStartMessageCount: () -&gt; Int?, private val clearA2uiThinkingOnResponse: () -&gt; Unit, private val isFollowingDuplicateInitialMessageInFlight: () -&gt; Boolean, private val clearFollowingDuplicateInitialMessageInFlight: () -&gt; Unit, // letta-mobile-ah1ng: every projection publication below routes through // this hook so terminal runs reconcile on EVERY publication — not only // on the global previous.isStreaming &amp;&amp; !next.isStreaming edge, which // missed completed runs first seen via hydration/reconnect and // presence/projection orderings. private val reconcileCollapsedRunsOnProjection: (previous: ChatUiState, next: ChatUiState) -&gt; ChatUiState, private val syncA2uiHistorySnapshot: (conversationId: String, messages: List&lt;A2uiMessage&gt;) -&gt; Map&lt;String, A2uiSurfaceState&gt; = { _, _ -&gt; emptyMap() }, private val projectionDispatcher: CoroutineDispatcher = Dispatchers.Default, // letta-mobile-yflpp: minimum gap between projection writes (COALESCE). Set // to 0 in unit tests so virtual-clock emissions stay synchronous. private val projectionFrameIntervalMs: Long = PROJECTION_FRAME_INTERVAL_MS, private val hydrationIdentity: (String?, String) -&gt; ChatHydrationTrace.Identity = { agentId, conversationId -&gt; ChatHydrationTrace.Identity(agentId = agentId, conversationId = conversationId) }, )</ID>
+    <ID>LongParameterList:LocalRuntimeChatSendCoordinatorTest.kt$LocalRuntimeChatSendCoordinatorTest$( scope: CoroutineScope, timelineRepository: FakeTimelineExternalTransportWriter, uiState: MutableStateFlow&lt;ChatUiState&gt;, backend: LocalLettaBackend? = backend(), clearComposerAfterSend: () -&gt; Unit = {}, activeConversationId: () -&gt; String? = { null }, setActiveConversationId: (String) -&gt; Unit = {}, startTimelineObserver: (String) -&gt; Unit = {}, )</ID>
+    <ID>LongParameterList:TimelineSendCoordinator.kt$TimelineSendCoordinator$( private val scope: CoroutineScope, private val agentId: String, private val isFreshRoute: Boolean, private val explicitConversationId: String?, private val conversationRepository: IConversationRepository, private val timelineRepository: TimelineRepository, private val uiState: MutableStateFlow&lt;ChatUiState&gt;, private val clearComposerAfterSend: () -&gt; Unit, private val activeConversationId: () -&gt; String?, private val setActiveConversationId: (String) -&gt; Unit, private val startTimelineObserver: (String) -&gt; Unit, )</ID>
+    <ID>LongParameterList:WsActiveSubagentSourceTest.kt$WsActiveSubagentSourceTest$(toolCallId: ToolCallRef, status: StatusRef = StatusRef(SubagentStatus.RUNNING), taskId: TaskRef? = null, subagentAgentId: AgentRef? = null, subagentConversationId: ConversationRef? = null, parentAgentId: AgentRef = AgentRef("agent-parent"), parentConversationId: ConversationRef = ConversationRef("default"), terminalAtEpochMs: Long? = null)</ID>
+    <ID>LongParameterList:WsChatSendCoordinator.kt$WsChatSendCoordinator$( scope: CoroutineScope, private val agentId: String, activeConfig: () -&gt; LettaConfig?, wsChatBridge: WsChatBridge, timelineRepository: TimelineExternalTransportWriter, conversationRepository: IConversationRepository, private val uiState: MutableStateFlow&lt;ChatUiState&gt;, clearComposerAfterSend: () -&gt; Unit, private val activeConversationId: () -&gt; String?, @Suppress("UNUSED_PARAMETER") isFreshRoute: Boolean = false, setActiveConversationId: (String) -&gt; Unit, startTimelineObserver: (String) -&gt; Unit, clientVersionProvider: ChatClientVersionProvider, private val backendDescriptor: () -&gt; BackendDescriptor? = { null }, private val runtimeEventSink: suspend (List&lt;RuntimeEventDraft&gt;) -&gt; Unit = {}, prepareConversation: suspend (String) -&gt; Unit = {}, )</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownFence.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownMathClamp.kt$while</ID>
+    <ID>MatchingDeclarationName:AdminChatContextUsage.kt$AdminChatContextSources</ID>
+    <ID>MatchingDeclarationName:AgentContextCardSession.kt$ContextCardSession</ID>
+    <ID>MatchingDeclarationName:AgentScaffold.kt$AgentScaffoldTestTags</ID>
+    <ID>MatchingDeclarationName:AgentScaffoldBodyState.kt$AgentScaffoldRuntimeState</ID>
+    <ID>MatchingDeclarationName:AgentScaffoldSearch.kt$ChatMessageSearch</ID>
+    <ID>MatchingDeclarationName:ChatPagingPresentationAdapterTest.kt$IsolatedChatPagingPresentationAdapterTest</ID>
+    <ID>MatchingDeclarationName:ChatScreenSubagentState.kt$ChatScreenSubagentBarState</ID>
+    <ID>MatchingDeclarationName:SharedChatPage.kt$SharedChatPageParams</ID>
+    <ID>MaxLineLength:A2uiRendererTest.kt$A2uiRendererTest$" {\"id\":\"field\",\"component\":\"TextField\",\"label\":{\"literalString\":\"Reply\"},\"value\":{\"path\":\"/reply\"}},"</ID>
+    <ID>MaxLineLength:A2uiRendererTest.kt$A2uiRendererTest$" {\"id\":\"submit\",\"component\":\"Button\",\"label\":{\"literalString\":\"Send\"},\"action\":{\"name\":\"demo.send\",\"unsafe\":true}}"</ID>
+    <ID>MaxLineLength:AdminChatViewModel.kt$AdminChatViewModel$.</ID>
+    <ID>MaxLineLength:AdminChatViewModel.kt$AdminChatViewModel$internal</ID>
+    <ID>MaxLineLength:AdminChatViewModel.kt$AdminChatViewModel$presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }</ID>
+    <ID>MaxLineLength:AdminChatViewModelStartupTest.kt$AdminChatViewModelStartupTest$com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment("fill-${staged++}".encodeToByteArray(), com.letta.mobile.data.canvas.CanvasMimeType.PNG)</ID>
+    <ID>MaxLineLength:AdminChatViewModelStartupTest.kt$AdminChatViewModelStartupTest$val overflow = com.letta.mobile.data.canvas.CanvasShare.createChatImageAttachment("overflow".encodeToByteArray(), com.letta.mobile.data.canvas.CanvasMimeType.PNG)</ID>
+    <ID>MaxLineLength:AgentScaffoldAgentPickerTest.kt$AgentScaffoldAgentPickerTest$val agent1 = Agent(id = AgentId("agent-1"), name = "Agent One", description = "First agent", createdAt = "2023-01-01T00:00:00Z", updatedAt = "2023-01-01T00:00:00Z")</ID>
+    <ID>MaxLineLength:AgentScaffoldAgentPickerTest.kt$AgentScaffoldAgentPickerTest$val agent2 = Agent(id = AgentId("agent-2"), name = "Agent Two", description = "Second agent", createdAt = "2023-01-01T00:00:00Z", updatedAt = "2023-01-01T00:00:00Z")</ID>
+    <ID>MaxLineLength:AgentScaffoldDrawer.kt$CircularProgressIndicator(modifier = Modifier.size(LettaDimens.Control.iconButtonSm), strokeWidth = LettaDimens.Space.hair)</ID>
+    <ID>MaxLineLength:AgentScaffoldDrawer.kt$label = { Text(stringResource(R.string.screen_project_bug_report_title), style = MaterialTheme.typography.listItemHeadline) }</ID>
+    <ID>MaxLineLength:AgentScaffoldHiltTest.kt$AgentScaffoldHiltTest$breakdown = com.letta.mobile.data.context.ContextBreakdownLoader(mockk&lt;com.letta.mobile.data.repository.api.IAgentRepository&gt;(relaxed = true))</ID>
+    <ID>MaxLineLength:AgentScaffoldHiltTest.kt$AgentScaffoldHiltTest$every { viewModel.conversationModelSelections } returns MutableStateFlow(com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices())</ID>
+    <ID>MaxLineLength:ChatApprovalCoordinatorTest.kt$ChatApprovalCoordinatorTest$answer = ChatApprovalAnswer("perm-tool-1", listOf("tool-1"), approve = true, reason = null, selectedSuggestionIds = listOf("rule-1"))</ID>
+    <ID>MaxLineLength:ChatHistoryPagerTest.kt$ChatHistoryPagerTest$coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), any()) } coAnswers { a.await() }</ID>
+    <ID>MaxLineLength:ChatHistoryPagerTest.kt$ChatHistoryPagerTest$coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), any()) } coAnswers { b.await() }</ID>
+    <ID>MaxLineLength:ChatTimelineObserverTest.kt$ChatTimelineObserverTest$flow.value = Timeline("conv-1", events = persistentListOf(confirmed("assistant-2", "after reconnect", TimelineMessageType.ASSISTANT)))</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$ChatUiStateProvider$UiState.Success(ChatUiState(conversationState = ConversationState.Ready("preview-conv"), messages = sampleMessages, isLoadingMessages = false, agentName = "Letta Agent"))</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$ChatUiStateProvider$UiState.Success(ChatUiState(conversationState = ConversationState.Ready("preview-conv"), messages = sampleMessages, isStreaming = true, isAgentTyping = true, isLoadingMessages = false, agentName = "Letta Agent"))</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$UiMessage(id = "2", role = "assistant", content = "Of course! I'd be happy to help. What would you like to know?", timestamp = "2024-03-15T10:00:05Z")</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$UiMessage(id = "5", role = "assistant", content = "Let me look that up for you.", timestamp = "2024-03-15T10:02:00Z", isReasoning = true)</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$content = "**Kotlin** is a modern programming language that targets the JVM, Android, JavaScript, and Native platforms.\n\nKey features:\n- Null safety\n- Extension functions\n- Coroutines for async code\n- Data classes"</ID>
+    <ID>MaxLineLength:ChatUiStateProvider.kt$propsJson = "{\"title\":\"Next steps\",\"suggestions\":[{\"label\":\"Explain coroutines\",\"message\":\"Explain Kotlin coroutines\"},{\"label\":\"Show Android example\",\"message\":\"Show an Android Kotlin example\"}]}"</ID>
+    <ID>MaxLineLength:FeatureChatDisclosureChevronContractTest.kt$FeatureChatDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
+    <ID>MaxLineLength:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$Log.i("LOCAL_HANDOFF", "runTurn_collect_start agent=$agentId conversation=$conversationId backend=${backend.descriptor.backendId} runtime=${backend.descriptor.runtimeId} otid=$otid")</ID>
+    <ID>MaxLineLength:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$Log.i("LOCAL_HANDOFF", "runTurn_event payload=${event.payload::class.simpleName} source=${event.source} runId=${event.runId?.value}")</ID>
+    <ID>MaxLineLength:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$Log.i("LOCAL_HANDOFF", "send_start agent=$agentId backend=${backend?.descriptor} activeConversation=${activeConversationId()} textChars=${text.length} attachments=${attachments.size}")</ID>
+    <ID>MaxLineLength:LocalRuntimeChatSendCoordinatorTest.kt$LocalRuntimeChatSendCoordinatorTest$assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(local.conversationId, local.otid), timelineRepository.failedLocals.single())</ID>
+    <ID>MaxLineLength:LocalRuntimeChatSendCoordinatorTest.kt$LocalRuntimeChatSendCoordinatorTest$assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(resolvedConversation, local.otid), timelineRepository.sentLocals.single())</ID>
+    <ID>MaxLineLength:MessageGroupingTest.kt$MessageGroupingTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = "file.txt", status = "success", toolCallId = "call-1")</ID>
+    <ID>MaxLineLength:ProjectChatCoordinatorTest.kt$ProjectChatCoordinatorTest$coEvery { mockAgentRepository.getContextWindow(AgentId(testAgentId), ConversationId(testConversationId)) } throws RuntimeException("API error")</ID>
+    <ID>MaxLineLength:ProjectChatCoordinatorTest.kt$ProjectChatCoordinatorTest$val updatedBlock = Block(label = "project_description", value = "New desc", id = BlockId("b1"), limit = 1000, updatedAt = "2023-01-01T00:00:00Z")</ID>
+    <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$appearance = ChatSurfaceAppearance(toolDetails = ChatToolDetails.Sheet, platformStyle = ChatPlatformStyle.Touch)</ID>
+    <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$toolCalls = listOf(UiToolCall(name = "Bash", arguments = """{"command":"ls -la"}""", result = null, status = null, toolCallId = CALL_ID))</ID>
+    <ID>MaxLineLength:RelayedPendingApprovalTimelineTest.kt$RelayedPendingApprovalTimelineTest$val narration = UiMessage(id = "n1", role = "assistant", content = "Let me check the tree.", timestamp = "2026-10-12T10:00:00Z", runId = RUN_ID)</ID>
+    <ID>MaxLineLength:RowParityScreenshotTest.kt$RowParityScreenshotTest$ParityResult(themeName, row.id, row.label, null, null, null, "render failed: ${failure::class.simpleName}: ${failure.message?.take(MAX_NOTE)}")</ID>
+    <ID>MaxLineLength:SelectedGenerationRetirementTest.kt$SelectedGenerationRetirementTest$assertEquals(SelectedTimelineRouteSession.Presentation.LegacyDeferred, session.decide(first, "next", null, this, "agent", null))</ID>
+    <ID>MaxLineLength:SelectedGenerationRetirementTest.kt$SelectedGenerationRetirementTest$assertEquals(SelectedTimelineRouteSession.Presentation.LegacyDeferred, session.decide(first, "old", null, this, "agent", null))</ID>
+    <ID>MaxLineLength:SharedChatSubagents.kt$overlays?.show(Overlay.Banner(message, key = SUBAGENT_BANNER_KEY, presentation = OverlayPresentation(durationMillis = SUBAGENT_BANNER_MILLIS)))</ID>
+    <ID>MaxLineLength:SharedNavDrawerBindingTest.kt$SharedNavDrawerBindingTest$assertEquals(listOf("Agent 7", "Agent 3", "Agent 5", "Agent 2", "Agent 4", "Agent 6", "Agent 8", "Agent 9"), rail.entries.map { it.name })</ID>
+    <ID>MaxLineLength:SharedNavDrawerViewModel.kt$SharedNavDrawerViewModel$reportFailure("Couldn't ${if (pinned) "pin" else "unpin"} the chat") { settingsRepository.setConversationPinned(conversationId.value, pinned) }</ID>
+    <ID>MaxLineLength:TimelineSendCoordinatorTest.kt$TimelineSendCoordinatorTest$coEvery { harness.timelineRepository.appendOptimisticLocal("agent-1", "conv-1", capture(insertOtidSlot), "hello", any()) } returns true</ID>
+    <ID>MaxLineLength:TimelineSendCoordinatorTest.kt$TimelineSendCoordinatorTest$coEvery { harness.timelineRepository.sendWithOtid("agent-1", "conv-1", "boom", any(), any()) } throws IllegalStateException("offline")</ID>
+    <ID>MaxLineLength:TimelineSendCoordinatorTest.kt$TimelineSendCoordinatorTest.Harness$coEvery { timelineRepository.appendOptimisticLocal(any&lt;String&gt;(), any&lt;String&gt;(), any&lt;String&gt;(), any&lt;String&gt;(), any&lt;List&lt;MessageContentPart.Image&gt;&gt;()) } returns true</ID>
+    <ID>MaxLineLength:TimelineSendCoordinatorTest.kt$TimelineSendCoordinatorTest.Harness$coEvery { timelineRepository.sendWithOtid(any&lt;String&gt;(), any&lt;String&gt;(), any&lt;String&gt;(), any&lt;String&gt;(), any&lt;List&lt;MessageContentPart.Image&gt;&gt;()) } returns Unit</ID>
+    <ID>MaxLineLength:WsActiveSubagentSourceTest.kt$WsActiveSubagentSourceTest$entry(ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"), subagentConversationId = ConversationRef("conv-subagent-456"))</ID>
+    <ID>MaxLineLength:WsActiveSubagentSourceTest.kt$WsActiveSubagentSourceTest$private</ID>
+    <ID>MaxLineLength:WsActiveSubagentSourceTest.kt$WsActiveSubagentSourceTest$repo.state.value = listOf(entry(ToolCallRef(""), status = StatusRef(SubagentStatus.COMPLETED), taskId = TaskRef("task_1"), terminalAtEpochMs = 9_000L))</ID>
+    <ID>MaxLineLength:WsActiveSubagentSourceTest.kt$WsActiveSubagentSourceTest$val subagent = entry(ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"), subagentConversationId = ConversationRef("conv-subagent-123")).toActiveSubagent()</ID>
+    <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$assertEquals(emptyList&lt;FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup&gt;(), timelineRepository.abandonedFragmentCleanups)</ID>
+    <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "msg-1", contentRaw = JsonPrimitive("I"), runId = "run-app")))</ID>
+    <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = false))</ID>
+    <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.TurnStarted(turnId = "turn-2", agentId = "agent-1", conversationId = "conv-default-agent-1", runId = "run-2"))</ID>
+    <ID>NestedBlockDepth:AdminChatA2uiCoordinator.kt$AdminChatA2uiCoordinator$fun syncA2uiHistorySnapshot( conversationId: String, messages: List&lt;A2uiMessage&gt;, ): Map&lt;String, A2uiSurfaceState&gt;</ID>
+    <ID>NewLineAtEndOfFile:SharedChatHaptics.kt$com.letta.mobile.feature.chat.screen.shared.SharedChatHaptics.kt</ID>
+    <ID>NewLineAtEndOfFile:SharedChatRichMarkdown.kt$com.letta.mobile.feature.chat.screen.shared.SharedChatRichMarkdown.kt</ID>
+    <ID>NewLineAtEndOfFile:SharedRichMarkdownScreenshotTest.kt$com.letta.mobile.feature.chat.SharedRichMarkdownScreenshotTest.kt</ID>
+    <ID>ReturnCount:ChatHistoryPager.kt$ChatHistoryPager$private fun classifyLoadRequest(clientModeEnabled: Boolean): LoadRequest?</ID>
+    <ID>ReturnCount:ChatTimelineObserver.kt$ChatTimelineObserver$private fun TimelineProjection.hasGrowingPassiveModelTail(previous: ChatUiState): Boolean</ID>
+    <ID>ReturnCount:StreamingDisplayText.kt$@VisibleForTesting internal fun clampToWordBoundary(raw: String): String</ID>
+    <ID>ReturnCount:StreamingMarkdownMathClamp.kt$private fun canOpenInlineMathAt(cursor: MarkdownMathScanCursor): Boolean</ID>
+    <ID>ReturnCount:StreamingMarkdownMathClamp.kt$private fun isLikelyIncompleteInlineMathBody(body: MarkdownMathInlineBodySpan): Boolean</ID>
+    <ID>SpreadOperator:ChatComposerController.kt$ChatComposerController$("AdminChatVM", name, *attrs)</ID>
+    <ID>SwallowedException:AdminChatModelCoordinator.kt$AdminChatModelCoordinator$e: Exception</ID>
+    <ID>SwallowedException:ChatSearchCoordinatorTest.kt$ChatSearchCoordinatorTest$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AdminChatModelCoordinator.kt$AdminChatModelCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AdminChatViewModel.kt$AdminChatViewModel$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:AdminChatViewModel.kt$AdminChatViewModel$failure: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatApprovalController.kt$ChatApprovalController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatApprovalCoordinator.kt$ChatApprovalCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatConversationCoordinator.kt$ChatConversationCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatHistoryPager.kt$ChatHistoryPager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatSearchCoordinator.kt$ChatSearchCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChatTimelineObserver.kt$ChatTimelineObserver$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:LocalRuntimeChatSendCoordinator.kt$LocalRuntimeChatSendCoordinator$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:ProjectChatCoordinator.kt$ProjectChatCoordinator$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SharedNavDrawerViewModel.kt$SharedNavDrawerViewModel$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:TimelineSendCoordinator.kt$TimelineSendCoordinator$e: Exception</ID>
+    <ID>TooManyFunctions:AdminChatA2uiCoordinator.kt$AdminChatA2uiCoordinator</ID>
+    <ID>TooManyFunctions:AdminChatActions.kt$AdminChatActions : ChatActions</ID>
+    <ID>TooManyFunctions:AdminChatComposerCoordinator.kt$AdminChatComposerCoordinator</ID>
+    <ID>TooManyFunctions:AdminChatViewModel.kt$AdminChatViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:ChatConversationCoordinator.kt$ChatConversationCoordinator</ID>
+    <ID>TooManyFunctions:ChatHydrationTrace.kt$ChatHydrationTrace</ID>
+    <ID>TooManyFunctions:ChatTimelineObserver.kt$ChatTimelineObserver</ID>
+    <ID>TooManyFunctions:StreamingMarkdownMathClamp.kt$com.letta.mobile.feature.chat.render.StreamingMarkdownMathClamp.kt</ID>
+    <ID>TooManyFunctions:WsChatSendCoordinator.kt$WsChatSendCoordinator$&lt;no name provided&gt; : ChatSendUiSink</ID>
+    <ID>UnusedImports:AdminChatComposerCoordinatorTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:AdminChatComposerCoordinatorTest.kt$import com.letta.mobile.feature.chat.send.ChatSendContext</ID>
+    <ID>UnusedImports:AdminChatComposerCoordinatorTest.kt$import kotlinx.coroutines.test.advanceUntilIdle</ID>
+    <ID>UnusedImports:AdminChatComposerCoordinatorTest.kt$import org.junit.Assert.assertNull</ID>
+    <ID>UnusedImports:AdminChatComposerCoordinatorTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:AdminChatParityTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:AdminChatParityTest.kt$import io.mockk.verify</ID>
+    <ID>UnusedImports:AdminChatViewModelReconcileStabilityTest.kt$import io.mockk.every</ID>
+    <ID>UnusedImports:AdminChatViewModelReconcileStabilityTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:AgentScaffoldDrawer.kt$import androidx.compose.material3.Icon</ID>
+    <ID>UnusedImports:AgentScaffoldDrawer.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:AgentScaffoldProjectContextTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:ChatSearchCoordinatorTest.kt$import com.letta.mobile.data.model.MessageSearchRequest</ID>
+    <ID>UnusedImports:ChatSearchCoordinatorTest.kt$import io.mockk.verify</ID>
+    <ID>UnusedImports:ChatSearchCoordinatorTest.kt$import kotlinx.coroutines.test.advanceUntilIdle</ID>
+    <ID>UnusedImports:ChatTimelineObserverTest.kt$import kotlinx.coroutines.flow.StateFlow</ID>
+    <ID>UnusedImports:SharedRichMarkdownScreenshotTest.kt$import androidx.compose.foundation.layout.fillMaxWidth</ID>
+    <ID>UnusedImports:TimelineSendCoordinatorTest.kt$import io.mockk.every</ID>
+    <ID>UnusedImports:TimelineTypographyCoverageTest.kt$import androidx.compose.material3.MaterialTheme</ID>
+    <ID>UnusedImports:WsActiveSubagentSourceTest.kt$import kotlinx.collections.immutable.toImmutableList</ID>
+    <ID>UnusedImports:WsChatSendCoordinatorTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedParameter:AdminChatSessionPort.kt$AdminChatSessionPort$ui: ChatUiState</ID>
+    <ID>UnusedParameter:SelectedGenerationRetirementTest.kt$SelectedGenerationRetirementTest$target: String?</ID>
+    <ID>UnusedPrivateMember:A2uiRendererTest.kt$private fun progressSurfaceManager(root: String): A2uiSurfaceManager</ID>
+    <ID>WildcardImport:AdminChatParityTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ChatBannerControllerTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ChatHistoryPagerTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ChatSessionInitializerTest.kt$import com.letta.mobile.feature.chat.render.*</ID>
+    <ID>WildcardImport:ChatSessionInitializerTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ChatTimelineObserverTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:LocalRuntimeChatSendCoordinatorTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ModelSwitchErrorSurfacingTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:RememberStreamSmootherTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:StreamingDisplayTextSmootherTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:TimelineSendCoordinatorTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:ToolDisplayRegistryTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+    <ID>WildcardImport:WsChatSendCoordinatorTest.kt$import com.letta.mobile.ui.chat.render.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

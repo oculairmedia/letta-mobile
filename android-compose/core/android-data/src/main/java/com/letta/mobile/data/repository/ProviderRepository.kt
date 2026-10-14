@@ -19,5 +19,8 @@ open class ProviderRepository(
     irohProviderSource = irohProviderSource,
 ) {
     /** A repository over a bound [remote] (tests bind a fake). */
-    constructor(remote: ProviderRemoteSource, irohProviderSource: IrohAdminRpcProviderSource? = null) : this(remote.bound(), irohProviderSource)
+    constructor(
+        remote: ProviderRemoteSource,
+        irohProviderSource: IrohAdminRpcProviderSource? = null,
+    ) : this(remote.bound(), irohProviderSource)
 }

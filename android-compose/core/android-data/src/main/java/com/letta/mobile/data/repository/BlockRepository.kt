@@ -25,5 +25,8 @@ class BlockRepository internal constructor(
     constructor(irohBlockSource: IrohAdminRpcBlockSource?) : this(RemoteRoute.Absent(SessionRoute.BLOCKS), irohBlockSource)
 
     /** A repository over a bound [remote] (tests bind a fake). */
-    internal constructor(remote: BlockRemoteSource, irohBlockSource: IrohAdminRpcBlockSource? = null) : this(remote.bound(), irohBlockSource)
+    internal constructor(
+        remote: BlockRemoteSource,
+        irohBlockSource: IrohAdminRpcBlockSource? = null,
+    ) : this(remote.bound(), irohBlockSource)
 }

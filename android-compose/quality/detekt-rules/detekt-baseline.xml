@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ReturnCount:MobileDesignSystemRules.kt$HardcodedComposeColor$override fun visitCallExpression(expression: KtCallExpression)</ID>
+    <ID>ReturnCount:MobileDesignSystemRules.kt$LowContentAlpha$override fun visitCallExpression(expression: KtCallExpression)</ID>
+    <ID>ReturnCount:MobileDesignSystemRules.kt$LowContentAlpha$private fun KtValueArgument.alphaValue(): Double?</ID>
+    <ID>ReturnCount:MobileDesignSystemRules.kt$RawDimensionLiteral$override fun visitDotQualifiedExpression(expression: KtDotQualifiedExpression)</ID>
+    <ID>ReturnCount:MobileDesignSystemRules.kt$private fun KtFile.isUiSource(): Boolean</ID>
+  </CurrentIssues>
+</SmellBaseline>

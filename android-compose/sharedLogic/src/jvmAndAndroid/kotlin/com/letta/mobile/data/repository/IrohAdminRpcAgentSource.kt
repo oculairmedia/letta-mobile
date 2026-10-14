@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.visibleInLists
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,12 +37,7 @@ class IrohAdminRpcAgentSource(
     // fields as explicit null (e.g. "metadata": null). explicitNulls=false +
     // coerceInputValues=true coerce those to the property defaults instead of
     // failing to decode (letta-mobile-71orq).
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
     private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
 ) : com.letta.mobile.data.repository.api.AgentIrohSource {
     override fun shouldUseIroh(): Boolean =

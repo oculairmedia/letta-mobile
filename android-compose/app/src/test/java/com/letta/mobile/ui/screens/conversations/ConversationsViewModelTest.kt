@@ -555,7 +555,8 @@ class ConversationsViewModelTest {
 
     @Test
     fun `cancel runs failure without a route reads as unavailable`() = runTest {
-        fakeConvRepo.cancelFailure = AppServerRouteUnavailable(SessionRoute.CONVERSATIONS, "ConversationCrudRemoteSource.cancelConversation")
+        fakeConvRepo.cancelFailure =
+            AppServerRouteUnavailable(SessionRoute.CONVERSATIONS, "ConversationCrudRemoteSource.cancelConversation")
         val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
 
         viewModel.cancelConversationRuns(display)

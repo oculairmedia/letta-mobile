@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -29,23 +30,13 @@ import kotlinx.serialization.json.put
 class IrohAdminRpcBlockSource private constructor(
     private val channelTransportProvider: () -> IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
     private val agentDirectoryProvider: (() -> IrohAdminRpcAgentDirectory)? = null,
 ) : com.letta.mobile.data.repository.api.BlockIrohSource {
     constructor(
         channelTransport: IChannelTransport,
         settingsRepository: ISettingsRepository,
-        json: Json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            explicitNulls = false
-            coerceInputValues = true
-        },
+        json: Json = LettaJson.adminRpc,
         agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
     ) : this({ channelTransport }, settingsRepository, json, { agentDirectory })
 

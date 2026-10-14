@@ -104,10 +104,9 @@ class AndroidSessionRouteMatrixTest {
         settings: FakeSettingsRepository,
     ): Any? = when (route) {
         SessionRoute.AGENTS -> graph.agentRepository.listAgentSummaries()
-        SessionRoute.BLOCKS -> graph.blockRepository?.getBlocks(AGENT) ?: unserved(route)
+        SessionRoute.BLOCKS, SessionRoute.CONVERSATION_RECOMPILE, SessionRoute.STEPS, SessionRoute.VIBESYNC ->
+            probeOptional(route, graph)
         SessionRoute.CONVERSATIONS -> graph.allConversationsRepository.refresh()
-        SessionRoute.CONVERSATION_RECOMPILE ->
-            graph.conversationRepository.canRecompileConversations().takeIf { it } ?: unserved(route)
         SessionRoute.MCP_SERVERS -> graph.mcpServerRepository.refreshServers()
         SessionRoute.MODELS -> graph.modelRepository.refreshLlmModels()
         SessionRoute.PASSAGES -> graph.passageRepository.refreshPassages(AgentId(AGENT))
@@ -118,10 +117,17 @@ class AndroidSessionRouteMatrixTest {
         SessionRoute.SCHEDULES -> graph.scheduleRepository.refreshSchedules(AGENT)
         // Skills ride the app-wide slash-command repository, over the same transport and settings.
         SessionRoute.SKILLS -> SlashCommandRepository(settings, transport).listGlobal().getOrThrow()
-        SessionRoute.STEPS -> graph.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
         SessionRoute.TOOLS -> graph.toolRepository.refreshTools()
+    }
+
+    /** Routes a backend may leave unbound: an absent binding reads as the route backstop. */
+    private suspend fun probeOptional(route: SessionRoute, graph: SessionGraph): Any = when (route) {
+        SessionRoute.BLOCKS -> graph.blockRepository?.getBlocks(AGENT) ?: unserved(route)
+        SessionRoute.CONVERSATION_RECOMPILE ->
+            graph.conversationRepository.canRecompileConversations().takeIf { it } ?: unserved(route)
+        SessionRoute.STEPS -> graph.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
         // No backend carries the VibeSync stream: the graph binds a source that always says so.
-        SessionRoute.VIBESYNC -> unserved(route)
+        else -> unserved(route)
     }
 
     private fun unserved(route: SessionRoute): Nothing = throw AppServerRouteUnavailable(route, "probe")

@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
@@ -106,6 +107,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
 
     companion object {
         /** See [LocalBackendEmbeddedStore.localConversationIdFor]. */
-        fun localConversationIdFor(agentId: String): String = LocalBackendEmbeddedStore.localConversationIdFor(agentId)
+        fun localConversationIdFor(agentId: AgentId): ConversationId =
+            LocalBackendEmbeddedStore.localConversationIdFor(agentId)
     }
 }

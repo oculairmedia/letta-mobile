@@ -1,10 +1,12 @@
 package com.letta.mobile.data.messaging
 
+import com.letta.mobile.data.model.IdFormats
+
 fun agentMessageDisplayLabel(agentId: String, resolvedName: String?): String {
     val name = resolvedName?.trim()
     if (!name.isNullOrEmpty()) return name
     if (agentId.isBlank()) return "Unknown agent"
-    return "Agent " + agentId.removePrefix("agent-").take(8)
+    return "Agent " + IdFormats.stripAgentPrefix(agentId).take(8)
 }
 
 fun AgentMessageProvenance.compactLabel(resolveName: (String) -> String?): String {
