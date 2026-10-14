@@ -312,7 +312,7 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5o (bug reports / slash commands / vibesync — merged #1278):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
 
-**5p (messages — merged #5p stack):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stays in Android `MessageRepository` binder (`MessagePagingSource`). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
+**5p (messages — merged #5p stack):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stayed in the Android binder (`MessagePagingSource`) until both were deleted as unused (letta-mobile-by4vm.34). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
 
 **5b.2 (all conversations list — #5p stack):** `CachedAllConversationsRepository` + `ConversationRemoteSource` / `AllConversationsLocalCache` (`ConversationApi`, `RoomAllConversationsLocalCache`, existing `LocalRuntimeConversationSource` + `IrohAdminRpcConversationListSource`); refresh/cache/hasMore/cursor/optimistic updates in sharedLogic with `kotlin.time.Clock` + `Telemetry`; `getConversationsPaged` stays in Android `AllConversationsRepository` binder (`ConversationPagingSource`).
 
@@ -371,7 +371,7 @@ Medium for Option B; low for Option A / 6a docs.
 
 | Module | Direction |
 |---|---|
-| `feature-chat`, `feature-editagent` | Keep Android **presentation shells** (Hilt, Roborazzi). Logic stays in sharedLogic. |
+| `feature-chat` (`feature-editagent` since removed) | Keep Android **presentation shells** (Hilt, Roborazzi). Logic stays in sharedLogic. |
 | `designsystem` | Migrate reusable pieces to `sharedUI` as touched; keep Android-specific (Paparazzi, Material extensions) until parity |
 | `desktop/chat/*` | Shrink to thin hosts over `sharedUI` composables |
 

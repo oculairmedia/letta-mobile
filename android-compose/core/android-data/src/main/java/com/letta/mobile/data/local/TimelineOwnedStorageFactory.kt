@@ -146,11 +146,3 @@ class TimelineOwnedStorageFactory(
         }
     }
 }
-
-/** Existing coordinator DI cannot bypass ownership while runtime lease integration is incomplete. */
-object DormantCanonicalTimelineStore : TimelineBoundedStore {
-    override suspend fun <T> read(scope: TimelineScope, block: suspend com.letta.mobile.data.timeline.TimelineStoreReader.() -> T): T =
-        error("Canonical storage requires an explicit ownership lease")
-    override suspend fun <T> transaction(scope: TimelineScope, block: suspend com.letta.mobile.data.timeline.TimelineStoreTransaction.() -> T): T =
-        error("Canonical storage requires an explicit ownership lease")
-}

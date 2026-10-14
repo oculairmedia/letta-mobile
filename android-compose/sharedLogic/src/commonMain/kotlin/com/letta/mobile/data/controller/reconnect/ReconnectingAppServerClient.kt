@@ -116,8 +116,10 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * with [AppServerNotConnectedException] — nothing queues, nothing blind-replays.
  * Whether a failed call may be retried is the caller's decision via
  * [com.letta.mobile.data.transport.appserver.AppServerCommandRetryClass];
- * ambiguous writes must reconcile against the committed
- * transcript first (see [AmbiguousTurnReconciler]).
+ * ambiguous writes must reconcile against the committed transcript first:
+ * the pinned App Server does not dedupe by `client_message_id`, so resend only
+ * when no committed user message has `otid == client_message_id` (lgns8.15
+ * restart/replay evidence).
  *
  * Terminal handshake failures (the transport's `Failed(terminal = true)`:
  * policy violation, auth rejection) stop the supervisor without retries —
