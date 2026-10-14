@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import java.io.File
 import java.util.Base64
 import kotlinx.serialization.json.Json

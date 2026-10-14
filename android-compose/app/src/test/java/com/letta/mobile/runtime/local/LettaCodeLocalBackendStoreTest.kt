@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ToolCallMessage

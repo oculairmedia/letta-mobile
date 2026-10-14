@@ -4,6 +4,7 @@ import android.content.Context
 import com.letta.mobile.data.context.estimate.ContextBreakdownEstimator
 import com.letta.mobile.data.context.estimate.LocalContextInputs
 import com.letta.mobile.data.context.estimate.toAgentContextJson
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
