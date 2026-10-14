@@ -44,3 +44,16 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }
+
+// JsonInstanceRatchetTest (letta-mobile-by4vm.20) reads production sources and its baseline off
+// disk; declare them so an up-to-date `test` result is never reused after either changes.
+tasks.test {
+    inputs.files(
+        fileTree(rootProject.projectDir) {
+            include("**/src/**/*.kt")
+            exclude("**/build/**")
+        },
+    ).withPropertyName("jsonRatchetSources").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file("json-instances-baseline.txt")
+        .withPropertyName("jsonRatchetBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
+}

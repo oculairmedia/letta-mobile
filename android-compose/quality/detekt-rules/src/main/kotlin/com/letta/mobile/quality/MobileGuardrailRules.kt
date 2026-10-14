@@ -30,10 +30,10 @@ import org.jetbrains.kotlin.psi.KtTryExpression
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 
-private fun KtFile.normalizedPath(): String = virtualFilePath.replace('\\', '/')
-private fun KtFile.isTestSource(): Boolean = normalizedPath().contains("/src/") &&
+internal fun KtFile.normalizedPath(): String = virtualFilePath.replace('\\', '/')
+internal fun KtFile.isTestSource(): Boolean = normalizedPath().contains("/src/") &&
     normalizedPath().substringAfter("/src/").substringBefore('/').contains("test", ignoreCase = true)
-private fun KtFile.isGenerated(): Boolean = normalizedPath().let {
+internal fun KtFile.isGenerated(): Boolean = normalizedPath().let {
     "/generated/" in it || "/build/" in it || "/ksp/" in it
 }
 
@@ -369,6 +369,7 @@ class MobileGuardrailProvider : RuleSetProvider {
             CancellationMustPropagate(config),
             NoDetachedCoroutineLifecycle(config),
             CoroutineTestGuardrails(config),
+            NoAdHocJsonInstance(config),
         ),
     )
 }
