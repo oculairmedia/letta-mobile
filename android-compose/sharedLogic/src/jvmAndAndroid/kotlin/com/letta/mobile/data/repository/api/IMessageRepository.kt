@@ -1,12 +1,10 @@
 package com.letta.mobile.data.repository.api
 
-import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Stateless HTTP message operations boundary.
@@ -19,13 +17,6 @@ import kotlinx.coroutines.flow.Flow
  * timeline-backed UI model rather than replacing it.
  */
 interface IMessageRepository : IConversationInspectorMessageRepository {
-    /**
-     * Legacy paging endpoint for admin/list surfaces, not the live chat stream.
-     */
-    fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>>
-    fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> =
-        getMessagesPaged(agentId?.let(::AgentId), conversationId?.let(::ConversationId))
-
     /**
      * Stateless recent/targeted fetch. Use only for explicit backfill or
      * inspector-style reads; live chat observation belongs to TimelineRepository.

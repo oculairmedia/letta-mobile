@@ -1,6 +1,5 @@
 package com.letta.mobile.data.repository
 
-import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
@@ -11,11 +10,10 @@ import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.MessageIrohTimelineSource
 import com.letta.mobile.data.repository.api.MessageRemoteSource
 import com.letta.mobile.data.repository.api.OlderMessagesPage
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
 /**
- * Phase 5p platform-neutral stateless message helper. Paging stays in the Android binder.
+ * Phase 5p platform-neutral stateless message helper.
  *
  * This is **not** the chat timeline source of truth; [TimelineRepository] owns live chat
  * state, streaming sends, optimistic writes, and reconciliation. Do not reintroduce those
@@ -33,10 +31,6 @@ open class CachedMessageRepository(
         const val DEFAULT_FETCH_LIMIT = INITIAL_FETCH_LIMIT
         const val TARGETED_FETCH_LIMIT = 100
         const val MAX_TARGETED_FETCH_PAGES = 20
-    }
-
-    override fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>> {
-        error("getMessagesPaged is Android-bound; override in MessageRepository")
     }
 
     override suspend fun fetchMessages(
