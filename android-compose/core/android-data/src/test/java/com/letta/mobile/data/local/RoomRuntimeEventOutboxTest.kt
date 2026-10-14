@@ -99,12 +99,14 @@ class RoomRuntimeEventOutboxTest {
                         draft(localMessageId = "local-2"),
                     ),
                 )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (caught: Throwable) {
                 failure = caught
             }
 
             assertNotNull(failure)
-            assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0))
+            assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE))
         }
 
         assertEquals(RuntimeEventOffset(1), outbox.append(draft("local-3")).offset)
@@ -129,7 +131,7 @@ class RoomRuntimeEventOutboxTest {
         }
 
         assertNotNull(failure)
-        assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0))
+        assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE))
         assertEquals(RuntimeEventOffset(1), outbox.append(draft("local-3")).offset)
     }
 
@@ -154,14 +156,16 @@ class RoomRuntimeEventOutboxTest {
     @Test
     fun `appendAll with no drafts returns empty`() = runTest {
         var factoryCalls = 0
-        val outbox = outbox { _, offset ->
-            factoryCalls += 1
-            RuntimeEventId("test-runtime-event-${offset.value}")
-        }
+        val outbox = outbox(
+            eventIdFactory = { _, offset ->
+                factoryCalls += 1
+                RuntimeEventId("test-runtime-event-${offset.value}")
+            },
+        )
 
         assertEquals(0, outbox.appendAll(emptyList()).size)
         assertEquals(0, factoryCalls)
-        assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0))
+        assertEquals(emptyList<RuntimeEventEntity>(), database!!.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE))
         assertEquals(RuntimeEventOffset(1), outbox.append(draft("local-1")).offset)
     }
 
@@ -179,10 +183,101 @@ class RoomRuntimeEventOutboxTest {
         }
     }
 
+    @Test
+    fun `listAfterOffset respects the limit`() = runTest {
+        val outbox = outbox()
+        outbox.appendAll(List(5) { draft("local-$it") })
+
+        val page = database!!.runtimeEventDao().listAfterOffset(1, 2)
+
+        assertEquals(listOf(2L, 3L), page.map { it.eventOffset })
+    }
+
+    @Test
+    fun `prune caps row count and keeps the newest rows`() = runTest {
+        val outbox = outbox(limits = Limits(maxRows = 3))
+
+        outbox.appendAll(List(5) { draft("local-$it") })
+
+        assertEquals(listOf(3L, 4L, 5L), allOffsets())
+    }
+
+    @Test
+    fun `prune drops aged rows but never the newest row`() = runTest {
+        var now = 1_000L
+        val outbox = outbox(limits = Limits(maxAgeMillis = 100), clock = { EpochMillis(now) })
+        outbox.appendAll(List(3) { draft("old-$it") })
+
+        now = 2_000L
+        outbox.prune()
+        assertEquals(listOf(3L), allOffsets())
+
+        outbox.append(draft("fresh"))
+        assertEquals(listOf(4L), allOffsets())
+    }
+
+    @Test
+    fun `prune keeps unexpired rows`() = runTest {
+        var now = 1_000L
+        val outbox = outbox(limits = Limits(maxAgeMillis = 100), clock = { EpochMillis(now) })
+        outbox.append(draft("old"))
+        now = 1_150L
+        outbox.append(draft("recent-1"))
+        outbox.append(draft("recent-2"))
+
+        assertEquals(listOf(2L, 3L), allOffsets())
+    }
+
+    @Test
+    fun `ids never collide after a prune`() = runTest {
+        val outbox = outbox(
+            eventIdFactory = { _, offset -> RuntimeEventId("runtime-event-${offset.value}") },
+            limits = Limits(maxRows = 1),
+        )
+
+        val ids = (1..6).flatMap { batch ->
+            outbox.appendAll(List(2) { draft("batch-$batch-$it") }).map { it.eventId.value }
+        }
+
+        assertEquals(ids.size, ids.toSet().size)
+        assertEquals(listOf(12L), allOffsets())
+        assertEquals(RuntimeEventOffset(13), outbox.append(draft("next")).offset)
+    }
+
+    @Test
+    fun `first use prunes rows left over from a previous process`() = runTest {
+        val writer = outbox()
+        writer.appendAll(List(4) { draft("local-$it") })
+
+        val reader = RoomRuntimeEventOutbox(database = database!!, clock = { EpochMillis(1_000) }, maxRows = 2)
+        reader.events(RuntimeEventOffset(0)).take(2).toList()
+
+        assertEquals(listOf(3L, 4L), allOffsets())
+    }
+
+    @Test
+    fun `events pages through a backlog larger than the page size`() = runTest {
+        val outbox = outbox(limits = Limits(pageSize = 2))
+        val appended = outbox.appendAll(List(5) { draft("local-$it") })
+
+        assertEquals(appended, outbox.events(RuntimeEventOffset(0)).take(5).toList())
+    }
+
+    private data class Limits(
+        val maxRows: Int = RoomRuntimeEventOutbox.DEFAULT_MAX_ROWS,
+        val maxAgeMillis: Long = RoomRuntimeEventOutbox.DEFAULT_MAX_AGE_MILLIS,
+        val pageSize: Int = RoomRuntimeEventOutbox.DEFAULT_PAGE_SIZE,
+    )
+
+    private suspend fun allOffsets(): List<Long> =
+        database!!.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE).map { it.eventOffset }
+
     private fun outbox(
         eventIdFactory: (RuntimeEventDraft, RuntimeEventOffset) -> RuntimeEventId = { _, offset ->
             RuntimeEventId("test-runtime-event-${offset.value}")
         },
+        limits: Limits = Limits(),
+        clock: () -> EpochMillis = { EpochMillis(1_000) },
     ): RoomRuntimeEventOutbox {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)
@@ -192,7 +287,10 @@ class RoomRuntimeEventOutboxTest {
         return RoomRuntimeEventOutbox(
             database = db,
             eventIdFactory = eventIdFactory,
-            clock = { EpochMillis(1_000) },
+            clock = clock,
+            maxRows = limits.maxRows,
+            maxAgeMillis = limits.maxAgeMillis,
+            pageSize = limits.pageSize,
         )
     }
 

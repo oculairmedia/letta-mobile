@@ -7,8 +7,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.jupiter.api.Tag
-import com.letta.mobile.feature.chat.a2ui.A2uiToolApprovalSubmission
-import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
+import com.letta.mobile.data.a2ui.A2uiToolApprovalSubmission
+import com.letta.mobile.data.a2ui.ToolApprovalRef
+import com.letta.mobile.data.a2ui.toToolApprovalSubmission
 
 @Tag("unit")
 class A2uiToolApprovalSubmissionTest {
@@ -23,8 +24,7 @@ class A2uiToolApprovalSubmissionTest {
 
         assertEquals(
             A2uiToolApprovalSubmission(
-                approvalRequestId = "approval-1",
-                callId = "call-1",
+                ref = ToolApprovalRef.of("approval-1", "call-1")!!,
                 approve = true,
                 scope = "once",
                 reason = null,
@@ -45,8 +45,7 @@ class A2uiToolApprovalSubmissionTest {
 
         assertEquals(
             A2uiToolApprovalSubmission(
-                approvalRequestId = "approval-1",
-                callId = "call-1",
+                ref = ToolApprovalRef.of("approval-1", "call-1")!!,
                 approve = false,
                 scope = "deny",
                 reason = "unsafe",
@@ -56,7 +55,7 @@ class A2uiToolApprovalSubmissionTest {
     }
 
     @Test
-    fun `returns null without approval request id so legacy shim falls back to WS`() {
+    fun `returns null without approval request id so the approval gate refuses it`() {
         val submission = action(
             approvalRequestId = null,
             callId = "call-1",

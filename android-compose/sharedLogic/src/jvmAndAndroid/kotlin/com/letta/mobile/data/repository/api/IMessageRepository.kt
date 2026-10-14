@@ -1,12 +1,10 @@
 package com.letta.mobile.data.repository.api
 
-import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Stateless HTTP message operations boundary.
@@ -19,13 +17,6 @@ import kotlinx.coroutines.flow.Flow
  * timeline-backed UI model rather than replacing it.
  */
 interface IMessageRepository : IConversationInspectorMessageRepository {
-    /**
-     * Legacy paging endpoint for admin/list surfaces, not the live chat stream.
-     */
-    fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>>
-    fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> =
-        getMessagesPaged(agentId?.let(::AgentId), conversationId?.let(::ConversationId))
-
     /**
      * Stateless recent/targeted fetch. Use only for explicit backfill or
      * inspector-style reads; live chat observation belongs to TimelineRepository.
@@ -77,7 +68,6 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     )
 
     suspend fun cancelMessage(agentId: AgentId, runIds: List<String>? = null): Map<String, String>
-    suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> = cancelMessage(AgentId(agentId), runIds)
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult>
 
     suspend fun submitApproval(
@@ -117,7 +107,6 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
      * API path behind it.
      */
     suspend fun resetMessages(agentId: AgentId)
-    suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
 }
 
 /** letta-mobile-bzvro.40: one approval answer, with the always-allow rule ids the person chose. */

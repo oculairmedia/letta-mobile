@@ -1,5 +1,7 @@
 # App Server REST/Admin Audit and Fanout Decision
 
+> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `AgentApi.kt`, `ConversationApi.kt`, `MessageApi.kt`, `ToolApi.kt`, `BlockApi.kt`, `ArchiveApi.kt`, `FolderApi.kt`, `ProviderApi.kt`, `RunApi.kt`, `JobApi.kt`, `StepApi.kt`, `ScheduleApi.kt`, `McpServerApi.kt`, `ProjectApi.kt`, `ProjectWorkApi.kt`, `GroupApi.kt`, `IdentityApi.kt`, `ModelApi.kt`, `PassageApi.kt`, `ProjectAgentApi.kt`, `LettaApiClient.kt`, `CloudConnectionValidator.kt`, `VibesyncAdminApi.kt`, `VibesyncDebugApi.kt`. Read references to them as historical; current code is the source of truth.
+
 Date: 2026-06-24
 
 Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`, `letta-mobile-lgns8.1`

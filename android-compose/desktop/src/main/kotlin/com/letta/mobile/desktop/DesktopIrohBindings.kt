@@ -43,7 +43,8 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
  * iroh:// backend: one QUIC channel transport shared by the chat gateway,
  * admin_rpc reads, and (once implemented server-side) registries. Selected
  * purely by URL scheme, same as Android's DefaultSessionRepositoryGraphFactory; null for HTTP
- * backends. Connects on entering composition and disconnects on dispose.
+ * backends. Connects on entering composition and closes (disconnect + cancel its
+ * owned coroutine job) on dispose.
  */
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
     IrohChannelTransport(
@@ -169,7 +170,9 @@ internal fun rememberIrohTransport(
             chatScope = chatScope,
             hooks = DesktopTransportLifecycleHooks(
                 onConnect = ::connectIrohTransport,
-                onDisposeTransport = { t -> t.disconnect() },
+                // by4vm.10: close, not disconnect: this instance dies with its config key, so its
+                // owned coroutine job must be cancelled or every config change leaks it.
+                onDisposeTransport = { t -> t.close() },
             ),
         ),
     )
