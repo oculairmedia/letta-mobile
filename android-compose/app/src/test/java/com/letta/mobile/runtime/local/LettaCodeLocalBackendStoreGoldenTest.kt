@@ -29,7 +29,8 @@ import org.junit.rules.TemporaryFolder
  * `local-backend-golden/snapshot.json` was recorded from the app-side parser on main BEFORE it
  * was replaced by the sharedLogic `LocalBackend*` readers, so this test proves the adapter
  * produces byte-identical records, context inputs, conversations and transcript projections
- * for the same fixture backend dir.
+ * for the same fixture backend dir. Re-recorded once for letta-mobile-by4vm.73: the session-log
+ * v3 envelope rows (`e1`/`e2`) are now projected into `transcriptA` (they were skipped before).
  *
  * The actual snapshot is also written to `build/local-backend-golden-actual.json` so a
  * deliberate format change can be re-recorded by copying it over the resource.

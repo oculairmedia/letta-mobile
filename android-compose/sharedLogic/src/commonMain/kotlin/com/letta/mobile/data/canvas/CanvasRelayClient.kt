@@ -188,6 +188,12 @@ class CanvasRelayClient(
         refresh(canvas.topic)
     }
 
+    override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) {
+        if (opIds.isEmpty()) return
+        // The same durable queue [publish] fills; a reconnect's join uploads whatever is in it.
+        delivery.enqueue(canvas(canvasId).topic, opIds)
+    }
+
     override fun subscribe(canvasId: CanvasId): Flow<CanvasOp> = channelFlow {
         launch { deliverTo(canvasId) { send(it) } }
         awaitClose()

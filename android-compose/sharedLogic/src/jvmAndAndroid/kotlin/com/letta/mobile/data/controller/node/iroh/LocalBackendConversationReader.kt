@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.ConversationRecency
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -23,7 +24,9 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
     /**
      * Port of admin-shim `GET /v1/conversations` (handleConversationsList):
      * read the conversation records (agent-scoped or all), apply the withRealTimes
-     * ordering overlay, filter by archive status, sort by last_message_at desc, page,
+     * ordering overlay, filter by archive status, sort newest first with the shared
+     * [ConversationRecency] order (letta-mobile-by4vm.72: parsed instants with an
+     * updated_at/created_at fallback and an id tie-break, the order the app's cache uses), page,
      * and project each via conversationToLetta. Returns null on any error so the
      * caller falls back to the shim proxy.
      *
@@ -48,7 +51,7 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
                     else -> !archived
                 }
             }
-            .sortedWith(compareByDescending { it.lastMessageAt ?: "" })
+            .sortedWith(NEWEST_FIRST)
         val from = (offset ?: 0).coerceAtLeast(0)
         val windowed = if (from >= convs.size) {
             emptyList()
@@ -185,6 +188,12 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
     }
 
     companion object {
+        private val NEWEST_FIRST: Comparator<ConvRecord> = ConversationRecency.comparator(
+            id = ConvRecord::id,
+            lastMessageAt = ConvRecord::lastMessageAt,
+            updatedAt = ConvRecord::updatedAt,
+            createdAt = ConvRecord::createdAt,
+        )
         private val ARCHIVE_STATUSES = setOf("active", "archived", "all")
         // admin-shim translate.ts: canned user uuid for created_by/last_updated_by.
         private val CANNED_USER_ID = JsonPrimitive("user-00000000-0000-4000-8000-000000000000")

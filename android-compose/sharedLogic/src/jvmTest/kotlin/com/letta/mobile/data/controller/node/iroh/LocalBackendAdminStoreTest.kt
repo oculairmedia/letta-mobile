@@ -165,6 +165,32 @@ class LocalBackendAdminStoreTest {
         assertEquals(0, (convs[0].jsonObject["isolated_block_ids"] as JsonArray).size)
     }
 
+    /**
+     * letta-mobile-by4vm.72: the host list used to sort `last_message_at` as a String (so `+02:00`
+     * and `Z` sorted above a fractional `.5Z`) with no updated_at/created_at fallback; it now uses
+     * the shared ConversationRecency order, the same one the app's conversation cache applies.
+     */
+    @Test
+    fun `conversation list orders mixed format timestamps by instant with the shared recency fallback`() {
+        val base = tempStore()
+        val rows = mapOf(
+            "a-plus-two" to """"last_message_at":"2025-05-01T10:00:00+02:00"""",
+            "b-fraction" to """"last_message_at":"2025-05-01T10:00:00.5Z"""",
+            "c-z" to """"last_message_at":"2025-05-01T10:00:00Z"""",
+            "d-updated-only" to """"updated_at":"2025-05-01T09:30:00.123456+00:00","created_at":"2024-01-01T00:00:00Z"""",
+            "e-none" to """"summary":"no timestamps"""",
+        )
+        rows.forEach { (id, fields) ->
+            writeConversation(base, "conversation:$id", """{"id":"$id","agent_id":"agent-1",$fields}""")
+        }
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+
+        val ids = store.listConversationsProjected("agent-1", "active", null, null)!!
+            .map { it.jsonObject["id"]!!.jsonPrimitive.content }
+
+        assertEquals(listOf("b-fraction", "c-z", "d-updated-only", "a-plus-two", "e-none"), ids)
+    }
+
     @Test
     fun `conversation list carries the conversation's own model override`() {
         // letta-mobile-dxz5s: the record's model, model_settings and context_window_limit used to be

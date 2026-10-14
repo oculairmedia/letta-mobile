@@ -12,6 +12,17 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 interface CanvasSyncTransport {
     suspend fun publish(canvasId: CanvasId, op: CanvasOp)
+
+    /**
+     * Durably commits to delivering [opIds] - this app's own ops, already in the local op log -
+     * whether or not [publish] for them ever runs (letta-mobile-by4vm.68). A session calls it after
+     * logging a local op and BEFORE writing the document, and again for every op its journal
+     * recovery folds in, so no crash point leaves a committed op both written and never sent.
+     * Idempotent; an op the far end already holds is acknowledged as a duplicate. A transport with
+     * no durable queue keeps the default, which does nothing.
+     */
+    suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) = Unit
+
     fun subscribe(canvasId: CanvasId): Flow<CanvasOp>
 
     /**
