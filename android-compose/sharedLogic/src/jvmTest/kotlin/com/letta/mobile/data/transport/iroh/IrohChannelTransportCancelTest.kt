@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -44,7 +45,7 @@ class IrohChannelTransportCancelTest {
         clientScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 
-    private fun transportWith(client: ControllableClient): IrohChannelTransport {
+    private fun transportWith(client: ControllableClient, serverTerminalWaitMs: Long = 200L): IrohChannelTransport {
         val engine = AppServerTurnEngine(client = client, requestIdFactory = { "runtime-start-1" })
         return IrohChannelTransport(
             scope = clientScope,
@@ -58,8 +59,43 @@ class IrohChannelTransportCancelTest {
                     close = {},
                 )
             },
-            serverTerminalWaitMs = 200L,
+            serverTerminalWaitMs = serverTerminalWaitMs,
         )
+    }
+
+    /**
+     * letta-mobile-by4vm.10: a cancel whose server terminal never arrives leaves a bounded
+     * terminal-wait coroutine running. close() must end it (it runs in the transport's own
+     * job), while the caller-supplied scope stays alive.
+     */
+    @Test
+    fun closeCancelsPendingTerminalWaitButLeavesCallerScopeActive() = runBlocking {
+        val client = ControllableClient()
+        val transport = transportWith(client, serverTerminalWaitMs = 60_000L)
+        val frames = mutableListOf<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+        try {
+            delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
+            transport.send("agent-1", "conv-1", "hi", "otid-1", null, false)
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds) }
+            withTimeout(3.seconds) { while (!client.inputReceived) delay(10.milliseconds) }
+            val childrenBeforeCancel = transport.transportJob.children.toSet()
+
+            assertTrue(transport.cancel("conv-1"))
+            // The abort lands strictly inside the terminal-wait coroutine, before its 60s wait.
+            withTimeout(3.seconds) { while (client.abortCommands.isEmpty()) delay(10.milliseconds) }
+            val launchedByCancel = transport.transportJob.children.toSet() - childrenBeforeCancel
+            assertTrue(launchedByCancel.any { it.isActive }, "terminal wait must still be pending before close")
+
+            transport.close()
+
+            withTimeout(3.seconds) { launchedByCancel.forEach { it.join() } }
+            assertTrue(launchedByCancel.none { it.isActive }, "close must end the pending terminal wait")
+            assertTrue(transport.transportJob.isCancelled, "close must cancel the transport's own job")
+            assertTrue(clientScope.isActive, "close must not cancel the caller's scope")
+        } finally {
+            collector.cancel()
+        }
     }
 
     @Test
