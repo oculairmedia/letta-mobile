@@ -5,6 +5,7 @@ import com.letta.mobile.data.context.estimate.LocalContextInputs
 import com.letta.mobile.data.context.estimate.LocalMessageTokens
 import com.letta.mobile.data.context.estimate.LocalTranscriptContext
 import com.letta.mobile.data.context.estimate.toAgentContextJson
+import com.letta.mobile.data.model.AgentId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.File
@@ -45,7 +46,9 @@ internal class LocalBackendContextReader(
      */
     fun agentContextProjected(query: AgentContextQuery): JsonObject? =
         runCatching {
-            val agent = readJson(File(File(support.baseDir, "agents"), "${query.agentId}.json")) ?: return@runCatching null
+            // letta-mobile-by4vm.21: letta.js names records agents/<base64url(id)>.json; bare <id>.json too.
+            val agentFile = LocalBackendLayout.findAgentRecordFile(support.baseDir, AgentId(query.agentId)) ?: return@runCatching null
+            val agent = readJson(agentFile) ?: return@runCatching null
             val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
             val inputs = LocalContextInputs(
                 systemPromptSidecar = readJson(File(dir, "system-prompt.json")),
