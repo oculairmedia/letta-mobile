@@ -61,6 +61,9 @@ class CanvasSession(
         if (pending.isNullOrEmpty()) return
         pending.forEach(::updateLamport)
         settlement.recovering {
+            // letta-mobile-by4vm.68: a crash after logging an op but before queueing it for delivery
+            // leaves it unsettled; queue it now. Remote ops among them are host duplicates (acked).
+            syncTransport?.reserveDelivery(canvasId, pending.map { it.opId })
             val current = currentDoc()
             val scene = CanvasOpProjector.project(current.sceneJson, pending)
             if (scene == current.sceneJson) {
@@ -216,7 +219,7 @@ class CanvasSession(
         if (current.acl != null && !current.acl.canWrite(op.actorId)) {
             throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
         }
-        settlement.append(op)
+        appendLocal(listOf(op))
         if (op.lamport > lamportClock) lamportClock = op.lamport
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
@@ -277,6 +280,21 @@ class CanvasSession(
         }
     }
 
+    /**
+     * Logs this app's own [ops], then queues them for delivery before the document write that
+     * carries them (letta-mobile-by4vm.68): a crash after that write but before the publish still
+     * leaves them queued; one before the queueing leaves them unsettled, and [recoverUnsettled]
+     * queues them.
+     */
+    private suspend fun appendLocal(ops: List<CanvasOp>) {
+        ops.forEach { settlement.append(it) }
+        reserveDelivery(ops)
+    }
+
+    private suspend fun reserveDelivery(ops: List<CanvasOp>) {
+        if (ops.isNotEmpty()) syncTransport?.reserveDelivery(canvasId, ops.map { it.opId })
+    }
+
     private suspend fun recordSingleOp(op: CanvasOp) {
         settlement.append(op)
         updateLamport(op)
@@ -322,6 +340,7 @@ class CanvasSession(
         val current = currentDoc()
         val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
+        if (!isRemote) reserveDelivery(opsToApply)
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
         val updated = commitScene(newScene)
@@ -708,7 +727,7 @@ class CanvasSession(
             lamport = ++lamportClock,
             sceneJson = checkpoint.sceneJson,
         )
-        settlement.append(op)
+        appendLocal(listOf(op))
         val updated = commitUpdate(
             current.copy(
                 revision = current.revision + 1L,

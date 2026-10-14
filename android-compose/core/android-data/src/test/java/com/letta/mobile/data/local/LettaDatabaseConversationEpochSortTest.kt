@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationRecency
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -85,6 +86,15 @@ class LettaDatabaseConversationEpochSortTest {
         dao.upsert(ConversationEntity.fromConversation(otherAgent))
 
         assertEquals(EXPECTED_ORDER, dao.getForAgentOnce(AGENT).map { it.id })
+        // letta-mobile-by4vm.72: the SQL order is the shared sharedLogic comparator's order.
+        assertEquals(
+            mixedFormatConversations().sortedWith(ConversationRecency.newestFirst).map { it.id.value },
+            dao.getForAgentOnce(AGENT).map { it.id },
+        )
+        assertEquals(
+            (mixedFormatConversations() + otherAgent).sortedWith(ConversationRecency.newestFirst).map { it.id.value },
+            dao.getAllOnce().map { it.id },
+        )
         assertEquals(
             listOf("b-fraction", "c-z", "other-agent", "d-updated-only", "a-plus-two", "zz-garbage", "zzz-none"),
             dao.getAllOnce().map { it.id },

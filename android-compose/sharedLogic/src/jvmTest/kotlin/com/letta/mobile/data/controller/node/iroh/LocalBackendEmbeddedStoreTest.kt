@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.storage.ImageBlobStore
 import kotlinx.serialization.json.Json
@@ -13,6 +14,7 @@ import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -116,19 +118,46 @@ class LocalBackendEmbeddedStoreTest {
         assertEquals("2026-05-05T05:05:05Z", renamed.createdAt)
     }
 
+    /** letta-mobile-by4vm.73: 0.29.x stores write session-log v3 envelopes; both reads must unwrap them. */
     @Test
-    fun readToolResultsUnwrapsEnvelopesWhileTheTranscriptProjectsFlatRows() {
+    fun readTranscriptAndToolResultsBothUnwrapSessionLogEnvelopes() {
         transcript(agentT).writeText(
             listOf(
                 """{"type":"session","version":3}""",
                 """{"type":"message","id":"e1","message":{"id":"r1","role":"toolResult","toolCallId":"c1","content":[{"type":"text","text":"ok"}],"isError":true}}""",
+                """{"type":"message","id":"e2","message":{"id":"u0","role":"user","content":[{"type":"text","text":"enveloped"}]}}""",
                 """{"id":"u1","role":"user","content":[{"type":"text","text":"flat"}]}""",
             ).joinToString("\n") + "\n",
         )
 
         assertEquals(StoredToolResult("c1", "ok", isError = true), store.readToolResults(agentT)["c1"])
         val messages = store.readTranscript(agentT) { noBlobs }
-        assertEquals(listOf("u1"), messages.map { it.id })
-        assertTrue(messages.single() is UserMessage)
+        assertEquals(listOf("r1", "u0", "u1"), messages.map { it.id })
+        assertEquals(listOf(2, 3, 4), messages.map { it.seqId })
+        val toolReturn = assertIs<ToolReturnMessage>(messages[0])
+        assertEquals("c1", toolReturn.toolCallId)
+        assertEquals("error", toolReturn.status)
+        assertTrue(messages[1] is UserMessage)
+    }
+
+    /**
+     * letta-mobile-by4vm.74: tool results go through [BoundedTranscriptReader] like the transcript,
+     * so an oversized text value becomes the size placeholder instead of one giant String.
+     */
+    @Test
+    fun readToolResultsBoundsAnOversizedTextValue() {
+        transcript(agentT).writeText(
+            listOf(
+                """{"id":"r1","role":"toolResult","toolCallId":"big","content":[{"type":"text","text":"${"x".repeat(10_000)}"}]}""",
+                """{"type":"message","id":"e1","message":{"id":"r2","role":"toolResult","toolCallId":"small","content":[{"type":"text","text":"fine"}]}}""",
+            ).joinToString("\n") + "\n",
+        )
+
+        val results = LocalBackendEmbeddedTranscript(root, maxInlineValueChars = 64).readToolResults(agentT)
+
+        val big = assertNotNull(results["big"]).body
+        assertTrue(big.startsWith("[content omitted: too large to load"), big)
+        assertTrue(big.length < 64, big)
+        assertEquals("fine", results["small"]?.body)
     }
 }
