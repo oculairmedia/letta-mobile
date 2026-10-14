@@ -44,7 +44,8 @@ internal class NoAdHocJsonInstance(
     }
 
     private companion object {
-        const val CANONICAL_SUFFIX = "/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt"
+        const val CANONICAL_SUFFIX =
+            "/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/serialization/LettaJson.kt"
     }
 }
 
@@ -57,10 +58,8 @@ internal object JsonInstanceBaseline {
 
     fun contains(path: String): Boolean {
         val index = path.lastIndexOf(MARKER)
-        if (index < 0) return false
-        val baseline = File(path.substring(0, index), BASELINE)
-        if (!baseline.isFile) return false
+        val baseline = File(path.substring(0, index.coerceAtLeast(0)), BASELINE).takeIf { index >= 0 && it.isFile }
         val relative = path.substring(index + 1)
-        return baseline.useLines { lines -> lines.map(String::trim).any { it == relative } }
+        return baseline?.useLines { lines -> lines.map(String::trim).any { it == relative } } ?: false
     }
 }

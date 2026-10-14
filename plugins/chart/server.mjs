@@ -39,7 +39,7 @@ class RpcError extends Error {
 const actionFailed = (code, message) => new RpcError(Code.ACTION_FAILED, message, { code });
 const CANCELLED = Symbol('cancelled');
 
-const isArrayOf = (value, check) => Array.isArray(value) && value.every(check);
+const isArrayOf = (value, check) => Array.isArray(value) && value.every((v) => check(v));
 const sameLength = ({ labels, values }) => labels.length === values.length;
 const pointsInRange = ({ labels }) => labels.length >= 1 && labels.length <= MAX_POINTS;
 

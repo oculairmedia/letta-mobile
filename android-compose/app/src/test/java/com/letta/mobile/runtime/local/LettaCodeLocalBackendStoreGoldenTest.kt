@@ -57,6 +57,8 @@ class LettaCodeLocalBackendStoreGoldenTest {
     private fun agentFile(agentId: String): File =
         File(storageRoot, "agents/${b64(agentId)}.json").apply { parentFile!!.mkdirs() }
 
+    // The transcript rows are verbatim on-disk JSONL fixtures; splitting them would hide their shape.
+    @Suppress("MaxLineLength")
     private fun writeFixture() {
         agentFile(AGENT_A).writeText(
             """{"id":"$AGENT_A","name":"Disk A","model":"lmstudio/m-disk","model_settings":{"context_window_limit":32000},"tags":["x"]}""",

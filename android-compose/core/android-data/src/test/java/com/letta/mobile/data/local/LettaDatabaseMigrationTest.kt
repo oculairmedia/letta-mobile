@@ -448,7 +448,8 @@ class LettaDatabaseMigrationTest {
             db.execSQL(
                 "INSERT INTO canvas_ops (opId, canvasId, lamport, actorId, opType, payloadJson, createdAtEpochMs) VALUES " +
                     "('op-v20-1', 'canvas-v20', 1, 'user-1', 'set_background', " +
-                    "'{\"type\":\"set_background\",\"opId\":\"op-v20-1\",\"actorId\":\"user-1\",\"lamport\":1,\"colorHex\":\"#000000\"}', 5)",
+                    "'{\"type\":\"set_background\",\"opId\":\"op-v20-1\"," +
+                    "\"actorId\":\"user-1\",\"lamport\":1,\"colorHex\":\"#000000\"}', 5)",
             )
         }
 
