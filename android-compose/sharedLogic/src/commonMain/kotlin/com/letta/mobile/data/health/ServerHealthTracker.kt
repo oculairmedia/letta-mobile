@@ -56,11 +56,11 @@ class ServerHealthTracker(
         refresh(configs.value)
     }
 
+    /**
+     * letta-mobile-by4vm.39: every write, the clear of an emptied list included, happens under
+     * [refreshMutex], so a refresh for a smaller set can never be undone by a probe still in flight.
+     */
     private suspend fun refresh(current: List<LettaConfig>) {
-        if (current.isEmpty()) {
-            statesFlow.value = emptyMap()
-            return
-        }
         refreshMutex.withLock {
             val liveIds = current.map { it.id }.toSet()
             statesFlow.update { states ->
@@ -72,7 +72,9 @@ class ServerHealthTracker(
         }
     }
 
+    /** A config removed while its probe ran keeps no dot: the answer is dropped. */
     private fun record(config: LettaConfig, health: ServerHealthState) {
+        if (configs.value.none { it.id == config.id }) return
         statesFlow.update { it + (config.id to health) }
         listener.onProbed(config, health)
     }
