@@ -50,9 +50,9 @@ class CallerBoard(private val backend: HostCanvasBackend) : PluginCanvasAccess {
         if (ended.size > RECENT_CALLS) ended.remove(ended.keys.first())
     }
 
-    override suspend fun boardFor(requestedCanvasId: String?, call: PluginCallId?): HostCanvasEntry? {
+    override suspend fun boardFor(requestedCanvas: String?, call: PluginCallId?): HostCanvasEntry? {
         val who = callerFor(call) ?: return null
-        val access = if (requestedCanvasId != null) backend.open(who, requestedCanvasId) else backend.ownConversation(who)
+        val access = if (requestedCanvas != null) backend.open(who, requestedCanvas) else backend.ownConversation(who)
         return (access as? HostCanvasAccess.Granted)?.entry
     }
 
