@@ -78,7 +78,7 @@ class ProcessDriverFixture(
         fun call(action: String) = ActionCall(action, JsonObject(emptyMap()), ActionContext(ActionOrigin.Agent("agent-1")))
 
         /** The test classpath, plus the code sources the fake needs should the worker hide them. */
-        private val classpath: String by lazy {
+        val classpath: String by lazy {
             val anchors = listOf(FakeLcpPlugin::class.java, LcpPluginSession::class.java, ActionCall::class.java, Unit::class.java, Job::class.java, Json::class.java, kotlinx.serialization.KSerializer::class.java)
             val sources = anchors.mapNotNull { it.protectionDomain?.codeSource?.location?.toURI()?.let(::File)?.absolutePath }
             (System.getProperty("java.class.path").split(File.pathSeparator) + sources).filter(String::isNotEmpty).distinct().joinToString(File.pathSeparator)

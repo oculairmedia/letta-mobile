@@ -91,6 +91,12 @@ data class InstalledPlugin(
     /** Whether the staged update returns the plugin to a state that advertises its tools. */
     private val resumesAdvertised: Boolean get() = pendingUpdate?.resumeState?.advertises == true
 
+    /** Whether the owner consented to this very version and everything it asks for (an empty consent never counts). */
+    val consented: Boolean get() = consent.forVersion == version && consent.covers(manifest)
+
+    /** Whether it may run: consented to and [ready]. */
+    val runnable: Boolean get() = ready && consented
+
     /** Whether everything the plugin needs to run is set: required settings and required secrets. */
     val ready: Boolean
         get() = settingsSummary.complete && manifest.secrets.filter { it.required }.all { secretsStatus[it.name] == SecretState.SET }
