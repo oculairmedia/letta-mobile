@@ -4,6 +4,10 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ChatRunInterruptHost
+import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
+import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
+import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
@@ -213,9 +217,11 @@ class DesktopChatController(
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
 
-    private val interruptCoordinator = DesktopChatInterruptCoordinator(
+    /** letta-mobile-by4vm.14: Stop's lifecycle, the same shared state machine Android's composer runs. */
+    private val interrupter = ChatRunInterrupter(
         scope = scope,
-        onForcedLocalStop = ::forceLocalStopClear,
+        host = ChatRunInterruptHost(::forceLocalStopClear),
+        telemetry = ChatRunInterruptTelemetry(TELEMETRY_TAG),
     )
 
     /**
@@ -225,7 +231,7 @@ class DesktopChatController(
      * frame) — never optimistically. While set, the composer refuses new sends,
      * so a message can't be interleaved into a turn that is still running.
      */
-    val cancellingConversationId: StateFlow<String?> = interruptCoordinator.cancellingConversationId
+    val cancellingConversationId: StateFlow<String?> = interrupter.cancelling
 
     /**
      * The shared chat timeline presenter - the same one Android's ChatTimelineObserver uses
@@ -421,10 +427,8 @@ class DesktopChatController(
         if (outcome == RemoteSendOutcome.Completed) {
             runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
         }
-        if (cancellingConversationId.value != attempt.conversationId) return
-        interruptCoordinator.clearCancelling()
-        clearThinkingFor(attempt.conversationId)
-        attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
+        val conversationId = attempt.conversationId ?: return
+        if (interrupter.settle(conversationId)) clearThinkingFor(conversationId)
     }
 
     private fun RemoteSendAttempt.isTheLiveStream(): Boolean =
@@ -981,16 +985,17 @@ class DesktopChatController(
 
     fun stopActiveRun(conversationId: String) {
         if (closed) return
-        interruptCoordinator.stopActiveRun(
-            conversationId = conversationId,
-            gateway = gateway,
-            streamingConversationId = _streamingConversationId.value,
-            thinkingConversationId = _thinkingConversationId.value,
-        )
+        // Only the conversation whose run is live can be stopped from here.
+        val active = _streamingConversationId.value ?: _thinkingConversationId.value
+        if (active != null && active != conversationId) return
+        val aborter = gateway as? DesktopTurnAborter
+        val abort: (suspend () -> Boolean)? = aborter?.let { target -> suspend { target.abortConversationTurn(conversationId) } }
+        interrupter.request(ChatStopRequest(key = conversationId, transport = "appServer", abort = abort))
     }
 
     /**
-     * Local escape hatch: drop the streaming UI without a terminal frame.
+     * Local escape hatch: drop the streaming UI without a terminal frame. The interrupter has
+     * already left CANCELLING and telemeters the clear.
      */
     private fun forceLocalStopClear(conversationId: String, reason: String) {
         sendJob?.cancel()
@@ -1001,7 +1006,6 @@ class DesktopChatController(
                 it
             }
         }
-        interruptCoordinator.clearCancelling()
         if (_thinkingConversationId.value == conversationId) {
             _thinkingConversationId.value = null
         }
@@ -1009,13 +1013,6 @@ class DesktopChatController(
             _streamingConversationId.value = null
         }
         runPhases.publish(conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason))
-        Telemetry.event(
-            TELEMETRY_TAG,
-            "interrupt.forcedLocalClear",
-            "conversationId" to conversationId,
-            "reason" to reason,
-            level = Telemetry.Level.WARN,
-        )
     }
 
     fun send() {
