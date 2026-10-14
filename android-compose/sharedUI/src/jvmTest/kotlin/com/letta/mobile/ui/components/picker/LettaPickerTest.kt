@@ -120,6 +120,37 @@ class LettaPickerTest {
     }
 
     @Test
+    fun swappingInRowsOfTheSameCountClearsTheHighlight() = runComposeUiTest {
+        // letta-mobile-by4vm.47: the highlight was keyed on the row count, so a swap to another
+        // section of equal size kept pointing at a row the user never highlighted.
+        val drinks = PickerSection(key = "drinks", title = "Drinks", items = listOf(item("tea", "Tea"), item("coffee", "Coffee")))
+        var sections by mutableStateOf(listOf(fruit))
+        val picked = mutableListOf<String>()
+        setContent {
+            Frame {
+                LettaPickerContent(
+                    spec = LettaPickerSpec(sections),
+                    callbacks = PickerCallbacks(onQuery = {}, onPick = { picked += it.value }),
+                )
+            }
+        }
+        onNodeWithTag(LettaPickerTags.SEARCH).requestFocus()
+        onNodeWithTag(LettaPickerTags.SEARCH).performKeyInput {
+            pressKey(Key.DirectionDown)
+            pressKey(Key.DirectionDown)
+        }
+        sections = listOf(drinks)
+        onNodeWithTag(LettaPickerTags.ROW_PREFIX + "coffee").assertExists()
+        onNodeWithTag(LettaPickerTags.SEARCH).performKeyInput { pressKey(Key.Enter) }
+        runOnIdle { assertEquals(emptyList<String>(), picked) }
+        onNodeWithTag(LettaPickerTags.SEARCH).performKeyInput {
+            pressKey(Key.DirectionDown)
+            pressKey(Key.Enter)
+        }
+        runOnIdle { assertEquals(listOf("tea"), picked) }
+    }
+
+    @Test
     fun aClickPicksAndTheSelectedRowIsMarked() = runComposeUiTest {
         val picked = show(selected = setOf("apple"))
         onNodeWithTag(LettaPickerTags.ROW_PREFIX + "apple").assertIsSelected()

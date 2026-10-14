@@ -122,6 +122,7 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit): Unit =
         current.checkpointAndRestoreConfig(agentId, operation)
 
+    override val supportsCreateAgent: Boolean get() = sessionManager.current.agentRepository.supportsCreateAgent
     override suspend fun createAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createAgent(params) }
 
     override suspend fun createLocalAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createLocalAgent(params) }

@@ -161,6 +161,8 @@ class IrohAgentRepository(
         operation()
     }
 
+    override val supportsCreateAgent: Boolean get() = false
+
     override suspend fun createAgent(params: AgentCreateParams): Agent = unsupported("createAgent")
 
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {

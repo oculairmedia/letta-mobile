@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.a2ui.mayForwardAsUserAction
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
@@ -55,7 +56,9 @@ internal fun rememberDesktopShellContext(
     }
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
         val resolved = resolveA2uiAction(action, chatState.value.selectedConversationId)
-        core.sessionGraph.value.channelTransport.sendA2uiAction(resolved)
+        // letta-mobile-by4vm.2: desktop has no registry-backed A2UI approval path, so a
+        // tool_approval_response is dropped (and logged) rather than matched by the server unchecked.
+        if (resolved.mayForwardAsUserAction()) core.sessionGraph.value.channelTransport.sendA2uiAction(resolved)
     }
     return DesktopShellContext(
         shell = shell,

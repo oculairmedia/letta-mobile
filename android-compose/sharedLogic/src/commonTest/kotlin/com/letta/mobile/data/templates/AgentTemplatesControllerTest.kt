@@ -74,11 +74,33 @@ class AgentTemplatesControllerTest {
         assertTrue(agents.created.isEmpty())
     }
 
+    @Test
+    fun aBackendThatCannotCreateGatesTheActionInsteadOfCallingIt() = runTest {
+        // letta-mobile-by4vm.45: the bundled App Server's createAgent always throws; the page hides it.
+        val agents = FakeAgentRepository(canCreate = false)
+        val controller = AgentTemplatesController(agents, backgroundScope)
+        assertEquals("This backend cannot create agents yet.", controller.state.value.createUnavailableReason)
+        val opened = mutableListOf<String>()
+        controller.create("default") { opened += it }
+        runCurrent()
+        assertTrue(agents.created.isEmpty())
+        assertEquals(emptyList<String>(), opened)
+        assertNull(controller.state.value.creatingId)
+        assertNull(controller.state.value.error)
+    }
+
+    @Test
+    fun aBackendThatCanCreateOffersTheAction() = runTest {
+        assertNull(AgentTemplatesController(FakeAgentRepository(), backgroundScope).state.value.createUnavailableReason)
+    }
+
     private class FakeAgentRepository(
         private val failure: Throwable? = null,
         private val gate: CompletableDeferred<Unit>? = null,
+        private val canCreate: Boolean = true,
     ) : IAgentRepository {
         val created = mutableListOf<AgentCreateParams>()
+        override val supportsCreateAgent: Boolean get() = canCreate
         override val agents: StateFlow<List<Agent>> = MutableStateFlow(emptyList())
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
