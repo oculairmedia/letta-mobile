@@ -80,7 +80,6 @@ dependencies {
 
     implementation(project(":sharedLogic"))
     api(project(":sharedUI"))
-    implementation(project(":core:android-data"))
 
     implementation(libs.coil3.compose)
     implementation(libs.coil3.svg)
