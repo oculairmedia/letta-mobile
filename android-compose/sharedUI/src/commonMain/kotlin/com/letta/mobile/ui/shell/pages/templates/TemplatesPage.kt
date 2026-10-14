@@ -31,6 +31,7 @@ import com.letta.mobile.ui.theme.LettaDimens
 object TemplatesPageTags {
     const val PAGE = "templates-page"
     const val ERROR = "templates-page-error"
+    const val UNAVAILABLE = "templates-page-unavailable"
     val LIST = RosterListTag("templates-page-list")
 
     fun create(templateId: String) = "templates-page-create-$templateId"
@@ -63,6 +64,14 @@ fun TemplatesPage(state: AgentTemplatesState, actions: TemplatesPageActions, mod
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = LettaDimens.Space.sm),
         )
+        state.createUnavailableReason?.let { reason ->
+            Text(
+                reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(TemplatesPageTags.UNAVAILABLE),
+            )
+        }
         state.error?.let { TemplatesError(it, actions.onDismissError) }
         RosterList(
             RosterSpec(
@@ -87,7 +96,7 @@ private fun CreateButton(template: StarterAgentTemplate, state: AgentTemplatesSt
     val creating = state.creatingId == template.id
     TextButton(
         onClick = { actions.onCreate(template.id) },
-        enabled = state.creatingId == null,
+        enabled = state.creatingId == null && state.createUnavailableReason == null,
         modifier = Modifier.testTag(TemplatesPageTags.create(template.id)),
     ) { Text(if (creating) CREATING else CREATE) }
 }

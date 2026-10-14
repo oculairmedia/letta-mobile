@@ -50,12 +50,16 @@ val BuiltinAgentTemplates: List<StarterAgentTemplate> = listOf(
     ),
 )
 
-/** What the Templates page shows: the starters, the one being made into an agent, and a failure. */
+/**
+ * What the Templates page shows: the starters, the one being made into an agent, a failure, and why
+ * creating is unavailable on this backend ([createUnavailableReason], null when it is offered).
+ */
 @Immutable
 data class AgentTemplatesState(
     val templates: List<StarterAgentTemplate> = BuiltinAgentTemplates,
     val creatingId: String? = null,
     val error: String? = null,
+    val createUnavailableReason: String? = null,
 )
 
 /**
@@ -68,12 +72,17 @@ class AgentTemplatesController(
     templates: List<StarterAgentTemplate> = BuiltinAgentTemplates,
     private val errorMessageMapper: (Throwable, String) -> String = { throwable, fallback -> throwable.message ?: fallback },
 ) {
-    private val stateFlow = MutableStateFlow(AgentTemplatesState(templates = templates))
+    private val stateFlow = MutableStateFlow(
+        AgentTemplatesState(
+            templates = templates,
+            createUnavailableReason = CREATE_UNAVAILABLE.takeUnless { agentRepository.supportsCreateAgent },
+        ),
+    )
     val state: StateFlow<AgentTemplatesState> = stateFlow
 
     fun create(templateId: String, onCreated: (agentId: String) -> Unit) {
         val current = stateFlow.value
-        if (current.creatingId != null) return
+        if (current.creatingId != null || current.createUnavailableReason != null) return
         val template = current.templates.firstOrNull { it.id == templateId } ?: return
         stateFlow.update { it.copy(creatingId = templateId, error = null) }
         scope.launch {
@@ -90,6 +99,7 @@ class AgentTemplatesController(
 
     private companion object {
         const val CREATE_FAILED = "Failed to create agent"
+        const val CREATE_UNAVAILABLE = "This backend cannot create agents yet."
     }
 }
 

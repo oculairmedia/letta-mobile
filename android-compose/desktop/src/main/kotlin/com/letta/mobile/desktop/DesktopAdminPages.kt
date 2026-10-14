@@ -131,7 +131,7 @@ private fun desktopProjectsPage(binding: DesktopAdminBinding) = ShellPageContent
 
 private fun ProjectSummary.agentIdOrNull(): String? = lettaAgentId?.value?.takeIf { it.isNotBlank() }
 
-private fun desktopAdminErrorMessage(throwable: Throwable, fallback: String): String = when (throwable) {
+internal fun desktopAdminErrorMessage(throwable: Throwable, fallback: String): String = when (throwable) {
     is DesktopRepositoryUnavailableException -> "This backend does not serve this page yet."
     else -> throwable.message ?: fallback
 }
