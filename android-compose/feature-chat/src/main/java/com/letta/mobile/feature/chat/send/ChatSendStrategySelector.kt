@@ -47,7 +47,6 @@ internal class ChatSendStrategySelector(
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
             "isLocalRuntime" to context.isLocalRuntime,
-            "isClientModeEnabled" to context.isClientModeEnabled,
         )
         Telemetry.event(
             "IrohTrace", "send.route",

@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import kotlinx.coroutines.Job
 
 internal data class ChatSendContext(
-    val isClientModeEnabled: Boolean,
     val explicitConversationId: String?,
     /**
      * letta-mobile-lgns8.10.4.1: routing keys on the backend KIND, not on a
