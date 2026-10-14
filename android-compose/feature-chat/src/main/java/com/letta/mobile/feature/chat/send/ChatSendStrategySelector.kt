@@ -14,8 +14,14 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.DIRECT_WS]          -> [TimelineChatSendStrategy] (g70jb.4: this
- *                                   includes leftover shim-era configs)
+ *  - [BackendKind.DIRECT_WS]     -> [TimelineChatSendStrategy]
+ *
+ * letta-mobile-by4vm.26: [BackendKind.DIRECT_WS] is a live configuration (a Settings "Remote
+ * host" with a ws:// App Server address; LettaConfigMigration keeps such addresses), not a
+ * shim-era leftover, so its strategy stays. Iroh and direct ws:// therefore still reach the same
+ * App Server through two send paths ([IrohChatSendStrategy] over the frame channel,
+ * [TimelineChatSendStrategy] through the timeline repository); collapsing them is a behaviour
+ * change tracked separately.
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
