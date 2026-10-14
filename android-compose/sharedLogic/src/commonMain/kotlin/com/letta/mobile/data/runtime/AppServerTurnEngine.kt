@@ -689,22 +689,13 @@ class AppServerTurnEngine(
                     slot.updateLease { cur ->
                         if (cur?.token == leaseToken) cur.copy(phase = TurnLeasePhase.Streaming) else cur
                     }
-                    collectTurnWithIdleWatchdog(
+                    val outcome = collectTurnWithIdleWatchdog(
                         scope,
                         command,
                         collectorReady,
                         leaseRef,
                     ) { draft -> send(draft) }
-                    release.record(TurnReleaseReason.STREAM_ENDED)
-                } catch (completed: TurnCompletedMarker) {
-                    release.record(TurnReleaseReason.NORMAL_COMPLETION)
-                } catch (idle: TurnIdleTimedOutMarker) {
-                    release.record(TurnReleaseReason.WATCHDOG_TIMEOUT)
-                    Telemetry.event(
-                        "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
-                    )
-                    noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "idle_timeout"), leaseRef)
-                    send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
+                    finishCollectedTurn(outcome, command, leaseRef, release) { draft -> send(draft) }
                 } catch (cancellation: CancellationException) {
                     release.record(TurnReleaseReason.CANCELLATION, cancellation)
                     throw cancellation
@@ -797,6 +788,28 @@ class AppServerTurnEngine(
                     "processRole" to (releasedOwner?.processRole),
                     "releaseReason" to releaseReason,
                 )
+            }
+        }
+    }
+
+    /** letta-mobile-by4vm.7: records how the collector ended; an idle timeout also publishes its Failed terminal. */
+    private suspend fun finishCollectedTurn(
+        outcome: TurnOutcome,
+        command: TurnCommand,
+        lease: LeaseRef,
+        release: TurnReleaseRecord,
+        emit: suspend (RuntimeEventDraft) -> Unit,
+    ) {
+        when (outcome) {
+            TurnOutcome.Completed -> release.record(TurnReleaseReason.NORMAL_COMPLETION)
+            TurnOutcome.StreamEnded -> release.record(TurnReleaseReason.STREAM_ENDED)
+            TurnOutcome.IdleTimedOut -> {
+                release.record(TurnReleaseReason.WATCHDOG_TIMEOUT)
+                Telemetry.event(
+                    "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
+                )
+                noteOwnerTerminal(OwnerTerminalNote(RuntimeRunStatus.Failed, source = "idle_timeout"), lease)
+                emit(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
             }
         }
     }
@@ -951,7 +964,8 @@ class AppServerTurnEngine(
             lastFrameAt.value = currentTimeMs()
         }
 
-        fun launchIn(scope: CoroutineScope): Job = scope.launch {
+        /** Ends the turn with [TurnOutcome.IdleTimedOut] once the idle window passes with no frame. */
+        fun launchIn(scope: CoroutineScope, completion: TurnCompletion): Job = scope.launch {
             val pauseRecheckMs = minOf(turnIdleTimeoutMs, WATCHDOG_PAUSE_RECHECK_MS)
             while (true) {
                 if (approvals.hasOutstanding(key) || isPaused()) {
@@ -960,7 +974,10 @@ class AppServerTurnEngine(
                     continue
                 }
                 val remaining = turnIdleTimeoutMs - (currentTimeMs() - lastFrameAt.value)
-                if (remaining <= 0) throw TurnIdleTimedOut
+                if (remaining <= 0) {
+                    completion.complete(TurnOutcome.IdleTimedOut)
+                    return@launch
+                }
                 delay(remaining.milliseconds)
             }
         }
@@ -970,6 +987,7 @@ class AppServerTurnEngine(
         val scope: AppServerRuntimeScope,
         val command: TurnCommand,
         val lease: LeaseRef,
+        val completion: TurnCompletion,
     )
 
     /** The turn's one [TurnDraftProcessor], wired to this engine's approval, settle and terminal handling. */
@@ -996,8 +1014,9 @@ class AppServerTurnEngine(
                     recordTerminalLifecycle(draft, wiring.command, frameSeq, wiring.lease)
                 },
                 noteCompleted = { frameSeq -> noteCompletedSettle(frameSeq, wiring.lease) },
-                complete = { throw TurnCompleted },
+                complete = { wiring.completion.complete(TurnOutcome.Completed) },
                 settleDelayMs = terminalSettleQuietMs,
+                isComplete = { wiring.completion.isSettled },
             ),
             coroutineScope = coroutineScope,
             identity = turnStreamIdentityFor(wiring.lease.queuedInput.clientMessageId),
@@ -1011,6 +1030,7 @@ class AppServerTurnEngine(
         val draftProcessor: TurnDraftProcessor,
         val externalToolDispatchScope: CoroutineScope,
         val emit: suspend (RuntimeEventDraft) -> Unit,
+        val completion: TurnCompletion,
     ) {
         val queuedFrames = QueuedLeaseFrameGate(lease.queuedInput)
     }
@@ -1047,6 +1067,7 @@ class AppServerTurnEngine(
     private suspend fun admitFrame(received: AppServerReceivedFrame, context: TurnFrameContext): Boolean {
         if (isConnectionGenerationSuperseded(context.lease)) {
             completeAbruptTurn(context, AbruptTurnEnding.GenerationSuperseded)
+            return false
         }
         if (received.isStaleGenerationForLease(context.lease)) return false
         if (approvalSender.reanswerCachedReplay(received.frame, context.runtimeScope, context.externalToolDispatchScope)) {
@@ -1064,6 +1085,8 @@ class AppServerTurnEngine(
         context: TurnFrameContext,
         budget: FrameProjectionErrorBudget,
     ) {
+        // letta-mobile-by4vm.7: a frame that raced the turn's completion is not this turn's any more.
+        if (context.completion.isSettled) return
         if (!admitFrame(received, context)) return
         (received.frame as? AppServerInboundFrame.UpdateDeviceStatus)?.snapshot?.currentPermissionMode
             ?.let { onPermissionModeInForce(context.runtimeScope, it) }
@@ -1132,8 +1155,6 @@ class AppServerTurnEngine(
      *
      * Deliberately NOT swallowed:
      *  - [CancellationException] — never swallow cancellation.
-     *  - [TurnCompletedMarker] / [TurnIdleTimedOutMarker] and anything caused by
-     *    a clean completion — control-flow signals.
      *  - a SUSTAINED run of failures ([FrameProjectionErrorBudget]). Tolerating
      *    one bad frame is resilience; tolerating every frame would be silently
      *    pretending a broken stream is fine.
@@ -1147,12 +1168,7 @@ class AppServerTurnEngine(
             mapper.map(context.command, received).also { budget.recordSuccess() }
         } catch (e: CancellationException) {
             throw e
-        } catch (e: TurnCompletedMarker) {
-            throw e
-        } catch (e: TurnIdleTimedOutMarker) {
-            throw e
         } catch (e: Throwable) {
-            if (e.isCausedByCleanCompletion()) throw e
             val consecutive = budget.recordFailure()
             val rethrown = consecutive > FrameProjectionErrorBudget.MAX_CONSECUTIVE
             Telemetry.event(
@@ -1170,7 +1186,10 @@ class AppServerTurnEngine(
         }
     }
 
-    private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding): Nothing {
+    private suspend fun completeAbruptTurn(context: TurnFrameContext, ending: AbruptTurnEnding) {
+        // letta-mobile-by4vm.7: completing no longer unwinds the frame, so a turn that already
+        // ended earlier in this frame must not get a second terminal.
+        if (context.completion.isSettled) return
         ending.ownerTerminalSource?.let { source ->
             recordDequeued(context.lease, source)
             noteOwnerTerminal(OwnerTerminalNote(ending.status, source = source), context.lease)
@@ -1185,7 +1204,7 @@ class AppServerTurnEngine(
         )
         context.draftProcessor.flushTail()
         context.emit(ending.draftFor(context.command))
-        throw TurnCompleted
+        context.completion.complete(TurnOutcome.Completed)
     }
 
     private suspend fun completeScopeRejectedTurn(
@@ -1201,18 +1220,24 @@ class AppServerTurnEngine(
         settleDanglingToolCalls(context.command, ledger.emitted, ledger.returned, context.emit, reason)
         context.draftProcessor.flushTail()
         context.emit(context.command.draftForScopeRejectedTerminal(status))
-        throw TurnCompleted
+        context.completion.complete(TurnOutcome.Completed)
     }
 
     /**
      * Collects turn events, resetting a [turnIdleTimeoutMs] watchdog on every
-     * matching frame. A parallel watchdog job throws [TurnIdleTimedOut] (by
-     * cancelling the collect scope) if the connection is silent for longer than
-     * the window. Throws [TurnCompleted] on a terminal lifecycle frame.
+     * matching frame, and returns how the turn ended ([TurnOutcome]).
      *
      * The watchdog runs CONCURRENTLY so a fully-silent turn (no frames at all)
      * still trips — checking only inside `collect` would never fire during
      * silence, which is exactly the c0qm0 hang.
+     *
+     * letta-mobile-by4vm.7: the frame loop runs under its own job, `collection`.
+     * Whatever ends the turn (a terminal frame, the delayed settle window, the
+     * reconnect countdown, the watchdog) completes the turn's [TurnCompletion],
+     * which cancels `collection`. The loop therefore always stops by
+     * cancellation, and a cancellation with a settled outcome on a live scope is
+     * that clean stop, never an abort, so it settles no dangling tool calls
+     * (fix(no-settle-on-clean-completion)).
      */
     @Suppress("NoDetachedCoroutineLifecycle") // Bounded responses deliberately outlive a completed turn.
     private suspend fun collectTurnWithIdleWatchdog(
@@ -1221,12 +1246,16 @@ class AppServerTurnEngine(
         collectorReady: CompletableDeferred<Unit>,
         lease: LeaseRef,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
-    ) = coroutineScope {
+    ): TurnOutcome = coroutineScope {
         val slot = lease.slot
+        // A child of this scope, so cancelling it stops only the frame loop; a supervisor, so a
+        // frame-loop failure reaches this function as the loop's own exception, as before.
+        val collection = SupervisorJob(coroutineContext[Job])
+        val completion = TurnCompletion(stopCollecting = { collection.cancel() })
         val idleWatchdog = TurnIdleWatchdog(slot.key) { lease.queuedInput.isWatchdogPaused(isConnectionGenerationSuperseded(lease)) }
-        val watchdog = idleWatchdog.launchIn(this)
+        val watchdog = idleWatchdog.launchIn(this, completion)
         val draftProcessor = newTurnDraftProcessor(
-            TurnDraftWiring(scope, command, lease),
+            TurnDraftWiring(scope, command, lease, completion),
             emitDraft,
             coroutineScope = this,
         )
@@ -1259,44 +1288,40 @@ class AppServerTurnEngine(
             draftProcessor = draftProcessor,
             externalToolDispatchScope = externalToolDispatchScope,
             emit = emitDraft,
+            completion = completion,
         )
         try {
             collectorReady.complete(Unit)
             val projectionErrors = FrameProjectionErrorBudget()
-            // letta-mobile-qygvv.16 / by4vm.9: a torn-down stream ends the turn; an interrupted
-            // session gets SESSION_RECONNECT_GRACE_MS to come back first.
-            SessionLossCutOff(draftProcessor, command, lease, inboundSource.sessionLink).endOnDetach(inboundEvents).collect { received ->
-                processReceivedFrame(received, frameContext, projectionErrors)
+            withContext(collection) {
+                // letta-mobile-qygvv.16 / by4vm.9: a torn-down stream ends the turn; an interrupted
+                // session gets SESSION_RECONNECT_GRACE_MS to come back first.
+                SessionLossCutOff(draftProcessor, command, lease, inboundSource.sessionLink).endOnDetach(inboundEvents).collect { received ->
+                    processReceivedFrame(received, frameContext, projectionErrors)
+                }
             }
-        } catch (idle: TurnIdleTimedOutMarker) {
-            // letta-mobile-oqfbj: settle before emitting the failed draft
-            settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
-            throw idle
+            completion.complete(TurnOutcome.StreamEnded)
+            completion.settledOutcome().also { turnEndReason = it.danglingToolCallReason() }
         } catch (e: CancellationException) {
-            // letta-mobile-oqfbj: settle on cancellation/abort.
-            // fix(no-settle-on-clean-completion): structured concurrency can
-            // deliver a CLEAN completion's `throw TurnCompleted` (thrown from
-            // the delayed terminalSettleJob, a sibling coroutine of this
-            // collect loop) to this suspension point wrapped as a
-            // CancellationException whose cause chain includes the original
-            // TurnCompletedMarker. That is NOT an abnormal cancellation/abort —
-            // it is the clean-completion path — so it must not settle.
-            if (!e.isCausedByCleanCompletion()) {
+            // letta-mobile-oqfbj: settle on cancellation/abort — unless this is the clean stop
+            // described above, which carries the turn's outcome.
+            val outcome = completion.outcome?.takeIf { isActive } ?: run {
                 turnEndReason = "Tool execution interrupted by cancellation"
+                throw e
             }
-            throw e
+            turnEndReason = outcome.danglingToolCallReason()
+            outcome
         } catch (e: Throwable) {
             // letta-mobile-oqfbj: settle on collector failure.
-            // fix(no-settle-on-clean-completion): same guard as above, in case
-            // the clean-completion marker surfaces here unwrapped instead.
-            if (!e.isCausedByCleanCompletion()) {
+            if (!completion.isSettled) {
                 turnEndReason = "Tool execution interrupted by stream error"
             }
             throw e
         } finally {
+            collection.cancel()
             // letta-mobile-oqfbj: settle any remaining dangling calls before cleanup
-            if (turnEndReason != null) {
-                settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, turnEndReason)
+            turnEndReason?.let { reason ->
+                settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, reason)
             }
             draftProcessor.terminalSettleJob?.cancel()
             watchdog.cancel()
@@ -1312,6 +1337,12 @@ class AppServerTurnEngine(
             }
         }
     }
+
+    /** letta-mobile-oqfbj: only an idle timeout leaves dangling tool calls to settle; a clean end never does. */
+    private fun TurnOutcome.danglingToolCallReason(): String? =
+        if (this == TurnOutcome.IdleTimedOut) "Tool execution interrupted by turn timeout" else null
+
+    private fun TurnCompletion.settledOutcome(): TurnOutcome = outcome ?: TurnOutcome.StreamEnded
 
     /**
      * Handles a frame rejected by [matches]. Records telemetry for terminal-
@@ -1744,19 +1775,6 @@ class AppServerTurnEngine(
     )
 
     /**
-     * fix(no-settle-on-clean-completion): true when [this] (or anything in its
-     * `cause` chain) is [TurnCompletedMarker] — i.e. the exception is really
-     * the clean-completion signal propagated across a coroutine boundary
-     * (structured concurrency wraps a sibling's thrown [TurnCompleted] as a
-     * [kotlinx.coroutines.CancellationException] whose cause chain preserves
-     * the original marker). Used to make sure the abnormal-end catch clauses
-     * below never mistake a clean completion for a real cancellation/error and
-     * settle dangling tool calls with a synthetic Failed return.
-     */
-    private fun Throwable.isCausedByCleanCompletion(): Boolean =
-        generateSequence(this) { it.cause }.any { it is TurnCompletedMarker }
-
-    /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
      * lifecycle status on the active-turn owner (if one is set). Pure metadata
      * write — no control-flow, no lock interaction, no effect on emitted drafts.
@@ -1936,11 +1954,3 @@ class AppServerTurnEngine(
         val defaultRequestId = AppServerRequestIdFactory("app-server")
     }
 }
-
-/** Clean-completion signal thrown out of the frame loop (see isCausedByCleanCompletion). */
-private object TurnCompleted : TurnCompletedMarker()
-private sealed class TurnCompletedMarker : Throwable()
-
-/** Idle-watchdog signal: the turn saw no frame for the idle window. */
-private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
-private sealed class TurnIdleTimedOutMarker : Throwable()

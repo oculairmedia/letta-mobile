@@ -75,10 +75,9 @@ class AppServerTurnEngineToolSettlementTest {
             val syntheticReturn = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
             assertEquals(ToolCallId("call-1"), syntheticReturn.toolCallId)
             assertEquals(ToolExecutionStatus.Failed, syntheticReturn.status)
-            assertTrue(
-                syntheticReturn.body.contains("timeout") || syntheticReturn.body.contains("interrupted"),
-                "Synthetic return body should mention timeout: ${syntheticReturn.body}",
-            )
+            // letta-mobile-by4vm.7: the watchdog's outcome reaches the settle step itself; before, it
+            // arrived as a cancellation and the return read "interrupted by cancellation".
+            assertEquals("Tool execution interrupted by turn timeout", syntheticReturn.body)
 
             // Terminal Failed lifecycle from idle timeout path
             val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)

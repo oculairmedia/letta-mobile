@@ -26,8 +26,11 @@ internal data class TurnDraftCallbacks(
     val completedDraft: (RunId?) -> RuntimeEventDraft,
     val recordTerminal: (RuntimeEventDraft, Long?) -> Unit,
     val noteCompleted: (Long?) -> Unit,
-    val complete: () -> Nothing,
+    /** Ends the turn (letta-mobile-by4vm.7: signals its [TurnOutcome.Completed]; it no longer throws). */
+    val complete: () -> Unit,
     val settleDelayMs: Long,
+    /** Whether the turn already ended, by this processor or another path (an abrupt local ending). */
+    val isComplete: () -> Boolean = { false },
 )
 
 internal class TurnDraftProcessor(
@@ -57,7 +60,7 @@ internal class TurnDraftProcessor(
      * completion already waiting out its settle window is published as it stands, otherwise
      * [fallback] is. Never emits a second terminal. Reports what it did, then completes the turn.
      */
-    suspend fun cutOff(fallback: RuntimeEventDraft, report: (TurnCutOffOutcome) -> Unit): Nothing {
+    suspend fun cutOff(fallback: RuntimeEventDraft, report: (TurnCutOffOutcome) -> Unit) {
         terminalSettleJob?.cancelAndJoin()
         terminalSettleJob = null
         report(publishCutOffTerminal(fallback))
@@ -101,6 +104,9 @@ internal class TurnDraftProcessor(
      * waiting out the quiet period the `stop_reason` delta fallback needs.
      */
     suspend fun process(incoming: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
+        // letta-mobile-by4vm.7: completing no longer throws, so nothing after the turn's terminal
+        // (a later draft of the same frame, a frame already in flight) may be processed.
+        if (isTurnOver()) return
         val draft = identity.stampDraft(incoming) ?: return
         flushClosedRoundTail(draft)
         if (emitAutoApproved(draft)) return
@@ -124,6 +130,8 @@ internal class TurnDraftProcessor(
         callbacks.emit(draft)
         armCompletedTerminalOnce()
     }
+
+    private fun isTurnOver(): Boolean = terminalEmitted || callbacks.isComplete()
 
     private suspend fun emitAutoApproved(draft: RuntimeEventDraft): Boolean {
         val approved = callbacks.autoApprovedDraft(draft) ?: return false
@@ -201,6 +209,7 @@ internal class TurnDraftProcessor(
         terminalArmed = true
         terminalSettleJob = coroutineScope.launch {
             delay(callbacks.settleDelayMs.milliseconds)
+            if (isTurnOver()) return@launch
             val terminal = pendingCompleted ?: return@launch
             flushTail()
             callbacks.noteCompleted(pendingCompletedSeq)
