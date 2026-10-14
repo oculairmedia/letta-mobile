@@ -23,8 +23,10 @@ object AppServerProtocol {
 
     /**
      * Upstream stream-channel message types (Letta Code `STREAM_CHANNEL_MESSAGE_TYPES`).
-     * On one-socket transports these are demuxed into [AppServerChannel.Stream];
-     * everything else (including malformed JSON) lands on [AppServerChannel.Control].
+     * On one-socket transports these are labelled [AppServerChannel.Stream];
+     * everything else (including malformed JSON) is [AppServerChannel.Control].
+     * The label picks a frame's per-type view only; delivery order is the socket's
+     * (letta-mobile-by4vm.5, see [AppServerInboundDelivery]).
      */
     private val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
         "stream_delta",

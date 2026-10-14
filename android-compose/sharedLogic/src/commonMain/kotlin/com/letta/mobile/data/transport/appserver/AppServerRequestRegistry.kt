@@ -49,6 +49,12 @@ internal class AppServerRequestRegistry(
         collectorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) { routeFrames() }
     }
 
+    /**
+     * letta-mobile-by4vm.5: this collector never suspends per frame (a map lookup under a
+     * lock, then [Pending.offer], which completes a deferred or `trySend`s into an unlimited
+     * channel). It reads the control VIEW, whose queue is separate from the ordered queue
+     * the router reads, so it cannot hold up runtime event delivery either way.
+     */
     private suspend fun routeFrames() {
         controlFrames.collect { received ->
             val frame = received.frame
