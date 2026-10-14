@@ -6,22 +6,23 @@ import com.letta.mobile.data.meridian.MeridianErrorCode
 
 /**
  * How the local endpoint decides who a CLI call comes from (letta-mobile-jna0o.4; design
- * "Caller identity"). The shim forwards `LETTA_AGENT_ID` / `LETTA_CONVERSATION_ID` from the agent's
- * shell env, which the agent can override, so that claim is never taken at face value in
- * [LIVE_CALL].
+ * "Caller identity"). The shim forwards `LETTA_TOOL_TOKEN` plus `LETTA_AGENT_ID` /
+ * `LETTA_CONVERSATION_ID` from the agent's shell env. The ids are the agent's to override, so in
+ * [LIVE_CALL] they are never used: only the per-call token says which call, and so which scope, a
+ * request belongs to (letta-mobile-by4vm.44).
  */
 enum class MeridianCallerBindingMode(val wire: String) {
     /**
-     * Phase 1 (default): the call binds only while the claimed conversation has a shell tool call
-     * running `meridian` in flight on a runtime this host relays; the scope and the call id are the
-     * App Server's, not the env's. No live call, no service.
+     * Default: the request must carry the token this host issued for one in-flight shell call that
+     * runs `meridian` ([MeridianLiveCalls.issueToken]); the scope and the call id are that call's,
+     * as the App Server stamped them. No live token, no service.
      */
     LIVE_CALL("live-call"),
 
     /**
      * Soft env-scoped attribution, the clearly weaker fallback for runtimes whose tool frames this
      * host cannot see (runtimes started by another App Server client, cron or channel turns nobody
-     * here subscribed to). The claimed scope is used as is when no live call vouches for it. Only
+     * here subscribed to). The claimed scope is used as is when no live token vouches for it. Only
      * acceptable on a single-tenant host where the agent's shell already runs as the user that owns
      * the canvas relay, so the CLI opens no hole the shell does not already have.
      */
@@ -34,26 +35,29 @@ enum class MeridianCallerBindingMode(val wire: String) {
     }
 }
 
-/** Turns a request's claimed scope into the [ExternalToolCaller] the router runs with, or refuses it. */
+/** Turns a request's tool token (or, in [MeridianCallerBindingMode.ENV_SCOPED], its claimed scope) into a caller. */
 class MeridianCallerBinder(
     private val mode: MeridianCallerBindingMode,
     private val liveCalls: MeridianLiveCalls,
 ) {
-    suspend fun bind(agentId: String?, conversationId: String?): Result<ExternalToolCaller> {
+    /** The token for the live call [toolCallId], issued once (letta-code's PreToolUse hook asks). */
+    suspend fun issue(toolCallId: String): Result<String> =
+        toolCallId.trim().takeIf { it.isNotEmpty() }?.let { liveCalls.issueToken(it) }?.let { Result.success(it) }
+            ?: denied("no tool token for call $toolCallId: it is not a running meridian shell call, or its token was already issued")
+
+    suspend fun bind(toolToken: String?, agentId: String?, conversationId: String?): Result<ExternalToolCaller> {
+        val token = toolToken?.trim()?.takeIf { it.isNotEmpty() }
+        val live = token?.let { liveCalls.claim(it) }
         val claimedAgent = agentId?.trim()?.takeIf { it.isNotEmpty() }
         val claimedConversation = conversationId?.trim()?.takeIf { it.isNotEmpty() }
-        val live = claimedConversation?.let { liveCalls.claim(it, claimedAgent) }
         return when {
             live != null -> Result.success(live.toCaller())
             mode == MeridianCallerBindingMode.ENV_SCOPED && (claimedAgent != null || claimedConversation != null) ->
                 Result.success(ExternalToolCaller(claimedAgent, claimedConversation))
-            claimedConversation == null -> denied(
-                "no conversation scope: meridian runs from an agent's shell tool, which sets LETTA_CONVERSATION_ID",
+            token == null -> denied(
+                "no tool token: meridian runs from an agent's shell tool, which gets LETTA_TOOL_TOKEN for that one call",
             )
-            else -> denied(
-                "no running meridian shell call in conversation $claimedConversation" +
-                    (claimedAgent?.let { " for agent $it" } ?: ""),
-            )
+            else -> denied("the tool token does not belong to a running meridian shell call (it ends with its call)")
         }
     }
 
@@ -66,12 +70,12 @@ class MeridianCallerBinder(
         toolCallId = if (invocation <= 1) toolCallId else "$toolCallId:$invocation",
     )
 
-    private fun denied(message: String): Result<ExternalToolCaller> = Result.failure(
+    private fun <T> denied(message: String): Result<T> = Result.failure(
         MeridianWireRefusal(
             MeridianError(
                 MeridianErrorCode.DENIED,
                 message,
-                hint = "Run meridian from your shell tool in this conversation; do not override LETTA_AGENT_ID or LETTA_CONVERSATION_ID.",
+                hint = "Run meridian from your shell tool in this conversation; a token works only inside the call it was issued for.",
             ).toResponse(),
         ),
     )

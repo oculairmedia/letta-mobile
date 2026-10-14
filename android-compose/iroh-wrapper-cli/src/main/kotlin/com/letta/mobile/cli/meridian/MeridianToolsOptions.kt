@@ -83,7 +83,7 @@ class MeridianToolsOptions : OptionGroup(name = "Meridian CLI endpoint (jna0o.4)
     private val binding by option(
         "--meridian-caller-binding",
         envvar = "MERIDIAN_CALLER_BINDING",
-        help = "live-call (default: bind each call to an in-flight `meridian` shell call) | env-scoped (soft: trust the shell env scope).",
+        help = "live-call (default: bind each call by the token issued to one in-flight `meridian` shell call) | env-scoped (soft: trust the shell env scope).",
     ).convert { MeridianCallerBindingMode.parse(it) ?: fail("must be live-call or env-scoped") }
         .default(MeridianCallerBindingMode.LIVE_CALL)
 
