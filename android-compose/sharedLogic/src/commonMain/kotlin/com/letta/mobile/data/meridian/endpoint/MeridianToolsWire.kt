@@ -45,7 +45,7 @@ object MeridianToolsWire {
         if (request.protocol != null && request.protocol != PROTOCOL) {
             return Result.failure(MeridianWireRefusal(malformed("unsupported protocol ${request.protocol}; this host speaks $PROTOCOL")))
         }
-        if (request.argv.isEmpty()) {
+        if (request.argv.isEmpty() && request.issueToolToken == null) {
             return Result.failure(MeridianWireRefusal(malformed("argv is empty")))
         }
         return Result.success(request)
@@ -71,18 +71,24 @@ object MeridianToolsWire {
 
 /**
  * One call: the shim's argv (program name first or not; the router strips it), the stdin JSON when
- * stdin was not a terminal, and the scope the shim read from `LETTA_AGENT_ID` /
- * `LETTA_CONVERSATION_ID`. That scope is a claim, not an identity: [MeridianCallerBinder] decides
- * what it is worth. [token] is the bearer token of the loopback TCP fallback, unused on the socket.
+ * stdin was not a terminal, the per-call [toolToken] from `LETTA_TOOL_TOKEN`, and the scope the shim
+ * read from `LETTA_AGENT_ID` / `LETTA_CONVERSATION_ID`. That scope is a claim, not an identity:
+ * [MeridianCallerBinder] attributes by [toolToken] and uses the ids only in the env-scoped fallback.
+ * [token] is the bearer token of the loopback TCP fallback, unused on the socket.
+ *
+ * [issueToolToken] instead asks for the token of that tool call id (letta-code's PreToolUse hook,
+ * once per call); such a request has no argv.
  */
 @Serializable
 data class MeridianToolsWireRequest(
-    val argv: List<String>,
+    val argv: List<String> = emptyList(),
     val stdin: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     val token: String? = null,
     val protocol: String? = null,
+    @SerialName("tool_token") val toolToken: String? = null,
+    @SerialName("issue_tool_token") val issueToolToken: String? = null,
 )
 
 /** The answer the shim prints: [stdout] to stdout, [stderr] to stderr, and exits with [exitCode]. */

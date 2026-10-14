@@ -120,17 +120,20 @@ function hookEntry(hookPath) {
   };
 }
 
-/** Registers the hook in a letta-code settings.json, keeping everything else as it is. */
-function install(file, checkOnly, hookPath = INSTALLED_PATH) {
+/**
+ * Registers a hook in a letta-code settings.json, keeping everything else as it is. Defaults to this
+ * PermissionRequest hook; meridian-token-hook.cjs registers itself under PreToolUse the same way.
+ */
+function install(file, checkOnly, { hookPath = INSTALLED_PATH, event = 'PermissionRequest', marker = HOOK_MARKER } = {}) {
   let settings = {};
   if (fs.existsSync(file)) settings = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
   const hooks = settings.hooks || {};
-  const entries = Array.isArray(hooks.PermissionRequest) ? hooks.PermissionRequest : [];
+  const entries = Array.isArray(hooks[event]) ? hooks[event] : [];
   const wanted = hookEntry(hookPath);
-  const ours = entries.filter((e) => JSON.stringify(e).includes(HOOK_MARKER));
+  const ours = entries.filter((e) => JSON.stringify(e).includes(marker));
   if (ours.length === 1 && JSON.stringify(ours[0]) === JSON.stringify(wanted)) return 'in sync';
   if (checkOnly) return 'DRIFTED';
-  hooks.PermissionRequest = entries.filter((e) => !JSON.stringify(e).includes(HOOK_MARKER)).concat([wanted]);
+  hooks[event] = entries.filter((e) => !JSON.stringify(e).includes(marker)).concat([wanted]);
   settings.hooks = hooks;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.meridian-tmp`;
@@ -172,4 +175,4 @@ if (require.main === module) {
   process.exitCode = main(process.argv.slice(2));
 }
 
-module.exports = { allowsCommand, decide, install, hookEntry, EXIT_ALLOW, EXIT_NO_OPINION };
+module.exports = { allowsCommand, decide, install, hookEntry, SHELL_TOOLS, EXIT_ALLOW, EXIT_NO_OPINION };

@@ -76,6 +76,18 @@ test('forwards argv, stdin and the caller env, and prints the host answer', asyn
   }
 });
 
+test('forwards the per-call LETTA_TOOL_TOKEN as tool_token', async () => {
+  const sock = socketPath('tooltoken');
+  const { server, requests } = await fakeEndpoint(sock, () => ({ exit_code: 0, stdout: '{}', stderr: '' }));
+  try {
+    const result = await runShim(['canvas', 'list'], { env: { MERIDIAN_SOCKET: sock, LETTA_TOOL_TOKEN: 'f'.repeat(64) } });
+    assert.equal(result.code, 0);
+    assert.equal(requests[0].tool_token, 'f'.repeat(64));
+  } finally {
+    server.close();
+  }
+});
+
 test('reads --input-file itself and sends it as stdin', async () => {
   const sock = socketPath('file');
   const input = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mshim-in-')), 'ops.json');
