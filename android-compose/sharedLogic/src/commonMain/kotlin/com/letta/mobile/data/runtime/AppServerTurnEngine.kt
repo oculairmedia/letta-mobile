@@ -14,6 +14,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.snapshot
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
@@ -73,7 +74,7 @@ class AppServerTurnEngine(
     private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
     /** bzvro.13: told a runtime's mode (runtime_start's, or a device status); answers the mode still wanted, if it differs. */
     private val onPermissionModeInForce: (AppServerRuntimeScope, AppServerPermissionMode) -> AppServerPermissionMode? = { _, _ -> null },
-    private val requestIdFactory: () -> String = ::defaultRequestId,
+    private val requestIdFactory: () -> String = defaultRequestId,
     /**
      * Idle-liveness window (ms). If NO event frame for the current turn arrives
      * within this window, the turn is force-completed with a Failed lifecycle so
@@ -1849,8 +1850,6 @@ class AppServerTurnEngine(
     // lgns8.17(c): internal (was private) so the external-tool deadline regression
     // test asserts against the real constant instead of a copied literal.
     internal companion object {
-        private var nextRequestId = 0
-
         // 90s idle window: long enough for a slow first token / tool round-trip,
         // short enough that a permanently-stuck turn frees the engine before the
         // user gives up. Idle-based (reset per frame), so a long actively-streaming
@@ -1878,10 +1877,7 @@ class AppServerTurnEngine(
         // stale interval. Bounds how stale lastFrameAt can be on resume.
         const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
 
-        fun defaultRequestId(): String {
-            nextRequestId += 1
-            return "app-server-${nextRequestId}"
-        }
+        val defaultRequestId = AppServerRequestIdFactory("app-server")
     }
 }
 

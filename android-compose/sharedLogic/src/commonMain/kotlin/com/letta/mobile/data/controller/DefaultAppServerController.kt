@@ -28,6 +28,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
@@ -62,7 +63,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 class DefaultAppServerController(
     private val client: AppServerClient,
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
-    private val requestIdFactory: () -> String = ::defaultRequestId,
+    private val requestIdFactory: () -> String = defaultRequestId,
     /**
      * Optional durable registry of desired runtimes (lgns8.5). When provided,
      * every successful runtime_start upserts a [RuntimeRecord] so the reconnect
@@ -732,11 +733,6 @@ class DefaultAppServerController(
             version = "0.2.0",
         )
 
-        private var nextRequestId = 0
-
-        private fun defaultRequestId(): String {
-            nextRequestId += 1
-            return "controller-req-$nextRequestId"
-        }
+        private val defaultRequestId = AppServerRequestIdFactory("controller-req")
     }
 }
