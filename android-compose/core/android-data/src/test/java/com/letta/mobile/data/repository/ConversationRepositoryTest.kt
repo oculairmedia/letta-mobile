@@ -30,6 +30,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.data.chat.recompile.IrohConversationRecompileRpc
 import org.junit.Assert.assertEquals
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -564,6 +567,62 @@ class ConversationRepositoryTest {
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
+    }
+
+    @Test
+    fun `recompile over Iroh goes through the host's conversation recompile relay`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            advertisedCapabilities = setOf(IrohConversationRecompileRpc.CAPABILITY)
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "r",
+                    success = true,
+                    result = IrohConversationRecompileRpc.result("compiled prompt", dryRun = false),
+                )
+            }
+        }
+        repository = irohRepository(transport)
+
+        assertTrue(repository.canRecompileConversations())
+        val prompt = repository.recompileConversation(ConversationId("conv-1"), false, AgentId("a1"))
+
+        assertEquals("compiled prompt", prompt)
+        val call = transport.adminRpcCalls.single()
+        assertEquals(IrohConversationRecompileRpc.METHOD, call.method)
+        val params = Json.parseToJsonElement(call.body!!).jsonObject
+        assertEquals("conv-1", params.getValue("conversation_id").jsonPrimitive.content)
+        assertEquals("a1", params.getValue("agent_id").jsonPrimitive.content)
+        assertFalse("dry_run" in params)
+        assertFalse(fakeApi.calls.any { it.startsWith("recompileConversation") })
+    }
+
+    @Test
+    fun `recompile over Iroh surfaces the host's refusal`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            advertisedCapabilities = setOf(IrohConversationRecompileRpc.CAPABILITY)
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = false, error = "recompile_failed: nope")
+            }
+        }
+        repository = irohRepository(transport)
+
+        val error = runCatching { repository.recompileConversation(ConversationId("conv-1"), true, AgentId("a1")) }.exceptionOrNull()
+
+        assertEquals("recompile_failed: nope", error?.message)
+        assertEquals("true", Json.parseToJsonElement(transport.adminRpcCalls.single().body!!).jsonObject.getValue("dry_run").jsonPrimitive.content)
+    }
+
+    @Test
+    fun `an Iroh host without the recompile relay offers no recompile and is never asked`() = runTest {
+        val transport = FakeChannelTransport()
+        repository = irohRepository(transport)
+
+        assertFalse(repository.canRecompileConversations())
+        val error = runCatching { repository.recompileConversation(ConversationId("conv-1"), false, AgentId("a1")) }.exceptionOrNull()
+
+        assertTrue(error is UnsupportedOperationException)
+        assertTrue(transport.adminRpcCalls.isEmpty())
+        assertFalse(fakeApi.calls.any { it.startsWith("recompileConversation") })
     }
 
     @Test

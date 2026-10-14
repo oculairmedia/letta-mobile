@@ -240,4 +240,13 @@ class IrohPeerCapabilitiesTest {
         // And admin.full is never implicit in any role constant.
         assertFalse(IrohPeerCapabilities.ADMIN_FULL in vibesyncRole, "vibesync role must not implicitly hold admin.full")
     }
+
+    @Test
+    fun conversationRecompileIsAConversationManageWriteADesktopHoldsButAChatPeerReaderDoesNot() {
+        // letta-mobile-by4vm.51: recompile re-renders and saves the system prompt, like compact.
+        val required = IrohPeerCapabilities.forAdminMethod("conversation.recompile")
+        assertEquals(IrohPeerCapabilities.CONVERSATION_MANAGE, required)
+        assertTrue(IrohPeerCapabilities.isAllowed(desktopRole, required))
+        assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_READ), required))
+    }
 }

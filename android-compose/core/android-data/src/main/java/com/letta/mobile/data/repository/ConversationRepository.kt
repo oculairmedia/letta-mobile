@@ -5,6 +5,7 @@ import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
 import com.letta.mobile.data.chat.branch.BranchUnavailableException
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
+import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
@@ -302,11 +303,12 @@ open class ConversationRepository(
     override fun canCancelConversationRuns(): Boolean = irohCancelTransport() != null
 
     /**
-     * letta-mobile-by4vm.12: no Android backend can recompile. The App Server has
-     * `conversation_recompile`, but the Iroh host has no `admin_rpc` relay for it and the embedded
-     * runtime offers none, so only the [remote] seam (no production route) is left.
+     * letta-mobile-by4vm.51: an Iroh host recompiles through its `conversation.recompile` relay (App
+     * Server `conversation_recompile`) when it advertises one; a wrapper deployed before the relay
+     * does not, and neither does the embedded runtime, so elsewhere only the [remote] seam (no
+     * production route) is left.
      */
-    override fun canRecompileConversations(): Boolean = false
+    override fun canRecompileConversations(): Boolean = irohRecompileSource() != null
 
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
         val channel = irohCancelTransport() ?: return remote.cancelConversation(id, agentId)
@@ -320,13 +322,22 @@ open class ConversationRepository(
         return if (agentId != null && !dryRun) {
             var result = ""
             agentRepository.checkpointAndRestoreConfig(agentId) {
-                result = remote.recompileConversation(id, dryRun, agentId)
+                result = recompileRoute(id, dryRun, agentId)
             }
             result
         } else {
-            remote.recompileConversation(id, dryRun, agentId)
+            recompileRoute(id, dryRun, agentId)
         }
     }
+
+    private suspend fun recompileRoute(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
+        val irohSource = irohConversationListSource?.takeIf { it.shouldUseIroh() }
+            ?: return remote.recompileConversation(id, dryRun, agentId)
+        return irohSource.recompiler.recompile(ConversationRecompileRequest(id.value, agentId?.value.orEmpty()), dryRun)
+    }
+
+    private fun irohRecompileSource(): IrohAdminRpcConversationListSource? =
+        irohConversationListSource?.takeIf { it.shouldUseIroh() && it.recompiler.supported }
 
     /** The embedded runtime (letta-code 0.26.1) has no `conversation_fork`; every other backend forks. */
     override fun canForkConversations(): Boolean =
