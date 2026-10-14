@@ -95,7 +95,7 @@ class LettaCodeLocalBackendStoreTest {
             """{"id":"ui-msg-9","role":"toolResult","toolCallId":"call_2","content":[{"type":"text","text":"boom"}],"isError":true}""",
         )
 
-        val results = store().readToolResults("agent-3")
+        val results = store().readToolResults(AgentId("agent-3"))
 
         assertEquals(2, results.size)
         assertEquals("hi\n", results.getValue("call_1").body)
