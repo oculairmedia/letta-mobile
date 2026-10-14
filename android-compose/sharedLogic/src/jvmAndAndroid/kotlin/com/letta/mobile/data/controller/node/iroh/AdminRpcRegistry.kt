@@ -45,6 +45,8 @@ object AdminRpcRegistry {
         "conversation.compact",
         // letta-mobile-joigh: context-limit relay (ConversationContextLimitHandlers).
         "conversation.context_limit",
+        // letta-mobile-by4vm.51: system-prompt recompile relay (ConversationRecompileHandlers).
+        "conversation.recompile",
         // letta-mobile-iczm7: dreaming (ReflectionAdminHandlers).
         "reflection.get",
         "reflection.set",
@@ -196,6 +198,8 @@ object AdminRpcRegistry {
         ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
         // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
         ConversationContextLimitHandlers.register(router, nativeClient)
+        // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
+        ConversationRecompileHandlers.register(router, nativeClient)
         pluginRoutes?.register(router)
             ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
 

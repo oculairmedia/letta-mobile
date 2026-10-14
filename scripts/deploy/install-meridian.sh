@@ -40,7 +40,9 @@ declare -A DROPINS=(
   [meridian-appserver.memory-protection.conf]="meridian-appserver.service.d/memory-protection.conf"
   [meridian-iroh-wrapper.memory-protection.conf]="meridian-iroh-wrapper.service.d/memory-protection.conf"
 )
-SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh meridian-permission-hook.cjs)
+# meridian-token-hook.cjs requires its two neighbours, so the shim is installed here too.
+SCRIPTS=(appserver-probe.cjs stall-watchdog.sh adopt-builds.sh cron-sensing-check.sh meridian-permission-hook.cjs
+  meridian-shim.cjs meridian-token-hook.cjs)
 
 # letta-mobile-jna0o.5: the agent-side `meridian` shim (on the App Server's PATH) and the
 # `meridian-canvas` letta-code skill (in the App Server user's global skills root, which letta-code
@@ -105,6 +107,19 @@ if [[ -f "$HERE/meridian-permission-hook.cjs" ]]; then
   fi
   [[ "$hook_state" == "in sync" ]] || drift=1
   say "$LETTA_SETTINGS (meridian PermissionRequest hook)" "$hook_state"
+fi
+
+# letta-mobile-by4vm.44: the PreToolUse hook that hands each `meridian` shell call its per-call
+# LETTA_TOOL_TOKEN. Required by the wrapper's default live-call binding: without it every CLI call
+# is refused (the env-scoped fallback does not need it).
+if [[ -f "$HERE/meridian-token-hook.cjs" ]]; then
+  if (( CHECK_ONLY )); then
+    token_state="$(node "$HERE/meridian-token-hook.cjs" --install "$LETTA_SETTINGS" --check 2>&1 || true)"
+  else
+    token_state="$(node "$HERE/meridian-token-hook.cjs" --install "$LETTA_SETTINGS" 2>&1 || true)"
+  fi
+  [[ "$token_state" == "in sync" ]] || drift=1
+  say "$LETTA_SETTINGS (meridian PreToolUse token hook)" "$token_state"
 fi
 
 # Env files: seed when absent, otherwise compare key names only. A value never

@@ -239,6 +239,8 @@ object IrohPeerCapabilities {
         "conversation.restore", "conversation.delete", "conversation.fork",
         // letta-mobile-57cta: rewrites the conversation's transcript, like fork/update.
         "conversation.compact",
+        // letta-mobile-by4vm.51: re-renders (and saves) the conversation's system prompt.
+        "conversation.recompile",
     )
 
     // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.

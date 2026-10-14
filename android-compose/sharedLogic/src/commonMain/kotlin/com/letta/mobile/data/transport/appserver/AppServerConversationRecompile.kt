@@ -36,8 +36,9 @@ data class AppServerConversationRecompileBody(
 )
 
 /**
- * `conversation_recompile_response`: whether it worked, and on failure the server's reason. The
- * compiled prompt ([AppServerInboundFrame.Unknown.raw]'s `result`) is not kept; nothing shows it.
+ * `conversation_recompile_response`: whether it worked, on failure the server's reason, and the
+ * compiled system prompt ([result], letta-code's `result` string; null when it sent none). The Iroh
+ * relay (letta-mobile-by4vm.51) hands [result] back to the client for the inspector's preview.
  *
  * Like the fork response, the frame is outside the typed [AppServerInboundFrame] set and is read
  * from [AppServerInboundFrame.Unknown], correlated by `request_id`.
@@ -46,6 +47,7 @@ data class AppServerConversationRecompileResponse(
     val requestId: String,
     val success: Boolean,
     val error: String?,
+    val result: String? = null,
 ) {
     companion object {
         /** The recompile response inside [frame], or null when [frame] is something else. */
@@ -57,6 +59,7 @@ data class AppServerConversationRecompileResponse(
                 requestId = unknown.requestId.orEmpty(),
                 success = (raw["success"] as? JsonPrimitive)?.contentOrNull == "true",
                 error = (raw["error"] as? JsonPrimitive)?.contentOrNull,
+                result = (raw["result"] as? JsonPrimitive)?.contentOrNull,
             )
         }
     }

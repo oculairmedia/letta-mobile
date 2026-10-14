@@ -1,10 +1,16 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.backend.RemoteRoute
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionPlatform
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.context.contextTokenReadingsOf
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
 import com.letta.mobile.data.repository.CachedProjectRepository
@@ -29,7 +35,6 @@ import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
-import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAgentRepository
 import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
@@ -55,14 +60,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-class DesktopRepositoryUnavailableException(
-    contractName: String,
-    operationName: String,
-) : UnsupportedOperationException(
-    "Desktop repository contract $contractName is not bound for operation $operationName. " +
-        "Install a JVM desktop implementation before invoking this API.",
-)
-
 class DesktopSessionGraph internal constructor(
     override val id: Long,
     override val backendDescriptor: BackendDescriptor,
@@ -85,6 +82,7 @@ class DesktopSessionGraph internal constructor(
     override val subagentRepository: ISubagentRepository,
     override val toolRepository: IToolRepository,
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository,
+    override val capabilities: SessionCapabilities,
     private val closeables: List<AutoCloseable> = emptyList(),
     /** letta-mobile-r2zo8: each conversation's latest context total; inert unless a transport feeds it. */
     val contextTokenReadings: ContextTokenReadings = ContextTokenReadings(),
@@ -147,6 +145,7 @@ class DesktopSessionGraphFactory(
             subagentRepository = adapters.subagentRepository,
             toolRepository = adapters.toolRepository,
             vibesyncEventStreamRepository = adapters.vibesyncEventStreamRepository,
+            capabilities = adapters.capabilities,
             closeables = adapters.closeables,
             contextTokenReadings = adapters.contextTokenReadings,
         )
@@ -211,6 +210,20 @@ class DesktopRepositoryAdapters(
     )
     private val irohMode = binding == SessionBackendBinding.Iroh
 
+    /**
+     * letta-mobile-by4vm.13: what this session serves — the desktop row of the
+     * [com.letta.mobile.data.backend.SessionRouteMatrix]. A remote host with no address is no backend.
+     * The bindings below decide independently; the desktop matrix test holds the two together.
+     */
+    val capabilities: SessionCapabilities = SessionCapabilities.forSession(
+        platform = SessionPlatform.DESKTOP,
+        kind = desktopBackendKind(binding, config),
+        hostCapabilities = { channelTransport.hostCapabilities },
+    )
+
+    /** True when this session's admin surfaces ride an Iroh host's relays (skills, slash commands). */
+    internal val servesIrohRelays: Boolean get() = irohMode
+
     // letta-mobile-ckmub.4: every non-Iroh backend is an App Server this window dials directly (the
     // bundled runtime or a remote ws:// host); its agents and memory are read over that session.
     private val appServerRepositories = when {
@@ -242,7 +255,7 @@ class DesktopRepositoryAdapters(
     // letta-mobile-ckmub.2.6: projects ride the Iroh host's `project.*` relay; no other backend has them.
     private val irohProjectRepository = if (irohMode) {
         CachedProjectRepository(
-            remote = unavailableRepository<ProjectRemoteSource>(),
+            remote = RemoteRoute.Absent(SessionRoute.PROJECTS),
             irohProjectSource = IrohAdminRpcProjectSource(channelTransport, irohSettings),
         )
     } else {
@@ -269,30 +282,37 @@ class DesktopRepositoryAdapters(
 
     val agentRepository: IAgentRepository = appServerRepositories?.agentRepository
         ?: irohAgentRepository
-        ?: unavailableRepository()
+        ?: unavailable(SessionRoute.AGENTS)
     val blockRepository: IAgentBlockRepository = appServerRepositories?.blockRepository
         ?: irohRepositories?.blockRepository
-        ?: unavailableRepository()
-    val conversationRepository: IConversationRepository = unavailableRepository()
+        ?: unavailable(SessionRoute.BLOCKS)
+    val conversationRepository: IConversationRepository = unavailable(SessionRoute.CONVERSATIONS)
     val cronRepository: ICronRepository = boundCronRepository
     val mcpServerRepository: IMcpServerRepository =
-        irohAdminReads?.mcpServerRepository ?: unavailableRepository()
+        irohAdminReads?.mcpServerRepository ?: unavailable(SessionRoute.MCP_SERVERS)
     val modelRepository: IModelRepository =
-        irohAdminReads?.modelRepository ?: unavailableRepository()
+        irohAdminReads?.modelRepository ?: unavailable(SessionRoute.MODELS)
     val passageRepository: IPassageRepository =
-        irohAdminReads?.passageRepository ?: unavailableRepository()
-    val projectRepository: IProjectRepository = irohProjectRepository ?: unavailableRepository()
-    val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
+        irohAdminReads?.passageRepository ?: unavailable(SessionRoute.PASSAGES)
+    val projectRepository: IProjectRepository = irohProjectRepository ?: unavailable(SessionRoute.PROJECTS)
+    val projectWorkRepository: IProjectWorkRepository = unavailable(SessionRoute.PROJECT_WORK)
     val providerRepository: IProviderRepository =
-        irohAdminReads?.providerRepository ?: unavailableRepository()
+        irohAdminReads?.providerRepository ?: unavailable(SessionRoute.PROVIDERS)
     val runRepository: IRunRepository =
-        irohAdminReads?.runRepository ?: unavailableRepository()
-    val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailableRepository()
+        irohAdminReads?.runRepository ?: unavailable(SessionRoute.RUNS)
+    val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailable(SessionRoute.SCHEDULES)
     val selfTodoRepository: ISelfTodoRepository = boundSelfTodoRepository
-    val stepRepository: IStepRepository = unavailableRepository()
+    val stepRepository: IStepRepository = unavailable(SessionRoute.STEPS)
     val subagentRepository: ISubagentRepository = boundSubagentRepository
-    val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailableRepository()
-    val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
+    val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailable(SessionRoute.TOOLS)
+    val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC)
+}
+
+/** The backend kind a desktop session binds; a remote host with no address is no backend at all. */
+private fun desktopBackendKind(binding: SessionBackendBinding, config: LettaConfig?): BackendKind? = when (binding) {
+    SessionBackendBinding.LocalRuntime -> BackendKind.LOCAL_RUNTIME
+    SessionBackendBinding.Iroh -> BackendKind.IROH
+    SessionBackendBinding.RemoteHttp -> BackendKind.DIRECT_WS.takeUnless { config?.serverUrl.isNullOrBlank() }
 }
 
 fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =

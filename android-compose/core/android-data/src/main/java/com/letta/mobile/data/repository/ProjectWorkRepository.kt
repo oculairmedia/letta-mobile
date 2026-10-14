@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.ProjectWorkRemoteSource
 
 /**
@@ -11,7 +13,10 @@ import com.letta.mobile.data.repository.api.ProjectWorkRemoteSource
  * route (the Letta REST backend was removed).
  */
 open class ProjectWorkRepository(
-    remote: ProjectWorkRemoteSource = noAppServerRoute(),
+    remote: RemoteRoute<ProjectWorkRemoteSource> = RemoteRoute.Absent(SessionRoute.PROJECT_WORK),
 ) : CachedProjectWorkRepository(
     remote = remote,
-)
+) {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(remote: ProjectWorkRemoteSource) : this(remote.bound())
+}

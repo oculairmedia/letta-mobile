@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.MessageRemoteSource
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
 import javax.inject.Inject
@@ -16,7 +18,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MessageRepository(
-    remote: MessageRemoteSource,
+    remote: RemoteRoute<MessageRemoteSource>,
     irohApprovalSource: IrohAdminRpcApprovalSource? = null,
     irohTimelineTransport: IrohAdminRpcTimelineTransport? = null,
 ) : CachedMessageRepository(
@@ -28,7 +30,14 @@ class MessageRepository(
     constructor(
         irohApprovalSource: IrohAdminRpcApprovalSource?,
         irohTimelineTransport: IrohAdminRpcTimelineTransport?,
-    ) : this(noAppServerRoute(), irohApprovalSource, irohTimelineTransport)
+    ) : this(RemoteRoute.Absent(SessionRoute.CONVERSATIONS), irohApprovalSource, irohTimelineTransport)
+
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(
+        remote: MessageRemoteSource,
+        irohApprovalSource: IrohAdminRpcApprovalSource? = null,
+        irohTimelineTransport: IrohAdminRpcTimelineTransport? = null,
+    ) : this(remote.bound(), irohApprovalSource, irohTimelineTransport)
 
     companion object {
         const val INITIAL_FETCH_LIMIT: Int = CachedMessageRepository.INITIAL_FETCH_LIMIT

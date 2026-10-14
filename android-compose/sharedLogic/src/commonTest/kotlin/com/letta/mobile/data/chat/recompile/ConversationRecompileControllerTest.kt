@@ -50,9 +50,9 @@ class ConversationRecompileControllerTest {
 
     @Test
     fun noRouteIsUnavailableWithTheHostsReason() = runTest(StandardTestDispatcher()) {
-        val noRoute = ConversationRecompileController(this, { null }, { ConversationRecompileController.UNAVAILABLE_OVER_IROH })
+        val noRoute = ConversationRecompileController(this, { null }, { ConversationRecompileController.UNAVAILABLE_HOST_OUTDATED })
         noRoute.recompile(request)
-        assertEquals(RecompileStatus.Unavailable(ConversationRecompileController.UNAVAILABLE_OVER_IROH), noRoute.status.value)
+        assertEquals(RecompileStatus.Unavailable(ConversationRecompileController.UNAVAILABLE_HOST_OUTDATED), noRoute.status.value)
 
         val wrapped = ConversationRecompileController(this, { FakeGateway { throw UnsupportedOperationException("x") } }, { "use REST" })
         wrapped.recompile(request)

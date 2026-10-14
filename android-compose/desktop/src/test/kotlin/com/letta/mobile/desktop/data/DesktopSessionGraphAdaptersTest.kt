@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.isUnavailable
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.chat.runtime.ChatGateway
@@ -75,10 +77,7 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     private fun assertUnavailable(repository: Any) {
-        assertTrue(
-            java.lang.reflect.Proxy.isProxyClass(repository::class.java),
-            "expected the unavailable repository, got $repository",
-        )
+        assertTrue(isUnavailable(repository), "expected the unavailable repository, got $repository")
     }
 
     @Test
@@ -133,7 +132,7 @@ class DesktopSessionGraphAdaptersTest {
 
         val adminError = runCatching { adapters.providerRepository.refreshProviders() }.exceptionOrNull()
         assertFalse(
-            adminError is DesktopRepositoryUnavailableException,
+            adminError is AppServerRouteUnavailable,
             "Iroh admin reads should be bound, not unavailable proxies",
         )
         adapters.closeables.forEach { it.close() }
@@ -150,7 +149,7 @@ class DesktopSessionGraphAdaptersTest {
         )
 
         assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
-        val error = assertFailsWith<DesktopRepositoryUnavailableException> {
+        val error = assertFailsWith<AppServerRouteUnavailable> {
             adapters.passageRepository.searchArchival(AgentId("agent-1"), "query")
         }
         assertTrue(error.message.orEmpty().contains("IPassageRepository"))
@@ -160,7 +159,7 @@ class DesktopSessionGraphAdaptersTest {
     fun unavailableRepositoriesFailWhenInvokedBeforeJvmBindingExists() = runTest {
         val graph = DesktopSessionGraphFactory().create()
 
-        val error = assertFailsWith<DesktopRepositoryUnavailableException> {
+        val error = assertFailsWith<AppServerRouteUnavailable> {
             graph.agentRepository.countAgents()
         }
 

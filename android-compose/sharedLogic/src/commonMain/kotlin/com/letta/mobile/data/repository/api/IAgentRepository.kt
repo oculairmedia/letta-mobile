@@ -75,6 +75,12 @@ interface IAgentRepository {
     suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit)
     suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) =
         checkpointAndRestoreConfig(AgentId(agentId), operation)
+    /**
+     * letta-mobile-by4vm.45: false when this backend cannot serve [createAgent] (the bundled local
+     * App Server and an Iroh agent directory have no create route), so pages hide the action instead
+     * of offering one that always fails.
+     */
+    val supportsCreateAgent: Boolean get() = true
     suspend fun createAgent(params: AgentCreateParams): Agent
     suspend fun createLocalAgent(params: AgentCreateParams): Agent =
         throw UnsupportedOperationException("Local agent creation is not supported by this repository")

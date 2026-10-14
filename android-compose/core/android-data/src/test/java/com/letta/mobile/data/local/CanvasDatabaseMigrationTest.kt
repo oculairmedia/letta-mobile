@@ -28,7 +28,7 @@ class CanvasDatabaseMigrationTest {
     }
 
     @Test
-    fun migratesLegacyDatabaseAndCreatesCanvasDocumentsTable() = runBlocking {
+    fun migratesLegacyDatabaseToTheNotebookJournalWithoutCanvasDocuments() = runBlocking {
         context.deleteDatabase(dbName)
         val legacyDb = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
         try {
@@ -61,20 +61,10 @@ class CanvasDatabaseMigrationTest {
             .build()
             .also { database = it }
 
-        val dao = db.canvasDocumentDao()
-        val doc = CanvasDocumentEntity(
-            id = "canvas-1",
-            agentId = "agent-1",
-            conversationId = "conv-1",
-            title = "Test Canvas",
-            revision = 1L,
-            sceneJson = """{"bgColor":-1,"elements":[]}""",
-            updatedAtEpochMs = 12345L,
-        )
-        dao.upsert(doc)
-        val loaded = dao.getById("canvas-1")
-        assertEquals(doc, loaded)
-        assertEquals(doc, dao.getForConversation("conv-1"))
-        assertEquals(listOf(doc), dao.listForAgent("agent-1"))
+        // letta-mobile-by4vm.22: canvases live in the notebook store; canvas_documents is gone.
+        val canvasTables = db.openHelper.readableDatabase
+            .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'canvas%' ORDER BY name")
+            .use { cursor -> buildList { while (cursor.moveToNext()) add(cursor.getString(0)) } }
+        assertEquals(listOf("canvas_ops"), canvasTables)
     }
 }

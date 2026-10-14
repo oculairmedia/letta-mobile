@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalSubmission
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 internal data class ApprovalSubmitParams(
-    val remote: MessageRemoteSource,
+    val remote: RemoteRoute<MessageRemoteSource>,
     val irohApprovalSource: IrohAdminRpcApprovalSource?,
     val json: Json,
     val agentId: AgentId,
@@ -58,7 +59,7 @@ internal object MessageRepositoryApproval {
             irohApproval.submitApproval(params.agentId, request, params.conversationId)
         } else {
             require(params.selectedSuggestionIds.isEmpty()) { "always-allow rules need an Iroh host" }
-            params.remote.sendMessage(params.agentId, request)
+            params.remote.source().sendMessage(params.agentId, request)
         }
     }
 

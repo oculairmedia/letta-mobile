@@ -1,5 +1,6 @@
 package com.letta.mobile.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -27,6 +28,13 @@ data class CanvasOpEntity(
     val opType: String,
     val payloadJson: String,
     val createdAtEpochMs: Long,
+    /**
+     * Whether the stored canvas document holds this op (letta-mobile-by4vm.22): appended unsettled,
+     * settled once the document write carrying it succeeded. Rows from before the journal are
+     * settled (the migration's default), since nothing records which of them the document missed.
+     */
+    @ColumnInfo(defaultValue = "1")
+    val settled: Boolean = true,
 ) {
     fun toCanvasOp(): CanvasOp =
         opSerializer.decodeFromString(CanvasOp.serializer(), payloadJson)
@@ -60,6 +68,7 @@ data class CanvasOpEntity(
                 opType = opType,
                 payloadJson = opSerializer.encodeToString(CanvasOp.serializer(), op),
                 createdAtEpochMs = clock(),
+                settled = false,
             )
         }
     }

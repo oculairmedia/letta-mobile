@@ -50,12 +50,14 @@ class LettaDatabaseCharacterizationTest {
             attachmentsJson = """[{"base64":"abc123","mediaType":"image/png"}]""",
             sentAtEpochMs = 123_456L,
             deliveryState = "SENT",
+            backendId = "backend-1",
+            agentId = "agent-1",
         )
 
         db.pendingLocalDao().upsert(row)
 
-        assertEquals(listOf(row), db.pendingLocalDao().listForConversation("conversation-1"))
-        assertEquals(emptyList<PendingLocalEntity>(), db.pendingLocalDao().listForConversation("conversation-2"))
+        assertEquals(listOf(row), db.pendingLocalDao().listForScope("backend-1", "agent-1", "conversation-1"))
+        assertEquals(emptyList<PendingLocalEntity>(), db.pendingLocalDao().listForScope("backend-1", "agent-1", "conversation-2"))
     }
 
     @Test

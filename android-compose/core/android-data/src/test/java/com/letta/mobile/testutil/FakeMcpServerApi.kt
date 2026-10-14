@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.model.McpServer
@@ -16,7 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-open class FakeMcpServerApi : McpServerRemoteSource by noAppServerRoute<McpServerRemoteSource>() {
+open class FakeMcpServerApi : McpServerRemoteSource by unavailable<McpServerRemoteSource>(SessionRoute.MCP_SERVERS) {
     var servers = mutableListOf<McpServer>()
     var serverTools = mutableMapOf<String, List<Tool>>()
     var resyncResults = mutableMapOf<String, McpServerResyncResult>()

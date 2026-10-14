@@ -86,7 +86,7 @@ internal class OrphanedTurnAborter(
      */
     private fun namesOwnRun(facts: LeaseReleaseFacts): Boolean {
         if (facts.phase == TurnLeasePhase.Queued) return false
-        return facts.runId != null || facts.releaseReason != CANCELLATION
+        return facts.runId != null || facts.releaseReason !in NEEDS_OWN_RUN_REASONS
     }
 
     /** Sends the abort when [shouldAbort]; never throws, bounded by [timeoutMs]. */
@@ -119,8 +119,17 @@ internal class OrphanedTurnAborter(
 
     companion object {
         const val ORPHAN_ABORT_TIMEOUT_MS: Long = 5_000L
-        private const val CANCELLATION = "cancellation"
-        private val ABORTING_REASONS = setOf("watchdog_timeout", "stream_error", CANCELLATION)
+        private val ABORTING_REASONS = setOf(
+            TurnReleaseReason.WATCHDOG_TIMEOUT,
+            TurnReleaseReason.STREAM_ERROR,
+            TurnReleaseReason.CANCELLATION,
+            // letta-mobile-by4vm.7: before it had its own reason, a throwing input send was
+            // released as a cancellation; it keeps that abort rule.
+            TurnReleaseReason.INPUT_SEND_FAILED,
+        )
+
+        /** Reasons that abort only a run this lease saw (no run-id-less abort of someone else's). */
+        private val NEEDS_OWN_RUN_REASONS = setOf(TurnReleaseReason.CANCELLATION, TurnReleaseReason.INPUT_SEND_FAILED)
 
         /** Terminals the engine synthesized itself; they are not evidence the server turn ended. */
         private val LOCAL_TERMINAL_SOURCES = setOf("idle_timeout", "input_rejected")

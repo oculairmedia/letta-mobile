@@ -8,7 +8,7 @@ import com.letta.mobile.data.model.backendKind
  * Session-graph binding choice: which transport / repo family a host should
  * construct for one [SessionRepositoryGraph] generation.
  *
- * [BackendKind.REST] (and a null config) bind the plain remote HTTP path —
+ * [BackendKind.DIRECT_WS] (and a null config) bind [RemoteHttp], the directly dialled App Server —
  * session factories only need Local vs Iroh vs everything else.
  *
  * Mode is authoritative: [LettaConfig.Mode.LOCAL] never binds Iroh even when
@@ -30,7 +30,7 @@ enum class SessionBackendBinding {
 fun LettaConfig?.sessionBackendBinding(
     forceIroh: Boolean = false,
 ): SessionBackendBinding = when (this?.backendKind(forceIroh = forceIroh)) {
-    null, BackendKind.REST -> SessionBackendBinding.RemoteHttp
+    null, BackendKind.DIRECT_WS -> SessionBackendBinding.RemoteHttp
     BackendKind.LOCAL_RUNTIME -> SessionBackendBinding.LocalRuntime
     BackendKind.IROH -> SessionBackendBinding.Iroh
 }

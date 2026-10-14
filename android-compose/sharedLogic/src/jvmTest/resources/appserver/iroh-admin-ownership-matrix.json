@@ -397,6 +397,25 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "conversation.recompile",
+      "handler": "ConversationRecompileHandlers.kt",
+      "current_backend": "native App Server v2 conversation_recompile (letta-mobile-by4vm.51)",
+      "owner": "app_server_v2",
+      "public_contract": "conversation_recompile",
+      "native_contract": [
+        "conversation_recompile",
+        "conversation_recompile_response"
+      ],
+      "authorization_class": "admin_write",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "notes": "letta-mobile-by4vm.51: system-prompt recompile relay for Iroh clients. Carries agent_id and the optional dry_run; answers with the compiled prompt. Advertised as conversation_recompile_v1.",
+      "production_first_route": "app_server_v2",
+      "post_shim_owner": "app_server_v2",
+      "post_shim_fallback": "none"
+    },
+    {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

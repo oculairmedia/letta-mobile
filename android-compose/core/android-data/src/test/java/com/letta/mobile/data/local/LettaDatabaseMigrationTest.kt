@@ -168,7 +168,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta")), agents.single().tagsJson)
         assertEquals(listOf("alpha", "beta"), agents.single().toAgent().tags)
         assertTrue(db.bugReportDao().getRecentForProject("project-1", limit = 10).isEmpty())
-        assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.pendingLocalDao().listForScope(null, null, "conversation-1").isEmpty())
         assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
@@ -204,7 +204,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(1, reports.size)
         assertEquals(7L, reports.single().id)
         assertEquals("Bug title", reports.single().title)
-        assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.pendingLocalDao().listForScope(null, null, "conversation-1").isEmpty())
         assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
@@ -256,7 +256,7 @@ class LettaDatabaseMigrationTest {
 
         val db = openMigratedDatabase()
 
-        assertEquals(listOf(row), db.pendingLocalDao().listForConversation("conversation-1"))
+        assertEquals(listOf(row), db.pendingLocalDao().listForScope(null, null, "conversation-1"))
         val agent = db.agentDao().getAllOnce().single()
         assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta", "gamma")), agent.tagsJson)
         assertEquals(listOf("alpha", "beta", "gamma"), agent.toAgent().tags)
@@ -401,27 +401,15 @@ class LettaDatabaseMigrationTest {
     }
 
     @Test
-    fun `migrates legacy database to v16 and creates canvas_documents table`() = runBlocking {
+    fun `migrates legacy database to latest without canvas_documents`() = runBlocking {
         createLegacyDatabase(version = 1) { db ->
             createAgentsTable(db)
         }
 
         val db = openMigratedDatabase()
-        val dao = db.canvasDocumentDao()
-        val doc = CanvasDocumentEntity(
-            id = "canvas-1",
-            agentId = "agent-1",
-            conversationId = "conv-1",
-            title = "Test Canvas",
-            revision = 1L,
-            sceneJson = """{"bgColor":-1,"elements":[]}""",
-            updatedAtEpochMs = 12345L,
-        )
-        dao.upsert(doc)
-        val loaded = dao.getById("canvas-1")
-        assertEquals(doc, loaded)
-        assertEquals(doc, dao.getForConversation("conv-1"))
-        assertEquals(listOf(doc), dao.listForAgent("agent-1"))
+
+        assertEquals(emptyList<String>(), tableNames(db).filter { it == "canvas_documents" })
+        assertTrue(tableNames(db).contains("canvas_ops"))
     }
 
     @Test
@@ -446,31 +434,65 @@ class LettaDatabaseMigrationTest {
         assertEquals(listOf(op), loaded)
         assertTrue(dao.has("canvas-v17-test", "op-v17-1"))
     }
+    /**
+     * letta-mobile-by4vm.22: v20 -> v21 drops the dead canvas_documents table and makes canvas_ops
+     * the notebook's journal. Ops logged before the journal are settled; new ones start unsettled.
+     */
     @Test
-    fun `migrates legacy database to v18 and adds aclJson column`() = runBlocking {
-        createLegacyDatabase(version = 1) { db ->
-            createAgentsTable(db)
+    fun `migrates v20 to v21 dropping canvas_documents and settling existing canvas ops`() = runBlocking {
+        createDatabaseAtVersion20 { db ->
+            db.execSQL(
+                "INSERT INTO canvas_documents (id, agentId, conversationId, title, revision, sceneJson, updatedAtEpochMs, aclJson) " +
+                    "VALUES ('canvas-v20', 'agent-1', 'conv-1', 'Old', 1, '', 1, NULL)",
+            )
+            db.execSQL(
+                "INSERT INTO canvas_ops (opId, canvasId, lamport, actorId, opType, payloadJson, createdAtEpochMs) VALUES " +
+                    "('op-v20-1', 'canvas-v20', 1, 'user-1', 'set_background', " +
+                    "'{\"type\":\"set_background\",\"opId\":\"op-v20-1\",\"actorId\":\"user-1\",\"lamport\":1,\"colorHex\":\"#000000\"}', 5)",
+            )
         }
 
         val db = openMigratedDatabase()
-        val dao = db.canvasDocumentDao()
-        val doc = CanvasDocumentEntity(
-            id = "canvas-v18-1",
-            agentId = "agent-1",
-            conversationId = "conv-1",
-            title = "Test Canvas",
-            revision = 1L,
-            sceneJson = """{"bgColor":-1,"elements":[]}""",
-            updatedAtEpochMs = 12345L,
-            aclJson = """{"ownerUserId":"user-1","writerUserIds":["user-2"]}""",
-        )
-        dao.upsert(doc)
-        val loaded = dao.getById("canvas-v18-1")
-        assertEquals(doc, loaded)
-        val domainDoc = loaded?.toCanvasDocument()
-        assertEquals("user-1", domainDoc?.acl?.ownerUserId)
-        assertTrue(domainDoc?.acl?.canWrite("user-2") == true)
+
+        assertTrue("canvas_documents survived the migration", tableNames(db).none { it == "canvas_documents" })
+        val dao = db.canvasOpDao()
+        val migrated = dao.getSince("canvas-v20", 0L).single()
+        assertEquals("op-v20-1", migrated.opId)
+        assertTrue("a pre-journal op would be replayed", migrated.settled)
+        assertEquals(emptyList<CanvasOpEntity>(), dao.getUnsettled("canvas-v20"))
+
+        val log = RoomCanvasOpLog(dao)
+        val next = com.letta.mobile.data.canvas.CanvasOp.SetBackgroundOp("op-v21-1", "user-1", 2L, "#ffffff")
+        log.append(com.letta.mobile.data.canvas.CanvasId("canvas-v20"), next)
+        assertEquals(listOf("op-v21-1"), dao.getUnsettled("canvas-v20").map { it.opId })
     }
+
+    /** A database migrated from v1 to v20 by the real migrations, [seed]ed, and left at v20. */
+    private fun createDatabaseAtVersion20(seed: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit) {
+        createLegacyDatabase(version = 1) { db -> createAgentsTable(db) }
+        val helper = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory().create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                .name(dbName)
+                .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                    override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) = Unit
+                    override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+                })
+                .build(),
+        )
+        try {
+            val db = helper.writableDatabase
+            LettaDatabaseMigrations.ALL.filter { it.endVersion <= 20 }.forEach { it.migrate(db) }
+            seed(db)
+            db.version = 20
+        } finally {
+            helper.close()
+        }
+    }
+
+    private fun tableNames(db: LettaDatabase): List<String> =
+        db.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type = 'table'").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
 
     @Test
     fun `migrates legacy database to v19 and keeps a conversation's own model`() = runBlocking {

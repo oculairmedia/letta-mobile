@@ -1,5 +1,6 @@
 package com.letta.mobile.data.paging
 
+import com.letta.mobile.data.backend.bound
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.letta.mobile.data.model.AgentId
@@ -32,7 +33,7 @@ class ConversationPagingSourceTest {
     @Before
     fun setup() {
         conversationApi = FakeConversationApi()
-        pagingSource = ConversationPagingSource(remote = conversationApi)
+        pagingSource = ConversationPagingSource(remote = conversationApi.bound())
     }
 
     @Test
@@ -78,7 +79,7 @@ class ConversationPagingSourceTest {
     @Test
     fun `passes filters to api`() = runTest {
         pagingSource = ConversationPagingSource(
-            remote = conversationApi,
+            remote = conversationApi.bound(),
             agentId = AgentId("agent-1"),
             archiveStatus = "unarchived",
             summarySearch = "important",
@@ -112,7 +113,7 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(listOf(TestData.conversation(id = "iroh-1", agentId = "agent-1"))) }
         }
         val source = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = irohPageLoader(transport),
             agentId = AgentId("agent-1"),
             archiveStatus = "unarchived",
@@ -150,7 +151,7 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(pages.removeFirst()) }
         }
         val source = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = irohPageLoader(transport),
         )
 
@@ -175,7 +176,7 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(emptyList()) }
         }
         val emptyResult = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = irohPageLoader(emptyTransport),
         ).load(refresh(loadSize = 50))
         emptyResult as PagingSource.LoadResult.Page
@@ -188,7 +189,7 @@ class ConversationPagingSourceTest {
             }
         }
         val failureResult = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = irohPageLoader(failureTransport),
         ).load(refresh(loadSize = 50))
         assertTrue(failureResult is PagingSource.LoadResult.Error)
@@ -197,7 +198,7 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> throw IllegalStateException("transport failed") }
         }
         val throwResult = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = irohPageLoader(throwingTransport),
         ).load(refresh(loadSize = 50))
         assertTrue(throwResult is PagingSource.LoadResult.Error)
@@ -224,7 +225,7 @@ class ConversationPagingSourceTest {
             throw kotlinx.coroutines.CancellationException("paging cancelled")
         }
         val source = ConversationPagingSource(
-            remote = armedConversationApi(),
+            remote = armedConversationApi().bound(),
             pageLoader = throwingLoader,
         )
         val ex = org.junit.Assert.assertThrows(kotlinx.coroutines.CancellationException::class.java) {
@@ -242,7 +243,7 @@ class ConversationPagingSourceTest {
         }
         val armedApi = armedConversationApi()
         val source = ConversationPagingSource(
-            remote = armedApi,
+            remote = armedApi.bound(),
             pageLoader = emptyLoader,
         )
         val result = source.load(refresh(loadSize = 50))

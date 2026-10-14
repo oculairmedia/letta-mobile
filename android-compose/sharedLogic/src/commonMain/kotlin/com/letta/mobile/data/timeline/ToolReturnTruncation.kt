@@ -50,45 +50,69 @@ internal fun foldToolReturnBodies(
     maxInboundBodyBytes: Int = DEFAULT_MAX_INBOUND_TOOL_RETURN_BYTES,
 ): ToolReturnFoldResult {
     if (matchingReturns.isEmpty()) return ToolReturnFoldResult(existingContent, existingTruncation)
-    val content = existingContent.toMutableMap()
-    val truncation = existingTruncation.toMutableMap()
-    for ((callId, toolReturn) in matchingReturns) {
-        val body = toolReturn.toolReturn.funcResponse ?: continue
-        if (toolReturn.toolReturnTruncated == true) {
-            val alreadyHoldsFullBody = callId in content && callId !in truncation
-            if (alreadyHoldsFullBody) continue
-            content[callId] = body
-            truncation[callId] = ToolReturnTruncation(
-                messageId = toolReturn.id,
-                byteLen = toolReturn.toolReturnByteLen ?: -1L,
-            )
-        } else {
-            // letta-mobile-c4igq.2: bound the full body at ingest. An oversized
-            // untruncated tool-return (server did not pre-project it) would
-            // otherwise be stored whole and could wedge the turn. Truncate to a
-            // UTF-8-safe prefix + attach a ToolReturnTruncation marker so the
-            // full body stays fetchable on demand; emit observable telemetry.
-            val bodyBytes = body.encodeToByteArray()
-            if (bodyBytes.size > maxInboundBodyBytes) {
-                val boundedPrefix = bodyBytes.decodeToString(0, maxInboundBodyBytes)
-                content[callId] = boundedPrefix +
-                    "\n… [truncated at ingest: ${bodyBytes.size} bytes > $maxInboundBodyBytes cap — expand to load the full output]"
-                truncation[callId] = ToolReturnTruncation(
-                    messageId = toolReturn.id,
-                    byteLen = bodyBytes.size.toLong(),
-                )
-                com.letta.mobile.util.Telemetry.event(
-                    "TimelineToolReturn", "inbound.truncated",
-                    "callId" to callId,
-                    "messageId" to toolReturn.id,
-                    "byteLen" to bodyBytes.size,
-                    "cap" to maxInboundBodyBytes,
-                )
-            } else {
-                content[callId] = body
-                truncation.remove(callId)
-            }
+    val fold = ToolReturnFold(existingContent.toMutableMap(), existingTruncation.toMutableMap(), maxInboundBodyBytes)
+    for ((callId, toolReturn) in matchingReturns) fold.add(callId, toolReturn)
+    return ToolReturnFoldResult(fold.content, fold.truncation)
+}
+
+/** The per-call maps one [foldToolReturnBodies] call writes into, one return at a time. */
+private class ToolReturnFold(
+    val content: MutableMap<String, String>,
+    val truncation: MutableMap<String, ToolReturnTruncation>,
+    private val maxInboundBodyBytes: Int,
+) {
+    fun add(callId: String, toolReturn: ToolReturnMessage) {
+        val body = toolReturn.toolReturn.funcResponse
+        when {
+            body == null -> addBodyless(callId)
+            toolReturn.toolReturnTruncated == true -> addPreview(callId, toolReturn, body)
+            else -> addFull(callId, toolReturn, body)
         }
     }
-    return ToolReturnFoldResult(content, truncation)
+
+    /**
+     * letta-mobile-by4vm.46: a return with no func_response (a stderr-only failure) still
+     * completes its call, exactly as the live reducer records it: "" unless a body is held.
+     */
+    private fun addBodyless(callId: String) {
+        if (callId !in content) content[callId] = ""
+    }
+
+    private fun addPreview(callId: String, toolReturn: ToolReturnMessage, body: String) {
+        val alreadyHoldsFullBody = callId in content && callId !in truncation
+        if (alreadyHoldsFullBody) return
+        content[callId] = body
+        truncation[callId] = ToolReturnTruncation(
+            messageId = toolReturn.id,
+            byteLen = toolReturn.toolReturnByteLen ?: -1L,
+        )
+    }
+
+    private fun addFull(callId: String, toolReturn: ToolReturnMessage, body: String) {
+        // letta-mobile-c4igq.2: bound the full body at ingest. An oversized
+        // untruncated tool-return (server did not pre-project it) would
+        // otherwise be stored whole and could wedge the turn. Truncate to a
+        // UTF-8-safe prefix + attach a ToolReturnTruncation marker so the
+        // full body stays fetchable on demand; emit observable telemetry.
+        val bodyBytes = body.encodeToByteArray()
+        if (bodyBytes.size <= maxInboundBodyBytes) {
+            content[callId] = body
+            truncation.remove(callId)
+            return
+        }
+        val boundedPrefix = bodyBytes.decodeToString(0, maxInboundBodyBytes)
+        content[callId] = boundedPrefix +
+            "\n… [truncated at ingest: ${bodyBytes.size} bytes > $maxInboundBodyBytes cap — expand to load the full output]"
+        truncation[callId] = ToolReturnTruncation(
+            messageId = toolReturn.id,
+            byteLen = bodyBytes.size.toLong(),
+        )
+        com.letta.mobile.util.Telemetry.event(
+            "TimelineToolReturn", "inbound.truncated",
+            "callId" to callId,
+            "messageId" to toolReturn.id,
+            "byteLen" to bodyBytes.size,
+            "cap" to maxInboundBodyBytes,
+        )
+    }
 }

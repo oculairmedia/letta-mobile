@@ -73,11 +73,10 @@ private fun Set<String>.toggle(value: String): Set<String> = if (value in this) 
 
 /**
  * The timeline port's presence comes from the projection alone (a prompt still sending, a run still
- * open); it has no client-mode stream, A2UI wait or transport turn flag of its own.
+ * open); it has no A2UI wait or transport turn flag of its own.
  */
 internal val IdlePresenceSignals = ChatPresenceSignals(
     replyStreaming = false,
-    clientModeStreamInFlight = false,
     a2uiThinkingActive = false,
     duplicateInitialMessageInFlight = false,
     turnInFlight = false,

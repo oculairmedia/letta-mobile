@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.model.Provider
@@ -9,7 +10,7 @@ import com.letta.mobile.data.model.ProviderCreateParams
 import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
 
-open class FakeProviderApi : ProviderRemoteSource by noAppServerRoute<ProviderRemoteSource>() {
+open class FakeProviderApi : ProviderRemoteSource by unavailable<ProviderRemoteSource>(SessionRoute.PROVIDERS) {
     var providers = mutableListOf<Provider>()
     var shouldFail = false
     val calls = mutableListOf<String>()

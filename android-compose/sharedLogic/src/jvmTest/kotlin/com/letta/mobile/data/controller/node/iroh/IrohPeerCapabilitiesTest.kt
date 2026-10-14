@@ -255,4 +255,13 @@ class IrohPeerCapabilitiesTest {
         assertTrue(IrohPeerCapabilities.isAllowed(IrohPeerCapabilities.CHAT_ROLE, IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.VIEW_ACTION)))
         assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_READ), IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.VIEW_ACTION)))
     }
+
+    @Test
+    fun conversationRecompileIsAConversationManageWriteADesktopHoldsButAChatPeerReaderDoesNot() {
+        // letta-mobile-by4vm.51: recompile re-renders and saves the system prompt, like compact.
+        val required = IrohPeerCapabilities.forAdminMethod("conversation.recompile")
+        assertEquals(IrohPeerCapabilities.CONVERSATION_MANAGE, required)
+        assertTrue(IrohPeerCapabilities.isAllowed(desktopRole, required))
+        assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_READ), required))
+    }
 }

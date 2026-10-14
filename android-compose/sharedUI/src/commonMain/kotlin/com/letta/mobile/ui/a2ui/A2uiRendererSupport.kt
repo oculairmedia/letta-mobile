@@ -26,8 +26,11 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiJsonPointer
+import com.letta.mobile.data.a2ui.A2uiLink
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
+import com.letta.mobile.data.a2ui.A2uiSurfaceLimits
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.a2ui.clampToA2uiTextLimit
 import com.letta.mobile.data.a2ui.resolveA2uiActionContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -255,7 +258,7 @@ internal fun resolveBindingText(
             A2uiResolvedBinding.Missing -> null
             is A2uiResolvedBinding.Value -> A2uiBindingResolver.displayText(resolved.value)
         }
-    }
+    }?.clampToA2uiTextLimit()
 
 @Composable
 internal fun resolveBindingElement(
@@ -346,7 +349,8 @@ internal fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRe
     )
 }
 
-internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? {
+/** The link an `openUrl` call asks for, or null when absent or not http/https/mailto (letta-mobile-by4vm.3). */
+internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): A2uiLink? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
     val functionCall = (action["functionCall"] as? JsonObject)
         ?: action.takeIf { it.stringValue("call") == "openUrl" }
@@ -355,9 +359,7 @@ internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: 
     val resolved = A2uiBindingResolver.resolve(functionCall.withScopedPaths(renderScope), surface.dataModel)
         as? A2uiResolvedBinding.Value
         ?: return null
-    return A2uiBindingResolver.displayText(resolved.value)
-        .trim()
-        .takeIf { it.startsWith("https://", ignoreCase = true) || it.startsWith("http://", ignoreCase = true) }
+    return A2uiLink.parse(A2uiBindingResolver.displayText(resolved.value))
 }
 
 internal fun A2uiComponent.spacing(): Dp =
@@ -846,7 +848,7 @@ internal val JsonElement.jsonPrimitiveOrNull: JsonPrimitive?
 
 internal const val DateIsoLength = 10
 internal const val TimeIsoLength = 5
-internal const val MaxRenderDepth = 32
+internal const val MaxRenderDepth = A2uiSurfaceLimits.MAX_RENDER_DEPTH
 internal const val DefaultToolApprovalTimeoutSeconds = 30
 internal const val A2uiButtonLocalTimeoutMillis = 10_000L
 internal const val A2uiLocalStateRootComponentId = "__surface__"

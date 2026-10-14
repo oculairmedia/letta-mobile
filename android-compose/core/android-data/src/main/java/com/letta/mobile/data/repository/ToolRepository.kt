@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
@@ -26,9 +28,12 @@ import kotlinx.coroutines.CancellationException
  * no-route error.
  */
 open class ToolRepository(
-    private val remote: ToolRemoteSource = noAppServerRoute(),
+    private val remote: RemoteRoute<ToolRemoteSource> = RemoteRoute.Absent(SessionRoute.TOOLS),
     private val irohToolSource: IrohAdminRpcToolSource? = null,
 ) : IToolRepository {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(remote: ToolRemoteSource, irohToolSource: IrohAdminRpcToolSource? = null) : this(remote.bound(), irohToolSource)
+
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
     private val refreshMutex = Mutex()
@@ -50,7 +55,7 @@ open class ToolRepository(
             refreshToolsIfStale(IROH_COUNT_MAX_AGE_MS)
             return _tools.value.size
         }
-        return remote.countTools()
+        return remote.source().countTools()
     }
 
     override suspend fun refreshTools() = refreshMutex.withLock {
@@ -64,7 +69,7 @@ open class ToolRepository(
             lastRefreshAtMillis = System.currentTimeMillis()
             return
         }
-        _tools.update { remote.listTools() }
+        _tools.update { remote.source().listTools() }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
@@ -83,7 +88,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.listTools(limit = limit, offset = offset)
         }
-        return remote.listTools(limit = limit, offset = offset)
+        return remote.source().listTools(limit = limit, offset = offset)
     }
 
     /**
@@ -92,7 +97,7 @@ open class ToolRepository(
      */
     override suspend fun getTool(toolId: String): Tool {
         val irohSource = irohToolSource
-        if (irohSource == null || !irohSource.shouldUseIroh()) return remote.getTool(ToolId(toolId))
+        if (irohSource == null || !irohSource.shouldUseIroh()) return remote.source().getTool(ToolId(toolId))
         // tool.get first so a tool changed/deleted since the catalog loaded is not served stale;
         // the cached catalog is only the fallback for hosts without tool.get.
         return irohGetOrNull(irohSource, toolId)
@@ -130,7 +135,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.attachTool(agentId, toolId)
         } else {
-            remote.attachTool(agentId, toolId)
+            remote.source().attachTool(agentId, toolId)
         }
         val tool = _tools.value.find { it.id == toolId }
         if (tool != null) {
@@ -146,7 +151,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.detachTool(agentId, toolId)
         } else {
-            remote.detachTool(agentId, toolId)
+            remote.source().detachTool(agentId, toolId)
         }
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     val existing = get(agentId.value) ?: emptyList()
@@ -159,7 +164,7 @@ open class ToolRepository(
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.createTool(params)
         } else {
-            remote.upsertTool(params)
+            remote.source().upsertTool(params)
         }
         _tools.update { current ->
             val index = current.indexOfFirst { it.id == tool.id }
@@ -173,7 +178,7 @@ open class ToolRepository(
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.updateTool(toolId, params)
         } else {
-            remote.updateTool(toolId, params)
+            remote.source().updateTool(toolId, params)
         }
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
@@ -191,7 +196,7 @@ open class ToolRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteTool(toolId)
         } else {
-            remote.deleteTool(toolId)
+            remote.source().deleteTool(toolId)
         }
         _tools.update { current -> current.filterNot { it.id == toolId } }
         _toolsByAgent.update { current ->

@@ -968,7 +968,6 @@ class ChatTimelineObserverTest {
             currentConversationTracker = currentConversationTracker,
             activeReplyStreams = activeReplyStreams,
             uiState = uiState,
-            isClientModeStreamInFlight = { false },
             hasActiveChatTurn = hasActiveChatTurn,
             a2uiThinkingStartMessageCount = a2uiThinkingStartMessageCount,
             clearA2uiThinkingOnResponse = clearA2uiThinkingOnResponse,

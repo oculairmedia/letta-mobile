@@ -57,6 +57,16 @@ class TemplatesPageTest {
     }
 
     @Test
+    fun aBackendThatCannotCreateDisablesEveryCreateAndSaysWhy() = runComposeUiTest {
+        // letta-mobile-by4vm.45: a direct App Server session has no agent_create route.
+        show(AgentTemplatesState(createUnavailableReason = "This backend cannot create agents yet."))
+        onNodeWithTag(TemplatesPageTags.UNAVAILABLE).assertExists()
+        onNodeWithText("This backend cannot create agents yet.").assertExists()
+        onNodeWithTag(TemplatesPageTags.create("default")).assertIsNotEnabled()
+        onNodeWithTag(TemplatesPageTags.create("writer")).assertIsNotEnabled()
+    }
+
+    @Test
     fun noTemplatesSaysSo() = runComposeUiTest {
         show(AgentTemplatesState(templates = emptyList()))
         onNodeWithTag(TemplatesPageTags.LIST.empty).assertExists()

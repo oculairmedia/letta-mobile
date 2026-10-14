@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
@@ -12,7 +13,7 @@ import com.letta.mobile.data.model.ConversationUpdateParams
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-open class FakeConversationApi : ConversationCrudRemoteSource by noAppServerRoute<ConversationCrudRemoteSource>() {
+open class FakeConversationApi : ConversationCrudRemoteSource by unavailable<ConversationCrudRemoteSource>(SessionRoute.CONVERSATIONS) {
     var conversations = mutableListOf<Conversation>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

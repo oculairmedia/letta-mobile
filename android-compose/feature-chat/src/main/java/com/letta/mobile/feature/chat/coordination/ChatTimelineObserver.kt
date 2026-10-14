@@ -50,7 +50,6 @@ internal class ChatTimelineObserver(
     private val currentConversationTracker: CurrentConversationTracker,
     private val activeReplyStreams: StateFlow<Set<String>>,
     private val uiState: MutableStateFlow<ChatUiState>,
-    private val isClientModeStreamInFlight: () -> Boolean,
     // letta-mobile-c4igq.7: transport-owned "a chat turn is in flight" signal
     // (true from turn start until the real terminal, across all tool rounds).
     // Holds presence across inter-round gaps so a multi-tool turn stays "working"
@@ -443,8 +442,6 @@ internal class ChatTimelineObserver(
             signals = presenceSignals(
                 PresenceRequest(binding, projection, previous, thinkingStart, responseArrived),
             ),
-            previousIsStreaming = previous.isStreaming,
-            previousIsAgentTyping = previous.isAgentTyping,
         )
     }
 
@@ -460,7 +457,6 @@ internal class ChatTimelineObserver(
     private fun presenceSignals(request: PresenceRequest) = ChatPresenceSignals(
         replyStreaming = activeReplyStreams.value.contains(request.binding.conversationId) ||
             request.projection.hasGrowingPassiveModelTail(request.previous),
-        clientModeStreamInFlight = isClientModeStreamInFlight(),
         a2uiThinkingActive = request.thinkingStart != null && !request.responseArrived,
         duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
         turnInFlight = hasActiveChatTurn(),

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.paging
 
+import com.letta.mobile.data.backend.RemoteRoute
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.letta.mobile.data.model.AgentId
@@ -18,7 +19,7 @@ internal typealias ConversationPageLoader = suspend (
 ) -> List<Conversation>
 
 class ConversationPagingSource(
-    private val remote: ConversationRemoteSource,
+    private val remote: RemoteRoute<ConversationRemoteSource>,
     private val agentId: AgentId? = null,
     private val archiveStatus: String? = null,
     private val summarySearch: String? = null,
@@ -37,7 +38,7 @@ class ConversationPagingSource(
                 summarySearch,
                 order,
                 orderBy,
-            ) ?: remote.listConversations(
+            ) ?: remote.source().listConversations(
                 agentId = agentId,
                 limit = params.loadSize,
                 after = params.key,

@@ -3,10 +3,19 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.document.InMemoryOpLog
 import com.letta.mobile.data.document.OpLog
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Append-only log of [CanvasOp] operations for a canvas document: the shared-document [OpLog]
  * for canvases.
+ *
+ * The log is also the write-ahead journal of the stored document (letta-mobile-by4vm.22). The
+ * document lives in another store (the Automerge notebook) with no transaction shared with the
+ * log, so a [CanvasSession] appends an op first, writes the document, and only then [settle]s the
+ * op. An op appended but never settled - the process died, or the document write failed, in
+ * between - is [unsettled]: the next session on the canvas folds it into the document before
+ * anything else happens. A log that cannot journal keeps the defaults and reports nothing pending.
  */
 @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE") // canvas callers and implementers name the id canvasId
 interface CanvasOpLog : OpLog<CanvasId, CanvasOp> {
@@ -14,18 +23,38 @@ interface CanvasOpLog : OpLog<CanvasId, CanvasOp> {
     override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp>
     override suspend fun has(canvasId: CanvasId, opId: String): Boolean
     override fun observe(canvasId: CanvasId): Flow<CanvasOp>
+
+    /** Ops on [canvasId] appended but not yet [settle]d, in the order they were appended. */
+    suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> = emptyList()
+
+    /** Records that the stored document of [canvasId] now holds [opIds]. Idempotent. */
+    suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) = Unit
 }
 
 /**
- * Thread-safe in-memory implementation of [CanvasOpLog].
+ * Thread-safe in-memory implementation of [CanvasOpLog], journal included.
  */
 @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE") // keeps the canvas's canvasId names for named callers
 class InMemoryCanvasOpLog : InMemoryOpLog<CanvasId, CanvasOp>(), CanvasOpLog {
-    override suspend fun append(canvasId: CanvasId, op: CanvasOp) = super.append(canvasId, op)
+    private val journalLock = Mutex()
+    private val pending = mutableMapOf<CanvasId, LinkedHashMap<String, CanvasOp>>()
+
+    override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
+        if (super.has(canvasId, op.opId)) return
+        journalLock.withLock { pending.getOrPut(canvasId) { LinkedHashMap() }[op.opId] = op }
+        super.append(canvasId, op)
+    }
 
     override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = super.getOps(canvasId, sinceLamport)
 
     override suspend fun has(canvasId: CanvasId, opId: String): Boolean = super.has(canvasId, opId)
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> = super.observe(canvasId)
+
+    override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> =
+        journalLock.withLock { pending[canvasId]?.values?.toList().orEmpty() }
+
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) {
+        journalLock.withLock { pending[canvasId]?.keys?.removeAll(opIds.toSet()) }
+    }
 }

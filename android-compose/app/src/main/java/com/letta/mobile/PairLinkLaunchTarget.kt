@@ -1,5 +1,6 @@
 package com.letta.mobile
 
+import android.content.Context
 import android.content.Intent
 import com.letta.mobile.ui.navigation.PairingScanRoute
 import com.letta.mobile.ui.screens.pairing.PendingPairLink
@@ -23,6 +24,6 @@ data object PairLinkLaunchTarget : AppLaunchTarget {
      * is handed over (in memory) it is cleared from the intent, so recreating the
      * activity cannot replay it.
      */
-    fun consume(intent: Intent): AppLaunchTarget? =
-        fromIntent(intent)?.also { intent.data = null } ?: AppLaunchTarget.fromIntent(intent)
+    fun consume(intent: Intent, context: Context): AppLaunchTarget? =
+        fromIntent(intent)?.also { intent.data = null } ?: AppLaunchTarget.fromIntent(intent, context)
 }

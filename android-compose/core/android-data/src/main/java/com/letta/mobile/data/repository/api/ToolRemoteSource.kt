@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.api
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
@@ -42,4 +43,4 @@ interface ToolRemoteSource {
     suspend fun detachTool(agentId: AgentId, toolId: ToolId): Unit = noRoute()
 }
 
-private fun noRoute(): Nothing = throw NoAppServerRouteException("ToolRemoteSource")
+private fun noRoute(): Nothing = throw AppServerRouteUnavailable(SessionRoute.TOOLS, "ToolRemoteSource")

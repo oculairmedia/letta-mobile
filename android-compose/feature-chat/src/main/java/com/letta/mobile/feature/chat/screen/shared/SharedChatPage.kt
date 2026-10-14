@@ -277,7 +277,7 @@ private fun rememberClientCommandPort(
         val recompile = ConversationRecompileController(
             scope = viewModel.viewModelScope,
             gateway = { current.recompileGateway },
-            unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
+            unavailableReason = { current.recompileUnavailableReason },
         )
         val routing = ClientCommandRouting(
             offered = commands.offered,

@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
@@ -11,7 +12,7 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 
-open class FakeAgentApi : AgentRemoteSource by noAppServerRoute<AgentRemoteSource>() {
+open class FakeAgentApi : AgentRemoteSource by unavailable<AgentRemoteSource>(SessionRoute.AGENTS) {
     var agents = mutableListOf<Agent>()
     var shouldFail = false
     var failCode = 500

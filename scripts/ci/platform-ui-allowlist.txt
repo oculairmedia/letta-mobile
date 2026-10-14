@@ -135,7 +135,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/Main.kt 308 leg
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/agent/DesktopAgentEditor.kt 133 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/DesktopMascotHost.kt 127 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveBenchInstruments.kt 158 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopSpike.kt 708 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopSurface.kt 267 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopTelemetry.kt 250 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/Surround.kt 132 legacy-pending(ckmub.3)

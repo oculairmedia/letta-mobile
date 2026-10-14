@@ -32,6 +32,7 @@ internal class TimelineOutboundSendProcessor(
     private val state: StateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val pendingLocalStore: PendingLocalStore,
+    private val pendingScope: PendingLocalScope = PendingLocalScope(backendId = null, conversationId = conversationId),
     private val logTag: String,
     scope: CoroutineScope,
     private val ingestStreamEvent: suspend (LettaMessage) -> Unit,
@@ -123,6 +124,8 @@ internal class TimelineOutboundSendProcessor(
                         content = content,
                         attachments = attachments,
                         sentAt = sentAt,
+                        backendId = pendingScope.backendId,
+                        agentId = pendingScope.agentId,
                     )
                 )
             }.onFailure { t ->

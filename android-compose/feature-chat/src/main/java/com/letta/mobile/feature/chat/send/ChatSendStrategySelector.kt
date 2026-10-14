@@ -14,8 +14,14 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.REST]          -> [TimelineChatSendStrategy] (g70jb.4: this
- *                                   includes leftover shim-era configs)
+ *  - [BackendKind.DIRECT_WS]     -> [TimelineChatSendStrategy]
+ *
+ * letta-mobile-by4vm.26: [BackendKind.DIRECT_WS] is a live configuration (a Settings "Remote
+ * host" with a ws:// App Server address; LettaConfigMigration keeps such addresses), not a
+ * shim-era leftover, so its strategy stays. Iroh and direct ws:// therefore still reach the same
+ * App Server through two send paths ([IrohChatSendStrategy] over the frame channel,
+ * [TimelineChatSendStrategy] through the timeline repository); collapsing them is a behaviour
+ * change tracked separately.
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
@@ -29,7 +35,7 @@ internal class ChatSendStrategySelector(
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
             BackendKind.IROH -> irohStrategy
-            BackendKind.REST -> timelineStrategy
+            BackendKind.DIRECT_WS -> timelineStrategy
         }
     }
 
@@ -47,7 +53,6 @@ internal class ChatSendStrategySelector(
             "conversationId" to context.explicitConversationId,
             "backendKind" to context.backendKind.name,
             "isLocalRuntime" to context.isLocalRuntime,
-            "isClientModeEnabled" to context.isClientModeEnabled,
         )
         Telemetry.event(
             "IrohTrace", "send.route",

@@ -278,6 +278,26 @@ Action rules:
   context fields are easier for agents and tests to reason about.
 - Keep input widgets side-effect-free. They update the local data model; the
   explicit user action is usually a Button tap or a domain widget control.
+- `functionCall: { call: "openUrl" }` never reaches the server. Only `http`,
+  `https` and `mailto` URLs parse (`A2uiLink`); anything else disables the
+  button. The link then goes through `LocalA2uiLinkPolicy` (default
+  `A2uiLinkPolicy.ConfirmAll`: the person sees the URL and taps Open).
+
+## Render Limits
+
+A surface is untrusted. `A2uiSurfaceLimits` (sharedLogic) sets the budgets
+(letta-mobile-by4vm.3):
+
+| Budget | Value | Enforced |
+|---|---|---|
+| Components per surface | 2,000 | `updateComponents` past it is refused; the surface renders `SURFACE_TOO_LARGE` until deleted |
+| Children per container | 200 | Column/Row/List render the first 200, then "N more not shown" |
+| Rendered instances per surface pass | 5,000 | `A2uiRenderBudget`; past it nodes render `RENDER_LIMIT` placeholders |
+| Instances of one component per list-item scope | 16 | flattens diamond DAGs (`children: [b, b]` per level) |
+| Depth | 32 | unchanged cycle/depth guard |
+| Text per binding | 64 KiB | longer values are cut |
+
+Keep real payloads well inside these; page long lists server-side.
 
 ## ListView Templating
 

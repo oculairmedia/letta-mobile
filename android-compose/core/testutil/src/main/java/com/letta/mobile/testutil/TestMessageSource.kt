@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaResponse
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -13,7 +14,7 @@ import io.ktor.utils.io.ByteReadChannel
  * production Letta REST `MessageApi`; this keeps its shape for the timeline engine tests only.
  * Every call fails unless a test overrides it.
  */
-open class TestMessageSource : MessageRemoteSource by noAppServerRoute<MessageRemoteSource>() {
+open class TestMessageSource : MessageRemoteSource by unavailable<MessageRemoteSource>(SessionRoute.CONVERSATIONS) {
     open suspend fun sendConversationMessage(conversationId: ConversationId, request: MessageCreateRequest): ByteReadChannel =
         notStubbed()
 
