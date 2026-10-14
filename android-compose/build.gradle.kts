@@ -1,5 +1,6 @@
 import com.autonomousapps.DependencyAnalysisExtension
 import io.gitlab.arturbosch.detekt.Detekt
+import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 
 plugins {
     id("com.letta.mobile.architecture-graph")
@@ -74,10 +75,18 @@ subprojects {
     }
 
     plugins.withId("io.gitlab.arturbosch.detekt") {
+        // letta-mobile-by4vm.32: each module's existing findings live in its own
+        // detekt-baseline.xml, so only NEW findings count. Refresh with
+        // `./gradlew detektBaseline` (JDK 21) when deliberately accepting debt.
+        extensions.configure<DetektExtension> {
+            baseline = file("detekt-baseline.xml")
+        }
         tasks.withType<Detekt>().configureEach {
             // Detekt 1.x supports JVM targets through 22; analysis does not need the Gradle runtime target.
             jvmTarget = "17"
-            // Keep rollout advisory by default; use -Parchitecture.strict=true to promote the gate.
+            // Local runs stay advisory by default. CI's `detekt` job passes
+            // -Parchitecture.strict=true, so a finding outside the baseline fails it.
+            // guardrailDetekt (quality/detekt-rules) sets ignoreFailures = false itself.
             ignoreFailures = providers.gradleProperty("architecture.strict").orNull != "true"
             exclude("**/build/**", "**/generated/**", "**/ksp/**")
             reports {

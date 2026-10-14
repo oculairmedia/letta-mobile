@@ -207,14 +207,18 @@ jobs:
           retention-days: 7
 
   detekt:
-    # Advisory static analysis. Wired with continue-on-error so existing debt
-    # does not block merges; findings still show on the PR checks list.
-    name: detekt (advisory)
-    # Keep advisory work out of the initial runner queue so required checks
+    # letta-mobile-by4vm.32: honest, non-required static analysis. Every module's
+    # existing findings are in its detekt-baseline.xml, so main is green and only
+    # a NEW finding fails this job. Not a required check (branch protection is
+    # untouched); it shows red instead of hiding behind continue-on-error.
+    # Covers the Android modules (app, core:android-data, designsystem,
+    # feature-chat) and quality:detekt-rules; KMP modules report NO-SOURCE.
+    # The changed-file guardrailDetekt rules run inside the required `test` job.
+    name: detekt
+    # Keep non-required work out of the initial runner queue so required checks
     # acquire capacity first.
     needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: android-compose
@@ -236,20 +240,31 @@ jobs:
           # restore shared entries without uploading competing snapshots.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Run detekt
-        run: ./gradlew detekt --continue
+      - name: Run detekt against the per-module baselines
+        run: ./gradlew detekt --continue -Parchitecture.strict=true
 
       - name: Publish detekt summary
         if: always()
         working-directory: ${{ github.workspace }}
         run: |
           {
-            echo "## detekt (advisory)"
+            echo "## detekt"
             echo
-            echo "Ran \`./gradlew detekt --continue\`. This check is non-blocking."
+            echo "Ran \`./gradlew detekt --continue -Parchitecture.strict=true\` (non-required)."
+            echo "Findings already in a module's \`detekt-baseline.xml\` are ignored; anything new fails."
+            echo "Fix it, or (deliberately) refresh the baseline with \`./gradlew detektBaseline\` on JDK 21."
             echo
             echo "Config: \`android-compose/detekt.yml\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload detekt reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-reports-${{ github.run_id }}
+          path: android-compose/**/build/reports/detekt/**
+          if-no-files-found: warn
+          retention-days: 7
 
   row-parity:
     # Hard cut S9 (letta-mobile-ckmub.2.2): the shared sharedUI chat rows against
