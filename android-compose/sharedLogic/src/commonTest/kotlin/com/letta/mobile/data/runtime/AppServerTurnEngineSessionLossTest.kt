@@ -1,6 +1,7 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.RuntimeEventFanout
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -59,6 +60,30 @@ class AppServerTurnEngineSessionLossTest {
         assertFalse(turn.engine.isBusy(AGENT, CONVERSATION), "the lease must be released")
     }
 
+    /**
+     * letta-mobile-by4vm.4: a turn whose fanout subscriber fell a full buffer behind is detached
+     * on its own; it must END (one failed terminal, lease released), not stop silently.
+     */
+    @Test
+    fun subscriberOverflowMidTurnEmitsExactlyOneConnectionLostTerminal() = runTest {
+        val turn = startTurn()
+
+        // route() never suspends, so the turn's collector gets no chance to drain in between.
+        // The first frame is handed straight to the collector parked in receive(), the next
+        // CAPACITY fill its buffer, and the one after that detaches this subscriber.
+        repeat(RuntimeEventFanout.SUBSCRIBER_BUFFER_CAPACITY + 2) { i ->
+            turn.fanout.route(receivedFrame(assistantDelta(seq = i + 1L)))
+        }
+        advanceUntilIdle()
+        turn.job.join()
+
+        val terminal = turn.singleTerminal()
+        assertEquals(RuntimeRunStatus.Failed, terminal.status)
+        assertEquals(SUBSCRIBER_OVERFLOW_TERMINAL_REASON, terminal.reason)
+        assertEquals(TurnFailureNotices.CONNECTION_LOST_KIND, terminalReasonKind(terminal.reason))
+        assertFalse(turn.engine.isBusy(AGENT, CONVERSATION), "the lease must be released")
+    }
+
     @Test
     fun terminalJustBeforeSessionLossIsNotDuplicated() = runTest {
         val turn = startTurn()
@@ -96,6 +121,7 @@ class AppServerTurnEngineSessionLossTest {
     private class RunningTurn(
         val client: RouterFedClient,
         val router: AppServerRuntimeEventRouter,
+        val fanout: RuntimeEventFanout,
         val engine: AppServerTurnEngine,
         val drafts: MutableList<RuntimeEventDraft>,
         val job: Job,
@@ -109,7 +135,8 @@ class AppServerTurnEngineSessionLossTest {
 
     private fun TestScope.startTurn(idleTimeoutMs: Long = 600_000): RunningTurn {
         val client = RouterFedClient()
-        val router = AppServerRuntimeEventRouter().also { it.attach(backgroundScope, client.events) }
+        val fanout = RuntimeEventFanout()
+        val router = AppServerRuntimeEventRouter(fanout = fanout).also { it.attach(backgroundScope, client.events) }
         val engine = AppServerTurnEngine(
             client = client,
             eventRouter = router,
@@ -119,7 +146,7 @@ class AppServerTurnEngineSessionLossTest {
         val drafts = mutableListOf<RuntimeEventDraft>()
         val job = launch { engine.runTurn(COMMAND).toList(drafts) }
         runCurrent()
-        return RunningTurn(client, router, engine, drafts, job)
+        return RunningTurn(client, router, fanout, engine, drafts, job)
     }
 
     private class RouterFedClient : AppServerClient {
@@ -127,17 +154,7 @@ class AppServerTurnEngineSessionLossTest {
         override val events: Flow<AppServerReceivedFrame> = inbound
 
         fun emit(frame: AppServerInboundFrame.StreamDelta) {
-            inbound.tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject {
-                        put("type", "stream_delta")
-                        put("idempotency_key", frame.idempotencyKey)
-                        put("delta", frame.delta)
-                    },
-                ),
-            )
+            inbound.tryEmit(receivedFrame(frame))
         }
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) =
@@ -165,7 +182,17 @@ class AppServerTurnEngineSessionLossTest {
             input = TurnInput.UserMessage(localMessageId = "local-1", text = "hi"),
         )
 
-        fun assistantDelta() = streamDelta(1, "evt-assistant") {
+        fun receivedFrame(frame: AppServerInboundFrame.StreamDelta) = AppServerReceivedFrame(
+            channel = AppServerChannel.Stream,
+            frame = frame,
+            raw = buildJsonObject {
+                put("type", "stream_delta")
+                put("idempotency_key", frame.idempotencyKey)
+                put("delta", frame.delta)
+            },
+        )
+
+        fun assistantDelta(seq: Long = 1) = streamDelta(seq, "evt-assistant-$seq") {
             put("id", "letta-msg-1")
             put("message_type", "assistant_message")
             put("content", "partial reply")
@@ -185,7 +212,7 @@ class AppServerTurnEngineSessionLossTest {
         ) = AppServerInboundFrame.StreamDelta(
             runtime = RUNTIME,
             eventSeq = seq,
-            emittedAt = "2026-09-25T00:00:0${seq}Z",
+            emittedAt = "2026-09-25T00:${(seq / 60).toString().padStart(2, '0')}:${(seq % 60).toString().padStart(2, '0')}Z",
             idempotencyKey = key,
             delta = buildJsonObject(body),
         )
