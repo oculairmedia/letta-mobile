@@ -18,7 +18,14 @@ import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.local.ConversationDao
+import com.letta.mobile.data.model.ConversationCreateParams
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -637,6 +644,127 @@ class ConversationRepositoryTest {
         val result = repository.getConversations("unknown").first()
         assertTrue(result.isEmpty())
     }
+    // letta-mobile-by4vm.16: a refresh that lands between an optimistic delete and its failed
+    // rollback survives; the rollback re-inserts only the deleted row instead of a stale snapshot.
+    @Test
+    fun failedDeleteRestoresOnlyTheDeletedRowOverAConcurrentRefresh() = runTest {
+        val deleteEntered = CompletableDeferred<Unit>()
+        val releaseDelete = CompletableDeferred<Unit>()
+        val gatedApi = object : FakeConversationApi() {
+            override suspend fun deleteConversation(conversationId: ConversationId) {
+                deleteEntered.complete(Unit)
+                releaseDelete.await()
+                throw ApiException(500, "Server error")
+            }
+        }
+        gatedApi.conversations.addAll(listOf(conversation("1"), conversation("2")))
+        repository = ConversationRepository(
+            gatedApi, FakeAgentRepository(), lazyOf(database.conversationDao()), repositoryScope = repositoryScope,
+        )
+        repository.refreshConversations("a1")
+
+        val delete = launch {
+            try {
+                repository.deleteConversation("1", "a1")
+                fail("Expected the delete to fail")
+            } catch (_: ApiException) {
+                // Expected: the server rejected the delete.
+            }
+        }
+        deleteEntered.await()
+        gatedApi.conversations = mutableListOf(conversation("2"), conversation("3"))
+        repository.refreshConversations("a1")
+        releaseDelete.complete(Unit)
+        delete.join()
+
+        val expected = setOf("1", "2", "3")
+        assertEquals(expected, repository.getCachedConversations(AgentId("a1")).map { it.id.value }.toSet())
+        assertEquals(expected, repository.getConversations("a1").first().map { it.id.value }.toSet())
+    }
+
+    @Test
+    fun optimisticRenameDoesNotSuppressTheNextStaleRefresh() = runTest {
+        database.conversationDao().upsert(ConversationEntity.fromConversation(conversation("1"), cachedAtEpochMs = 10L))
+        database.conversationDao().upsertRefreshState(ConversationRefreshEntity(agentId = "a1", lastRefreshAtMillis = 10L))
+        fakeApi.conversations.add(conversation("1"))
+        val initScope = childScope()
+        repository = ConversationRepository(
+            fakeApi, FakeAgentRepository(), lazyOf(database.conversationDao()), repositoryScope = initScope,
+        )
+        initScope.coroutineContext.job.children.toList().joinAll()
+
+        repository.updateConversation("1", "a1", "Renamed")
+
+        assertFalse(repository.hasFreshConversations(AgentId("a1"), maxAgeMs = 60_000))
+        assertTrue(repository.refreshConversationsIfStale("a1", maxAgeMs = 60_000))
+        assertEquals(1, fakeApi.calls.count { it == "listConversations" })
+    }
+
+    @Test
+    fun initialCacheLoadDoesNotClobberARefreshThatFinishedFirst() = runTest {
+        val realDao = database.conversationDao()
+        realDao.upsert(ConversationEntity.fromConversation(conversation("stale"), cachedAtEpochMs = 10L))
+        val initRead = CompletableDeferred<Unit>()
+        val releaseInit = CompletableDeferred<Unit>()
+        val gatedDao = object : ConversationDao by realDao {
+            override suspend fun getAllOnce(): List<ConversationEntity> = realDao.getAllOnce().also {
+                initRead.complete(Unit)
+                releaseInit.await()
+            }
+        }
+        val initScope = childScope()
+        repository = ConversationRepository(
+            fakeApi, FakeAgentRepository(), lazyOf<ConversationDao>(gatedDao), repositoryScope = initScope,
+        )
+        initRead.await()
+        fakeApi.conversations.add(conversation("fresh"))
+        repository.refreshConversations("a1")
+        releaseInit.complete(Unit)
+        initScope.coroutineContext.job.children.toList().joinAll()
+
+        assertEquals(listOf("fresh"), repository.getCachedConversations(AgentId("a1")).map { it.id.value })
+        assertTrue(repository.hasFreshConversations(AgentId("a1"), maxAgeMs = 60_000))
+    }
+
+    @Test
+    fun concurrentCreatesAndRefreshesOnDefaultDispatcherKeepEveryAgentFresh() = runTest {
+        val threadSafeApi = object : FakeConversationApi() {
+            override suspend fun createConversation(params: ConversationCreateParams): Conversation =
+                TestData.conversation(id = "new-${params.agentId.value}", agentId = params.agentId.value)
+
+            override suspend fun listConversations(
+                agentId: AgentId?,
+                limit: Int?,
+                after: String?,
+                archiveStatus: String?,
+                summarySearch: String?,
+                order: String?,
+                orderBy: String?,
+            ): List<Conversation> = emptyList()
+        }
+        repository = ConversationRepository(
+            threadSafeApi, FakeAgentRepository(), lazyOf(database.conversationDao()), repositoryScope = repositoryScope,
+        )
+        val agents = List(16) { AgentId("agent-$it") }
+
+        withContext(Dispatchers.Default) {
+            agents.flatMap { agent ->
+                listOf(
+                    launch { repository.createConversation(agent, "created") },
+                    launch { repository.refreshConversations(agent) },
+                    launch { repeat(50) { repository.hasFreshConversations(agent, maxAgeMs = 60_000) } },
+                )
+            }.joinAll()
+        }
+
+        assertTrue(agents.all { repository.hasFreshConversations(it, maxAgeMs = 60_000) })
+    }
+
+    private fun conversation(id: String) = TestData.conversation(id = id, agentId = "a1")
+
+    /** A scope torn down with [repositoryScope] whose init job a test can join. */
+    private fun childScope() = CoroutineScope(repositoryScope.coroutineContext + Job(repositoryScope.coroutineContext.job))
+
     private class FakeLocalRuntimeConversationSource : LocalRuntimeConversationSource {
         val createdAgentIds = mutableListOf<AgentId>()
 
