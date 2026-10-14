@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 
 /**
  * The two non-shim read sources available to admin handlers.
@@ -26,6 +27,11 @@ data class NativeReadTiers(
     /** Serves `logical_message_id` / `turn_id` on `message.list` rows; null serves rows as stored. */
     val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 )
+
+/** Admin RPC handlers a platform adds to the router: the JVM host's plugin runtime (letta-mobile-cdgpr.7). */
+fun interface AdminRpcRoutes {
+    fun register(router: AdminRpcRouter)
+}
 
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
@@ -76,7 +82,7 @@ object AdminRpcRegistry {
         "project.update",
         "project.archive",
         "project.delete",
-    )
+    ) + PluginAdminRpc.METHODS
 
     fun buildRouter(
         /**
@@ -137,6 +143,12 @@ object AdminRpcRegistry {
         pairingQr: PairingQrConfig? = null,
         /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to viewers; null pushes nothing. */
         permissionModes: PermissionModePublisher? = null,
+        /**
+         * letta-mobile-cdgpr.7: the host's `plugins.*` handlers (`PluginAdminHandlers` on a JVM host
+         * running plugins). Null (`--plugins=off`, Android) answers them `capability_unavailable`
+         * and advertises no `plugins_v1`.
+         */
+        pluginRoutes: AdminRpcRoutes? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -184,6 +196,8 @@ object AdminRpcRegistry {
         ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
         // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
         ConversationContextLimitHandlers.register(router, nativeClient)
+        pluginRoutes?.register(router)
+            ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

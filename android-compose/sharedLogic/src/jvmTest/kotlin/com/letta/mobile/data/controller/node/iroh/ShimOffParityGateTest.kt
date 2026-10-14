@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -18,6 +19,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -312,6 +314,7 @@ class ShimOffParityGateTest {
     private fun productionRouter(
         controller: AppServerController? = GateController(),
         localBackendDir: String? = null,
+        pluginRoutes: AdminRpcRoutes? = null,
     ): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(
             adminBaseUrl = "http://127.0.0.1:9", // shim host — but transport is forced to fail
@@ -330,6 +333,7 @@ class ShimOffParityGateTest {
             // store-owned rows are asserted to FAIL CLOSED without it; the
             // store-injected run is a separate, explicit expectation.
             localBackendDir = localBackendDir,
+            pluginRoutes = pluginRoutes,
         )
 
     /**
@@ -581,6 +585,42 @@ class ShimOffParityGateTest {
                 "localBackendDir regresses them to capability_unavailable",
         )
         assertEquals(0, proxyDialCount.get(), "store-served rows must never dial an admin HTTP host")
+    }
+
+    /**
+     * letta-mobile-cdgpr.7: with no plugin host (`--plugins=off`, Android) every `plugins.*` row
+     * denies with the typed capability contract and the host advertises no `plugins_v1`.
+     */
+    @Test
+    fun pluginHostOwnedOpsDenyWithoutAPluginHost() = runTest {
+        val router = productionRouter()
+        assertFalse(PluginAdminRpc.CAPABILITY in router.featureCapabilities)
+        val rows = IrohAdminOwnershipMatrix.pluginHostMethods()
+        assertEquals(PluginAdminRpc.METHODS.sorted(), rows)
+        rows.forEach { method ->
+            val obj = dispatch(router, method)
+            assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$method")
+            assertTrue(obj["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true, "$method: $obj")
+        }
+    }
+
+    /** letta-mobile-cdgpr.7: with a plugin host injected its registry serves natively and `plugins_v1` is advertised. */
+    @Test
+    fun pluginHostServesItsRegistryWhenInjected() = runTest {
+        val fixture = com.letta.mobile.data.plugin.host.PluginHostFixture()
+        val runtime = fixture.runtime()
+        try {
+            runtime.start()
+            val router = productionRouter(pluginRoutes = PluginAdminHandlers(runtime, com.letta.mobile.data.storage.InMemoryAssetStore()))
+            assertTrue(PluginAdminRpc.CAPABILITY in router.featureCapabilities)
+            listOf(PluginAdminRpc.LIST, PluginAdminRpc.DISABLE_ALL).forEach { method ->
+                assertEquals("true", dispatch(router, method)["success"]?.jsonPrimitive?.content, method)
+            }
+            assertEquals(0, proxyDialCount.get(), "the plugin host never dials an admin HTTP host")
+        } finally {
+            runtime.close()
+            fixture.close()
+        }
     }
 
     /**

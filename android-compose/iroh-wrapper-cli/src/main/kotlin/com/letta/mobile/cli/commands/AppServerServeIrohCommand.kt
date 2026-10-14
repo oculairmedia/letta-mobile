@@ -397,6 +397,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
                 scope = scope,
                 pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
+                pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
             )
 
             printChannelsHostBanner()
@@ -533,6 +534,7 @@ class AppServerServeIrohCommand : CliktCommand(
         admin: AdminContext,
         scope: CoroutineScope,
         pairingQr: PairingQrConfig?,
+        pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     ) {
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
@@ -560,6 +562,7 @@ class AppServerServeIrohCommand : CliktCommand(
                     .also { subagentPublisher = it }
             },
             permissionModes = permissionModes,
+            pluginRoutes = pluginRoutes,
         )
         endpoint.attachPermissionModePublisher(permissionModes)
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)

@@ -144,6 +144,12 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** Stops every driver for host shutdown; the registry keeps them enabled for the next start. */
     suspend fun close() = mutex.withLock { drivers.stopAll() }
 
+    /** [pluginId]'s running plugin, for a live view's calls (letta-mobile-cdgpr.7); null when it is not running. */
+    fun live(pluginId: String): LivePlugin? = drivers.live(pluginId)
+
+    /** Where [plugin]'s current version is unpacked: its pages are read from here. */
+    fun packageDir(plugin: InstalledPlugin): Path = store.dirOf(plugin.manifest)
+
     fun health(): List<PluginHealthSnapshot> = registry.value.plugins.map {
         PluginHealthSnapshot(it.id, it.version, it.state, it.consented, drivers.driverState(it.id), it.lastFault)
     }
