@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Self-test for scripts/ci/platform-ui-gate.sh (letta-mobile-ckmub.7).
-# Proves: unlisted new composable file -> fail; listed legacy file growing
-# past its limit -> fail; Platform-UI-Reason: present -> pass with warning.
+# Proves: unlisted new composable file -> fail, even with Platform-UI-Reason:;
+# listed legacy file growing past its limit -> warning only; raising or adding an
+# allowlist line -> fail unless Platform-UI-Reason: is present.
 set -euo pipefail
 
 GATE="$(cd "$(dirname "$0")/../ci" && pwd)/platform-ui-gate.sh"
@@ -44,25 +45,27 @@ assert_contains "$out" "ERROR|PUI001|android-compose/desktop/src/main/kotlin/New
 assert_contains "$out" "exit=1"
 rm "$UI/NewScreen.kt"
 
-# PUI002: a listed legacy file may grow within the +5 slack, not beyond.
+# PUI002: a listed legacy file growing past the +5 slack is a warning, not an error.
 composable "$UI/Legacy.kt" 25
-assert_contains "$(gate PLATFORM_UI_REASON=)" "exit=0"
+out="$(gate PLATFORM_UI_REASON=)"
+assert_not_contains "$out" "PUI002"
+assert_contains "$out" "exit=0"
 composable "$UI/Legacy.kt" 26
 out="$(gate PLATFORM_UI_REASON=)"
-assert_contains "$out" "ERROR|PUI002|android-compose/desktop/src/main/kotlin/Legacy.kt"
-assert_contains "$out" "exit=1"
-
-# Platform-UI-Reason: in the PR body (or env locally) -> pass with warning.
-composable "$UI/NewScreen.kt" 10
-out="$(gate PLATFORM_UI_REASON= PR_BODY=$'Summary\nPlatform-UI-Reason: camera host needs a platform view\n')"
-assert_contains "$out" "WARN|PUI001|android-compose/desktop/src/main/kotlin/NewScreen.kt"
-assert_contains "$out" "WARN|PUI002|"
-assert_contains "$out" "overridden by Platform-UI-Reason: camera host needs a platform view"
+assert_contains "$out" "WARN|PUI002|android-compose/desktop/src/main/kotlin/Legacy.kt"
 assert_not_contains "$out" "ERROR|"
 assert_contains "$out" "exit=0"
+
+# Platform-UI-Reason: in the PR body (or env locally) never excuses a new platform UI file.
+composable "$UI/NewScreen.kt" 10
+out="$(gate PLATFORM_UI_REASON= PR_BODY=$'Summary\nPlatform-UI-Reason: camera host needs a platform view\n')"
+assert_contains "$out" "ERROR|PUI001|android-compose/desktop/src/main/kotlin/NewScreen.kt"
+assert_not_contains "$out" "overridden by Platform-UI-Reason"
+assert_contains "$out" "Platform-UI-Reason: camera host needs a platform view"
+assert_contains "$out" "exit=1"
 out="$(gate PLATFORM_UI_REASON='local override')"
-assert_contains "$out" "exit=0"
-assert_contains "$out" "overridden by Platform-UI-Reason: local override"
+assert_contains "$out" "ERROR|PUI001|"
+assert_contains "$out" "exit=1"
 
 # PUI003: a deleted allowlisted file asks for its line to be removed (warn only).
 rm "$UI/Legacy.kt" "$UI/NewScreen.kt"
@@ -83,5 +86,9 @@ g commit -q -am raise
 out="$(env -u PR_BODY -u GITHUB_EVENT_PATH PLATFORM_UI_REASON= bash "$GATE" --root "$TMP" --allowlist "$ALLOW" --diff-base HEAD~1 --enforce 2>&1)" \
   && fail "raised allowlist line without a reason passed: $out"
 assert_contains "$out" "ERROR|PUI004|android-compose/desktop/src/main/kotlin/Legacy.kt|allowlist maxLines raised 20 -> 40"
+# ...and the reason is what lets an allowlist change through.
+out="$(env -u PR_BODY -u GITHUB_EVENT_PATH PLATFORM_UI_REASON='camera host' bash "$GATE" --root "$TMP" --allowlist "$ALLOW" --diff-base HEAD~1 --enforce 2>&1)" \
+  || fail "raised allowlist line with a reason failed: $out"
+assert_contains "$out" "WARN|PUI004|android-compose/desktop/src/main/kotlin/Legacy.kt|allowlist maxLines raised 20 -> 40 (overridden by Platform-UI-Reason: camera host)"
 
 echo "platform-ui-gate-test: ok"
