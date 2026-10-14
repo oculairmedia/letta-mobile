@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -27,8 +28,7 @@ internal fun externalConversationDedupeKey(agentId: String?, conversationId: Str
         conversationId
     }
 
-private fun String.isProvisionalConversationId(): Boolean =
-    this == "default" || startsWith("conv-default-")
+private fun String.isProvisionalConversationId(): Boolean = IdFormats.isDefaultConversation(this)
 
 /**
  * Per-conversation [TimelineSyncLoop] registry.
