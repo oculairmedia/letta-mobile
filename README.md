@@ -19,7 +19,8 @@ Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/let
 - **Subagents** — roster and progress for delegated work, including a running subagent's step detail
 - **Memory administration** — core memory blocks and the pan/zoom memory graph on a shared page, plus the Android memory overview and file views
 - **Admin tooling** — providers, tools, skills, templates, projects, channels, schedules, runs, telemetry, system access, pairing and config
-- **Canvas and notes** — a shared canvas workspace with the vendored DrawBox editor, plus Dreaming reflection settings
+- **Canvas and notes** — a shared canvas workspace with the vendored DrawBox editor, peer-owned documents synced across collaborators, plus Dreaming reflection settings; agents draw with `canvas_apply_ops` and lay out notes, checklists and cards by meaning with `canvas_compose`
+- **Canvas plugins** — new canvas element kinds and agent tools from plugins under a versioned contract: the `plugin-api` Kotlin SPI for JVM plugins, the LCP wire protocol for process/service plugins in any language, and live re-advertisement of plugin tools to the agent
 - **Live sync** — multi-client conversation sync between mobile, desktop and browser, paired-device authz, agent-to-agent messaging
 - **Shell** — one adaptive shell across clients: unified search, connection state, a live dock mascot, and pull-to-refresh on list surfaces
 
@@ -83,6 +84,7 @@ matched wrapper and client deploy (see Development notes).
 | Android (dev) | `./gradlew :app:assembleRootDebug` — the `root` distribution flavor; `play` and `sideload` also exist (see [`android-compose/README.md`](android-compose/README.md)) |
 | Android (release-shaped) | `./gradlew :app:assemblePlayRelease` |
 | Compose Desktop | `./gradlew :desktop:run` |
+| Phone UI on desktop | `./gradlew :desktop:runPhone` (live backend) / `:desktop:runPhonePlayground` (fixtures); `…Hot` variants add hot reload — see [`phone-preview.md`](docs/development/phone-preview.md) |
 | Browser WASM | `./gradlew :web:wasmJsBrowserDevelopmentRun`; CI runs `:web:wasmJsBrowserDistribution` and `:web:wasmJsBrowserTest` (job `web-wasm`) |
 | Iroh wrapper (the deployed server) | `./gradlew :iroh-wrapper-cli:installDist` → `build/install/meridian-iroh-wrapper/bin/meridian-iroh-wrapper app-server-serve-iroh …` |
 | CLI / probes | `./gradlew :cli:run -PcliArgs="…"`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
@@ -92,6 +94,18 @@ distributable server binary comes from `:iroh-wrapper-cli`. The `app-server-iroh
 `app-server-iroh-two-client-probe` commands live in `:cli`.
 
 Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md).
+
+## Further reading
+
+| Topic | Doc |
+|---|---|
+| Letta's own docs (agents, memory, App Server) | [`docs/reference/letta-docs.md`](docs/reference/letta-docs.md) |
+| A2UI renderer and catalog authoring | [`sharedUI/…/ui/a2ui/README.md`](android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md) |
+| `canvas_compose` contract | [`docs/reference/canvas-compose-v1.md`](docs/reference/canvas-compose-v1.md) |
+| Canvas plugin platform | [plan](docs/design/canvas-plugin-platform-plan.md), [LCP wire v1](docs/reference/canvas-plugin-wire-v1.md), [view bridge v1](docs/reference/plugin-view-bridge-v1.md) |
+| Live external tools | [`docs/architecture/live-external-tools.md`](docs/architecture/live-external-tools.md) |
+| KMP module map | [`docs/architecture/kmp-module-map.md`](docs/architecture/kmp-module-map.md) |
+| Releasing | [`docs/RELEASE.md`](docs/RELEASE.md) |
 
 ## Quick start
 
@@ -146,6 +160,11 @@ release flow.
 
 - Issue tracking is **bd** (beads) — `bd ready`, `bd show <id>`, `bd update <id> --claim`.
   Never commit `.beads` artifacts.
+- The docs are checked against the tree in the required `test` job:
+  [`scripts/ci/docs-freshness-check.py`](scripts/ci/docs-freshness-check.py) fails when a Gradle
+  module is missing from the module tables, a Gradle task path names no module, the required-gate
+  list here differs from `scripts/bootstrap-branch-protection.sh`, a relative link breaks, or a
+  quoted Gradle version differs from the wrapper. Run it locally before pushing doc changes.
 - The pre-push hook blocks pushes to `main`/`master` and checks `JAVA_HOME`. Kotlin compile is **opt-in** (`PRE_PUSH_COMPILE=1`) — off by default so cold Gradle configure cannot OOM the shared host; CI owns the compile gate.
 - Anything touching `sharedLogic` **App Server transport** requires a matched wrapper + APK deploy.
   There is no REST fallback to catch a mismatched pair.

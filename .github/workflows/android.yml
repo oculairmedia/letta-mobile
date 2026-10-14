@@ -9,6 +9,8 @@ on:
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
+      - "*.md"
+      - "scripts/bootstrap-branch-protection.sh"
   pull_request:
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, and cursor/** PRs as well as PRs into main.
@@ -34,6 +36,8 @@ on:
       # pull_request paths filter and always runs.
       # qodana.yaml lives at the repo root, not under android-compose/. A
       # Qodana-exclude-only PR would otherwise skip these required jobs forever.
+      # *.md and scripts/bootstrap-branch-protection.sh feed the docs-freshness
+      # check in `test`, so a README-only PR must run it rather than skip it.
       # docs/** is here for the same reason: a docs-only PR reports perf-gate
       # (android-perf.yml has no paths filter) but none of the other required
       # contexts, so branch protection blocks it with nothing to fix and no
@@ -42,6 +46,8 @@ on:
       # report and short-circuit when nothing they gate has changed.
       - ".github/workflows/**"
       - "docs/**"
+      - "*.md"
+      - "scripts/bootstrap-branch-protection.sh"
       - "android-compose/**"
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
@@ -122,6 +128,13 @@ jobs:
       - name: Enforce stateful mock isolation
         working-directory: ${{ github.workspace }}
         run: bash scripts/ci/stateful-mock-gate.sh
+
+      # README/CONTRIBUTING/CLAUDE/AGENTS must name every Gradle module, list the
+      # branch-protection gates, cite real modules in task paths, keep relative
+      # links resolving, and quote the wrapper's Gradle version.
+      - name: Check docs match the tree
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/ci/docs-freshness-check.py
 
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.

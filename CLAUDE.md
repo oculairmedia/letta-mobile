@@ -19,7 +19,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 - Hilt (Android DI), Room (Android persistence), Ktor (HTTP + WebSocket transports)
 - Iroh QUIC (`computer.iroh:iroh:1.0.0`) for P2P transport
 - Material 3 + Lucide icons + A2UI renderer
-- Gradle 9.4.1, JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
+- Gradle 9.6.1, JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
 
 ---
 
