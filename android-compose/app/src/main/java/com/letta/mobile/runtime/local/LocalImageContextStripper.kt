@@ -1,11 +1,13 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import com.letta.mobile.data.storage.ImageBlobStore
 import com.letta.mobile.util.Telemetry
 import java.io.File
 import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -174,7 +176,7 @@ class LocalImageContextStripper(
      * are skipped, so this stays idempotent (image_ref parts from a prior pass
      * are left untouched).
      */
-    private fun isStrippableImage(part: Any?): Boolean {
+    private fun isStrippableImage(part: JsonElement?): Boolean {
         val p = part as? JsonObject ?: return false
         // Only real image parts are strippable. A text placeholder (even one
         // carrying an image_ref pointer) is already stripped → idempotent no-op.

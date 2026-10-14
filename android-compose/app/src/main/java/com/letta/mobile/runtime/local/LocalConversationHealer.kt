@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import com.letta.mobile.util.Telemetry
 import java.io.BufferedOutputStream
 import java.io.File

@@ -36,6 +36,7 @@ internal class LocalBackendContextReader(
     private val support: LocalBackendStoreSupport,
     private val messageReader: LocalBackendMessageReader,
     private val maxTranscriptBytes: Long = LocalBackendMessageReader.MAX_TRANSCRIPT_BYTES,
+    private val maxInlineValueChars: Int = BoundedTranscriptReader.DEFAULT_MAX_INLINE_VALUE_CHARS,
 ) {
 
     /**
@@ -68,11 +69,15 @@ internal class LocalBackendContextReader(
         summary.toLong() + LocalMessageTokens.ofAll(transcript.messages)
     }.getOrNull()
 
-    /** An absent transcript is an empty conversation; one past the byte cap is not estimated at all. */
+    /**
+     * An absent transcript is an empty conversation; one past the byte cap is not estimated at all.
+     * Below the cap, lines go through [BoundedTranscriptReader] (letta-mobile-by4vm.49) so a
+     * multi-MB base64 image part becomes a length marker instead of one giant String.
+     */
     private fun readTranscript(file: File): LocalTranscriptContext? {
         if (!file.isFile) return LocalTranscriptContext.read(emptySequence())
         if (file.length() > maxTranscriptBytes) return null
-        return file.bufferedReader().use { LocalTranscriptContext.read(it.lineSequence()) }
+        return BoundedTranscriptReader.readTranscriptContext(file, maxInlineValueChars)
     }
 
     private fun readJson(file: File): JsonObject? = runCatching {
