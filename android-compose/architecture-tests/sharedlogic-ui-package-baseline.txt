@@ -1,0 +1,14 @@
+# com.letta.mobile.ui.* packages still declared in :sharedLogic (letta-mobile-by4vm.27).
+#
+# UI belongs in :sharedUI. SharedLayeringTest fails on a ui package in any sharedLogic
+# production source set that is not listed here, and on a line here whose package is gone.
+# Delete the line in the change that moves the package out. Never add a line.
+# See docs/architecture/shared-layering-ratchet.md.
+
+com.letta.mobile.ui.ambient
+com.letta.mobile.ui.chat.render
+com.letta.mobile.ui.chat.session
+com.letta.mobile.ui.common
+com.letta.mobile.ui.haptics
+com.letta.mobile.ui.state
+com.letta.mobile.ui.theme
