@@ -22,6 +22,11 @@ import kotlinx.serialization.json.Json
  *
  * Persists ops for each canvas into `{rootDirectory}/ops/{canvasId_sha256}.jsonl`
  * while keeping an in-memory index of seen op IDs for O(1) deduplication.
+ *
+ * The journal ([CanvasOpLog.unsettled], letta-mobile-by4vm.22) is a sidecar of settled op ids,
+ * `{canvasId_sha256}.settled`, one per line. A log written before the journal existed has no
+ * sidecar; its ops are all taken as settled when it is first read, since the document they were
+ * written beside is the only record of which of them it holds.
  */
 class FileCanvasOpLog(
     private val rootDirectory: Path = defaultOpsDirectory(),
@@ -34,6 +39,7 @@ class FileCanvasOpLog(
     }
 
     private val opIdsByCanvas = mutableMapOf<CanvasId, MutableSet<String>>()
+    private val settledByCanvas = mutableMapOf<CanvasId, MutableSet<String>>()
     private val flowsByCanvas = ConcurrentHashMap<CanvasId, MutableSharedFlow<CanvasOp>>()
 
     init {
@@ -43,6 +49,7 @@ class FileCanvasOpLog(
     override suspend fun append(canvasId: CanvasId, op: CanvasOp): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
+            getOrLoadSettled(canvasId)
             if (!opIds.add(op.opId)) {
                 return@withLock
             }
@@ -93,6 +100,52 @@ class FileCanvasOpLog(
             opIds.contains(opId)
         }
     }
+
+    override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val settled = getOrLoadSettled(canvasId)
+            readOps(canvasId).filterNot { it.opId in settled }
+        }
+    }
+
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>): Unit = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val settled = getOrLoadSettled(canvasId)
+            val fresh = opIds.filter { settled.add(it) }
+            if (fresh.isNotEmpty()) appendLines(settledFile(canvasId), fresh)
+        }
+    }
+
+    /** Settled op ids; a log without a sidecar predates the journal and is settled whole, once. */
+    private fun getOrLoadSettled(canvasId: CanvasId): MutableSet<String> = settledByCanvas.getOrPut(canvasId) {
+        val sidecar = settledFile(canvasId)
+        if (Files.isRegularFile(sidecar)) {
+            Files.readAllLines(sidecar).map { it.trim() }.filterTo(mutableSetOf()) { it.isNotEmpty() }
+        } else {
+            val legacy = getOrLoadOpIds(canvasId).toMutableSet()
+            Files.writeString(sidecar, legacy.joinToString("") { it + "\n" }, StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+            legacy
+        }
+    }
+
+    /** Every op in [canvasId]'s file, in the order appended; corrupted lines are skipped. */
+    private fun readOps(canvasId: CanvasId): List<CanvasOp> {
+        val file = opLogFile(canvasId)
+        if (!Files.isRegularFile(file)) return emptyList()
+        return Files.readAllLines(file).mapNotNull { line -> line.trim().takeIf { it.isNotEmpty() }?.let(::decodeOrNull) }
+    }
+
+    private fun decodeOrNull(line: String): CanvasOp? = try {
+        json.decodeFromString(CanvasOp.serializer(), line)
+    } catch (_: IllegalArgumentException) {
+        null // a corrupted line (SerializationException is one)
+    }
+
+    private fun appendLines(file: Path, lines: List<String>) {
+        Files.writeString(file, lines.joinToString("") { it + "\n" }, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+    }
+
+    private fun settledFile(canvasId: CanvasId): Path = rootDirectory.resolve("${canvasId.value.sha256PathComponent()}.settled")
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> {
         val flow = flowsByCanvas.computeIfAbsent(canvasId) {
