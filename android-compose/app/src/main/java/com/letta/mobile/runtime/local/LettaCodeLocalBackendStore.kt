@@ -3,7 +3,6 @@ package com.letta.mobile.runtime.local
 import android.content.Context
 import com.letta.mobile.data.context.estimate.ContextBreakdownEstimator
 import com.letta.mobile.data.context.estimate.LocalContextInputs
-import com.letta.mobile.data.context.estimate.LocalTranscriptContext
 import com.letta.mobile.data.context.estimate.toAgentContextJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -135,11 +134,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
                 systemPromptSidecar = readJsonObject(File(conversationDir, "system-prompt.json")),
                 agent = record,
                 conversation = readJsonObject(File(conversationDir, "conversation.json")),
-                transcript = if (transcript.isFile) {
-                    transcript.bufferedReader().use { LocalTranscriptContext.read(it.lineSequence()) }
-                } else {
-                    LocalTranscriptContext.read(emptySequence())
-                },
+                transcript = BoundedTranscriptReader.readTranscriptContext(transcript),
                 reportedTotal = null,
             )
             val overview = json.decodeFromJsonElement(
