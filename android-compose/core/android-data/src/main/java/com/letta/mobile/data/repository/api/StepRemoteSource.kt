@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.api
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ProviderTrace
 import com.letta.mobile.data.model.Step
@@ -32,4 +33,4 @@ interface StepRemoteSource {
 @JvmInline
 value class StepId(val value: String)
 
-private fun noRoute(): Nothing = throw NoAppServerRouteException("StepRemoteSource")
+private fun noRoute(): Nothing = throw AppServerRouteUnavailable(SessionRoute.STEPS, "StepRemoteSource")

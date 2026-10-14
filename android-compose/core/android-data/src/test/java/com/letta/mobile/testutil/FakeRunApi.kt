@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.RunRemoteSource
 import com.letta.mobile.data.model.AssistantMessage
@@ -11,7 +12,7 @@ import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.UsageStatistics
 
-open class FakeRunApi : RunRemoteSource by noAppServerRoute<RunRemoteSource>() {
+open class FakeRunApi : RunRemoteSource by unavailable<RunRemoteSource>(SessionRoute.RUNS) {
     var runs = mutableListOf<Run>()
     var runMessages = mutableMapOf<String, List<LettaMessage>>()
     var runUsage = mutableMapOf<String, UsageStatistics>()

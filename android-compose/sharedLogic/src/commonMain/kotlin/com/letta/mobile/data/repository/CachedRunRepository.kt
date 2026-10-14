@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.Run
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.update
 
 /** Phase 5k: platform-neutral cached run repository. */
 open class CachedRunRepository(
-    private val remote: RunRemoteSource,
+    private val remote: RemoteRoute<RunRemoteSource>,
     private val irohRunSource: RunIrohSource? = null,
 ) : IRunRepository {
     private val _runs = MutableStateFlow<List<Run>>(emptyList())
@@ -32,7 +33,7 @@ open class CachedRunRepository(
             _runs.value = irohSource.listRuns(params)
             return
         }
-        _runs.value = remote.listRuns(params)
+        _runs.value = remote.source().listRuns(params)
     }
 
     override suspend fun getRecentRuns(limit: Int): List<Run> {
@@ -45,7 +46,7 @@ open class CachedRunRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.listRuns(recentParams)
         }
-        return remote.listRuns(recentParams)
+        return remote.source().listRuns(recentParams)
     }
 
     override suspend fun getRun(runId: RunId): Run {
@@ -53,22 +54,22 @@ open class CachedRunRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.getRun(runId.value)
         }
-        return remote.retrieveRun(runId.value)
+        return remote.source().retrieveRun(runId.value)
     }
 
     override suspend fun getRunMessages(runId: RunId): List<LettaMessage> {
         if (!supportsRunDetail) irohUnsupported("run.messages($runId)")
-        return remote.listRunMessages(runId = runId.value, order = "asc")
+        return remote.source().listRunMessages(runId = runId.value, order = "asc")
     }
 
     override suspend fun getRunUsage(runId: RunId): UsageStatistics {
         if (!supportsRunDetail) irohUnsupported("run.usage($runId)")
-        return remote.retrieveRunUsage(runId.value)
+        return remote.source().retrieveRunUsage(runId.value)
     }
 
     override suspend fun getRunMetrics(runId: RunId): RunMetrics {
         if (!supportsRunDetail) irohUnsupported("run.metrics($runId)")
-        return remote.retrieveRunMetrics(runId.value)
+        return remote.source().retrieveRunMetrics(runId.value)
     }
 
     override suspend fun getRunSteps(runId: RunId): List<Step> {
@@ -76,20 +77,20 @@ open class CachedRunRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.getRunSteps(runId.value)
         }
-        return remote.listRunSteps(runId = runId.value, order = "desc")
+        return remote.source().listRunSteps(runId = runId.value, order = "desc")
     }
 
     override suspend fun cancelRun(run: Run): Run {
         if (!supportsRunDetail) irohUnsupported("run.cancel(${run.id})")
-        remote.cancelRun(agentId = run.agentId, runId = run.id)
-        val refreshed = remote.retrieveRun(run.id)
+        remote.source().cancelRun(agentId = run.agentId, runId = run.id)
+        val refreshed = remote.source().retrieveRun(run.id)
         upsertRun(refreshed)
         return refreshed
     }
 
     override suspend fun deleteRun(runId: RunId) {
         if (!supportsRunDetail) irohUnsupported("run.delete($runId)")
-        remote.deleteRun(runId.value)
+        remote.source().deleteRun(runId.value)
         _runs.update { current -> current.filterNot { it.id == runId.value } }
     }
 

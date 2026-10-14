@@ -1,12 +1,13 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
 
-open class FakePassageApi : PassageRemoteSource by noAppServerRoute<PassageRemoteSource>() {
+open class FakePassageApi : PassageRemoteSource by unavailable<PassageRemoteSource>(SessionRoute.PASSAGES) {
     private val passagesByAgent = mutableMapOf<String, MutableList<Passage>>()
     var shouldFail = false
     val calls = mutableListOf<String>()

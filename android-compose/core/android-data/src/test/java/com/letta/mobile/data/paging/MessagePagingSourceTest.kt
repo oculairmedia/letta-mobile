@@ -1,5 +1,6 @@
 package com.letta.mobile.data.paging
 
+import com.letta.mobile.data.backend.bound
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.letta.mobile.data.model.AgentId
@@ -23,7 +24,7 @@ class MessagePagingSourceTest {
     fun setup() {
         messageApi = FakeMessageApi()
         pagingSource = MessagePagingSource(
-            remote = messageApi,
+            remote = messageApi.bound(),
             agentId = AgentId("agent-123"),
             conversationId = ConversationId("conv-456")
         )

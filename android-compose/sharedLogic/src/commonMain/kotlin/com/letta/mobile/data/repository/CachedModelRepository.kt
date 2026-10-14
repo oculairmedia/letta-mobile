@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.update
 
 /** Phase 5l: platform-neutral cached model catalog repository. */
 open class CachedModelRepository(
-    private val remote: ModelRemoteSource,
+    private val remote: RemoteRoute<ModelRemoteSource>,
     private val localModelSource: LocalRuntimeModelSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val irohModelSource: ModelIrohSource? = null,
@@ -41,7 +42,7 @@ open class CachedModelRepository(
             _llmModels.update { ModelCatalogNormalizer.normalize(irohSource.listLlmModels()) }
             return
         }
-        _llmModels.update { ModelCatalogNormalizer.normalize(remote.listLlmModels()) }
+        _llmModels.update { ModelCatalogNormalizer.normalize(remote.source().listLlmModels()) }
     }
 
     override suspend fun refreshEmbeddingModels() {
@@ -54,6 +55,6 @@ open class CachedModelRepository(
             _embeddingModels.update { irohSource.listEmbeddingModels() }
             return
         }
-        _embeddingModels.update { remote.listEmbeddingModels() }
+        _embeddingModels.update { remote.source().listEmbeddingModels() }
     }
 }

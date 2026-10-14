@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.conversations
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
@@ -12,7 +14,6 @@ import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.NoActiveConversationRunException
-import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.testutil.FakeMessageApi
 import com.letta.mobile.testutil.FakeAgentApi
@@ -554,7 +555,7 @@ class ConversationsViewModelTest {
 
     @Test
     fun `cancel runs failure without a route reads as unavailable`() = runTest {
-        fakeConvRepo.cancelFailure = NoAppServerRouteException("ConversationCrudRemoteSource.cancelConversation")
+        fakeConvRepo.cancelFailure = AppServerRouteUnavailable(SessionRoute.CONVERSATIONS, "ConversationCrudRemoteSource.cancelConversation")
         val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
 
         viewModel.cancelConversationRuns(display)

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
@@ -22,7 +23,7 @@ import kotlinx.serialization.json.Json
  * responsibilities here.
  */
 open class CachedMessageRepository(
-    private val remote: MessageRemoteSource,
+    private val remote: RemoteRoute<MessageRemoteSource>,
     private val irohTimelineSource: MessageIrohTimelineSource? = null,
     private val irohApprovalSource: IrohAdminRpcApprovalSource? = null,
     private val json: Json = Json { ignoreUnknownKeys = true },
@@ -82,20 +83,20 @@ open class CachedMessageRepository(
     )
 
     override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> =
-        remote.cancelMessage(agentId, runIds)
+        remote.source().cancelMessage(agentId, runIds)
 
     override suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> =
-        remote.searchMessages(request)
+        remote.source().searchMessages(request)
 
     override suspend fun fetchConversationInspectorMessages(conversationId: ConversationId): List<ConversationInspectorMessage> =
-        remote.listConversationMessages(conversationId, limit = 200, after = null, order = "asc")
+        remote.source().listConversationMessages(conversationId, limit = 200, after = null, order = "asc")
             .map { it.toInspectorMessage() }
 
     override suspend fun fetchLatestConversationInspectorMessages(
         conversationId: ConversationId,
         limit: Int,
     ): List<ConversationInspectorMessage> =
-        remote.listConversationMessages(conversationId, limit = limit, after = null, order = "desc")
+        remote.source().listConversationMessages(conversationId, limit = limit, after = null, order = "desc")
             .map { it.toInspectorMessage() }
 
     override suspend fun submitApproval(
@@ -139,6 +140,6 @@ open class CachedMessageRepository(
     }
 
     override suspend fun resetMessages(agentId: AgentId) {
-        remote.resetMessages(agentId)
+        remote.source().resetMessages(agentId)
     }
 }

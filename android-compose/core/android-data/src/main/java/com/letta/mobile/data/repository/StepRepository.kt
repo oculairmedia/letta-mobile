@@ -1,7 +1,7 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ProviderTrace
 import com.letta.mobile.data.model.Step
@@ -68,10 +68,10 @@ class StepRepository(
     }
 
     private fun requireStepQueries(operation: String) {
-        if (!supportsStepQueries) throw NoAppServerRouteException(operation)
+        if (!supportsStepQueries) throw AppServerRouteUnavailable(SessionRoute.STEPS, operation)
     }
 
-    private fun requireRemote(): StepRemoteSource = remote ?: noAppServerRoute()
+    private fun requireRemote(): StepRemoteSource = remote ?: throw AppServerRouteUnavailable(SessionRoute.STEPS)
 
     override fun upsertStep(step: Step) {
         _steps.update { current ->

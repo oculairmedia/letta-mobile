@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
@@ -19,7 +20,7 @@ import kotlinx.datetime.Instant
 
 /** Phase 5n: platform-neutral cached project repository. */
 open class CachedProjectRepository(
-    private val remote: ProjectRemoteSource,
+    private val remote: RemoteRoute<ProjectRemoteSource>,
     private val irohProjectSource: ProjectIrohSource? = null,
 ) : IProjectRepository {
     private val _projects = MutableStateFlow<List<ProjectSummary>>(emptyList())
@@ -35,7 +36,7 @@ open class CachedProjectRepository(
     private suspend fun refreshProjectsLocked(): ProjectCatalog {
         val catalog = fromActiveSource(
             iroh = { it.refreshProjects() },
-            http = { remote.listProjects() },
+            http = { remote.source().listProjects() },
         ).sanitize()
         _projects.value = catalog.projects
         lastRefreshAtMillis = Clock.System.now().toEpochMilliseconds()
@@ -48,7 +49,7 @@ open class CachedProjectRepository(
 
         val fresh = fromActiveSource(
             iroh = { it.getProject(identifier) },
-            http = { remote.getProject(identifier) },
+            http = { remote.source().getProject(identifier) },
         ).sanitize()
         upsertProject(fresh)
         return fresh
@@ -57,21 +58,21 @@ open class CachedProjectRepository(
     override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
         return fromActiveSource(
             iroh = { it.getBeadsRemoteStatus(identifier) },
-            http = { remote.getBeadsRemoteStatus(identifier) },
+            http = { remote.source().getBeadsRemoteStatus(identifier) },
         ).sanitize()
     }
 
     override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
         return fromActiveSource(
             iroh = { it.provisionBeadsRemote(identifier, push) },
-            http = { remote.provisionBeadsRemote(identifier, push) },
+            http = { remote.source().provisionBeadsRemote(identifier, push) },
         )
     }
 
     override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
         return fromActiveSource(
             iroh = { it.triggerSync(identifier) },
-            http = { remote.triggerSync(identifier) },
+            http = { remote.source().triggerSync(identifier) },
         )
     }
 
@@ -82,7 +83,7 @@ open class CachedProjectRepository(
     ): ProjectSummary {
         val created = fromActiveSource(
             iroh = { it.createProject(name, filesystemPath, gitUrl) },
-            http = { remote.createProject(name, filesystemPath, gitUrl) },
+            http = { remote.source().createProject(name, filesystemPath, gitUrl) },
         ).sanitize()
         _projects.update { current ->
             (current + created)
@@ -100,7 +101,7 @@ open class CachedProjectRepository(
     ): ProjectSummary {
         val updated = fromActiveSource(
             iroh = { it.updateProject(identifier, filesystemPath, gitUrl) },
-            http = { remote.updateProject(identifier, filesystemPath, gitUrl) },
+            http = { remote.source().updateProject(identifier, filesystemPath, gitUrl) },
         ).sanitize()
         upsertProject(updated)
         lastRefreshAtMillis = Clock.System.now().toEpochMilliseconds()
@@ -110,7 +111,7 @@ open class CachedProjectRepository(
     override suspend fun archiveProject(identifier: String): ProjectSummary {
         val updated = fromActiveSource(
             iroh = { it.archiveProject(identifier) },
-            http = { remote.archiveProject(identifier) },
+            http = { remote.source().archiveProject(identifier) },
         ).sanitize()
         upsertProject(updated)
         lastRefreshAtMillis = Clock.System.now().toEpochMilliseconds()
@@ -120,7 +121,7 @@ open class CachedProjectRepository(
     override suspend fun deleteProject(identifier: String) {
         fromActiveSource(
             iroh = { it.deleteProject(identifier) },
-            http = { remote.deleteProject(identifier) },
+            http = { remote.source().deleteProject(identifier) },
         )
         _projects.update { current -> current.filterNot { it.identifier == identifier } }
         lastRefreshAtMillis = Clock.System.now().toEpochMilliseconds()

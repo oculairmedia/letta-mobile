@@ -1,7 +1,9 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import android.util.Log
-import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
 import com.letta.mobile.data.chat.branch.BranchUnavailableException
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
@@ -40,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
 // (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
 // @Provides methods returning framework types like Provider.)
 open class ConversationRepository(
-    private val remote: ConversationCrudRemoteSource = noAppServerRoute(),
+    private val remote: RemoteRoute<ConversationCrudRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     private val agentRepository: IAgentRepository,
     private val conversationDao: Lazy<ConversationDao>,
     repositoryScope: CoroutineScope,
@@ -54,6 +56,27 @@ open class ConversationRepository(
      */
     private val transport: IChannelTransport? = null,
 ) : IConversationRepository, BackendScopedCache {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(
+        remote: ConversationCrudRemoteSource,
+        agentRepository: IAgentRepository,
+        conversationDao: Lazy<ConversationDao>,
+        repositoryScope: CoroutineScope,
+        localConversationSource: LocalRuntimeConversationSource? = null,
+        settingsRepository: ISettingsRepository? = null,
+        irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+        transport: IChannelTransport? = null,
+    ) : this(
+        remote.bound(),
+        agentRepository,
+        conversationDao,
+        repositoryScope,
+        localConversationSource,
+        settingsRepository,
+        irohConversationListSource,
+        transport,
+    )
+
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     /** Single-flights network refreshes; held across the list request. Taken before [cacheMutex], never after. */
     private val refreshMutex = Mutex()
@@ -160,7 +183,7 @@ open class ConversationRepository(
         val conversations = if (irohSource?.shouldUseIroh() == true) {
             irohSource.listConversations(agentId = agentId)
         } else {
-            remote.listConversations(
+            remote.source().listConversations(
                 agentId = agentId,
                 limit = null,
                 after = null,
@@ -209,7 +232,7 @@ open class ConversationRepository(
             val fetched = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.getConversation(id)
             } else {
-                remote.getConversation(id)
+                remote.source().getConversation(id)
             }
             fetched.also { conversation -> upsertCachedConversation(conversation) }
         } catch (cancelled: CancellationException) {
@@ -228,7 +251,7 @@ open class ConversationRepository(
                 irohSource.createConversation(agentId, summary)
             else -> {
                 val params = ConversationCreateParams(agentId = agentId, summary = summary)
-                remote.createConversation(params)
+                remote.source().createConversation(params)
             }
         }
         upsertCachedConversation(conversation, markAgentFresh = true)
@@ -244,7 +267,7 @@ open class ConversationRepository(
             if (irohSource?.shouldUseIroh() == true) {
                 irohSource.deleteConversation(id)
             } else {
-                remote.deleteConversation(id)
+                remote.source().deleteConversation(id)
             }
         } catch (e: Exception) {
             if (removed != null) restoreCachedConversation(agentId, removed)
@@ -259,7 +282,7 @@ open class ConversationRepository(
             val updated = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.updateConversation(id, summary)
             } else {
-                remote.updateConversation(id, ConversationUpdateParams(summary = summary))
+                remote.source().updateConversation(id, ConversationUpdateParams(summary = summary))
             }
             swapCachedConversation(agentId, id) { updated }
         } catch (e: Exception) {
@@ -278,7 +301,7 @@ open class ConversationRepository(
             val updated = if (irohSource?.shouldUseIroh() == true) {
                 irohSource.setConversationArchived(id, archived)
             } else {
-                remote.updateConversation(id, ConversationUpdateParams(archived = archived))
+                remote.source().updateConversation(id, ConversationUpdateParams(archived = archived))
             }
             if (swap != null) swapCachedConversation(agentId, id) { updated }
         } catch (e: Exception) {
@@ -304,7 +327,7 @@ open class ConversationRepository(
     override fun canRecompileConversations(): Boolean = irohRecompileSource() != null
 
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
-        val channel = irohCancelTransport() ?: return remote.cancelConversation(id, agentId)
+        val channel = irohCancelTransport() ?: return remote.source().cancelConversation(id, agentId)
         if (!channel.cancel(id.value)) throw NoActiveConversationRunException(id)
     }
 
@@ -325,7 +348,7 @@ open class ConversationRepository(
 
     private suspend fun recompileRoute(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
         val irohSource = irohConversationListSource?.takeIf { it.shouldUseIroh() }
-            ?: return remote.recompileConversation(id, dryRun, agentId)
+            ?: return remote.source().recompileConversation(id, dryRun, agentId)
         return irohSource.recompiler.recompile(ConversationRecompileRequest(id.value, agentId?.value.orEmpty()), dryRun)
     }
 
@@ -352,7 +375,7 @@ open class ConversationRepository(
         val conversation = if (irohSource?.shouldUseIroh() == true) {
             irohSource.forkConversation(request)
         } else {
-            remote.forkConversation(request)
+            remote.source().forkConversation(request)
         }
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
