@@ -34,7 +34,8 @@ import java.security.SecureRandom
  *   port and bearer token go to [MeridianToolsConfig.endpointFile] (mode 0600, the App Server
  *   user's).
  * - Binds callers to live `meridian` shell calls seen on [frames] (the App Server frames this host
- *   relays), or, with the `env-scoped` fallback, to the shell env's scope.
+ *   relays) by the per-call token it issues to letta-code's PreToolUse hook (letta-mobile-by4vm.44),
+ *   or, with the `env-scoped` fallback, to the shell env's scope.
  * - Rate-limits tool-running calls per conversation and keeps the router's size caps.
  *
  * Off unless `--agent-tools-mode cli`: [start] then does nothing, so the default host is unchanged.
@@ -53,7 +54,7 @@ class MeridianToolsEndpoint(
     suspend fun start(scope: CoroutineScope): Job? {
         if (!config.enabled) return null
         val listener = withContext(Dispatchers.IO) { bind() } ?: return null
-        val liveCalls = MeridianLiveCalls(nowMs)
+        val liveCalls = MeridianLiveCalls(nowMs, newToken = { newToken() })
         val service = MeridianToolsService(router(), MeridianCallerBinder(config.binding, liveCalls), listener.token)
         scope.launch { frames.collect(liveCalls::observe) }
         log(

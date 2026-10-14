@@ -99,9 +99,7 @@ class TimelineExternalTransportAppender(
             result.confirmedServerId?.let { serverId ->
                 events.emit(TimelineSyncEvent.LocalConfirmed(request.otid.value, serverId))
             }
-            if (result.shouldDeletePendingLocal) {
-                runCatching { pendingLocalStore.delete(request.otid.value) }
-            }
+            if (result.shouldDeletePendingLocal) deleteConfirmedPendingLocal(request.otid)
             timer.stop(
                 "otid" to request.otid.value,
                 "serverCount" to serverMessages.size,
@@ -113,6 +111,26 @@ class TimelineExternalTransportAppender(
         } catch (t: Throwable) {
             timer.stopError(t, "otid" to request.otid.value)
             events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
+        }
+    }
+
+    /**
+     * letta-mobile-by4vm.17: a failed delete is logged, not swallowed. The row stays on disk and
+     * the next hydrate deletes it once it sees the server echo of this otid (idempotent), so a
+     * confirmed message is never re-injected as a stale unsent bubble.
+     */
+    private suspend fun deleteConfirmedPendingLocal(otid: TimelineExternalOtid) {
+        try {
+            pendingLocalStore.delete(otid.value)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "reconcile.pendingLocalDeleteFailed", failure,
+                "otid" to otid.value,
+                "conversationId" to conversationId,
+                "retry" to "nextHydrate",
+            )
         }
     }
 

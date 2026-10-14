@@ -2,11 +2,14 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -48,6 +51,8 @@ internal class IrohDialer(
     private val bindEndpoint: suspend (ByteArray, List<ByteArray>) -> Endpoint = { secretKey, alpns ->
         Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey, alpns = alpns))
     },
+    /** letta-mobile-by4vm.50: when cadence syncs may run on this device; recovery syncs always may. */
+    private val syncBudget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
 ) {
     private val endpointMutex = Mutex()
     private var hostEndpoint: Endpoint? = null
@@ -112,9 +117,9 @@ internal class IrohDialer(
                 val appServerClient = DefaultAppServerClient(irohTransport)
                 val serverCapabilities = authenticateClient(appServerClient, config.token)
                 irohTransport.awaitConnectionReady()
-                val (engine, eventRouter) = buildIrohTurnEngine(appServerClient, config.clientVersion, scope)
+                val bound = buildIrohTurnEngine(appServerClient, config.clientVersion, scope, serverCapabilities)
                 buildHandle(
-                    HandleComponents(config, ticket, irohTransport, engine, serverCapabilities, eventRouter, localEndpoint, sharedEndpoint == null),
+                    HandleComponents(config, ticket, irohTransport, bound, serverCapabilities, localEndpoint, sharedEndpoint == null),
                 ).also { dialedHandle.set(it) }
             } catch (error: Throwable) {
                 closeIrohResources("dial_failed", transport, localEndpoint.takeIf { sharedEndpoint == null })
@@ -185,13 +190,14 @@ internal class IrohDialer(
         ticket = components.ticket,
         sessionId = components.ticket.hashCode().toString(),
         transport = components.transport,
-        turnEngine = components.engine,
+        turnEngine = components.bound.engine,
         serverCapabilities = components.serverCapabilities,
         openConnection = { alpn ->
             components.localEndpoint.connect(IrohAppServerTransportAdapter.parseIrohAddress(components.ticket), alpn)
         },
         close = { reason ->
-            components.eventRouter.detach()
+            components.bound.integrityJob?.cancel()
+            components.bound.eventRouter.detach()
             onCloseResources(reason)
             closeIrohResources(reason, components.transport, components.localEndpoint.takeIf { components.ownsEndpoint })
         },
@@ -201,9 +207,8 @@ internal class IrohDialer(
         val config: IrohConnectConfig,
         val ticket: String,
         val transport: IrohAppServerTransport,
-        val engine: AppServerTurnEngine,
+        val bound: IrohBoundEngine,
         val serverCapabilities: Set<String>?,
-        val eventRouter: AppServerRuntimeEventRouter,
         val localEndpoint: Endpoint,
         val ownsEndpoint: Boolean,
     )
@@ -297,12 +302,22 @@ internal class IrohDialer(
         }
     }
 
+    /** One dial's engine, its event router, and the stream-integrity loop (null when not bound). */
+    internal data class IrohBoundEngine(
+        val engine: AppServerTurnEngine,
+        val eventRouter: AppServerRuntimeEventRouter,
+        val integrityJob: Job?,
+    )
+
     private fun buildIrohTurnEngine(
         client: DefaultAppServerClient,
         clientVersion: String,
         routerScope: CoroutineScope,
-    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
+        hostCapabilities: Set<String>?,
+    ): IrohBoundEngine {
         val eventRouter = AppServerRuntimeEventRouter()
+        // letta-mobile-by4vm.50: bound before attach so the first frame is already observed.
+        val integrityJob = bindIrohStreamIntegrity(eventRouter, client, hostCapabilities, routerScope)
         eventRouter.attach(routerScope, client.events)
         val engine = AppServerTurnEngine(
             client = client,
@@ -315,8 +330,21 @@ internal class IrohDialer(
             externalToolRegistry = externalToolRegistry,
         )
         engine.answerApprovalReplaysFrom(eventRouter, routerScope)
-        return engine to eventRouter
+        return IrohBoundEngine(engine, eventRouter, integrityJob)
     }
+
+    /**
+     * letta-mobile-by4vm.50: gap detection (and with it the busy/idle sync cadence, within
+     * [syncBudget]) only against a host that advertises ordered event_seq; older hosts keep the
+     * no-monitor behaviour, since their seq can reach the wire out of order.
+     */
+    internal fun bindIrohStreamIntegrity(
+        router: AppServerRuntimeEventRouter,
+        client: AppServerClient,
+        hostCapabilities: Set<String>?,
+        scope: CoroutineScope,
+    ): Job? = StreamIntegrityBinding(client, { "iroh-sync-${UUID.randomUUID()}" }, syncBudget)
+        .bindIfHostOrdersEventSeq(router, hostCapabilities, scope)
 
     private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
         Telemetry.event("IrohTrace", "transport.close.resources", "reason" to reason)

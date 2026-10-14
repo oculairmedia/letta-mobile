@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.letta.mobile.data.a2ui.A2UI_LIST_VIEW_WIDGET_ID
 import com.letta.mobile.data.a2ui.A2uiComponent
+import com.letta.mobile.data.a2ui.A2uiRenderBudget
+import com.letta.mobile.data.a2ui.A2uiRenderClaim
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
@@ -46,6 +48,10 @@ fun A2uiSurfaceRenderer(
         A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SURFACE_MISSING))
         return
     }
+    if (surface.limitViolation != null) {
+        A2uiSurfaceTooLarge(modifier = modifier)
+        return
+    }
 
     val root = surface.rootComponentId
         ?.let(surface.components::get)
@@ -58,12 +64,17 @@ fun A2uiSurfaceRenderer(
 
     var pendingActionCount by remember(surface.surfaceId) { mutableStateOf(0) }
     val localStateScope = remember(surface.surfaceId) { A2uiLocalStateScope.root(surface.surfaceId) }
+    // letta-mobile-by4vm.3: one budget per surface and component set; nodes claim slots from it.
+    val renderBudget = remember(surface.surfaceId, surface.components) { A2uiRenderBudget.forSurface(surface.surfaceId) }
     val submitting = pendingActionCount > 0
     fun updatePendingActionCount(delta: Int) {
         pendingActionCount = (pendingActionCount + delta).coerceAtLeast(0)
     }
 
-    CompositionLocalProvider(LocalA2uiLocalState provides localStateScope) {
+    CompositionLocalProvider(
+        LocalA2uiLocalState provides localStateScope,
+        LocalA2uiRenderBudget provides renderBudget,
+    ) {
         A2uiComponentNode(
             component = root,
             surface = surface,
@@ -81,6 +92,10 @@ object A2uiTestTags {
     const val SURFACE_MISSING = "a2ui_surface_missing"
     const val SURFACE_PENDING = "a2ui_surface_pending"
     const val MISSING_COMPONENT = "a2ui_missing_component"
+    const val SURFACE_TOO_LARGE = "a2ui_surface_too_large"
+    const val RENDER_LIMIT = "a2ui_render_limit"
+    const val CHILDREN_TRUNCATED = "a2ui_children_truncated"
+    const val LINK_CONFIRM = "a2ui_link_confirm"
     const val MISSING_TEXT = "a2ui_missing_text"
     const val MISSING_IMAGE = "a2ui_missing_image"
     const val TEXT_FIELD = "a2ui_text_field"
@@ -133,6 +148,10 @@ internal fun A2uiComponentNode(
 ) {
     if (component.id in visited || visited.size > MaxRenderDepth) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
+        return
+    }
+    if (rememberA2uiRenderClaim(component.id, renderScope) != A2uiRenderClaim.Granted) {
+        A2uiRenderLimitPlaceholder(modifier = modifier)
         return
     }
     val parentLocalState = LocalA2uiLocalState.current

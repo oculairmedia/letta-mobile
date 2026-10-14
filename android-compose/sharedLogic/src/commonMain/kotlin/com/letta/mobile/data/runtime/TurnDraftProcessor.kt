@@ -26,8 +26,11 @@ internal data class TurnDraftCallbacks(
     val completedDraft: (RunId?) -> RuntimeEventDraft,
     val recordTerminal: (RuntimeEventDraft, Long?) -> Unit,
     val noteCompleted: (Long?) -> Unit,
-    val complete: () -> Nothing,
+    /** Ends the turn (letta-mobile-by4vm.7: signals its [TurnOutcome.Completed]; it no longer throws). */
+    val complete: () -> Unit,
     val settleDelayMs: Long,
+    /** Whether the turn already ended, by this processor or another path (an abrupt local ending). */
+    val isComplete: () -> Boolean = { false },
 )
 
 internal class TurnDraftProcessor(
@@ -37,19 +40,24 @@ internal class TurnDraftProcessor(
     val identity: TurnStreamIdentity = turnStreamIdentityFor(null),
 ) {
     val ledger = TurnToolCallLedger()
-    private var pendingCompleted: RuntimeEventDraft? = null
     private val tail = TurnTailBuffer()
-    private var terminalArmed = false
-    private var speculativeCompletionArmed = false
-    private var sawToolReturn = false
-    private var sawAssistantAfterToolReturn = false
+
+    /**
+     * letta-mobile-by4vm.7: the completion lifecycle ([TurnPhase]), in place of the former
+     * `terminalArmed` / `speculativeCompletionArmed` / `terminalEmitted` flags. The settle window is
+     * armed exactly when a completion is held, i.e. on leaving [TurnPhase.Streaming] for a pending
+     * phase.
+     */
+    private val lifecycle = TurnStateMachine("draft_processor", TurnPhase.Streaming, ::turnTransition)
+    private var evidence = SpeculationEvidence.None
+
+    /** The completion held while its settle window runs (set only in a pending [TurnPhase]). */
+    private var pendingCompleted: RuntimeEventDraft? = null
     private var pendingCompletedSeq: Long? = null
     var terminalSettleJob: Job? = null
         private set
 
-    /** letta-mobile-qygvv.16: set once this turn's terminal lifecycle has been emitted. */
-    var terminalEmitted = false
-        private set
+    val phase: TurnPhase get() = lifecycle.phase
 
     /**
      * letta-mobile-qygvv.16: the transport session carrying this turn is gone, so no server terminal
@@ -57,7 +65,7 @@ internal class TurnDraftProcessor(
      * completion already waiting out its settle window is published as it stands, otherwise
      * [fallback] is. Never emits a second terminal. Reports what it did, then completes the turn.
      */
-    suspend fun cutOff(fallback: RuntimeEventDraft, report: (TurnCutOffOutcome) -> Unit): Nothing {
+    suspend fun cutOff(fallback: RuntimeEventDraft, report: (TurnCutOffOutcome) -> Unit) {
         terminalSettleJob?.cancelAndJoin()
         terminalSettleJob = null
         report(publishCutOffTerminal(fallback))
@@ -65,7 +73,7 @@ internal class TurnDraftProcessor(
     }
 
     private suspend fun publishCutOffTerminal(fallback: RuntimeEventDraft): TurnCutOffOutcome {
-        if (terminalEmitted) return TurnCutOffOutcome.AlreadyTerminal
+        if (phase == TurnPhase.Terminal) return TurnCutOffOutcome.AlreadyTerminal
         val pending = pendingCompleted
         if (pending != null) {
             flushTail()
@@ -101,20 +109,23 @@ internal class TurnDraftProcessor(
      * waiting out the quiet period the `stop_reason` delta fallback needs.
      */
     suspend fun process(incoming: RuntimeEventDraft, frameSeq: Long?, authoritative: Boolean = false) {
-        val draft = identity.stampDraft(incoming) ?: return
+        // letta-mobile-by4vm.7: completing no longer throws, so nothing after the turn's terminal
+        // (a later draft of the same frame, a frame already in flight) may be processed.
+        val draft = stampWhileLive(incoming) ?: return
         flushClosedRoundTail(draft)
         if (emitAutoApproved(draft)) return
         callbacks.track(draft, ledger)
         observeContinuedActivity(draft)
         if (bufferTail(draft, frameSeq)) return
         if (authoritative && draft.isTerminalLifecycle()) {
-            cancelPendingCompletion()
+            // An authoritative terminal supersedes a held completion: its window must not fire.
+            dropPendingCompletion()
             emitTerminal(draft, frameSeq)
             return
         }
         if (draft.isCompletedLifecycle()) {
             pendingCompleted = draft
-            armCompletedTerminalOnce()
+            hold(TurnEvent.CompletionHeld)
             return
         }
         if (draft.isTerminalLifecycle()) {
@@ -122,14 +133,17 @@ internal class TurnDraftProcessor(
             return
         }
         callbacks.emit(draft)
-        armCompletedTerminalOnce()
     }
+
+    private fun stampWhileLive(incoming: RuntimeEventDraft): RuntimeEventDraft? =
+        if (isTurnOver()) null else identity.stampDraft(incoming)
+
+    private fun isTurnOver(): Boolean = phase == TurnPhase.Terminal || callbacks.isComplete()
 
     private suspend fun emitAutoApproved(draft: RuntimeEventDraft): Boolean {
         val approved = callbacks.autoApprovedDraft(draft) ?: return false
         callbacks.track(approved, ledger)
         callbacks.emit(approved)
-        armCompletedTerminalOnce()
         return true
     }
 
@@ -139,9 +153,13 @@ internal class TurnDraftProcessor(
             draft.isToolReturnFrame(),
             draft.isAssistantFrame(),
         ).any { it }
-        if (continued) cancelSpeculativeCompletion()
-        if (draft.isToolReturnFrame()) sawToolReturn = true
-        if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
+        if (continued) {
+            val step = lifecycle.fire(TurnEvent.ContinuedActivity)
+            // The speculation was wrong: drop the held completion and its window.
+            if (step?.from == TurnPhase.SpeculativeCompletionPending) dropPendingCompletion()
+        }
+        if (draft.isToolReturnFrame()) evidence = evidence.afterToolReturn()
+        if (draft.isAssistantFrame()) evidence = evidence.afterAssistant()
     }
 
     private fun bufferTail(draft: RuntimeEventDraft, frameSeq: Long?): Boolean {
@@ -152,15 +170,13 @@ internal class TurnDraftProcessor(
     }
 
     private fun armSpeculativeCompletionAfterUsage(draft: RuntimeEventDraft, frameSeq: Long?) {
-        if (!sawAssistantAfterToolReturn) return
+        if (evidence != SpeculationEvidence.AnsweredAfterToolReturn) return
         if (pendingCompleted == null) {
             pendingCompleted = callbacks.completedDraft(draft.runId)
             pendingCompletedSeq = frameSeq
         }
-        sawAssistantAfterToolReturn = false
-        sawToolReturn = false
-        speculativeCompletionArmed = true
-        armCompletedTerminalOnce()
+        evidence = SpeculationEvidence.None
+        hold(TurnEvent.SpeculativeCompletionHeld)
     }
 
     private suspend fun emitTerminal(draft: RuntimeEventDraft, frameSeq: Long?) {
@@ -179,28 +195,26 @@ internal class TurnDraftProcessor(
 
     private suspend fun emitMarkingTerminal(terminal: RuntimeEventDraft) {
         callbacks.emit(terminal)
-        terminalEmitted = true
+        lifecycle.fire(TurnEvent.TerminalPublished)
     }
 
-    private fun cancelSpeculativeCompletion() {
-        if (!speculativeCompletionArmed) return
-        cancelPendingCompletion()
-    }
-
-    private fun cancelPendingCompletion() {
+    private fun dropPendingCompletion() {
         terminalSettleJob?.cancel()
         terminalSettleJob = null
-        terminalArmed = false
-        speculativeCompletionArmed = false
         pendingCompleted = null
         pendingCompletedSeq = null
     }
 
-    private fun armCompletedTerminalOnce() {
-        if (terminalArmed || pendingCompleted == null) return
-        terminalArmed = true
+    /** Holds a completion; the settle window starts when the turn enters a pending phase. */
+    private fun hold(event: TurnEvent) {
+        val step = lifecycle.fire(event) ?: return
+        if (step.from == TurnPhase.Streaming) armSettleWindow()
+    }
+
+    private fun armSettleWindow() {
         terminalSettleJob = coroutineScope.launch {
             delay(callbacks.settleDelayMs.milliseconds)
+            if (isTurnOver()) return@launch
             val terminal = pendingCompleted ?: return@launch
             flushTail()
             callbacks.noteCompleted(pendingCompletedSeq)

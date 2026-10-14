@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -265,8 +267,9 @@ private fun buildDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
+    // letta-mobile-by4vm.13: no agents served (no backend configured) resolves no names.
     val agentRepository = {
-        runtime.dataBindings.sessionGraphProvider.current.agentRepository
+        runtime.dataBindings.sessionGraphProvider.current.ifSupported(SessionRoute.AGENTS) { agentRepository }
     }
     return DesktopChatController(
         bootstrapState = runtime.bootstrapState,
@@ -292,10 +295,10 @@ private fun buildDesktopChatController(
                 )
         },
         agentNamesByIdProvider = { agentIds ->
-            resolveDesktopAgentNames(agentIds, agentRepository())
+            agentRepository()?.let { resolveDesktopAgentNames(agentIds, it) }.orEmpty()
         },
         agentByIdProvider = { agentIds ->
-            resolveDesktopAgents(agentIds, agentRepository())
+            agentRepository()?.let { resolveDesktopAgents(agentIds, it) }.orEmpty()
         },
         loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
         persistArchivedConversationIds = { ids ->

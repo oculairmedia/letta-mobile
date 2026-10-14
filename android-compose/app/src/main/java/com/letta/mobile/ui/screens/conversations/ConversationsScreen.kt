@@ -281,6 +281,8 @@ private fun ConversationInspector(viewModel: ConversationsViewModel, uiState: Co
             inspectorMessages = uiState.inspectorMessages,
             isInspectorLoading = uiState.isInspectorLoading,
             inspectorError = uiState.inspectorError,
+            routes = viewModel.adminRoutes,
+            adminActionError = uiState.adminActionError,
         ),
         callbacks = ConversationAdminDialogCallbacks(
             onDismiss = viewModel::closeConversationAdmin,

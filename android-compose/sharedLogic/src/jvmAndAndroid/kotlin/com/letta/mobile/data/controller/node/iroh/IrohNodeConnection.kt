@@ -46,7 +46,6 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
@@ -823,13 +822,7 @@ class IrohNodeConnection(
                     "conversationId" to input.runtime.conversationId,
                 )
                 runCatching {
-                    // Replay each parked frame (newline-separated)
-                    parkedFrameSequence.split("\n").forEach { frameJson ->
-                        if (frameJson.isNotBlank()) {
-                            val delta = AppServerProtocol.json.parseToJsonElement(frameJson).jsonObject
-                            writeStreamDelta(streamSend, input.runtime, delta)
-                        }
-                    }
+                    replayParkedDeltas(ensureSelfViewer(streamSend), input.runtime, parkedFrameSequence)
                 }.onFailure { replayError ->
                     // Could not deliver on this stream either — re-park so a
                     // later redial can still resolve the turn.
@@ -969,53 +962,6 @@ class IrohNodeConnection(
             runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
         }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
 
-    /**
-     * eaczz.4: retained ONLY for the redial parked-frame REPLAY path — a
-     * reconnecting INITIATOR re-sends the same turn and we replay its parked
-     * frame tail to ITS OWN stream (observers reconcile via message.list, so they
-     * are not part of this replay). Live turn frames go through
-     * [ConversationTurnFanout] now.
-     */
-    private suspend fun writeStreamDelta(
-        streamSend: SendStream,
-        runtime: AppServerRuntimeScope,
-        delta: JsonObject,
-    ) {
-        // letta-mobile-h30cy: the Iroh stream forwards the App Server delta with
-        // its raw provider id (letta-msg-*), but message.list later returns the
-        // SAME reply with a DIFFERENT id namespace (ui-msg-*, null run) — the two
-        // never share an identity field, so the mobile reconcile cannot dedupe the
-        // streamed row against the disk-fetched copy and renders it twice. The
-        // WS/HTTP shim paths already solve this by rewriting the streamed
-        // assistant id to a stable `cm-stream-<otid>` (and reasoning to
-        // `cm-reason-<otid>`), which mobile's optimistic-twin dedup collapses
-        // against the disk copy. The Iroh serve path bypassed the shim, so it
-        // never got this tag — THE reason Iroh dupes and HTTPS does not. Apply the
-        // identical tagging here.
-        val taggedDelta = tagStreamDeltaForOptimisticDedup(delta)
-        val frame = buildJsonObject {
-            put("type", "stream_delta")
-            put("runtime", AppServerProtocol.json.encodeToJsonElement(runtime))
-            put("event_seq", eventSeq.next())
-            put("emitted_at", Instant.now().toString())
-            put("idempotency_key", "iroh-delta-${UUID.randomUUID()}")
-            put("delta", taggedDelta)
-        }.toString()
-        Telemetry.event(
-            "IrohNode", "stream.write",
-            "remoteEndpointId" to remoteEndpointId,
-            *IrohDiagnostics.redactedFrameAttributes(frameType(frame), frame.length).toTypedArray(),
-        )
-        streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
-        }
-    }
-
-
-    private fun frameType(rawFrame: String): String? = runCatching {
-        AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
-    }.getOrNull()
-
     private suspend fun serveStreamReadiness(biStream: BiStream) {
         val recvStream = biStream.recv()
         runCatching { recvStream.read(1u) }
@@ -1030,7 +976,9 @@ class IrohNodeConnection(
         )
 
         internal fun advertisedCapabilities(router: AdminRpcRouter): List<String> = buildList {
-            addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY) + router.featureCapabilities)
+            // letta-mobile-by4vm.50: ordered event_seq is a property of the connection's write path,
+            // not of any admin handler, so every host advertises it.
+            addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, ORDERED_EVENT_SEQ_CAPABILITY) + router.featureCapabilities)
             if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
                 add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
             }

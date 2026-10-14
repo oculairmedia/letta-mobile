@@ -28,14 +28,18 @@ data class CommandAnswer(val success: Boolean, val output: String?) {
                 ?.delta as? JsonObject ?: return null
             if (delta.text("message_type") != SLASH_COMMAND_END) return null
             if (!delta.isFor(command.commandId)) return null
-            return CommandAnswer(delta.bool("success") ?: true, delta.text("output"))
+            // letta-mobile-by4vm.40: every letta-code emitter sets `success`; an end without it is not
+            // evidence that the command worked, so it reads as not successful.
+            return CommandAnswer(delta.bool("success") ?: false, delta.text("output"))
         }
 
         private fun AppServerRuntimeScope.sameConversation(other: AppServerRuntimeScope?): Boolean =
             other != null && conversationId == other.conversationId && agentId == other.agentId
 
+        /** By its id, else by the input's command word: `/compactify` is not `/compact`. */
         private fun JsonObject.isFor(commandId: String): Boolean =
-            text("command_id") == commandId || text("input").orEmpty().trim().startsWith("/$commandId")
+            text("command_id") == commandId ||
+                text("input").orEmpty().trim().takeWhile { !it.isWhitespace() } == "/$commandId"
 
         private const val SLASH_COMMAND_END = "slash_command_end"
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
@@ -121,18 +122,18 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
 ) {
     /** The fakes stand in for a non-App-Server backend through the letta-mobile-ckmub.4 seam. */
     private fun remoteSources() = SessionRemoteSources(
-        agents = agentApi,
-        conversations = conversationApi,
-        mcpServers = mcpServerApi,
-        models = modelApi,
-        passages = passageApi,
-        projects = projectApi,
-        projectWork = projectWorkApi,
-        providers = providerApi,
-        runs = runApi,
-        schedules = scheduleApi,
-        steps = stepApi,
-        tools = toolApi,
+        agents = agentApi.bound(),
+        conversations = conversationApi.bound(),
+        mcpServers = mcpServerApi.bound(),
+        models = modelApi.bound(),
+        passages = passageApi.bound(),
+        projects = projectApi.bound(),
+        projectWork = projectWorkApi.bound(),
+        providers = providerApi.bound(),
+        runs = runApi.bound(),
+        schedules = scheduleApi.bound(),
+        steps = stepApi.bound(),
+        tools = toolApi.bound(),
     )
 
     fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(

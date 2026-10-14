@@ -312,11 +312,25 @@ tasks.withType<Test>().configureEach {
 // Needs a locally built bridge DLL; see avatar/renderer-rive/native/desktop/README.md.
 //   -PriveBridge=path\to\rive_desktop_bridge.dll -PriveFile=path\to\file.riv
 //   [-PriveStateMachine=name] [-PriveTriggers=a,b,c]
+// The bench lives in its own source set (src/riveSpike) so it never reaches the shipped jar; like
+// phonePlayground it sees desktop's internals (BenchInstruments, RiveDesktopScene) as a test would.
+val riveSpike: SourceSet = sourceSets.create("riveSpike") {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += sourceSets.main.get().output
+}
+configurations.named("riveSpikeImplementation") { extendsFrom(configurations.implementation.get()) }
+configurations.named("riveSpikeRuntimeOnly") { extendsFrom(configurations.runtimeOnly.get()) }
+configurations.named("riveSpikeCompileClasspath") {
+    shouldResolveConsistentlyWith(configurations.getByName("riveSpikeRuntimeClasspath"))
+}
+kotlin.target.compilations.named("riveSpike") {
+    associateWith(kotlin.target.compilations.getByName("main"))
+}
 tasks.register<JavaExec>("runRiveSpike") {
     group = "application"
     description = "Runs the native Rive spike window (Windows / D3D11)."
     mainClass.set("com.letta.mobile.desktop.avatar.rive.RiveDesktopSpikeKt")
-    classpath = sourceSets.main.get().runtimeClasspath
+    classpath = riveSpike.runtimeClasspath
     providers.gradleProperty("riveBridge").orNull?.let { systemProperty("rive.bridge.path", it) }
     providers.gradleProperty("riveSelfTest").orNull?.let { systemProperty("rive.spike.selfTest", it) }
     // -PriveRecord=enter-thinking takes one motion signature as soon as the file loads and prints it.

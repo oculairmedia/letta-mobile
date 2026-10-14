@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.ProviderRemoteSource
 
 /**
@@ -10,9 +12,12 @@ import com.letta.mobile.data.repository.api.ProviderRemoteSource
  * route (the Letta REST backend was removed).
  */
 open class ProviderRepository(
-    remote: ProviderRemoteSource = noAppServerRoute(),
+    remote: RemoteRoute<ProviderRemoteSource> = RemoteRoute.Absent(SessionRoute.PROVIDERS),
     irohProviderSource: IrohAdminRpcProviderSource? = null,
 ) : CachedProviderRepository(
     remote = remote,
     irohProviderSource = irohProviderSource,
-)
+) {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(remote: ProviderRemoteSource, irohProviderSource: IrohAdminRpcProviderSource? = null) : this(remote.bound(), irohProviderSource)
+}

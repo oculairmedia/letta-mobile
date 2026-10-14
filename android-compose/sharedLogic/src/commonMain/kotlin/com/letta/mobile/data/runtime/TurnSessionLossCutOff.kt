@@ -1,15 +1,26 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.controller.fanout.RuntimeSessionLink
 import com.letta.mobile.data.controller.fanout.isRuntimeStreamDetached
 import com.letta.mobile.data.controller.fanout.isRuntimeSubscriberOverflow
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-qygvv.16: the reason a turn cut off by a lost transport session fails with. It is
@@ -28,19 +39,81 @@ internal const val SUBSCRIBER_OVERFLOW_TERMINAL_REASON: String =
     "Connection lost during turn: this client fell behind the App Server event stream and was detached"
 
 /**
+ * letta-mobile-by4vm.9: how long a turn waits, keeping its lease and its fanout subscription, for
+ * an interrupted App Server session to come back before it fails with
+ * [SESSION_LOST_TERMINAL_REASON]. The server keeps running the turn meanwhile.
+ *
+ * 30 s covers a Wi-Fi blip or a roaming hand-off plus about six full-jitter redials of
+ * [com.letta.mobile.data.controller.reconnect.FullJitterBackoff] (250 ms base, doubling; the
+ * ceilings add up to ~32 s by the seventh attempt), and stays well under the 300 s turn idle
+ * watchdog, so a dead session still fails with its own connection_lost reason.
+ */
+const val SESSION_RECONNECT_GRACE_MS: Long = 30_000L
+
+/**
  * letta-mobile-qygvv.16: ends [lease]'s turn when the session carrying it is gone (connection
  * closed, redial, wrapper restart), because no server terminal will ever reach it then. The
  * terminal goes through [processor]'s own terminal path, which flushes the buffered stop reason
  * and usage first and never emits a second terminal when the real one already went out.
+ *
+ * letta-mobile-by4vm.9: two ways a session goes away, handled differently.
+ *  - The stream detaches ([endOnDetach]): the router was torn down for good, or this subscriber
+ *    overflowed (letta-mobile-by4vm.4). Nothing will reconnect it, so the turn ends at once.
+ *  - The session is interrupted ([watchReconnect], on a router whose [link] outlives the socket):
+ *    the turn is reconnecting. It keeps its lease and subscription; if the link is restored within
+ *    [graceMs] the successor socket's frames continue the turn, otherwise it fails here.
  */
 internal class SessionLossCutOff(
     private val processor: TurnDraftProcessor,
     private val command: TurnCommand,
     private val lease: LeaseRef,
+    private val link: StateFlow<RuntimeSessionLink>? = null,
+    private val graceMs: Long = SESSION_RECONNECT_GRACE_MS,
 ) {
-    /** [events], ending the turn instead of failing when the stream detaches (see [endIfSessionLost]). */
+    /**
+     * Fails the turn when [link] stays interrupted for [graceMs]; a restore inside the window
+     * cancels the countdown and a later interruption starts a fresh one. Its failure completes the
+     * turn through the collected flow, like any other cut-off; null without a link.
+     */
+    private fun watchReconnect(scope: CoroutineScope): Job? {
+        val sessionLink = link ?: return null
+        return scope.launch {
+            sessionLink.collectLatest { state ->
+                if (state !is RuntimeSessionLink.Interrupted) return@collectLatest
+                reportReconnecting(state)
+                delay(graceMs.milliseconds)
+                processor.cutOff(command.failedDraft(SESSION_LOST_TERMINAL_REASON)) { report(it, overflow = false) }
+            }
+        }
+    }
+
+    private fun reportReconnecting(state: RuntimeSessionLink.Interrupted) {
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "turn.reconnecting",
+            "key" to lease.key.toString(),
+            "runId" to (lease.current?.runId ?: ""),
+            "epoch" to state.epoch,
+            "reason" to (state.reason ?: ""),
+            "graceMs" to graceMs,
+        )
+    }
+
+    /**
+     * [events], ending the turn instead of failing when the stream detaches (see [endIfSessionLost]),
+     * with the reconnect countdown ([watchReconnect]) running for as long as they are collected.
+     */
     fun endOnDetach(events: Flow<AppServerReceivedFrame>): Flow<AppServerReceivedFrame> =
-        events.catch { cause ->
+        flow {
+            coroutineScope {
+                val reconnectWatch = watchReconnect(this)
+                try {
+                    emitAll(events)
+                } finally {
+                    reconnectWatch?.cancel()
+                }
+            }
+        }.catch { cause ->
             if (cause is CancellationException) endIfSessionLost(cause)
             throw cause
         }

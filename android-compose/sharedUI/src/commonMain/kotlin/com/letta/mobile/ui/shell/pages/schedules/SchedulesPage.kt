@@ -46,6 +46,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import kotlin.jvm.JvmInline
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
@@ -242,7 +243,7 @@ private fun SchedulesPageDialogs(ui: SchedulesPageUi, context: SchedulesDialogCo
                 confirmLabel = "Delete",
             ),
             onConfirm = {
-                actions.onDelete(id)
+                actions.delete(context.state.deleteTarget(id))
                 ui.pendingDelete = null
                 ui.rail = ScheduleRailState.Overview
             },
@@ -268,15 +269,56 @@ data class SchedulesPageState(
     val showsAgentChips: Boolean get() = focusedAgentId == null && library.agents.size > 1
 }
 
-/** What the page asks its host to do. A null [onTogglePause] disables Pause / Resume. */
+/**
+ * What the page asks its host to do. A null [onTogglePause] disables Pause / Resume.
+ *
+ * Deletes are typed by the list that rendered the row (letta-mobile-by4vm.42): [onDeleteCron] for a
+ * cron task, [onDeleteSchedule] for a native schedule with the agent it belongs to, so a host never
+ * has to guess the backend from a bare id.
+ */
 @Immutable
 data class SchedulesPageActions(
     val onRefresh: () -> Unit = {},
     val onSelectAgent: (String) -> Unit = {},
     val onCreate: (ScheduleCreateRequest) -> Unit = {},
-    val onDelete: (String) -> Unit = {},
+    val onDeleteSchedule: (NativeScheduleRef) -> Unit = {},
+    val onDeleteCron: (CronTaskId) -> Unit = {},
     val onTogglePause: ((String, Boolean) -> Unit)? = null,
 )
+
+/** A cron task's id, as the host's cron API names it. */
+@JvmInline
+value class CronTaskId(val value: String)
+
+/** A native schedule and the agent that owns it. */
+@Immutable
+data class NativeScheduleRef(val agentId: String, val scheduleId: String)
+
+/** The row a delete confirmation was opened from; null when it is no longer listed. */
+internal sealed interface ScheduleDeleteTarget {
+    data class Cron(val id: CronTaskId) : ScheduleDeleteTarget
+
+    data class Native(val ref: NativeScheduleRef) : ScheduleDeleteTarget
+}
+
+/**
+ * Resolves [id] the way [SchedulesPageModel.defs] rendered it: a cron task in scope for the focused
+ * agent wins over a native schedule with the same id, exactly as the merged list shows it.
+ */
+internal fun SchedulesPageState.deleteTarget(id: String): ScheduleDeleteTarget? {
+    val cron = crons.firstOrNull { it.id == id && (focusedAgentId == null || it.agentId == null || it.agentId == focusedAgentId) }
+    if (cron != null) return ScheduleDeleteTarget.Cron(CronTaskId(cron.id))
+    val native = library.schedules.firstOrNull { it.id == id } ?: return null
+    return ScheduleDeleteTarget.Native(NativeScheduleRef(native.agentId, native.id))
+}
+
+private fun SchedulesPageActions.delete(target: ScheduleDeleteTarget?) {
+    when (target) {
+        is ScheduleDeleteTarget.Cron -> onDeleteCron(target.id)
+        is ScheduleDeleteTarget.Native -> onDeleteSchedule(target.ref)
+        null -> Unit
+    }
+}
 
 /** Host presentation: [showTitle] false when the host already titles the screen; [touch] sizes chips for fingers. */
 @Immutable

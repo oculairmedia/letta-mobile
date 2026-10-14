@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -91,6 +92,28 @@ class AppServerRuntimeEventRouter(
         }
     }
 
+    private val sessionLinkState = RuntimeSessionLinkState()
+
+    /** letta-mobile-by4vm.9: whether the session behind this router is carrying frames right now. */
+    val sessionLink: StateFlow<RuntimeSessionLink> = sessionLinkState.link
+
+    /**
+     * letta-mobile-by4vm.9: the socket under a stable inbound pipe dropped and its owner is
+     * redialling. Unlike [detach], nothing is closed: the collector and every subscriber stay, so
+     * frames from the successor socket reach the same turns. Turns fail only if the session is not
+     * restored within their grace window.
+     */
+    fun interruptSession(reason: String?) = sessionLinkState.interrupt(reason)
+
+    /**
+     * letta-mobile-by4vm.9: the successor socket is attached. Ends an interruption and resyncs the
+     * watched runtimes so what streamed during the gap is recovered; a no-op while linked.
+     */
+    fun restoreSession() {
+        if (sessionLinkState.restore()) requestResync()
+    }
+
+    /** Permanent teardown: every subscriber's turn ends now (see [RuntimeEventFanout.closeAllSubscribersSync]). */
     fun detach() {
         collectorJob.getAndSet(null)?.cancel()
         // Closing subscriber channels unblocks turn collectors waiting on fanout

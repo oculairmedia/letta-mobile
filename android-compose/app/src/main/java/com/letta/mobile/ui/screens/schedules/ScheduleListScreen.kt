@@ -44,7 +44,8 @@ fun ScheduleListScreen(
             onRefresh = viewModel::loadData,
             onSelectAgent = viewModel::selectAgent,
             onCreate = viewModel::create,
-            onDelete = viewModel::deleteSchedule,
+            // Crons are read-only on the phone (no cron API): only native schedules delete.
+            onDeleteSchedule = { ref -> viewModel.deleteSchedule(ref.scheduleId) },
         )
     }
     LettaPageScaffold(

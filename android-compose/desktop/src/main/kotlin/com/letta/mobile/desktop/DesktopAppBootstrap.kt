@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,7 +34,6 @@ import com.letta.mobile.data.memory.graph.MemoryPageController
 import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
 import com.letta.mobile.desktop.workspace.memfs
-import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.runtime.DesktopRuntimeLaunchSettings
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
@@ -165,7 +166,8 @@ internal fun rememberDesktopLibraryControllers(
 
 /**
  * The shared schedule library over the session graph. letta-mobile-ckmub.4: only an Iroh host relays
- * schedules today, so the unavailable repository bound for other backends means "not served here".
+ * schedules today. letta-mobile-by4vm.13: the session's capabilities say so up front, so the page
+ * opens on "not served here" without calling the unavailable repository.
  */
 private fun desktopScheduleLibraryController(
     sessionGraphProvider: DesktopSessionGraphProvider,
@@ -178,17 +180,18 @@ private fun desktopScheduleLibraryController(
         scope = scope,
         errorMessageMapper = { throwable, fallback ->
             when (throwable) {
-                is DesktopRepositoryUnavailableException -> "Desktop schedule repositories are not available for this backend yet."
+                is AppServerRouteUnavailable -> "Desktop schedule repositories are not available for this backend yet."
                 else -> throwable.message ?: throwable::class.simpleName ?: fallback
             }
         },
-        scheduleAdminUnavailableMatcher = { throwable -> throwable is DesktopRepositoryUnavailableException },
+        scheduleAdminUnavailableMatcher = { throwable -> throwable is AppServerRouteUnavailable },
+        nativeScheduleRoute = graph.capabilities.supports(SessionRoute.SCHEDULES),
     )
 }
 
 private fun desktopMemoryErrorMessage(throwable: Throwable): String =
     when (throwable) {
-        is DesktopRepositoryUnavailableException -> "Desktop memory repositories are not available for this backend yet."
+        is AppServerRouteUnavailable -> "Desktop memory repositories are not available for this backend yet."
         else -> throwable.message ?: throwable::class.simpleName ?: "Memory data could not be loaded."
     }
 

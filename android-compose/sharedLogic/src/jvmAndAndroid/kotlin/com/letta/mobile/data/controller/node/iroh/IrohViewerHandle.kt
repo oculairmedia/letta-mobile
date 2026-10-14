@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
 import java.util.UUID
@@ -41,10 +42,11 @@ fun sendStreamSink(send: SendStream): ViewerFrameSink = object : ViewerFrameSink
  * honoring ITS OWN frame-part capability. This keeps per-connection seq
  * monotonicity and capability gating intact while guaranteeing shape parity.
  *
- * [writeFrame] (raw already-encoded wire frame, e.g. redial-parked replay) and
- * [writeBroadcastFrame] (a tagged delta body re-wrapped per-viewer) are the two
- * write entry points. Both are best-effort: a failed write returns false so the
- * broadcaster can de-register a dead viewer, and never throws into the caller
+ * [writeFrame] (raw already-encoded wire frame), [writeBroadcastFrame] (a tagged
+ * delta body re-wrapped per-viewer) and [writeProtocolFrame] are the write entry
+ * points; the stamped ones draw event_seq under the stream lock. All are
+ * best-effort: a failed write returns false so the broadcaster can de-register a
+ * dead viewer, and never throws into the caller
  * (a slow/dead observer must never block the initiator's turn — eaczz.6).
  */
 internal class IrohViewerHandle(
@@ -71,17 +73,7 @@ internal class IrohViewerHandle(
     suspend fun writeBroadcastFrame(
         runtime: AppServerRuntimeScope,
         delta: JsonObject,
-    ): Boolean {
-        val frame = buildJsonObject {
-            put("type", "stream_delta")
-            put("runtime", AppServerProtocol.json.encodeToJsonElement(AppServerRuntimeScope.serializer(), runtime))
-            put("event_seq", eventSeq.next())
-            put("emitted_at", Instant.now().toString())
-            put("idempotency_key", "iroh-delta-${UUID.randomUUID()}")
-            put("delta", delta)
-        }.toString()
-        return writeFrame(frame)
-    }
+    ): Boolean = writeSerialized { streamDeltaFrame(runtime, delta, eventSeq.next()) }
 
     /**
      * letta-mobile-qygvv.12: write a non-delta App Server frame (`update_loop_status`,
@@ -92,15 +84,28 @@ internal class IrohViewerHandle(
         type: String,
         runtime: AppServerRuntimeScope,
         fields: JsonObject,
-    ): Boolean = writeFrame(protocolFrame(type, runtime, fields, eventSeq.next()).toString())
+    ): Boolean = writeSerialized { protocolFrame(type, runtime, fields, eventSeq.next()).toString() }
 
     /**
-     * Write an already-encoded wire frame verbatim (used for redial replay of
-     * parked frames, and by [writeBroadcastFrame]). Best-effort; returns false
-     * on failure without throwing.
+     * Write an already-encoded wire frame verbatim (agent/conversation pushes,
+     * subagent and approval replays). Best-effort; returns false on failure
+     * without throwing.
      */
-    override suspend fun writeFrame(frame: String): Boolean = try {
+    override suspend fun writeFrame(frame: String): Boolean = writeSerialized { frame }
+
+    /**
+     * letta-mobile-by4vm.50: the ONE serialized write step for this connection's stream.
+     * [encode] runs INSIDE [streamWriteMutex], so a stamped frame draws its event_seq in
+     * the same critical section that puts it on the wire. Several chains write to one
+     * handle (the connection's initiator queue, the node's observer queue, the
+     * initiator-only busy rejection, redial replay); allocating before the lock let a
+     * writer that lost the race put seq N+1 on the wire ahead of N, which the client's
+     * EventSeqGapDetector reads as a Gap then a Stale. Under the lock, wire order is
+     * seq order for every frame on the connection.
+     */
+    private suspend fun writeSerialized(encode: () -> String): Boolean = try {
         streamWriteMutex.withLock {
+            val frame = encode()
             if (frameParts()) {
                 IrohFrameCodec.encodeFrameParts(frame, maxFrameBytes).forEach { sink.writeAll(it) }
             } else {
@@ -117,5 +122,35 @@ internal class IrohViewerHandle(
             level = Telemetry.Level.WARN,
         )
         false
+    }
+}
+
+/** The `stream_delta` envelope around an already-tagged [delta], stamped with [eventSeq]. */
+internal fun streamDeltaFrame(runtime: AppServerRuntimeScope, delta: JsonObject, eventSeq: Long): String =
+    buildJsonObject {
+        put("type", "stream_delta")
+        put("runtime", AppServerProtocol.json.encodeToJsonElement(AppServerRuntimeScope.serializer(), runtime))
+        put("event_seq", eventSeq)
+        put("emitted_at", Instant.now().toString())
+        put("idempotency_key", "iroh-delta-${UUID.randomUUID()}")
+        put("delta", delta)
+    }.toString()
+
+/**
+ * Replays a redial's parked delta bodies ([parked], newline-separated) to the reconnecting
+ * initiator's [viewer]. Each body is re-tagged and stamped at REPLAY time from the new
+ * connection's counter, under the same lock as live writes (letta-mobile-by4vm.50). The
+ * parked tail holds delta BODIES ([TurnFrameTracker] records them before any envelope), so
+ * there is no original seq to keep, and one would be wrong anyway: it came from the dead
+ * connection's counter, which the client's gap detector tracks as a separate generation.
+ * Dedupe of replayed rows rides on their message ids and cm-stream tags, not on event_seq.
+ * Throws when a write fails so the caller can re-park the tail for a later redial.
+ */
+internal suspend fun replayParkedDeltas(viewer: IrohViewerHandle, runtime: AppServerRuntimeScope, parked: String) {
+    parked.split("\n").filter { it.isNotBlank() }.forEach { frameJson ->
+        val delta = AppServerProtocol.json.parseToJsonElement(frameJson).jsonObject
+        check(viewer.writeBroadcastFrame(runtime, tagStreamDeltaForOptimisticDedup(delta))) {
+            "parked frame replay write failed"
+        }
     }
 }

@@ -2,9 +2,7 @@ package com.letta.mobile.feature.chat.screen
 
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.context.ContextTokenReadings
-import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
@@ -62,10 +60,6 @@ internal fun openedChatViewModel(
     sessionManager = stubSessionManager(session),
     runtimeEventOutbox = mockk(relaxed = true),
     currentConversationTracker = mockk(relaxed = true),
-    shimBackendDetector = mockk<ShimBackendDetector>(relaxed = true) {
-        every { activeUsesChannelTransport } returns MutableStateFlow(false)
-        every { activeBackendKind } returns MutableStateFlow(BackendKind.REST)
-    },
     wsChatBridge = stubChatBridge(),
     subagentRepository = mockk(relaxed = true),
     slashCommandRepository = mockk(relaxed = true) {

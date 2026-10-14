@@ -259,21 +259,16 @@ class DesktopChatController(
     val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
 
     private val presenceJob: Job = scope.launch {
-        var presenceConversationId: String? = null
         combine(
             _boundProjection,
             _streamingConversationId,
             state.map { it.selectedConversationId },
         ) { bound, streamingConversationId, selectedConversationId ->
-            // Presence carries over only within one conversation; a selection change starts fresh.
-            val previous = _replyPresence.value.takeIf { presenceConversationId == selectedConversationId }
-            presenceConversationId = selectedConversationId
             derivePresence(
                 projection = bound.projection?.takeIf { bound.conversationId != null && bound.conversationId == selectedConversationId },
                 // The send job spans send -> terminal across every tool round: it is desktop's
                 // in-flight turn, the same fact Android reads from the transport.
                 turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
-                previous = previous,
             )
         }
             // Tokens arriving for the selected conversation are the one phase this controller
@@ -305,39 +300,29 @@ class DesktopChatController(
     private fun derivePresence(
         projection: TimelineProjection?,
         turnInFlight: Boolean,
-        previous: ChatStreamingPresence?,
     ): ChatStreamingPresence {
-        val previousIsStreaming = previous?.isStreaming ?: false
-        val previousIsAgentTyping = previous?.isAgentTyping ?: false
         if (projection == null) {
             // Nothing projected for this conversation yet: only the in-flight turn can say it works.
             return ChatStreamingPresencePolicy.derive(
                 inputs = ChatStreamInputs(
-                    previousIsStreaming = previousIsStreaming,
-                    previousIsAgentTyping = previousIsAgentTyping,
                     anyServerLocalPending = false,
                     tailIsAssistant = false,
                     replyStreaming = turnInFlight,
-                    clientModeStreamInFlight = false,
                     a2uiThinkingActive = false,
                     duplicateInitialMessageInFlight = false,
                     turnInFlight = turnInFlight,
                 ),
             )
         }
-        // Desktop is server-mode only, so the client-mode / A2UI-thinking / duplicate-initial
-        // signals are inert here.
+        // Desktop has no A2UI-thinking or duplicate-initial signals, so those are inert here.
         val presentation = timelinePresenter.present(
             projection = projection,
             signals = ChatPresenceSignals(
                 replyStreaming = turnInFlight,
-                clientModeStreamInFlight = false,
                 a2uiThinkingActive = false,
                 duplicateInitialMessageInFlight = false,
                 turnInFlight = turnInFlight,
             ),
-            previousIsStreaming = previousIsStreaming,
-            previousIsAgentTyping = previousIsAgentTyping,
         )
         return ChatStreamingPresence(isStreaming = presentation.isStreaming, isAgentTyping = presentation.isAgentTyping)
     }

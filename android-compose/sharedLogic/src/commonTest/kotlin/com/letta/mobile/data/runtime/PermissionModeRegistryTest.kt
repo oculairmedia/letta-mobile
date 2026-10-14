@@ -13,8 +13,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 
@@ -287,6 +289,25 @@ class PermissionModeRegistryTest {
     }
 
     @Test
+    fun anOlderChangeWhoseWriteFinishesLastDoesNotOverwriteTheNewerOne() = runTest {
+        val store = ReorderingStore()
+        val modes = PermissionModeSettings(store).modes
+        val newerGate = CompletableDeferred<ModeChangeResult>()
+        // While the older change's write is in flight, the newer change runs to completion of its own write.
+        store.beforeFirstWrite = {
+            launch(start = CoroutineStart.UNDISPATCHED) { modes.change(runtime, Strict) { newerGate.await() } }
+        }
+
+        val olderConfirmed = modes.change(runtime, Standard) { ModeChangeResult.Confirmed }
+
+        assertFalse(olderConfirmed, "the superseded change must not be sent or confirmed")
+        assertEquals(Strict, modes.modeFor(runtime))
+        assertEquals(Strict, modes.observe(runtime).first().mode)
+        assertEquals(Strict, PermissionModeSettings(store).modes.modeFor(runtime), "the store must hold the newer choice too")
+        newerGate.complete(ModeChangeResult.AppliesOnStart)
+    }
+
+    @Test
     fun forgettingARuntimeDropsItsEntryAndItsStoredChoice() = runTest {
         val store = MapSettingsStore()
         val modes = PermissionModeSettings(store).modes
@@ -296,6 +317,20 @@ class PermissionModeRegistryTest {
 
         assertEquals(Unrestricted, modes.modeFor(runtime))
         assertEquals(Unrestricted, PermissionModeSettings(store).modes.modeFor(runtime))
+    }
+
+    /** Runs [beforeFirstWrite] inside the first write, before that write lands: the writes complete in reverse order. */
+    private class ReorderingStore : SecureSettingsStore {
+        private val values = mutableMapOf<String, String>()
+        var beforeFirstWrite: (() -> Unit)? = null
+
+        override fun getString(key: String, defaultValue: String?): String? = values[key] ?: defaultValue
+        override fun putString(key: String, value: String) {
+            beforeFirstWrite?.also { beforeFirstWrite = null }?.invoke()
+            values[key] = value
+        }
+        override fun remove(key: String) { values.remove(key) }
+        override fun clear() = values.clear()
     }
 
     private class FailingStore : SecureSettingsStore {

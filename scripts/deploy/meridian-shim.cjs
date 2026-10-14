@@ -13,6 +13,10 @@
 //   3. $MERIDIAN_ENDPOINT_FILE or ~/.letta/meridian/tools.endpoint: the loopback TCP fallback,
 //      {"port": N, "token": "..."} written 0600 by the wrapper
 //
+// Caller identity: $LETTA_TOOL_TOKEN, the token the host issued for this one shell call (see
+// meridian-token-hook.cjs). LETTA_AGENT_ID / LETTA_CONVERSATION_ID are sent too, but only the
+// env-scoped fallback looks at them.
+//
 // Exit codes: 0 ok, 2 refused input, 3 denied, 4 host unavailable (stdout {"error":"host_unavailable"}).
 // No dependencies; Node 18+.
 'use strict';
@@ -135,7 +139,7 @@ function resolveEndpoint() {
   return { host: '127.0.0.1', port: descriptor.port, token: descriptor.token };
 }
 
-function call(endpoint, request) {
+function call(endpoint, request, timeoutMs = TIMEOUT_MS) {
   return new Promise((resolve) => {
     const socket = endpoint.path
       ? net.createConnection({ path: endpoint.path })
@@ -150,7 +154,7 @@ function call(endpoint, request) {
       socket.destroy();
       resolve(value);
     };
-    const timer = setTimeout(() => settle({ unavailable: `no answer within ${TIMEOUT_MS} ms` }), TIMEOUT_MS);
+    const timer = setTimeout(() => settle({ unavailable: `no answer within ${timeoutMs} ms` }), timeoutMs);
     socket.on('connect', () => socket.write(`${JSON.stringify(request)}\n`));
     socket.on('data', (chunk) => {
       size += chunk.length;
@@ -201,6 +205,9 @@ async function main() {
     agent_id: process.env.LETTA_AGENT_ID || null,
     conversation_id: process.env.LETTA_CONVERSATION_ID || null,
   };
+  // letta-mobile-by4vm.44: the per-call capability token the PreToolUse hook (meridian-token-hook.cjs)
+  // put in this shell. The host attributes the call by it alone; the ids above are display only.
+  if (process.env.LETTA_TOOL_TOKEN) request.tool_token = process.env.LETTA_TOOL_TOKEN;
   if (stdin) request.stdin = stdin;
   if (endpoint.token) request.token = endpoint.token;
   const answer = await call(endpoint, request);
@@ -218,4 +225,8 @@ async function main() {
   finish(Number.isInteger(response.exit_code) ? response.exit_code : EXIT_HOST_UNAVAILABLE, response.stdout || '', response.stderr || '');
 }
 
-main().catch((error) => hostUnavailable(`meridian shim failed: ${error && error.message ? error.message : error}`));
+if (require.main === module) {
+  main().catch((error) => hostUnavailable(`meridian shim failed: ${error && error.message ? error.message : error}`));
+}
+
+module.exports = { PROTOCOL, resolveEndpoint, call };

@@ -12,6 +12,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 
 /** letta-mobile-bzvro.1 (F01), .2 (F02) and .4 (F04) desktop bindings. */
@@ -19,37 +24,48 @@ class DesktopAppServerConnectionProbeTest {
     private val ok = AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1))
 
     @Test
-    fun preflightStopsTheDialOnAuthenticationAndIncompatible() = runTest {
+    fun aFirstDialTheProbeRejectsFailsWithTheVerdictAndNeverDials() = runTest {
+        // letta-mobile-by4vm.9: the shared reconnect owner runs the probe; the gateway surfaces
+        // its verdict with the summary() prefix the Home banner keys on.
         val auth = assertFailsWith<DesktopAppServerUnusableException> {
-            preflightDesktopAppServer("ws://h:1", "bad", DesktopAppServerProbe { _, _ -> AppServerProbeResult.Authentication("HTTP 401") })
+            openDirect { AppServerProbeResult.Authentication("HTTP 401") }
         }
         assertTrue(auth.message.orEmpty().startsWith("Authentication failed:"))
         assertEquals("The server rejected the access token", connectionFailureHeadline(com.letta.mobile.data.chat.runtime.ChatScreenStatus.BackendOffline(auth.message), auth.message))
 
-        assertFailsWith<DesktopAppServerUnusableException> {
-            preflightDesktopAppServer("ws://h:1", null, DesktopAppServerProbe { _, _ -> AppServerProbeResult.Incompatible("HTTP 404") })
+        val incompatible = assertFailsWith<DesktopAppServerUnusableException> {
+            openDirect { AppServerProbeResult.Incompatible("HTTP 404") }
         }
+        assertTrue(incompatible.message.orEmpty().startsWith("Incompatible server:"))
+
+        val down = assertFailsWith<IllegalStateException> {
+            openDirect { AppServerProbeResult.Unavailable("refused") }
+        }
+        assertEquals("probe: refused", down.message, "a down server is reported at once, not retried behind the user's back")
     }
 
-    @Test
-    fun preflightLetsTransientFailuresAndUnprobeableUrlsDial() = runTest {
-        var probed = 0
-        fun probe(result: AppServerProbeResult?) = DesktopAppServerProbe { _, _ ->
-            probed++
-            result
+    private suspend fun openDirect(probe: suspend () -> AppServerProbeResult) = coroutineScope {
+        val scope = CoroutineScope(coroutineContext + SupervisorJob())
+        try {
+            DesktopDirectAppServerSession.open(
+                dial = DesktopDirectDial(
+                    serverUrl = "ws://127.0.0.1:9",
+                    bearerToken = null,
+                    readiness = DesktopAppServerReadinessExpectation(),
+                    preflight = probe,
+                ),
+                scope = scope,
+                listener = object : ReconnectingClientListener {},
+            )
+        } finally {
+            scope.cancel()
         }
-        preflightDesktopAppServer("ws://h:1", null, probe(AppServerProbeResult.Unavailable("refused")))
-        preflightDesktopAppServer("iroh://ticket", null, probe(null))
-        preflightDesktopAppServer("ws://h:1", null, probe(ok))
-        // An App Server older than the HTTP discovery route: the socket handshake decides.
-        preflightDesktopAppServer("ws://h:1", null, probe(AppServerProbeResult.Incompatible("HTTP 404", endpointMissing = true)))
-        assertEquals(4, probed, "every URL was probed and none of the outcomes stopped the dial")
     }
 
     @Test
     fun connectionTestReportsIdentityOrReason() = runTest {
         var sentToken: String? = "unset"
-        val probe = DesktopAppServerProbe { _, token ->
+        val probe: suspend (String, String?) -> AppServerProbeResult? = { _, token ->
             sentToken = token
             ok
         }
@@ -61,11 +77,11 @@ class DesktopAppServerConnectionProbeTest {
             finished.toSettingsStatus(),
         )
 
-        val failed = runDesktopConnectionTest("ws://h:1", "t", DesktopAppServerProbe { _, _ -> AppServerProbeResult.Unavailable("refused") })
+        val failed = runDesktopConnectionTest("ws://h:1", "t", { _, _ -> AppServerProbeResult.Unavailable("refused") })
         assertEquals(SettingsStatus("Server unavailable: refused", SettingsTone.Error), failed.toSettingsStatus())
 
         assertIs<DesktopConnectionTestState.NotSupported>(runDesktopConnectionTest("", null, probe))
-        val iroh = runDesktopConnectionTest("iroh://x", null, DesktopAppServerProbe { _, _ -> null })
+        val iroh = runDesktopConnectionTest("iroh://x", null, { _, _ -> null })
         assertEquals(SettingsTone.Normal, assertIs<DesktopConnectionTestState.NotSupported>(iroh).toSettingsStatus().tone)
     }
 

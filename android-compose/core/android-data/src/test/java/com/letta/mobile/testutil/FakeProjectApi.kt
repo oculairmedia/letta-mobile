@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.model.ProjectCatalog
@@ -8,7 +9,7 @@ import com.letta.mobile.data.model.ProjectSummary
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-open class FakeProjectApi : ProjectRemoteSource by noAppServerRoute<ProjectRemoteSource>() {
+open class FakeProjectApi : ProjectRemoteSource by unavailable<ProjectRemoteSource>(SessionRoute.PROJECTS) {
     var projects = mutableListOf<ProjectSummary>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

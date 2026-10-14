@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
@@ -8,9 +9,10 @@ import com.letta.mobile.data.repository.api.MessageIrohTimelineSource
 import com.letta.mobile.data.repository.api.MessageRemoteSource
 import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 
 internal data class MessageFetchParams(
-    val remote: MessageRemoteSource,
+    val remote: RemoteRoute<MessageRemoteSource>,
     val agentId: AgentId,
     val conversationId: ConversationId,
     val targetMessageId: String?,
@@ -20,7 +22,7 @@ internal data class MessageFetchParams(
 )
 
 internal data class TargetedMessageFetchParams(
-    val remote: MessageRemoteSource,
+    val remote: RemoteRoute<MessageRemoteSource>,
     val agentId: AgentId,
     val conversationId: ConversationId,
     val targetMessageId: String,
@@ -45,6 +47,8 @@ internal object MessageRepositoryFetch {
                     )
                 )
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event(
                 "MessageRepository",
@@ -86,7 +90,7 @@ internal object MessageRepositoryFetch {
     }
 
     suspend fun fetchOlderMessages(
-        remote: MessageRemoteSource,
+        remote: RemoteRoute<MessageRemoteSource>,
         irohTimelineSource: MessageIrohTimelineSource?,
         agentId: AgentId,
         conversationId: ConversationId,
@@ -103,7 +107,7 @@ internal object MessageRepositoryFetch {
             ).toAppMessages()
         }
 
-        return remote.fetchRecentMessages(
+        return remote.source().fetchRecentMessages(
             conversationId = conversationId,
             messageLimit = olderMessagesPageSize,
             beforeMessageId = beforeMessageId,
@@ -111,7 +115,7 @@ internal object MessageRepositoryFetch {
     }
 
     suspend fun fetchOlderMessagesPage(
-        remote: MessageRemoteSource,
+        remote: RemoteRoute<MessageRemoteSource>,
         irohTimelineSource: MessageIrohTimelineSource?,
         agentId: AgentId,
         conversationId: ConversationId,
@@ -132,7 +136,7 @@ internal object MessageRepositoryFetch {
             )
         }
 
-        val rawMessages = remote.fetchRecentMessages(
+        val rawMessages = remote.source().fetchRecentMessages(
             conversationId = conversationId,
             messageLimit = olderMessagesPageSize,
             beforeMessageId = beforeMessageId,
@@ -144,7 +148,7 @@ internal object MessageRepositoryFetch {
     }
 
     private suspend fun fetchRecentMessages(params: MessageFetchParams): List<AppMessage> =
-        params.remote.fetchRecentMessages(
+        params.remote.source().fetchRecentMessages(
             conversationId = params.conversationId,
             messageLimit = params.defaultFetchLimit,
             beforeMessageId = null,
@@ -154,7 +158,7 @@ internal object MessageRepositoryFetch {
         params: TargetedMessageFetchParams,
         after: String?,
     ): List<AppMessage> =
-        params.remote.listMessages(
+        params.remote.source().listMessages(
             agentId = params.agentId,
             limit = params.targetedFetchLimit,
             before = null,

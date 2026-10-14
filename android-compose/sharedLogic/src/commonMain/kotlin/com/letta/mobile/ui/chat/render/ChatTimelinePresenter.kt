@@ -15,7 +15,6 @@ import kotlinx.collections.immutable.ImmutableList
  */
 data class ChatPresenceSignals(
     val replyStreaming: Boolean,
-    val clientModeStreamInFlight: Boolean,
     val a2uiThinkingActive: Boolean,
     val duplicateInitialMessageInFlight: Boolean,
     // letta-mobile-c4igq.7: true while a chat turn is in flight on the transport
@@ -85,8 +84,6 @@ class ChatTimelinePresenter {
     fun present(
         projection: TimelineProjection,
         signals: ChatPresenceSignals,
-        previousIsStreaming: Boolean,
-        previousIsAgentTyping: Boolean,
     ): ChatPresentation {
         // letta-mobile-dir4k: feed the projection's "run is still active" flag
         // into the presence policy so a stale `signals.turnInFlight` cannot
@@ -98,12 +95,9 @@ class ChatTimelinePresenter {
         // "Worked for 5.0s".
         val presence = ChatStreamingPresencePolicy.derive(
             inputs = ChatStreamInputs(
-                previousIsStreaming = previousIsStreaming,
-                previousIsAgentTyping = previousIsAgentTyping,
                 anyServerLocalPending = projection.anyLettaServerLocalPending,
                 tailIsAssistant = projection.tailIsAssistant,
                 replyStreaming = signals.replyStreaming,
-                clientModeStreamInFlight = signals.clientModeStreamInFlight,
                 a2uiThinkingActive = signals.a2uiThinkingActive,
                 duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
                 turnInFlight = signals.turnInFlight,

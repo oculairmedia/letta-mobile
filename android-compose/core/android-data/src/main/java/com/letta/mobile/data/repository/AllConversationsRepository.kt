@@ -1,9 +1,11 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import com.letta.mobile.data.backend.noAppServerRoute
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.RoomAllConversationsLocalCache
 import com.letta.mobile.data.model.AgentId
@@ -34,7 +36,7 @@ internal fun defaultAllConversationsScope(): CoroutineScope =
  * [getConversationsPaged] stays here because [ConversationPagingSource] is Android-bound.
  */
 open class AllConversationsRepository(
-    private val remote: ConversationRemoteSource = noAppServerRoute(),
+    private val remote: RemoteRoute<ConversationRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     conversationDao: Lazy<ConversationDao>? = null,
     repositoryScope: CoroutineScope,
     localConversationSource: LocalRuntimeConversationSource? = null,
@@ -54,14 +56,19 @@ open class AllConversationsRepository(
     constructor(
         remote: ConversationRemoteSource,
         conversationDao: Lazy<ConversationDao>? = null,
+        repositoryScope: CoroutineScope = defaultAllConversationsScope(),
         localConversationSource: LocalRuntimeConversationSource? = null,
         settingsRepository: ISettingsRepository? = null,
+        irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+        transport: IChannelTransport? = null,
     ) : this(
-        remote = remote,
+        remote = remote.bound(),
+        conversationDao = conversationDao,
+        repositoryScope = repositoryScope,
         localConversationSource = localConversationSource,
         settingsRepository = settingsRepository,
-        conversationDao = conversationDao,
-        repositoryScope = defaultAllConversationsScope(),
+        irohConversationListSource = irohConversationListSource,
+        transport = transport,
     )
 
     internal fun createConversationsPagingSource(

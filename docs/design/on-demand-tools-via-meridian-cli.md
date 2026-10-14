@@ -197,10 +197,20 @@ with its stdout as the return.
 - **Caller identity.** This is the one real regression against external tools. Today the App Server
   stamps the runtime scope on the call, and the model cannot choose it. In Bash,
   `LETTA_AGENT_ID` and `LETTA_CONVERSATION_ID` are env vars the agent can override.
-  - Phase-1 mitigation: bind each CLI request to a live call. The wrapper relays the runtime's
-    stream, so it can require an in-flight `Bash` tool call in that conversation whose command
-    contains `meridian`. A forged scope then has to match another agent's call that is running at
-    that moment.
+  - Phase-1 mitigation (superseded): bind each CLI request to a live call by its claimed
+    conversation. Any in-flight `Bash` call running `meridian` in that conversation vouched for it,
+    so overriding `LETTA_CONVERSATION_ID` bound to another conversation's call while it ran.
+  - Per-call capability token (letta-mobile-by4vm.44, current). The wrapper tracks shell calls that
+    run `meridian` from `client_tool_start`. letta-code's PreToolUse hook
+    (`scripts/deploy/meridian-token-hook.cjs`) asks the wrapper for that `tool_call_id`'s token, which
+    is issued once, and prepends `export LETTA_TOOL_TOKEN=…` to the command. The shim sends the token.
+    The wrapper resolves the scope and call id from the token alone and ignores the id env vars, which
+    the env-scoped fallback still reads. The token dies with the call (`client_tool_end`, the tool
+    return, the turn's end, or the 15-minute cap).
+  - Residual, same-user only: the token sits in the shell's environment and `bash -c` argv. A process
+    running as the App Server user can read another live call's token from `/proc` and use it until
+    that call ends. Closing that gap needs a separate user per agent shell (see the honest baseline
+    below).
   - Spike: whether the wrapper sees tool-call frames for every runtime, including runtimes the app
     started (Q2).
   - Honest baseline: on this host the agent's Bash already runs as the user that owns

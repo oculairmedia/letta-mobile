@@ -5,6 +5,8 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerStopReason
 import com.letta.mobile.data.transport.appserver.AppServerTurnBoundary
 import kotlinx.atomicfu.AtomicRef
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.atomicfu.update
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -19,14 +21,19 @@ internal class TurnRunIdGate(
     private val activeLeaseRef: AtomicRef<TurnLease?>,
     private val activeTurnOwnerRef: AtomicRef<AppServerTurnEngine.ActiveTurnOwner?>,
 ) {
+    // letta-mobile-by4vm.8: frames are accepted on the inbound collector while promote/beginLease
+    // run on the turn's coroutine, so both fields are guarded like the sibling gates' state.
+    private val lock = SynchronizedObject()
     private val supersededRunIds = mutableSetOf<String>()
     private var activeLeaseToken: Long? = null
 
     /** Clear superseded IDs when a new turn lease begins. */
     fun beginLease(leaseToken: Long) {
-        if (activeLeaseToken != leaseToken) {
-            supersededRunIds.clear()
-            activeLeaseToken = leaseToken
+        synchronized(lock) {
+            if (activeLeaseToken != leaseToken) {
+                supersededRunIds.clear()
+                activeLeaseToken = leaseToken
+            }
         }
     }
 
@@ -34,14 +41,16 @@ internal class TurnRunIdGate(
         val lease = activeLeaseRef.value ?: return true
         if (lease.token != leaseToken) return false
         val frameRunId = received.frameRunIdOrNull() ?: return true
-        return frameRunId !in supersededRunIds
+        return synchronized(lock) { frameRunId !in supersededRunIds }
     }
 
     fun promote(runId: String, leaseToken: Long) {
         if (activeLeaseRef.value?.token != leaseToken) return
         val current = activeTurnOwnerRef.value ?: return
         if (current.runId == runId) return
-        current.runId?.takeIf { it.isNotBlank() }?.let { supersededRunIds.add(it) }
+        current.runId?.takeIf { it.isNotBlank() }?.let { superseded ->
+            synchronized(lock) { supersededRunIds.add(superseded) }
+        }
         activeTurnOwnerRef.value = current.copy(runId = runId)
         activeLeaseRef.update { lease -> lease.withPromotedRunId(runId, leaseToken) }
     }

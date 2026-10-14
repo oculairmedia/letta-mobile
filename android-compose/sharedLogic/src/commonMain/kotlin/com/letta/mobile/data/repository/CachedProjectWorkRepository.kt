@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.IssueAnalyticsResponse
 import com.letta.mobile.data.model.ProjectIssueAnalyticsParams
 import com.letta.mobile.data.model.ProjectIssueDetail
@@ -19,7 +20,7 @@ import kotlinx.coroutines.sync.withLock
 
 /** Phase 5n: platform-neutral cached project work / issue repository. */
 open class CachedProjectWorkRepository(
-    private val remote: ProjectWorkRemoteSource,
+    private val remote: RemoteRoute<ProjectWorkRemoteSource>,
 ) : IProjectWorkRepository {
     private val _readyWorkByProject = MutableStateFlow<Map<String, List<ProjectIssueSummary>>>(emptyMap())
     override val readyWorkByProject: StateFlow<Map<String, List<ProjectIssueSummary>>> = _readyWorkByProject.asStateFlow()
@@ -39,7 +40,7 @@ open class CachedProjectWorkRepository(
 
     override suspend fun refreshReadyWork(projectId: String, limit: Int?, cursor: String?): List<ProjectIssueSummary> =
         refreshMutex.withLock {
-            val response = remote.getReadyWork(projectId, limit, cursor)
+            val response = remote.source().getReadyWork(projectId, limit, cursor)
             _readyWorkByProject.update { current -> current + (projectId to response.items) }
             response.items
         }
@@ -48,7 +49,7 @@ open class CachedProjectWorkRepository(
         projectId: String,
         params: ProjectIssueListParams,
     ): List<ProjectIssueSummary> = refreshMutex.withLock {
-        val response = remote.listIssues(projectId, params)
+        val response = remote.source().listIssues(projectId, params)
         _issuesByProject.update { current -> current + (projectId to response.items) }
         response.items
     }
@@ -57,7 +58,7 @@ open class CachedProjectWorkRepository(
         projectId: String,
         params: ProjectIssueListParams,
     ): ProjectIssueListResponse = refreshMutex.withLock {
-        val response = remote.listIssues(projectId, params)
+        val response = remote.source().listIssues(projectId, params)
         _issuesByProject.update { current ->
             val mergedItems = if (params.cursor == null) {
                 response.items
@@ -73,7 +74,7 @@ open class CachedProjectWorkRepository(
         projectId: String,
         params: ProjectIssueAnalyticsParams,
     ): IssueAnalyticsResponse = analyticsRefreshMutex.withLock {
-        val response = remote.getIssueAnalytics(projectId, params)
+        val response = remote.source().getIssueAnalytics(projectId, params)
         _issueAnalyticsByProject.update { current -> current + (projectId to response) }
         response
     }
@@ -83,7 +84,7 @@ open class CachedProjectWorkRepository(
             if (!forceRefresh) {
                 _issueDetails.value[issueId]?.let { return@withLock it }
             }
-            val issue = remote.getIssue(issueId).issue
+            val issue = remote.source().getIssue(issueId).issue
             _issueDetails.update { current -> current + (issueId to issue) }
             issue
         }
@@ -107,7 +108,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.claimIssue(issueId, assignee, ifMatch, idempotencyKey).issue,
+        remote.source().claimIssue(issueId, assignee, ifMatch, idempotencyKey).issue,
     )
 
     override suspend fun unclaimIssue(
@@ -115,7 +116,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.unclaimIssue(issueId, ifMatch, idempotencyKey).issue,
+        remote.source().unclaimIssue(issueId, ifMatch, idempotencyKey).issue,
     )
 
     override suspend fun updateIssueStatus(
@@ -124,7 +125,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.updateIssueStatus(issueId, status, ifMatch, idempotencyKey).issue,
+        remote.source().updateIssueStatus(issueId, status, ifMatch, idempotencyKey).issue,
     )
 
     override suspend fun addIssueNote(
@@ -133,7 +134,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.addIssueNote(issueId, note, ifMatch, idempotencyKey).issue,
+        remote.source().addIssueNote(issueId, note, ifMatch, idempotencyKey).issue,
     )
 
     override suspend fun closeIssue(
@@ -142,7 +143,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.closeIssue(issueId, reason, ifMatch, idempotencyKey).issue,
+        remote.source().closeIssue(issueId, reason, ifMatch, idempotencyKey).issue,
     )
 
     override suspend fun reopenIssue(
@@ -151,7 +152,7 @@ open class CachedProjectWorkRepository(
         ifMatch: String,
         idempotencyKey: String,
     ): ProjectIssueSummary = applyMutationResult(
-        remote.reopenIssue(issueId, reason, ifMatch, idempotencyKey).issue,
+        remote.source().reopenIssue(issueId, reason, ifMatch, idempotencyKey).issue,
     )
 
     private suspend fun applyMutationResult(issue: ProjectIssueSummary): ProjectIssueSummary =

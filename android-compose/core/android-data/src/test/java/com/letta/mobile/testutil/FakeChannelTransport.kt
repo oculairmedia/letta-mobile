@@ -137,6 +137,12 @@ class FakeChannelTransport(
 
     val adminRpcCalls = mutableListOf<AdminRpcCall>()
 
+    /** letta-mobile-by4vm.51: the feature capabilities the fake host advertised. */
+    var advertisedCapabilities: Set<String> = emptySet()
+
+    override val hostCapabilities: Set<String>
+        get() = advertisedCapabilities
+
     /**
      * Hook for admin_rpc routing tests. Receives (method, path, body) and
      * returns the response frame. Defaults to erroring so a test that forgets
@@ -160,7 +166,12 @@ class FakeChannelTransport(
         val body: String?,
     )
 
-    override fun cancel(conversationId: String): Boolean = cancelResult
+    val cancelCalls = mutableListOf<String>()
+
+    override fun cancel(conversationId: String): Boolean {
+        cancelCalls += conversationId
+        return cancelResult
+    }
 
     override fun bye(): Boolean = byeResult
 

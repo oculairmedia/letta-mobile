@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.BlockRemoteSource
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -52,7 +53,7 @@ class BlockPaginationTest {
     private class PaginatingBlockApi(
         private val blocks: List<Block>,
         private val agents: List<Agent> = emptyList(),
-    ) : BlockRemoteSource by noAppServerRoute<BlockRemoteSource>() {
+    ) : BlockRemoteSource by unavailable<BlockRemoteSource>(SessionRoute.BLOCKS) {
         val observedOffsets = mutableListOf<Int?>()
         val observedLimits = mutableListOf<Int?>()
         val observedAftersForAgents = mutableListOf<String?>()

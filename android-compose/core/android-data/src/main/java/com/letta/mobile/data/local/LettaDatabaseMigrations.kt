@@ -408,6 +408,58 @@ object LettaDatabaseMigrations {
         }
     }
 
+    /**
+     * letta-mobile-by4vm.17: pending (unsent) messages gain their owning backend and agent.
+     * The active backend id lives in encrypted settings, not in this database, so it cannot
+     * be derived here: migrated rows keep NULL owners, which reads treat as "legacy, matches
+     * any" until the next backend switch purges them (see [PendingLocalDao]).
+     */
+    val MIGRATION_19_20 = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `pending_local_messages` ADD COLUMN `backendId` TEXT")
+            db.execSQL("ALTER TABLE `pending_local_messages` ADD COLUMN `agentId` TEXT")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_pending_local_messages_backendId_agentId_conversationId` " +
+                    "ON `pending_local_messages` (`backendId`, `agentId`, `conversationId`)",
+            )
+        }
+    }
+
+    /**
+     * letta-mobile-by4vm.22: one owner per canvas document.
+     *
+     * - `canvas_documents` is dropped. Canvases have lived in the Automerge notebook store since
+     *   #1708 and nothing has written or read this table since; its rows are unreachable.
+     * - `canvas_ops` becomes the write-ahead journal of the notebook document: a row is appended
+     *   unsettled and settled once the document write carrying it succeeds, so a crash between the
+     *   two is folded in when the canvas is next opened. Existing rows are taken as settled.
+     */
+    val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS `canvas_documents`")
+            db.execSQL("ALTER TABLE `canvas_ops` ADD COLUMN `settled` INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
+    /**
+     * letta-mobile-by4vm.19: conversations gain epoch-millis copies of their ISO timestamps so the
+     * cached lists sort chronologically (the String columns mixed `Z`/`+00:00` and fraction
+     * precision, and fell back to sorting by id). Existing rows are backfilled in Kotlin with the
+     * same parser that new writes use; see [ConversationEpochBackfill].
+     */
+    val MIGRATION_21_22 = object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `lastMessageAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `updatedAtEpochMs` INTEGER")
+            db.execSQL("ALTER TABLE `conversations` ADD COLUMN `createdAtEpochMs` INTEGER")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_conversations_agentId_lastMessageAtEpochMs` " +
+                    "ON `conversations` (`agentId`, `lastMessageAtEpochMs`)",
+            )
+            ConversationEpochBackfill.run(db)
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -427,5 +479,8 @@ object LettaDatabaseMigrations {
         MIGRATION_16_17,
         MIGRATION_17_18,
         MIGRATION_18_19,
+        MIGRATION_19_20,
+        MIGRATION_20_21,
+        MIGRATION_21_22,
     )
 }

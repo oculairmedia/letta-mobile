@@ -129,9 +129,19 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * `GET /app-server-info` [com.letta.mobile.data.transport.appserver.AppServerProbe], which never
  * opens a socket. An `Authentication` or `Incompatible` answer stops the loop with that
  * [GiveUpKind], so a revoked token is reported once instead of retried forever; `Unavailable`
- * backs off without dialling. [resumeNow] (F04) cuts the current backoff short after the system
- * wakes from sleep. [start] may be called again after a terminal stop (the user pressed Retry or
- * changed settings).
+ * backs off without dialling. A 404 on the discovery route (`Incompatible.endpointMissing`) dials
+ * anyway: App Servers older than that route still speak the socket protocol, and the generation's
+ * own readiness handshake decides. [resumeNow] (F04) cuts the current backoff short after the
+ * system wakes from sleep. [start] may be called again after a terminal stop (the user pressed
+ * Retry or changed settings).
+ *
+ * letta-mobile-by4vm.9: this is the one owner of App-Server-session reconnect over a direct socket
+ * (the wrapper's runtime and admin lanes, the desktop's ws:// gateway). Its [state] projects onto
+ * the shared UI model with [toChannelTransportState]. [stampGenerations] stamps every piped frame
+ * with its generation for hosts that fence turns by generation (the wrapper's controller); a host
+ * whose turns must survive a reconnect (see
+ * [com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter.interruptSession]) passes
+ * false, which is safe because generations are piped strictly one after another.
  */
 class ReconnectingAppServerClient(
     private val connect: suspend () -> AppServerClientGeneration,
@@ -142,6 +152,7 @@ class ReconnectingAppServerClient(
     private val random: kotlin.random.Random = kotlin.random.Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     private val preflight: (suspend () -> AppServerProbeResult)? = null,
+    private val stampGenerations: Boolean = true,
 ) : AppServerClient {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
     val state: StateFlow<ReconnectingClientState> = _state.asStateFlow()
@@ -163,6 +174,8 @@ class ReconnectingAppServerClient(
             ?.client?.serverInfo
             ?: emptyServerInfoFlow
 
+    // Written by the supervise loop, read by every caller's ready(): visible across threads.
+    @kotlin.concurrent.Volatile
     private var current: AppServerClientGeneration? = null
     /**
      * lgns8.22.4: mirrors DefaultAppServerController.connectionGeneration.
@@ -271,13 +284,8 @@ class ReconnectingAppServerClient(
     /** Null when the dial may proceed; otherwise the outcome that replaces it. */
     private suspend fun runPreflight(): GenerationOutcome? {
         val probe = preflight ?: return null
-        val result = try {
-            probe()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppServerProbeResult.Unavailable(e.message ?: "probe failed")
-        }
+        val result = probeOrUnavailable(probe)
+        if (result is AppServerProbeResult.Incompatible && result.endpointMissing) return null
         return when (result) {
             is AppServerProbeResult.Ok -> null
             is AppServerProbeResult.Authentication -> GenerationOutcome.Terminal(result.detail, GiveUpKind.Authentication)
@@ -285,6 +293,18 @@ class ReconnectingAppServerClient(
             is AppServerProbeResult.Unavailable -> GenerationOutcome.NeverReady("probe: ${result.detail}")
         }
     }
+
+    private suspend fun probeOrUnavailable(probe: suspend () -> AppServerProbeResult): AppServerProbeResult =
+        try {
+            probe()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppServerProbeResult.Unavailable(e.message ?: "probe failed")
+        }
+
+    private fun AppServerReceivedFrame.stampedWith(generation: Long): AppServerReceivedFrame =
+        if (stampGenerations) copy(connectionGeneration = generation) else this
 
     private suspend fun runGeneration(scope: CoroutineScope, attempt: Int): GenerationOutcome {
         runPreflight()?.let { return it }
@@ -316,7 +336,7 @@ class ReconnectingAppServerClient(
         val pipeGeneration = pipeGenerationSeq.getAndIncrement()
         val pipe = scope.launch {
             generation.client.events.collect { frame ->
-                _events.emit(frame.copy(connectionGeneration = pipeGeneration))
+                _events.emit(frame.stampedWith(pipeGeneration))
             }
         }
 

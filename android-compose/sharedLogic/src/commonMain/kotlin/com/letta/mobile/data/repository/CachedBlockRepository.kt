@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockAgentsListParams
@@ -23,7 +24,7 @@ import com.letta.mobile.data.session.BackendScopedCache
  * / HTTP admin for its session graph.
  */
 open class CachedBlockRepository(
-    private val remote: BlockRemoteSource,
+    private val remote: RemoteRoute<BlockRemoteSource>,
     private val irohBlockSource: BlockIrohSource? = null,
 ) : IBlockRepository, IAgentBlockWriteRepository, BackendScopedCache {
     override suspend fun clearForBackendSwitch() = Unit
@@ -31,13 +32,13 @@ open class CachedBlockRepository(
     override suspend fun getBlocks(agentId: String): List<Block> =
         withIrohOrRemote(
             iroh = { it.listAgentBlocks(agentId) },
-            http = { remote.listBlocks(agentId) },
+            http = { remote.source().listBlocks(agentId) },
         )
 
     override suspend fun retrieveBlock(blockId: String): Block =
         withIrohOrRemote(
             iroh = { it.retrieveBlock(blockId) },
-            http = { remote.retrieveBlock(blockId) },
+            http = { remote.source().retrieveBlock(blockId) },
         )
 
     /**
@@ -49,13 +50,13 @@ open class CachedBlockRepository(
     override suspend fun countBlocks(): Int =
         withIrohOrRemote(
             iroh = { it.countBlocks() },
-            http = { remote.countBlocks() },
+            http = { remote.source().countBlocks() },
         )
 
     override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block =
         withIrohOrRemote(
             iroh = { it.updateAgentBlock(agentId, blockLabel, params) },
-            http = { remote.updateAgentBlock(agentId, blockLabel, params) },
+            http = { remote.source().updateAgentBlock(agentId, blockLabel, params) },
         )
 
     override suspend fun writeAgentBlock(target: AgentBlockTarget, params: BlockUpdateParams): Block =
@@ -69,8 +70,8 @@ open class CachedBlockRepository(
         withIrohOrRemote(
             iroh = { it.createAgentBlock(target, value) },
             http = {
-                remote.createBlock(BlockCreateParams(label = target.label, value = value)).also { created ->
-                    remote.attachBlock(target.agentId, created.id.value)
+                remote.source().createBlock(BlockCreateParams(label = target.label, value = value)).also { created ->
+                    remote.source().attachBlock(target.agentId, created.id.value)
                 }
             },
         )
@@ -79,9 +80,9 @@ open class CachedBlockRepository(
         withIrohOrRemote(
             iroh = { it.deleteAgentBlock(target) },
             http = {
-                val block = remote.listBlocks(target.agentId).firstOrNull { it.label == target.label }
+                val block = remote.source().listBlocks(target.agentId).firstOrNull { it.label == target.label }
                     ?: error("Block ${target.label} not found on agent ${target.agentId}")
-                remote.deleteBlock(block.id.value)
+                remote.source().deleteBlock(block.id.value)
             },
         )
     }
@@ -94,33 +95,33 @@ open class CachedBlockRepository(
     ): Block =
         withIrohOrRemote(
             iroh = { it.updateGlobalBlock(blockId, params, clearDescription, clearLimit) },
-            http = { remote.updateGlobalBlock(blockId, params, clearDescription, clearLimit) },
+            http = { remote.source().updateGlobalBlock(blockId, params, clearDescription, clearLimit) },
         )
 
     override suspend fun createBlock(params: BlockCreateParams): Block =
         withIrohOrRemote(
             iroh = { it.createBlock(params) },
-            http = { remote.createBlock(params) },
+            http = { remote.source().createBlock(params) },
         )
 
     override suspend fun deleteBlock(blockId: String) {
         withIrohOrRemote(
             iroh = { it.deleteBlock(blockId) },
-            http = { remote.deleteBlock(blockId) },
+            http = { remote.source().deleteBlock(blockId) },
         )
     }
 
     override suspend fun attachBlock(agentId: String, blockId: String) {
         withIrohOrRemote(
             iroh = { it.attachBlock(agentId, blockId) },
-            http = { remote.attachBlock(agentId, blockId) },
+            http = { remote.source().attachBlock(agentId, blockId) },
         )
     }
 
     override suspend fun detachBlock(agentId: String, blockId: String) {
         withIrohOrRemote(
             iroh = { it.detachBlock(agentId, blockId) },
-            http = { remote.detachBlock(agentId, blockId) },
+            http = { remote.source().detachBlock(agentId, blockId) },
         )
     }
 
@@ -133,7 +134,7 @@ open class CachedBlockRepository(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, offset ->
-                remote.listAllBlocks(
+                remote.source().listAllBlocks(
                     params.copy(limit = limit, offset = offset),
                 )
             },
@@ -147,7 +148,7 @@ open class CachedBlockRepository(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
-                remote.listAgentsForBlock(
+                remote.source().listAgentsForBlock(
                     query.copy(limit = limit, after = after),
                 )
             },
@@ -157,11 +158,11 @@ open class CachedBlockRepository(
     }
 
     override suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block {
-        return remote.attachIdentityToBlock(blockId, identityId)
+        return remote.source().attachIdentityToBlock(blockId, identityId)
     }
 
     override suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block {
-        return remote.detachIdentityFromBlock(blockId, identityId)
+        return remote.source().detachIdentityFromBlock(blockId, identityId)
     }
 
     private suspend inline fun <T> withIrohOrRemote(

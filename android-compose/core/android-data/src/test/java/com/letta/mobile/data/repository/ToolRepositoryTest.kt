@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -214,17 +216,17 @@ class ToolRepositoryTest {
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
     @Test
-    fun `refreshTools in iroh mode without source throws NoAppServerRouteException`() = runTest {
+    fun `refreshTools in iroh mode without source throws AppServerRouteUnavailable`() = runTest {
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                throw AppServerRouteUnavailable(SessionRoute.TOOLS, "Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = ToolRepository(apiThatThrows)
 
         val failure = runCatching { repo.refreshTools() }.exceptionOrNull()
 
-        assertTrue("expected the iroh guard, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
+        assertTrue("expected the iroh guard, got $failure", failure is AppServerRouteUnavailable)
     }
 
     @Test
@@ -253,7 +255,7 @@ class ToolRepositoryTest {
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.TOOLS, "Raw HTTP forbidden")
             }
         }
         val repo = ToolRepository(apiThatThrows, irohSource)
@@ -282,7 +284,7 @@ class ToolRepositoryTest {
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun upsertTool(params: com.letta.mobile.data.model.ToolCreateParams): com.letta.mobile.data.model.Tool {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.TOOLS, "Raw HTTP forbidden")
             }
         }
         val repo = ToolRepository(apiThatThrows, irohSource)
@@ -312,7 +314,7 @@ class ToolRepositoryTest {
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun updateTool(toolId: com.letta.mobile.data.model.ToolId, params: com.letta.mobile.data.model.ToolUpdateParams): com.letta.mobile.data.model.Tool {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.TOOLS, "Raw HTTP forbidden")
             }
         }
         val repo = ToolRepository(apiThatThrows, irohSource)
@@ -335,7 +337,7 @@ class ToolRepositoryTest {
         val irohSource = IrohAdminRpcToolSource(transport, settings)
         val apiThatThrows = object : FakeToolApi() {
             override suspend fun deleteTool(toolId: com.letta.mobile.data.model.ToolId) {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.TOOLS, "Raw HTTP forbidden")
             }
         }
         val repo = ToolRepository(apiThatThrows, irohSource)

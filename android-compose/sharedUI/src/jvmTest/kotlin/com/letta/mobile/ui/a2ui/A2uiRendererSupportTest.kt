@@ -82,7 +82,7 @@ class A2uiRendererSupportTest {
     fun `localOpenUrl accepts an https target`() {
         val component = componentWithOpenUrl("https://letta.com/docs")
 
-        assertEquals("https://letta.com/docs", component.localOpenUrl(surface(), emptyScope))
+        assertEquals("https://letta.com/docs", component.localOpenUrl(surface(), emptyScope)?.url)
     }
 
     @Test

@@ -4,9 +4,12 @@ import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ToolAudience
+import com.letta.mobile.data.controller.reconnect.SessionSurvivingReconnectListener
+import com.letta.mobile.data.controller.reconnect.reattachRuntimes
 import com.letta.mobile.data.meridian.AgentToolsModePolicy
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
-import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
+import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -16,15 +19,13 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
-import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
@@ -64,8 +65,11 @@ class DesktopAppServerChatGatewayBuilder(
     private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
     /** Must be the registry the canvas UI registers into, or agent edits miss the open session. */
     private val canvasSessions: CanvasSessionRegistry = CanvasSessionRegistry(),
-    /** HTTP `/app-server-info` probe run before every remote WebSocket dial (letta-mobile-bzvro.2). */
-    private val preflightProbe: DesktopAppServerProbe = defaultDesktopAppServerProbe,
+    /**
+     * HTTP `/app-server-info` probe, handed to the shared reconnect owner as the preflight hook it
+     * runs before every remote WebSocket dial (letta-mobile-bzvro.2, by4vm.9).
+     */
+    private val preflightProbe: suspend (String, String?) -> AppServerProbeResult? = ::probeDesktopAppServer,
     /** letta-mobile-bzvro.13: the app's one permission-mode settings; null runs every runtime Unrestricted, with no chip. */
     permissionModeSettings: PermissionModeSettings? = null,
 ) : DesktopAppServerChatGatewayFactory {
@@ -81,72 +85,54 @@ class DesktopAppServerChatGatewayBuilder(
                     "Settings, or ${DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY} / " +
                     "${DesktopAppServerRuntimeConfig.SERVER_URL_ENV}.",
             )
-
-        val isIroh = IrohChannelTransport.isIrohUrl(serverUrl)
-        // The bundled local child was just started by us and is checked by the readiness handshake.
-        if (!isIroh && lettaConfig.mode != LettaConfig.Mode.LOCAL) {
-            preflightDesktopAppServer(serverUrl, lettaConfig.accessToken, preflightProbe)
-        }
-        val (transport, transportResources) = if (isIroh) {
-            buildIrohTransport(serverUrl, lettaConfig)
+        if (IrohChannelTransport.isIrohUrl(serverUrl)) {
+            createIrohGateway(serverUrl, lettaConfig)
         } else {
-            buildWebSocketTransport(serverUrl, lettaConfig)
+            createDirectGateway(serverUrl, lettaConfig)
         }
+    }
 
-        val clientScope = CoroutineScope(
-            controllerScope.coroutineContext + SupervisorJob(controllerScope.coroutineContext[Job]),
-        )
+    private fun childScope(): CoroutineScope =
+        CoroutineScope(controllerScope.coroutineContext + SupervisorJob(controllerScope.coroutineContext[Job]))
+
+    /**
+     * iroh:// — one QUIC connection per gateway. Its reconnect stays with the Iroh transport and,
+     * past the outage window, [DesktopChatController.retryConnection] (letta-mobile-by4vm.9 map).
+     */
+    private suspend fun createIrohGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
+        val (transport, transportResources) = buildIrohTransport(serverUrl, lettaConfig)
+        val clientScope = childScope()
         val client = DefaultAppServerClient(transport, parentScope = clientScope)
+        val router = AppServerRuntimeEventRouter()
         var localClientLease: AutoCloseable? = null
-        var directClientLease: AutoCloseable? = null
-        var eventRouter: AppServerRuntimeEventRouter? = null
         try {
-            if (transport is KtorAppServerWebSocketTransport) {
-                awaitDesktopAppServerReadiness(
-                    DesktopAppServerReadinessProbe(
-                        connectionState = transport.connectionState,
-                        client = client,
-                        expectation = readinessExpectationFor(lettaConfig),
-                    ),
-                )
-            }
             if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
                 localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
             }
-            if (!isIroh) {
-                directClientLease = DesktopLocalAppServerClientRegistry.direct.install(client)
-            }
-            val router = AppServerRuntimeEventRouter()
-            eventRouter = router
-            if (!isIroh) startStreamIntegrity(router, client, clientScope)
+            // letta-mobile-by4vm.50: gap detection only when this host advertises ordered event_seq.
+            startStreamIntegrity(router, client, clientScope, irohHostCapabilities = transport.serverCapabilities)
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = client,
                 scope = controllerScope,
-                externalToolRegistry = desktopCanvasToolRegistry(isIroh, canvasSessions),
-                config = DesktopAppServerEngineConfig(
-                    eventRouter = router,
-                    // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
-                    // Unrestricted, as it always did, and the persisted default does not reach it.
-                    permissionModes = permissionModes.takeUnless { isIroh },
-                ),
+                externalToolRegistry = desktopCanvasToolRegistry(isIroh = true, canvasSessions),
+                // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
+                // Unrestricted, as it always did, and the persisted default does not reach it.
+                config = DesktopAppServerEngineConfig(eventRouter = router),
             )
-            DesktopAppServerChatGateway(
+            return DesktopAppServerChatGateway(
                 turnEngine = turnEngine,
                 client = client,
                 transportResources = transportResources,
-                permissionModes = permissionModes.takeUnless { isIroh },
                 onClose = {
-                    eventRouter.detach()
+                    router.detach()
                     localClientLease?.close()
-                    directClientLease?.close()
                     client.failPendingRequests("Desktop App Server gateway closed")
                     clientScope.cancel()
                 },
             )
         } catch (error: Throwable) {
-            eventRouter?.detach()
+            router.detach()
             localClientLease?.close()
-            directClientLease?.close()
             client.failPendingRequests("Desktop App Server gateway creation failed")
             clientScope.cancel()
             transportResources.close()
@@ -155,20 +141,89 @@ class DesktopAppServerChatGatewayBuilder(
     }
 
     /**
+     * ws:// — the shared [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]
+     * owns the socket (letta-mobile-by4vm.9). The router and turn engine are built once over its
+     * stable client and outlive each socket, so a turn in flight across a brief drop reconnects
+     * instead of failing ([SessionSurvivingReconnectListener]).
+     */
+    private suspend fun createDirectGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
+        val local = lettaConfig.mode == LettaConfig.Mode.LOCAL
+        val clientScope = childScope()
+        val router = AppServerRuntimeEventRouter()
+        val toolRegistry = desktopCanvasToolRegistry(isIroh = false, canvasSessions)
+        var engine: AppServerTurnEngine? = null
+        var session: DesktopDirectAppServerSession? = null
+        val leases = mutableListOf<AutoCloseable>()
+        try {
+            val opened = DesktopDirectAppServerSession.open(
+                dial = DesktopDirectDial(
+                    serverUrl = serverUrl,
+                    bearerToken = lettaConfig.accessToken,
+                    readiness = readinessExpectationFor(lettaConfig),
+                    // The bundled local child was just started by us and is checked by the readiness handshake.
+                    preflight = if (local) null else ({ preflightProbe(serverUrl, lettaConfig.accessToken) ?: notProbeable() }),
+                ),
+                scope = clientScope,
+                listener = SessionSurvivingReconnectListener(
+                    router = router,
+                    onSessionLost = { engine?.invalidateRuntime(notifyHost = false) },
+                    reattach = { client, runtimes ->
+                        client.reattachRuntimes(runtimes) { desktopReattachCommand(it, toolRegistry, permissionModes) }
+                    },
+                ),
+            )
+            session = opened
+            if (local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
+            leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
+            startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = null)
+            val turnEngine = buildDesktopAppServerTurnEngine(
+                client = opened.client,
+                scope = controllerScope,
+                externalToolRegistry = toolRegistry,
+                config = DesktopAppServerEngineConfig(eventRouter = router, permissionModes = permissionModes),
+            )
+            engine = turnEngine
+            return DesktopAppServerChatGateway(
+                turnEngine = turnEngine,
+                client = opened.client,
+                transportResources = opened.resources(),
+                permissionModes = permissionModes,
+                session = opened,
+                onClose = {
+                    router.detach()
+                    leases.forEach { it.close() }
+                    clientScope.cancel()
+                },
+            )
+        } catch (error: Throwable) {
+            router.detach()
+            leases.forEach { it.close() }
+            session?.resources()?.close()
+            clientScope.cancel()
+            throw error
+        }
+    }
+
+    /**
      * letta-mobile-bzvro.6: on a direct App Server socket every frame of the connection reaches
      * this client, so an `event_seq` gap is a lost frame: resync, and keep the watched runtimes on
-     * the busy/idle sync cadence. Iroh dials go through the host's per-viewer relay, whose
-     * filtered sequence has legitimate holes, so they are left to the reconnect path.
+     * the busy/idle sync cadence. letta-mobile-by4vm.50: an Iroh dial ([irohHostCapabilities] not
+     * null) gets the same only when the host advertises ordered event_seq; an older host's relay
+     * can put its seq on the wire out of order, so it is left to the reconnect path. Desktop has no
+     * sync budget: the cadence always runs.
      */
-    private fun startStreamIntegrity(router: AppServerRuntimeEventRouter, client: AppServerClient, scope: CoroutineScope) {
-        val monitor = StreamIntegrityMonitor.forRouter(
-            router = router,
-            client = client,
-            detectGaps = true,
-            requestIdFactory = { "desktop-sync-${UUID.randomUUID()}" },
-        )
-        router.bindStreamIntegrity(monitor)
-        monitor.start(scope)
+    private fun startStreamIntegrity(
+        router: AppServerRuntimeEventRouter,
+        client: AppServerClient,
+        scope: CoroutineScope,
+        irohHostCapabilities: Set<String>?,
+    ) {
+        val binding = StreamIntegrityBinding(client, { "desktop-sync-${UUID.randomUUID()}" })
+        if (irohHostCapabilities == null) {
+            binding.bindAndStart(router, detectGaps = true, scope = scope)
+        } else {
+            binding.bindIfHostOrdersEventSeq(router, irohHostCapabilities, scope)
+        }
     }
 
     private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
@@ -208,21 +263,6 @@ class DesktopAppServerChatGatewayBuilder(
             }
             throw t
         }
-    }
-
-    private fun buildWebSocketTransport(
-        serverUrl: String,
-        lettaConfig: LettaConfig,
-    ): Pair<AppServerTransport, DesktopTransportResources> {
-        val endpoint = AppServerEndpoint.fromWebSocketUrl(url = serverUrl, bearerToken = lettaConfig.accessToken)
-        val httpClient = createDesktopAppServerHttpClient()
-        val transport = KtorAppServerWebSocketTransport(
-            httpClient = httpClient,
-            baseUrl = endpoint.address,
-            scope = controllerScope,
-            bearerToken = endpoint.bearerToken,
-        )
-        return transport to DesktopTransportResources.forWebSocket(transport, httpClient)
     }
 }
 
@@ -274,6 +314,35 @@ internal fun desktopAgentToolsModePolicy(
     AgentToolsModePolicy()
 }
 
+private val DESKTOP_CLIENT_INFO = AppServerRuntimeStartClientInfo(
+    name = "letta-desktop",
+    title = "Letta Desktop",
+    version = "0.2.0",
+)
+
+private fun notProbeable() = AppServerProbeResult.Unavailable("the App Server address cannot be probed")
+
+/**
+ * letta-mobile-by4vm.9: the `runtime_start` that reattaches [runtime] to a new socket after a
+ * reconnect: the same client, mode and external tools the engine's own runtime_start carries, with
+ * approvals and device status recovered.
+ */
+internal fun desktopReattachCommand(
+    runtime: AppServerRuntimeScope,
+    externalToolRegistry: ExternalToolRegistry,
+    permissionModes: PermissionModeRegistry?,
+    requestId: String = "desktop-reattach-${UUID.randomUUID()}",
+): AppServerCommand.RuntimeStart = AppServerCommand.RuntimeStart(
+    requestId = requestId,
+    agentId = runtime.agentId,
+    conversationId = runtime.conversationId,
+    mode = permissionModes?.modeFor(runtime) ?: AppServerPermissionMode.Unrestricted,
+    clientInfo = DESKTOP_CLIENT_INFO,
+    recoverApprovals = true,
+    forceDeviceStatus = true,
+    externalTools = externalToolRegistry.advertisedToolsCommandGroups(audience = ToolAudience(runtime.agentId)),
+)
+
 internal fun buildDesktopAppServerTurnEngine(
     client: AppServerClient,
     scope: CoroutineScope,
@@ -285,11 +354,7 @@ internal fun buildDesktopAppServerTurnEngine(
     router.attach(scope, client.events)
     return AppServerTurnEngine(
         client = client,
-        clientInfo = AppServerRuntimeStartClientInfo(
-            name = "letta-desktop",
-            title = "Letta Desktop",
-            version = "0.2.0",
-        ),
+        clientInfo = DESKTOP_CLIENT_INFO,
         permissionMode = AppServerPermissionMode.Unrestricted,
         permissionModeProvider = { command ->
             config.permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))

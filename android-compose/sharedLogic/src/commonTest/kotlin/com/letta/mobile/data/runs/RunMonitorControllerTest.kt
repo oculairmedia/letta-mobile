@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runs
 
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -32,6 +33,28 @@ class RunMonitorControllerTest {
             it.start()
             runCurrent()
         }
+
+    /** letta-mobile-by4vm.13: a session with no runs route gets no repository; the page says why. */
+    @Test
+    fun anAbsentRunsRouteShowsTheHostReasonWithoutCallingAnything() = runTest {
+        val controller = RunMonitorController(
+            runRepository = null,
+            scope = backgroundScope,
+            errorMessageMapper = { throwable, fallback ->
+                if (throwable is AppServerRouteUnavailable) "not served: ${throwable.route}" else fallback
+            },
+        )
+        controller.start()
+        runCurrent()
+        val state = controller.state.value
+        assertEquals("not served: RUNS", state.error)
+        assertFalse(state.loading)
+        assertTrue(state.runs.isEmpty())
+        assertFalse(controller.canManageRuns)
+        controller.open("run-1")
+        runCurrent()
+        assertEquals("not served: RUNS", controller.state.value.operationError)
+    }
 
     @Test
     fun loadsTheRunsAndCountsThem() = runTest {

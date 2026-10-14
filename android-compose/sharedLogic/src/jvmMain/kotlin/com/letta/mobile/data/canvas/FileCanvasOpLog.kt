@@ -22,6 +22,11 @@ import kotlinx.serialization.json.Json
  *
  * Persists ops for each canvas into `{rootDirectory}/ops/{canvasId_sha256}.jsonl`
  * while keeping an in-memory index of seen op IDs for O(1) deduplication.
+ *
+ * The journal ([CanvasOpLog.unsettled], letta-mobile-by4vm.22) is a sidecar of settled op ids,
+ * `{canvasId_sha256}.settled`, one per line. A log written before the journal existed has no
+ * sidecar; its ops are all taken as settled when it is first read, since the document they were
+ * written beside is the only record of which of them it holds.
  */
 class FileCanvasOpLog(
     private val rootDirectory: Path = defaultOpsDirectory(),
@@ -34,6 +39,11 @@ class FileCanvasOpLog(
     }
 
     private val opIdsByCanvas = mutableMapOf<CanvasId, MutableSet<String>>()
+    private val journal = FileCanvasOpJournal(
+        sidecarOf = { id -> rootDirectory.resolve("${id.value.sha256PathComponent()}.settled") },
+        loggedIds = { id -> getOrLoadOpIds(id) },
+        decode = { line -> json.decodeFromString(CanvasOp.serializer(), line) },
+    )
     private val flowsByCanvas = ConcurrentHashMap<CanvasId, MutableSharedFlow<CanvasOp>>()
 
     init {
@@ -43,6 +53,7 @@ class FileCanvasOpLog(
     override suspend fun append(canvasId: CanvasId, op: CanvasOp): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
+            journal.settled(canvasId)
             if (!opIds.add(op.opId)) {
                 return@withLock
             }
@@ -91,6 +102,18 @@ class FileCanvasOpLog(
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
             opIds.contains(opId)
+        }
+    }
+
+    override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            journal.unsettled(canvasId, opLogFile(canvasId))
+        }
+    }
+
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>): Unit = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            journal.settle(canvasId, opIds)
         }
     }
 

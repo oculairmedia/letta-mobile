@@ -61,6 +61,10 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
+import com.letta.mobile.data.transport.ChannelTransportState
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -127,7 +131,11 @@ class DesktopAppServerChatGateway internal constructor(
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         admin.getConversation(conversationId).agentId.value
     },
+    /** letta-mobile-by4vm.9: the session that reconnects itself (ws://); null on Iroh. */
+    private val session: DesktopSelfReconnectingSession? = null,
 ) : DesktopChatGateway,
+    ConnectionStatusGateway,
+    DesktopReconnectOwningGateway,
     ChatGatewayExtras,
     ConversationSummaryGateway,
     ConversationForkGateway,
@@ -139,6 +147,22 @@ class DesktopAppServerChatGateway internal constructor(
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,
     AutoCloseable {
+
+    /**
+     * letta-mobile-by4vm.9: the session status the chat controller's watcher reads. A gateway
+     * without a self-reconnecting session reports Idle, which the watcher ignores.
+     */
+    override val connectionState: StateFlow<ChannelTransportState> =
+        session?.connectionState ?: MutableStateFlow(ChannelTransportState.Idle)
+
+    override val ownsReconnect: Boolean get() = session != null
+
+    /** The machine woke from sleep: true when this gateway's own reconnect owner took it (F04). */
+    override fun resumeSession(): Boolean {
+        val owner = session ?: return false
+        owner.resumeNow()
+        return true
+    }
 
     /** The bundled runtime this gateway keeps alive, released when the gateway closes. */
     @Volatile

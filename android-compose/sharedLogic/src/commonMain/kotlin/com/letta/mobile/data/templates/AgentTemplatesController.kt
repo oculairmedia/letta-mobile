@@ -50,34 +50,47 @@ val BuiltinAgentTemplates: List<StarterAgentTemplate> = listOf(
     ),
 )
 
-/** What the Templates page shows: the starters, the one being made into an agent, and a failure. */
+/**
+ * What the Templates page shows: the starters, the one being made into an agent, a failure, and why
+ * creating is unavailable on this backend ([createUnavailableReason], null when it is offered).
+ */
 @Immutable
 data class AgentTemplatesState(
     val templates: List<StarterAgentTemplate> = BuiltinAgentTemplates,
     val creatingId: String? = null,
     val error: String? = null,
+    val createUnavailableReason: String? = null,
 )
 
 /**
  * letta-mobile-ckmub.2.5 (hard cut S17): makes an agent from a starter template. The host decides
  * where a made agent opens ([create]'s callback); one creation runs at a time.
+ *
+ * letta-mobile-by4vm.13: a null [agentRepository] is a session that serves no agents; it offers no
+ * create, with the same reason as a backend that cannot create one.
  */
 class AgentTemplatesController(
-    private val agentRepository: IAgentRepository,
+    private val agentRepository: IAgentRepository?,
     private val scope: CoroutineScope,
     templates: List<StarterAgentTemplate> = BuiltinAgentTemplates,
     private val errorMessageMapper: (Throwable, String) -> String = { throwable, fallback -> throwable.message ?: fallback },
 ) {
-    private val stateFlow = MutableStateFlow(AgentTemplatesState(templates = templates))
+    private val stateFlow = MutableStateFlow(
+        AgentTemplatesState(
+            templates = templates,
+            createUnavailableReason = CREATE_UNAVAILABLE.takeUnless { agentRepository?.supportsCreateAgent == true },
+        ),
+    )
     val state: StateFlow<AgentTemplatesState> = stateFlow
 
     fun create(templateId: String, onCreated: (agentId: String) -> Unit) {
         val current = stateFlow.value
-        if (current.creatingId != null) return
+        if (current.creatingId != null || current.createUnavailableReason != null) return
         val template = current.templates.firstOrNull { it.id == templateId } ?: return
+        val agents = agentRepository ?: return
         stateFlow.update { it.copy(creatingId = templateId, error = null) }
         scope.launch {
-            runCatchingCancellable { agentRepository.createAgent(template.toCreateParams()) }
+            runCatchingCancellable { agents.createAgent(template.toCreateParams()) }
                 .onSuccess { agent ->
                     stateFlow.update { it.copy(creatingId = null) }
                     onCreated(agent.id.value)
@@ -90,6 +103,7 @@ class AgentTemplatesController(
 
     private companion object {
         const val CREATE_FAILED = "Failed to create agent"
+        const val CREATE_UNAVAILABLE = "This backend cannot create agents yet."
     }
 }
 

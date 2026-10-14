@@ -4,6 +4,7 @@ import com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker
 import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -27,11 +28,21 @@ class AdminRpcCompactionRepository(
         }
         return runCatchingCancellable { rpc.invoke(ConversationCompactRpc.METHOD, params) }.fold(
             onSuccess = { result ->
-                result?.let { json.decodeFromJsonElement(ConversationCompactResult.serializer(), it).toOutcome() }
-                    ?: CompactionOutcome.Failed("The host returned no compaction result")
+                result?.let(::decode) ?: CompactionOutcome.Failed("The host returned no compaction result")
             },
             onFailure = { classify(it.message.orEmpty()) },
         )
+    }
+
+    /**
+     * letta-mobile-by4vm.41: a result this client cannot read (a mismatched host) is a failed
+     * compaction, not an exception out of [compact]. ([kotlinx.serialization.SerializationException]
+     * is an [IllegalArgumentException].)
+     */
+    private fun decode(result: JsonElement): CompactionOutcome = try {
+        json.decodeFromJsonElement(ConversationCompactResult.serializer(), result).toOutcome()
+    } catch (@Suppress("SwallowedException") unreadable: IllegalArgumentException) {
+        CompactionOutcome.Failed("The host returned an unreadable compaction result")
     }
 
     private fun classify(message: String): CompactionOutcome = when {
