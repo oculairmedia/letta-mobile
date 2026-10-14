@@ -115,3 +115,8 @@ Known exact matches that were left in place: `System1Client` has the `adminRpc` 
 the App Server or Iroh path, and `CachedAgentRepository` has one `adminRpc`-identical construction
 next to one that is not. `LcpWire` and `CanvasPluginElements` have the `wire` flags but speak their
 own protocols, so tying them to the App Server wire configuration is a separate decision.
+
+`LettaJson.persisted` has no consumers yet. The 14 constructions that set exactly
+`ignoreUnknownKeys = true` and `encodeDefaults = true` (mostly file stores, for example
+`FileCanvasDeliveryStore`, `FileCanvasRelayStore` and `RoomMemFsStore`) match it flag for flag
+and are the next migration candidates. They are not on the wire path, so this change left them alone.
