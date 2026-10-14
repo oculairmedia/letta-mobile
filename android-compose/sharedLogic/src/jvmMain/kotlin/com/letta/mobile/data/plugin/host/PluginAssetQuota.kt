@@ -9,7 +9,7 @@ import kotlin.time.Duration.Companion.days
  * sliding window. Bytes the store already has cost nothing (assets are content-addressed, so a
  * re-upload writes nothing), and an upload that would cross the limit is refused whole.
  *
- * TODO(letta-mobile-cdgpr.6): in memory, so a host restart forgets the day's usage; persist it with
+ * TODO(letta-mobile-cdgpr.15): in memory, so a host restart forgets the day's usage; persist it with
  * the plugin registry once PluginHostRuntime owns one. A crash-looping plugin is already held by
  * the driver's restart backoff and Faulted state.
  */

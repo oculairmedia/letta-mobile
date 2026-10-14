@@ -78,7 +78,7 @@ class PluginDriverHost(
 
     private companion object {
         /**
-         * The manifest's setting defaults. TODO(letta-mobile-cdgpr.6 follow-up): a host settings and
+         * The manifest's setting defaults. TODO(letta-mobile-cdgpr.14): a host settings and
          * secrets store; until then a plugin runs on its defaults with no secrets.
          */
         fun defaultSettings(manifest: PluginManifest): JsonObject =

@@ -24,7 +24,7 @@ import kotlinx.serialization.json.put
  * reached the plugin, or the canvas an emit names when that caller may open it. A plugin nobody
  * has called yet has no board. v1 binds to the LAST caller: a plugin serving two conversations at
  * once places on the later one's board (the action result's own `emit` is applied right after
- * its call, so it lands correctly).
+ * its call, so it lands correctly). TODO(letta-mobile-cdgpr.16): bind to the exact call.
  */
 class CallerBoard(private val backend: HostCanvasBackend) : PluginCanvasAccess {
     @Volatile var caller: HostCanvasCaller? = null
