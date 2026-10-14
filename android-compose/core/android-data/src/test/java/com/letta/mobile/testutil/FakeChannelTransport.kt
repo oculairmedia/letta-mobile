@@ -160,7 +160,12 @@ class FakeChannelTransport(
         val body: String?,
     )
 
-    override fun cancel(conversationId: String): Boolean = cancelResult
+    val cancelCalls = mutableListOf<String>()
+
+    override fun cancel(conversationId: String): Boolean {
+        cancelCalls += conversationId
+        return cancelResult
+    }
 
     override fun bye(): Boolean = byeResult
 

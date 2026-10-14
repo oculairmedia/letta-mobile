@@ -50,7 +50,7 @@ open class ConversationRepository(
      * `conversation_updated` pushes, so the in-chat picker and drawer show a conversation another
      * device created or changed without reopening.
      */
-    transport: IChannelTransport? = null,
+    private val transport: IChannelTransport? = null,
 ) : IConversationRepository, BackendScopedCache {
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
@@ -293,9 +293,28 @@ open class ConversationRepository(
         }
     }
 
+    /**
+     * letta-mobile-by4vm.12: an Iroh host cancels through the App Server's `abort_message` on the
+     * control channel (the chat's stop button), which aborts the run this connection drives for the
+     * conversation. Neither the Iroh `admin_rpc` relay nor the embedded runtime has a route that
+     * cancels another client's run, so elsewhere this is the [remote] seam (no production route).
+     */
+    override fun canCancelConversationRuns(): Boolean = irohCancelTransport() != null
+
+    /**
+     * letta-mobile-by4vm.12: no Android backend can recompile. The App Server has
+     * `conversation_recompile`, but the Iroh host has no `admin_rpc` relay for it and the embedded
+     * runtime offers none, so only the [remote] seam (no production route) is left.
+     */
+    override fun canRecompileConversations(): Boolean = false
+
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
-        remote.cancelConversation(id, agentId)
+        val channel = irohCancelTransport() ?: return remote.cancelConversation(id, agentId)
+        if (!channel.cancel(id.value)) throw NoActiveConversationRunException(id)
     }
+
+    private fun irohCancelTransport(): IChannelTransport? =
+        transport?.takeIf { irohConversationListSource?.shouldUseIroh() == true }
 
     override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
         return if (agentId != null && !dryRun) {
@@ -381,3 +400,8 @@ open class ConversationRepository(
             "The on-device runtime can't fork conversations; connect to a desktop or server host to fork."
     }
 }
+
+/** letta-mobile-by4vm.12: "Cancel runs" found no run of [conversationId] that this connection drives. */
+class NoActiveConversationRunException(conversationId: ConversationId) : IllegalStateException(
+    "No run of conversation ${conversationId.value} is active on this connection.",
+)
