@@ -1,10 +1,12 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.api.IRunRepository
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.runs.RunMonitorController
+import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.templates.AgentTemplatesController
-import com.letta.mobile.desktop.data.unavailableRepository
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.data.DesktopSessionGraphFactory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -15,15 +17,21 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-by4vm.45: a direct App Server desktop session binds the Runs page to the
- * `unavailableRepository()` stub and the Templates page to a repository with no create route. Both
- * pages must say so instead of failing an action (or crashing) when the user reaches for it.
+ * letta-mobile-by4vm.45 / by4vm.13: a direct App Server desktop session serves no runs, and no
+ * session without a backend serves agents. The pages ask the session's capabilities first and say
+ * why, instead of calling a stand-in repository (or crashing on one).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DesktopAdminPagesTest {
+    private val directAppServer = LettaConfig(id = "direct", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500")
+
     @Test
-    fun theRunsPageOverTheUnavailableStubShowsWhyNotAnEmptyList() = runTest {
-        val controller = RunMonitorController(unavailableRepository<IRunRepository>(), backgroundScope, ::desktopAdminErrorMessage)
+    fun theRunsPageOverASessionWithoutRunsShowsWhyNotAnEmptyList() = runTest {
+        val graph = DesktopSessionGraphFactory(configProvider = { directAppServer }).create()
+        val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }
+        assertNull(runs, "a direct App Server session serves no runs")
+
+        val controller = RunMonitorController(runs, backgroundScope, ::desktopAdminErrorMessage)
         controller.start()
         runCurrent()
         val state = controller.state.value
@@ -31,15 +39,16 @@ class DesktopAdminPagesTest {
         assertFalse(state.loading)
         assertTrue(state.runs.isEmpty())
         assertFalse(controller.canManageRuns)
+        graph.close()
     }
 
     @Test
-    fun theTemplatesPageOverTheUnavailableStubOffersNoCreate() = runTest {
-        val controller = AgentTemplatesController(
-            agentRepository = unavailableRepository<IAgentRepository>(),
-            scope = backgroundScope,
-            errorMessageMapper = ::desktopAdminErrorMessage,
-        )
+    fun theTemplatesPageOverASessionWithoutAgentsOffersNoCreate() = runTest {
+        val graph = DesktopSessionGraphFactory().create()
+        val agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository }
+        assertNull(agents, "no backend configured serves no agents")
+
+        val controller = AgentTemplatesController(agentRepository = agents, scope = backgroundScope, errorMessageMapper = ::desktopAdminErrorMessage)
         assertEquals("This backend cannot create agents yet.", controller.state.value.createUnavailableReason)
         val opened = mutableListOf<String>()
         controller.create("default") { opened += it }
@@ -47,5 +56,15 @@ class DesktopAdminPagesTest {
         assertTrue(opened.isEmpty())
         assertNull(controller.state.value.error)
         assertNull(controller.state.value.creatingId)
+        graph.close()
+    }
+
+    @Test
+    fun theUnifiedRouteFailureReadsAsTheNotServedReason() {
+        assertEquals(
+            "This backend does not serve this page yet.",
+            desktopAdminErrorMessage(AppServerRouteUnavailable(SessionRoute.PROJECTS), "fallback"),
+        )
+        assertEquals("boom", desktopAdminErrorMessage(IllegalStateException("boom"), "fallback"))
     }
 }

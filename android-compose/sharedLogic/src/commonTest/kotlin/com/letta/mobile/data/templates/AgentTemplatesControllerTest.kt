@@ -25,6 +25,19 @@ import kotlin.test.assertTrue
 /** letta-mobile-ckmub.2.5 (S17): making an agent from a starter template through `agent_create`. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AgentTemplatesControllerTest {
+    /** letta-mobile-by4vm.13: a session with no agents route offers no create, and never calls one. */
+    @Test
+    fun anAbsentAgentsRouteOffersNoCreate() = runTest {
+        val controller = AgentTemplatesController(agentRepository = null, scope = backgroundScope)
+        assertTrue(controller.state.value.createUnavailableReason != null)
+        val opened = mutableListOf<String>()
+        controller.create("coder") { opened += it }
+        runCurrent()
+        assertTrue(opened.isEmpty())
+        assertNull(controller.state.value.creatingId)
+        assertNull(controller.state.value.error)
+    }
+
     @Test
     fun aTemplateBecomesAnAgentWithItsPromptAndTags() = runTest {
         val agents = FakeAgentRepository()

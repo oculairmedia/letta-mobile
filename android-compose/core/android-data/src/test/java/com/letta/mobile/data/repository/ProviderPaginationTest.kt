@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderId
@@ -70,7 +71,7 @@ class ProviderPaginationTest {
 
     private class PaginatingProviderApi(
         private val providers: List<Provider>,
-    ) : ProviderRemoteSource by noAppServerRoute<ProviderRemoteSource>() {
+    ) : ProviderRemoteSource by unavailable<ProviderRemoteSource>(SessionRoute.PROVIDERS) {
         val observedAfters = mutableListOf<String?>()
         val observedLimits = mutableListOf<Int?>()
 

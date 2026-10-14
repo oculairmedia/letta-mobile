@@ -1,7 +1,8 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.runtime.RunId
-import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -77,7 +78,7 @@ class RunRepositoryTest {
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
     @Test
-    fun `refreshRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
+    fun `refreshRuns in iroh mode without source throws AppServerRouteUnavailable`() = runTest {
         val failure = runCatching {
             val settings = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -89,13 +90,13 @@ class RunRepositoryTest {
             )
             val apiThatThrows = object : FakeRunApi() {
                 override suspend fun listRuns(params: RunListParams): List<Run> {
-                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                    throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
             val repo = RunRepository(apiThatThrows)
             repo.refreshRuns(RunListParams())
         }.exceptionOrNull()
-        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
+        org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
     }
 
     @Test
@@ -131,7 +132,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -170,7 +171,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun listRuns(params: RunListParams): List<Run> {
-                throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -180,17 +181,17 @@ class RunRepositoryTest {
     }
 
     @Test
-    fun `getRecentRuns in iroh mode without source throws NoAppServerRouteException`() = runTest {
+    fun `getRecentRuns in iroh mode without source throws AppServerRouteUnavailable`() = runTest {
         val failure = runCatching {
             val apiThatThrows = object : FakeRunApi() {
                 override suspend fun listRuns(params: RunListParams): List<Run> {
-                    throw NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                    throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
             val repo = RunRepository(apiThatThrows)
             repo.getRecentRuns(limit = 5)
         }.exceptionOrNull()
-        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is NoAppServerRouteException)
+        org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
     }
 
     @Test
@@ -219,7 +220,7 @@ class RunRepositoryTest {
         val irohSource = IrohAdminRpcRunSource(transport, settings)
         val apiThatThrows = object : FakeRunApi() {
             override suspend fun retrieveRun(runId: String): Run {
-                throw NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
@@ -277,7 +278,7 @@ class RunRepositoryTest {
                 limit: Int?,
                 order: String?,
             ): List<Step> {
-                throw NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)

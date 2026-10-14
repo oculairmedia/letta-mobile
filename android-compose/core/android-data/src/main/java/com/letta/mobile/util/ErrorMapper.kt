@@ -1,7 +1,7 @@
 package com.letta.mobile.util
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.repository.api.ToolUnavailableException
 
 fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong"): String {
@@ -10,7 +10,7 @@ fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong
             ToolUnavailableException.Reason.NOT_FOUND -> "Not found. The tool may have been deleted."
             ToolUnavailableException.Reason.NOT_SUPPORTED -> "Not available over Iroh. ${e.message.orEmpty()}".trim()
         }
-        is NoAppServerRouteException -> "Not available on this backend. The App Server has no route for this action yet."
+        is AppServerRouteUnavailable -> "Not available on this backend. The App Server has no route for this action yet."
         is ApiException -> when (e.code) {
             401 -> "Authentication failed. Check your Letta API key in Settings."
             403 -> "Access denied. This API key does not have permission for that Letta resource."

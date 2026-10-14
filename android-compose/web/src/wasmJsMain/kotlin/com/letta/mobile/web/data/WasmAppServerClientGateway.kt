@@ -1,6 +1,10 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionPlatform
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
@@ -43,9 +47,9 @@ class WasmAppServerClientGateway(
     val state: StateFlow<BackendConnectionStatus> = mutableState.asStateFlow()
 
     suspend fun listAgents(config: LettaConfig): List<AgentItemState> {
-        if (config.serverUrl.isBlank()) {
+        unservedStatus(config)?.let { status ->
             close()
-            mutableState.value = BackendConnectionStatus.Unconfigured
+            mutableState.value = status
             return emptyList()
         }
 
@@ -152,6 +156,29 @@ class WasmAppServerClientGateway(
         const val AGENT_LIMIT = 100
         const val WEB_BACKEND_ID = "web-app-server"
     }
+}
+
+/**
+ * letta-mobile-by4vm.13: what a browser session serves — the web row of the
+ * [com.letta.mobile.data.backend.SessionRouteMatrix] (the chat page's agents and conversation over an
+ * App Server reached by ws:// or Iroh). A blank address is no backend.
+ */
+internal fun webSessionCapabilities(config: LettaConfig): SessionCapabilities =
+    SessionCapabilities.forSession(
+        platform = SessionPlatform.WEB,
+        kind = config.backendKind().takeUnless { config.serverUrl.isBlank() },
+    )
+
+private const val NO_BROWSER_ROUTE = "This backend has no route from a browser (a browser cannot run the on-device runtime)."
+
+/**
+ * Why [config] cannot list agents from a browser, or null when it can: no address, or (letta-mobile-by4vm.13)
+ * a backend kind outside the web row of the session route matrix.
+ */
+internal fun unservedStatus(config: LettaConfig): BackendConnectionStatus? = when {
+    config.serverUrl.isBlank() -> BackendConnectionStatus.Unconfigured
+    !webSessionCapabilities(config).supports(SessionRoute.AGENTS) -> BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
+    else -> null
 }
 
 /** The page's stop and approval answers, scoped to [target]'s conversation. */

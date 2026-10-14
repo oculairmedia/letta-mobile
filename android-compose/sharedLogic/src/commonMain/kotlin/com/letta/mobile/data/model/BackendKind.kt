@@ -25,7 +25,12 @@ package com.letta.mobile.data.model
  *  - desktop: `sessionBackendBinding` in `DesktopRepositoryAdapters`, and
  *    `DesktopAppServerChatGateways.createDefault`, which chooses on mode and address;
  *  - web: `WasmAppServerSession`, which still chooses on [isIrohBackendUrl] directly.
- * Nothing in sharedUI keys on the backend family.
+ *
+ * letta-mobile-by4vm.13: the compiler and the matrix tests then say what else to do. Every row of
+ * [com.letta.mobile.data.backend.SessionRouteMatrix] is an exhaustive `when` over this enum, so a new
+ * kind does not build until each platform (Android, desktop, web) decides which
+ * [com.letta.mobile.data.backend.SessionRoute]s it serves; each platform's matrix test then fails
+ * until its session factory binds exactly that row. Nothing in sharedUI keys on the backend family.
  */
 enum class BackendKind {
     /** On-device embedded runtime — no network transport at all. */

@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
@@ -11,7 +12,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
 import java.util.concurrent.atomic.AtomicInteger
 
-open class FakeConversationApi : ConversationCrudRemoteSource by noAppServerRoute<ConversationCrudRemoteSource>() {
+open class FakeConversationApi : ConversationCrudRemoteSource by unavailable<ConversationCrudRemoteSource>(SessionRoute.CONVERSATIONS) {
     var conversations = mutableListOf<Conversation>()
     var shouldFail = false
     val calls = mutableListOf<String>()

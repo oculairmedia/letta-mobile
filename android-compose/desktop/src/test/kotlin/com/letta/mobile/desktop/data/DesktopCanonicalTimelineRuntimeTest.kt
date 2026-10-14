@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
@@ -176,7 +178,7 @@ class DesktopCanonicalTimelineRuntimeTest {
      */
     private fun install(scope: kotlinx.coroutines.CoroutineScope) = DesktopCanonicalSendInstall(
         frameSource = NoOpChannelTransport(),
-        conversationRepository = unavailableRepository(),
+        conversationRepository = unavailable(SessionRoute.CONVERSATIONS),
         scope = scope,
         activeConfig = { null },
         clientVersion = { "test" },

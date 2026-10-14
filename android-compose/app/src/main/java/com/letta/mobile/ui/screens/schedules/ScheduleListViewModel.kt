@@ -3,7 +3,7 @@ package com.letta.mobile.ui.screens.schedules
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
@@ -70,4 +70,4 @@ class ScheduleListViewModel @Inject constructor(
 }
 
 /** letta-mobile-ckmub.4: schedules have a route only through an Iroh host's `schedule.*` relay. */
-private fun Throwable.isScheduleAdminUnavailable(): Boolean = this is NoAppServerRouteException
+private fun Throwable.isScheduleAdminUnavailable(): Boolean = this is AppServerRouteUnavailable

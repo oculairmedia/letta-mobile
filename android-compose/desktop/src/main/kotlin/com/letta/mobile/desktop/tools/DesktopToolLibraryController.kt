@@ -2,7 +2,7 @@ package com.letta.mobile.desktop.tools
 
 import com.letta.mobile.data.tools.ToolLibraryController
 import com.letta.mobile.data.tools.ToolLibraryState
-import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +52,7 @@ class DesktopToolLibraryController(
 
     private fun Throwable.toDesktopToolsMessage(): String =
         when (this) {
-            is DesktopRepositoryUnavailableException -> "Desktop tool repositories are not available for this backend yet."
+            is AppServerRouteUnavailable -> "Desktop tool repositories are not available for this backend yet."
             else -> message ?: this::class.simpleName ?: "Tools could not be loaded."
         }
 }

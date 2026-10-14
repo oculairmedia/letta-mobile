@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -163,6 +164,7 @@ private class StubSessionGraph(
     override val toolRepository: IToolRepository get() = unused()
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository get() = unused()
     override val blockRepository: IAgentBlockRepository? get() = null
+    override val capabilities: SessionCapabilities = SessionCapabilities.None
 
     override fun close() {
         closeAttempted = true

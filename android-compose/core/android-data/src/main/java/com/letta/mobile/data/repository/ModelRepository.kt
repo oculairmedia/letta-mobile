@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.ModelRemoteSource
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
@@ -12,7 +14,7 @@ import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
  * route (the Letta REST backend was removed).
  */
 open class ModelRepository(
-    remote: ModelRemoteSource = noAppServerRoute(),
+    remote: RemoteRoute<ModelRemoteSource> = RemoteRoute.Absent(SessionRoute.MODELS),
     localModelSource: LocalRuntimeModelSource? = null,
     settingsRepository: ISettingsRepository? = null,
     irohModelSource: IrohAdminRpcModelSource? = null,
@@ -21,4 +23,12 @@ open class ModelRepository(
     localModelSource = localModelSource,
     settingsRepository = settingsRepository,
     irohModelSource = irohModelSource,
-)
+) {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(
+        remote: ModelRemoteSource,
+        localModelSource: LocalRuntimeModelSource? = null,
+        settingsRepository: ISettingsRepository? = null,
+        irohModelSource: IrohAdminRpcModelSource? = null,
+    ) : this(remote.bound(), localModelSource, settingsRepository, irohModelSource)
+}

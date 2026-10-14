@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.api
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
@@ -30,4 +31,4 @@ interface ScheduleRemoteSource {
 }
 
 private fun noRoute(operation: String): Nothing =
-    throw NoAppServerRouteException("ScheduleRemoteSource.$operation")
+    throw AppServerRouteUnavailable(SessionRoute.SCHEDULES, "ScheduleRemoteSource.$operation")

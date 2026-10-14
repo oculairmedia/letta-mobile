@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.BlockRemoteSource
 import com.letta.mobile.data.model.Block
@@ -8,7 +9,7 @@ import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 
-open class FakeBlockApi : BlockRemoteSource by noAppServerRoute<BlockRemoteSource>() {
+open class FakeBlockApi : BlockRemoteSource by unavailable<BlockRemoteSource>(SessionRoute.BLOCKS) {
     var blocks = mutableMapOf<String, MutableList<Block>>()
     var allBlocks = mutableListOf<Block>()
     var shouldFail = false

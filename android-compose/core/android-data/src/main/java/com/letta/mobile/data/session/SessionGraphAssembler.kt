@@ -1,11 +1,14 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.BlockRepository
@@ -76,10 +79,8 @@ class SessionGraphAssembler @Inject constructor(
         val agentRepository = createAgentRepository(request)
         val conversationRepos = createConversationRepos(request, agentRepository)
         val adminRepositories = createAdminRepositories(request)
-        val binding = request.activeConfig.sessionBackendBinding(
-            forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl),
-        )
-        val useIroh = binding.bindsIroh()
+        val forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
+        val useIroh = request.activeConfig.sessionBackendBinding(forceIroh = forceIroh).bindsIroh()
         return SessionGraph(
             id = request.graphId,
             capturedConfig = request.activeConfig,
@@ -108,13 +109,14 @@ class SessionGraphAssembler @Inject constructor(
                 transport = request.channelTransport,
                 scope = request.scope,
             ),
-            stepRepository = StepRepository(remoteSources.steps),
+            stepRepository = StepRepository(remoteSources.steps.orNull()),
             subagentRepository = SubagentRepository(
                 transport = request.channelTransport,
                 scope = request.scope,
             ),
             toolRepository = adminRepositories.tool,
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
+            capabilities = sessionCapabilities(request, forceIroh),
             contextTokenReadings = contextTokenReadingsOf(
                 transport = request.channelTransport,
                 scope = request.scope,
@@ -177,6 +179,19 @@ class SessionGraphAssembler @Inject constructor(
             run = RunRepository(remoteSources.runs, request.irohSource(::IrohAdminRpcRunSource)),
             provider = ProviderRepository(remoteSources.providers, request.irohSource(::IrohAdminRpcProviderSource)),
             tool = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
+        )
+
+    /**
+     * letta-mobile-by4vm.13: what this graph serves — the Android row of the
+     * [com.letta.mobile.data.backend.SessionRouteMatrix] for the config's backend kind, plus any route
+     * a bound remote source adds. The Iroh host's advertised features are read live.
+     */
+    private fun sessionCapabilities(request: SessionGraphAssembleRequest, forceIroh: Boolean): SessionCapabilities =
+        SessionCapabilities.forSession(
+            platform = SessionPlatform.ANDROID,
+            kind = request.activeConfig?.backendKind(forceIroh = forceIroh),
+            hostCapabilities = { request.channelTransport.hostCapabilities },
+            extraBound = remoteSources.boundRoutes(),
         )
 
     /** An Iroh admin_rpc source over this graph's transport, when the graph has settings to scope it. */

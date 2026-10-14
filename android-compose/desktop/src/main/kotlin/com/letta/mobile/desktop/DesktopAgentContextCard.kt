@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.session.llmModelsOrEmpty
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,7 +55,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
             attention = core.attentionPrefs,
         )
     }
-    val models by graph.modelRepository.llmModels.collectAsState()
+    val models by remember(graph) { graph.llmModelsOrEmpty() }.collectAsState()
     val selections by chatController.conversationModelSelections.collectAsState()
     val conversationId = frame.chatState.selectedConversationId
     val agent = frame.focus.rosterAgents.firstOrNull { it.id.value == agentId }

@@ -1,7 +1,8 @@
 package com.letta.mobile.testutil
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.repository.api.ConversationCrudRemoteSource
-import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 
@@ -14,5 +15,5 @@ fun armedConversationApi(): ConversationCrudRemoteSource = object : Conversation
         summarySearch: String?,
         order: String?,
         orderBy: String?,
-    ): List<Conversation> = throw NoAppServerRouteException("iroh://armed-http")
+    ): List<Conversation> = throw AppServerRouteUnavailable(SessionRoute.CONVERSATIONS, "iroh://armed-http")
 }
