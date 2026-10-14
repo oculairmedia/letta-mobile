@@ -204,6 +204,7 @@ internal fun TopLevelDestination.isSelected(currentDestination: NavDestination?)
             ConfigRoute::class,
             ConfigListRoute::class,
             TemplatesRoute::class,
+            PluginsRoute::class,
             ProvidersRoute::class,
             SchedulesRoute::class,
             RunsRoute::class,

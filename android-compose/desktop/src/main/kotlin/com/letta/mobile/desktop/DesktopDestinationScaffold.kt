@@ -103,6 +103,8 @@ internal data class DestinationContentActions(
     val onRailRecencyDaysChange: (Int) -> Unit = {},
     /** Settings' Providers section opens the Providers destination. */
     val onOpenProviders: () -> Unit = {},
+    /** Settings' Plugins section opens the Plugins destination (letta-mobile-cdgpr.9). */
+    val onOpenPlugins: () -> Unit = {},
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,

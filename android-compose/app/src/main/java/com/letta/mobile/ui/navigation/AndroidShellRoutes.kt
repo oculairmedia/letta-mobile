@@ -42,6 +42,7 @@ private val AndroidRouteOfKind: Map<ShellPageKind, (ShellDestination) -> Any> = 
     ShellPageKind.Runs to { _ -> RunsRoute },
     ShellPageKind.Templates to { _ -> TemplatesRoute },
     ShellPageKind.Projects to { _ -> ProjectsRoute },
+    ShellPageKind.Plugins to { _ -> PluginsRoute },
 )
 
 /** The Android navigation route that shows [this]. */
@@ -69,6 +70,7 @@ private val ShellDestinationOfRoute: Map<KClass<*>, (Any) -> ShellDestination> =
     RunsRoute::class to { _ -> ShellDestination.Runs },
     TemplatesRoute::class to { _ -> ShellDestination.Templates },
     ProjectsRoute::class to { _ -> ShellDestination.Projects },
+    PluginsRoute::class to { _ -> ShellDestination.Plugins },
     // The Home tab's root is the projects catalog too, without a back arrow.
     HomeRoute::class to { _ -> ShellDestination.Projects },
 )
