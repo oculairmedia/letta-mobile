@@ -48,13 +48,12 @@ local macrobench run shows `startup.cold.p95_ms` above the
    failing metric is `StartupBenchmark#coldStartupCompilationPartial` and not
    noise from a different benchmark. See
    [`perf-gate.md` → Investigating flakes](perf-gate.md#investigating-flakes).
-3. Check whether the workflow already took the automatic cold-start retry path.
-   A single first-attempt `startup.cold.p95_ms` spike now triggers one bounded
-   rerun inside the same job; both attempts upload `build/perf-summary/attempt-*`
-   summaries.
-4. If the retry attempt also fails on `startup.cold.p95_ms`, treat it as a real
-   regression. Do **not** widen tolerances reactively or manually rerun to hide
-   the repeat failure.
+3. Read the "Perf control: last main runs" table in the failing job's summary.
+   The gate measures once and never reruns itself (letta-mobile-by4vm.32). If
+   main runs also sit at or over the ceiling, the runner moved: one manual rerun,
+   noted on the PR with the control line, is legitimate.
+4. If main stays under the ceiling, treat it as a real regression. Do **not**
+   widen tolerances reactively or rerun repeatedly to get green.
 5. Reproduce locally if you have the canonical emulator available — see
    [Tool: Run macrobench locally](#run-macrobench-locally).
 6. If the regression is intentional and accepted (for example, a deliberate

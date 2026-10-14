@@ -45,10 +45,32 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
-- **CI gates merges, not pushes.** Required status checks on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
-- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`), `detekt (advisory)`, and CodeScene Code Health Review surface debt without blocking merge. Do not treat them as required gates.
-- **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
-- **Run the pre-push checklist before opening the PR.** See the next section. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
+- **CI gates merges, not pushes.** Required status checks on `main` (branch protection, asserted by `scripts/tests/ci-policy-scripts-test.sh`): `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.) The CI map below is exactly what runs where.
+- **Run the pre-push checklist before opening the PR.** See "Pre-push PR readiness checklist" below. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
+
+### CI map (what runs where)
+
+**Required** (red blocks merge):
+
+| Check | Workflow | Runs on | What it actually runs |
+|---|---|---|---|
+| `test` | `android.yml` | PRs + main pushes touching the workflow's paths | CI policy script tests, stateful-mock gate, then one Gradle graph: `:app:compileSideloadDebugKotlin :core:android-data:testDebugUnitTest :app:testRootDebugUnitTest :app:testScreenshot :build-logic:test checkArchitectureBoundaries :architecture-tests:test :architecture-tests:architectureTest :quality:detekt-rules:check` (the last includes `guardrailDetekt`, blocking, on changed `.kt` files). **PRs only**, path-filtered additive tasks from `scripts/ci/changed-gradle-modules.sh` (`:feature-chat`, `:designsystem`, `:sharedUI:jvmTest`, `:desktop:test`, `:cli`, `:plugin-*`, … only when that module's own tree changed). |
+| `shared-multiplatform` | `android.yml` | same | `:sharedLogic:jvmTest` (12 min bound), `:appserver-cli:test`, `:iroh-wrapper-cli:test`, then **compiles only** for hostNative and wasmJs (`:sharedLogic`, `:sharedUI`) plus the karma browser tests. Not `:sharedLogic:allTests` (hostNativeTest hangs) and not `:desktop:test`. |
+| `build-apk-pass` | `android.yml` | same | `:app:assembleRootDebug`. `:app:assemblePlayRelease` + APK size/R8 validation run on **main pushes only**; on PRs that matrix leg skips its build but still reports success. |
+| `perf-gate` | `android-perf.yml` | every PR (benchmarks only when `android-compose/**` or the workflow changed) + main pushes | perf script unit tests, Baseline Profile freshness check (warns, never fails), then **one** cold/warm startup macrobenchmark on the API 33 emulator. No automatic rerun: on a breach the job summary shows the last 5 main runs as a control and a human decides (`docs/performance/perf-gate.md`). |
+
+**Not required, but honest** (they go red on a real problem; fix it, don't wave it through):
+
+| Check | Workflow | Runs on | What it runs |
+|---|---|---|---|
+| `detekt` | `android.yml` | after the required jobs | `./gradlew detekt -Parchitecture.strict=true` against each module's `detekt-baseline.xml`: only findings not already in the baseline fail. Covers `app`, `core:android-data`, `designsystem`, `feature-chat`, `quality:detekt-rules`; the KMP modules report NO-SOURCE. |
+| `Platform UI gate` | `agents-policy.yml` | PRs into `main` | `platform-ui-gate.sh --enforce`: PUI001 (new platform `@Composable` file) and PUI004 (allowlist add/raise without `Platform-UI-Reason:`) fail; PUI002 growth warns. |
+| `main module tests (sharedUI jvm + desktop)` | `android.yml` | **main pushes only** (+ dispatch) | `:sharedUI:jvmTest :desktop:test` unconditionally, so main is never silently broken by a PR whose diff skipped them. |
+| `windows-installer` / `desktop-installer-pass`, `iroh-probe-gate`, `appserver-contract-baseline`, `web-wasm`, `build-iroh-wrapper-pass` | `desktop.yml`, `iroh-probe.yml`, `appserver-contract.yml`, `android.yml` | path-filtered PRs / pushes | their own builds and probes; not in branch protection. |
+
+**Advisory** (findings never fail the job): `Advisory AGENTS.md policy` (`agents-policy-check.sh`, `continue-on-error`), `row goldens (advisory)` (`:feature-chat:rowGoldenReport`, `continue-on-error`), `Export architecture graph` (`continue-on-error`), CodeScene Code Health Review (external; still expected green before merge, see `cs delta`). `codecov` runs on main pushes only.
+
+**Runs nowhere in CI:** `:sharedLogic:allTests` / hostNativeTest, and the 7 files under `app/src/androidTest` (device tests: mascot still, LiteRT-LM engine, embedded-runtime loop, image request capture, live Iroh receive, Automerge JNI). Run those by hand on a device when you touch their area.
 
 ## Module map (where work belongs)
 
@@ -63,13 +85,13 @@ git push --force-with-lease                 # safe force-push to your branch
 
 Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash scripts/ci/agents-policy-check.sh` (full) or `bash scripts/ci/agents-policy-check.sh --diff-base origin/main` (PR-shaped). Run detekt from `android-compose/` with Java 21 as documented below. The policy scripts are Bash-only; their regression runner executes in the required `test` CI job.
 
-- **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
+- **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:jvmTest` plus hostNative and wasmJs *compiles* — not `allTests`, whose hostNativeTest hangs, and not `:desktop:test`, which runs in `test` only when `desktop/` changes and on every main push in `main module tests`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
 - **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
 - **Feature LOGIC goes in `sharedLogic/commonMain`; platform modules add only the binding.** State, transforms, caching, TTL, retry/cache policy, request/response shaping, mappers, and reducers are platform-neutral — they belong in `sharedLogic`, implemented once, consumed by every host (Android `app`, `desktop`, future iOS). A platform module (`desktop/`, `app/`) should contain ONLY what genuinely cannot be shared:
   - **Legit-platform:** windowing/Compose-host wiring (AWT/Swing on desktop, Activity on Android), OS single-instance lock, file-storage backend, Ktor **engine** creation, installer/`Main`, platform permissions.
   - **Must-be-shared (never duplicate per platform):** repositories, view-state reducers, data mappers, formatters, caching/TTL/error-flow, request shaping.
   - **Anti-pattern to reject in review:** a platform module re-implementing a `sharedLogic` interface (e.g. `IAgentRepository`) with its own logic. If you need a shared interface implemented, implement the platform-neutral core in `commonMain` and inject the platform bit (e.g. the Ktor `HttpClient` engine). Duplicated implementations across `desktop/` and `core/android-data`/`app/` WILL drift — that is the regression this rule prevents (audit 2026-06-13, beads `letta-mobile-mqzkc`/`8h463`).
-  - The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) backstops this; keep it green.
+  - The `shared-multiplatform` required check (`:sharedLogic:jvmTest` + hostNative/wasmJs compiles) backstops this; keep it green.
 - **All UI is shared (`sharedUI`); platform modules are containers.** (Hard cut `letta-mobile-ckmub`, gate `letta-mobile-ckmub.7`; enforced for new files since `letta-mobile-by4vm.32`, not yet a required check.) `desktop/`, `app/`, `feature-*`, `web/` may contain only window/activity hosts, nav hosts that map routes to `sharedUI` pages, the platform's container for `LettaHost` (popover window vs bottom sheet), DI, and platform services (renderers, camera, clipboard, file access, tray, installer). A new screen, row, dialog, picker, sheet, header or settings card goes in `sharedUI/commonMain` and composes the shared primitives (`LettaPageScaffold`, `LettaHost`/`LettaPane`, `ShellHeader`, `RosterList`/`ListRow`, `LettaPicker`, `InspectorPane`, `SettingsSection`, `OverlayHost`, `SharedDocument`). Platform rendering differences go in a `sharedUI` expect/actual or a `LettaHost` binding, not a platform-module composable.
   - `scripts/ci/platform-ui-gate.sh` enforces this. **PUI001** (error, never overridable): a new `@Composable` file under those trees fails unless it is listed in `scripts/ci/platform-ui-allowlist.txt`. **PUI004** (error): adding or raising an allowlist line fails unless the PR body carries a `Platform-UI-Reason: <why>` line — that reviewed reason is the only way a new platform file gets in. **PUI002** (warning for now): an allowlisted legacy file grew beyond its recorded line count (+5). Copying an existing surface instead of composing the primitives is a review blocker. Run it locally with `bash scripts/ci/platform-ui-gate.sh --enforce --diff-base origin/main` (set `PLATFORM_UI_REASON=...` to mirror the PR-body reason); `--update` regenerates the allowlist (each cut slice deletes its lines); self-test: `bash scripts/tests/platform-ui-gate-test.sh`. CI job: `Platform UI gate` in `.github/workflows/agents-policy.yml` — runs with `--enforce`, goes red on PUI001/PUI004, but is not a required check.
   - Android pages are edge-to-edge: `LettaPageScaffold` owns insets; no page calls `systemBars`/`statusBars`/`navigationBars`/`ime` padding itself (agents-policy rule `PUI-INSETS`, planned, greps for those calls outside `sharedUI` scaffold).
@@ -141,13 +163,15 @@ echo "Latest commit subject:" && git log -1 --format=%s HEAD
 # If your PR title says "add X test" but X isn't in the file list, the
 # branch and the title disagree. Fix one or the other before pushing.
 
-# 5. Local gate — required CI is :app compile + testDebugUnitTest, plus
-#    :sharedLogic:allTests + :desktop:test if sharedLogic changed. Run all
-#    that apply BEFORE pushing. Failed required gate = guaranteed red CI.
+# 5. Local gate — required CI is :app compile + testRootDebugUnitTest
+#    (`test`) and :sharedLogic:jvmTest (`shared-multiplatform`). CI runs
+#    :desktop:test / :sharedUI:jvmTest on a PR only when their own trees
+#    change, so a sharedLogic change must run them here; main runs them on
+#    every push and goes red if you skipped it. Failed gate = red CI.
 cd android-compose
 SHARED_HITS=$(git diff --name-only $BASE..HEAD | grep -cF 'sharedLogic/' || true)
 if [ "$SHARED_HITS" -gt 0 ]; then
-  ./gradlew --no-daemon :sharedLogic:allTests :desktop:test
+  ./gradlew --no-daemon :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
 fi
 ./gradlew --no-daemon :app:compileRootDebugKotlin :app:testRootDebugUnitTest
 
@@ -156,7 +180,9 @@ fi
 #    Long overload to Duration conversion, Redundant suspend modifier,
 #    plus CodeScene "Complex Method" and "Excess Function Arguments".
 #    Pre-fix them at dev cost, not after CI flags them.
-./gradlew --no-daemon :app:detekt   # advisory; do not lower thresholds
+# detekt on JDK 21; strict = what the CI `detekt` job runs (new findings fail,
+# baselined ones don't). Fix new findings; never lower thresholds.
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
 # CodeScene delta — the same analysis the "CodeScene Code Health Review"
 # PR check runs, but local. Needs the `cs` CLI + CS_ACCESS_TOKEN (PAT from
 # https://codescene.io/users/me/pat); skips silently when absent. The
@@ -185,12 +211,14 @@ fi
 # 8. Required vs advisory — know which CI checks block merge and which don't.
 #    Required (any red = merge blocked):
 #      `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`
-#    Advisory (cannot block merge; do not iterate to "fix" them):
-#    - `CodeScene Code Health Review` — advisory, often pre-existing.
-#    - `detekt (advisory)` — `maxIssues: 0` on main, pre-existing.
-#    - `Advisory AGENTS.md policy` — greppable rules, never blocks.
-#    When any required gate fails, fix it. When only advisory fails,
-#    document the cost in a PR comment and proceed.
+#    Not required but honest (red means a NEW problem in your diff; fix it):
+#    - `detekt` — fails only on findings outside detekt-baseline.xml.
+#    - `Platform UI gate` — new platform @Composable file / allowlist change.
+#    Advisory (findings never fail the job):
+#    - `Advisory AGENTS.md policy` — greppable rules.
+#    - `row goldens (advisory)` — shared chat row pixel diffs.
+#    - `CodeScene Code Health Review` — external; still keep it green.
+#    Full table: "CI map" near the top of this file.
 
 # 9. PR description — every PR must state, in one sentence each:
 #    - what behavior changes
@@ -657,8 +685,12 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   ```bash
   JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew detekt
   ```
-  Detekt is **not** a required CI gate and `detekt.yml` sets
-  `maxIssues: 0`, so it currently reports pre-existing findings on `main`.
+  Each detekt module has a `detekt-baseline.xml` holding its pre-existing findings. CI's
+  `detekt` job (not required, but not masked) runs with `-Parchitecture.strict=true` and fails
+  on any finding outside the baseline; without that property local runs only report. Fix new
+  findings; regenerate a baseline (`./gradlew detektBaseline`, JDK 21) only to accept debt
+  deliberately, in its own commit. `guardrailDetekt` (`detekt-guardrails.yml`, changed files,
+  no baseline) runs inside the required `test` job.
 
 ### Flaky unit tests
 

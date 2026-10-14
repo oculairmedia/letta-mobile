@@ -78,12 +78,25 @@ cd android-compose
 ./gradlew --no-daemon :app:compileRootDebugKotlin
 ./gradlew --no-daemon :app:testRootDebugUnitTest
 
-# Required if you touched sharedLogic/ (KMP common code) — also enforced by CI:
-./gradlew --no-daemon :sharedLogic:allTests :desktop:test
+# If you touched sharedLogic/ (KMP common code). What CI actually runs (android.yml):
+#   `shared-multiplatform` — :sharedLogic:jvmTest, then only *compiles* hostNative
+#     and wasmJs (:sharedLogic:allTests is NOT run: hostNativeTest hangs).
+#   `test` — :app:testRootDebugUnitTest, :core:android-data:testDebugUnitTest, and on
+#     PRs :sharedUI:jvmTest / :desktop:test only when their own trees changed
+#     (scripts/ci/changed-gradle-modules.sh). Every main push runs both anyway
+#     (`main module tests`), so a skipped local run shows up red on main.
+./gradlew --no-daemon :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
 
-# Mechanical-debt preflight (advisory; do not lower thresholds):
-./gradlew --no-daemon :app:detekt    # must run on JDK 21
+# detekt — JDK 21. Same as the CI `detekt` job: findings already in a module's
+# detekt-baseline.xml are ignored, anything new fails. Do not lower thresholds.
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parchitecture.strict=true
 ```
+
+**CI at a glance** (full table: "CI map" in `AGENTS.md`):
+- **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`, `perf-gate` (one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry).
+- **Not required, but honest** (red = a new problem in your diff): `detekt` (baselined), `Platform UI gate` (`--enforce`: a new platform `@Composable` file fails), `main module tests` (main pushes only: `:sharedUI:jvmTest :desktop:test`).
+- **Advisory** (never fail): `Advisory AGENTS.md policy`, `row goldens (advisory)`, `Export architecture graph`; CodeScene is external and still expected green.
+- **Not run in CI:** `:sharedLogic:allTests`, the `app/src/androidTest` device tests. Qodana was removed (its license token had been declined since 2026-09).
 
 Before pushing, also run the **pre-push PR readiness checklist** in `AGENTS.md` — it covers scope audit, sensitive-path grep, stale-base detection, and the concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit.
 
