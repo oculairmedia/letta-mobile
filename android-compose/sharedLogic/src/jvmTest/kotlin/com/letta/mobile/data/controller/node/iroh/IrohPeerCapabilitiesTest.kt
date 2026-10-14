@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -239,6 +240,20 @@ class IrohPeerCapabilitiesTest {
         )
         // And admin.full is never implicit in any role constant.
         assertFalse(IrohPeerCapabilities.ADMIN_FULL in vibesyncRole, "vibesync role must not implicitly hold admin.full")
+    }
+
+    @Test
+    fun pluginManagementIsAdminFullWhileALiveViewNeedsOnlyChat() {
+        // letta-mobile-cdgpr.7: installing and switching plugins administers the host; a view reads
+        // its page like chat and its actions are a chat send.
+        PluginAdminRpc.MANAGEMENT.forEach { method ->
+            assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod(method), method)
+            assertFalse(IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)), method)
+        }
+        assertEquals(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.PAGE_READ))
+        assertEquals(IrohPeerCapabilities.CHAT_SEND, IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.VIEW_ACTION))
+        assertTrue(IrohPeerCapabilities.isAllowed(IrohPeerCapabilities.CHAT_ROLE, IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.VIEW_ACTION)))
+        assertFalse(IrohPeerCapabilities.isAllowed(setOf(IrohPeerCapabilities.CHAT_READ), IrohPeerCapabilities.forAdminMethod(PluginAdminRpc.VIEW_ACTION)))
     }
 
     @Test

@@ -30,6 +30,7 @@ import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellSettingsPage
+import com.letta.mobile.ui.shell.pages.plugins.rememberPluginsContributions
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.systemcolor.isSystemInHighContrast
 import dev.nucleusframework.systemcolor.systemAccentColor
@@ -97,7 +98,7 @@ private fun desktopContributions(inputs: DestinationContentInputs, actions: Dest
         SettingsContribution(SettingsGroup.Appearance, railSection(inputs.railRecencyDays, actions.onRailRecencyDaysChange)),
         SettingsContribution(SettingsGroup.Appearance, rememberSystemAppearance()),
         SettingsContribution(SettingsGroup.Notifications, desktopNotificationsSection(nucleus, actions.nucleus.onTestNotification)),
-    ) + about.map { SettingsContribution(SettingsGroup.About, it) }
+    ) + about.map { SettingsContribution(SettingsGroup.About, it) } + rememberPluginsContributions(actions.pluginViews, actions.onOpenPlugins)
 }
 
 /** The bundled runtime's sections, with the two folder pickers they open. */

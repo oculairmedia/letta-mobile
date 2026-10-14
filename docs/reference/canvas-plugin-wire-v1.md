@@ -6,7 +6,7 @@ WebSocket server the host connects to) speak with the Letta host. It mirrors the
 runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
 (names, directions, SPI members, deadlines, size limits) and the message shapes are `:plugin-api`'s
 (`com.letta.mobile.plugin.api.LcpMethod` and its DTOs); the codec, framing, peer, session and
-guards are `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
+guards are `sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
 `LcpCalls`).
 
 The golden transcripts in
@@ -142,3 +142,25 @@ Notifications run in arrival order.
 - Everything a plugin sends is held to its secrets (verbatim and base64), failing closed: a
   `host.log` keeps its shape with each leaking string replaced; any other call or result holding a
   secret is refused whole with `-32007`; an error's message is scrubbed and its data dropped.
+
+## Host limits (v1)
+
+What the host's handlers hold a plugin to beyond its capabilities (`data/plugin/host/`). Every
+refusal carries `data.reason` and is counted per plugin.
+
+- **Ownership.** `host.emit` places only the plugin's own kinds (`<kind>` or `ext:<pluginId>/<kind>`)
+  and updates or removes only elements it placed: the host mints their ids as `p-<pluginId>-<suffix>`.
+  Anything else refuses the whole emit with `-32006` (`reason` `foreign_kind` or `foreign_element`,
+  `index` the entry); nothing is written. This is the one exception to "a refused entry never
+  fails the call".
+- **Entries** the host cannot take are left out and named in the receipt as `<reason>: <detail>`:
+  `unknown_kind` (no schema for the kind at that `v`), `props_too_large` (over 4 KiB),
+  `inline_bytes_unsupported` (upload with `host.putAsset` and place the ref) and
+  `place_images_unsupported`. The rest is written as `plugin:<pluginId>` in one atomic batch
+  through the canvas validator; a batch it refuses answers `-32602` (`invalid_batch`), writing nothing.
+- **Rates.** `host.emit` at most 10 per second per plugin (`-32008`, `rate_limited`); `host.log`
+  at most 50 per second, the rest dropped.
+- **Assets.** `image/png`, `image/jpeg`, `image/svg+xml` and `application/json` only, and at most
+  64 MiB per plugin per trailing 24 hours (bytes the host already has are free); otherwise `-32011`
+  (`content_type` or `asset_quota`).
+- `host.readElements` is refused with `-32006` (`canvas:read`): contract v1 grants no reads.

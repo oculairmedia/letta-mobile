@@ -50,6 +50,7 @@ internal data class DesktopAdminBinding(
     val projectsAvailable: Boolean,
     val projectPins: ProjectPinStore,
     val navigation: DesktopAdminNavigation,
+    val pluginViews: com.letta.mobile.data.plugin.view.PluginViewsModel? = null,
 )
 
 /** letta-mobile-ckmub.2.6: the admin pages over the current session; projects only through a live Iroh host. */
@@ -69,20 +70,21 @@ internal fun rememberDesktopAdminBinding(context: DesktopShellContext): DesktopA
             openAgent = { router.openAgent(AgentId(it)) },
             openSettings = { context.navigator.navigate(DesktopDestination.Settings) },
         ),
+        pluginViews = core.bootstrap.dataBindings.pluginViews,
     )
 }
 
 private const val PROJECT_PINS_KEY = "desktop.projects.pinned"
 
 /**
- * letta-mobile-ckmub.2.6: the shared Runs, Templates and Projects pages on the desktop, each over its
- * sharedLogic controller. A controller lives as long as its page is on screen, and is rebuilt when the
- * session graph is (a backend switch).
+ * letta-mobile-ckmub.2.6 / cdgpr.9: the shared Runs, Templates, Projects and Plugins pages, each over its sharedLogic
+ * controller, which lives while its page is on screen and is rebuilt with the session graph (a backend switch).
  */
 internal fun desktopAdminPages(binding: DesktopAdminBinding): ShellAdminPages = ShellAdminPages(
     runs = desktopRunsPage(binding),
     templates = desktopTemplatesPage(binding),
     projects = if (binding.projectsAvailable) desktopProjectsPage(binding) else shellProjectsUnavailablePage(binding.navigation.openSettings),
+    plugins = desktopPluginsPage(binding.pluginViews),
 )
 
 private fun desktopRunsPage(binding: DesktopAdminBinding) = ShellPageContent<ShellDestination.Runs> { destination, modifier ->

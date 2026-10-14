@@ -10,7 +10,7 @@ import com.letta.mobile.data.pairing.PairLink
  * ```
  * home | chat?agent=a&conversation=c | canvas?id=b | memory?agent=a | schedules?agent=a | channels
  * skills?agent=a&section=tools | settings?section=pairing | agent-editor?agent=a | agent-editor (a new agent) | providers | overview
- * runs | templates | projects
+ * runs | templates | projects | plugins
  * ```
  *
  * [decode] is the inverse of [encode]; anything else (an unknown name, a missing required id, an
@@ -47,6 +47,7 @@ object ShellRoute {
         ShellPageKind.Runs to { _ -> ShellDestination.Runs },
         ShellPageKind.Templates to { _ -> ShellDestination.Templates },
         ShellPageKind.Projects to { _ -> ShellDestination.Projects },
+        ShellPageKind.Plugins to { _ -> ShellDestination.Plugins },
     )
 
     fun encode(destination: ShellDestination): String {

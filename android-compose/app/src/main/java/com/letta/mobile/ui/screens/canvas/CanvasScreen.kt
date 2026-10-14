@@ -21,8 +21,8 @@ import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
+import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.plugin.view.ViewPlatform
-import com.letta.mobile.pluginview.PluginViewEnvironment
 import com.letta.mobile.pluginview.ProvidePluginViews
 import com.letta.mobile.pluginview.WebViewPluginViewHost
 import com.letta.mobile.ui.canvas.CanvasWorkspace
@@ -44,6 +44,8 @@ class CanvasViewModel @Inject constructor(
     private val opLog: CanvasOpLog,
     /** The app's canvas assets, shared with the relay (see AppModule.provideCanvasAssetStore). */
     val assets: com.letta.mobile.data.storage.AssetStore,
+    /** The host's enabled plugins, their view transport and this device's live-views switch (letta-mobile-cdgpr.8). */
+    val pluginViews: PluginViewsModel,
 ) : ViewModel() {
     private val _session = MutableStateFlow<CanvasSession?>(null)
     val session: StateFlow<CanvasSession?> = _session.asStateFlow()
@@ -98,15 +100,12 @@ fun CanvasScreen(
     val session by viewModel.session.collectAsStateWithLifecycle()
     val activeSession = session
     if (activeSession != null) {
-        // Live plugin pages (letta-mobile-s416w.13): the WebView host. The plugin catalog and the
-        // page transport arrive with the live-view integration (s416w.15/.32); until then the
-        // transport is offline and every plugin element keeps its fallback card.
-        val pluginViews = remember(activeSession.canvasId) {
-            PluginViewEnvironment(canvasId = activeSession.canvasId.value, platform = ViewPlatform.ANDROID)
-        }
+        // Live plugin pages (letta-mobile-s416w.13): the WebView host, with the host's enabled
+        // plugins and view transport from the shared model (letta-mobile-cdgpr.8). With live views
+        // off on this device, or no plugins on the host, every plugin element keeps its fallback card.
         // The view model's scope outlives a removed element, so a page's teardown can finish.
         val pluginHost = remember(viewModel) { WebViewPluginViewHost(viewModel.viewModelScope) }
-        ProvidePluginViews(host = pluginHost, environment = pluginViews, plugins = emptyList()) {
+        ProvidePluginViews(viewModel.pluginViews, pluginHost, activeSession.canvasId.value, ViewPlatform.ANDROID) {
             CanvasWorkspace(
                 session = activeSession,
                 presenceTransport = viewModel.presenceTransport,

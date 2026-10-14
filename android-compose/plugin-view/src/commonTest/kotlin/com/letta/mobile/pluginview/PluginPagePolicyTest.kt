@@ -6,7 +6,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/** Where a plugin page's requests may go, and the headers its page is served with (letta-mobile-s416w.13). */
+/**
+ * Where a plugin page's requests may go, and the headers its page is served with (letta-mobile-s416w.13).
+ * Common code, so it runs on every host target: the Android WebView host and the desktop JCEF host
+ * (letta-mobile-cdgpr.3) both serve pages through this one policy.
+ */
 class PluginPagePolicyTest {
     private val policy = PluginPagePolicy(PluginViewFixtures.spec)
 
@@ -60,5 +64,32 @@ class PluginPagePolicyTest {
         // Camera is declared and granted; the microphone is granted but not declared; geolocation declared but not granted.
         assertEquals("camera=(self), microphone=(), geolocation=(), clipboard-write=()", headers.getValue("Permissions-Policy"))
         assertEquals("no-store", headers.getValue("Cache-Control"))
+    }
+
+    @Test
+    fun everyHostSharesTheInvalidHostTheSandboxAndTheHeaderSet() {
+        assertTrue(PluginPagePolicy.PAGE_HOST.endsWith(".invalid"), PluginPagePolicy.PAGE_HOST)
+        assertEquals("sandbox allow-scripts", PluginPagePolicy.SANDBOX)
+        assertEquals(
+            setOf("Content-Security-Policy", "Permissions-Policy", "Cache-Control", "Referrer-Policy", "X-Content-Type-Options"),
+            policy.headers(granted = emptySet()).keys,
+        )
+        assertEquals("no-referrer", policy.headers(granted = emptySet()).getValue("Referrer-Policy"))
+        assertEquals("nosniff", policy.headers(granted = emptySet()).getValue("X-Content-Type-Options"))
+        val versioned = PluginPagePolicy(PluginViewFixtures.spec.copy(pluginVersion = "1.2.0+build.7"))
+        assertEquals("https://plugin-view.letta.invalid/letta.example/1.2.0%2Bbuild.7/widget", versioned.pageUrl)
+    }
+
+    @Test
+    fun noBrowserSchemeOrOtherPageIsReachable() {
+        listOf(
+            policy.pageUrl + "/app.js",
+            policy.pageUrl + "?x=1",
+            "http://plugin-view.letta.invalid/letta.example/1.2.0/widget",
+            "about:blank",
+            "chrome://settings",
+            "chrome-extension://abc/x.js",
+            "blob:https://plugin-view.letta.invalid/1234",
+        ).forEach { url -> assertIs<PluginPageRequest.Refused>(policy.decide(url), url) }
     }
 }

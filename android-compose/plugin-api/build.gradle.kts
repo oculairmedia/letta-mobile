@@ -12,7 +12,6 @@ plugins {
 }
 
 // The SPI version; its major is the manifest's `contract.version` (PluginApi.CONTRACT_VERSION).
-// PluginApiStabilityTest holds this equal to PluginApi.VERSION.
 group = "com.letta.mobile"
 version = "1.0.0"
 
@@ -63,12 +62,4 @@ kotlin {
             }
         }
     }
-}
-
-// The committed public-API dump (api/plugin-api.api). Regenerate deliberately with
-// ./gradlew :plugin-api:jvmTest -PpluginApi.updateDump=true and review the diff.
-tasks.withType<Test>().configureEach {
-    systemProperty("pluginApi.dump", layout.projectDirectory.file("api/plugin-api.api").asFile.absolutePath)
-    systemProperty("pluginApi.version", project.version.toString())
-    providers.gradleProperty("pluginApi.updateDump").orNull?.let { systemProperty("pluginApi.updateDump", it) }
 }

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart</title>
+<!--
+  letta.chart's live view. The host injects the lcp-view/1 shim before this page, so
+  window.lettaView offers ready() / action(name, input) / resize(w, h) / displayMode(mode) /
+  openLink(url) / log(level, message), and host messages arrive as `message` events whose data is
+  the JSON-RPC object (host.context, host.element.changed, host.teardown). The CSP is default-deny
+  with no allowlisted domains: everything here is inline, and nothing is fetched.
+-->
+<style>
+  :root { --bg: #ffffff; --fg: #1c1b1f; --muted: #6b6b75; --grid: #e4e4ea; --series: #6750a4; }
+  :root[data-theme="dark"] { --bg: #1c1b1f; --fg: #e6e1e5; --muted: #a09ca8; --grid: #36343b; --series: #d0bcff; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.3 system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 8px; padding: 8px 10px 0; }
+  h1 { flex: 1; margin: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button { font: inherit; color: var(--series); background: transparent; border: 1px solid var(--grid); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  svg { display: block; width: 100%; height: auto; }
+  .grid { stroke: var(--grid); } .axis { stroke: var(--muted); } .label { fill: var(--muted); font-size: 10px; }
+  .bar { fill: var(--series); } .line { fill: none; stroke: var(--series); stroke-width: 2.5; } .dot { fill: var(--series); }
+</style>
+</head>
+<body>
+<header><h1 id="title">Chart</h1><button id="toggle" type="button" disabled>Line</button></header>
+<svg id="chart" viewBox="0 0 320 180" role="img" aria-labelledby="title"></svg>
+<script>
+(function () {
+  'use strict';
+  var view = window.lettaView; // absent when the file is opened directly: a demo chart is drawn
+  var props = null;
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('chart');
+  var button = document.getElementById('toggle');
+
+  function el(name, attrs, text) {
+    var node = document.createElementNS(NS, name);
+    Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    if (text != null) node.textContent = text;
+    return svg.appendChild(node);
+  }
+
+  // Element props are flat: labels and values are JSON arrays carried as strings.
+  function parse(p) {
+    try { return { kind: p.kind, title: p.title, labels: JSON.parse(p.labels), values: JSON.parse(p.values) }; }
+    catch (e) { return null; }
+  }
+
+  function draw() {
+    var c = props && parse(props);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    document.getElementById('title').textContent = (c && c.title) || 'Chart';
+    button.disabled = !c || !view;
+    if (!c || !c.values.length) return;
+    button.textContent = c.kind === 'bar' ? 'Line' : 'Bar';
+    var left = 30, right = 312, top = 8, bottom = 160;
+    var lo = Math.min.apply(null, [0].concat(c.values)), hi = Math.max.apply(null, [0].concat(c.values));
+    var span = (hi - lo) || 1, slot = (right - left) / c.values.length;
+    function y(v) { return top + (hi - v) / span * (bottom - top); }
+    function x(i) { return left + slot * (i + 0.5); }
+    for (var g = 0; g <= 4; g++) {
+      var gy = top + g * (bottom - top) / 4;
+      el('line', { x1: left, x2: right, y1: gy, y2: gy, 'class': 'grid' });
+      el('text', { x: left - 4, y: gy + 3, 'text-anchor': 'end', 'class': 'label' }, +(hi - g * span / 4).toPrecision(3));
+    }
+    if (c.kind === 'line') {
+      el('polyline', { points: c.values.map(function (v, i) { return x(i) + ',' + y(v); }).join(' '), 'class': 'line' });
+      c.values.forEach(function (v, i) { el('circle', { cx: x(i), cy: y(v), r: 3, 'class': 'dot' }); });
+    } else {
+      c.values.forEach(function (v, i) {
+        el('rect', { x: x(i) - slot * 0.3, width: slot * 0.6, y: Math.min(y(v), y(0)), height: Math.abs(y(v) - y(0)), rx: 2, 'class': 'bar' });
+      });
+    }
+    el('line', { x1: left, x2: right, y1: y(0), y2: y(0), 'class': 'axis' });
+    c.labels.forEach(function (label, i) {
+      el('text', { x: x(i), y: bottom + 14, 'text-anchor': 'middle', 'class': 'label' }, String(label).slice(0, 12));
+    });
+    if (view) view.resize(document.documentElement.scrollWidth, document.documentElement.scrollHeight);
+  }
+
+  // host.context and the view.ready result: {theme, cssVariables, element: {id, type, v, props, ...}, ...}
+  function apply(context) {
+    if (!context) return;
+    if (context.theme) document.documentElement.setAttribute('data-theme', context.theme);
+    if (context.element) { props = context.element.props; draw(); }
+  }
+
+  if (!view) {
+    props = { kind: 'bar', title: 'Demo', labels: '["Q1","Q2","Q3","Q4"]', values: '[3,5,2,6]' };
+    draw();
+    return;
+  }
+
+  window.addEventListener('message', function (event) {
+    var m = event.data || {};
+    if (m.method === 'host.context') apply(m.params);
+    else if (m.method === 'host.element.changed') apply({ element: m.params && m.params.element });
+  });
+
+  // Bar/Line: view.action toggle {current props}; the plugin re-renders the snapshot and updates
+  // the element, which comes back as host.element.changed. Flip locally meanwhile.
+  button.addEventListener('click', function () {
+    if (!props) return;
+    button.disabled = true;
+    view.action('toggle', props).then(function (result) {
+      var kind = result && result.structured && result.structured.kind;
+      if (kind) { props = Object.assign({}, props, { kind: kind }); draw(); }
+    }, function (error) {
+      view.log('warn', 'toggle failed: ' + (error && error.message));
+      button.disabled = false;
+    });
+  });
+
+  view.ready().then(apply, function (error) { view.log('error', 'view.ready failed: ' + (error && error.message)); });
+})();
+</script>
+</body>
+</html>

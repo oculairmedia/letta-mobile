@@ -200,6 +200,7 @@ dependencies {
     implementation(project(":sharedLogic"))
     implementation(libs.androidx.paging.compose)
     implementation(project(":sharedUI"))
+    implementation(project(":plugin-view"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
     // computer.iroh:iroh as `implementation` (not `api`), so it is NOT exposed
     // transitively for desktop compilation â€” declare it directly here. The JAR
