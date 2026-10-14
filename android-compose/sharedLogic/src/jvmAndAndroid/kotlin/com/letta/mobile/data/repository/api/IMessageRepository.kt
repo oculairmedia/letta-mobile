@@ -68,7 +68,6 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     )
 
     suspend fun cancelMessage(agentId: AgentId, runIds: List<String>? = null): Map<String, String>
-    suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> = cancelMessage(AgentId(agentId), runIds)
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult>
 
     suspend fun submitApproval(
@@ -108,7 +107,6 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
      * API path behind it.
      */
     suspend fun resetMessages(agentId: AgentId)
-    suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
 }
 
 /** letta-mobile-bzvro.40: one approval answer, with the always-allow rule ids the person chose. */
