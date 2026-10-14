@@ -12,8 +12,8 @@ import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.BackendKind
+import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -161,7 +161,6 @@ internal class AdminChatViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val runtimeEventOutbox: RuntimeEventOutbox,
     private val currentConversationTracker: CurrentConversationTracker,
-    private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
     private val slashCommandRepository: ISlashCommandRepository,
@@ -280,13 +279,15 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.explicitNewChat
     /**
      * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" — not "is this the shim?". Since g70jb.4 only Iroh
-     * is; a leftover shim-era config classifies as REST.
+     * by a frame channel?" — not "is this the shim?". Only Iroh is. Both flags
+     * are classified from the active config alone (see [routedBackendKind]).
      */
-    private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
-        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
-    private val backendKind: StateFlow<BackendKind> = shimBackendDetector.activeBackendKind
-        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveBackendKind())
+    private val backendKind: StateFlow<BackendKind> = settingsRepository.activeConfig
+        .map { it.routedBackendKind() }
+        .stateIn(viewModelScope, SharingStarted.Lazily, settingsRepository.activeConfig.value.routedBackendKind())
+    private val usesChannelTransport: StateFlow<Boolean> = backendKind
+        .map { it.usesChannelTransport }
+        .stateIn(viewModelScope, SharingStarted.Lazily, backendKind.value.usesChannelTransport)
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
         get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
@@ -430,7 +431,7 @@ internal class AdminChatViewModel @Inject constructor(
             composerController = composerController,
             chatBannerController = chatBannerController,
             submitApproval = chatApprovalController::submitApproval,
-            // lgns8.10.4.1: config truth, resolved once in ShimBackendDetector.
+            // lgns8.10.4.1: config truth, classified once by routedBackendKind().
             // The inline iroh:// URL sniff that used to live here is gone.
             backendKind = { backendKind.value },
             activeConversationId = { chatConversationCoordinator.activeConversationId },

@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.flowOf
  * EncryptedSharedPreferences leaks across the daemon JVM — see letta-mobile-0dnn).
  *
  * Covers the reads used by:
- *  - Infra collaborators: ShimBackendDetector, ChannelHeartbeatSync.
+ *  - Infra collaborators: ChannelHeartbeatSync.
  *  - VM-facing reads: ConversationsViewModel (pinned-conversation state) and
  *    DashboardViewModel (favorite + pinned agents + shortcuts). Adding new
  *    VM consumers should widen the interface here rather than reaching for
