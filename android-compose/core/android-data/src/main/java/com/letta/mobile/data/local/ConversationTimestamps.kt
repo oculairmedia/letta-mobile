@@ -2,6 +2,7 @@ package com.letta.mobile.data.local
 
 import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.db.SupportSQLiteStatement
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -57,7 +58,9 @@ internal object ConversationEpochBackfill {
     private data class Row(val id: String, val lastMessageAt: String?, val updatedAt: String?, val createdAt: String?)
 
     fun run(db: SupportSQLiteDatabase) {
-        readRows(db).forEach { row -> writeEpochs(db, row) }
+        db.compileStatement(UPDATE_EPOCHS_SQL).use { update ->
+            readRows(db).forEach { row -> writeEpochs(update, row) }
+        }
     }
 
     private fun readRows(db: SupportSQLiteDatabase): List<Row> =
@@ -76,18 +79,23 @@ internal object ConversationEpochBackfill {
             }
         }
 
-    private fun writeEpochs(db: SupportSQLiteDatabase, row: Row) {
-        db.execSQL(
-            "UPDATE `conversations` SET `lastMessageAtEpochMs` = ?, `updatedAtEpochMs` = ?, `createdAtEpochMs` = ? " +
-                "WHERE `id` = ?",
-            arrayOf<Any?>(
-                ConversationTimestamps.epochMillisOrNull(row.lastMessageAt),
-                ConversationTimestamps.epochMillisOrNull(row.updatedAt),
-                ConversationTimestamps.epochMillisOrNull(row.createdAt),
-                row.id,
-            ),
-        )
+    /** Typed binds (no `Array<Any?>` bind list): a null epoch binds SQL NULL. */
+    private fun writeEpochs(update: SupportSQLiteStatement, row: Row) {
+        update.clearBindings()
+        update.bindEpochOrNull(1, ConversationTimestamps.epochMillisOrNull(row.lastMessageAt))
+        update.bindEpochOrNull(2, ConversationTimestamps.epochMillisOrNull(row.updatedAt))
+        update.bindEpochOrNull(3, ConversationTimestamps.epochMillisOrNull(row.createdAt))
+        update.bindString(4, row.id)
+        update.executeUpdateDelete()
     }
+
+    private fun SupportSQLiteStatement.bindEpochOrNull(index: Int, epochMs: Long?) {
+        if (epochMs == null) bindNull(index) else bindLong(index, epochMs)
+    }
+
+    private const val UPDATE_EPOCHS_SQL =
+        "UPDATE `conversations` SET `lastMessageAtEpochMs` = ?, `updatedAtEpochMs` = ?, `createdAtEpochMs` = ? " +
+            "WHERE `id` = ?"
 
     private fun Cursor.stringOrNull(index: Int): String? = if (isNull(index)) null else getString(index)
 }

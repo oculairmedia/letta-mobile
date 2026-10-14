@@ -55,13 +55,14 @@ object NotificationLaunchTokens {
         val overflow = entries.size - (MAX_TOKENS - 1)
         if (overflow <= 0) return emptyList()
         return entries.entries
-            .sortedBy { (_, value) -> issuedAt(value) }
+            .sortedBy { (_, value) -> issuedAt(value as? String) }
             .take(overflow)
             .map { it.key }
     }
 
-    private fun issuedAt(value: Any?): Long =
-        runCatching { JSONObject(value as String).getLong(KEY_ISSUED_AT) }.getOrDefault(Long.MIN_VALUE)
+    /** A token whose stored entry is missing or unreadable sorts oldest, so it is evicted first. */
+    private fun issuedAt(rawEntry: String?): Long =
+        rawEntry?.let { runCatching { JSONObject(it).getLong(KEY_ISSUED_AT) }.getOrNull() } ?: Long.MIN_VALUE
 
     private fun decode(raw: String): NotificationNavigationTarget? = runCatching {
         val json = JSONObject(raw)
