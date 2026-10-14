@@ -546,6 +546,12 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 - `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
   update script; recreate it if missing.
 
+- Build logic: versions only in `android-compose/gradle/libs.versions.toml` (one per library,
+  no per-module forks); convention plugins in `android-compose/build-logic/`. The embedded
+  (dev-only) letta-code runtime prep is the `com.letta.mobile.embedded-runtime` plugin, with pins
+  in `app/embedded-runtime/embedded-runtime.properties` and letta.js patches as real files in
+  `app/embedded-runtime/patches/` — edit those, not `app/build.gradle.kts`.
+
 ### App Server contract / probe toolchain (epic letta-mobile-lgns8)
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
