@@ -204,14 +204,19 @@ class DefaultAppServerController(
      * Thread-safe access via [runtimeMutex].
      */
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
-    private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
+
+    /**
+     * letta-mobile-by4vm.8: written under [runtimeMutex] but read lock-free by the turn engine's
+     * permission-mode provider, which runs concurrently across per-key leases.
+     */
+    private val runtimePermissionModes = CopyOnWriteMap<RuntimeKey, AppServerPermissionMode>()
 
     /**
      * letta-mobile-bzvro.40: modes a relayed client chose with [changePermissionMode]. A later start
      * (a client's `runtime_start` naming its own default, a reconnect, an eviction) never runs the
      * runtime looser than this; only another [changePermissionMode] can relax it.
      */
-    private val pinnedPermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
+    private val pinnedPermissionModes = CopyOnWriteMap<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
     /**
@@ -244,10 +249,7 @@ class DefaultAppServerController(
     /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
     private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
 
-    /**
-     * Turn engine instance. Created lazily and reused for all turns.
-     * The engine itself serializes turns, so we don't need additional locking here.
-     */
+    /** Turn engine instance. Created lazily and reused for all turns. */
     private val turnEngine by lazy {
         AppServerTurnEngine(
             client = client,
