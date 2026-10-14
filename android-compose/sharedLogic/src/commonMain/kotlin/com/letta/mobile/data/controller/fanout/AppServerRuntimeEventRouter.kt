@@ -35,6 +35,12 @@ class AppServerRuntimeEventRouter(
     private val attachLock = SynchronizedObject()
     private val integrity = atomic<StreamIntegrityMonitor?>(null)
 
+    init {
+        // letta-mobile-by4vm.4: a subscriber the fanout detached for falling behind lost frames;
+        // resync the watched runtimes so what is on screen catches up.
+        fanout.bindSubscriberOverflowListener { requestResync() }
+    }
+
     /**
      * letta-mobile-bzvro.6: every inbound frame is shown to [monitor] (gap detection, sync cadence)
      * before it is fanned out. One monitor per router; binding again replaces it.

@@ -8,11 +8,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ClosedSendChannelException
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
@@ -80,6 +76,20 @@ class RuntimeEventFanout(
         approvalReplayResponder.value = responder
     }
 
+    private val subscriberOverflowListener =
+        atomic<((com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) -> Unit)?>(null)
+
+    /**
+     * letta-mobile-by4vm.4: [listener] is told the runtime of every subscriber [route] detaches
+     * for overflowing (see [RuntimeSubscriberOverflowCancellation]), so the owner can resync what
+     * that subscriber missed. Called from [route]; must not block.
+     */
+    fun bindSubscriberOverflowListener(
+        listener: (com.letta.mobile.data.transport.appserver.AppServerRuntimeScope) -> Unit,
+    ) {
+        subscriberOverflowListener.value = listener
+    }
+
     /**
      * Per-subscriber channels. Buffering starts at [subscribe], not at collect,
      * so frames cannot be lost in the subscribe→collect handoff window. There is
@@ -87,8 +97,11 @@ class RuntimeEventFanout(
      * turn's terminal.
      *
      * Capacity is bounded ([SUBSCRIBER_BUFFER_CAPACITY]) for memory safety.
-     * [route] delivers to subscribers concurrently so a full buffer on one
-     * runtime cannot head-of-line block delivery to others.
+     * [route] never suspends on a subscriber (letta-mobile-by4vm.4): it offers
+     * each frame with `trySend`, and a subscriber whose buffer is full is
+     * detached and its channel closed with [RuntimeSubscriberOverflowCancellation]
+     * — after the frames it already buffered — so only that subscriber's turn
+     * fails. The single router loop, and every other subscriber, keep going.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
@@ -142,7 +155,7 @@ class RuntimeEventFanout(
         val channel = Channel<AppServerReceivedFrame>(
             capacity = SUBSCRIBER_BUFFER_CAPACITY,
         )
-        subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
+        subscribers[subscriberId] = SubscriberSlot(id = subscriberId, key = key, channel = channel)
         // lgns8.22.4.1.1: hand recovery control frames buffered during the
         // no-subscriber window to this successor before it starts collecting.
         flushPendingControlLocked(key, channel)
@@ -162,7 +175,7 @@ class RuntimeEventFanout(
     ): Pair<String, Flow<AppServerReceivedFrame>> = synchronized(stateLock) {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val channel = Channel<AppServerReceivedFrame>(capacity = SUBSCRIBER_BUFFER_CAPACITY)
-        subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel, passive = true)
+        subscribers[subscriberId] = SubscriberSlot(id = subscriberId, key = key, channel = channel, passive = true)
         subscriberId to channel.receiveAsFlow()
     }
 
@@ -188,13 +201,20 @@ class RuntimeEventFanout(
      * (different agent) so TurnEngine can apply authoritative-terminal release.
      * Unscoped external-tool / control requests register in
      * [inboundControlRegistry] then deliver once (duplicate request_ids drop).
+     *
+     * Never suspends on a subscriber (letta-mobile-by4vm.4): the router calls this
+     * from ONE sequential loop for the whole connection, so waiting on any one
+     * subscriber's full buffer would stall every runtime and, upstream, the
+     * transport's bounded delivery queue. A full subscriber is detached instead
+     * (see [deliverToSubscribers]).
      */
     suspend fun route(received: AppServerReceivedFrame) {
         val control = received.frame as? AppServerInboundFrame.ControlRequest
         if (control != null && approvalReplayResponder.value?.invoke(control) == true) return
         val plan = synchronized(stateLock) { planRoute(received) }
-        val delivered = deliverToChannels(plan.channels, received)
-        plan.markDispatchedIfNeeded(delivered)
+        val outcome = deliverToSubscribers(plan.targets, received)
+        plan.markDispatchedIfNeeded(outcome.delivered)
+        if (outcome.overflowed.isNotEmpty()) onSubscribersOverflowed(plan, received, outcome)
     }
 
     private fun RoutePlan.markDispatchedIfNeeded(delivered: Boolean) {
@@ -208,7 +228,7 @@ class RuntimeEventFanout(
     }
 
     private data class RoutePlan(
-        val channels: List<Channel<AppServerReceivedFrame>>,
+        val targets: List<SubscriberSlot>,
         val controlRequestId: String? = null,
         val controlGeneration: Long? = null,
         val controlToolCallId: String? = null,
@@ -228,9 +248,7 @@ class RuntimeEventFanout(
         return when {
             runtime == null -> planUnscopedControl(received)
             received.isTerminalBearingStreamDelta() -> RoutePlan(
-                channels = subscribers.values
-                    .filter { it.key.conversationId == runtime.conversationId }
-                    .map { it.channel },
+                targets = subscribers.values.filter { it.key.conversationId == runtime.conversationId },
             )
             else -> planScoped(received, runtime)
         }
@@ -238,14 +256,14 @@ class RuntimeEventFanout(
 
     private fun planUnscopedControl(received: AppServerReceivedFrame): RoutePlan {
         if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(emptyList())
-        val targets = subscribers.values.filterNot { it.passive }.map { it.channel }
+        val targets = subscribers.values.filterNot { it.passive }
         if (targets.isEmpty()) {
             bufferPendingControlLocked(received, runtimeKey = null)
             return RoutePlan(emptyList())
         }
         if (!registerUnscopedControl(received, runtime = null)) return RoutePlan(emptyList())
         return RoutePlan(
-            channels = targets,
+            targets = targets,
             controlRequestId = received.frame.requestId,
             controlGeneration = frameGeneration(received),
             controlToolCallId = received.controlToolCallId(),
@@ -258,15 +276,15 @@ class RuntimeEventFanout(
     ): RoutePlan {
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
         val scoped = subscribers.values.filter { it.key == key }
-        if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(scoped.map { it.channel })
-        val targets = scoped.filterNot { it.passive }.map { it.channel }
+        if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(scoped)
+        val targets = scoped.filterNot { it.passive }
         if (targets.isEmpty()) {
             bufferPendingControlLocked(received, runtimeKey = key)
             return RoutePlan(emptyList())
         }
         if (!registerUnscopedControl(received, runtime)) return RoutePlan(emptyList())
         return RoutePlan(
-            channels = targets,
+            targets = targets,
             controlRequestId = received.frame.requestId,
             controlGeneration = frameGeneration(received),
             controlToolCallId = received.controlToolCallId(),
@@ -370,23 +388,93 @@ class RuntimeEventFanout(
         pendingControlFrames.size
     }
 
-    private suspend fun deliverToChannels(
-        channels: List<Channel<AppServerReceivedFrame>>,
+    private class DeliveryOutcome(
+        /** At least one subscriber buffered the frame. */
+        val delivered: Boolean,
+        /** Subscribers whose buffer was full; already detached and closed. */
+        val overflowed: List<SubscriberSlot>,
+    )
+
+    /**
+     * letta-mobile-by4vm.4: offer [received] to each target without suspending. A
+     * target whose buffer is full is detached on the spot: removed from
+     * [subscribers] and its channel closed with [RuntimeSubscriberOverflowCancellation].
+     * `close` (not `cancel`) keeps the frames it already buffered, so its collector
+     * sees every frame up to the overflow, in order, then the failure. A target that
+     * is already closed (unsubscribed between plan and delivery) is skipped.
+     */
+    private fun deliverToSubscribers(
+        targets: List<SubscriberSlot>,
         received: AppServerReceivedFrame,
-    ): Boolean {
-        // Concurrent sends: a full buffer on one subscriber cannot HOL-block
-        // unrelated runtimes (bounded channels + isolated sends).
-        return coroutineScope {
-            channels.map { channel ->
-                async {
-                    try {
-                        channel.send(received)
-                        true
-                    } catch (_: ClosedSendChannelException) {
-                        false
-                    }
-                }
-            }.awaitAll().any { it }
+    ): DeliveryOutcome {
+        var delivered = false
+        val overflowed = mutableListOf<SubscriberSlot>()
+        for (slot in targets) {
+            val result = slot.channel.trySend(received)
+            when {
+                result.isSuccess -> delivered = true
+                result.isClosed -> Unit
+                else -> overflowed += slot
+            }
+        }
+        overflowed.forEach { detachOverflowed(it, received) }
+        return DeliveryOutcome(delivered, overflowed)
+    }
+
+    private fun detachOverflowed(slot: SubscriberSlot, received: AppServerReceivedFrame) {
+        synchronized(stateLock) {
+            if (subscribers[slot.id] === slot) subscribers.remove(slot.id)
+        }
+        slot.channel.close(
+            RuntimeSubscriberOverflowCancellation(
+                subscriberId = slot.id,
+                agentId = slot.key.agentId,
+                conversationId = slot.key.conversationId,
+                droppedFrameType = received.frame.type,
+                capacity = SUBSCRIBER_BUFFER_CAPACITY,
+            ),
+        )
+        Telemetry.event(
+            "RuntimeEventFanout",
+            "subscriber.overflowDetached",
+            "subscriberId" to slot.id,
+            "agentId" to slot.key.agentId,
+            "conversationId" to slot.key.conversationId,
+            "passive" to slot.passive,
+            "droppedFrameType" to (received.frame.type ?: ""),
+            "capacity" to SUBSCRIBER_BUFFER_CAPACITY,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /**
+     * A server-initiated control frame that reached NO subscriber because every
+     * target overflowed is retained exactly like one that arrived with no subscriber
+     * (lgns8.22.4.1.1), so the successor lease (the retried turn) still answers it
+     * instead of the server blocking forever. Then the owner is asked to resync.
+     */
+    private fun onSubscribersOverflowed(
+        plan: RoutePlan,
+        received: AppServerReceivedFrame,
+        outcome: DeliveryOutcome,
+    ) {
+        if (!outcome.delivered && plan.controlRequestId != null) {
+            val runtime = received.frame.runtime
+            synchronized(stateLock) {
+                bufferPendingControlLocked(
+                    received,
+                    runtimeKey = runtime?.let { RuntimeKey(it.agentId, it.conversationId) },
+                )
+            }
+        }
+        val listener = subscriberOverflowListener.value ?: return
+        outcome.overflowed.map { it.key }.distinct().forEach {
+            listener(
+                com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                    agentId = it.agentId,
+                    conversationId = it.conversationId,
+                ),
+            )
         }
     }
 
@@ -519,7 +607,8 @@ class RuntimeEventFanout(
         }
     }
 
-    private data class SubscriberSlot(
+    private class SubscriberSlot(
+        val id: String,
         val key: RuntimeKey,
         val channel: Channel<AppServerReceivedFrame>,
         /** Probe-only subscriber: never a delivery target for control requests. */
@@ -536,8 +625,8 @@ class RuntimeEventFanout(
     companion object {
         /**
          * Per-subscriber buffer. Large enough for bursty stream deltas; when full,
-         * that subscriber's send suspends while other runtimes continue via
-         * concurrent [route] delivery.
+         * [route] detaches that subscriber with [RuntimeSubscriberOverflowCancellation]
+         * rather than waiting for it (letta-mobile-by4vm.4).
          */
         const val SUBSCRIBER_BUFFER_CAPACITY = 256
 
