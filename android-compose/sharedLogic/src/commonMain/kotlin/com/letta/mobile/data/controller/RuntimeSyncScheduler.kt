@@ -28,6 +28,9 @@ import kotlin.time.Duration.Companion.seconds
  *   [Policy.busyInterval] while the loop is working, every [Policy.idleInterval] while it waits
  *   on input. A periodic sync only refreshes the snapshots (device status, loop status, queue);
  *   it never asks for approval replays.
+ * - letta-mobile-by4vm.50: a periodic sync goes out only when [budget] allows it (phones: unmetered
+ *   network and charging or screen on). A suppressed one stays due until the budget allows it.
+ *   Recovery syncs never ask the budget.
  *
  * The clock is injected and [tick] is public so the policy is testable without real time.
  */
@@ -36,6 +39,7 @@ class RuntimeSyncScheduler(
     private val sync: suspend (AppServerRuntimeScope, SyncReason) -> Unit,
     private val clock: () -> Long,
     private val policy: Policy = Policy(),
+    private val budget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
 ) {
     data class Policy(
         val minInterval: Duration = 1.seconds,
@@ -112,21 +116,24 @@ class RuntimeSyncScheduler(
     }
 
     private fun dueSyncs(now: Long): List<Pair<AppServerRuntimeScope, SyncReason>> = synchronized(lock) {
+        // Asked at most once per tick, and only when some runtime has a periodic sync due.
+        val periodicAllowed = lazy(LazyThreadSafetyMode.NONE) { budget.allowsPeriodicSync() }
         refreshLocked(now).mapNotNull { runtime ->
             val cadence = cadences[runtime.key()] ?: return@mapNotNull null
-            val reason = cadence.dueReason(now) ?: return@mapNotNull null
+            val reason = cadence.dueReason(now, periodicAllowed) ?: return@mapNotNull null
             cadence.lastSyncAt = now
             cadence.pending = null
             runtime to reason
         }
     }
 
-    private fun RuntimeCadence.dueReason(now: Long): SyncReason? {
+    private fun RuntimeCadence.dueReason(now: Long, periodicAllowed: Lazy<Boolean>): SyncReason? {
         val last = lastSyncAt
         val recovery = pending
         if (recovery != null) return recovery.takeIf { last == null || (now - last).milliseconds >= policy.minInterval }
         val interval = if (busy) policy.busyInterval else policy.idleInterval
-        return SyncReason.Periodic.takeIf { (now - (last ?: since)).milliseconds >= interval }
+        val periodicDue = (now - (last ?: since)).milliseconds >= interval
+        return SyncReason.Periodic.takeIf { periodicDue && periodicAllowed.value }
     }
 
     /** Tracks exactly the watched runtimes: new ones start their cadence now, gone ones are dropped. */

@@ -976,7 +976,9 @@ class IrohNodeConnection(
         )
 
         internal fun advertisedCapabilities(router: AdminRpcRouter): List<String> = buildList {
-            addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY) + router.featureCapabilities)
+            // letta-mobile-by4vm.50: ordered event_seq is a property of the connection's write path,
+            // not of any admin handler, so every host advertises it.
+            addAll(listOf(IrohFrameCodec.FRAME_PART_CAPABILITY, ORDERED_EVENT_SEQ_CAPABILITY) + router.featureCapabilities)
             if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
                 add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
             }
