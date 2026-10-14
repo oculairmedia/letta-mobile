@@ -138,7 +138,9 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
 
     /** Disables every plugin: the runtime kill switch. */
     suspend fun disableAll() = mutex.withLock {
-        registry.value.plugins.filter { it.state.advertises || drivers.live(it.id) != null }.forEach { disableLocked(it.id) }
+        val on = registry.value.plugins.filter { it.state.advertises || drivers.live(it.id) != null }
+        on.forEach { disableLocked(it.id) }
+        PluginHostEvents.record(PluginHostEvent.KILL_SWITCH, PluginHostEvents.ALL, "scope" to "runtime", "plugins" to on.size.toString())
     }
 
     /** Stops every driver for host shutdown; the registry keeps them enabled for the next start. */
@@ -216,7 +218,7 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     private fun refusalOf(refused: PluginTransition.Refused) = PluginHostResult.Refused("${refused.refusal}: ${refused.message}", refused.consentDiff)
 
     private fun refused(event: PluginHostEvent, pluginId: String, refusal: PluginHostResult.Refused): PluginHostResult =
-        refusal.also { PluginHostEvents.refused(event, pluginId, it) }
+        refusal.also { PluginHostEvents.refused(event, pluginId, it.message) }
 
     private suspend fun commit(next: PluginRegistryState) {
         registry.value = next

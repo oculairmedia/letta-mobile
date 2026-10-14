@@ -9,6 +9,7 @@ import com.letta.mobile.data.storage.AssetStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Path
@@ -40,10 +41,13 @@ class PluginDriverHost(
 
     /**
      * Starts [plugin] from [packageDir] and suspends until it runs or gives up; answers that state.
-     * Later states go to [onState] (on [scope]) while the driver is still this host's.
+     * Later states go to [onState] (on [scope]) while the driver is still this host's. A plugin whose
+     * recorded consent is not for this very version and everything it asks for (a hand-edited or
+     * stale `plugins.json`) is never spawned: it answers Faulted at once.
      */
     suspend fun launch(plugin: InstalledPlugin, packageDir: Path, onState: suspend (PluginDriver, PluginDriverState) -> Unit): PluginDriverState {
         val id = plugin.id
+        if (!plugin.consented) return PluginDriverState.Faulted("consent does not cover $id ${plugin.version}; consent again to run it")
         val board = CallerBoard(canvas)
         val secrets = PluginSecrets()
         val handlers = HostLcpHandlers(id, PlacementCompiler(id, kinds, canvas, board, refusals), assets, secrets.scrubber(), limits, quota, refusals)
@@ -52,16 +56,23 @@ class PluginDriverHost(
         val entry = Entry(LivePlugin(driver, handlers, board))
         entries[id] = entry
         val started = driver.start()
-        entry.watcher = scope.launch { driver.state.collect { if (entries[id] === entry) onState(driver, it) } }
+        // The watcher ends by itself after a terminal state: [forget] runs inside it, so cancelling it
+        // there would cancel the runtime's own Faulted transition halfway (letta-mobile-cdgpr.10).
+        entry.watcher = scope.launch {
+            driver.state.first { state ->
+                if (entries[id] === entry) onState(driver, state)
+                state.terminal
+            }
+        }
         return started
     }
 
     /** Whether [driver] is still the one running [pluginId]. */
     fun owns(pluginId: String, driver: PluginDriver): Boolean = entries[pluginId]?.live?.driver === driver
 
-    /** Forgets [pluginId]'s driver without stopping it (it ended on its own). */
+    /** Forgets [pluginId]'s driver without stopping it (it ended on its own; its watcher ends with it). */
     fun forget(pluginId: String) {
-        entries.remove(pluginId)?.watcher?.cancel()
+        entries.remove(pluginId)
     }
 
     /** Stops [pluginId]'s driver, if one runs; its state changes no longer reach the runtime. */

@@ -53,10 +53,10 @@ class PluginHostFixture(val pluginsDir: Path = Files.createTempDirectory("plugin
         const val TOOL = "fake_plot"
         const val NOW = 1_760_000_000_000L
 
-        /** The fake's `.lcp` at [version], asking for [capabilities] (wire names). */
-        fun pkg(version: String = "1.0.0", capabilities: List<String> = listOf("canvas:place")): ByteArray {
+        /** The fake's `.lcp` at [version], asking for [capabilities] (wire names), running [FakeLcpPlugin] in [mode] as [id]. */
+        fun pkg(version: String = "1.0.0", capabilities: List<String> = listOf("canvas:place"), mode: String = "normal", id: String = ID): ByteArray {
             val manifest = """
-                {"manifestVersion":1,"id":"$ID","name":"Fake","version":"$version","publisher":"letta","contract":{"version":1},
+                {"manifestVersion":1,"id":"$id","name":"Fake","version":"$version","publisher":"letta","contract":{"version":1},
                  "runtime":{"kind":"process","command":"sh","args":["run.sh"]},
                  "capabilities":[${capabilities.joinToString { "\"$it\"" }}],
                  "elements":{"chart":{"schemaVersion":1,"props":{"type":"object","additionalProperties":false,"properties":{"title":{"type":"string","maxLength":200}}}}},
@@ -66,15 +66,15 @@ class PluginHostFixture(val pluginsDir: Path = Files.createTempDirectory("plugin
             val out = ByteArrayOutputStream()
             ZipOutputStream(out).use { zip ->
                 zip.entry("letta-plugin.json", manifest)
-                zip.entry("run.sh", runScript())
+                zip.entry("run.sh", runScript(mode))
             }
             return out.toByteArray()
         }
 
-        private fun runScript(): String {
+        private fun runScript(mode: String): String {
             val java = File(System.getProperty("java.home"), "bin/java").absolutePath
             val flags = "-Xshare:auto -XX:TieredStopAtLevel=1 -XX:+UseSerialGC -Xmx64m"
-            return "exec '$java' $flags -cp '${ProcessDriverFixture.classpath}' ${FakeLcpPlugin::class.java.name} --mode=normal\n"
+            return "exec '$java' $flags -cp '${ProcessDriverFixture.classpath}' ${FakeLcpPlugin::class.java.name} --mode=$mode\n"
         }
 
         private fun ZipOutputStream.entry(name: String, text: String) {

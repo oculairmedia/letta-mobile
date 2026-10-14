@@ -40,6 +40,7 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /**
  * One installed `process` plugin, as the host runs it: the package it lives in, its resolved
@@ -122,7 +123,17 @@ class ProcessPluginDriver(
         return state.first { it is PluginDriverState.Running || it.terminal }
     }
 
-    override suspend fun invoke(call: ActionCall): ActionResult = live().session.invoke(call, options.invokeTimeout)
+    override suspend fun invoke(call: ActionCall): ActionResult {
+        val began = TimeSource.Monotonic.markNow()
+        val outcome = runCatching { live().session.invoke(call, options.invokeTimeout) }
+        val label = outcome.fold(
+            onSuccess = { if (it is ActionResult.Error) "error:${it.code}" else "ok" },
+            onFailure = { if (it is LcpCallException) "failed:${it.code}" else "failed" },
+        )
+        val tookMs = began.elapsedNow().inWholeMilliseconds
+        PluginHostEvents.timed(PluginHostEvent.INVOKE, pluginId, tookMs, "action" to call.action, "outcome" to label)
+        return outcome.getOrThrow()
+    }
 
     override suspend fun elementEvent(event: ElementEvent) = live().session.elementEvent(event)
 

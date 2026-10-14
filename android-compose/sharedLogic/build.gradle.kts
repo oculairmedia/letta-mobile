@@ -40,6 +40,9 @@ detekt {
 // in CI runners; they are skipped (via JUnit Assume) unless this is "true".
 tasks.withType<Test>().configureEach {
     System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
+    // A planted host secret (letta-mobile-cdgpr.10): PluginTrustTest asserts a plugin process
+    // never inherits it. Fake value; nothing reads it but that test.
+    environment("LETTA_TOKEN", "letta-trust-test-planted-host-token")
 }
 
 kotlin {
