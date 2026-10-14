@@ -100,20 +100,6 @@ class ChatStreamingPresenceTest {
     }
 
     @Test
-    fun clientModeStreamHoldsPreviousFlags() {
-        // The runtime owns the flags during a client-mode turn — other signals
-        // are ignored and the prior values are preserved.
-        val p = derive {
-            copy(
-                previousIsStreaming = true,
-                clientModeStreamInFlight = true,
-            )
-        }
-        assertTrue(p.isStreaming)
-        assertFalse(p.isAgentTyping)
-    }
-
-    @Test
     fun replyStreamingShowsStreamingAndTyping() {
         val p = derive { copy(replyStreaming = true) }
         assertTrue(p.isStreaming)

@@ -739,7 +739,6 @@ internal class AdminChatViewModel @Inject constructor(
         currentConversationTracker = currentConversationTracker,
         activeReplyStreams = MutableStateFlow(emptySet()),
         uiState = _uiState,
-        isClientModeStreamInFlight = { false },
         // letta-mobile-c4igq.7: hold presence across inter-round gaps of a
         // multi-tool turn. wsChatBridge.hasActiveChatTurn(conversationId) is true
         // from turn start until the real terminal (spans all tool rounds), so the
