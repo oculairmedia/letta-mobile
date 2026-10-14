@@ -16,9 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -37,9 +35,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * - Close or failure tears down the generation (closes the command queue so
  *   pending sends fail) and moves to [AppServerConnectionState.Failed],
  *   distinguishing terminal auth/config failures from retryable drops.
- * - Inbound frames are decoded once, then demuxed into [controlFrames] /
- *   [streamFrames] by message type so existing request correlation and stream
- *   observers keep working without dual sockets.
+ * - Inbound frames are decoded once and delivered by [AppServerInboundDelivery]:
+ *   [inboundFrames] carries every frame in socket arrival order (the router reads
+ *   this), while [controlFrames] / [streamFrames] are per-type views of the same
+ *   sequence for request correlation and stream observers (letta-mobile-by4vm.5).
  *
  * `bearerToken` is intentionally optional: loopback App Server runs omit WS auth,
  * while non-loopback/headless hosts should launch `letta app-server` / `letta
@@ -53,8 +52,7 @@ class KtorAppServerWebSocketTransport(
     private val protocol: AppServerProtocol = AppServerProtocol,
 ) : AppServerTransport {
     private val controlCommandQueue = Channel<AppServerCommand>(Channel.BUFFERED)
-    private val controlFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
-    private val streamFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
+    private val delivery = AppServerInboundDelivery()
 
     // One generation: its own Job so tearing it down never cancels the caller's scope.
     private val generationJob = Job(scope.coroutineContext.job)
@@ -70,8 +68,9 @@ class KtorAppServerWebSocketTransport(
         },
     )
 
-    override val controlFrames: Flow<AppServerReceivedFrame> = controlFrameFlow.asSharedFlow()
-    override val streamFrames: Flow<AppServerReceivedFrame> = streamFrameFlow.asSharedFlow()
+    override val inboundFrames: Flow<AppServerReceivedFrame> = delivery.inboundFrames
+    override val controlFrames: Flow<AppServerReceivedFrame> = delivery.controlFrames
+    override val streamFrames: Flow<AppServerReceivedFrame> = delivery.streamFrames
 
     /** Explicit lifecycle of the connection generation. */
     val connectionState: StateFlow<AppServerConnectionState> = coordinator.state
@@ -122,37 +121,24 @@ class KtorAppServerWebSocketTransport(
      * close is not misclassified as a retryable delivery failure.
      */
     private suspend fun DefaultClientWebSocketSession.runBidirectionalSession(): CloseReason? = coroutineScope {
-        // Keep control delivery independent from a slow stream collector without
-        // allowing either handoff to retain an unbounded number of frames. A full
-        // queue fails the generation explicitly; silently evicting accepted
+        // One ordered delivery path plus per-type views; see AppServerInboundDelivery.
+        // A full queue fails the generation explicitly; silently evicting accepted
         // control responses or timeline deltas would corrupt client state.
-        val controlDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
-        val streamDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
+        val session = delivery.open(this)
         val sender = launch {
             for (command in controlCommandQueue) {
                 send(Frame.Text(protocol.encodeCommand(command)))
             }
         }
-        val controlDelivery = launch {
-            for (frame in controlDeliveryQueue) {
-                controlFrameFlow.emit(frame)
-            }
-        }
-        val streamDelivery = launch {
-            for (frame in streamDeliveryQueue) {
-                streamFrameFlow.emit(frame)
-            }
-        }
         var reachedEndOfStream = false
         var drainTimedOut: Boolean
         try {
-            receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
+            receiveFrames(session)
             reachedEndOfStream = true
         } finally {
             sender.cancel()
-            controlDeliveryQueue.close()
-            streamDeliveryQueue.close()
-            drainTimedOut = !finishDeliveryJobs(reachedEndOfStream, controlDelivery, streamDelivery)
+            session.closeQueues()
+            drainTimedOut = !finishDeliveryJobs(reachedEndOfStream, session.jobs)
         }
         val closeReason = closeReason.await()
         if (drainTimedOut && !closeReason.isTerminal()) {
@@ -167,7 +153,7 @@ class KtorAppServerWebSocketTransport(
      */
     private suspend fun finishDeliveryJobs(
         reachedEndOfStream: Boolean,
-        vararg jobs: Job,
+        jobs: List<Job>,
     ): Boolean {
         if (!reachedEndOfStream) {
             jobs.forEach { it.cancel() }
@@ -184,30 +170,14 @@ class KtorAppServerWebSocketTransport(
         return true
     }
 
-    private suspend fun DefaultClientWebSocketSession.receiveAndDemuxFrames(
-        controlDeliveryQueue: Channel<AppServerReceivedFrame>,
-        streamDeliveryQueue: Channel<AppServerReceivedFrame>,
-    ) {
+    private suspend fun DefaultClientWebSocketSession.receiveFrames(session: AppServerInboundDelivery.Session) {
         for (frame in incoming) {
             if (frame is Frame.Text) {
                 // protocol.decodeFrame is total: malformed frames surface as
                 // AppServerInboundFrame.DecodeFailure rather than throwing, so a
                 // bad frame never tears down this receive loop (letta-mobile-lgns8.4).
-                val received = protocol.decodeFrame(frame.readText())
-                when (received.channel) {
-                    AppServerChannel.Control -> controlDeliveryQueue.enqueueOrFail(received, "control")
-                    AppServerChannel.Stream -> streamDeliveryQueue.enqueueOrFail(received, "stream")
-                }
+                session.accept(protocol.decodeFrame(frame.readText()))
             }
-        }
-    }
-
-    private fun Channel<AppServerReceivedFrame>.enqueueOrFail(
-        frame: AppServerReceivedFrame,
-        channelName: String,
-    ) {
-        if (!trySend(frame).isSuccess) {
-            throw AppServerDeliveryOverflowException(channelName, DELIVERY_QUEUE_CAPACITY)
         }
     }
 
@@ -217,29 +187,6 @@ class KtorAppServerWebSocketTransport(
     }
 
     private companion object {
-        const val FRAME_BUFFER_CAPACITY = 64
-        /**
-         * letta-mobile-eo65k: 256 was an arbitrary round number, not derived from
-         * real traffic. Production wrapper logs show this capacity was exceeded 4
-         * times in 28h ("stream delivery queue exceeded its bounded capacity of
-         * 256 frames"), each one tearing down the WHOLE shared session — control
-         * delivery included — not just the burst that overflowed it.
-         *
-         * A suspend-based (block-instead-of-fail) queue was considered and
-         * rejected: [receiveAndDemuxFrames] reads both channels off ONE
-         * sequential loop against the shared socket, so a full stream queue
-         * blocking on send() would also stall control delivery right behind it —
-         * exactly the coupling
-         * [KtorAppServerWebSocketTransportLifecycleTest.streamBackpressureCannotBlockControlDeliveryOnTheSharedSocket]
-         * exists to rule out. Silently evicting frames was already rejected by
-         * the original design for the same correctness reason (frame loss can
-         * corrupt client state). Raising the capacity is the only change that
-         * reduces how often real bursts hit the ceiling without touching either
-         * of those tested invariants; it does not eliminate the ceiling, which is
-         * intentional — a queue with no bound at all trades a clear, recoverable
-         * failure for an unbounded memory leak under a truly stuck consumer.
-         */
-        const val DELIVERY_QUEUE_CAPACITY = 1_024
         const val DELIVERY_DRAIN_TIMEOUT_MILLIS = 1_000L
     }
 }
@@ -248,13 +195,6 @@ private class AppServerDeliveryDrainTimeoutException(
     timeoutMillis: Long,
 ) : IllegalStateException(
     "App Server delivery queues did not drain within ${timeoutMillis}ms after socket EOF",
-)
-
-private class AppServerDeliveryOverflowException(
-    channelName: String,
-    capacity: Int,
-) : IllegalStateException(
-    "App Server $channelName delivery queue exceeded its bounded capacity of $capacity frames",
 )
 
 /**

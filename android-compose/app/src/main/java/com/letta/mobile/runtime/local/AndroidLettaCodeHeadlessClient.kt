@@ -49,7 +49,7 @@ class AndroidLettaCodeHeadlessClient @Inject constructor(
         command: TurnCommand,
         pendingToolCallIds: MutableSet<String>,
     ) {
-        val stored = runCatching { localBackendStore.readToolResults(command.agentId.value) }
+        val stored = runCatching { localBackendStore.readToolResults(command.agentId) }
             .getOrDefault(emptyMap())
         val resolved = pendingToolCallIds.mapNotNull { stored[it] }
         resolved.forEach { result ->

@@ -67,9 +67,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * This keeps the existing mobile send coordinator and [WsChatBridge] path intact while
  * swapping only the transport underneath it. The embedded/local runtime path is not touched.
  */
-@Suppress("NoDetachedCoroutineLifecycle") // Compatibility default; production injects its session-owned scope.
 class IrohChannelTransport(
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    // letta-mobile-by4vm.10: optional parent context (dispatcher + lifetime bound). The transport
+    // always runs its work in its OWN job ([transportJob]) and cancels it in [close]; a caller's
+    // scope is never cancelled. Null = Dispatchers.IO and no outer bound.
+    scope: CoroutineScope? = null,
     private val onConnect: () -> Unit = {},
     // Test/override hook: when non-blank, used instead of the compiled DEBUG_FORCE_IROH_URL.
     // Lets the on-host harness dial a live in-process node without rebuilding the constant.
@@ -110,6 +112,19 @@ class IrohChannelTransport(
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport,
     CronControlTransport {
+    /**
+     * Owned lifecycle, cancelled by [close]. It is NOT attached as a child of [scope]'s job (an
+     * idle, never-completing child would hold the caller's structured join open, e.g. runTest);
+     * instead the caller's job completing or cancelling cancels it, so the caller still bounds it.
+     */
+    internal val transportJob: Job = SupervisorJob()
+    private val parentCompletionHandle =
+        scope?.coroutineContext?.get(Job)?.invokeOnCompletion { transportJob.cancel() }
+
+    @Suppress("NoDetachedCoroutineLifecycle") // Owned: transportJob is cancelled in close().
+    private val transportScope: CoroutineScope =
+        CoroutineScope((scope?.coroutineContext ?: Dispatchers.IO) + transportJob)
+
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -195,7 +210,7 @@ class IrohChannelTransport(
         IrohTransportSupport.createNotebookHandlerFactory(notebookPeers?.invoke(), notebookStore, notebookDirectory)
 
     private val irohDialer = IrohDialer(
-        scope = scope,
+        scope = transportScope,
         secretKeyStore = secretKeyStore,
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
         onCloseResources = ::handleCloseResources,
@@ -206,7 +221,7 @@ class IrohChannelTransport(
     // Explicit type: this field and `livenessProbe` reference each other through
     // their lambdas, which defeats type inference.
     private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
-        scope = scope,
+        scope = transportScope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
@@ -214,7 +229,7 @@ class IrohChannelTransport(
 
     init {
         if (notebookHandlerFactory != null) {
-            IrohTransportSupport.launchNotebook(scope) { irohDialer.startNotebook() }
+            IrohTransportSupport.launchNotebook(transportScope) { irohDialer.startNotebook() }
         }
     }
 
@@ -243,7 +258,7 @@ class IrohChannelTransport(
 
     private val sessionLossCutOff by lazy {
         IrohSessionLossCutOff(
-            scope = scope,
+            scope = transportScope,
             registry = turnRegistry,
             emitBoth = ::emitBoth,
             graceMs = sessionLossTerminalGraceMs,
@@ -349,7 +364,7 @@ class IrohChannelTransport(
     // Own generation-bound observer and viewer re-subscription work in a typed
     // session so stale handles cannot mutate a successor connection.
     private val connectionSession = IrohConnectionSession(
-        scope = scope,
+        scope = transportScope,
         ingestObserverFrame = { received ->
             observerIngestor.ingestObserverFrame(ObserverFrameRequest(received))
         },
@@ -360,7 +375,7 @@ class IrohChannelTransport(
 
     private val observerIngestor: IrohObserverIngestor by lazy {
         IrohObserverIngestor(
-            scope = scope,
+            scope = transportScope,
             turnRegistry = turnRegistry,
             connectionGeneration = ::currentConnectionGeneration,
             emitBoth = ::emitBoth,
@@ -375,7 +390,7 @@ class IrohChannelTransport(
 
     private val turnDispatcher = IrohTurnDispatcher(
         IrohTurnDispatcherDependencies(
-            scope = scope,
+            scope = transportScope,
             registry = turnRegistry,
             ready = supervisor::ready,
             emitTurnFrame = ::emitTurnFrame,
@@ -622,7 +637,7 @@ class IrohChannelTransport(
             "turnId" to turn.turnId,
             "runId" to turn.runId,
         )
-        scope.launch {
+        transportScope.launch {
             // Guard against stale ActiveTurn race: if send(A) was called twice
             // quickly and this cancel captured the old ActiveTurn, aborting would
             // target the NEW turn. Only proceed if this is still the active turn.
@@ -735,6 +750,21 @@ class IrohChannelTransport(
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
+    }
+
+    /**
+     * letta-mobile-by4vm.10: terminal teardown. [disconnect] keeps the instance reusable (a
+     * later [connect] redials); [close] also cancels [transportJob] so every coroutine this
+     * transport launched (cancel terminal waits, observers, liveness) ends with it. The
+     * caller's scope, if any, stays active. The instance must not be reused after close.
+     */
+    suspend fun close() {
+        try {
+            disconnect()
+        } finally {
+            transportJob.cancel()
+            parentCompletionHandle?.dispose()
+        }
     }
 
 

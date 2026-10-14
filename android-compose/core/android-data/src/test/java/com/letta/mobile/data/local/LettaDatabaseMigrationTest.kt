@@ -308,7 +308,7 @@ class LettaDatabaseMigrationTest {
             clock = { EpochMillis(1_000) },
         )
 
-        assertTrue(db.runtimeEventDao().listAfterOffset(0).isEmpty())
+        assertTrue(db.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE).isEmpty())
         val event = outbox.append(
             RuntimeEventDraft(
                 backendId = BackendId("backend-1"),
@@ -323,7 +323,7 @@ class LettaDatabaseMigrationTest {
         )
 
         assertEquals(1L, event.offset.value)
-        assertEquals(1, db.runtimeEventDao().listAfterOffset(0).size)
+        assertEquals(1, db.runtimeEventDao().listAfterOffset(0, Int.MAX_VALUE).size)
     }
 
     @Test

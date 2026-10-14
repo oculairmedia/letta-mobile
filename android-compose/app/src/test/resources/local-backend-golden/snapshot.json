@@ -1,0 +1,107 @@
+{
+    "agents": [
+        {
+            "id": "agent-a",
+            "name": "Sidecar A",
+            "model": "lmstudio/m-a",
+            "system": "sidecar system"
+        },
+        {
+            "id": "agent-b",
+            "name": "agent-b",
+            "model": "lmstudio/m-b"
+        },
+        {
+            "id": "agent-blank-model",
+            "name": "Blank",
+            "model": ""
+        },
+        {
+            "id": "agent-c",
+            "name": "Sidecar C"
+        }
+    ],
+    "conversations": [
+        {
+            "id": "local-conv-agent-a",
+            "agent_id": "agent-a",
+            "summary": "conv A",
+            "created_at": "2026-02-01T00:00:00.000Z",
+            "updated_at": "2026-02-02T00:00:00.000Z",
+            "last_message_at": "2026-02-03T00:00:00.000Z",
+            "archived": false
+        },
+        {
+            "id": "local-conv-agent-b",
+            "agent_id": "agent-b",
+            "created_at": "2026-01-05T00:00:00.000Z",
+            "archived": true
+        }
+    ],
+    "createdConversation": {
+        "id": "local-conv-agent-a",
+        "agent_id": "agent-a",
+        "summary": "conv A",
+        "created_at": "2026-02-01T00:00:00.000Z",
+        "updated_at": "2026-02-02T00:00:00.000Z",
+        "last_message_at": "2026-02-03T00:00:00.000Z",
+        "archived": false
+    },
+    "contextOverviewA": {
+        "context_window_size_max": 32000,
+        "context_window_size_current": 1239,
+        "num_messages": 12,
+        "num_recall_memory": 12,
+        "num_tokens_system": 53,
+        "num_tokens_messages": 1186,
+        "source": "estimate",
+        "calibrated": true,
+        "tools_derived": true,
+        "total_source": "recorded",
+        "memory_split": false,
+        "window_source": "agent.model_settings.context_window_limit"
+    },
+    "contextOverviewB": {
+        "context_window_size_max": 128000,
+        "source": "estimate",
+        "calibrated": false,
+        "tools_derived": false,
+        "memory_split": false
+    },
+    "contextOverviewMissing": "null",
+    "storedModelA": "lmstudio/m-seeded",
+    "storedModelB": "lmstudio/m-b",
+    "storedModelBlank": null,
+    "storedModelMissing": null,
+    "transcriptA": [
+        "UserMessage(id=u1, contentRaw=\"hello there\", date=2026-02-03T00:00:01.000Z, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=2, messageType=user_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "AssistantMessage(id=a1, contentRaw=\"calling\", date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=4, messageType=assistant_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "ToolCallMessage(id=a1-tool-0, toolCall=ToolCall(id=call_1, toolCallId=null, name=Bash, arguments={\"command\":\"ls\"}, type=function), toolCalls=null, date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=4, messageType=tool_call_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "ToolCallMessage(id=a1-tool-1, toolCall=ToolCall(id=call_2, toolCallId=null, name=Read, arguments=null, type=function), toolCalls=null, date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=4, messageType=tool_call_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "ToolReturnMessage(id=t1, toolReturnRaw=\"a\\nb\\nc\", status=success, toolCallId=call_1, stdout=null, stderr=null, toolReturns=null, toolReturnTruncated=null, toolReturnByteLen=null, toolReturnPointer=null, date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=5, messageType=tool_return_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "ToolReturnMessage(id=t2, toolReturnRaw=\"boom\", status=error, toolCallId=call_x, stdout=null, stderr=null, toolReturns=null, toolReturnTruncated=null, toolReturnByteLen=null, toolReturnPointer=null, date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=6, messageType=tool_return_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "UserMessage(id=u3, contentRaw=\"see image\", date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=9, messageType=user_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "UserMessage(id=u4, contentRaw=\"lost image\\n[image unavailable]\", date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=10, messageType=user_message, logicalMessageId=null, turnId=null, textSeq=null)",
+        "AssistantMessage(id=a2, contentRaw=\"done\", date=null, name=null, runId=null, stepId=null, otid=null, senderId=null, isErr=null, seqId=13, messageType=assistant_message, logicalMessageId=null, turnId=null, textSeq=null)"
+    ],
+    "transcriptMissing": 0,
+    "toolResultsA": {
+        "call_1": "StoredToolResult(toolCallId=call_1, body=a\nb\nc, isError=false)",
+        "call_env": "StoredToolResult(toolCallId=call_env, body=from envelope, isError=false)",
+        "call_x": "StoredToolResult(toolCallId=call_x, body=boom, isError=true)"
+    },
+    "toolResultsMissing": 0,
+    "files": {
+        "agents/YWdlbnQtYQ.json": "{\n    \"id\": \"agent-a\",\n    \"name\": \"Sidecar A\",\n    \"model\": \"lmstudio/m-seeded\",\n    \"model_settings\": {\n        \"context_window_limit\": 32000\n    },\n    \"tags\": [\n        \"x\"\n    ],\n    \"system\": \"sidecar system\"\n}",
+        "agents/YWdlbnQtYg.json": "{\"id\":\"agent-b\",\"model\":\"lmstudio/m-b\"}",
+        "agents/YWdlbnQtYmxhbmstbW9kZWw.json": "{\"id\":\"agent-blank-model\",\"name\":\"Blank\",\"model\":\"\"}",
+        "agents/YWdlbnQtYw.json": "{\n    \"id\": \"agent-c\",\n    \"name\": \"Sidecar C\"\n}",
+        "agents/garbage.json": "not json",
+        "app-agents/YWdlbnQtYQ.json": "{\n    \"id\": \"agent-a\",\n    \"name\": \"Sidecar A\",\n    \"model\": \"lmstudio/m-a\",\n    \"system\": \"sidecar system\"\n}",
+        "app-agents/YWdlbnQtYw.json": "{\n    \"id\": \"agent-c\",\n    \"name\": \"Sidecar C\"\n}",
+        "conversations/Y29udmVyc2F0aW9uOmNvbnYteg/conversation.json": "{\"id\":\"conv-z\",\"agent_id\":\"agent-a\",\"created_at\":\"2026-03-01T00:00:00.000Z\"}",
+        "conversations/ZGVmYXVsdDphZ2VudC1h/conversation.json": "{\"id\":\"default\",\"agent_id\":\"agent-a\",\"archived\":false,\"archived_at\":null,\"created_at\":\"2026-02-01T00:00:00.000Z\",\"updated_at\":\"2026-02-02T00:00:00.000Z\",\"last_message_at\":\"2026-02-03T00:00:00.000Z\",\"summary\":\"conv A\",\"in_context_message_ids\":[]}",
+        "conversations/ZGVmYXVsdDphZ2VudC1h/system-prompt.json": "{\"content\":\"You are a fixture. word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word \"}",
+        "conversations/ZGVmYXVsdDphZ2VudC1i/conversation.json": "{\"id\":\"default\",\"agent_id\":\"agent-b\",\"archived\":true,\"created_at\":\"2026-01-05T00:00:00.000Z\"}"
+    }
+}

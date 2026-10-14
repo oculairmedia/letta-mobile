@@ -12,7 +12,7 @@ import kotlinx.serialization.json.contentOrNull
  *
  * Enforcement is centralized here so it cannot be forgotten by a handler:
  *  - requests: any admin_rpc params / runtime frame naming an out-of-scope
- *    `agent_id` (top level or under `runtime`) are denied before dispatch;
+ *    `agent_id` (top level or under `runtime`; all of them, by4vm.36) are denied before dispatch;
  *  - results: listings (`agent.list`, `conversation.list`, …) drop rows that
  *    belong to out-of-scope agents.
  *
@@ -27,15 +27,28 @@ object AgentScopeGuard {
     private val AGENT_ID_KEYS = listOf("agent_id", "agentId")
     private val LIST_KEYS = listOf("agents", "conversations", "items", "data")
 
-    /** The agent a runtime/admin frame addresses, if any. */
-    fun agentIdOf(frame: JsonObject?): String? {
-        if (frame == null) return null
-        return frame.stringField(AGENT_ID_KEYS)
-            ?: (frame["runtime"] as? JsonObject)?.stringField(AGENT_ID_KEYS)
+    /**
+     * Every agent a runtime/admin frame names: the top-level `agent_id` and `runtime.agent_id`,
+     * each in either spelling (letta-mobile-by4vm.36). Admin handlers act on the top-level id; relayed runtime frames
+     * (`input`, `abort_message`, queue controls) decode and act on `runtime.agent_id`. Checking
+     * only the first one found let an in-scope top-level id smuggle an out-of-scope runtime id.
+     */
+    fun agentIdsOf(frame: JsonObject?): Set<String> {
+        val carriers = listOfNotNull(frame, frame?.get("runtime") as? JsonObject)
+        return carriers.flatMapTo(mutableSetOf()) { carrier -> AGENT_ID_KEYS.mapNotNull { carrier.stringField(listOf(it)) } }
     }
 
-    fun allowsParams(scope: Set<String>?, params: JsonObject?): Boolean =
-        IrohPeerCapabilities.isAgentInScope(scope, agentIdOf(params))
+    /**
+     * Unrestricted peers (null scope) and frames naming no agent pass. A scoped peer's frame
+     * passes only when it names exactly one agent and that agent is in scope: no legitimate
+     * frame carries two different agent ids, so disagreeing carriers are denied outright
+     * rather than guessing which one the handler will act on.
+     */
+    fun allowsParams(scope: Set<String>?, params: JsonObject?): Boolean {
+        if (scope == null) return true
+        val ids = agentIdsOf(params)
+        return ids.size <= 1 && ids.all { IrohPeerCapabilities.isAgentInScope(scope, it) }
+    }
 
     fun filterResult(scope: Set<String>?, method: String, result: JsonElement): JsonElement {
         if (scope == null) return result

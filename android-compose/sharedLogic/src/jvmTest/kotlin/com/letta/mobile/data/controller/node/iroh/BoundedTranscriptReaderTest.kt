@@ -1,10 +1,15 @@
-package com.letta.mobile.runtime.local
+package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.context.estimate.LocalMessageTokens
+import com.letta.mobile.data.context.estimate.LocalTranscriptContext
 import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -132,5 +137,64 @@ class BoundedTranscriptReaderTest {
         val line = BoundedTranscriptReader.readSingleLineFull(file, 0)
         assertNotNull(line)
         assertTrue(line!!.contains("\"id\":\"u0\""))
+    }
+
+    @Test
+    fun `context read of an 8MB image part holds the marker, not the base64`() {
+        val imageChars = 9 * 1024 * 1024 // past the ~8MB default cap
+        val file = tempFolder.newFile("messages.jsonl")
+        // Written in chunks so the test itself never holds the whole line.
+        file.bufferedWriter().use { writer ->
+            writer.write("""{"id":"u1","role":"user","content":[{"type":"text","text":"look"},""")
+            writer.write("""{"type":"image","mimeType":"image/png","data":"""")
+            val chunk = "A".repeat(1024 * 1024)
+            repeat(imageChars / chunk.length) { writer.write(chunk) }
+            writer.write("\"}]}\n")
+            writer.write("""{"id":"a1","role":"assistant","content":[{"type":"text","text":"a cat"}]}""" + "\n")
+        }
+
+        val context = BoundedTranscriptReader.readTranscriptContext(file)
+
+        assertEquals(2, context.messages.size)
+        val image = (context.messages[0]["content"] as JsonArray)[1] as JsonObject
+        assertEquals("image", image["type"]!!.jsonPrimitive.content)
+        val data = image["data"]!!.jsonPrimitive.content
+        assertTrue(BoundedTranscriptReader.extractOversizedLength(data)!! >= imageChars)
+        assertFalse(context.toString().contains("AAAA"))
+        // The collapsed image still counts as one image toward the context estimate.
+        val smallImage = json.parseToJsonElement(
+            """{"role":"user","content":[{"type":"text","text":"look"},{"type":"image","mimeType":"image/png","data":"AAAA"}]}""",
+        ).jsonObject
+        assertEquals(LocalMessageTokens.of(smallImage), LocalMessageTokens.of(context.messages[0]))
+    }
+
+    @Test
+    fun `context read of a normal transcript matches the unbounded read`() {
+        val file = tempFolder.newFile("messages.jsonl").apply {
+            writeText(
+                listOf(
+                    """{"type":"message","id":"e1","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}""",
+                    """{"type":"message","id":"e2","message":{"role":"assistant","content":[{"type":"text","text":"yo"}],"timestamp":1,"usage":{"totalTokens":40}}}""",
+                    "",
+                    """{"type":"compaction","message":{"role":"user","content":"summary","timestamp":2},"firstKeptEntryId":"e2"}""",
+                    """{"type":"message","id":"e3","message":{"role":"user","content":[{"type":"text","text":"esc \"q\" \\ \u00e9"},{"type":"image","mimeType":"image/png","data":"iVBORw0KGgo="}]}}""",
+                    """{"type":"message","id":"e4","message":{"role":"assistant","content":[{"type":"toolCall","id":"c1","name":"Bash","arguments":{"command":"ls"}}],"timestamp":3,"usage":{"input":10,"output":5}}}""",
+                    "not json",
+                ).joinToString("\r\n") + "\n",
+            )
+        }
+
+        val unbounded = file.bufferedReader().use { LocalTranscriptContext.read(it.lineSequence()) }
+
+        assertEquals(unbounded, BoundedTranscriptReader.readTranscriptContext(file))
+        assertEquals(3, unbounded.messages.size)
+    }
+
+    @Test
+    fun `context read of a missing file is an empty conversation`() {
+        assertEquals(
+            LocalTranscriptContext.read(emptySequence()),
+            BoundedTranscriptReader.readTranscriptContext(File(tempFolder.root, "absent.jsonl")),
+        )
     }
 }

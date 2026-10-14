@@ -17,9 +17,9 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 - Kotlin / Jetpack Compose / Compose Desktop
 - Kotlin Multiplatform — `sharedLogic` consumed by Android, JVM/desktop, host-native
 - Hilt (Android DI), Room (Android persistence), Ktor (HTTP + WebSocket transports)
-- Iroh QUIC (`computer.iroh:iroh:1.0.0`) for P2P transport
+- Iroh QUIC (`computer.iroh:iroh:1.1.0`, pinned in `gradle/libs.versions.toml`) for P2P transport
 - Material 3 + Lucide icons + A2UI renderer
-- Gradle 9.4.1, JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
+- Gradle 9.6.1 (wrapper), JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
 
 ---
 
@@ -44,13 +44,13 @@ For App Server contract work, also provision Node `v24.18.0` and the contract `@
 | Module | Purpose |
 |---|---|
 | `app/` | Android app — screens, navigation, ViewModels, Hilt DI |
-| `feature-chat/` | Compose feature module (legacy Android chat) |
+| `feature-chat/` | Android host of the shared chat page — ViewModels, Hilt bindings and platform glue around the `sharedUI` chat surface |
 | `core/android-data/` | Repositories, Room DB, transport-bound data sources |
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
-| `sharedLogic/` | **KMP shared module** — platform-neutral domain/transport plus shared Android/Desktop A2UI renderer and LettaIcons (UI → `:sharedUI` in Phase 3) |
-| `sharedUI/` | **KMP Compose UI** — android + jvm shared composables (scaffold Phase 3a) |
+| `sharedLogic/` | **KMP shared module** — platform-neutral domain, transports, timeline, repositories and runtime |
+| `sharedUI/` | **KMP Compose UI** — the shared Compose UI for Android, Desktop and web: pages, chat surface, A2UI renderer, LettaIcons, primitives |
 | `desktop/` | Compose Desktop — windowing, Ktor engine, OS lock, installer |
 | `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
 
@@ -59,7 +59,7 @@ For App Server contract work, also provision Node `v24.18.0` and the contract `@
 - `sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/README.md` — shared Android/Desktop A2UI renderer and catalog authoring guide (read before touching A2UI payloads, catalog IDs, or renderer dispatch)
 - `app/src/main/java/com/letta/mobile/ui/screens/` — Android screen composables
 - `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/` — Iroh + App Server transports (platform-neutral)
-- `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/` — App Server turn engine (`AppServerTurnEngine.kt`), `RuntimeEventFanout`, and transports
+- `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt` — App Server turn engine; `RuntimeEventFanout` is in `data/controller/fanout/`
 - `appserver-cli/` — JVM probe toolchain for App Server contract verification
 
 **The cardinal rule:** feature logic goes in `sharedLogic/commonMain`. Platform modules (`app/`, `desktop/`) only bind. Duplicating repository logic across `app/` and `desktop/` is the documented anti-pattern — the `shared-multiplatform` required CI gate backstops this.
@@ -78,8 +78,13 @@ cd android-compose
 ./gradlew --no-daemon :app:compileRootDebugKotlin
 ./gradlew --no-daemon :app:testRootDebugUnitTest
 
-# Required if you touched sharedLogic/ (KMP common code) — also enforced by CI:
-./gradlew --no-daemon :sharedLogic:allTests :desktop:test
+# If you touched sharedLogic/ (KMP common code). What CI actually runs (android.yml):
+#   `shared-multiplatform` — :sharedLogic:jvmTest, then only *compiles* hostNative
+#     and wasmJs (:sharedLogic:allTests is NOT run: hostNativeTest hangs).
+#   `test` — :app:testRootDebugUnitTest, :core:android-data:testDebugUnitTest, and
+#     :desktop:test only when android-compose/desktop/ changed
+#     (scripts/ci/changed-gradle-modules.sh).
+./gradlew --no-daemon :sharedLogic:jvmTest :desktop:test
 
 # Mechanical-debt preflight (advisory; do not lower thresholds):
 ./gradlew --no-daemon :app:detekt    # must run on JDK 21

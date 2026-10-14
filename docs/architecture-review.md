@@ -55,7 +55,6 @@ android-compose/
   sharedLogic/         portable contracts, timeline, transport (includes former core/domain APIs)
   designsystem/        reusable Material 3 UI foundations
   feature-chat/        chat feature state and WS send coordinator
-  feature-editagent/   edit-agent feature
   feature-mcp/         present on disk, not currently included
   cli/                 developer tooling
   macrobenchmark/

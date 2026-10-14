@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonObject
  * failure domain from the connection that owns live runtimes.
  */
 interface AppServerClient {
+    /** Every inbound frame, in socket order where the transport has one ([AppServerTransport.inboundFrames]). */
     val events: Flow<AppServerReceivedFrame>
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
@@ -251,7 +252,7 @@ class DefaultAppServerClient(
         timeoutMs = requestTimeoutMs,
     )
 
-    override val events: Flow<AppServerReceivedFrame> = transport.mergedFrames()
+    override val events: Flow<AppServerReceivedFrame> = transport.inboundFrames
     override val isConnected: Flow<Boolean> = transport.isConnected
 
     /**

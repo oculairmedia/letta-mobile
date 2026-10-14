@@ -3,17 +3,11 @@
   <string name="action_back">Back</string>
   <string name="action_cancel">Cancel</string>
   <string name="action_close">Close</string>
-  <string name="action_copied">Copied to clipboard</string>
-  <string name="action_copy">Copy</string>
   <string name="action_delete">Delete</string>
   <string name="action_edit">Edit</string>
   <string name="action_refresh">Refresh</string>
-  <string name="action_remove_attachment">Remove attachment</string>
-  <string name="action_reset_messages">Reset Messages</string>
   <string name="action_retry">Retry</string>
   <string name="action_save">Save</string>
-  <string name="action_search">Search</string>
-  <string name="action_send_message">Send message</string>
   <string name="common_agents">Agents</string>
   <string name="common_conversations">Conversations</string>
   <string name="common_details">Details</string>
@@ -29,9 +23,6 @@
   <string name="screen_chat_image_share_error">Couldn\'t share image</string>
   <string name="screen_chat_image_share_chooser">Share image</string>
   <string name="screen_chat_title">Agent Chat</string>
-  <string name="screen_conversations_dialog_delete_title">Delete Conversation</string>
-  <string name="screen_conversations_empty">No conversations yet</string>
-  <string name="screen_conversations_new_action">New Conversation</string>
   <string name="screen_conversations_search_hint">Search conversations\u2026</string>
   <string name="screen_drawer_default_agent_name">Agent</string>
   <string name="screen_project_agents_empty">No linked coding agents are currently visible for this project.</string>

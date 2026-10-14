@@ -250,7 +250,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean {
         return startMutex.withLock {
             val configModelSelection = EmbeddedLettaCodeModelSelection.from(config)
-            val storedModelHandle = localBackendStore.storedModelHandle(command.agentId.value)
+            val storedModelHandle = localBackendStore.storedModelHandle(command.agentId)
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
             val modelSelection = if (

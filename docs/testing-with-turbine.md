@@ -72,7 +72,7 @@ For non-conflated `Flow` / `SharedFlow`, every emission is observed in order.
 
 When converting an existing test that polls a StateFlow:
 
-- [ ] Add `import app.cash.turbine.test`. The dep is already in `core`, `app`, and `feature-editagent` test source sets.
+- [ ] Add `import app.cash.turbine.test`. The dep is already in the `core` and `app` test source sets.
 - [ ] Replace `delay()` / stability heuristics with `flow.test { ... awaitItem() ... }`.
 - [ ] Make sure the test's coroutine scope is cancelled at the end (Turbine cancels collection, but the scope you launched the producer in still needs `.coroutineContext.job.cancel()`).
 - [ ] If conflation matters, prefer `expectMostRecentItem()` over a long `awaitItem()` chain.

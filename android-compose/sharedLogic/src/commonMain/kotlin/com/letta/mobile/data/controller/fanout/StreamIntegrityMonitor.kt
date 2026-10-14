@@ -18,6 +18,10 @@ import kotlin.time.Clock
  * `event_seq` gap, see [EventSeqGapDetector]) asks the [RuntimeSyncScheduler] for a recovery
  * `sync`; loop status frames set each runtime's cadence (busy vs idle). [requestResync] is the
  * hook for "the app came back to the foreground / the window regained focus".
+ *
+ * Gap detection needs frames in socket order. The router reads `AppServerClient.events`, which on a
+ * direct socket is `AppServerTransport.inboundFrames` in arrival order (letta-mobile-by4vm.5); fed
+ * from the old two-lane merge, a `turn_finished` overtaking a delta read as a gap.
  */
 class StreamIntegrityMonitor(
     private val scheduler: RuntimeSyncScheduler,
