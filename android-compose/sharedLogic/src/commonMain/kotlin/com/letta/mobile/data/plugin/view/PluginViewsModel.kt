@@ -12,14 +12,11 @@ import com.letta.mobile.data.settings.SettingValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -36,15 +33,18 @@ import kotlinx.coroutines.launch
  * - [liveViews]: this device's "Live plugin views" switch, persisted per device. Off, the shells
  *   provide no view host ([viewHost]), so every plugin element draws its fallback card or snapshot.
  *
- * Every value of [hostChanges] (the channel transport's state, say) runs [refresh], so the model
- * follows a reconnect or a backend switch.
+ * Every signal on [hostChanges] (each change of the channel transport's state, say) runs [refresh],
+ * so the model follows a reconnect or a backend switch.
+ *
+ * [plugins] and [kinds] are written together by one collector the model launches on [scope], so a
+ * reader never sees a plugin list and a kind catalog from different host answers.
  */
 class PluginViewsModel(
     private val host: HostPluginCatalog?,
     private val hostTransport: PluginViewTransport?,
     val liveViews: SettingValue<Boolean>,
     scope: CoroutineScope,
-    hostChanges: Flow<Any?> = emptyFlow(),
+    hostChanges: Flow<Unit> = emptyFlow(),
 ) {
     private val unavailable = UnavailablePluginCatalog()
     private val hostRunsPlugins = MutableStateFlow(false)
@@ -56,12 +56,10 @@ class PluginViewsModel(
     /** How live views reach the host; null while it does not run plugins. */
     val transport: PluginViewTransport? get() = hostTransport?.takeIf { supported.value }
 
-    val plugins: StateFlow<List<PluginViewPlugin>> =
-        combine(host?.plugins ?: flowOf(emptyList()), hostRunsPlugins) { listed, runs -> if (runs) livePlugins(listed) else emptyList() }
-            .stateIn(scope, SharingStarted.Eagerly, emptyList())
+    private val livePluginsState = MutableStateFlow<List<PluginViewPlugin>>(emptyList())
+    private val kindCatalog = MutableStateFlow<PluginKindCatalog>(PluginKindCatalog.Empty)
 
-    private val kindCatalog: StateFlow<PluginKindCatalog> =
-        plugins.map(::kindsOf).stateIn(scope, SharingStarted.Eagerly, PluginKindCatalog.Empty)
+    val plugins: StateFlow<List<PluginViewPlugin>> = livePluginsState.asStateFlow()
 
     /** The kinds of [plugins], following the list as it changes. */
     val kinds: PluginKindCatalog = object : PluginKindCatalog {
@@ -72,6 +70,15 @@ class PluginViewsModel(
 
     init {
         scope.launch { hostChanges.collect { refresh() } }
+        scope.launch {
+            combine(host?.plugins ?: flowOf(emptyList()), hostRunsPlugins) { listed, runs -> if (runs) livePlugins(listed) else emptyList() }
+                .collect { publish(it) }
+        }
+    }
+
+    private fun publish(live: List<PluginViewPlugin>) {
+        kindCatalog.value = kindsOf(live)
+        livePluginsState.value = live
     }
 
     val liveViewsEnabled: StateFlow<Boolean> get() = liveViews.current

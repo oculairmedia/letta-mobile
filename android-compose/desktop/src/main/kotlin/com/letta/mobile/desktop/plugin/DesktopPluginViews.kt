@@ -39,9 +39,9 @@ internal fun desktopPluginViewsModel(
 ): PluginViewsModel {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     return hostPluginViewsModel(
-        host = PluginHostConnection(
+        host = PluginHostConnection.onEachChange(
             link = pluginAdminLinkOver(transport),
-            changes = snapshotFlow { transport() }.flatMapLatest { it?.state ?: flowOf(null) },
+            state = snapshotFlow { transport() }.flatMapLatest { it?.state ?: flowOf(null) },
         ),
         relay = DesktopCanvasHostSync.relay,
         liveViews = store.setting(scope),

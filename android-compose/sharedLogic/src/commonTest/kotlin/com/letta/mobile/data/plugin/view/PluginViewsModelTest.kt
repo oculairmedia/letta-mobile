@@ -119,23 +119,23 @@ class PluginViewsModelTest {
     @Test
     fun aHostChangeRefreshesAndALostHostDropsItsPlugins() = runTest {
         val host = FakeHost(listOf(summary("letta.chart", PluginState.Active)))
-        val changes = MutableSharedFlow<Any?>()
+        val changes = MutableSharedFlow<Unit>()
         val model = model(host, changes = changes)
         runCurrent()
 
-        changes.emit("connected")
+        changes.emit(Unit) // connected
         runCurrent()
         assertTrue(model.supported.value)
         assertEquals(1, model.plugins.value.size)
 
         host.runs = false
-        changes.emit("reconnected to a host without plugins")
+        changes.emit(Unit) // reconnected to a host without plugins
         runCurrent()
         assertFalse(model.supported.value)
         assertTrue(model.plugins.value.isEmpty())
     }
 
-    private fun TestScope.model(host: FakeHost, liveViews: Boolean = false, changes: MutableSharedFlow<Any?> = MutableSharedFlow()) =
+    private fun TestScope.model(host: FakeHost, liveViews: Boolean = false, changes: MutableSharedFlow<Unit> = MutableSharedFlow()) =
         PluginViewsModel(host, PluginViewTransport.Unavailable, inMemoryLiveViewsSetting(liveViews), backgroundScope, changes)
 
     private class FakeHost(

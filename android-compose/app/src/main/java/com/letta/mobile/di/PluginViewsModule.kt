@@ -38,7 +38,7 @@ object PluginViewsModule {
     ): PluginViewsModel {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         return hostPluginViewsModel(
-            host = PluginHostConnection(pluginAdminLinkOver { transport }, transport.state),
+            host = PluginHostConnection.onEachChange(pluginAdminLinkOver { transport }, transport.state),
             relay = relay,
             liveViews = liveViewsSetting(settings, scope),
             scope = scope,

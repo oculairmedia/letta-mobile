@@ -5,6 +5,7 @@ import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.settings.SettingValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * letta-mobile-cdgpr.8: [PluginPackageUploader] over the canvas relay. The package goes into the
@@ -20,8 +21,17 @@ class RelayPluginPackageUploader(private val relay: CanvasRelayClient) : PluginP
     }
 }
 
-/** The host side of a [PluginViewsModel]: its admin_rpc [link], and [changes], each of which refreshes the model. */
-class PluginHostConnection(val link: PluginAdminLink, val changes: Flow<Any?>)
+/**
+ * The host side of a [PluginViewsModel]: its admin_rpc [link], and [changes], each signal of which
+ * refreshes the model. [onEachChange] turns any state flow into that signal.
+ */
+class PluginHostConnection(val link: PluginAdminLink, val changes: Flow<Unit>) {
+    companion object {
+        /** A connection refreshed on every value of [state] (the channel transport's state, say). */
+        fun <T> onEachChange(link: PluginAdminLink, state: Flow<T>): PluginHostConnection =
+            PluginHostConnection(link, state.map { })
+    }
+}
 
 /**
  * The shells' [PluginViewsModel] on [host]. It uses the admin_rpc catalog and view transport,
