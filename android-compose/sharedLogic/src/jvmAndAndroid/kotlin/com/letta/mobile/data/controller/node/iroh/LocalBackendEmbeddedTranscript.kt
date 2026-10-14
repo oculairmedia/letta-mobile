@@ -34,11 +34,15 @@ data class StoredToolResult(
  * value is ever materialized beyond its cap; a collapsed image/text value is rendered as a small
  * placeholder instead of dropping the row.
  *
- * Divergence from [LocalBackendMessageReader], kept on purpose and pinned by the app golden:
- * [readTranscript] projects FLAT rows only (the embedded runtime's pinned letta-code writes flat
- * rows), so session-log v3 envelopes are skipped there, while [readToolResults] unwraps them.
+ * Both reads share one row parser ([readMessageRows]): bounded lines, with session-log v3
+ * envelopes (`{type:message,message:{…}}`, written by letta-code 0.29.x) unwrapped to their
+ * message body via [LocalBackendLayout.messageBody] — the same unwrap [LocalBackendMessageReader]
+ * applies (letta-mobile-by4vm.73). [maxInlineValueChars] is the per-value cap (tests lower it).
  */
-internal class LocalBackendEmbeddedTranscript(private val baseDir: File) {
+internal class LocalBackendEmbeddedTranscript(
+    private val baseDir: File,
+    private val maxInlineValueChars: Int = BoundedTranscriptReader.DEFAULT_MAX_INLINE_VALUE_CHARS,
+) {
     // Decode-only reads of the on-disk transcript (letta-mobile-by4vm.20).
     private val json: Json = LettaJson.persisted
 
@@ -47,11 +51,22 @@ internal class LocalBackendEmbeddedTranscript(private val baseDir: File) {
         val transcript = File(conversationDir, LocalBackendLayout.TRANSCRIPT_FILE)
         if (!transcript.isFile) return emptyList()
         val blobStore = blobStoreFor(conversationDir)
-        return BoundedTranscriptReader.readLines(transcript).flatMapIndexed { index, boundedLine ->
-            val row = runCatching { json.parseToJsonElement(boundedLine.text).jsonObject }.getOrNull()
+        return readMessageRows(transcript).flatMapIndexed { index, row ->
             row?.let { projectRow(it, seqId = index + 1, blobStore) }.orEmpty()
         }
     }
+
+    /**
+     * The message body of every non-blank transcript line, in file order (null for an unparseable
+     * line, so callers keep 1-based line positions as seq ids). Read through
+     * [BoundedTranscriptReader] so no single JSON string value is materialized beyond
+     * [maxInlineValueChars] (letta-mobile-by4vm.74).
+     */
+    private fun readMessageRows(transcript: File): List<JsonObject?> =
+        BoundedTranscriptReader.readLines(transcript, maxInlineValueChars).map { boundedLine ->
+            runCatching { json.parseToJsonElement(boundedLine.text).jsonObject }.getOrNull()
+                ?.let(LocalBackendLayout::messageBody)
+        }
 
     /**
      * Tool results letta.js persisted for the default conversation, keyed by tool_call_id. The live
@@ -60,17 +75,18 @@ internal class LocalBackendEmbeddedTranscript(private val baseDir: File) {
     fun readToolResults(agentId: AgentId): Map<String, StoredToolResult> {
         val transcript = File(LocalBackendLayout.defaultConversationDir(baseDir, agentId), LocalBackendLayout.TRANSCRIPT_FILE)
         if (!transcript.isFile) return emptyMap()
-        return transcript.useLines { lines -> lines.filter { it.isNotBlank() }.mapNotNull(::toolResultOf).toMap() }
+        return readMessageRows(transcript).filterNotNull().mapNotNull(::toolResultOf).toMap()
     }
 
-    private fun toolResultOf(line: String): Pair<String, StoredToolResult>? {
-        val rawRow = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull() ?: return null
-        // Envelope-aware (letta-mobile-6ppdr): role/toolCallId/content live on the message BODY.
-        val row = LocalBackendLayout.messageBody(rawRow)
+    private fun toolResultOf(row: JsonObject): Pair<String, StoredToolResult>? {
         if (row.string("role") != "toolResult") return null
         val callId = row.string("toolCallId") ?: return null
+        // An oversized text value arrives as the bounded marker; render the size placeholder.
         val body = (row["content"] as? JsonArray)
-            ?.mapNotNull { part -> (part as? JsonObject)?.takeIf { it.string("type") == "text" }?.string("text") }
+            ?.filterIsInstance<JsonObject>()
+            ?.filter { it.string("type") == "text" }
+            ?.map(::collapseOversizedPart)
+            ?.mapNotNull { it.string("text") }
             ?.joinToString("\n")
             .orEmpty()
         return callId to StoredToolResult(toolCallId = callId, body = body, isError = row.isError())

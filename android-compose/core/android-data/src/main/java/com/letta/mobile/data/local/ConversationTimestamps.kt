@@ -3,48 +3,17 @@ package com.letta.mobile.data.local
 import android.database.Cursor
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteStatement
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
+import com.letta.mobile.data.model.ConversationRecency
 
 /**
  * letta-mobile-by4vm.19: turns a conversation's ISO-8601 timestamp into epoch millis so the
- * cached lists sort chronologically.
- *
- * Servers send `Z` and `+00:00` offsets, any fraction precision, and occasionally a naive
- * (offset-less, assumed UTC) or space-separated value. `Instant.parse` (what
- * `parseTimelineInstantOrNull` uses) rejects offsets other than `Z` on the API 26 java.time, so
- * this parses through [OffsetDateTime], which accepts every offset form on every supported API.
- * Anything unparseable maps to null, which the DAO sorts last.
+ * cached lists sort chronologically. letta-mobile-by4vm.72: delegates to the shared
+ * [ConversationRecency] parser, so the cache's epoch columns (and the DAO's
+ * `COALESCE(last, updated, created, 0) DESC, id` order) agree with every other conversation
+ * ordering. Anything unparseable maps to null, which the DAO sorts last.
  */
 internal object ConversationTimestamps {
-    private const val DATE_TIME_SEPARATOR_INDEX = 10
-
-    fun epochMillisOrNull(raw: String?): Long? {
-        val value = raw?.trim()?.takeIf { it.isNotEmpty() }?.let(::withIsoSeparator) ?: return null
-        return parseWithOffset(value) ?: parseNaiveAsUtc(value)
-    }
-
-    private fun withIsoSeparator(value: String): String =
-        if (value.length > DATE_TIME_SEPARATOR_INDEX && value[DATE_TIME_SEPARATOR_INDEX] == ' ') {
-            value.replaceRange(DATE_TIME_SEPARATOR_INDEX, DATE_TIME_SEPARATOR_INDEX + 1, "T")
-        } else {
-            value
-        }
-
-    private fun parseWithOffset(value: String): Long? = try {
-        OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant().toEpochMilli()
-    } catch (_: DateTimeParseException) {
-        null
-    }
-
-    private fun parseNaiveAsUtc(value: String): Long? = try {
-        LocalDateTime.parse(value, DateTimeFormatter.ISO_LOCAL_DATE_TIME).toInstant(ZoneOffset.UTC).toEpochMilli()
-    } catch (_: DateTimeParseException) {
-        null
-    }
+    fun epochMillisOrNull(raw: String?): Long? = ConversationRecency.epochMillisOrNull(raw)
 }
 
 /**
