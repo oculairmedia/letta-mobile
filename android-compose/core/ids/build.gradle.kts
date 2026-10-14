@@ -43,5 +43,11 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             }
         }
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.serialization.json)
+            }
+        }
     }
 }
