@@ -1,0 +1,65 @@
+{
+  "manifestVersion": 1,
+  "id": "letta.chart",
+  "name": "Chart",
+  "version": "1.0.0",
+  "publisher": "oculairmedia",
+  "contract": { "version": 1 },
+  "runtime": { "kind": "process", "command": "node", "args": ["server.mjs"], "cwd": "." },
+  "capabilities": ["canvas:place", "assets:write", "ui:pages"],
+  "elements": {
+    "chart": {
+      "schemaVersion": 1,
+      "props": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "title", "labels", "values"],
+        "properties": {
+          "kind": { "enum": ["bar", "line"] },
+          "title": { "type": "string", "maxLength": 120 },
+          "labels": { "type": "string", "maxLength": 1024, "description": "the labels as a JSON array of strings (props are flat)" },
+          "values": { "type": "string", "maxLength": 1024, "description": "the values as a JSON array of numbers (props are flat)" }
+        }
+      },
+      "defaultSize": { "width": 320, "height": 200 },
+      "page": "chart"
+    }
+  },
+  "actions": {
+    "plot": {
+      "description": "Place a bar or line chart on the canvas. labels and values are parallel arrays of the same length (1 to 24 points).",
+      "visibility": ["agent", "view"],
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "labels", "values"],
+        "properties": {
+          "kind": { "enum": ["bar", "line"], "description": "bar (the default) or line" },
+          "title": { "type": "string", "maxLength": 120 },
+          "labels": { "type": "array", "minItems": 1, "maxItems": 24, "items": { "type": "string", "maxLength": 32 } },
+          "values": { "type": "array", "minItems": 1, "maxItems": 24, "items": { "type": "number" } }
+        }
+      }
+    },
+    "toggle": {
+      "visibility": ["view"],
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["bar", "line"] },
+          "title": { "type": "string", "maxLength": 120 },
+          "labels": { "type": "string", "maxLength": 1024 },
+          "values": { "type": "string", "maxLength": 1024 }
+        }
+      }
+    }
+  },
+  "pages": {
+    "chart": {
+      "html": "pages/chart.html",
+      "csp": { "connectDomains": [], "resourceDomains": [], "frameDomains": [] },
+      "displayModes": ["inline", "fullscreen"]
+    }
+  }
+}
