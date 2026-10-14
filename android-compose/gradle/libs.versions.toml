@@ -76,14 +76,12 @@ core-ktx = "1.19.0"
 zxing-javase = "3.5.3"
 automerge = "0.0.9"
 jackson-yaml = "2.20.2"
-okhttp = "5.3.2"
 compose-runtime = "1.8.3"
 nucleus = "2.1.5"
 nucleus-native-tray = "2.1.6"
 jewel = "0.37.0-262.4852.51"
 kuiver = "0.3.0"
 colorpicker = "1.2.0"
-autolinktext = "2.0.2"
 texty = "1.0.0-alpha"
 calendar = "2.10.1"
 jcefmaven = "146.0.10"
@@ -91,12 +89,17 @@ rive = "11.12.0"
 jna = "5.17.0"
 skiko = "0.9.37.3"
 kotzilla = "2.3.3"
+# Gradle plugin versions that have no library sibling above.
+kover = "0.9.8"
+dependency-analysis = "3.5.1"
+compose-multiplatform = "1.10.0"
+compose-hot-reload = "1.2.0"
+paparazzi = "2.0.0-alpha05"
+sentry-gradle = "6.8.1"
+androidx-baselineprofile = "1.5.0-alpha06"
 compose-desktop-ui-test = "1.11.1"
 compose-desktop-material3 = "1.9.0"
 compose-desktop-material-icons = "1.7.3"
-compose-web = "1.10.0"
-compose-web-material3 = "1.9.0"
-compose-web-material-icons = "1.7.3"
 
 [libraries]
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
@@ -222,7 +225,6 @@ markdown-renderer-coil3 = { module = "com.mikepenz:multiplatform-markdown-render
 markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdown" }
 zxing-javase = { module = "com.google.zxing:javase", version.ref = "zxing-javase" }
 automerge = { module = "org.automerge:automerge", version.ref = "automerge" }
-okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 jackson-dataformat-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml", version.ref = "jackson-yaml" }
 filekit-core-jvm = { module = "io.github.vinceglb:filekit-core-jvm", version.ref = "filekit" }
 filekit-dialogs-compose-jvm = { module = "io.github.vinceglb:filekit-dialogs-compose-jvm", version.ref = "filekit" }
@@ -257,7 +259,6 @@ compose-desktop-material-icons = { module = "org.jetbrains.compose.material:mate
 skiko-awt = { module = "org.jetbrains.skiko:skiko-awt", version.ref = "skiko" }
 kuiver = { module = "io.github.justdeko:kuiver", version.ref = "kuiver" }
 colorpicker = { module = "codes.side:colorpicker", version.ref = "colorpicker" }
-autolinktext = { module = "sh.calvin.autolinktext:autolinktext", version.ref = "autolinktext" }
 texty = { module = "com.arjunjadeja:texty", version.ref = "texty" }
 calendar-compose-multiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
 jcefmaven = { module = "me.friwi:jcefmaven", version.ref = "jcefmaven" }
@@ -265,11 +266,6 @@ rive-android = { module = "app.rive:rive-android", version.ref = "rive" }
 jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 kotzilla-sdk-compose-jvm = { module = "io.kotzilla:kotzilla-sdk-compose-jvm", version.ref = "kotzilla" }
 compose-desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-desktop-ui-test" }
-compose-web-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-web" }
-compose-web-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-web" }
-compose-web-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-web-material3" }
-compose-web-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-web" }
-compose-web-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-web-material-icons" }
 
 [plugins]
 
@@ -283,3 +279,17 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+dependency-analysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependency-analysis" }
+# Keep the project plugin on 1.10.0 for the shared macOS x64 target, which Compose 1.11 no longer
+# publishes; see the root build script.
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+compose-hot-reload = { id = "org.jetbrains.compose.hot-reload", version.ref = "compose-hot-reload" }
+nucleus = { id = "dev.nucleusframework", version.ref = "nucleus" }
+paparazzi = { id = "app.cash.paparazzi", version.ref = "paparazzi" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+aboutlibraries-android = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutlibraries" }
+sentry-android = { id = "io.sentry.android.gradle", version.ref = "sentry-gradle" }
+androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "androidx-baselineprofile" }
+kotzilla = { id = "io.kotzilla.kotzilla-plugin", version.ref = "kotzilla" }
