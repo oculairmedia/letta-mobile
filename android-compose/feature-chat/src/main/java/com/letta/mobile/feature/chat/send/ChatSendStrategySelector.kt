@@ -14,7 +14,7 @@ import kotlinx.coroutines.Job
  * The mapping is total and exclusive:
  *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
  *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.REST]          -> [TimelineChatSendStrategy] (g70jb.4: this
+ *  - [BackendKind.DIRECT_WS]          -> [TimelineChatSendStrategy] (g70jb.4: this
  *                                   includes leftover shim-era configs)
  */
 internal class ChatSendStrategySelector(
@@ -29,7 +29,7 @@ internal class ChatSendStrategySelector(
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
             BackendKind.IROH -> irohStrategy
-            BackendKind.REST -> timelineStrategy
+            BackendKind.DIRECT_WS -> timelineStrategy
         }
     }
 

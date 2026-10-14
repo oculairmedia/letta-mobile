@@ -10,10 +10,10 @@ internal data class ChatSendContext(
      * letta-mobile-lgns8.10.4.1: routing keys on the backend KIND, not on a
      * boolean named `isShimBackend` that was true for Iroh.
      */
-    val backendKind: BackendKind = BackendKind.REST,
+    val backendKind: BackendKind = BackendKind.DIRECT_WS,
     val isLocalRuntime: Boolean = false,
 ) {
-    /** Iroh — i.e. a duplex frame channel rather than REST. */
+    /** Iroh — i.e. a duplex frame channel rather than a directly dialled App Server. */
     val usesChannelTransport: Boolean get() = backendKind.usesChannelTransport
 }
 

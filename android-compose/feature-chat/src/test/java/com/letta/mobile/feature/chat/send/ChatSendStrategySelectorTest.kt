@@ -10,7 +10,7 @@ import org.junit.Test
 
 class ChatSendStrategySelectorTest {
     @Test
-    fun `selects timeline strategy for a plain REST backend`() {
+    fun `selects timeline strategy for a direct ws backend`() {
         val f = Fixture()
 
         val selected = f.selector.select(

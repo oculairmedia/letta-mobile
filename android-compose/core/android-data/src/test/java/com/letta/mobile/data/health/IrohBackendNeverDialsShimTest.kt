@@ -50,11 +50,11 @@ class IrohBackendNeverDialsShimTest {
     }
 
     @Test
-    fun `routed kind classifies a plain address and a missing config as REST`() {
+    fun `routed kind classifies a ws address and a missing config as DIRECT_WS`() {
         for (config in listOf(config("ws://localhost:8291"), null)) {
             val kind = config.routedBackendKind()
 
-            assertEquals("config=$config", BackendKind.REST, kind)
+            assertEquals("config=$config", BackendKind.DIRECT_WS, kind)
             assertFalse(kind.usesChannelTransport)
         }
     }
