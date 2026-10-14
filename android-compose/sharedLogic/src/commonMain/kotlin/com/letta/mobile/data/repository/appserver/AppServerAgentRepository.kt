@@ -100,6 +100,7 @@ class AppServerAgentRepository(
     }
 
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) = operation()
+    override val supportsCreateAgent: Boolean get() = false
     override suspend fun createAgent(params: AgentCreateParams): Agent = unsupported("createAgent")
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = unsupported("updateAgent")
     override suspend fun deleteAgent(id: AgentId): Unit = unsupported("deleteAgent")

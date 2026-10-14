@@ -156,7 +156,8 @@ fun <T> ColumnScope.LettaPickerContent(
     slots: PickerSlots<T> = PickerSlots(),
 ) {
     val layout = remember(spec.sections, spec.query, spec.filterLocally) { PickerLayout.of(spec.sections, spec.query, spec.filterLocally) }
-    val highlight = remember(spec.query, layout.rows.size) { mutableIntStateOf(PickerKeys.initial(spec.mode, spec.query, layout.rows.size)) }
+    // letta-mobile-by4vm.47: keyed on the layout itself, so new rows of the same count start fresh.
+    val highlight = remember(spec.query, layout) { mutableIntStateOf(PickerKeys.initial(spec.mode, spec.query, layout.rows.size)) }
     val listState = rememberLazyListState()
     LaunchedEffect(highlight.intValue, layout) {
         if (highlight.intValue != PickerKeys.NONE) listState.reveal(layout.lineOf(highlight.intValue))

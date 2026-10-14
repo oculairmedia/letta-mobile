@@ -51,8 +51,20 @@ internal fun SessionGraph.toContextCardSession(): ContextCardSession {
 }
 
 internal fun contextCardSessions(graphs: StateFlow<SessionGraph>, scope: CoroutineScope): StateFlow<ContextCardSession> =
-    graphs.map { it.toContextCardSession() }
-        .stateIn(scope, SharingStarted.WhileSubscribed(SESSION_STOP_TIMEOUT_MS), graphs.value.toContextCardSession())
+    perGraph(graphs, scope, SessionGraph::toContextCardSession)
+
+/**
+ * letta-mobile-by4vm.47: [build] runs once per graph. The StateFlow replays its current graph to
+ * every (re)subscription; without the memo that replay rebuilt the initial value's controllers and
+ * dropped whatever the card had already started (a running compaction).
+ */
+internal fun <G : Any, S> perGraph(graphs: StateFlow<G>, scope: CoroutineScope, build: (G) -> S): StateFlow<S> {
+    val initialGraph = graphs.value
+    var last: Pair<G, S> = initialGraph to build(initialGraph)
+    return graphs.map { graph ->
+        last.takeIf { it.first === graph }?.second ?: build(graph).also { last = graph to it }
+    }.stateIn(scope, SharingStarted.WhileSubscribed(SESSION_STOP_TIMEOUT_MS), last.second)
+}
 
 private const val SESSION_STOP_TIMEOUT_MS = 5_000L
 
