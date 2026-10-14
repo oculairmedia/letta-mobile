@@ -42,11 +42,11 @@ internal object IrohAdminOwnershipMatrix {
         .sorted()
 
     /**
-     * Bounded services (admin REST, VibeSync) that are NOT injected in the gate:
+     * Bounded services (admin REST, VibeSync, the plugin host) that are NOT injected in the gate:
      * they must degrade to a clean `success:false`, never throw or hang.
      */
     fun boundedServiceMethods(): List<String> = operations
-        .filter { it.requiredString("post_shim_owner") in setOf("admin_rest_service", "vibesync_service") }
+        .filter { it.requiredString("post_shim_owner") in BOUNDED_SERVICE_OWNERS }
         .map { it.requiredString("method") }
         .sorted()
 
@@ -61,6 +61,20 @@ internal object IrohAdminOwnershipMatrix {
         .sorted()
 
     const val LOCAL_BACKEND_STORE_OWNER: String = "local_backend_store"
+
+    /**
+     * Owners whose service the gate does not inject. letta-mobile-cdgpr.7: `plugin_host` is the JVM
+     * wrapper's plugin runtime (`--plugins=on`); without it `plugins.*` answer capability_unavailable.
+     */
+    val BOUNDED_SERVICE_OWNERS: Set<String> = setOf("admin_rest_service", "vibesync_service", PLUGIN_HOST_OWNER)
+
+    const val PLUGIN_HOST_OWNER: String = "plugin_host"
+
+    /** letta-mobile-cdgpr.7: the methods the plugin host serves when one is injected. */
+    fun pluginHostMethods(): List<String> = operations
+        .filter { it.requiredString("post_shim_owner") == PLUGIN_HOST_OWNER }
+        .map { it.requiredString("method") }
+        .sorted()
 
     fun fixtureJson(name: String): JsonObject {
         val stream = checkNotNull(javaClass.getResourceAsStream("/appserver/$name")) { "Missing fixture $name" }

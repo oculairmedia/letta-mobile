@@ -59,6 +59,8 @@ fun buildProductionAdminRouter(
     pairingQr: com.letta.mobile.data.controller.node.iroh.PairingQrConfig? = null,
     /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to conversation viewers. */
     permissionModes: com.letta.mobile.data.controller.node.iroh.PermissionModePublisher? = null,
+    /** letta-mobile-cdgpr.7: the plugin host's `plugins.*` handlers; null when plugins are off. */
+    pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
 ): AdminRpcRouter {
     val skillsCatalog = NativeSkillsCatalog()
     // Cold-start discovery: hydrate BEFORE the router is built, so the very first
@@ -115,6 +117,7 @@ fun buildProductionAdminRouter(
         turnIdentity = turnIdentity,
         pairingQr = pairingQr,
         permissionModes = permissionModes,
+        pluginRoutes = pluginRoutes,
     ).also { router ->
         if (nativeSource?.changeListener != null) router.featureCapabilities += ControllerSubagentRegistrySource.PUSH_CAPABILITY
     }
