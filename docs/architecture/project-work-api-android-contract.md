@@ -1,7 +1,5 @@
 # Android Project Work API Contract
 
-> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `ProjectApi.kt`, `ProjectWorkApi.kt`. Read references to them as historical; current code is the source of truth.
-
 Android uses the Vibe Sync Project / Beads Work API as the canonical project-work source for native project workspace screens.
 
 ## Canonical endpoints
@@ -46,11 +44,10 @@ Explicit tombstone records are not part of v1 incremental sync. Android must not
 
 The current Android data contract lives in:
 
-- `android-compose/core/src/main/java/com/letta/mobile/data/model/Project.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/model/ProjectWork.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/api/ProjectApi.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/api/ProjectWorkApi.kt`
-- `android-compose/core/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
+- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Project.kt`
+- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/ProjectWork.kt`
+- ~~`ProjectApi.kt`~~, ~~`ProjectWorkApi.kt`~~ — removed with the Letta REST backend in the hard cut (letta-mobile-ckmub); no REST client remains
+- `android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/ProjectWorkRepository.kt`
 
 Focused coverage lives in:
 

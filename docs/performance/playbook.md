@@ -35,7 +35,7 @@ reference docs land. Tracked in `letta-mobile-84oa`.
 
 **Trigger.** `Android Perf Gate / perf-gate` CI job failed on a PR, or a
 local macrobench run shows `startup.cold.p95_ms` above the
-`+20%` ceiling defined in `android-compose/perf/baselines.json`.
+`+50%` ceiling defined in `android-compose/perf/baselines.json` (letta-mobile-3gpwo).
 
 **Do this.**
 
@@ -67,9 +67,11 @@ local macrobench run shows `startup.cold.p95_ms` above the
 
 **Do not.**
 
-- Do not loosen `startup.cold.p95_ms` past `+20%` to make a PR pass without a
-  documented baseline change. The current `+20%` envelope already accounts
-  for measured shared-runner drift up to `+17.2%`.
+- Do not loosen `startup.cold.p95_ms` past `+50%` to make a PR pass without a
+  documented baseline change. The `+50%` envelope (ceiling `2269.1 ms`,
+  letta-mobile-3gpwo) already accounts for shared-runner noise: unrelated runs
+  measured cold p95 of `1955-2091 ms` against the former `+20%` ceiling
+  (`1815.3 ms`). See [`perf-gate.md`](perf-gate.md).
 - Do not move warm startup back into the gate. Warm startup is informational
   on this runner because of one-sided spikes that are runner noise, not real
   regressions.
@@ -299,7 +301,7 @@ Related artifacts:
 
 Related beads:
 
-- `letta-mobile-o7ob.4.1` — original perf gate landing (context for the `+20%` cold-start envelope).
+- `letta-mobile-o7ob.4.1` — original perf gate landing (context for the original `+20%` cold-start envelope, since widened to `+50%` by letta-mobile-3gpwo).
 - `letta-mobile-o7ob.3.4` — production JankStats sampling.
 - `letta-mobile-o7ob.3.5` — Sentry ANR / crash budget dashboard.
 - `letta-mobile-4ccv` — extend the perf gate with FrameTimingMetric benchmarks once a deterministic launch route exists.

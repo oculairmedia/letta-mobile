@@ -1,7 +1,5 @@
 # KMP Extraction Current State
 
-> **Status note (2026-10-13, letta-mobile-by4vm.34):** these files named below are no longer in the tree (deleted in the hard cut, or proposed and never landed): `ChannelTransport.kt`. Read references to them as historical; current code is the source of truth.
-
 Last updated: 2026-06-06 on branch `codex/windows-chat-ui-decision`.
 
 ## Goal
@@ -79,7 +77,7 @@ straight file move.
 | `IAllConversationsRepository` / `IMessageRepository` | Expose Android Paging and legacy Android UI message models; keep them platform-side until desktop needs a common paging/streaming list contract. |
 | `IFolderRepository` / `IGroupRepository` | Expose Ktor `ContentType` / `ByteReadChannel`; extract a common non-streaming/non-upload subset separately if another platform needs it. |
 | `SseParser.kt` / `Utf8LineReader.kt` | Ktor channel parser plus Android logging. `SseFrame` is shared; parser adapters should be platform-specific or rebuilt around a common byte/line abstraction. |
-| `ChannelTransport.kt`, `WsChatBridge.kt`, `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared transport/frame/cursor contracts are extracted. |
+| ~~`ChannelTransport.kt`~~ (removed), `WsChatBridge.kt` (now in `sharedLogic/.../data/transport/`), `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared transport/frame/cursor contracts are extracted. |
 | Compose A2UI renderers | Android `designsystem` still owns concrete widget rendering, haptics, URL opening, and Android action handling. Shared A2UI protocol/action/data model contracts are extracted. |
 
 ## Extraction Pivot
