@@ -2,6 +2,6 @@
   "database": "jsonl",
   "backend": "dolt",
   "dolt_mode": "embedded",
-  "dolt_database": "beads",
+  "dolt_database": "letta_mobile",
   "project_id": "6493891b-aa7b-4882-8461-2ea827354dbc"
 }
