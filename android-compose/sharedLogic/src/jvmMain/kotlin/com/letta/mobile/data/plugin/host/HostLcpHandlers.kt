@@ -23,7 +23,7 @@ fun interface PluginLogSink {
     companion object {
         val TELEMETRY = PluginLogSink { pluginId, line ->
             val fields = line.fields.map { (key, value) -> "field.$key" to value }.toTypedArray()
-            Telemetry.event(PluginRefusals.TAG, "plugin.log", "plugin" to pluginId, "message" to line.message, *fields, level = levelOf(line.level))
+            PluginHostEvents.log(pluginId, levelOf(line.level), "message" to line.message, *fields)
         }
 
         private fun levelOf(level: LogLevel): Telemetry.Level = when (level) {
@@ -71,7 +71,7 @@ class HostLcpHandlers(
             throw refusals.refuse(pluginId, PluginRefusal.CONTENT_TYPE, "'${asset.mediaType}' is not one of $ALLOWED_MEDIA_TYPES")
         }
         val ref = AssetRefs.PREFIX + asset.sha256
-        if (assets.has(ref)) return ref
+        if (assets.has(ref)) return ref.also { recordAsset(0L, mediaType) }
         val size = asset.bytes.size.toLong()
         if (!quota.tryCharge(pluginId, size)) {
             throw refusals.refuse(pluginId, PluginRefusal.ASSET_QUOTA, "$size bytes would cross ${quota.limit.amount} bytes per ${quota.limit.window}")
@@ -79,6 +79,7 @@ class HostLcpHandlers(
         return runCatching { assets.put(mediaType, asset.bytes).ref }
             .onFailure { quota.refund(pluginId, size) }
             .getOrThrow()
+            .also { recordAsset(size, mediaType) }
     }
 
     override suspend fun readElements(query: ElementQuery): List<PluginElementView> =
@@ -88,6 +89,9 @@ class HostLcpHandlers(
         if (!limits.tryLog(pluginId)) return refusals.record(pluginId, PluginRefusal.LOG_DROPPED)
         logSink.write(pluginId, scrub(line))
     }
+
+    private fun recordAsset(bytes: Long, mediaType: String) =
+        PluginHostEvents.record(PluginHostEvent.ASSET, pluginId, "bytes" to bytes.toString(), "mediaType" to mediaType)
 
     private fun scrub(line: LogParams): LogParams {
         val encoded = LcpWire.json.encodeToJsonElement(LogParams.serializer(), line)

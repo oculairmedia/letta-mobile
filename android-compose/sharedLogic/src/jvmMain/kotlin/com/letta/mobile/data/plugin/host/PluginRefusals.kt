@@ -3,7 +3,6 @@ package com.letta.mobile.data.plugin.host
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.wire.LcpCallException
 import com.letta.mobile.data.plugin.wire.LcpErrorCode
-import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.serialization.json.buildJsonObject
@@ -61,7 +60,7 @@ class PluginRefusals {
 
     fun record(pluginId: String, refusal: PluginRefusal) {
         synchronized(lock) { counts[pluginId to refusal] = (counts[pluginId to refusal] ?: 0) + 1 }
-        Telemetry.event(TAG, "refused", "plugin" to pluginId, "reason" to refusal.wire, level = Telemetry.Level.WARN)
+        PluginHostEvents.record(PluginHostEvent.REFUSED, pluginId, "reason" to refusal.wire)
     }
 
     fun count(pluginId: String, refusal: PluginRefusal): Int = synchronized(lock) { counts[pluginId to refusal] ?: 0 }
@@ -78,6 +77,6 @@ class PluginRefusals {
     }
 
     companion object {
-        const val TAG: String = "PluginHost"
+        const val TAG: String = PluginHostEvents.TAG
     }
 }

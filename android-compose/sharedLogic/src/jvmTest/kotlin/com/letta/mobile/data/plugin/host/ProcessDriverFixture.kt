@@ -8,6 +8,7 @@ import com.letta.mobile.data.plugin.PluginSecretDecl
 import com.letta.mobile.data.plugin.PluginSecrets
 import com.letta.mobile.data.plugin.PluginSettingField
 import com.letta.mobile.data.plugin.PluginSettingType
+import com.letta.mobile.data.plugin.wire.LcpHostHandlers
 import com.letta.mobile.data.plugin.wire.LcpPluginSession
 import com.letta.mobile.data.plugin.wire.RecordingHost
 import com.letta.mobile.plugin.api.ActionCall
@@ -36,19 +37,21 @@ class ProcessDriverFixture(
     options: (ProcessDriverOptions) -> ProcessDriverOptions = { it },
     confinement: ProcessConfinementSource = ProcessConfinementSource { ProcessConfinement.Unconfined },
     env: Map<String, String> = DEFAULT_ENV,
+    handlers: LcpHostHandlers? = null,
+    manifest: PluginManifest = manifest(mode, env),
 ) {
     val packageDir: Path = Files.createTempDirectory("lcp-fake-plugin")
     val stderr: MutableList<String> = CopyOnWriteArrayList()
     val host = RecordingHost()
     val driver = ProcessPluginDriver(
         spec = ProcessPluginSpec(
-            manifest = manifest(mode, env),
+            manifest = manifest,
             packageDir = packageDir,
             settings = buildJsonObject { put("greeting", "hello from settings") },
             secrets = PluginSecrets().with("apiToken", SECRET),
             consentedCapabilities = setOf(PluginCapability.CANVAS_PLACE),
         ),
-        handlers = host,
+        handlers = handlers ?: host,
         scope = scope,
         options = options(
             ProcessDriverOptions(

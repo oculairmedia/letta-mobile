@@ -4,6 +4,8 @@ import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.plugin.host.LateBoundPluginKinds
 import com.letta.mobile.data.plugin.host.PluginHostConfig
+import com.letta.mobile.data.plugin.host.PluginHostEvent
+import com.letta.mobile.data.plugin.host.PluginHostEvents
 import com.letta.mobile.data.plugin.host.PluginHostRuntime
 import com.letta.mobile.data.plugin.host.ProcessDriverOptions
 import com.letta.mobile.data.storage.AssetStore
@@ -42,6 +44,7 @@ internal suspend fun startPluginHost(
 ): PluginHostRuntime? {
     if (flags.off) {
         println("[iroh-app-server] Plugins: OFF (--plugins=off)")
+        PluginHostEvents.record(PluginHostEvent.KILL_SWITCH, PluginHostEvents.ALL, "scope" to "global", "plugins" to "0")
         return null
     }
     val root = flags.root()
