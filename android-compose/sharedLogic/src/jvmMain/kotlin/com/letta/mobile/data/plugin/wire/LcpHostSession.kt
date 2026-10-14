@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration
 
 /** What the host does for a plugin's calls (SPI `PluginHost`); the guards have already held each call. */
 interface LcpHostHandlers {
@@ -97,11 +98,15 @@ class LcpHostSession(transport: LcpTransport, binding: LcpHostBinding, scope: Co
         peer.call(LcpCalls.ACTIVATE, LcpEmpty)
     }
 
-    suspend fun health(): PluginHealth = peer.call(LcpCalls.HEALTH, LcpEmpty)
+    /** [timeout] narrows the method's deadline (null: [LcpMethod.HEALTH]'s own). */
+    suspend fun health(timeout: Duration? = null): PluginHealth = peer.call(LcpCalls.HEALTH, LcpEmpty, timeout)
 
-    /** Runs an action (SPI `CanvasPlugin.invoke`); the plugin's own failure is [ActionResult.Error], a protocol failure throws. */
-    suspend fun invoke(call: ActionCall): ActionResult = try {
-        peer.call(LcpCalls.INVOKE, call)
+    /**
+     * Runs an action (SPI `CanvasPlugin.invoke`); the plugin's own failure is [ActionResult.Error], a protocol failure throws.
+     * [timeout] narrows the method's deadline (null: [LcpMethod.INVOKE]'s own).
+     */
+    suspend fun invoke(call: ActionCall, timeout: Duration? = null): ActionResult = try {
+        peer.call(LcpCalls.INVOKE, call, timeout)
     } catch (e: LcpCallException) {
         if (e.code != LcpErrorCode.ACTION_FAILED) throw e
         ActionResult.Error(actionCodeOf(e.error), e.error.message)
