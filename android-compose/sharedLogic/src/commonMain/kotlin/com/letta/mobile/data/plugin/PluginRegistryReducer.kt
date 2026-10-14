@@ -12,6 +12,8 @@ sealed interface PluginCommand {
         val nowEpochMs: Long,
         /** Null for a plugin with no settings set yet: every required field without a default is missing. */
         val settingsSummary: PluginSettingsSummary? = null,
+        /** Install now and ask later: [consent] is ignored, the plugin holds [PluginConsent.none] until [RecordConsent]. */
+        val awaitingConsent: Boolean = false,
     ) : PluginCommand {
         override val pluginId: String get() = manifest.id
     }
@@ -23,6 +25,8 @@ sealed interface PluginCommand {
         val consent: PluginConsent?,
         val nowEpochMs: Long,
         val settingsSummary: PluginSettingsSummary? = null,
+        /** Stage even when the update asks for more: it keeps the old consent, so it cannot be enabled until [RecordConsent]. */
+        val awaitingConsent: Boolean = false,
     ) : PluginCommand {
         override val pluginId: String get() = manifest.id
     }
@@ -152,7 +156,7 @@ internal object PluginLifecycle {
     private fun enable(state: PluginRegistryState, plugin: InstalledPlugin): PluginTransition = when {
         plugin.state.advertises -> PluginTransition.Applied(state)
         !plugin.ready -> PluginRegistryReducer.refuse(PluginRefusal.NOT_READY, "${plugin.id} needs its required settings and secrets before it can be enabled")
-        !plugin.consent.covers(plugin.manifest) -> PluginRegistryReducer.refuse(
+        !plugin.consented -> PluginRegistryReducer.refuse(
             PluginRefusal.CONSENT_REQUIRED, "${plugin.id} asks for more than was consented to", PluginConsentDiff.between(plugin.consent, plugin.manifest),
         )
         else -> PluginRegistryReducer.applied(state, plugin.copy(state = PluginState.Enabled))
