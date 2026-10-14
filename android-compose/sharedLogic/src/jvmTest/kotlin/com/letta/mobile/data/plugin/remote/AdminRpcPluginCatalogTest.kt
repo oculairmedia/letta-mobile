@@ -71,6 +71,26 @@ class AdminRpcPluginCatalogTest {
         assertTrue(refused.reason.startsWith("the host's answer could not be read"), refused.reason)
     }
 
+    @Test
+    fun theManifestTheHostSendsReachesTheSummary() = runTest {
+        val manifest = com.letta.mobile.data.plugin.PluginManifest(
+            manifestVersion = 1, id = "letta.chart", name = "Chart", version = "1.2.0", publisher = "letta",
+            contract = com.letta.mobile.data.plugin.PluginContract(1),
+            runtime = com.letta.mobile.data.plugin.PluginRuntime.Process("node", listOf("server.mjs")),
+            pages = mapOf("chart" to com.letta.mobile.data.plugin.PluginPage("pages/chart.html")),
+        )
+        val wire = com.letta.mobile.data.plugin.catalog.PluginPluginsWire(
+            listOf(com.letta.mobile.data.plugin.catalog.PluginSummaryWire("letta.chart", "Chart", "1.2.0", PluginState.Active, manifest = manifest)),
+        )
+        val catalog = AdminRpcPluginCatalog(
+            CannedLink(PluginAdminRpc.json.encodeToJsonElement(com.letta.mobile.data.plugin.catalog.PluginPluginsWire.serializer(), wire)),
+        ) { _, _ -> error("unused") }
+
+        catalog.refresh()
+
+        assertEquals(manifest, catalog.plugins.value.single().manifest)
+    }
+
     private class CannedLink(private val answer: kotlinx.serialization.json.JsonElement) : PluginAdminLink {
         override val hostCapabilities: Set<String> = setOf(PluginAdminRpc.CAPABILITY)
         val methods = mutableListOf<String>()

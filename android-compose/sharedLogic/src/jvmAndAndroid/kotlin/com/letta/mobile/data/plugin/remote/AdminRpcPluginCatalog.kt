@@ -2,7 +2,7 @@ package com.letta.mobile.data.plugin.remote
 
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
-import com.letta.mobile.data.plugin.catalog.PluginCatalog
+import com.letta.mobile.data.plugin.catalog.HostPluginCatalog
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.plugin.catalog.PluginGrants
 import com.letta.mobile.data.plugin.catalog.PluginId
@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap
  * On a host that does not advertise `plugins_v1` ([supported] false) nothing is sent: every call
  * answers [PLUGINS_UNSUPPORTED] and the page should not be offered.
  */
-class AdminRpcPluginCatalog(private val link: PluginAdminLink, private val uploader: PluginPackageUploader) : PluginCatalog {
+class AdminRpcPluginCatalog(private val link: PluginAdminLink, private val uploader: PluginPackageUploader) : HostPluginCatalog {
     constructor(client: IrohAdminRpcClient, uploader: PluginPackageUploader) : this(client.asPluginAdminLink(), uploader)
 
     private val state = MutableStateFlow<List<PluginSummary>>(emptyList())
@@ -43,10 +43,10 @@ class AdminRpcPluginCatalog(private val link: PluginAdminLink, private val uploa
     override val plugins: StateFlow<List<PluginSummary>> = state.asStateFlow()
 
     /** Whether the connected host runs plugins; read it after connecting (capabilities arrive with auth). */
-    val supported: Boolean get() = link.supportsPlugins
+    override val supported: Boolean get() = link.supportsPlugins
 
     /** Reloads [plugins] from the host. */
-    suspend fun refresh(): PluginCatalogResult<Unit> = listed(link.call(PluginAdminRpc.LIST))
+    override suspend fun refresh(): PluginCatalogResult<Unit> = listed(link.call(PluginAdminRpc.LIST))
 
     override suspend fun install(fileBytes: ByteArray, sha256: String): PluginCatalogResult<PluginInstallRequest> {
         if (!supported) return PluginCatalogResult.Refused(PLUGINS_UNSUPPORTED)

@@ -2,13 +2,10 @@ package com.letta.mobile.pluginview
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.plugin.PluginCapability
-import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.view.PluginViewConsent
 import com.letta.mobile.data.plugin.view.PluginViewTransport
-import com.letta.mobile.data.plugin.view.ViewHostContext
 import com.letta.mobile.data.plugin.view.ViewLinkPolicy
 import com.letta.mobile.data.plugin.view.ViewPlatform
-import kotlinx.serialization.json.JsonObject
 
 /**
  * What a shell gives its live views on one board: which canvas they belong to, how they reach the
@@ -30,15 +27,8 @@ data class PluginViewEnvironment(
 }
 
 /**
- * An installed plugin as the client knows it from the host's catalog: its [manifest] and the
- * values of its settings. Pages only ever see the public part ([publicSettings]).
+ * An installed plugin as the client knows it from the host's catalog. It lives in sharedLogic
+ * (letta-mobile-cdgpr.8) so the shared [com.letta.mobile.data.plugin.view.PluginViewsModel] can
+ * hand the shells their list; this name stays for the renderer.
  */
-@Immutable
-data class PluginViewPlugin(val manifest: PluginManifest, val settings: JsonObject = JsonObject(emptyMap())) {
-    /** The settings a page may see: only the fields the manifest declares, never secrets. */
-    val publicSettings: JsonObject get() = ViewHostContext.publicSettings(manifest, settings)
-
-    /** The page of each element kind that declares one the manifest has, by kind. */
-    val livePages: Map<String, String>
-        get() = manifest.elements.mapNotNull { (kind, spec) -> spec.page?.takeIf { it in manifest.pages }?.let { kind to it } }.toMap()
-}
+typealias PluginViewPlugin = com.letta.mobile.data.plugin.view.PluginViewPlugin

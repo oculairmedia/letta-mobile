@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalUriHandler
-import com.letta.mobile.data.plugin.catalog.pluginsSettingsContribution
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.ChatSettings
@@ -31,6 +30,7 @@ import com.letta.mobile.ui.settings.SettingsPageServices
 import com.letta.mobile.ui.settings.SettingsPageState
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.shellSettingsPage
+import com.letta.mobile.ui.shell.pages.plugins.rememberPluginsContributions
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.systemcolor.isSystemInHighContrast
 import dev.nucleusframework.systemcolor.systemAccentColor
@@ -98,7 +98,7 @@ private fun desktopContributions(inputs: DestinationContentInputs, actions: Dest
         SettingsContribution(SettingsGroup.Appearance, railSection(inputs.railRecencyDays, actions.onRailRecencyDaysChange)),
         SettingsContribution(SettingsGroup.Appearance, rememberSystemAppearance()),
         SettingsContribution(SettingsGroup.Notifications, desktopNotificationsSection(nucleus, actions.nucleus.onTestNotification)),
-    ) + about.map { SettingsContribution(SettingsGroup.About, it) } + pluginsSettingsContribution(actions.onOpenPlugins)
+    ) + about.map { SettingsContribution(SettingsGroup.About, it) } + rememberPluginsContributions(actions.pluginViews, actions.onOpenPlugins)
 }
 
 /** The bundled runtime's sections, with the two folder pickers they open. */

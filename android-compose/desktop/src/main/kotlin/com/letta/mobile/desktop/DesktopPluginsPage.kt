@@ -2,7 +2,7 @@ package com.letta.mobile.desktop
 
 import com.letta.mobile.data.plugin.catalog.PluginPackageFile
 import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
-import com.letta.mobile.data.plugin.catalog.inMemoryLiveViewsSetting
+import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.pages.plugins.PluginsPageBinding
@@ -14,17 +14,17 @@ import java.awt.Frame
 import java.io.File
 
 /**
- * letta-mobile-cdgpr.9: the desktop's binding of the shared Plugins page: the platform file dialog
- * for a package, and the catalog. C7 (letta-mobile-cdgpr.7) binds the admin_rpc catalog in place of
- * [UnavailablePluginCatalog]; C8 persists the live-views switch per device. No UI here.
+ * letta-mobile-cdgpr.9/.8: the desktop's binding of the shared Plugins page: the platform file
+ * dialog for a package, and the window's [PluginViewsModel]. The model supplies the admin_rpc
+ * catalog while the host runs plugins, and the persisted live-views switch. Without a model, the
+ * page lists nothing and refuses every call. No UI here.
  */
-internal fun desktopPluginsPage(): ShellPageContent<ShellDestination.Plugins> = shellPluginsPage(DesktopPluginsBinding)
-
-private val DesktopPluginsBinding = PluginsPageBinding(
-    catalog = UnavailablePluginCatalog(),
-    pickPackage = ::pickPluginPackage,
-    liveViews = inMemoryLiveViewsSetting(),
-)
+internal fun desktopPluginsPage(pluginViews: PluginViewsModel?): ShellPageContent<ShellDestination.Plugins> =
+    if (pluginViews != null) {
+        shellPluginsPage(pluginViews, ::pickPluginPackage)
+    } else {
+        shellPluginsPage(PluginsPageBinding(UnavailablePluginCatalog(), ::pickPluginPackage))
+    }
 
 /** The AWT file dialog (modal, on the UI thread), then the chosen file read off it, at most one byte over the page's limit. */
 private suspend fun pickPluginPackage(): PluginPackageFile? {

@@ -3,6 +3,7 @@ package com.letta.mobile.data.plugin.catalog
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
+import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,6 +71,8 @@ data class PluginSummary(
     val health: PluginHealth = PluginHealth.Unknown,
     /** The last fault the host recorded (a failed update, a crash), shown even after the plugin recovered. */
     val lastFault: String? = null,
+    /** The installed version's manifest, when the host sent it (letta-mobile-cdgpr.8): its element kinds and pages. */
+    val manifest: PluginManifest? = null,
 ) {
     /** Whether the plugin is switched on (its tools advertised). */
     val enabled: Boolean get() = state.advertises

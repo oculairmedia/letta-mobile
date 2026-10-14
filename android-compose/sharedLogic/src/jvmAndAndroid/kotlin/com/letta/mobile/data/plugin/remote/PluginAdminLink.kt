@@ -3,6 +3,7 @@ package com.letta.mobile.data.plugin.remote
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.repository.IrohAdminRpcClient
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +23,20 @@ fun IrohAdminRpcClient.asPluginAdminLink(): PluginAdminLink = object : PluginAdm
 
     override suspend fun adminRpc(method: String, params: JsonObject) =
         channelTransport.adminRpc(method, PluginAdminRpc.PATH, params.toString())
+}
+
+/**
+ * letta-mobile-cdgpr.8: a [PluginAdminLink] over whichever channel transport is current. [transport]
+ * is read on every call, so a host that swaps transports (a reconnect, a backend switch) is followed.
+ * With no transport the host advertises nothing, and no call is sent.
+ */
+fun pluginAdminLinkOver(transport: () -> IChannelTransport?): PluginAdminLink = object : PluginAdminLink {
+    override val hostCapabilities: Set<String> get() = transport()?.hostCapabilities.orEmpty()
+
+    override suspend fun adminRpc(method: String, params: JsonObject): AppServerInboundFrame.AdminRpcResponse {
+        val channel = transport() ?: throw IllegalStateException("Not connected to a host")
+        return channel.adminRpc(method, PluginAdminRpc.PATH, params.toString())
+    }
 }
 
 /**

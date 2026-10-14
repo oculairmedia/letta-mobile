@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.catalog
 
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
+import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginPage
 import com.letta.mobile.data.plugin.PluginState
 import kotlinx.serialization.SerialName
@@ -60,8 +61,10 @@ data class PluginSummaryWire(
     val health: PluginHealth = PluginHealth.Unknown,
     val consented: Boolean = false,
     @SerialName("last_fault") val lastFault: String? = null,
+    /** The installed version's manifest, so a client knows its element kinds and pages (letta-mobile-cdgpr.8). */
+    val manifest: PluginManifest? = null,
 ) {
-    fun toSummary(): PluginSummary = PluginSummary(PluginId(id), name, version, state, health, lastFault)
+    fun toSummary(): PluginSummary = PluginSummary(PluginId(id), name, version, state, health, lastFault, manifest)
 }
 
 /** What an installed version asks the owner to consent to, from its manifest. */

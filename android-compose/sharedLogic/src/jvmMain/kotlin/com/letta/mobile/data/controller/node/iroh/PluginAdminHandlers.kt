@@ -119,7 +119,10 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
     private fun summaries(): List<PluginSummaryWire> {
         val drivers = runtime.health().associate { it.pluginId to it.driver }
         return runtime.state.value.plugins.map { plugin ->
-            PluginSummaryWire(plugin.id, plugin.manifest.name, plugin.version, plugin.state, healthOf(plugin, drivers[plugin.id]), plugin.consented, plugin.lastFault)
+            PluginSummaryWire(
+                plugin.id, plugin.manifest.name, plugin.version, plugin.state, healthOf(plugin, drivers[plugin.id]),
+                plugin.consented, plugin.lastFault, plugin.manifest,
+            )
         }
     }
 

@@ -105,6 +105,8 @@ internal data class DestinationContentActions(
     val onOpenProviders: () -> Unit = {},
     /** Settings' Plugins section opens the Plugins destination (letta-mobile-cdgpr.9). */
     val onOpenPlugins: () -> Unit = {},
+    /** Whether the host runs plugins; the Plugins section is hidden while it does not (letta-mobile-cdgpr.8). */
+    val pluginViews: com.letta.mobile.data.plugin.view.PluginViewsModel? = null,
     val nucleus: DestinationNucleusActions,
     val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
     val localBackendDirectory: DesktopLocalBackendDirectoryActions,
