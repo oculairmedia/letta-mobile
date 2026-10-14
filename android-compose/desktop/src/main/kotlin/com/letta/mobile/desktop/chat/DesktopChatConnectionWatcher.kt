@@ -28,10 +28,15 @@ internal class DesktopChatConnectionWatcher(
     @Volatile
     private var currentOutage: OutageTracker? = null
 
+    /** letta-mobile-by4vm.9: the bound gateway redials on its own; only its give-up escalates. */
+    @Volatile
+    private var reconnectOwner: DesktopReconnectOwningGateway? = null
+
     fun start(gateway: DesktopChatGateway?) {
         connectionJob?.cancel()
         connectionJob = null
         currentOutage = null
+        reconnectOwner = (gateway as? DesktopReconnectOwningGateway)?.takeIf { it.ownsReconnect }
         val statusGateway = gateway as? ConnectionStatusGateway ?: return
         val outage = OutageTracker()
         currentOutage = outage
@@ -55,14 +60,17 @@ internal class DesktopChatConnectionWatcher(
         connectionJob?.cancel()
         connectionJob = null
         currentOutage = null
+        reconnectOwner = null
     }
 
     /**
-     * The machine woke from sleep (letta-mobile-bzvro.4, F04). A connection that is down now is
-     * almost certainly the sleep's doing, so retry at once instead of waiting out the sustained
-     * outage window. Returns true when a retry was triggered.
+     * The machine woke from sleep (letta-mobile-bzvro.4, F04). A gateway that reconnects itself is
+     * told to redial now (letta-mobile-by4vm.9). Otherwise a connection that is down now is almost
+     * certainly the sleep's doing, so retry at once instead of waiting out the sustained outage
+     * window. Returns true when a retry was triggered.
      */
     fun onSystemResumed(): Boolean {
+        if (reconnectOwner?.resumeSession() == true) return true
         val outage = currentOutage ?: return false
         if (!outage.isDown.get()) return false
         outageEscalated = true
@@ -110,6 +118,9 @@ internal class DesktopChatConnectionWatcher(
     ) {
         if (transportState.isAuthFailure) {
             outage.markUp()
+        } else if (transportState.willReconnect && reconnectOwner != null) {
+            // The gateway's own owner is redialling; rebuilding it would kill the turns it keeps.
+            outage.sawDisconnect.set(true)
         } else {
             outage.sawDisconnect.set(true)
             outage.isDown.set(true)
