@@ -14,13 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.desktop.phone.DesktopShellRow
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
@@ -30,7 +30,6 @@ import com.letta.mobile.desktop.phone.sidebarVisible
 import com.letta.mobile.desktop.plugin.view.rememberJcefPluginViewHost
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
-import com.letta.mobile.pluginview.PluginViewEnvironment
 import com.letta.mobile.pluginview.ProvidePluginViews
 import com.letta.mobile.ui.chat.subagents.BackgroundTasksSidePane
 import com.letta.mobile.ui.host.InspectorFrame
@@ -52,15 +51,13 @@ import com.letta.mobile.ui.shell.sidebar.ShellAgentPanel
 /** The window's surface: the rail, the agent sidebar and the main pane, with the overlays over them. */
 /**
  * Plugin elements render live through the shared plugin-view renderer on the JCEF host
- * (letta-mobile-cdgpr.3), as on Android. Until the host's plugin catalog and a per-board
- * environment reach the client (letta-mobile-cdgpr.8) no plugin is registered and every element is
- * its card; the browser is only started when a live view first shows.
+ * (letta-mobile-cdgpr.3), as on Android. The host's enabled plugins and view transport come from
+ * the shared model (letta-mobile-cdgpr.8). With live views off on this device, every element is its
+ * card. The browser is only started when a live view first shows.
  */
 @Composable
-private fun ShellPluginViews(content: @Composable () -> Unit) {
-    val host = rememberJcefPluginViewHost()
-    val environment = remember { PluginViewEnvironment(canvasId = "", platform = ViewPlatform.DESKTOP) }
-    ProvidePluginViews(host = host, environment = environment, plugins = emptyList(), content = content)
+private fun ShellPluginViews(pluginViews: PluginViewsModel?, content: @Composable () -> Unit) {
+    ProvidePluginViews(pluginViews, rememberJcefPluginViewHost(), canvasId = "", platform = ViewPlatform.DESKTOP, content = content)
 }
 
 @Composable
@@ -78,7 +75,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                     LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
                     LocalAttentionPrefs provides context.core.attentionPrefs,
                 ) {
-                    ShellPluginViews {
+                    ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {
                         DesktopShellLayoutBody(context, frame)
                     }
                 }

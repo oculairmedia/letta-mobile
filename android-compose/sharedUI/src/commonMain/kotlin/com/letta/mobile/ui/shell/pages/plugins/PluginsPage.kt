@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -21,6 +22,9 @@ import com.letta.mobile.data.plugin.catalog.PluginPackageFile
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
 import com.letta.mobile.data.plugin.catalog.PluginsPageController
 import com.letta.mobile.data.plugin.catalog.PluginsPageState
+import com.letta.mobile.data.plugin.catalog.pluginsSettingsContributionOrNull
+import com.letta.mobile.data.plugin.view.PluginViewsModel
+import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingValue
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.ui.components.list.RosterListTag
@@ -141,6 +145,32 @@ fun shellPluginsPage(binding: PluginsPageBinding, onBack: (() -> Unit)? = null) 
         val onPick = binding.pickPackage?.let { pick -> { scope.launch { pick()?.let(controller::pick) }; Unit } }
         PluginsPage(state, controller, modifier, PluginsPageOptions(onPickPackage = onPick, onBack = onBack))
     }
+
+/**
+ * letta-mobile-cdgpr.8: the Plugins page over [model]. It shows the host's catalog while the host
+ * runs plugins, and the unavailable one otherwise. It refreshes when it opens, and its live-views
+ * switch is the persisted one.
+ */
+fun shellPluginsPage(model: PluginViewsModel, pickPackage: (suspend () -> PluginPackageFile?)?, onBack: (() -> Unit)? = null) =
+    ShellPageContent<ShellDestination.Plugins> { destination, modifier ->
+        LaunchedEffect(model) { model.refresh() }
+        val supported by model.supported.collectAsState()
+        val binding = remember(model, supported, pickPackage) { PluginsPageBinding(model.catalog, pickPackage, model.liveViews) }
+        shellPluginsPage(binding, onBack).Content(destination, modifier)
+    }
+
+/** letta-mobile-cdgpr.8: [onOpen] while the host runs plugins, else null, so the Settings entry is hidden. */
+@Composable
+fun rememberPluginsEntry(model: PluginViewsModel, onOpen: () -> Unit): (() -> Unit)? {
+    LaunchedEffect(model) { model.refresh() }
+    val supported by model.supported.collectAsState()
+    return onOpen.takeIf { supported }
+}
+
+/** The Plugins Settings entry over [model]: none without a model, or while the host does not run plugins. */
+@Composable
+fun rememberPluginsContributions(model: PluginViewsModel?, onOpen: () -> Unit): List<SettingsContribution> =
+    listOfNotNull(pluginsSettingsContributionOrNull(model?.let { rememberPluginsEntry(it, onOpen) }))
 
 private const val TITLE = "Plugins"
 private const val INTRO = "Plugins add element kinds, agent tools and pages. Each one runs only with what you allowed when you installed it."

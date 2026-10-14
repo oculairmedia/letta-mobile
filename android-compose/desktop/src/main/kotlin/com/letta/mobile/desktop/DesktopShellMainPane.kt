@@ -238,6 +238,7 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
         onRailRecencyDaysChange = core.railPrefs::updateRecencyDays,
         onOpenProviders = { context.navigator.navigate(ShellDestination.Providers) },
         onOpenPlugins = { context.navigator.navigate(ShellDestination.Plugins) },
+        pluginViews = core.bootstrap.dataBindings.pluginViews,
         onRetryConnection = core.chatController::retryConnection,
         home = desktopHomeCallbacks(context, frame),
         memory = controllers.memory,

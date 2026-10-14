@@ -47,6 +47,7 @@ internal data class DesktopAdminBinding(
     val projectsAvailable: Boolean,
     val projectPins: ProjectPinStore,
     val navigation: DesktopAdminNavigation,
+    val pluginViews: com.letta.mobile.data.plugin.view.PluginViewsModel? = null,
 )
 
 /** letta-mobile-ckmub.2.6: the admin pages over the current session; projects only through a live Iroh host. */
@@ -65,6 +66,7 @@ internal fun rememberDesktopAdminBinding(context: DesktopShellContext): DesktopA
             openAgent = { router.openAgent(AgentId(it)) },
             openSettings = { context.navigator.navigate(DesktopDestination.Settings) },
         ),
+        pluginViews = core.bootstrap.dataBindings.pluginViews,
     )
 }
 
@@ -78,7 +80,7 @@ internal fun desktopAdminPages(binding: DesktopAdminBinding): ShellAdminPages = 
     runs = desktopRunsPage(binding),
     templates = desktopTemplatesPage(binding),
     projects = if (binding.projectsAvailable) desktopProjectsPage(binding) else shellProjectsUnavailablePage(binding.navigation.openSettings),
-    plugins = desktopPluginsPage(),
+    plugins = desktopPluginsPage(binding.pluginViews),
 )
 
 private fun desktopRunsPage(binding: DesktopAdminBinding) = ShellPageContent<ShellDestination.Runs> { destination, modifier ->
