@@ -47,15 +47,9 @@ class WasmAppServerClientGateway(
     val state: StateFlow<BackendConnectionStatus> = mutableState.asStateFlow()
 
     suspend fun listAgents(config: LettaConfig): List<AgentItemState> {
-        if (config.serverUrl.isBlank()) {
+        unservedStatus(config)?.let { status ->
             close()
-            mutableState.value = BackendConnectionStatus.Unconfigured
-            return emptyList()
-        }
-        // letta-mobile-by4vm.13: the web row of the session route matrix decides, not the URL shape.
-        if (!webSessionCapabilities(config).supports(SessionRoute.AGENTS)) {
-            close()
-            mutableState.value = BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
+            mutableState.value = status
             return emptyList()
         }
 
@@ -176,6 +170,16 @@ internal fun webSessionCapabilities(config: LettaConfig): SessionCapabilities =
     )
 
 private const val NO_BROWSER_ROUTE = "This backend has no route from a browser (a browser cannot run the on-device runtime)."
+
+/**
+ * Why [config] cannot list agents from a browser, or null when it can: no address, or (letta-mobile-by4vm.13)
+ * a backend kind outside the web row of the session route matrix.
+ */
+internal fun unservedStatus(config: LettaConfig): BackendConnectionStatus? = when {
+    config.serverUrl.isBlank() -> BackendConnectionStatus.Unconfigured
+    !webSessionCapabilities(config).supports(SessionRoute.AGENTS) -> BackendConnectionStatus.Failed(NO_BROWSER_ROUTE)
+    else -> null
+}
 
 /** The page's stop and approval answers, scoped to [target]'s conversation. */
 private fun webRunControls(controls: AppServerRunControls, target: TimelineChatTarget) = TimelineChatRunControls(

@@ -406,7 +406,12 @@ class ScheduleLibraryControllerTest {
     @Test
     fun aSessionWithoutTheScheduleRouteNeverCallsIt() = runTest {
         val schedules = FakeScheduleRepository()
-        val controller = controller(scheduleRepository = schedules, nativeScheduleRoute = false)
+        val controller = ScheduleLibraryController(
+            agentRepository = FakeAgentRepository(),
+            scheduleRepository = schedules,
+            scope = this,
+            nativeScheduleRoute = false,
+        )
 
         controller.start()
         advanceUntilIdle()
@@ -422,7 +427,6 @@ class ScheduleLibraryControllerTest {
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
         cronSource: CronScheduleSource? = null,
         initialAgentId: String? = null,
-        nativeScheduleRoute: Boolean = true,
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
@@ -430,7 +434,6 @@ class ScheduleLibraryControllerTest {
         scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
         cronSource = cronSource,
         initialAgentId = initialAgentId,
-        nativeScheduleRoute = nativeScheduleRoute,
     )
 
     private class RouteUnavailableException : RuntimeException("route unavailable")

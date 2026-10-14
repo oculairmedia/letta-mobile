@@ -217,11 +217,7 @@ class DesktopRepositoryAdapters(
      */
     val capabilities: SessionCapabilities = SessionCapabilities.forSession(
         platform = SessionPlatform.DESKTOP,
-        kind = when (binding) {
-            SessionBackendBinding.LocalRuntime -> BackendKind.LOCAL_RUNTIME
-            SessionBackendBinding.Iroh -> BackendKind.IROH
-            SessionBackendBinding.RemoteHttp -> BackendKind.REST.takeUnless { config?.serverUrl.isNullOrBlank() }
-        },
+        kind = desktopBackendKind(binding, config),
         hostCapabilities = { channelTransport.hostCapabilities },
     )
 
@@ -310,6 +306,13 @@ class DesktopRepositoryAdapters(
     val subagentRepository: ISubagentRepository = boundSubagentRepository
     val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailable(SessionRoute.TOOLS)
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC)
+}
+
+/** The backend kind a desktop session binds; a remote host with no address is no backend at all. */
+private fun desktopBackendKind(binding: SessionBackendBinding, config: LettaConfig?): BackendKind? = when (binding) {
+    SessionBackendBinding.LocalRuntime -> BackendKind.LOCAL_RUNTIME
+    SessionBackendBinding.Iroh -> BackendKind.IROH
+    SessionBackendBinding.RemoteHttp -> BackendKind.REST.takeUnless { config?.serverUrl.isNullOrBlank() }
 }
 
 fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =
