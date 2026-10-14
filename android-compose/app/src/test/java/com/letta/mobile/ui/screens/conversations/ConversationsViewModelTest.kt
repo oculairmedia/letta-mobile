@@ -11,6 +11,8 @@ import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.NoActiveConversationRunException
+import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.testutil.FakeMessageApi
 import com.letta.mobile.testutil.FakeAgentApi
@@ -513,6 +515,59 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `recompile without a route shows why and never calls the repository`() = runTest {
+        fakeConvRepo.canRecompile = false
+        val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
+
+        viewModel.recompileConversation(display)
+
+        assertEquals(ConversationAdminAction.Recompile.unavailableMessage, viewModel.uiState.value.adminActionError)
+        assertTrue(fakeConvRepo.recompileCalls.isEmpty())
+        assertEquals(null, viewModel.uiState.value.recompilePreview)
+    }
+
+    @Test
+    fun `cancel runs without a route shows why and never calls the repository`() = runTest {
+        fakeConvRepo.canCancel = false
+        val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
+
+        viewModel.cancelConversationRuns(display)
+
+        assertEquals(ConversationAdminAction.CancelRuns.unavailableMessage, viewModel.uiState.value.adminActionError)
+        assertTrue(fakeConvRepo.cancelCalls.isEmpty())
+        assertFalse(viewModel.adminRoutes.cancelRuns)
+    }
+
+    @Test
+    fun `cancel runs failure is shown instead of only logged`() = runTest {
+        fakeConvRepo.cancelFailure = NoActiveConversationRunException(ConversationId("1"))
+        val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
+
+        viewModel.cancelConversationRuns(display)
+
+        assertEquals(listOf("1"), fakeConvRepo.cancelCalls)
+        assertEquals(
+            "No run of conversation 1 is active on this connection.",
+            viewModel.uiState.value.adminActionError,
+        )
+    }
+
+    @Test
+    fun `cancel runs failure without a route reads as unavailable`() = runTest {
+        fakeConvRepo.cancelFailure = NoAppServerRouteException("ConversationCrudRemoteSource.cancelConversation")
+        val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
+
+        viewModel.cancelConversationRuns(display)
+
+        assertEquals(
+            "Not available on this backend. The App Server has no route for this action yet.",
+            viewModel.uiState.value.adminActionError,
+        )
+        viewModel.closeConversationAdmin()
+        assertEquals(null, viewModel.uiState.value.adminActionError)
+    }
+
+    @Test
     fun `closeConversationAdmin clears inspector state`() = runTest {
         val display = ConversationDisplay(TestData.conversation(id = "1", agentId = "a1"), "Agent One")
 
@@ -627,11 +682,25 @@ class ConversationsViewModelTest {
             archivedUpdates.add(id.value to archived)
         }
 
+        var canCancel = true
+        var canRecompile = true
+        var cancelFailure: Exception? = null
+        val cancelCalls = mutableListOf<String>()
+        val recompileCalls = mutableListOf<String>()
+
+        override fun canCancelConversationRuns(): Boolean = canCancel
+
+        override fun canRecompileConversations(): Boolean = canRecompile
+
         override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
+            recompileCalls += id.value
             return "recompiled-system-prompt"
         }
 
-        override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {}
+        override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
+            cancelCalls += id.value
+            cancelFailure?.let { throw it }
+        }
     }
 
     private class FakeAgentRepository : AgentRepository(

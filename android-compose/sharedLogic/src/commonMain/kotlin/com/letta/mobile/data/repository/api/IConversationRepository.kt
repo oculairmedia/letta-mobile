@@ -37,6 +37,15 @@ interface IConversationRepository {
      */
     fun canForkConversations(): Boolean = true
 
+    /**
+     * letta-mobile-by4vm.12: whether [cancelConversation] has a route on the active backend, so pages
+     * offer "Cancel runs" only where it works. False unless a backend says otherwise.
+     */
+    fun canCancelConversationRuns(): Boolean = false
+
+    /** letta-mobile-by4vm.12: whether [recompileConversation] has a route on the active backend. */
+    fun canRecompileConversations(): Boolean = false
+
     suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = error("forkConversation unsupported")
     suspend fun forkConversation(id: String, agentId: String): Conversation = forkConversation(ConversationId(id), AgentId(agentId))
 

@@ -31,7 +31,7 @@ internal data class AndroidClientCommands(
 /** The scaffold's client commands for the shared chat page; null outside a scaffold (tests, previews). */
 internal val LocalAndroidClientCommands = compositionLocalOf<AndroidClientCommands?> { null }
 
-/** `/recompile` through the conversation repository (REST `POST /v1/conversations/{id}/recompile`). */
+/** `/recompile` through the conversation repository, offered only where it reports a recompile route. */
 internal class RepositoryRecompileGateway(private val repository: IConversationRepository) : ConversationRecompileGateway {
     override suspend fun recompileConversation(request: ConversationRecompileRequest) {
         repository.recompileConversation(
@@ -54,11 +54,14 @@ internal fun rememberAndroidClientCommands(state: AgentScaffoldRuntimeState, onR
     val navigation = state.params.navigation
     val offered = remember(navigation) { offeredClientCommands(navigation) }
     val iroh = drawer?.backendIsIroh == true
-    return remember(offered, iroh, state.drawerConversationRepo) {
+    val repository = state.drawerConversationRepo
+    return remember(offered, iroh, repository) {
         AndroidClientCommands(
             offered = offered,
             route = { command -> routeClientCommand(current, command, onRename) },
-            recompileGateway = if (iroh) null else RepositoryRecompileGateway(state.drawerConversationRepo),
+            // letta-mobile-by4vm.12: only where the repository has a recompile route; otherwise the
+            // chat says recompile is unavailable instead of sending it into a no-route stub.
+            recompileGateway = RepositoryRecompileGateway(repository).takeIf { !iroh && repository.canRecompileConversations() },
         )
     }
 }

@@ -522,6 +522,51 @@ class ConversationRepositoryTest {
     }
 
     @Test
+    fun `no route offers neither cancel nor recompile off Iroh`() {
+        assertFalse(repository.canCancelConversationRuns())
+        assertFalse(repository.canRecompileConversations())
+    }
+
+    @Test
+    fun `cancelConversation over Iroh aborts through the channel transport, not the remote seam`() = runTest {
+        val transport = FakeChannelTransport()
+        repository = irohRepository(transport)
+
+        assertTrue(repository.canCancelConversationRuns())
+        assertFalse(repository.canRecompileConversations())
+        repository.cancelConversation("conv-1", "a1")
+
+        assertEquals(listOf("conv-1"), transport.cancelCalls)
+        assertTrue(transport.adminRpcCalls.isEmpty())
+        assertFalse(fakeApi.calls.any { it.startsWith("cancelConversation") })
+    }
+
+    @Test
+    fun `cancelConversation over Iroh with no run on this connection says so`() = runTest {
+        val transport = FakeChannelTransport().apply { cancelResult = false }
+        repository = irohRepository(transport)
+
+        val error = runCatching { repository.cancelConversation("conv-1", "a1") }.exceptionOrNull()
+
+        assertTrue(error is NoActiveConversationRunException)
+        assertEquals("No run of conversation conv-1 is active on this connection.", error?.message)
+        assertEquals(listOf("conv-1"), transport.cancelCalls)
+    }
+
+    private fun irohRepository(transport: FakeChannelTransport): ConversationRepository {
+        val settings = irohSettings()
+        return ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            lazyOf(database.conversationDao()),
+            repositoryScope = repositoryScope,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+            transport = transport,
+        )
+    }
+
+    @Test
     fun `recompileConversation delegates to api`() = runTest {
         val result = repository.recompileConversation("1", false, "a1")
         assertEquals("recompiled-system-prompt", result)
