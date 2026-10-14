@@ -1,16 +1,8 @@
 package com.letta.mobile.data.repository
 
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import com.letta.mobile.data.backend.noAppServerRoute
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.paging.MessagePagingSource
 import com.letta.mobile.data.repository.api.MessageRemoteSource
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,12 +12,11 @@ import javax.inject.Singleton
  * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
  * route (the Letta REST backend was removed).
  *
- * Phase 5p — fetch / approval / inspector / batch orchestration live in sharedLogic;
- * [getMessagesPaged] stays here because [MessagePagingSource] is Android-bound.
+ * Phase 5p — fetch / approval / inspector / batch orchestration live in sharedLogic.
  */
 @Singleton
 class MessageRepository(
-    private val remote: MessageRemoteSource,
+    remote: MessageRemoteSource,
     irohApprovalSource: IrohAdminRpcApprovalSource? = null,
     irohTimelineTransport: IrohAdminRpcTimelineTransport? = null,
 ) : CachedMessageRepository(
@@ -45,16 +36,5 @@ class MessageRepository(
         const val DEFAULT_FETCH_LIMIT: Int = CachedMessageRepository.DEFAULT_FETCH_LIMIT
         const val TARGETED_FETCH_LIMIT: Int = CachedMessageRepository.TARGETED_FETCH_LIMIT
         const val MAX_TARGETED_FETCH_PAGES: Int = CachedMessageRepository.MAX_TARGETED_FETCH_PAGES
-    }
-
-    override fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>> {
-        return Pager(
-            config = PagingConfig(
-                pageSize = MessagePagingSource.PAGE_SIZE,
-                enablePlaceholders = false,
-                initialLoadSize = MessagePagingSource.PAGE_SIZE,
-            ),
-            pagingSourceFactory = { MessagePagingSource(remote, agentId, conversationId) },
-        ).flow
     }
 }

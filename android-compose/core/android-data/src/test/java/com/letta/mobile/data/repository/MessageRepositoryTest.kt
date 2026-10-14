@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
@@ -141,8 +142,8 @@ class MessageRepositoryTest {
 
     @Test
     fun `cancel and reset message operations delegate identifiers`() = runTest {
-        val cancelResult = repository.cancelMessage("agent-1", runIds = listOf("run-1"))
-        repository.resetMessages("agent-1")
+        val cancelResult = repository.cancelMessage(AgentId("agent-1"), runIds = listOf("run-1"))
+        repository.resetMessages(AgentId("agent-1"))
 
         assertEquals(mapOf("status" to "cancelled"), cancelResult)
         assertEquals("agent-1", fakeApi.lastCancelAgentId)

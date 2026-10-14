@@ -49,18 +49,6 @@ abstract class PendingLocalStoreModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
-object CanonicalTimelineModule {
-    @Provides
-    @Singleton
-    fun provideCoordinator(
-        store: com.letta.mobile.data.timeline.TimelineBoundedStore,
-        transport: com.letta.mobile.data.timeline.TimelineTransport,
-    ): com.letta.mobile.data.timeline.CanonicalTimelineCoordinator =
-        com.letta.mobile.data.timeline.CanonicalTimelineCoordinator(store, transport)
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
 object DatabaseModule {
     @Provides
     @Singleton
@@ -85,11 +73,6 @@ object DatabaseModule {
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2,
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_2_3,
         ).build()
-
-    @Provides
-    @Singleton
-    fun provideTimelineBoundedStore(): com.letta.mobile.data.timeline.TimelineBoundedStore =
-        com.letta.mobile.data.local.DormantCanonicalTimelineStore
 
     @Provides
     @Singleton

@@ -19,7 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * One generation-local request registry + inbound router for the App Server
  * control channel (letta-mobile-lgns8.3).
  *
- * Replaces the per-request [AppServerRequestCorrelator] (which spawned one
+ * Replaces the former per-request `AppServerRequestCorrelator` (which spawned one
  * `collect` coroutine per call) with a single long-lived collector that routes
  * every control response to the registered [PendingRequest] by [requestId].
  *

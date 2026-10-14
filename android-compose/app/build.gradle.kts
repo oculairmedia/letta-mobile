@@ -1538,6 +1538,13 @@ android {
 
     lint {
         disable += "NullSafeMutableLiveData"
+        // letta-mobile-by4vm.34: 238 orphaned strings were removed after the
+        // hard cut. Android lint is not a CI gate (only release lint-vital,
+        // which checks fatal issues), so this is a warning rather than an
+        // error: promoting it would need a baseline for every other unused
+        // drawable/layout/raw resource without anything enforcing it. Run
+        // `./gradlew :app:lintRootDebug` to see new orphans.
+        warning += "UnusedResources"
     }
 
     packaging {

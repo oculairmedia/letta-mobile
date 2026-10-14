@@ -465,8 +465,12 @@ class IrohNodeEndpoint(
      * Connection admission (not authentication). With a static allowlist, only
      * listed NodeIds connect — unless pairing is configured, in which case paired
      * NodeIds and unknown peers that come to redeem an invite are admitted too.
-     * Admission never authenticates: unlisted peers still have to prove a
-     * paired NodeId or a valid invite in the auth frame (dpv7m.1).
+     * Admission never authenticates. In the auth frame ([PeerSessionAuth]):
+     * a paired NodeId or a valid invite authenticates regardless of the
+     * allowlist (dpv7m.1); the static bearer token and allowlist
+     * pre-authentication ([IrohBearerAuthVerifier]) are honoured only for
+     * listed NodeIds when an allowlist is set (by4vm.35), so admitted but
+     * unlisted peers cannot use a leaked token.
      */
     private fun isPeerAllowed(remoteId: String): Boolean =
         authPolicy.allowedPeerIds.isEmpty() || remoteId in authPolicy.allowedPeerIds || pairingService != null
