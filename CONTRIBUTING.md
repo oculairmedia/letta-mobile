@@ -118,13 +118,13 @@ Device install:
 
 ## Pre-push PR readiness
 
-CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that Qodana flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
+CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
 
 ## Required vs advisory CI
 
 Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, `codecov`.
 
-Advisory only (does **not** block merge): `qodana`, `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing.
+Advisory only (does **not** block merge): `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing.
 
 ## Releases
 

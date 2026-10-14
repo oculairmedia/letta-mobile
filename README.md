@@ -90,7 +90,7 @@ opening a PR.**
 - `perf-gate` — perf-budget benchmarks
 
 Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
-**Advisory only** (cannot block merge): `detekt`, `qodana`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
+**Advisory only** (cannot block merge): `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
 
 ## Releases
 
