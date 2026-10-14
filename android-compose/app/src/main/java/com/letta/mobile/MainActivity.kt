@@ -214,6 +214,11 @@ class MainActivity : ComponentActivity() {
         if (encodedPayload.isBlank()) {
             return
         }
+        // letta-mobile-by4vm.1: exported activity — release builds never stage the extra.
+        if (!AutomationAuthBootstrap.acceptsLaunchPayload) {
+            intent.removeExtra(AutomationAuthBootstrap.EXTRA_PAYLOAD_BASE64)
+            return
+        }
         getSharedPreferences(AutomationAuthBootstrap.PREFS_NAME, MODE_PRIVATE)
             .edit(commit = true) {
                 putString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, encodedPayload)
