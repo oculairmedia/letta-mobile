@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
@@ -35,6 +36,20 @@ import kotlin.test.assertTrue
 class IrohEventSeqWireOrderTest {
 
     private val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+
+    @Test
+    fun theHostAdvertisesOrderedEventSeqInItsAuthResponse() {
+        // A property of the connection's write path, so every host advertises it: with no admin
+        // handlers registered, and alongside whatever feature capabilities the router carries.
+        val bare = IrohNodeConnection.advertisedCapabilities(AdminRpcRouter())
+        assertTrue(StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY in bare)
+        assertEquals("event_seq_ordered_v1", StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY)
+        val withFeatures = AdminRpcRouter().also { it.featureCapabilities += "some_feature_v1" }
+        val advertised = IrohNodeConnection.advertisedCapabilities(withFeatures)
+        assertTrue(StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY in advertised)
+        assertTrue("some_feature_v1" in advertised)
+        assertEquals(1, advertised.count { it == StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY })
+    }
 
     @Test
     fun busyRejectionRacingALiveDeltaBroadcastKeepsWireSeqStrictlyIncreasing() = runTest {

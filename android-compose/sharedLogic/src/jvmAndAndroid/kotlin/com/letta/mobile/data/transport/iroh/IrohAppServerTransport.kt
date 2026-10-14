@@ -112,6 +112,14 @@ class IrohAppServerTransport(
      */
     private val serverSupportsFrameParts = AtomicBoolean(false)
 
+    @Volatile private var authCapabilities: Set<String> = emptySet()
+
+    /**
+     * letta-mobile-by4vm.50: every capability the server advertised in its last successful
+     * auth_response (recorded before that response reaches the caller of `auth`); empty before.
+     */
+    val serverCapabilities: Set<String> get() = authCapabilities
+
     /**
      * Awaits the initial QUIC connection completion (success or failure).
      * The transport is not fully usable until this completes successfully.
@@ -469,6 +477,7 @@ class IrohAppServerTransport(
     private fun recordServerCapabilities(frame: AppServerReceivedFrame) {
         val auth = frame.frame as? AppServerInboundFrame.AuthResponse ?: return
         if (!auth.success) return
+        authCapabilities = auth.capabilities.orEmpty().toSet()
         val supported = IrohFrameCodec.FRAME_PART_CAPABILITY in auth.capabilities.orEmpty()
         val changed = serverSupportsFrameParts.getAndSet(supported) != supported
         if (changed) {

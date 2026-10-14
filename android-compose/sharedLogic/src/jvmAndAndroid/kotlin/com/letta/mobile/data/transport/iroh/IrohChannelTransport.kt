@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -107,6 +108,9 @@ class IrohChannelTransport(
     private val sessionLossTerminalGraceMs: Long = IrohSessionLossCutOff.SESSION_LOSS_TERMINAL_GRACE_MS,
     // Process-owned store shared with canvas/document APIs; transport never closes or polls it.
     private val notebookStore: NotebookLocalStore? = null,
+    // letta-mobile-by4vm.50: when this device may run cadence syncs (phones: unmetered and charging
+    // or screen on). Only used against hosts that advertise ordered event_seq.
+    private val syncBudget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport,
     CronControlTransport {
@@ -201,6 +205,7 @@ class IrohChannelTransport(
         onCloseResources = ::handleCloseResources,
         externalToolRegistry = externalToolRegistry,
         notebookHandlerFactory = notebookHandlerFactory,
+        syncBudget = syncBudget,
     )
 
     // Explicit type: this field and `livenessProbe` reference each other through
