@@ -19,6 +19,7 @@ import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -459,8 +460,12 @@ class ConversationRepositoryTest {
     @Test
     fun `conversation_updated refetch failure leaves loaded list unchanged`() = runTest {
         val settings = irohSettings()
+        // applyPush gates the refetch on a Room query that runs on Room's own executor, outside the
+        // test scheduler, so runCurrent() can return before the refetch happens. Await the refetch.
+        val refetched = CompletableDeferred<Unit>()
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ ->
+                refetched.complete(Unit)
                 AppServerInboundFrame.AdminRpcResponse("req", success = false, error = "RPC failed")
             }
         }
@@ -478,7 +483,7 @@ class ConversationRepositoryTest {
         runCurrent()
 
         transport.events.emit(conversationPush("missing", agentId = "a1"))
-        runCurrent()
+        refetched.await()
 
         assertEquals(1, transport.adminRpcCalls.size)
         assertEquals(listOf("existing"), pushed.getConversations("a1").first().map { it.id.value })
