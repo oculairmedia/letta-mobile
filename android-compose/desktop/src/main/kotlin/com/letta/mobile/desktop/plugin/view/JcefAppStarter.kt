@@ -2,9 +2,7 @@ package com.letta.mobile.desktop.plugin.view
 
 import me.friwi.jcefmaven.CefAppBuilder
 import me.friwi.jcefmaven.EnumProgress
-import me.friwi.jcefmaven.MavenCefAppHandlerAdapter
 import org.cef.CefApp
-import org.cef.callback.CefSchemeRegistrar
 import java.awt.GraphicsEnvironment
 import java.io.File
 
@@ -46,9 +44,9 @@ internal data class JcefConfig(
 
 /**
  * Starts the process's one [CefApp] through jcefmaven: installs the native bundle when it is
- * missing (reporting progress), registers the `letta-plugin` scheme as standard and secure, and
- * uses windowed rendering (each browser is a heavyweight AWT component the board embeds through
- * SwingPanel). Throws when the bundle cannot be fetched (offline on first run), the platform is
+ * missing (reporting progress) and uses windowed rendering (each browser is a heavyweight AWT component the board embeds through
+ * SwingPanel). Pages need no custom scheme: each is served at the shared policy's `https` URL
+ * under the reserved `.invalid` host, answered by its view's request handler. Throws when the bundle cannot be fetched (offline on first run), the platform is
  * unsupported, or CEF does not initialise; the runtime turns that into the cards' reason.
  */
 internal class JcefAppStarter(private val config: JcefConfig) : BrowserStarter<CefApp> {
@@ -58,23 +56,7 @@ internal class JcefAppStarter(private val config: JcefConfig) : BrowserStarter<C
         builder.setProgressHandler { state, percent -> progress.report(stageOf(state), fractionOf(percent)) }
         builder.cefSettings.windowless_rendering_enabled = false
         builder.cefSettings.root_cache_path = config.cacheDir.absolutePath
-        builder.setAppHandler(SchemeRegistration)
         return builder.build()
-    }
-
-    private object SchemeRegistration : MavenCefAppHandlerAdapter() {
-        override fun onRegisterCustomSchemes(registrar: CefSchemeRegistrar) {
-            registrar.addCustomScheme(
-                PluginViewScheme.SCHEME,
-                /* isStandard = */ true,
-                /* isLocal = */ false,
-                /* isDisplayIsolated = */ false,
-                /* isSecure = */ true,
-                /* isCorsEnabled = */ false,
-                /* isCspBypassing = */ false,
-                /* isFetchEnabled = */ false,
-            )
-        }
     }
 
     companion object {

@@ -1,6 +1,7 @@
 // Live plugin pages on the canvas (letta-mobile-s416w.13, plan section 7.3): the live-view
 // renderer the shells register, the page policy every host shares, and the platform hosts
-// (androidMain: the sandboxed WebView; jvmMain: desktop JCEF, letta-mobile-s416w.14).
+// (androidMain: the sandboxed WebView). Desktop's JCEF host lives in :desktop (it needs JCEF) and
+// implements the same PluginViewHost over this module's PluginPagePolicy (letta-mobile-cdgpr.3).
 // KMP like :sharedUI, and it depends on :sharedUI and :sharedLogic only.
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
