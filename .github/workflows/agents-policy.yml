@@ -2,8 +2,9 @@ name: Agents Policy Check
 
 # Advisory semantic lint for implemented greppable AGENTS.md rules: raw hex
 # colors, sharedLogic JVM APIs, and raw AlertDialog usage.
-# Findings never fail the job (continue-on-error); they surface in the
-# GitHub Actions job summary for PR review.
+# Its findings never fail the job (continue-on-error); they surface in the
+# GitHub Actions job summary for PR review. The platform-ui-gate job below is
+# different: it runs with --enforce and goes red (letta-mobile-by4vm.32).
 
 on:
   push:
