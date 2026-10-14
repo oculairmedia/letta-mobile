@@ -17,7 +17,6 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
-import com.letta.mobile.data.local.CanvasDocumentDao
 import com.letta.mobile.data.local.CanvasOpDao
 import com.letta.mobile.data.local.RoomCanvasOpLog
 import com.letta.mobile.data.timeline.ConversationCursorStore
@@ -148,11 +147,6 @@ object DatabaseModule {
     }
 
     @Provides
-    fun provideCanvasDocumentDao(database: LettaDatabase): CanvasDocumentDao {
-        return database.canvasDocumentDao()
-    }
-
-    @Provides
     @Singleton
     fun provideNotebookLocalStore(@ApplicationContext context: Context): NotebookLocalStore {
         val prefs = context.getSharedPreferences("notebook-identity", Context.MODE_PRIVATE)
@@ -174,6 +168,10 @@ object DatabaseModule {
         return database.canvasOpDao()
     }
 
+    /**
+     * The canvas op log is the notebook document's write-ahead journal (letta-mobile-by4vm.22):
+     * the notebook store owns the document, CanvasSession settles each op once it is stored.
+     */
     @Provides
     @Singleton
     fun provideCanvasOpLog(dao: CanvasOpDao): CanvasOpLog {

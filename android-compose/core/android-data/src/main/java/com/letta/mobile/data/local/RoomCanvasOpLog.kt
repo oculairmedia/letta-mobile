@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * Android Room-backed persistent implementation of [CanvasOpLog].
+ * Android Room-backed persistent implementation of [CanvasOpLog], journal included: rows are
+ * appended unsettled and settled once the canvas document holding them is written
+ * (letta-mobile-by4vm.22, see [CanvasOpLog.unsettled]).
  */
 class RoomCanvasOpLog(
     private val dao: CanvasOpDao,
@@ -34,6 +36,14 @@ class RoomCanvasOpLog(
         return dao.has(canvasId.value, opId)
     }
 
+    override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> =
+        dao.getUnsettled(canvasId.value).map { it.toCanvasOp() }
+
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) {
+        // SQLite caps bound parameters; a recovery after a long outage can settle many at once.
+        opIds.distinct().chunked(SETTLE_CHUNK).forEach { chunk -> dao.settle(canvasId.value, chunk) }
+    }
+
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> {
         val flow = flowsByCanvas.computeIfAbsent(canvasId) {
             MutableSharedFlow(replay = 16, extraBufferCapacity = 64)
@@ -41,3 +51,5 @@ class RoomCanvasOpLog(
         return flow.asSharedFlow()
     }
 }
+
+private const val SETTLE_CHUNK = 500

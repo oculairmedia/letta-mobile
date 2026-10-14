@@ -425,6 +425,22 @@ object LettaDatabaseMigrations {
         }
     }
 
+    /**
+     * letta-mobile-by4vm.22: one owner per canvas document.
+     *
+     * - `canvas_documents` is dropped. Canvases have lived in the Automerge notebook store since
+     *   #1708 and nothing has written or read this table since; its rows are unreachable.
+     * - `canvas_ops` becomes the write-ahead journal of the notebook document: a row is appended
+     *   unsettled and settled once the document write carrying it succeeds, so a crash between the
+     *   two is folded in when the canvas is next opened. Existing rows are taken as settled.
+     */
+    val MIGRATION_20_21 = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS `canvas_documents`")
+            db.execSQL("ALTER TABLE `canvas_ops` ADD COLUMN `settled` INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -445,5 +461,6 @@ object LettaDatabaseMigrations {
         MIGRATION_17_18,
         MIGRATION_18_19,
         MIGRATION_19_20,
+        MIGRATION_20_21,
     )
 }
