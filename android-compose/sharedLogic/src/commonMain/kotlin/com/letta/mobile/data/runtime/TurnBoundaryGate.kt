@@ -64,26 +64,25 @@ internal class TurnBoundaryGate {
     private val finishedTurnIds = RecentIds<String>(RECENT_CAPACITY)
     private val settledRunIds = RecentIds<String>(RECENT_CAPACITY)
     private var leaseToken: Long? = null
-    private var evidenceSeen = false
-    private var abortRequested = false
 
-    /** letta-mobile-qygvv.29: the lease's latest stop_reason paused the run for a continuation round. */
-    private var roundContinues = false
+    /** letta-mobile-by4vm.7: the current lease's boundary facts ([BoundaryPhase]); guarded by [lock]. */
+    private val boundary = TurnStateMachine("boundary_gate", BoundaryPhase.AwaitingEvidence, ::boundaryTransition)
+
+    /** The current lease's boundary phase (diagnostics and tests). */
+    val phase: BoundaryPhase get() = synchronized(lock) { boundary.phase }
 
     /** Reset per-lease state when a new turn lease starts collecting. */
     fun beginLease(token: Long): Unit = synchronized(lock) {
         if (leaseToken == token) return@synchronized
         leaseToken = token
-        evidenceSeen = false
-        abortRequested = false
-        roundContinues = false
+        boundary.fire(BoundaryEvent.LeaseBegan)
     }
 
     /** An `abort_message` was sent for this key: a later idle loop status reads as Cancelled. */
-    fun noteAbortRequested(): Unit = synchronized(lock) { abortRequested = true }
+    fun noteAbortRequested(): Unit = synchronized(lock) { boundary.fire(BoundaryEvent.AbortRequested) }
 
     /** Whether an abort was already requested for the current lease (letta-mobile-qygvv.3). */
-    fun isAbortRequested(): Boolean = synchronized(lock) { abortRequested }
+    fun isAbortRequested(): Boolean = synchronized(lock) { boundary.phase.abortRequested }
 
     /** The active lease settled [runId]; later terminals for it belong to no live turn. */
     fun noteSettled(runId: String?) {
@@ -111,14 +110,15 @@ internal class TurnBoundaryGate {
             }
             return TurnBoundaryDecision.ProjectSettledRunDraft
         }
-        evidenceSeen = true
-        noteRoundStop(received)
+        boundary.fire(received.boundaryEvent())
         return TurnBoundaryDecision.Project
     }
 
-    private fun noteRoundStop(received: AppServerReceivedFrame) {
-        if (received.terminalMessageTypeOrNull() != STOP_REASON) return
-        roundContinues = received.stopReasonOrNull() == AppServerStopReason.REQUIRES_APPROVAL
+    /** Every own delta is evidence; a stop_reason also says whether the round continues (qygvv.29). */
+    private fun AppServerReceivedFrame.boundaryEvent(): BoundaryEvent = when {
+        terminalMessageTypeOrNull() != STOP_REASON -> BoundaryEvent.Delta
+        stopReasonOrNull() == AppServerStopReason.REQUIRES_APPROVAL -> BoundaryEvent.RoundStoppedForApproval
+        else -> BoundaryEvent.RoundStopped
     }
 
     private fun decideTurnFinished(
@@ -147,11 +147,13 @@ internal class TurnBoundaryGate {
         frame: AppServerInboundFrame.UpdateLoopStatus,
         input: TurnBoundaryInput,
     ): TurnBoundaryDecision {
-        if (!evidenceSeen || heldByApproval(input)) return TurnBoundaryDecision.Project
+        val phase = boundary.phase
+        if (!phase.evidenceSeen || heldByApproval(input, phase)) return TurnBoundaryDecision.Project
         if (frame.loopStatus.status != LOOP_WAITING_ON_INPUT) return TurnBoundaryDecision.Project
         if (frame.loopStatus.activeRunIds.isNotEmpty()) return TurnBoundaryDecision.Project
-        if (continuesAfterIdle()) return TurnBoundaryDecision.Project
-        val status = if (abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
+        // An aborted phase never continues: the round-stop fact is dropped on abort.
+        if (phase.roundContinues) return TurnBoundaryDecision.Project
+        val status = if (phase.abortRequested) RuntimeRunStatus.Cancelled else RuntimeRunStatus.Completed
         return TurnBoundaryDecision.LoopIdle(status)
     }
 
@@ -159,9 +161,8 @@ internal class TurnBoundaryGate {
      * A parked approval holds the turn open, unless the turn was aborted: nobody can answer it then,
      * and a server that sends no turn_finished must still be able to end the turn.
      */
-    private fun heldByApproval(input: TurnBoundaryInput) = input.approvalOutstanding && !abortRequested
-
-    private fun continuesAfterIdle() = roundContinues && !abortRequested
+    private fun heldByApproval(input: TurnBoundaryInput, phase: BoundaryPhase) =
+        input.approvalOutstanding && !phase.abortRequested
 
     /** Insertion-ordered, bounded set: the oldest id is evicted once [capacity] is exceeded. */
     private class RecentIds<T>(private val capacity: Int) {
