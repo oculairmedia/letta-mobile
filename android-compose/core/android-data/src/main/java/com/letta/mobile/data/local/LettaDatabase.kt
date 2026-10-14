@@ -33,7 +33,7 @@ import com.letta.mobile.data.model.DomainIdConverters
         NormalizedTimelineSnapshotRowEntity::class,
         CanvasOpEntity::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
