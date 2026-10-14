@@ -1,9 +1,11 @@
 package com.letta.mobile.data.transport.iroh
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -47,11 +49,18 @@ class IrohChannelTransportCloseLifecycleTest {
         assertFalse(transport.transportJob.isActive, "the caller's lifetime still bounds the transport")
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun idleTransportDoesNotHoldTheCallersStructuredJoinOpen() = runTest {
-        // runTest itself fails with UncompletedCoroutinesError if the transport's job were a
-        // never-completing child of this TestScope.
-        IrohChannelTransport(scope = this)
+        // runTest waits for every active child of the TestScope's job; a live transport job
+        // among them would end the test in UncompletedCoroutinesError.
+        val transport = IrohChannelTransport(scope = this)
+        val callerJob = coroutineContext[Job]!!
+        advanceUntilIdle()
+
+        assertTrue(transport.transportJob.isActive, "the idle transport stays alive")
+        assertFalse(transport.transportJob in callerJob.children.toList(), "transport job must not be a structured child")
+        assertTrue(callerJob.children.none { it.isActive }, "nothing the transport started holds the caller's join open")
     }
 
     @Test
