@@ -2,6 +2,7 @@ package com.letta.mobile.debug
 
 import android.content.Context
 import android.util.Base64
+import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaConfigMigration
 import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
@@ -20,12 +21,12 @@ object AutomationAuthBootstrap {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** letta-mobile-by4vm.1: only the non-shipping `benchmark` build type; see [AutomationImportGate]. */
+    val acceptsLaunchPayload: Boolean
+        get() = AutomationImportGate.releaseImportEnabled(BuildConfig.BUILD_TYPE)
+
     fun importPendingConfig(context: Context, settingsRepository: ISettingsRepository) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val encodedPayload = prefs.getString(KEY_PAYLOAD_BASE64, null)?.trim().orEmpty()
-        if (encodedPayload.isBlank()) {
-            return
-        }
+        val encodedPayload = AutomationImportGate.consumeStagedPayload(context, acceptsLaunchPayload) ?: return
 
         runCatching {
             val payload = decodePayload(encodedPayload)
@@ -44,8 +45,6 @@ object AutomationAuthBootstrap {
                 "key" to KEY_PAYLOAD_BASE64,
             )
         }
-
-        prefs.edit().remove(KEY_PAYLOAD_BASE64).commit()
     }
 
     private fun decodePayload(encodedPayload: String): AutomationAuthPayload {
