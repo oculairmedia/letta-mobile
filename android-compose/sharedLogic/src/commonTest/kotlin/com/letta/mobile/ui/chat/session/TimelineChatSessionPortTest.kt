@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.DeliveryState
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -145,6 +147,72 @@ class TimelineChatSessionPortTest {
     }
 
     @Test
+    fun aStopSettlesWhenTheTimelinesRunEnds() = runTest {
+        val (session, port) = runningPort { true }
+        pressStop(port)
+        assertTrue(port.uiState.value.isCancellingRun)
+
+        session.timeline.value = timelineWith()
+        runCurrent()
+
+        assertFalse(port.uiState.value.isCancelling)
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun aSecondStopPressClearsTheRunLocallyWithoutAskingAgain() = runTest {
+        var stops = 0
+        val (_, port) = runningPort { stops++; true }
+
+        pressStop(port)
+        pressStop(port)
+
+        assertEquals(1, stops)
+        assertFalse(port.uiState.value.isRunInFlight)
+        assertFalse(port.uiState.value.isCancelling)
+    }
+
+    @Test
+    fun anAbortThatDidNotGoOutOrThrewClearsTheRunLocally() = runTest {
+        val (_, notSent) = runningPort { false }
+        pressStop(notSent)
+        assertFalse(notSent.uiState.value.isRunInFlight)
+        assertNull(notSent.uiState.value.error)
+
+        val (_, threw) = runningPort { throw IllegalStateException("socket closed") }
+        pressStop(threw)
+        assertFalse(threw.uiState.value.isRunInFlight)
+        assertEquals("socket closed", threw.uiState.value.error)
+    }
+
+    @Test
+    fun aRunWhoseTerminalNeverLandsIsClearedAfterTheSharedTimeout() = runTest {
+        val (_, port) = runningPort { true }
+
+        port.actions.stopRun()
+        advanceTimeBy(ChatRunInterrupter.CANCEL_TERMINAL_TIMEOUT_MS - 1)
+        runCurrent()
+        assertTrue(port.uiState.value.isCancellingRun)
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun aLocalClearLiftsOnceTheTimelinesRunEndsSoTheNextRunShows() = runTest {
+        val (session, port) = runningPort { false }
+        pressStop(port)
+
+        session.timeline.value = timelineWith()
+        runCurrent()
+        session.timeline.value = timelineWith(pendingPrompt("from another client"))
+        runCurrent()
+
+        assertTrue(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
     fun anApprovalIsAnsweredOnceWhileItsAnswerIsInFlight() = runTest {
         val session = FakeTimelineChatSession()
         val answers = mutableListOf<ChatApprovalAnswer>()
@@ -228,6 +296,20 @@ class TimelineChatSessionPortTest {
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
         return port
+    }
+
+    /** A port whose conversation has a run in flight, with [stopRun] as the transport's abort. */
+    private fun TestScope.runningPort(stopRun: suspend () -> Boolean): Pair<FakeTimelineChatSession, TimelineChatSessionPort> {
+        val session = FakeTimelineChatSession()
+        val port = port(session, TimelineChatRunControls(stopRun = stopRun))
+        session.timeline.value = timelineWith(pendingPrompt("long task"))
+        runCurrent()
+        return session to port
+    }
+
+    private fun TestScope.pressStop(port: TimelineChatSessionPort) {
+        port.actions.stopRun()
+        runCurrent()
     }
 
     private fun image() = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
