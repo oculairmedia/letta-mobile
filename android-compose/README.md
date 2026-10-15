@@ -10,12 +10,12 @@ Every module below is declared in `settings.gradle.kts`.
 
 | Module | Purpose | Required / additive tests |
 | --- | --- | --- |
-| `sharedLogic` | Platform-neutral domain, repositories, timeline reducer, and App Server transport | `:sharedLogic:jvmTest` plus host-native and wasmJs compile (required `shared-multiplatform`) |
-| `sharedUI` | Shared Compose UI for Android, desktop and browser: shell, chat, agent editor, memory, providers, schedules, canvas, search, settings, A2UI rendering | compiles for every host target in `shared-multiplatform`; wasmJs compile catches JVM-only calls |
+| `sharedLogic` | Platform-neutral domain, repositories, timeline reducer, and App Server transport | `:sharedLogic:jvmTest` plus host-native and wasmJs main/test compiles (required `shared-multiplatform`) |
+| `sharedUI` | Shared Compose UI for Android, desktop and browser: shell, chat, agent editor, memory, providers, schedules, canvas, search, settings, A2UI rendering | wasmJs main/test compiles in `shared-multiplatform` catch JVM-only calls; `:sharedUI:jvmTest` additive in `test` on path change, and on every main push |
 | `sharedUI-devfixtures` | Deterministic fixtures for `sharedUI` previews and tests | covered by `sharedUI` builds |
 | `app` | Android host: navigation graph, Hilt wiring, ViewModels, thin containers around shared pages, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
 | `desktop` | Compose Desktop host (JVM): entry point, single-instance/OS lock, bundled JBR, installers | `:desktop:test` (additive in `test` when desktop changes) |
-| `web` | Browser client (Kotlin/WASM, Compose for Web) | `web-wasm` job (advisory); wasmJs compile is in required `shared-multiplatform` |
+| `web` | Browser client (Kotlin/WASM, Compose for Web) | `web-wasm` job (not required): `:web:wasmJsBrowserDistribution :web:wasmJsBrowserTest`; wasmJs compiles are in required `shared-multiplatform` |
 | `core/android-data` | Android data bindings, Ktor wiring, Room, mappers | `:core:android-data:testDebugUnitTest` (required `test` job) |
 | `core/runtime` | Turn engine, runtime event fanout | covered by host builds |
 | `core/ids` | Shared identifiers (`core/schemas/` holds wire schemas as source packages, not a module) | covered by host builds |
@@ -26,9 +26,9 @@ Every module below is declared in `settings.gradle.kts`.
 | `plugin-api` / `plugin-api-testkit` / `plugin-view` | The Kotlin SPI a JVM-runtime canvas plugin implements (LCP wire shapes; `:sharedLogic` depends on it), the conformance test kit, and the WebView host that renders a plugin's UI | additive on path change |
 | `avatar/core` / `avatar/renderer-rive` | Avatar models and Rive rendering | additive on path change |
 | `cli` / `appserver-cli` / `iroh-wrapper-cli` | JVM tooling, App Server contract probes, and the Iroh server wrapper (`meridian-iroh-wrapper`) | wrapper/CLI tasks in `shared-multiplatform`; additive `cli` tests |
-| `architecture-tests` / `quality/detekt-rules` | Module-boundary tests and custom static-analysis rules | `detekt` job (advisory) |
+| `architecture-tests` / `quality/detekt-rules` | Module-boundary tests and custom static-analysis rules | `:architecture-tests:test`, `:quality:detekt-rules:check` (required `test`); `detekt` job (not required, but honest: fails only on findings outside each module's `detekt-baseline.xml`) |
 | `macrobenchmark` / `baselineprofile` / `perf` / `native` | Performance infrastructure and native libraries | `perf-gate` (required) |
-| `build-logic` | Convention plugins, e.g. `com.letta.mobile.android.library` | build-time only |
+| `build-logic` | Convention plugins: `com.letta.mobile.android.library`, `com.letta.mobile.kmp.library` (`build-logic/src/main/kotlin/com/letta/mobile/kmp/KmpLibraryPlugin.kt`), architecture-graph, embedded-runtime, JNI 16 KB | `:build-logic:test` (required `test`) |
 
 **Ownership rule:** portable feature *logic* lives in `sharedLogic/commonMain`, shared
 Compose UI in `sharedUI`, and host-specific integration in `app/`, `desktop/` and `web/`
@@ -81,7 +81,8 @@ Two categories were removed, and they are not the same:
 `compileSdk`, `targetSdk`, `minSdk`, kotlinx-coroutines, Ktor, Hilt, AGP, and
 Kotlin plugin versions live in `gradle/libs.versions.toml`. Android library
 modules apply `com.letta.mobile.android.library` instead of repeating SDK/Java
-17 settings. Documented exceptions: `:baselineprofile` uses
+17 settings, and Kotlin Multiplatform library modules apply `com.letta.mobile.kmp.library`
+for their JVM 17 / `compileSdk` / `minSdk` target defaults. Documented exceptions: `:baselineprofile` uses
 `minSdkBaselineProfile` (28); `:feature-chat` still pins Hilt 2.60.1 and
 `ktor-client-core` 3.5.2.
 

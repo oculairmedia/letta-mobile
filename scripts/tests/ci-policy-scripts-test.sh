@@ -342,5 +342,14 @@ printf '\nSee [gone](docs/does-not-exist.md) and `:nope:assembleDebug`.\n' >>"$T
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "broken link must fail docs-freshness"; fi
 assert_contains "$output" 'broken link (docs/does-not-exist.md)'
 assert_contains "$output" '`:nope:assembleDebug` does not start with a declared Gradle module'
+# An includeBuild(...) build is a valid task prefix (`:build-logic:test` runs in `test`);
+# dropping the includeBuild makes the same reference fail.
+docs_fixture
+printf '\nRun `:build-logic:test`.\n' >>"$TMP/docs/README.md"
+output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
+assert_not_contains "$output" '`:build-logic:test` does not start'
+sed -i '/includeBuild("build-logic")/d' "$TMP/docs/android-compose/settings.gradle.kts"
+if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "unknown build prefix must fail docs-freshness"; fi
+assert_contains "$output" '`:build-logic:test` does not start with a declared Gradle module'
 
 echo "ci policy script tests: PASS"

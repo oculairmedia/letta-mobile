@@ -28,7 +28,7 @@ Use semantic `MaterialTheme.typography` roles. Headlines use `headline*`, screen
 
 ## 4. Spacing & Layout
 
-Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32 dp. Compact web layouts use one content pane and top navigation; expanded layouts mirror Desktop with a 56 dp agent rail (`LettaDimens.railWidth`, applied by `ShellAgentRail`) and a 220 dp sidebar (`LettaDimens.navWidth`). Chat messages and the composer remain constrained to 760 dp (`ChatColumnMaxWidth`) while the shell fills the viewport. Dimension constants live in `sharedUI/src/commonMain/.../theme/LettaDimens.kt`; keep this document and that file in agreement rather than restating values only here.
+Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32 dp. Compact web layouts use one content pane and top navigation; expanded web layouts reserve the 56 dp agent rail (`LettaDimens.Pane.railWidth`, widening to `railExpandedWidth`, 248 dp, when `ShellAgentRail` shows names) plus a 231 dp sidebar (`WideNavigationWidth` in `web/.../LettaWebApp.kt`). `LettaDimens.Pane.navWidth` (220 dp) is a settings page's left navigation column, not the shell sidebar. Chat messages and the composer remain constrained to 760 dp (`ChatColumnMaxWidth`) while the shell fills the viewport. Dimension constants live in `sharedUI/src/commonMain/.../theme/LettaDimens.kt`; keep this document and that file in agreement rather than restating values only here.
 
 ## 5. Components
 
@@ -50,7 +50,7 @@ Spacing follows a 4 dp base grid. Common values are 4, 8, 12, 16, 20, 24, and 32
 ### Chat messages
 - **User prompt**: full-width, quietly outlined `surfaceContainerLow` card within the readable column.
 - **Assistant narration**: plain text beside the radial teal identity sphere; no generic assistant bubble.
-- **Identity gradients**: rail/sidebar orbs use the Desktop palette (`#F0A03C→#E0457B`, `#E0457B→#8E5CFF`, `#3FA0F0→#3FE0C0`, `#7AD08F→#3FA0A0`, `#8E7CFF→#3F6EF0`, `#3FC0D0→#3F90A0`). The palette is defined once in `avatar/core/src/commonMain/.../MascotIdentity.kt` and consumed by the shared orb (`sharedUI/.../chat/AgentOrb.kt`), so the mascot and the rail stay in agreement.
+- **Identity gradients**: rail/sidebar orbs use the Desktop palette (`#F0A03C→#E0457B`, `#E0457B→#8E5CFF`, `#3FA0F0→#3FE0C0`, `#7AD08F→#3FA0A0`, `#8E7CFF→#3F6EF0`, `#3FC0D0→#3F90A0`). The six pairs are declared once, as `AgentOrbGradients` in `sharedUI/.../chat/AgentOrb.kt`; `MascotIdentity.kt` holds the mascot's solid `MascotPalette` colors, not these gradients.
 
 ## 6. Motion & Interaction
 

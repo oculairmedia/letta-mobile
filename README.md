@@ -17,7 +17,7 @@ Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/let
 - **Interactive tools** — `AskUserQuestion` and `ExitPlanMode` surface to the user with full submit/approve wiring
 - **Approvals and permission modes** — pending approvals relay to every connected client; permission mode changes push live rather than waiting for a reconnect
 - **Subagents** — roster and progress for delegated work, including a running subagent's step detail
-- **Memory administration** — core memory blocks and the pan/zoom memory graph on a shared page, plus the Android memory overview and file views
+- **Memory administration** — core memory blocks, memory files and the pan/zoom memory graph on the shared memory workspace (`sharedUI`); on Android the `MemoryOverviewScreen` entry point in `app/` hosts that shared workspace
 - **Admin tooling** — providers, tools, skills, templates, projects, channels, schedules, runs, telemetry, system access, pairing and config
 - **Canvas and notes** — a shared canvas workspace with the vendored DrawBox editor, peer-owned documents synced across collaborators, plus Dreaming reflection settings; agents draw with `canvas_apply_ops` and lay out notes, checklists and cards by meaning with `canvas_compose`
 - **Canvas plugins** — new canvas element kinds and agent tools from plugins under a versioned contract: the `plugin-api` Kotlin SPI for JVM plugins, the LCP wire protocol for process/service plugins in any language, and live re-advertisement of plugin tools to the agent
@@ -61,15 +61,16 @@ as much Kotlin as the Android `app` module, and `app/` is a host rather than the
 | `cli/` `appserver-cli/` `iroh-wrapper-cli/` | JVM tooling, App Server contract probes, and the Iroh server wrapper that ships as `meridian-iroh-wrapper` |
 | `quality/detekt-rules/` `architecture-tests/` | Static-analysis rules and module-boundary tests |
 | `macrobenchmark/` `baselineprofile/` `perf/` `native/` | Performance infrastructure and native libraries |
-| `build-logic/` | Convention plugins (`com.letta.mobile.android.library` and friends) |
+| `build-logic/` | Convention plugins: `com.letta.mobile.android.library` for Android library modules, `com.letta.mobile.kmp.library` (`KmpLibraryPlugin.kt`) for the KMP target defaults, plus the architecture-graph, embedded-runtime and JNI 16 KB plugins |
 
 `core/docs/` is documentation, not a module.
 
 The cardinal rule: **portable feature logic lives in `sharedLogic/commonMain`; shared
 Compose UI lives in `sharedUI`; platform modules provide host-specific bindings.** The
-required `shared-multiplatform` check runs bounded `:sharedLogic:jvmTest`, native
-compilation, wrapper/CLI tasks, and browser tests rather than `:sharedLogic:allTests`
-or `:desktop:test`. Desktop tests run in `test` when the desktop module changes.
+required `shared-multiplatform` check runs bounded `:sharedLogic:jvmTest`, wrapper/CLI tasks,
+and host-native and wasmJs *compiles* rather than `:sharedLogic:allTests` or `:desktop:test`.
+Desktop and `:sharedUI:jvmTest` run additively in `test` when their trees change; browser tests
+run only in the non-required `web-wasm` job.
 
 ## Transport
 
@@ -89,9 +90,11 @@ matched wrapper and client deploy (see Development notes).
 | Iroh wrapper (the deployed server) | `./gradlew :iroh-wrapper-cli:installDist` → `build/install/meridian-iroh-wrapper/bin/meridian-iroh-wrapper app-server-serve-iroh …` |
 | CLI / probes | `./gradlew :cli:run -PcliArgs="…"`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
 
-`:cli` is an Android library module with a custom `run` task, so it has no `installDist`; the
-distributable server binary comes from `:iroh-wrapper-cli`. The `app-server-iroh-probe` and
-`app-server-iroh-two-client-probe` commands live in `:cli`.
+`:cli` is a plain Kotlin/JVM `application` module (the developer `meridian` CLI): `:cli:run`
+takes `-PcliArgs="…"` (Gradle's own `--args` also works), and `:cli:installDist` builds
+`cli/build/install/meridian/bin/meridian`. The deployed server binary comes from
+`:iroh-wrapper-cli`. The `app-server-iroh-probe` and `app-server-iroh-two-client-probe` commands
+live in `:cli`.
 
 Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md).
 
@@ -134,9 +137,9 @@ opening a PR.**
 
 `main` is protected; PRs must pass all of:
 
-- `test` — module unit tests, policy scripts, additive module tests (`:desktop:test`, `:designsystem`, `:feature-chat`, `:cli` when those trees change)
+- `test` — module unit tests, policy scripts, and on PRs additive module tests for each changed module tree (`:sharedUI:jvmTest`, `:desktop:test`, `:designsystem`, `:feature-chat`, `:cli`, `:plugin-*`, …; the mapping is [`scripts/ci/changed-gradle-modules.sh`](scripts/ci/changed-gradle-modules.sh))
 - `build-apk-pass` — Android APK build (stable aggregator of the `build-apk` matrix)
-- `shared-multiplatform` — bounded `:sharedLogic:jvmTest` (12 min), host-native and wasmJs compilation, wrapper/CLI verification, and browser tests; desktop tests are additive in `test` when desktop changes
+- `shared-multiplatform` — bounded `:sharedLogic:jvmTest` (12 min), wrapper/CLI verification, and host-native and wasmJs *compiles* (main + test) for `:sharedLogic` and `:sharedUI`; no browser tests (`:web:wasmJsBrowserTest` runs in the non-required `web-wasm` job). Exact tasks: [`.github/workflows/android.yml`](.github/workflows/android.yml)
 - `perf-gate` — perf-budget benchmarks
 
 Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.

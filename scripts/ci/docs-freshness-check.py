@@ -6,7 +6,8 @@ so the docs cannot silently go stale when a module, gate or link changes:
 
   modules   every `include(":x")` in settings.gradle.kts is named in the README
             module tables, and every path the root README module table names exists
-  tasks     every `:module:task` reference names a declared Gradle module
+  tasks     every `:module:task` reference names a declared Gradle module or an
+            `includeBuild(...)` build (`:build-logic:test` runs the included build)
   gates     the README "Required CI gates" list equals CHECKS in
             scripts/bootstrap-branch-protection.sh, and each gate is a workflow job
   links     relative markdown links resolve
@@ -56,6 +57,12 @@ def declared_modules() -> list[str]:
     return re.findall(r'^\s*include\(\s*"(:[^"]+)"\s*\)', settings, re.M)
 
 
+def included_builds() -> list[str]:
+    """`includeBuild("build-logic")` builds, as `:build-logic`; their tasks are addressable too."""
+    settings = (BUILD / "settings.gradle.kts").read_text(encoding="utf-8")
+    return [":" + Path(path).name for path in re.findall(r'includeBuild\(\s*"([^"]+)"\s*\)', settings)]
+
+
 def present_docs(docs: list[str]):
     """(doc, text) for each doc that exists."""
     return [(doc, text) for doc in docs if (text := read(doc)) is not None]
@@ -101,7 +108,7 @@ def owns_module(ref: str, known: set[str]) -> bool:
 
 
 def check_tasks(modules: list[str]) -> None:
-    known = set(modules)
+    known = set(modules) | set(included_builds())
     for doc, text in present_docs(DOCS):
         for ref in sorted(r for r in task_refs(text) if not owns_module(r, known)):
             fail(doc, f"`{ref}` does not start with a declared Gradle module")
