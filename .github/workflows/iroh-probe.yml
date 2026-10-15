@@ -82,7 +82,7 @@ jobs:
       - name: Probe assertion + CLI unit tests
         run: |
           ./gradlew :sharedLogic:jvmTest --tests 'com.letta.mobile.data.transport.iroh.IrohProbeAssertionsTest'
-          ./gradlew :cli:testDebugUnitTest
+          ./gradlew :cli:test
 
   probe-hermetic:
     needs: [changes, probe-unit]
