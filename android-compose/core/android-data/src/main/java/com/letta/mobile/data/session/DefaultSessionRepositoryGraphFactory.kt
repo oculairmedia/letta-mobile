@@ -1,7 +1,5 @@
 package com.letta.mobile.data.session
 
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.plus
 import com.letta.mobile.data.model.LettaConfig
@@ -9,6 +7,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.LocalLettaBackend
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
+import dagger.Lazy
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,11 +31,11 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     private val cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
     /**
-     * Outer bound for every graph this factory creates. Production hands back the process
-     * lifecycle so a graph that is never closed still dies with the process; tests supply their
-     * own so the factory does not reach for a main-thread global to build a data-layer object.
+     * Outer bound for every graph this factory creates, read on each [create]. Production hands
+     * back the [ProcessScope] so a graph that is never closed still dies with the process; tests
+     * supply their own.
      */
-    private val graphParentScope: () -> CoroutineScope = { ProcessLifecycleOwner.get().lifecycleScope },
+    private val graphParentScope: () -> CoroutineScope,
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
@@ -47,6 +46,9 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         settingsRepository: ISettingsRepository,
         cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory,
+        // letta-mobile-by4vm.89: injected from :app instead of read off ProcessLifecycleOwner here;
+        // Lazy keeps it resolved on first create(), as the old default lambda was.
+        @ProcessScope processScope: Lazy<CoroutineScope>,
     ) : this(
         assembler = assembler,
         cursorFactory = cursorFactory,
@@ -57,6 +59,7 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
             memFsStore = memFsStore,
             providers = localRuntimeProviders,
         ),
+        graphParentScope = processScope::get,
     )
 
     private val nextId = AtomicLong(0L)

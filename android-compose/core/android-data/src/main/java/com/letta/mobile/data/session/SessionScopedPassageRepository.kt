@@ -67,7 +67,7 @@ class SessionScopedPassageRepository internal constructor(
 
     override suspend fun clearForBackendSwitch() {
         clearTrackedFlows()
-        sessionManager.current.passageRepository.clearForBackendSwitch()
+        clearBackendScopedCache(sessionManager.current.passageRepository)
     }
 
     override suspend fun createPassage(agentId: AgentId, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }

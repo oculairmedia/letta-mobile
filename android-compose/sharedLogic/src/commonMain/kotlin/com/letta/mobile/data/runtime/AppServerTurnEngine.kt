@@ -426,7 +426,7 @@ class AppServerTurnEngine(
      */
     private fun validatedLeaseGeneration(lease: LeaseRef): Long? {
         val current = lease.current ?: return null
-        if (current.connectionGeneration != connectionGenerationProvider()) return null
+        if (current.isBehind(connectionGenerationProvider())) return null
         return current.connectionGeneration
     }
 
@@ -749,7 +749,7 @@ class AppServerTurnEngine(
                 runId = held.runId?.takeIf { it.isNotBlank() },
                 lastTerminal = held.lastTerminal,
                 lastTerminalSource = held.lastTerminalSource,
-                generationSuperseded = held.connectionGeneration != connectionGenerationProvider(),
+                generationSuperseded = held.isBehind(connectionGenerationProvider()),
                 abortAlreadyRequested = slot.boundaryGate.isAbortRequested(),
             )
             orphanAborter.abortIfOrphaned(facts)
@@ -765,7 +765,9 @@ class AppServerTurnEngine(
                 leaseToken = leaseToken,
                 connectionGeneration = releasedLease.connectionGeneration,
             )
-            slot.casLease(releasedLease, null)
+            // By token, not by instance: a lease carried into the next generation
+            // (letta-mobile-by4vm.55) is a new instance with the same token.
+            slot.updateLease { held -> held?.takeUnless { it.token == leaseToken } }
             slot.casOwner(releasedOwner, null)
         }
         // SENSING (b, letta-mobile-8xxzv): the lease ended WITHOUT ever
@@ -1372,7 +1374,7 @@ class AppServerTurnEngine(
 
     private fun isConnectionGenerationSuperseded(lease: LeaseRef): Boolean {
         val current = lease.current ?: return false
-        return current.connectionGeneration != connectionGenerationProvider()
+        return current.isBehind(connectionGenerationProvider())
     }
 
     /**
@@ -1512,7 +1514,7 @@ class AppServerTurnEngine(
         val frameGeneration = connectionGeneration
         if (frameGeneration != null && frameGeneration != lease.connectionGeneration) return false
         // Generation mismatch is handled by the collect loop (terminate turn).
-        if (lease.connectionGeneration != connectionGenerationProvider()) return false
+        if (lease.isBehind(connectionGenerationProvider())) return false
         val eventRuntime = frame.runtime ?: return when (val f = frame) {
             // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
             // wildcards. External-tool / control requests correlate through the

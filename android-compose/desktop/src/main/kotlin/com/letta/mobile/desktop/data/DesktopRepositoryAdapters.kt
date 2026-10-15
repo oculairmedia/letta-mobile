@@ -38,9 +38,11 @@ import com.letta.mobile.data.session.DEFAULT_REMOTE_BACKEND_LABEL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
 import com.letta.mobile.data.session.SessionBackendBinding
-import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphFactory
+import com.letta.mobile.data.session.graph.HostSessionRepositories
+import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.SubagentListing
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.session.sessionBackendBinding
@@ -48,56 +50,19 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
-class DesktopSessionGraph internal constructor(
-    override val id: Long,
-    override val backendDescriptor: BackendDescriptor,
-    override val localRuntimeBackend: LettaBackend?,
-    override val agentRepository: IAgentRepository,
-    override val blockRepository: IAgentBlockRepository,
-    override val channelTransport: IChannelTransport,
-    override val conversationRepository: IConversationRepository,
-    override val cronRepository: ICronRepository,
-    override val mcpServerRepository: IMcpServerRepository,
-    override val modelRepository: IModelRepository,
-    override val passageRepository: IPassageRepository,
-    override val projectRepository: IProjectRepository,
-    override val projectWorkRepository: IProjectWorkRepository,
-    override val runRepository: IRunRepository,
-    override val providerRepository: IProviderRepository,
-    override val scheduleRepository: IScheduleRepository,
-    override val selfTodoRepository: ISelfTodoRepository,
-    override val stepRepository: IStepRepository,
-    override val subagentRepository: ISubagentRepository,
-    override val toolRepository: IToolRepository,
-    override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository,
-    override val capabilities: SessionCapabilities,
-    private val closeables: List<AutoCloseable> = emptyList(),
-    /** letta-mobile-r2zo8: each conversation's latest context total; inert unless a transport feeds it. */
-    val contextTokenReadings: ContextTokenReadings = ContextTokenReadings(),
-) : SessionRepositoryGraph {
-    private val closedRef = AtomicBoolean(false)
-
-    val isClosed: Boolean
-        get() = closedRef.get()
-
-    override fun close() {
-        if (closedRef.compareAndSet(false, true)) {
-            closeables.forEach { closeable ->
-                runCatching { closeable.close() }
-            }
-        }
-    }
-}
+/**
+ * letta-mobile-by4vm.86: desktop's session graph is the shared one; [DesktopRepositoryAdapters]
+ * supplies only the repositories desktop binds itself.
+ */
+typealias DesktopSessionGraph = SharedSessionRepositoryGraph
 
 class DesktopSessionGraphFactory(
     private val configProvider: () -> LettaConfig? = { null },
@@ -121,31 +86,21 @@ class DesktopSessionGraphFactory(
         val config = configProvider()
         val channelTransport = channelTransportFactory()
         val adapters = repositoryAdaptersFactory(config, channelTransport)
-        return DesktopSessionGraph(
-            id = nextId.incrementAndGet(),
-            backendDescriptor = desktopRemoteLettaDescriptor(config),
-            localRuntimeBackend = null,
-            agentRepository = adapters.agentRepository,
-            blockRepository = adapters.blockRepository,
-            channelTransport = channelTransport,
-            conversationRepository = adapters.conversationRepository,
-            cronRepository = adapters.cronRepository,
-            mcpServerRepository = adapters.mcpServerRepository,
-            modelRepository = adapters.modelRepository,
-            passageRepository = adapters.passageRepository,
-            projectRepository = adapters.projectRepository,
-            projectWorkRepository = adapters.projectWorkRepository,
-            runRepository = adapters.runRepository,
-            providerRepository = adapters.providerRepository,
-            scheduleRepository = adapters.scheduleRepository,
-            selfTodoRepository = adapters.selfTodoRepository,
-            stepRepository = adapters.stepRepository,
-            subagentRepository = adapters.subagentRepository,
-            toolRepository = adapters.toolRepository,
-            vibesyncEventStreamRepository = adapters.vibesyncEventStreamRepository,
-            capabilities = adapters.capabilities,
-            closeables = adapters.closeables,
-            contextTokenReadings = adapters.contextTokenReadings,
+        return SharedSessionRepositoryGraph(
+            identity = SessionGraphIdentity(
+                id = nextId.incrementAndGet(),
+                backendDescriptor = desktopRemoteLettaDescriptor(config),
+                localRuntimeBackend = null,
+                channelTransport = channelTransport,
+                capabilities = adapters.capabilities,
+            ),
+            host = adapters.hostRepositories(),
+            transportBound = adapters.transportBound,
+            onClose = {
+                adapters.closeables.forEach { closeable ->
+                    runCatching { closeable.close() }
+                }
+            },
         )
     }
 }
@@ -261,7 +216,7 @@ class DesktopRepositoryAdapters(
     }
     // letta-mobile-by4vm.24: built by the shared graph builder, as Android's are. The desktop
     // Background tasks panel has a "Finished" section, so it lists every subagent.
-    private val transportBound = SharedSessionGraph.transportBound(
+    internal val transportBound = SharedSessionGraph.transportBound(
         transport = channelTransport,
         scope = transportBoundScope,
         snapshots = contextReadingSnapshots,
@@ -305,6 +260,24 @@ class DesktopRepositoryAdapters(
     val subagentRepository: ISubagentRepository = boundSubagentRepository
     val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailable(SessionRoute.TOOLS)
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC)
+
+    /** The repositories desktop binds itself; the transport-bound ones come from [transportBound]. */
+    internal fun hostRepositories(): HostSessionRepositories = HostSessionRepositories(
+        agentRepository = agentRepository,
+        blockRepository = blockRepository,
+        conversationRepository = conversationRepository,
+        mcpServerRepository = mcpServerRepository,
+        modelRepository = modelRepository,
+        passageRepository = passageRepository,
+        projectRepository = projectRepository,
+        projectWorkRepository = projectWorkRepository,
+        runRepository = runRepository,
+        providerRepository = providerRepository,
+        scheduleRepository = scheduleRepository,
+        stepRepository = stepRepository,
+        toolRepository = toolRepository,
+        vibesyncEventStreamRepository = vibesyncEventStreamRepository,
+    )
 }
 
 /** The backend kind a desktop session binds; a remote host with no address is no backend at all. */

@@ -131,7 +131,7 @@ class DesktopAppServerChatGateway internal constructor(
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         admin.getConversation(conversationId).agentId.value
     },
-    /** letta-mobile-by4vm.9: the session that reconnects itself (ws://); null on Iroh. */
+    /** letta-mobile-by4vm.9/.56: the session that reconnects itself (ws:// and iroh://); null for test fakes. */
     private val session: DesktopSelfReconnectingSession? = null,
 ) : DesktopChatGateway,
     ConnectionStatusGateway,

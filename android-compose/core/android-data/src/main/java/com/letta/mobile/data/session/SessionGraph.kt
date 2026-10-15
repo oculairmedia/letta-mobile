@@ -1,67 +1,36 @@
 package com.letta.mobile.data.session
 
-import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.context.ContextTokenReadings
-import com.letta.mobile.data.context.contextTokenReadingsOf
+import com.letta.mobile.data.local.CapturedBackendConversationCursorStore
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
-import com.letta.mobile.data.repository.BlockRepository
-import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.CronRepository
-import com.letta.mobile.data.repository.McpServerRepository
-import com.letta.mobile.data.repository.ModelRepository
-import com.letta.mobile.data.repository.PassageRepository
-import com.letta.mobile.data.repository.ProjectRepository
-import com.letta.mobile.data.repository.ProjectWorkRepository
-import com.letta.mobile.data.repository.ProviderRepository
-import com.letta.mobile.data.repository.RunRepository
-import com.letta.mobile.data.repository.api.IScheduleRepository
-import com.letta.mobile.data.repository.SelfTodoRepository
-import com.letta.mobile.data.repository.StepRepository
-import com.letta.mobile.data.repository.SubagentRepository
-import com.letta.mobile.data.repository.ToolRepository
-import com.letta.mobile.data.repository.VibesyncEventStreamRepository
-import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.runtime.BackendDescriptor
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.CoroutineStart
 
+/**
+ * One Android session graph generation: the shared, interface-typed
+ * [SharedSessionRepositoryGraph] (letta-mobile-by4vm.86) plus what only Android binds — the
+ * generation's [scope], the paging conversation list, the captured cursor store and config, and a
+ * local runtime typed as [LocalLettaBackend].
+ */
 class SessionGraph internal constructor(
-    override val id: Long,
-    override val backendDescriptor: BackendDescriptor,
+    private val repositories: SharedSessionRepositoryGraph,
     override val localRuntimeBackend: LocalLettaBackend?,
     val scope: CoroutineScope,
-    override val agentRepository: AgentRepository,
     val allConversationsRepository: AllConversationsRepository,
-    override val channelTransport: IChannelTransport,
-    override val conversationRepository: ConversationRepository,
-    override val cronRepository: CronRepository,
-    override val mcpServerRepository: McpServerRepository,
-    override val modelRepository: ModelRepository,
-    override val passageRepository: PassageRepository,
-    override val projectRepository: ProjectRepository,
-    override val projectWorkRepository: ProjectWorkRepository,
-    override val runRepository: RunRepository,
-    override val providerRepository: ProviderRepository,
-    override val scheduleRepository: IScheduleRepository,
-    override val selfTodoRepository: SelfTodoRepository,
-    override val stepRepository: StepRepository,
-    override val subagentRepository: SubagentRepository,
-    override val toolRepository: ToolRepository,
-    override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
-    override val capabilities: SessionCapabilities,
-    override val blockRepository: BlockRepository? = null,
-    val conversationCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
+    val conversationCursorStore: CapturedBackendConversationCursorStore? = null,
     /** Configuration captured at creation, never resolved from mutable settings. */
     val capturedConfig: LettaConfig? = null,
+) : SessionRepositoryGraph by repositories {
     /** letta-mobile-r2zo8: each conversation's latest context total, fed by [channelTransport]. */
-    val contextTokenReadings: ContextTokenReadings = contextTokenReadingsOf(channelTransport, scope),
-) : SessionRepositoryGraph {
+    val contextTokenReadings: ContextTokenReadings
+        get() = repositories.contextTokenReadings
+
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try { awaitCancellation() } finally { conversationCursorStore?.close() }
@@ -71,5 +40,14 @@ class SessionGraph internal constructor(
     override fun close() {
         conversationCursorStore?.retire()
         scope.cancel()
+        repositories.close()
     }
+}
+
+/**
+ * Clears [repository]'s per-backend cache. The graph exposes repositories by interface
+ * (letta-mobile-by4vm.86); the Android ones that cache per backend implement [BackendScopedCache].
+ */
+internal suspend fun <T> clearBackendScopedCache(repository: T) {
+    (repository as? BackendScopedCache)?.clearForBackendSwitch()
 }

@@ -138,8 +138,9 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * letta-mobile-by4vm.9: this is the one owner of App-Server-session reconnect over a direct socket
  * (the wrapper's runtime and admin lanes, the desktop's ws:// gateway). Its [state] projects onto
  * the shared UI model with [toChannelTransportState]. [stampGenerations] stamps every piped frame
- * with its generation for hosts that fence turns by generation (the wrapper's controller); a host
- * whose turns must survive a reconnect (see
+ * with its generation for hosts that fence frames by generation (the wrapper's controller, which
+ * carries its surviving turns into each new generation, letta-mobile-by4vm.55); a host with no
+ * generation fence whose turns survive a reconnect (see
  * [com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter.interruptSession]) passes
  * false, which is safe because generations are piped strictly one after another.
  */

@@ -126,6 +126,12 @@ object AdminRpcRegistry {
          * When null, skill.list returns an empty skills array until a catalog is wired.
          */
         skillsListing: SkillsListingSource? = null,
+        /**
+         * letta-mobile-by4vm.84: the App Server's slash commands, observed from
+         * `update_device_status`. Null falls back to a catalog that answers the built-in list
+         * when a [nativeClient] is wired, and `capability_unavailable` when none is.
+         */
+        slashCommands: NativeSlashCommandCatalog? = null,
         /** See [NativeReadTiers.agentChanges]. */
         agentChanges: AgentChangeNotifier? = null,
         /** See [NativeReadTiers.conversationChanges]. */
@@ -177,9 +183,9 @@ object AdminRpcRegistry {
         ScheduleAdminHandlers.register(router, nativeClient)
         ToolAdminHandlers.register(router, localBackendStore, nativeClient)
         McpAdminHandlers.register(router)
-        // Phase 3: shim-era goal/slash surfaces are product-removed.
-        GoalAdminHandlers.register(router, adminBaseUrl = null)
-        SlashCommandAdminHandlers.register(router, adminBaseUrl = null)
+        // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
+        GoalAdminHandlers.register(router)
+        SlashCommandAdminHandlers.register(router, slashCommands ?: nativeClient?.let { NativeSlashCommandCatalog() })
         SkillAdminHandlers.register(
             router,
             nativeClient = nativeClient,
