@@ -34,10 +34,16 @@
 # ---------------------------------------------------------------------------
 # letta-mobile-by4vm.88: session-scoped repositories are java.lang.reflect.Proxy
 # instances over these interfaces (SessionForwarding.kt). Keep each
-# interface a real type (no merging into its single implementation); renaming
-# is fine because the proxy invokes the same Method on the graph's repository.
+# interface a real type (no merging into its single implementation). Method names
+# must survive too: SessionScopedInvocationHandler checks SessionForwarding's names
+# ("clearForBackendSwitch", ...) against Class.getMethods() at construction, so an
+# obfuscated interface fails app start in minified builds (perf-gate on main
+# 81787e1cb: "Target package ... is not running").
 # ---------------------------------------------------------------------------
 -keep,allowobfuscation,allowshrinking interface com.letta.mobile.data.repository.api.I*Repository
+-keepclassmembernames interface com.letta.mobile.data.repository.api.I*Repository {
+    <methods>;
+}
 
 # ---------------------------------------------------------------------------
 # OkHttp — keep public API + TLS internals; let R8 shrink implementation.
