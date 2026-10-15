@@ -8,6 +8,7 @@ import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeProblem
 import com.letta.mobile.data.canvas.compose.ComposeTarget
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas.plugin
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -20,7 +21,7 @@ fun interface PluginKindCatalog {
     fun schemaFor(type: String, v: Int): JsonObject?
 
     /** Whether this host has the plugin [pluginId] at all, whatever its kinds and their versions. */
-    fun knows(pluginId: String): Boolean = false
+    fun knows(pluginId: PluginId): Boolean = false
 
     companion object {
         val Empty: PluginKindCatalog = PluginKindCatalog { _, _ -> null }
@@ -62,7 +63,7 @@ data class PluginKindSpec(
  */
 class InMemoryPluginKindCatalog(specs: List<PluginKindSpec>) : PluginKindCatalog {
     private val byKind: Map<Pair<String, Int>, PluginKindSpec> = specs.associateBy { it.elementType to it.schemaVersion }
-    private val plugins: Set<String> = specs.mapTo(mutableSetOf()) { it.pluginId }
+    private val plugins: Set<PluginId> = specs.mapTo(mutableSetOf()) { PluginId(it.pluginId) }
 
     init {
         val problems = specs.flatMap { it.problems() }
@@ -76,7 +77,7 @@ class InMemoryPluginKindCatalog(specs: List<PluginKindSpec>) : PluginKindCatalog
 
     override fun schemaFor(type: String, v: Int): JsonObject? = spec(type, v)?.propsSchema
 
-    override fun knows(pluginId: String): Boolean = pluginId in plugins
+    override fun knows(pluginId: PluginId): Boolean = pluginId in plugins
 
     companion object {
         /**
@@ -84,10 +85,10 @@ class InMemoryPluginKindCatalog(specs: List<PluginKindSpec>) : PluginKindCatalog
          * entry's current `schemaVersion`, `props` schema and `defaultSize`. A kind missing its
          * `props` schema is declared with none, which [PluginKindSpec.problems] refuses.
          */
-        fun specsOf(pluginId: String, elements: JsonObject): List<PluginKindSpec> = elements.map { (kind, declared) ->
+        fun specsOf(pluginId: PluginId, elements: JsonObject): List<PluginKindSpec> = elements.map { (kind, declared) ->
             val entry = declared as? JsonObject ?: JsonObject(emptyMap())
             PluginKindSpec(
-                elementType = "${CanvasPluginElement.TYPE_PREFIX}$pluginId/$kind",
+                elementType = "${CanvasPluginElement.TYPE_PREFIX}${pluginId.value}/$kind",
                 schemaVersion = (entry["schemaVersion"] as? JsonPrimitive)?.intOrNull ?: 1,
                 propsSchema = entry["props"] as? JsonObject ?: JsonObject(emptyMap()),
                 defaultSize = (entry["defaultSize"] as? JsonObject)?.let(::sizeOf),

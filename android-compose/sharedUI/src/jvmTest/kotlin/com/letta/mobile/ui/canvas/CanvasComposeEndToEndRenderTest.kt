@@ -24,7 +24,6 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.CanvasRelayProtocol
@@ -49,6 +48,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
@@ -293,11 +293,11 @@ class CanvasComposeEndToEndRenderTest {
         // A group's cards sit inside its frame.
         val elements = (json.parseToJsonElement(session.sceneJsonOrEmpty()).jsonObject["elements"] as kotlinx.serialization.json.JsonArray).map { it.jsonObject }
         receipt.items.filter { it.kind == ComposeKind.GROUP }.forEach { group ->
-            val frame = elements.single { (it["id"] as JsonPrimitive).content == group.boardId(receipt.artifactId) }
+            val frame = elements.single { (it["id"] as JsonPrimitive).content == group.boardIdIn(receipt) }
             val (a, b) = (frame["points"] as kotlinx.serialization.json.JsonArray).map { p -> (p as JsonPrimitive).content.split(",").map(String::toFloat) }
             val box = Rect(a[0], a[1], b[0], b[1])
             group.children.orEmpty().filter { it.kind in DOCUMENT_KINDS }.forEach { child ->
-                assertTrue(box.containsRect(rendered.getValue(child.boardId(receipt.artifactId))), "${child.key} is outside its group $box")
+                assertTrue(box.containsRect(rendered.getValue(child.boardIdIn(receipt))), "${child.key} is outside its group $box")
             }
         }
     }

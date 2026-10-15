@@ -7,9 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.mayForwardAsUserAction
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState

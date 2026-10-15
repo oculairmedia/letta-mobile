@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -62,5 +63,5 @@ internal object CanvasBatchFixtures {
 
     /** [ops] projected from nothing, each stamped after the last, as a log would hold them. */
     fun sceneOf(ops: List<CanvasOp>): String =
-        CanvasOpProjector.project("", ops.mapIndexed { index, op -> op.withStamp("seed-$index", index + 1L) })
+        CanvasOpProjector.project("", ops.mapIndexed { index, op -> op.withStamp(CanvasOpId("seed-$index"), index + 1L) })
 }

@@ -1,10 +1,10 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.BiStream
 import computer.iroh.Connection

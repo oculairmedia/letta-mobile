@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.storage.AssetRef
 import com.letta.mobile.data.storage.AssetRefs
 import com.letta.mobile.data.storage.AssetStore

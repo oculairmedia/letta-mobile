@@ -16,12 +16,10 @@ import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.session.BackendScopedCache
 
 /**
- * Phase 5e: platform-neutral block repository (HTTP / Iroh routing). Android
- * supplies [BlockRemoteSource] and optional [BlockIrohSource]. No durable local
- * cache — identity attach/detach stay HTTP-only (no Iroh handlers yet).
- *
- * Desktop continues to use [com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository]
- * / HTTP admin for its session graph.
+ * Phase 5e: platform-neutral block repository (HTTP / Iroh routing) over [BlockRemoteSource] and an
+ * optional [BlockIrohSource]. No durable local cache — identity attach/detach stay HTTP-only (no
+ * Iroh handlers yet). letta-mobile-by4vm.103: the one memory-block repository Android and desktop
+ * Iroh sessions build (through [com.letta.mobile.data.session.graph.adminRepositories]).
  */
 open class CachedBlockRepository(
     private val remote: RemoteRoute<BlockRemoteSource>,

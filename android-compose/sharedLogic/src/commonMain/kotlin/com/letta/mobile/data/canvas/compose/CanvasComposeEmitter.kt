@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler.Built
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler.ELEMENT_COMPOSE
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler.Entry
+import com.letta.mobile.data.model.CanvasArtifactId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -22,7 +23,7 @@ internal class Emitted(val op: CanvasOp, val path: String)
  * The ops of [CanvasComposeCompiler]'s batch, placed by [placement]: group frames, then documents,
  * then texts (TEXT items and group labels), so what is drawn under comes first.
  */
-internal class ComposeEmitter(private val artifactId: String, private val placement: Placement) {
+internal class ComposeEmitter(private val artifactId: CanvasArtifactId, private val placement: Placement) {
     fun emit(built: List<Built>): List<Emitted> {
         val all = built.flatMap { if (it is Built.Group) listOf(it) + it.children else listOf(it) }
         val groups = all.filterIsInstance<Built.Group>().map { Emitted(groupFrame(it), it.entry.path) }
@@ -40,7 +41,7 @@ internal class ComposeEmitter(private val artifactId: String, private val placem
     private fun slot(entry: Entry): Slot = placement.slots.getValue(entry.key)
 
     private fun provenance(entry: Entry) = CanvasComposeProvenance(
-        artifactId = artifactId,
+        artifactId = artifactId.value,
         key = entry.key,
         kind = entry.item.kind.name,
         catalog = CanvasComposeContract.CATALOG,

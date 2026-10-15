@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject

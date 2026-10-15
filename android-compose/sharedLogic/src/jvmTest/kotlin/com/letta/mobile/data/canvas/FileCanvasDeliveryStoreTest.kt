@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.HostId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
@@ -66,7 +67,7 @@ class FileCanvasDeliveryStoreTest {
 
     private companion object {
         const val IO_THREAD = "canvas-delivery-io"
-        const val HOST = "host-1"
+        val HOST = HostId("host-1")
         const val TOPIC = "topic-1"
     }
 }

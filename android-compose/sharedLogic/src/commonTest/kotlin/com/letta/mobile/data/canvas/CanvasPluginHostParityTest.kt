@@ -10,6 +10,7 @@ import com.letta.mobile.data.canvas.PluginToolHost.Companion.json
 import com.letta.mobile.data.canvas.PluginToolHost.Companion.shape
 import com.letta.mobile.data.canvas.PluginToolHost.Companion.withoutOpIds
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,5 +88,5 @@ class CanvasPluginHostParityTest {
         }
     }
 
-    private fun unstamped(ops: List<CanvasOp>?): List<CanvasOp> = assertIs<List<CanvasOp>>(ops).map { it.withStamp("", it.lamport) }
+    private fun unstamped(ops: List<CanvasOp>?): List<CanvasOp> = assertIs<List<CanvasOp>>(ops).map { it.withStamp(CanvasOpId(""), it.lamport) }
 }

@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneCheck
 import com.letta.mobile.data.canvas.CanvasSceneValidator
+import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -66,7 +67,7 @@ class CanvasPluginFixturesTest {
     fun theExampleManifestsWidgetRefusesPropsAtTheFixturesPointers() {
         val manifest = json.parseToJsonElement(fixture("manifest-example.json")).jsonObject
         val kinds = InMemoryPluginKindCatalog(
-            InMemoryPluginKindCatalog.specsOf(manifest.getValue("id").jsonPrimitive.content, manifest.getValue("elements").jsonObject),
+            InMemoryPluginKindCatalog.specsOf(PluginId(manifest.getValue("id").jsonPrimitive.content), manifest.getValue("elements").jsonObject),
         )
         val fixture = json.parseToJsonElement(fixture("props-problems.json")).jsonObject
         val type = fixture.getValue("type").jsonPrimitive.content

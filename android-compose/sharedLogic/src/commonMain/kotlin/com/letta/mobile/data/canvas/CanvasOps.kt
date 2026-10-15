@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.document.DocumentOp
@@ -211,6 +212,9 @@ fun CanvasOp.withActor(actorId: CanvasActorId): CanvasOp = when (this) {
     is CanvasOp.BatchOp -> copy(actorId = actorId.value, ops = ops.map { it.withActor(actorId) })
 }
 
+/** This op's [CanvasOp.opId], typed for the op log and the delivery queue (by4vm.99.1). */
+val CanvasOp.canvasOpId: CanvasOpId get() = CanvasOpId(opId)
+
 /**
  * The same operation with a fresh identity and [lamport].
  *
@@ -218,20 +222,20 @@ fun CanvasOp.withActor(actorId: CanvasActorId): CanvasOp = when (this) {
  * cannot carry the clock it was born with: the scene has moved on, and last-writer-wins would
  * discard a stale op without a word. It is stamped at the moment it is applied instead.
  */
-fun CanvasOp.withStamp(opId: String, lamport: Long): CanvasOp = when (this) {
-    is CanvasOp.ReplaceSceneOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.AddElementOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.UpdateElementOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.RemoveElementOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetBackgroundOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetBackgroundPatternOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetArrowBindingOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetLabelOwnerOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetDocumentOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.RemoveDocumentOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.SetPluginElementOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.RemovePluginElementOp -> copy(opId = opId, lamport = lamport)
-    is CanvasOp.BatchOp -> copy(opId = opId, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
+fun CanvasOp.withStamp(opId: CanvasOpId, lamport: Long): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.AddElementOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.UpdateElementOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.RemoveElementOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetBackgroundOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetBackgroundPatternOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetArrowBindingOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetLabelOwnerOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetDocumentOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.RemoveDocumentOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.SetPluginElementOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.RemovePluginElementOp -> copy(opId = opId.value, lamport = lamport)
+    is CanvasOp.BatchOp -> copy(opId = opId.value, lamport = lamport, ops = ops.map { it.withStamp(opId, lamport) })
 }
 
 /**

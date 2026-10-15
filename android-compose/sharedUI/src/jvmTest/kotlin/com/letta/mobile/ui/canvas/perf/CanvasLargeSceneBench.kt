@@ -7,7 +7,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneState
@@ -16,6 +15,7 @@ import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.CanvasImageAssets
 import com.letta.mobile.ui.canvas.CanvasWorkspaceSupport
 import com.letta.mobile.ui.canvas.ExternalSyncParams

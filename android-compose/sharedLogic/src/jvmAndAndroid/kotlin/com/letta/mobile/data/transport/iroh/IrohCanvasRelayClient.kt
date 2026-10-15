@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasRelayConnection
 import com.letta.mobile.data.canvas.CanvasRelayDecoded
 import com.letta.mobile.data.canvas.CanvasRelayMessage
 import com.letta.mobile.data.canvas.CanvasRelayProtocol
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
@@ -81,7 +82,7 @@ class IrohCanvasRelayClient(
                 val writes = Mutex()
                 relay.run(
                     object : CanvasRelayConnection {
-                        override val hostId: String = hostId
+                        override val hostId: HostId = HostId(hostId)
 
                         override suspend fun send(message: CanvasRelayMessage) {
                             writes.withLock { CanvasRelayFraming.write(send, CanvasRelayProtocol.encode(message)) }

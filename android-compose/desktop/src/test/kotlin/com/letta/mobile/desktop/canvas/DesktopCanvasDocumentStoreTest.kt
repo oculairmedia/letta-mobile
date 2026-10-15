@@ -6,7 +6,6 @@ import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
@@ -16,6 +15,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

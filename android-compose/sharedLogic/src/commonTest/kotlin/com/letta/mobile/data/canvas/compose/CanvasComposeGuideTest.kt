@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasToolContract
+import com.letta.mobile.runtime.ToolCallId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -157,8 +158,8 @@ class CanvasComposeGuideTest {
         assertTrue("i0, i1, and i3-c0 for the first child of the group at i3" in prose)
         assertTrue("cmp-<artifact_id>-<key>; a group's label is cmp-<artifact_id>-<key>-label" in prose)
         // Without an artifact_id: derived from the tool call.
-        assertEquals("a-", CanvasComposeIds.derived("call-1").take(2))
-        assertEquals(2 + CanvasComposeIds.DERIVED_HEX, CanvasComposeIds.derived("call-1").length)
+        assertEquals("a-", CanvasComposeIds.derived(ToolCallId("call-1")).value.take(2))
+        assertEquals(2 + CanvasComposeIds.DERIVED_HEX, CanvasComposeIds.derived(ToolCallId("call-1")).value.length)
     }
 
     @Test

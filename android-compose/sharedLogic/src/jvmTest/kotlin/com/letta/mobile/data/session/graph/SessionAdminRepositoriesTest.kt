@@ -21,11 +21,15 @@ class SessionAdminRepositoriesTest {
 
         override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
             methods += method
-            val server = buildJsonObject {
-                put("id", "mcp-1")
+            // One row every admin list here decodes: an MCP server, a tool and a memory block.
+            val row = buildJsonObject {
+                put("id", "row-1")
                 put("server_name", "files")
+                put("name", "search")
+                put("label", "human")
+                put("value", "remembered")
             }
-            return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = true, result = JsonArray(listOf(server)))
+            return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = true, result = JsonArray(listOf(row)))
         }
     }
 
@@ -38,7 +42,22 @@ class SessionAdminRepositoriesTest {
         admin.mcpServerRepository.refreshServers()
 
         assertEquals(listOf("mcp.list"), transport.methods)
-        assertEquals(listOf("mcp-1"), admin.mcpServerRepository.servers.value.map { it.id.value })
+        assertEquals(listOf("row-1"), admin.mcpServerRepository.servers.value.map { it.id.value })
+    }
+
+    /** letta-mobile-by4vm.103: tools and memory blocks come from the same builder on both platforms. */
+    @Test
+    fun anIrohBackendServesToolsAndMemoryBlocksOverAdminRpc() = runTest {
+        val transport = RecordingTransport()
+        val settings = ActiveConfigSettingsRepository(LettaConfig("host", LettaConfig.Mode.SELF_HOSTED, "iroh://node"))
+
+        val admin = SharedSessionGraph.adminRepositories(transport, settings)
+        admin.toolRepository.refreshTools()
+        val blocks = admin.blockRepository.getBlocks("agent-1")
+
+        assertEquals(listOf("tool.list", "block.list_agent"), transport.methods)
+        assertEquals(listOf("row-1"), admin.toolRepository.getTools().value.map { it.id.value })
+        assertEquals(listOf("remembered"), blocks.map { it.value })
     }
 
     @Test
@@ -49,6 +68,10 @@ class SessionAdminRepositoriesTest {
         val failure = assertFailsWith<AppServerRouteUnavailable> { admin.mcpServerRepository.refreshServers() }
 
         assertEquals(SessionRoute.MCP_SERVERS, failure.route)
+        val toolFailure = assertFailsWith<AppServerRouteUnavailable> { admin.toolRepository.refreshTools() }
+        assertEquals(SessionRoute.TOOLS, toolFailure.route)
+        val blockFailure = assertFailsWith<AppServerRouteUnavailable> { admin.blockRepository.getBlocks("agent-1") }
+        assertEquals(SessionRoute.BLOCKS, blockFailure.route)
         assertEquals(emptyList(), transport.methods)
     }
 }

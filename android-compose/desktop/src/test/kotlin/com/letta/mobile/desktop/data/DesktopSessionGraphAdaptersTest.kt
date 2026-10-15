@@ -14,7 +14,8 @@ import com.letta.mobile.data.repository.appserver.AppServerAgentBlockRepository
 import com.letta.mobile.data.repository.appserver.AppServerAgentRepository
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
-import com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository
+import com.letta.mobile.data.repository.CachedBlockRepository
+import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -90,14 +91,14 @@ class DesktopSessionGraphAdaptersTest {
             ),
         )
 
-        assertIs<IrohAgentBlockRepository>(adapters.blockRepository)
+        assertIs<CachedBlockRepository>(adapters.blockRepository)
     }
 
     /**
      * letta-mobile-9v9nu regression: before the fix, `irohMode` was computed
      * purely from `IrohChannelTransport.isIrohUrl(config.serverUrl)`, so a
      * LOCAL config with a leftover `iroh://` serverUrl still built
-     * [buildIrohRepositories] and routed `toolRepository`/`scheduleRepository`
+     * the Iroh repositories and routed `toolRepository`/`scheduleRepository`
      * through the Iroh-backed implementations instead of falling back to the
      * (correctly local-only) unavailable repository.
      */
@@ -111,7 +112,7 @@ class DesktopSessionGraphAdaptersTest {
             ),
         )
 
-        assertFalse(adapters.toolRepository is com.letta.mobile.data.repository.iroh.IrohToolRepository)
+        assertFalse(adapters.toolRepository is ToolRepository)
         assertFalse(adapters.scheduleRepository is com.letta.mobile.data.repository.iroh.IrohScheduleRepository)
     }
 

@@ -1,7 +1,7 @@
 ﻿package com.letta.mobile.desktop.canvas
 
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import kotlin.test.Test

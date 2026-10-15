@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -30,6 +31,9 @@ data class PluginManifest(
     val actions: Map<String, PluginAction> = emptyMap(),
     val pages: Map<String, PluginPage> = emptyMap(),
 ) {
+    /** [id] typed (letta-mobile-by4vm.101): what the registry, its commands and the kind catalog are keyed by. */
+    val pluginId: PluginId get() = PluginId(id)
+
     /** The last segment of [id], the prefix of every agent tool the plugin offers: `example` of `letta.example`. */
     val idShort: String get() = id.substringAfterLast('.')
 

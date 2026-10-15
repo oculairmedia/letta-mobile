@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasOpId
 import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -18,6 +19,9 @@ object CanvasOpDiffer {
         ignoreUnknownKeys = true
         isLenient = true
     }
+
+    /** A fresh [CanvasOpId] for an op this app stamps. */
+    fun newOpId(prefix: String = "op"): CanvasOpId = CanvasOpId(generateOpId(prefix))
 
     fun generateOpId(prefix: String = "op"): String {
         val high = (Random.nextLong() and Long.MAX_VALUE).toString(16)
