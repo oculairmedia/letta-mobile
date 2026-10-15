@@ -24,8 +24,11 @@ Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/let
 - **Live sync** — multi-client conversation sync between mobile, desktop and browser, paired-device authz, agent-to-agent messaging
 - **Shell** — one adaptive shell across clients: unified search, connection state, a live dock mascot, and pull-to-refresh on list surfaces
 
-All of the above are shared Compose UI in `sharedUI` and shared logic in `sharedLogic`; the
-platform modules supply navigation hosts, DI, persistence and OS integration.
+The cross-client surfaces above are shared Compose UI in `sharedUI` and shared logic in
+`sharedLogic`; the platform modules supply navigation hosts, DI, persistence and OS integration.
+The exception is Android chat: `feature-chat` is an Android-only Compose module that owns the
+Android chat screen and scaffold (the `AdminChatViewModel` stack) and composes `sharedUI`
+components inside it.
 
 Since the hard cuts that removed the HTTP/REST backend, the REST-only admin screens — archival
 passages, block library, MCP servers, tool editor, model browser and usage — are **gone with no App

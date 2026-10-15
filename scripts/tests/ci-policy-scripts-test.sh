@@ -323,10 +323,13 @@ python3 "$docs_check" "$SOURCE_ROOT" >/dev/null || fail "docs-freshness-check mu
 # also report; each case asserts its own message rather than a clean baseline.
 docs_fixture() {
   rm -rf "$TMP/docs" && mkdir -p "$TMP/docs"
-  (cd "$SOURCE_ROOT" && cp --parents -t "$TMP/docs" README.md CONTRIBUTING.md CLAUDE.md AGENTS.md \
+  # Portable copy (BSD cp has no --parents / -t).
+  (cd "$SOURCE_ROOT" && for f in README.md CONTRIBUTING.md CLAUDE.md AGENTS.md \
     android-compose/README.md android-compose/settings.gradle.kts \
     android-compose/gradle/wrapper/gradle-wrapper.properties \
-    scripts/bootstrap-branch-protection.sh .github/workflows/*.yml)
+    scripts/bootstrap-branch-protection.sh .github/workflows/*.yml; do
+      mkdir -p "$TMP/docs/$(dirname "$f")" && cp "$f" "$TMP/docs/$f"
+    done)
 }
 docs_fixture
 printf '%s\n' 'include(":brand-new-module")' >>"$TMP/docs/android-compose/settings.gradle.kts"
@@ -334,7 +337,7 @@ mkdir -p "$TMP/docs/android-compose/brand-new-module"
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "unlisted module must fail docs-freshness"; fi
 assert_contains "$output" 'module :brand-new-module is not named'
 docs_fixture
-sed -i 's/^CHECKS=(\(.*\))/CHECKS=(\1 codecov)/' "$TMP/docs/scripts/bootstrap-branch-protection.sh"
+sed -i.bak 's/^CHECKS=(\(.*\))/CHECKS=(\1 codecov)/' "$TMP/docs/scripts/bootstrap-branch-protection.sh"
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "gate drift must fail docs-freshness"; fi
 assert_contains "$output" 'Required CI gates lists'
 docs_fixture
@@ -348,7 +351,7 @@ docs_fixture
 printf '\nRun `:build-logic:test`.\n' >>"$TMP/docs/README.md"
 output="$(python3 "$docs_check" "$TMP/docs" 2>&1 || true)"
 assert_not_contains "$output" '`:build-logic:test` does not start'
-sed -i '/includeBuild("build-logic")/d' "$TMP/docs/android-compose/settings.gradle.kts"
+sed -i.bak '/includeBuild("build-logic")/d' "$TMP/docs/android-compose/settings.gradle.kts"
 if output="$(python3 "$docs_check" "$TMP/docs" 2>&1)"; then fail "unknown build prefix must fail docs-freshness"; fi
 assert_contains "$output" '`:build-logic:test` does not start with a declared Gradle module'
 

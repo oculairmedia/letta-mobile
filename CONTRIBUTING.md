@@ -111,7 +111,8 @@ and wasmJs (main + test, for `:sharedLogic` and `:sharedUI`); on PRs `:sharedUI:
 task lists live in `.github/workflows/android.yml`:
 
 ```bash
-./gradlew :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
+./gradlew :sharedLogic:jvmTest :sharedUI:jvmTest
+./gradlew :desktop:test   # optional: only when you changed desktop/ (it can run long; see below)
 ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
 ./gradlew :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
 ```
