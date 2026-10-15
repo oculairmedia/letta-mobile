@@ -64,3 +64,14 @@ value class CanvasActorId(val value: String) {
 value class CanvasOpId(val value: String) {
     override fun toString(): String = value
 }
+
+/**
+ * The id of a composed canvas artifact (letta-mobile-by4vm.99.3): the `artifact_id` an agent sends
+ * to `canvas_compose`, or the one derived from its tool call. Receipts and compose provenance carry
+ * it as a bare string ([value]); the compose compiler and the board-id helpers take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasArtifactId(val value: String) {
+    override fun toString(): String = value
+}

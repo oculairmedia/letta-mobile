@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry

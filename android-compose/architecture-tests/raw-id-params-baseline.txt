@@ -57,11 +57,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSession.kt 
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSessionPluginElements.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSnap.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasTools.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeCompiler.kt 3
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeContract.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeExisting.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeIds.kt 3
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/compose/CanvasComposeReserveBlocks.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindCatalog.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindProps.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/channel/ChannelsPageController.kt 3
@@ -73,7 +68,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/Conversation
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/ConversationLineage.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/IrohConversationForkRpc.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/PendingComposerDrafts.kt 3
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/CanvasArtifactReceiptEvents.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/ChatRenderModelBuilder.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/MessageGrouping.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/projection/RunActivityProjection.kt 1
@@ -307,7 +301,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatTimelinePr
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatUiModels.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/session/ChatActions.kt 5
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/session/TimelineChatSessionMapping.kt 3
-sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/canvas/NotebookCanvasMigration.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/canvas/NotebookLocalStore.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/extras/DefaultIrohCliRunner.kt 11
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRouter.kt 2
@@ -371,7 +364,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAg
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAgentIdentity.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAgentMessageReceiver.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAppServerTransport.kt 2
-sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCanvasRelay.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohChannelTransport.kt 27
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCronRpcClient.kt 7
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohDialer.kt 1

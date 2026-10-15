@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.OverlappingFileLockException
@@ -59,7 +60,7 @@ class NotebookCanvasMappingStore(private val directory: Path) {
         }
         val result = importer()
         if (result != NotebookCanvasImportResult.CONFLICT && entry?.completed != true) {
-            markCompleted(canvas.id.value)
+            markCompleted(canvas.id)
         }
         result
     }
@@ -76,9 +77,9 @@ class NotebookCanvasMappingStore(private val directory: Path) {
         return entries.any { it.targetHex == targetHex }
     }
 
-    private fun markCompleted(canvasId: String) {
+    private fun markCompleted(canvasId: CanvasId) {
         val current = read()
-        write(current.map { if (it.canvasId == canvasId) it.copy(completed = true) else it })
+        write(current.map { if (it.canvasId == canvasId.value) it.copy(completed = true) else it })
     }
 
     private fun <T> locked(action: (List<Entry>) -> T): T {

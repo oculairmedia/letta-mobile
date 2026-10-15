@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import computer.iroh.Connection
 import computer.iroh.Endpoint
@@ -458,7 +459,7 @@ class IrohNodeEndpoint(
             return
         }
         Telemetry.event("IrohNode", "canvas.accepted", "remoteEndpointId" to remoteId, "alpn" to alpn.decodeToString())
-        relay.accept(alpn, connection, origin = remoteId, hostNodeId = nodeIdHex())
+        relay.accept(alpn, connection, origin = remoteId, hostNodeId = HostId(nodeIdHex()))
     }
 
     /**

@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.projection
 
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract
@@ -12,6 +11,8 @@ import com.letta.mobile.data.canvas.compose.ComposeReceiptFrames
 import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.controller.node.iroh.MessageListWireProjection
+import com.letta.mobile.data.model.CanvasArtifactId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -191,7 +192,7 @@ class CanvasComposeReceiptSizeTest {
     }
 
     private fun ComposeReceiptItem.withIds(artifactId: String): ComposeReceiptItem =
-        copy(id = boardId(artifactId), children = children?.map { it.withIds(artifactId) })
+        copy(id = boardId(CanvasArtifactId(artifactId)), children = children?.map { it.withIds(artifactId) })
 
     private fun bytesText(receipt: ComposeReceipt): String = CanvasComposeContract.json.encodeToString(ComposeReceipt.serializer(), receipt)
 

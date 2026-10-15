@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler.ELEMENT_COMPOSE
+import com.letta.mobile.data.model.CanvasArtifactId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -75,11 +76,11 @@ internal class ExistingArtifact(
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun of(sceneJson: String, artifactId: String): ExistingArtifact {
-            val documents = CanvasOpProjector.documentsOf(sceneJson).filter { it.compose?.artifactId == artifactId }
+        fun of(sceneJson: String, artifactId: CanvasArtifactId): ExistingArtifact {
+            val documents = CanvasOpProjector.documentsOf(sceneJson).filter { it.compose?.artifactId == artifactId.value }
             val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject
             val elements = (root?.get("elements") as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
-                .filter { artifactOf(it) == artifactId }
+                .filter { artifactOf(it) == artifactId.value }
             val signatures = documents.associate { it.id to DocumentContent(it.json, it.color, it.title, it.compose).signature() } +
                 elements.mapNotNull { element -> element.string("id")?.let { it to elementSignature(element) } }
             return ExistingArtifact(signatures, documents, elements)

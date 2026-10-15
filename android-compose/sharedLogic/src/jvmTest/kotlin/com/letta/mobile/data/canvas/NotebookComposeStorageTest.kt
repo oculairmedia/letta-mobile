@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.compose.ComposeCompilation
 import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.canvas.compose.ComposeTarget
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files

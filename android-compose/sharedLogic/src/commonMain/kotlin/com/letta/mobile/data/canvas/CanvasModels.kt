@@ -1,15 +1,9 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentSnapshot
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-/**
- * The canvas id now lives in `core/ids` beside the other domain ids (letta-mobile-by4vm.99). This
- * alias keeps the `com.letta.mobile.data.canvas.CanvasId` name the canvas code already imports;
- * new code may import [com.letta.mobile.data.model.CanvasId] directly.
- */
-typealias CanvasId = com.letta.mobile.data.model.CanvasId
 
 /** A board at a revision: the shared-document [DocumentSnapshot] for canvases. */
 @Serializable

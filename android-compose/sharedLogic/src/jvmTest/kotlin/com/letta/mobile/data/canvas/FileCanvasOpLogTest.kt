@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import java.nio.file.Files
 import java.nio.file.Path

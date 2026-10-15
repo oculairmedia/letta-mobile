@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.InMemoryOpLog
 import com.letta.mobile.data.document.OpLog
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex

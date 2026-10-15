@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.HistoryBudget
 import com.letta.mobile.data.document.InMemoryOpArchive
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

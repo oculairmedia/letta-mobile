@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasBatchFixtures.box2
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.label1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.labelledBox
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.sceneOf
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

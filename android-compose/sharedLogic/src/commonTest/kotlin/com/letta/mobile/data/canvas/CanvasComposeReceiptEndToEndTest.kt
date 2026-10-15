@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
@@ -25,6 +26,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -138,7 +140,7 @@ class CanvasComposeReceiptEndToEndTest {
         val receipt = attached.values.single().single()
         assertEquals(CanvasArtifactStatus.Published, receipt.status)
         assertEquals(TOOL_CALL_ID, receipt.toolCallId)
-        assertEquals(CanvasComposeIds.derived(TOOL_CALL_ID), receipt.artifactId, "the artifact the host derived from the call id")
+        assertEquals(CanvasComposeIds.derived(ToolCallId(TOOL_CALL_ID)).value, receipt.artifactId, "the artifact the host derived from the call id")
         assertEquals(CanvasId.forConversation(ConversationId(CONVERSATION)).value, receipt.canvasId)
         assertEquals(host.scene().revision, receipt.revision)
         assertEquals("Weekend", receipt.title)

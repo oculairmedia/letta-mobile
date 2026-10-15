@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.ConcurrentHashMap

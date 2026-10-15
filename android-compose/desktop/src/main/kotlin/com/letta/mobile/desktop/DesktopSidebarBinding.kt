@@ -2,7 +2,6 @@ package com.letta.mobile.desktop
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasLibrary
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.display.ChatTextSize
@@ -12,6 +11,7 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.canvas.toCanvasArchiveFilter
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter

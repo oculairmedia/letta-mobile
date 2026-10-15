@@ -10,6 +10,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString

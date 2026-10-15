@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.WEEKEND
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest

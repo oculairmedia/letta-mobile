@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.timeline.TimelineEvent
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -71,7 +72,7 @@ internal class ComposeCallReading private constructor(
             val pieceIds = mutableListOf<String>()
             fun visit(item: ComposeReceiptItem) {
                 kinds += item.kind
-                pieceIds += item.boardId(receipt.artifactId)
+                pieceIds += item.boardIdIn(receipt)
                 item.children.orEmpty().forEach(::visit)
             }
             receipt.items.forEach(::visit)
@@ -125,14 +126,14 @@ internal class ComposeCallReading private constructor(
          * is the shell's output and the receipt JSON is read off its stdout.
          */
         fun of(event: TimelineEvent, call: ToolCall, ordinal: Int, fromCli: Boolean = false): ComposeCallReading {
-            val callId = call.effectiveId.takeIf { it.isNotBlank() }
+            val callId = call.effectiveId.takeIf { it.isNotBlank() }?.let(::ToolCallId)
             val request = RequestSummary.of(call.arguments)
             val returned = event.returnText(callId, ordinal)
             val result = if (fromCli) MeridianCommandCall.toolResult(returned) else returned
             return ComposeCallReading(
-                callId = callId,
+                callId = callId?.value,
                 request = request,
-                fallbackId = request.artifactId ?: callId?.let { "call:$it" } ?: "call:${CanvasArtifactReceipts.eventKey(event)}#$ordinal",
+                fallbackId = request.artifactId ?: callId?.let { "call:${it.value}" } ?: "call:${CanvasArtifactReceipts.eventKey(event)}#$ordinal",
                 result = result,
                 isError = event.returnIsError(callId) || (fromCli && MeridianCommandCall.isErrorResult(returned)),
                 truncated = event.returnTruncated(callId),

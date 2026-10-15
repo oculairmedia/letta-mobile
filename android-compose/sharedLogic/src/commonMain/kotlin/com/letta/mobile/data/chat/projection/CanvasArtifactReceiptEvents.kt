@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.projection
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
+import com.letta.mobile.runtime.ToolCallId
 
 /**
  * The narrating message for the compose call at [index] of [events] (see [CanvasArtifactReceipts]),
@@ -52,15 +53,15 @@ internal fun TimelineEvent.toolCallList(): List<ToolCall> = when (this) {
 }
 
 /** The return of the call [callId] (or, for the event's first call, the event's own return). */
-internal fun TimelineEvent.returnText(callId: String?, ordinal: Int): String? =
-    callId?.let { returnByCallId()[it] } ?: returnContent().takeIf { ordinal == 0 }
+internal fun TimelineEvent.returnText(callId: ToolCallId?, ordinal: Int): String? =
+    callId?.let { returnByCallId()[it.value] } ?: returnContent().takeIf { ordinal == 0 }
 
-internal fun TimelineEvent.returnIsError(callId: String?): Boolean =
-    callId?.let { returnIsErrorByCallId()[it] } ?: eventReturnIsError()
+internal fun TimelineEvent.returnIsError(callId: ToolCallId?): Boolean =
+    callId?.let { returnIsErrorByCallId()[it.value] } ?: eventReturnIsError()
 
 /** Whether the stored return of [callId] is a truncated preview. */
-internal fun TimelineEvent.returnTruncated(callId: String?): Boolean =
-    callId != null && this is TimelineEvent.Confirmed && callId in toolReturnTruncationByCallId
+internal fun TimelineEvent.returnTruncated(callId: ToolCallId?): Boolean =
+    callId != null && this is TimelineEvent.Confirmed && callId.value in toolReturnTruncationByCallId
 
 private fun TimelineEvent.messageTypeOf(): TimelineMessageType = when (this) {
     is TimelineEvent.Confirmed -> messageType

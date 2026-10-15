@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.document.InMemoryPresenceTransport
 import com.letta.mobile.data.document.PeerPresence
 import com.letta.mobile.data.document.PresenceTransport
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 

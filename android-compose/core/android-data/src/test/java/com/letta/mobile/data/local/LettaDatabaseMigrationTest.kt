@@ -464,7 +464,7 @@ class LettaDatabaseMigrationTest {
 
         val log = RoomCanvasOpLog(dao)
         val next = com.letta.mobile.data.canvas.CanvasOp.SetBackgroundOp("op-v21-1", "user-1", 2L, "#ffffff")
-        log.append(com.letta.mobile.data.canvas.CanvasId("canvas-v20"), next)
+        log.append(com.letta.mobile.data.model.CanvasId("canvas-v20"), next)
         assertEquals(listOf("op-v21-1"), dao.getUnsettled("canvas-v20").map { it.opId })
     }
 

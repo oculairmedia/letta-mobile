@@ -1,7 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json

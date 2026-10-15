@@ -1,7 +1,7 @@
 package com.letta.mobile.data.local
 
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import java.util.concurrent.ConcurrentHashMap

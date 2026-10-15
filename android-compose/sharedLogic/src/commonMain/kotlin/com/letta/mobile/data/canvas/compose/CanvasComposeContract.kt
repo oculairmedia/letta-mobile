@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasToolContract
+import com.letta.mobile.data.model.CanvasArtifactId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
@@ -345,7 +346,10 @@ data class ComposeReceiptItem(
     val children: List<ComposeReceiptItem>? = null,
 ) {
     /** The board id of this piece of [artifactId]: the one the receipt names, else the derived one. */
-    fun boardId(artifactId: String): String = id ?: CanvasComposeIds.piece(artifactId, key)
+    fun boardId(artifactId: CanvasArtifactId): String = id ?: CanvasComposeIds.piece(artifactId, key)
+
+    /** [boardId] of this piece of [receipt]'s artifact. */
+    fun boardIdIn(receipt: ComposeReceipt): String = boardId(CanvasArtifactId(receipt.artifactId))
 }
 
 /**
