@@ -62,6 +62,28 @@ class DualLaneAppServerClientTest {
         assertEquals(listOf("input"), runtime.calls)
     }
 
+    // letta-mobile-by4vm.82: the Iroh host's /context-limit relay runs execute_command through this
+    // client; the interface default threw, so the host answered capability_unavailable.
+    @Test
+    fun executeCommandRunsOnTheRuntimeLane() = runTest {
+        val runtime = RecordingClient("runtime")
+        val admin = RecordingClient("admin")
+        val client = DualLaneAppServerClient(runtime = runtime, admin = admin)
+
+        val response = client.executeCommand(
+            AppServerCommand.ExecuteCommand(
+                requestId = "exec-1",
+                commandId = "context-limit",
+                args = "200000",
+                runtime = AppServerRuntimeScope("agent-1", "conv-1"),
+            ),
+        )
+
+        assertEquals("exec-1", response.requestId)
+        assertEquals(listOf("executeCommand"), runtime.calls)
+        assertEquals(emptyList(), admin.calls)
+    }
+
     private class RecordingClient(
         private val lane: String,
         private val failAgentList: Boolean = false,
@@ -105,6 +127,13 @@ class DualLaneAppServerClientTest {
         ): AppServerInboundFrame.ConversationMessagesListResponse {
             calls += "conversationMessagesList"
             return AppServerInboundFrame.ConversationMessagesListResponse(command.requestId, success = true)
+        }
+
+        override suspend fun executeCommand(
+            command: AppServerCommand.ExecuteCommand,
+        ): AppServerInboundFrame.ExecuteCommandResponse {
+            calls += "executeCommand"
+            return AppServerInboundFrame.ExecuteCommandResponse(command.requestId, success = true)
         }
 
         override suspend fun channelStart(command: AppServerCommand.ChannelStart): AppServerInboundFrame.ChannelStartResponse {

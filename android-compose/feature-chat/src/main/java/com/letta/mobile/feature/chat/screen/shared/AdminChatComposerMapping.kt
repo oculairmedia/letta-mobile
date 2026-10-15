@@ -42,6 +42,8 @@ internal object AdminChatComposerMapping {
         val models: List<LlmModel>,
         val conversationOverride: String?,
         val effortsFor: (String?) -> List<String>,
+        /** letta-mobile-by4vm.82: the conversation's effort (this session's pick, else the host's record). */
+        val conversationEffort: String? = null,
     )
 
     fun composerUiState(inputs: ComposerInputs): ChatComposerUiState = ChatComposerUiState(
@@ -81,10 +83,11 @@ internal object AdminChatComposerMapping {
     }
 
     /**
-     * The effort the agent was configured with. A conversation-scoped switch does not report
-     * its effort back, so the agent's value is only meaningful while no override is active.
+     * The conversation's effort (letta-mobile-by4vm.82), else the effort the agent was configured with.
+     * The agent's value only describes the conversation while no override is active.
      */
     private fun currentEffort(inputs: ModelInputs): String? {
+        inputs.conversationEffort?.takeIf { it.isNotBlank() }?.let { return it }
         if (!inputs.conversationOverride.isNullOrBlank()) return null
         val agent = inputs.agent ?: return null
         return agent.llmConfig?.reasoningEffort ?: agent.modelSettings?.reasoningEffort

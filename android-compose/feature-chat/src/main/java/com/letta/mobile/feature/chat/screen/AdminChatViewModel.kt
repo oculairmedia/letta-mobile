@@ -454,7 +454,10 @@ internal class AdminChatViewModel @Inject constructor(
             activeAgent = activeAgent,
             bannerController = chatBannerController,
             modelControl = modelControl,
-            conversationId = { conversationId?.value },
+            conversation = com.letta.mobile.feature.chat.coordination.OpenConversation(
+                id = { conversationId?.value },
+                refresh = { conversationRepository.refreshConversations(agentId) },
+            ),
         )
     }
 
