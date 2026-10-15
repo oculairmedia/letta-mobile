@@ -37,11 +37,11 @@ class ShellSidebarMappingTest {
                 conversations = chats,
                 marks = ShellConversationMarks(selectedId = "c1", thinkingId = "c1", parentIds = mapOf("c2" to "c1")),
                 canvases = listOf(
-                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.canvas.CanvasId("a"), title = "Roadmap"),
-                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.canvas.CanvasId("b"), title = "Old"),
+                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.model.CanvasId("a"), title = "Roadmap"),
+                    com.letta.mobile.data.canvas.CanvasDocument(id = com.letta.mobile.data.model.CanvasId("b"), title = "Old"),
                 ),
-                activeCanvasId = com.letta.mobile.data.canvas.CanvasId("a"),
-                archivedCanvasIds = setOf(com.letta.mobile.data.canvas.CanvasId("b")),
+                activeCanvasId = com.letta.mobile.data.model.CanvasId("a"),
+                archivedCanvasIds = setOf(com.letta.mobile.data.model.CanvasId("b")),
             ),
             now,
         )

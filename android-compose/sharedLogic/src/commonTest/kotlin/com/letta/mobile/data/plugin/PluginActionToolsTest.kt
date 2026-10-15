@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.MutableToolSource
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginRegistryFixtures.json
 import com.letta.mobile.data.plugin.PluginRegistryFixtures.manifest
 import kotlinx.coroutines.test.runTest
@@ -43,7 +44,7 @@ class PluginActionToolsTest {
     fun onlyAdvertisedPluginsOfferTools() {
         val installed = PluginRegistryFixtures.registryOf(example)
         assertTrue(PluginActionTools.toolsFor(installed, invoker).isEmpty())
-        val enabled = assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(installed, PluginCommand.Enable(example.id))).state
+        val enabled = assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(installed, PluginCommand.Enable(example.pluginId))).state
         assertEquals(listOf("example_start", "example_cancel"), PluginActionTools.toolsFor(enabled, invoker).map { it.name })
     }
 
@@ -53,7 +54,7 @@ class PluginActionToolsTest {
         val source = MutableToolSource(PluginActionTools.SOURCE_ID)
         registry.addSource(source)
         val installed = PluginRegistryFixtures.registryOf(example)
-        val enabled = assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(installed, PluginCommand.Enable(example.id))).state
+        val enabled = assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(installed, PluginCommand.Enable(example.pluginId))).state
 
         PluginActionTools.publish(source, enabled, invoker)
         val advertised = registry.advertisedToolsCommandGroups()?.single()?.tools.orEmpty()
@@ -76,7 +77,7 @@ class PluginActionToolsTest {
         assertNotNull(catalog.schemaFor("ext:letta.example/widget", 2))
         assertNotNull(catalog.schemaFor("ext:acme.board/widget", 2))
         assertNull(catalog.schemaFor("ext:letta.example/widget", 1))
-        assertTrue(catalog.knows("acme.board"))
+        assertTrue(catalog.knows(PluginId("acme.board")))
 
         val bad = CanvasPluginElementFixtures.place(1).copy(elementType = "ext:letta.example/widget", v = 2, props = json("""{"status":"paused"}""").jsonObject)
         val check = assertIs<CanvasSceneCheck.Invalid>(CanvasSceneValidator.pluginElement(bad, catalog))

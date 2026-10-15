@@ -10,6 +10,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.TYPE
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.place
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.progress
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.props
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -52,7 +53,7 @@ class PluginKindValidationTest {
         assertEquals(widgetProps, catalog.schemaFor(TYPE, 1))
         assertNull(catalog.schemaFor(TYPE, 2))
         assertNull(catalog.schemaFor("ext:someone.else/gadget", 1))
-        assertTrue(catalog.knows("letta.example"))
+        assertTrue(catalog.knows(PluginId("letta.example")))
         assertEquals(PluginKindSize(320f, 240f), catalog.spec(TYPE, 1)?.defaultSize)
     }
 
@@ -144,7 +145,7 @@ class PluginKindValidationTest {
         val elements = Json.parseToJsonElement(
             """{"widget":{"schemaVersion":2,"props":$widgetProps,"defaultSize":{"width":320,"height":240}}}""",
         ).jsonObject
-        val specs = InMemoryPluginKindCatalog.specsOf("letta.example", elements)
+        val specs = InMemoryPluginKindCatalog.specsOf(PluginId("letta.example"), elements)
         assertEquals(listOf(PluginKindSpec(TYPE, 2, widgetProps, PluginKindSize(320f, 240f))), specs)
         assertEquals(widgetProps, InMemoryPluginKindCatalog(specs).schemaFor(TYPE, 2))
     }

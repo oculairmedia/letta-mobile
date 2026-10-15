@@ -11,8 +11,8 @@ import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 import com.letta.mobile.data.shell.ShellDestination

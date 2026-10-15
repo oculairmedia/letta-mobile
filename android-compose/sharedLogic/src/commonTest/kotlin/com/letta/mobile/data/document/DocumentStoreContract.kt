@@ -1,10 +1,10 @@
 package com.letta.mobile.data.document
 
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.document.markdown.MarkdownDocId
 import com.letta.mobile.data.document.markdown.MarkdownDocument
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest

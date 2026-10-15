@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentStore
 import com.letta.mobile.data.document.DocumentStoreContract
+import com.letta.mobile.data.model.CanvasId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest

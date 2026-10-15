@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentStorageHealth
 import com.letta.mobile.data.document.StorageFault
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.flow.StateFlow
 
 /**

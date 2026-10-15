@@ -1,8 +1,8 @@
 package com.letta.mobile.ui.canvas
 
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasStorageFault
 import com.letta.mobile.data.canvas.affecting
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -16,10 +16,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.model.Tool
-import com.letta.mobile.data.model.ToolCreateParams
-import com.letta.mobile.data.model.ToolId
-import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.AgentBlockTarget
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -201,54 +197,6 @@ class IrohAdminRpcAgentDirectory(
             method = AdminRpcMethod("agent.context"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/context$query"),
             body = body,
-        )
-    }
-
-    suspend fun listTools(limit: Int, offset: Int): List<Tool> = adminRpcDecodedList(
-        method = AdminRpcMethod("tool.list"),
-        path = AdminRpcPath("/v1/tools?limit=$limit&offset=$offset"),
-        body = jsonBody {
-            put("limit", limit)
-            put("offset", offset)
-        },
-    )
-
-    suspend fun createTool(params: ToolCreateParams): Tool = adminRpcDecoded(
-        method = AdminRpcMethod("tool.create"),
-        path = AdminRpcPath("/v1/tools"),
-        body = AdminRpcBody(json.encodeToString(ToolCreateParams.serializer(), params)),
-    )
-
-    suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
-        val paramsJson = json.encodeToJsonElement(ToolUpdateParams.serializer(), params).jsonObject
-        val body = jsonBody {
-            put("tool_id", toolId.value)
-            paramsJson.forEach { (key, value) -> put(key, value) }
-        }
-        return adminRpcDecoded(
-            method = AdminRpcMethod("tool.update"),
-            path = AdminRpcPath("/v1/tools/${toolId.value}"),
-            body = body,
-        )
-    }
-
-    suspend fun deleteTool(toolId: ToolId) {
-        adminRpcResult(
-            method = AdminRpcMethod("tool.delete"),
-            path = AdminRpcPath("/v1/tools/${toolId.value}"),
-            body = entityIdBody("tool_id", toolId.value),
-        )
-    }
-
-    suspend fun setToolAttached(agentId: AgentId, toolId: ToolId, attached: Boolean) {
-        val action = if (attached) "attach" else "detach"
-        adminRpcResult(
-            method = AdminRpcMethod(if (attached) "tool.attach" else "tool.detach"),
-            path = AdminRpcPath("/v1/agents/${agentId.value}/tools/$action/${toolId.value}"),
-            body = jsonBody {
-                put("agent_id", agentId.value)
-                put("tool_id", toolId.value)
-            },
         )
     }
 

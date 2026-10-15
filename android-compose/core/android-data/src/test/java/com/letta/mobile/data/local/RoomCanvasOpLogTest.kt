@@ -8,7 +8,6 @@ import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
@@ -19,6 +18,8 @@ import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.runBlocking
@@ -242,10 +243,10 @@ class RoomCanvasOpLogTest {
         opLog.append(canvasId, first)
         assertEquals("in append order", listOf("journal-2", "journal-1"), opLog.unsettled(canvasId).map { it.opId })
 
-        opLog.settle(canvasId, listOf("journal-2"))
+        opLog.settle(canvasId, listOf(CanvasOpId("journal-2")))
         opLog.append(canvasId, second) // a redelivered op keeps its settled state
         assertEquals(listOf("journal-1"), RoomCanvasOpLog(database.canvasOpDao()).unsettled(canvasId).map { it.opId })
-        opLog.settle(canvasId, (1..1200).map { "absent-$it" } + "journal-1")
+        opLog.settle(canvasId, (1..1200).map { CanvasOpId("absent-$it") } + CanvasOpId("journal-1"))
         assertEquals(emptyList<String>(), opLog.unsettled(canvasId).map { it.opId })
     }
 

@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.view
 
 import com.letta.mobile.data.canvas.plugin.InMemoryPluginKindCatalog
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginKinds
 import com.letta.mobile.data.plugin.catalog.HostPluginCatalog
@@ -65,7 +66,7 @@ class PluginViewsModel(
     val kinds: PluginKindCatalog = object : PluginKindCatalog {
         override fun schemaFor(type: String, v: Int) = kindCatalog.value.schemaFor(type, v)
 
-        override fun knows(pluginId: String) = kindCatalog.value.knows(pluginId)
+        override fun knows(pluginId: PluginId) = kindCatalog.value.knows(pluginId)
     }
 
     init {

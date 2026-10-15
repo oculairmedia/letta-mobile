@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
@@ -51,7 +53,7 @@ class CanvasRelayClosedBoardTest {
         return phone
     }
 
-    private suspend fun TestApp.cursor(): Long? = delivery.cursor(HOST, CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)))
+    private suspend fun TestApp.cursor(): Long? = delivery.cursor(HostId(HOST), CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)))
 
     private suspend fun TestApp.stored(): String = documents.get(CanvasId.forConversation(ConversationId(CONVERSATION)))!!.sceneJson
 

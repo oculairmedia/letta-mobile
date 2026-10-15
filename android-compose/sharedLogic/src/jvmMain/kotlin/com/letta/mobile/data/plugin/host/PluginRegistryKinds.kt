@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginRegistryState
 import kotlinx.serialization.json.JsonObject
 
@@ -16,7 +17,7 @@ class PluginRegistryKinds(private val registry: () -> PluginRegistryState) : Plu
             ?.value?.props
     }
 
-    override fun knows(pluginId: String): Boolean = registry()[pluginId] != null
+    override fun knows(pluginId: PluginId): Boolean = registry()[pluginId] != null
 }
 
 /**
@@ -28,5 +29,5 @@ class LateBoundPluginKinds : PluginKindCatalog {
 
     override fun schemaFor(type: String, v: Int): JsonObject? = target.schemaFor(type, v)
 
-    override fun knows(pluginId: String): Boolean = target.knows(pluginId)
+    override fun knows(pluginId: PluginId): Boolean = target.knows(pluginId)
 }

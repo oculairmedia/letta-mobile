@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentStore
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 
 /**

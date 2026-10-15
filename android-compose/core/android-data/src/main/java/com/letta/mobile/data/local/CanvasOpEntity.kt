@@ -4,8 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.json.Json
 
 private val opSerializer = Json {

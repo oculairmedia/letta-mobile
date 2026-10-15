@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasBatchViolation
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
@@ -107,7 +108,7 @@ internal class ComposeRun(
     },
 ) {
     suspend fun run(input: JsonElement): ComposeOutcome {
-        val ready = when (val compiled = compile(input, target.sceneJson) { CanvasComposeIds.derived(target.toolCallId) }) {
+        val ready = when (val compiled = compile(input, target.sceneJson) { CanvasComposeIds.derived(target.toolCallId?.takeIf { it.isNotBlank() }?.let(::ToolCallId)).value }) {
             is ComposeCompilation.Refused -> return ComposeOutcome.Refused(compiled.refusal)
             is ComposeCompilation.Ready -> compiled
         }

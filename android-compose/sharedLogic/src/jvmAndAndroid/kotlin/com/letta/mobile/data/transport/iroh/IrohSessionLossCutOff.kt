@@ -12,8 +12,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * letta-mobile-qygvv.16: ends every turn whose transport session was lost (connection closed,
- * redial, wrapper restart) within a bounded time, with exactly one terminal.
+ * letta-mobile-qygvv.16: ends every turn whose transport session ended for good (config change,
+ * disconnect, auth failure) within a bounded time, with exactly one terminal. A redial is not an
+ * end (letta-mobile-by4vm.96): the engine carries its turns across it.
  *
  * Before, closing the session cancelled each turn's send job at once. The engine's own terminal
  * could never flow out of a cancelled job, nothing else produced one, and the phone sat on

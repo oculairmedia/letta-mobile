@@ -10,8 +10,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.RunListParams
-import com.letta.mobile.data.repository.BlockRepository
-import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
 import com.letta.mobile.data.repository.SlashCommandRepository
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
@@ -74,7 +72,6 @@ class AndroidSessionRouteMatrixTest {
         agentDao = dagger.Lazy<AgentDao> { FakeAgentDao() },
         conversationDao = dagger.Lazy<ConversationDao> { FakeConversationDao() },
         // Production: SessionRemoteSources.None, the default.
-        blockRepository = BlockRepository(IrohAdminRpcBlockSource(transport, settings)),
         localConversationSource = mockk(relaxed = true),
         localAgentSource = mockk(relaxed = true),
         localModelSource = mockk(relaxed = true),

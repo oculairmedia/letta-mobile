@@ -30,7 +30,6 @@ class IrohDialerTest {
             scope = this,
             secretKeyStore = FakeSecretKeyStore(),
             onConnectionLost = { _, _ -> },
-            onCloseResources = {},
         )
 
         val nonIrohConfig = IrohConnectConfig(
@@ -53,7 +52,6 @@ class IrohDialerTest {
             scope = this,
             secretKeyStore = FakeSecretKeyStore(),
             onConnectionLost = { _, _ -> },
-            onCloseResources = {},
             bindEndpoint = { _, _ -> throw RuntimeException("mock bind failed") },
         )
 
@@ -69,31 +67,6 @@ class IrohDialerTest {
         }
 
         assertTrue(connectingCalled, "onConnecting callback must be invoked when dial begins")
-    }
-
-    @Test
-    fun closeResourcesInvokedOnDialFailure() = runTest(UnconfinedTestDispatcher()) {
-        var closeReason: String? = null
-        val dialer = IrohDialer(
-            scope = this,
-            secretKeyStore = FakeSecretKeyStore(),
-            onConnectionLost = { _, _ -> },
-            onCloseResources = { reason -> closeReason = reason },
-            bindEndpoint = { _, _ -> throw RuntimeException("mock bind failed") },
-        )
-
-        val config = IrohConnectConfig(
-            baseShimUrl = "iroh://invalid-ticket-that-fails",
-            token = "token",
-            deviceId = "dev",
-            clientVersion = "1.0",
-        )
-
-        runCatching {
-            dialer.dial(config)
-        }
-
-        assertEquals("dial_failed", closeReason)
     }
 
     @Test

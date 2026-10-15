@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption

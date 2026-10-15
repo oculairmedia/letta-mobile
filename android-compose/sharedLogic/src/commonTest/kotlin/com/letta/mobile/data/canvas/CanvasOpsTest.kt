@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
@@ -192,7 +193,7 @@ class CanvasOpsTest {
         val rebound = batch.withActor(CanvasActorId("caller")) as CanvasOp.BatchOp
         assertEquals("caller", (rebound.ops[0] as CanvasOp.SetPluginElementOp).actorId)
         assertEquals("caller", ((rebound.ops[1] as CanvasOp.BatchOp).ops[0] as CanvasOp.RemovePluginElementOp).actorId)
-        val stamped = batch.withStamp("undo-1", 99) as CanvasOp.BatchOp
+        val stamped = batch.withStamp(CanvasOpId("undo-1"), 99) as CanvasOp.BatchOp
         assertEquals(99, (stamped.ops[0] as CanvasOp.SetPluginElementOp).lamport)
         assertEquals("undo-1", ((stamped.ops[1] as CanvasOp.BatchOp).ops[0] as CanvasOp.RemovePluginElementOp).opId)
         assertEquals(place.copy(opId = "undo-1", lamport = 99), stamped.ops[0])

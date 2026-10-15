@@ -10,6 +10,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
@@ -189,7 +190,7 @@ private suspend fun commitOpsUpdate(
     val callerId = context.resolveCallerId()
     if (activeSession != null) return activeSession.applyAgentOps(ops, callerId).revision
     val stamped = CanvasStampedBatch.separately(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) {
-        CanvasOpDiffer.generateOpId("agent")
+        CanvasOpDiffer.newOpId("agent")
     }
     return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, stamped))
 }
@@ -325,7 +326,7 @@ private suspend fun publishComposed(
             throw ComposePublishException(ComposeErrorCode.UNAUTHORIZED, e.message ?: "Unauthorized: actor '$callerId'")
         }
     }
-    val batch = CanvasStampedBatch.of(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) { CanvasOpDiffer.generateOpId("agent") }
+    val batch = CanvasStampedBatch.of(ops, callerId, CanvasOpProjector.maxLamport(doc.sceneJson)) { CanvasOpDiffer.newOpId("agent") }
     return persistWithoutSession(context.store, doc, CanvasOpProjector.project(doc.sceneJson, listOf(batch)))
         ?: throw ComposePublishException(
             ComposeErrorCode.BOARD_REFUSED,

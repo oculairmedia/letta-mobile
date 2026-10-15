@@ -2,24 +2,31 @@ package com.letta.mobile.data.session.graph
 
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.repository.CachedBlockRepository
 import com.letta.mobile.data.repository.CachedMcpServerRepository
 import com.letta.mobile.data.repository.CachedModelRepository
 import com.letta.mobile.data.repository.CachedPassageRepository
 import com.letta.mobile.data.repository.CachedProjectRepository
 import com.letta.mobile.data.repository.CachedProviderRepository
 import com.letta.mobile.data.repository.CachedRunRepository
+import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
 import com.letta.mobile.data.repository.IrohAdminRpcRunSource
+import com.letta.mobile.data.repository.IrohAdminRpcToolSource
+import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.repository.api.BlockRemoteSource
+import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.IProjectRepository
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
+import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.repository.api.McpServerRemoteSource
@@ -28,11 +35,12 @@ import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.repository.api.ProjectRemoteSource
 import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.repository.api.RunRemoteSource
+import com.letta.mobile.data.repository.api.ToolRemoteSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 
 /**
  * letta-mobile-by4vm.87: the admin repositories (MCP servers, models, archival passages, projects,
- * providers, runs) a session graph serves over an Iroh host's `admin_rpc`, built the same way for
+ * providers, runs; letta-mobile-by4vm.103: tools and memory blocks) a session graph serves over an Iroh host's `admin_rpc`, built the same way for
  * Android and desktop. Each one asks its Iroh source first and falls back to its [AdminRemoteRoutes]
  * entry, which production leaves absent (the call then fails as an unsupported route).
  */
@@ -43,6 +51,8 @@ class SessionAdminRepositories internal constructor(
     val projectRepository: IProjectRepository,
     val providerRepository: IProviderRepository,
     val runRepository: IRunRepository,
+    val toolRepository: IToolRepository,
+    val blockRepository: IBlockRepository,
 )
 
 /** The non-Iroh backend seam for [SessionAdminRepositories]; every route is absent by default. */
@@ -53,6 +63,8 @@ class AdminRemoteRoutes(
     val projects: RemoteRoute<ProjectRemoteSource> = RemoteRoute.Absent(SessionRoute.PROJECTS),
     val providers: RemoteRoute<ProviderRemoteSource> = RemoteRoute.Absent(SessionRoute.PROVIDERS),
     val runs: RemoteRoute<RunRemoteSource> = RemoteRoute.Absent(SessionRoute.RUNS),
+    val tools: RemoteRoute<ToolRemoteSource> = RemoteRoute.Absent(SessionRoute.TOOLS),
+    val blocks: RemoteRoute<BlockRemoteSource> = RemoteRoute.Absent(SessionRoute.BLOCKS),
 )
 
 /**
@@ -79,5 +91,7 @@ fun SharedSessionGraph.adminRepositories(
         projectRepository = CachedProjectRepository(remotes.projects, iroh(::IrohAdminRpcProjectSource)),
         providerRepository = CachedProviderRepository(remotes.providers, iroh(::IrohAdminRpcProviderSource)),
         runRepository = CachedRunRepository(remotes.runs, iroh(::IrohAdminRpcRunSource)),
+        toolRepository = ToolRepository(remotes.tools, iroh(::IrohAdminRpcToolSource)),
+        blockRepository = CachedBlockRepository(remotes.blocks, iroh { t, s -> IrohAdminRpcBlockSource(t, s) }),
     )
 }

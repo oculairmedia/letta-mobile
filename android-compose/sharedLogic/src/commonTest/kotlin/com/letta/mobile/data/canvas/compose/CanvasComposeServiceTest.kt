@@ -3,10 +3,11 @@ package com.letta.mobile.data.canvas.compose
 import com.letta.mobile.data.canvas.CanvasBatchCheck
 import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasBatchViolation
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasStateInvariant
 import com.letta.mobile.data.canvas.CanvasStateViolation
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
@@ -184,7 +185,7 @@ class CanvasComposeServiceTest {
         val board = ComposeBoard()
         val request = """{"items":[{"kind":"NOTE","markdown":"x"},{"kind":"TEXT","text":"t","size":"body"}]}"""
         val first = assertIs<ComposeOutcome.Done>(board.compose(request, toolCallId = "call-42")).receipt
-        assertEquals(CanvasComposeIds.derived("call-42"), first.artifactId)
+        assertEquals(CanvasComposeIds.derived(ToolCallId("call-42")).value, first.artifactId)
         val published = board.published.size
         val again = assertIs<ComposeOutcome.Done>(board.compose(request, toolCallId = "call-42")).receipt
         assertEquals(first.artifactId, again.artifactId)

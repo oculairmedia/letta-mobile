@@ -2,10 +2,10 @@ package com.letta.mobile.ui.shell.sidebar
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.avatar.core.MascotIdentity
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.CanvasId
 
 /** The agent panel's Active / Archived / All scope; it applies to conversations and canvases alike. */
 enum class ShellArchiveFilter(val label: String) {

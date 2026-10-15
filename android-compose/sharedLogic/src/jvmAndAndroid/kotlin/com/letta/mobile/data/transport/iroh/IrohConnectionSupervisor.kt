@@ -86,6 +86,21 @@ sealed interface IrohConnectionState {
     data object Closed : IrohConnectionState
 }
 
+/** The [IrohConnectionState.Degraded] reason of a config change: the old session ends for good. */
+internal const val IROH_CONFIG_CHANGED = "config_changed"
+
+/**
+ * letta-mobile-by4vm.96: why entering this state ends the session for good, or null when the
+ * supervisor is redialling (a lost connection or a failed dial) and turns wait for it.
+ */
+internal fun IrohConnectionState.sessionEndReason(): String? = when (this) {
+    is IrohConnectionState.Degraded -> reason.takeIf { it == IROH_CONFIG_CHANGED }
+    is IrohConnectionState.AuthFailed -> "auth_failed"
+    IrohConnectionState.Disconnected -> "disconnect"
+    IrohConnectionState.Closed -> "closed"
+    IrohConnectionState.Dialing, IrohConnectionState.Handshaking, is IrohConnectionState.Ready -> null
+}
+
 class IrohAuthFailure(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 
 class IrohConnectionSupervisor(
@@ -136,14 +151,14 @@ class IrohConnectionSupervisor(
                 val existing = currentHandle
                 currentHandle = null
                 currentConfig = null
-                cancelDialLocked("config_changed")
-                transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
+                cancelDialLocked(IROH_CONFIG_CHANGED)
+                transitionTo(IrohConnectionState.Degraded(IROH_CONFIG_CHANGED), IROH_CONFIG_CHANGED)
                 existing
             } else {
                 null
             }
         }
-        staleHandle?.close("config_changed")
+        staleHandle?.close(IROH_CONFIG_CHANGED)
         if (staleHandle != null && !closed) {
             ensureDialing()
         }
@@ -242,14 +257,14 @@ class IrohConnectionSupervisor(
             return@withLock CompletableDeferred(ready)
         }
         if (ready != null && currentConfig != desired) {
-            scope.launch { ready.close("config_changed") }
+            scope.launch { ready.close(IROH_CONFIG_CHANGED) }
             currentHandle = null
             currentConfig = null
-            transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
+            transitionTo(IrohConnectionState.Degraded(IROH_CONFIG_CHANGED), IROH_CONFIG_CHANGED)
         }
         if (dialJob?.isActive == true && dialConfig != desired) {
-            cancelDialLocked("config_changed")
-            transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
+            cancelDialLocked(IROH_CONFIG_CHANGED)
+            transitionTo(IrohConnectionState.Degraded(IROH_CONFIG_CHANGED), IROH_CONFIG_CHANGED)
         }
         dialResult?.takeIf { dialJob?.isActive == true && dialConfig == desired }?.let { return@withLock it }
         redialReadyAtMs?.let { readyAt ->

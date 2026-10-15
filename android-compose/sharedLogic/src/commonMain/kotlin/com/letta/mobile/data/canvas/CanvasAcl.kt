@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.document.PrincipalAcl
 import com.letta.mobile.data.document.UnauthorizedDocumentMutationException
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 
 /**
  * Access Control List for a collaborative [CanvasDocument]: the shared-document
