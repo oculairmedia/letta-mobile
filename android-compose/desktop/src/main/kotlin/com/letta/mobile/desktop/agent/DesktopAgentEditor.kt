@@ -80,7 +80,7 @@ private fun rememberDesktopAgentEditor(agentId: String?, deps: DesktopAgentEdito
             agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository },
             tools = graph.ifSupported(SessionRoute.TOOLS) { toolRepository },
             models = graph.ifSupported(SessionRoute.MODELS) { modelRepository },
-            modelCatalog = chat.availableModels,
+            modelCatalog = chat.models.available,
         )
         AgentEditorController(
             backend = RepositoryAgentEditorBackend(repositories, AgentCreator { params -> chat.createAgentAndOpen(params) }),

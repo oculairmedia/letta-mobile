@@ -149,17 +149,22 @@ internal fun answeringApprovalOnScreen(submitting: Set<String>, messages: List<U
     }
 }
 
-/** The composer for [draft]; a send waits for the run to end (this port has no send queue). */
+/** Whether a send may go out now: none while a run is in flight, unless the host queues it. */
+data class TimelineSendGate(val runInFlight: Boolean, val canQueue: Boolean) {
+    val blocked: Boolean get() = runInFlight && !canQueue
+}
+
+/** The composer for [draft]; a send during a run waits for it to end unless [gate] queues it. */
 fun timelineComposerUiState(
     draft: TimelineComposerDraft,
-    runInFlight: Boolean,
+    gate: TimelineSendGate,
     options: TimelineChatSessionOptions,
 ): ChatComposerUiState = ChatComposerUiState(
     text = draft.state.text,
     attachments = draft.state.pendingImageAttachments.toImmutableList(),
     error = draft.hostError ?: draft.state.error?.message(options.attachmentLimits),
-    canSend = draft.state.hasPayload && !runInFlight,
-    canQueueWhileStreaming = false,
+    canSend = draft.state.hasPayload && !gate.blocked,
+    canQueueWhileStreaming = gate.canQueue,
     placeholder = options.placeholder,
     maxAttachments = options.attachmentLimits.maxAttachmentCount,
     attachmentLimits = options.attachmentLimits,

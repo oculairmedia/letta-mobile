@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClientForwardingProbe.
 import com.letta.mobile.data.transport.appserver.AppServerClientForwardingProbe.recordingClient
 import com.letta.mobile.data.transport.appserver.AppServerClientForwardingProbe.requests
 import com.letta.mobile.data.transport.appserver.AppServerClientForwardingProbe.unforwarded
+import com.letta.mobile.data.transport.iroh.IrohDialSwitchingClient
 import com.letta.mobile.data.workspace.relay.WorkspaceRelayClient
 import java.io.File
 import java.lang.reflect.Modifier
@@ -72,6 +73,18 @@ class AppServerClientWrapperCoverageTest {
     }
 
     @Test
+    fun irohDialSwitchingForwardsEveryRequestToTheBoundDial() = runBlocking {
+        val seen = newLog()
+        val switching = IrohDialSwitchingClient(this)
+        val dial = switching.bind(recordingClient("dial", seen))
+        try {
+            assertEquals(emptyList(), unforwarded(switching, seen))
+        } finally {
+            switching.unbind(dial)
+        }
+    }
+
+    @Test
     fun everyImplementationIsClassified() {
         val classified = (WRAPPERS + LEAVES).map { it.name }.toSortedSet()
         assertEquals(classified, sharedLogicImplementations().toSortedSet())
@@ -112,7 +125,11 @@ class AppServerClientWrapperCoverageTest {
         const val READY_TIMEOUT_MS = 5_000L
 
         /** Clients that wrap another [AppServerClient] and must forward every request. */
-        val WRAPPERS = listOf(DualLaneAppServerClient::class.java, ReconnectingAppServerClient::class.java)
+        val WRAPPERS = listOf(
+            DualLaneAppServerClient::class.java,
+            ReconnectingAppServerClient::class.java,
+            IrohDialSwitchingClient::class.java,
+        )
 
         /**
          * Implementations that are not wrappers: the socket client itself, and the workspace relay,

@@ -50,6 +50,11 @@ class AppServerRuntimeEventRouter(
         integrity.value = monitor
     }
 
+    /** letta-mobile-by4vm.95: the connection the monitor watched is gone; frames go unobserved until the next bind. */
+    fun unbindStreamIntegrity() {
+        integrity.value = null
+    }
+
     /** letta-mobile-bzvro.6: ask the bound monitor to resync what is on screen; no-op without one. */
     fun requestResync() {
         integrity.value?.requestResync()
@@ -116,8 +121,16 @@ class AppServerRuntimeEventRouter(
     /** Permanent teardown: every subscriber's turn ends now (see [RuntimeEventFanout.closeAllSubscribersSync]). */
     fun detach() {
         collectorJob.getAndSet(null)?.cancel()
-        // Closing subscriber channels unblocks turn collectors waiting on fanout
-        // (otherwise they sit until idle watchdog / forever under a user-input gate).
+        endSubscribedTurns()
+    }
+
+    /**
+     * Every subscriber's turn ends now, as on [detach], but the collector stays attached for the
+     * next connection behind a stable inbound pipe (letta-mobile-by4vm.95: an Android Iroh dial
+     * ended). Closing subscriber channels unblocks turn collectors waiting on fanout (otherwise
+     * they sit until idle watchdog / forever under a user-input gate).
+     */
+    fun endSubscribedTurns() {
         fanout.closeAllSubscribersSync()
     }
 

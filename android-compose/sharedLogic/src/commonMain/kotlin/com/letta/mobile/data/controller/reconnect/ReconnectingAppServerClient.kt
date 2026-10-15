@@ -1,13 +1,10 @@
 package com.letta.mobile.data.controller.reconnect
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInfoData
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -154,7 +151,7 @@ class ReconnectingAppServerClient(
     private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     private val preflight: (suspend () -> AppServerProbeResult)? = null,
     private val stampGenerations: Boolean = true,
-) : AppServerClient {
+): ForwardingAppServerClient() {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
     val state: StateFlow<ReconnectingClientState> = _state.asStateFlow()
     private val emptyServerInfoFlow: StateFlow<AppServerInfoData?> = MutableStateFlow(null)
@@ -175,7 +172,7 @@ class ReconnectingAppServerClient(
             ?.client?.serverInfo
             ?: emptyServerInfoFlow
 
-    // Written by the supervise loop, read by every caller's ready(): visible across threads.
+    // Written by the supervise loop, read by every caller's target(): visible across threads.
     @kotlin.concurrent.Volatile
     private var current: AppServerClientGeneration? = null
     /**
@@ -383,7 +380,7 @@ class ReconnectingAppServerClient(
         listener.onGaveUp(reason)
     }
 
-    private fun ready(): AppServerClient =
+    override fun target(): AppServerClient =
         current
             ?.takeIf {
                 _state.value is ReconnectingClientState.Ready ||
@@ -394,150 +391,6 @@ class ReconnectingAppServerClient(
                 "App Server connection is not ready (state=${_state.value}); " +
                     "callers must not queue writes across generations",
             )
-
-    override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
-        ready().auth(command)
-
-    override suspend fun appServerInfo(command: AppServerCommand.AppServerInfo): AppServerInboundFrame.AppServerInfoResponse =
-        ready().appServerInfo(command)
-
-    override suspend fun runtimeStart(
-        command: AppServerCommand.RuntimeStart,
-    ): AppServerInboundFrame.RuntimeStartResponse = ready().runtimeStart(command)
-
-    override suspend fun input(command: AppServerCommand.Input) = ready().input(command)
-
-    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted =
-        ready().inputAwaitingAcceptance(command)
-
-    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = ready().changeDeviceState(command)
-
-    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-        ready().sync(command)
-
-    override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-        ready().abort(command)
-
-    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
-        ready().resumeQueue(command)
-
-    override suspend fun removeQueueItem(
-        command: AppServerCommand.RemoveQueueItem,
-    ): AppServerInboundFrame.RemoveQueueItemResponse = ready().removeQueueItem(command)
-
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        ready().adminRpc(command)
-
-    override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
-        ready().sendExternalToolResponse(command)
-
-    override suspend fun agentList(command: AppServerCommand.AgentList) = ready().agentList(command)
-
-    override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = ready().agentRetrieve(command)
-
-    override suspend fun agentCreate(command: AppServerCommand.AgentCreate) = ready().agentCreate(command)
-
-    override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate) = ready().agentUpdate(command)
-
-    override suspend fun agentDelete(command: AppServerCommand.AgentDelete) = ready().agentDelete(command)
-
-    override suspend fun conversationList(command: AppServerCommand.ConversationList) = ready().conversationList(command)
-
-    override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve) =
-        ready().conversationRetrieve(command)
-
-    override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate) =
-        ready().conversationCreate(command)
-
-    override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
-        ready().conversationUpdate(command)
-
-    override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
-        ready().conversationFork(command)
-
-    override suspend fun conversationRecompile(command: com.letta.mobile.data.transport.appserver.AppServerConversationRecompile) =
-        ready().conversationRecompile(command)
-
-    override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
-        ready().conversationMessagesList(command)
-
-    override suspend fun conversationCompact(command: AppServerCommand.ConversationCompact) =
-        ready().conversationCompact(command)
-
-    override suspend fun listModels(command: AppServerCommand.ListModels) = ready().listModels(command)
-
-    override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
-
-    override suspend fun listConnectProviders(command: AppServerCommand.ListConnectProviders) =
-        ready().listConnectProviders(command)
-
-    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider) = ready().connectProvider(command)
-
-    override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
-        ready().disconnectProvider(command)
-
-    override suspend fun updateModel(command: AppServerCommand.UpdateModel) = ready().updateModel(command)
-
-    override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
-
-    // bfooy.5: without these forwarders the interface default throws
-    // UnsupportedOperationException, so the wrapper's block.update_agent /
-    // block.create_agent / block.delete_agent (routed through DualLane's
-    // runtime lane, a ReconnectingAppServerClient) could never reach the socket.
-    override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) = ready().writeMemoryFile(command)
-
-    override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) = ready().deleteMemoryFile(command)
-
-    override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
-
-    override suspend fun cronAdd(command: AppServerCommand.CronAdd) = ready().cronAdd(command)
-
-    override suspend fun cronGet(command: AppServerCommand.CronGet) = ready().cronGet(command)
-
-    override suspend fun cronRuns(command: AppServerCommand.CronRuns) = ready().cronRuns(command)
-
-    override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) = ready().cronTrigger(command)
-
-    override suspend fun cronUpdate(command: AppServerCommand.CronUpdate) = ready().cronUpdate(command)
-
-    override suspend fun cronDelete(command: AppServerCommand.CronDelete) = ready().cronDelete(command)
-
-    override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
-
-    // Without these forwarders the interface default throws UnsupportedOperationException, so the
-    // Iroh host answered every /context-limit (execute_command) with capability_unavailable and
-    // the drawer's context slider vanished (letta-mobile-by4vm.82 follow-up).
-    override suspend fun cronPause(command: AppServerCommand.CronPause) = ready().cronPause(command)
-
-    override suspend fun cronResume(command: AppServerCommand.CronResume) = ready().cronResume(command)
-
-    override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand) = ready().executeCommand(command)
-
-    override suspend fun monitorStop(command: AppServerCommand.MonitorStop) = ready().monitorStop(command)
-
-    override suspend fun updateToolset(command: AppServerCommand.UpdateToolset) = ready().updateToolset(command)
-
-    override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap) = ready().getCwdMap(command)
-
-    override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) = ready().getReflectionSettings(command)
-
-    override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) = ready().setReflectionSettings(command)
-
-    override suspend fun workspaceRequest(command: AppServerWorkspaceCommand) = ready().workspaceRequest(command)
-
-    // lgns8.23: admitted while Recovering so ChannelRestoreCoordinator can run
-    // inside onRecovered, on the same generation whose socket ingress binds to.
-
-    override suspend fun channelsList(command: AppServerCommand.ChannelsList) = ready().channelsList(command)
-
-    override suspend fun channelAccountsList(command: AppServerCommand.ChannelAccountsList) =
-        ready().channelAccountsList(command)
-
-    override suspend fun channelStart(command: AppServerCommand.ChannelStart) = ready().channelStart(command)
-
-    override suspend fun channelAccountUpdate(command: AppServerCommand.ChannelAccountUpdate) =
-        ready().channelAccountUpdate(command)
-
 
     companion object {
         private const val EVENT_BUFFER = 256

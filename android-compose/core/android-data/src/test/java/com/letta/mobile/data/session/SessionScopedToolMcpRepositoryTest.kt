@@ -1,5 +1,7 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -54,10 +56,7 @@ class SessionScopedToolMcpRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val toolProxy = SessionScopedToolRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val toolProxy = sessionManager.sessionScoped(IToolRepository::class) { it.toolRepository }
         val agentTools = toolProxy.getAgentTools("agent-1")
 
         toolProxy.refreshTools()
@@ -97,10 +96,7 @@ class SessionScopedToolMcpRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val mcpProxy = SessionScopedMcpServerRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val mcpProxy = sessionManager.sessionScoped(IMcpServerRepository::class) { it.mcpServerRepository }
         val serverTools = mcpProxy.getServerTools(McpServerId("server-a"))
 
         mcpProxy.refreshServers()

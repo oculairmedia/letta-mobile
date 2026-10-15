@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -59,10 +60,7 @@ class SessionScopedProjectWorkRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val workProxy = SessionScopedProjectWorkRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val workProxy = sessionManager.sessionScoped(IProjectWorkRepository::class) { it.projectWorkRepository }
 
         workProxy.refreshReadyWork("letta-mobile")
         workProxy.refreshIssues("letta-mobile", ProjectIssueListParams())

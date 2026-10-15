@@ -501,9 +501,9 @@ internal fun createDesktopOverlayActions(
 ): DesktopOverlayActions = DesktopOverlayActions(
     modelControl = DesktopModelControlHost(
         session = params.dataBindings.modelControl,
-        chatModels = params.chatController.availableModels,
-        reloadChatModels = params.chatController::reloadModelCatalog,
-        onModelSelected = params.chatController::setConversationModel,
+        chatModels = params.chatController.models.available,
+        reloadChatModels = params.chatController.models::reload,
+        onModelSelected = params.chatController.models::select,
         recentModels = params.chatController.conversationManagement.recentModels,
     ),
     onOpenAgent = params.onOpenAgent,
