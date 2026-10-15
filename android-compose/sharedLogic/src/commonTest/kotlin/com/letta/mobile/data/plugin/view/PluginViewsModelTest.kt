@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.view
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginContract
 import com.letta.mobile.data.plugin.PluginElementKind
 import com.letta.mobile.data.plugin.PluginHealth
@@ -10,7 +11,6 @@ import com.letta.mobile.data.plugin.PluginState
 import com.letta.mobile.data.plugin.catalog.HostPluginCatalog
 import com.letta.mobile.data.plugin.catalog.PluginCatalog
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginSummary
 import com.letta.mobile.data.plugin.catalog.UnavailablePluginCatalog
 import com.letta.mobile.data.plugin.catalog.inMemoryLiveViewsSetting

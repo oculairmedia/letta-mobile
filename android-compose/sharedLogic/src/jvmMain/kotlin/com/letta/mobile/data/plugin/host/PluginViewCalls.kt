@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.InstalledPlugin
 import com.letta.mobile.data.plugin.PluginPage
 import com.letta.mobile.data.plugin.view.PluginViewActionCall
@@ -38,7 +39,7 @@ class PluginViewRefusal(message: String) : Exception(message)
  */
 class PluginViewCalls(private val runtime: PluginHostRuntime) {
     /** [pageId] of [pluginId]; [version], when given, must be the installed one (a view of an older version reloads). */
-    suspend fun page(pluginId: String, pageId: String, version: String?): PluginPageDocument {
+    suspend fun page(pluginId: PluginId, pageId: String, version: String?): PluginPageDocument {
         val plugin = enabled(pluginId)
         if (version != null && version != plugin.version) refuse("$pluginId is at ${plugin.version}, not $version")
         val page = plugin.manifest.pages[pageId] ?: refuse("$pluginId has no page '$pageId'")
@@ -51,12 +52,12 @@ class PluginViewCalls(private val runtime: PluginHostRuntime) {
 
     /** Runs [call]; refusals throw [PluginViewRefusal], what the plugin answered comes back as an outcome. */
     suspend fun action(call: PluginViewActionCall): PluginViewActionOutcome {
-        val plugin = enabled(call.pluginId)
+        val plugin = enabled(PluginId(call.pluginId))
         val schema = PluginViewSpec.viewActionsOf(plugin.manifest)[call.action]
             ?: refuse("'${call.action}' is not an action a view of ${call.pluginId} may call")
         val problems = JsonSchemaCheck(schema).check(call.input, "/input")
         if (problems.isNotEmpty()) refuse("the input of '${call.action}' does not hold: " + problems.joinToString("; ") { "${it.path}: ${it.message}" })
-        val live = runtime.live(call.pluginId) ?: return PluginViewActionOutcome.Unavailable("${call.pluginId} is not running on the host")
+        val live = runtime.live(PluginId(call.pluginId)) ?: return PluginViewActionOutcome.Unavailable("${call.pluginId} is not running on the host")
         val origin = ActionContext(ActionOrigin.View(call.elementId), canvasId = call.canvasId, elementId = call.elementId)
         return try {
             when (val result = live.driver.invoke(ActionCall(call.action, call.input, origin))) {
@@ -71,8 +72,8 @@ class PluginViewCalls(private val runtime: PluginHostRuntime) {
         }
     }
 
-    private fun enabled(pluginId: String): InstalledPlugin {
-        val plugin = runtime.state.value[pluginId] ?: refuse("$pluginId is not installed")
+    private fun enabled(pluginId: PluginId): InstalledPlugin {
+        val plugin = runtime.state.value[pluginId.value] ?: refuse("$pluginId is not installed")
         if (!plugin.state.advertises) refuse("$pluginId is not enabled")
         return plugin
     }

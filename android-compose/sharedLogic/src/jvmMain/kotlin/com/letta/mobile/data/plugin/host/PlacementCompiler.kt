@@ -12,6 +12,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementSchema
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.plugin.api.ElementFallback
 import com.letta.mobile.plugin.api.EmitReceipt
 import com.letta.mobile.plugin.api.EmitRefusal
@@ -54,7 +55,7 @@ fun interface PluginCanvasAccess {
  */
 @OptIn(ExperimentalUuidApi::class)
 class PlacementCompiler(
-    private val pluginId: String,
+    private val pluginId: PluginId,
     private val kinds: PluginKindCatalog,
     private val backend: HostCanvasBackend,
     private val access: PluginCanvasAccess,
@@ -158,7 +159,7 @@ class PlacementCompiler(
             fallback = fallbackOf(place.fallback),
             snapshot = place.snapshot?.let(::snapshotOf),
             ref = place.ref,
-            meta = JsonObject(mapOf(META_PLUGIN to JsonPrimitive(pluginId))),
+            meta = JsonObject(mapOf(META_PLUGIN to JsonPrimitive(pluginId.value))),
         )
     }
 

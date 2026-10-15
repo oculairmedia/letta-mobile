@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlin.time.Clock
@@ -29,16 +30,16 @@ class PluginAssetQuota(
     }
 
     /** Charges [bytes] to [pluginId]; false (and nothing charged) when that would cross [limit]. */
-    fun tryCharge(pluginId: String, bytes: Long): Boolean = window.tryTake(pluginId, bytes).also { charged -> if (charged) save() }
+    fun tryCharge(pluginId: PluginId, bytes: Long): Boolean = window.tryTake(pluginId.value, bytes).also { charged -> if (charged) save() }
 
     /** Gives back a charge of [bytes] whose store failed. */
-    fun refund(pluginId: String, bytes: Long) {
-        window.refund(pluginId, bytes)
+    fun refund(pluginId: PluginId, bytes: Long) {
+        window.refund(pluginId.value, bytes)
         save()
     }
 
     /** The bytes [pluginId] has stored in the current window. */
-    fun used(pluginId: String): Long = window.used(pluginId)
+    fun used(pluginId: PluginId): Long = window.used(pluginId.value)
 
     /** Writes the current window; serialized, so the last write always holds the latest usage. */
     private fun save() {

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.catalog
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 
 /** The file the owner picked to install, with the sha256 shown before anything is uploaded. */

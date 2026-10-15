@@ -9,6 +9,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasRelayStore
 import com.letta.mobile.data.canvas.InMemoryHostCanvasDirectory
 import com.letta.mobile.data.canvas.plugin.InMemoryPluginKindCatalog
 import com.letta.mobile.data.canvas.plugin.PluginKindSpec
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.wire.LogParams
 import com.letta.mobile.data.storage.InMemoryAssetStore
@@ -34,8 +35,8 @@ class PluginHostRig(
     var board: HostCanvasEntry? = null
     private var nextId = 0
 
-    val placement = PlacementCompiler(PLUGIN, catalog, backend, PluginCanvasAccess { _, _ -> board }, refusals, newIdSuffix = { "e${++nextId}" })
-    val handlers = HostLcpHandlers(PLUGIN, placement, assets, SecretScrubber(secrets), limits, quota, refusals) { id, line -> logged += id to line }
+    val placement = PlacementCompiler(PLUGIN_ID, catalog, backend, PluginCanvasAccess { _, _ -> board }, refusals, newIdSuffix = { "e${++nextId}" })
+    val handlers = HostLcpHandlers(PLUGIN_ID, placement, assets, SecretScrubber(secrets), limits, quota, refusals) { id, line -> logged += id.value to line }
 
     suspend fun openBoard(): HostCanvasEntry = backend.create(HostCanvasCaller("agent-1"), "Board").also { board = it }
 
@@ -46,6 +47,7 @@ class PluginHostRig(
 
     companion object {
         const val PLUGIN = "letta.chart"
+        val PLUGIN_ID = PluginId(PLUGIN)
         const val TYPE = "ext:letta.chart/chart"
 
         private val schema: JsonObject = Json.parseToJsonElement(

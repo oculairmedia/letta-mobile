@@ -1,11 +1,11 @@
 package com.letta.mobile.data.plugin.remote
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.plugin.catalog.HostPluginCatalog
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.plugin.catalog.PluginGrants
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginInspectWire
 import com.letta.mobile.data.plugin.catalog.PluginInstallRequest
 import com.letta.mobile.data.plugin.catalog.PluginPluginsWire

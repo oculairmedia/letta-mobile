@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -73,22 +74,22 @@ object PluginHostEvents {
     const val TAG: String = "PluginHost"
 
     /** The plugin id of an event about every plugin (a kill switch, the registry file). */
-    const val ALL: String = "*"
+    val ALL: PluginId = PluginId("*")
 
-    fun record(event: PluginHostEvent, pluginId: String, vararg attrs: Pair<String, String>) =
-        emit(event, event.level, null, arrayOf("plugin" to pluginId, *attrs))
+    fun record(event: PluginHostEvent, pluginId: PluginId, vararg attrs: Pair<String, String>) =
+        emit(event, event.level, null, arrayOf("plugin" to pluginId.value, *attrs))
 
     /** [event] with its latency, for a timed call ([PluginHostEvent.INVOKE]). */
-    fun timed(event: PluginHostEvent, pluginId: String, durationMs: Long, vararg attrs: Pair<String, String>) =
-        emit(event, event.level, durationMs, arrayOf("plugin" to pluginId, *attrs))
+    fun timed(event: PluginHostEvent, pluginId: PluginId, durationMs: Long, vararg attrs: Pair<String, String>) =
+        emit(event, event.level, durationMs, arrayOf("plugin" to pluginId.value, *attrs))
 
     /** A `host.log` line at the plugin's own [level]. */
-    fun log(pluginId: String, level: Telemetry.Level, vararg attrs: Pair<String, String>) =
-        emit(PluginHostEvent.LOG, level, null, arrayOf("plugin" to pluginId, *attrs))
+    fun log(pluginId: PluginId, level: Telemetry.Level, vararg attrs: Pair<String, String>) =
+        emit(PluginHostEvent.LOG, level, null, arrayOf("plugin" to pluginId.value, *attrs))
 
     /** [event] refused: the same event with `refused` set, at WARN. */
-    fun refused(event: PluginHostEvent, pluginId: String, message: String) =
-        emit(event, Telemetry.Level.WARN, null, arrayOf("plugin" to pluginId, "refused" to message))
+    fun refused(event: PluginHostEvent, pluginId: PluginId, message: String) =
+        emit(event, Telemetry.Level.WARN, null, arrayOf("plugin" to pluginId.value, "refused" to message))
 
     private fun emit(event: PluginHostEvent, level: Telemetry.Level, durationMs: Long?, attrs: Array<Pair<String, String>>) {
         Telemetry.event(TAG, event.eventName, *attrs, durationMs = durationMs, level = level)

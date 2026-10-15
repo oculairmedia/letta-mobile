@@ -72,6 +72,18 @@ value class RequestId(val value: String) {
     override fun toString(): String = value
 }
 
+/**
+ * A plugin's manifest id (`letta.chart`): the key of the host's plugin registry, of its drivers,
+ * rate limits and asset quota, and the `plugin_id` of the `plugins.*` admin RPCs. Serializes as
+ * its bare string. No blank check: registry lookups take ids straight from the wire and answer
+ * "not installed" for an unknown one, which a blank id is.
+ */
+@JvmInline
+@Serializable
+value class PluginId(val value: String) {
+    override fun toString(): String = value
+}
+
 @JvmInline
 @Serializable
 value class ToolId(val value: String) {

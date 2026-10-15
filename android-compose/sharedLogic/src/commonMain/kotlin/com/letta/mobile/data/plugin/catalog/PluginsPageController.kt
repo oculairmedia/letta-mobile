@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.catalog
 
 import com.letta.mobile.data.canvas.compose.Sha256
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginsPageEvent.ConsentClosed
 import com.letta.mobile.data.plugin.catalog.PluginsPageEvent.Done
 import com.letta.mobile.data.plugin.catalog.PluginsPageEvent.Failed

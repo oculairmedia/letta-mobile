@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.canvas.compose.Sha256
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginOrigin
 import com.letta.mobile.data.plugin.PluginRegistryState
@@ -10,7 +11,7 @@ import com.letta.mobile.data.plugin.ResolvedTemplates
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.host.PluginHostFixture.Companion.ID
 import com.letta.mobile.data.plugin.host.PluginHostFixture.Companion.pkg
-import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN
+import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.data.plugin.host.ProcessDriverFixture.Companion.SECRET
 import com.letta.mobile.data.plugin.host.ProcessDriverFixture.Companion.call
@@ -97,8 +98,8 @@ class PluginTrustTest {
 
     private suspend fun PluginHostRuntime.running(id: String = ID, mode: String = "normal") {
         assertIs<PluginHostResult.Done>(install(pkg(mode = mode, id = id)))
-        assertIs<PluginHostResult.Done>(consent(id, canvasOnly, emptySet()))
-        assertIs<PluginHostResult.Done>(enable(id))
+        assertIs<PluginHostResult.Done>(consent(PluginId(id), canvasOnly, emptySet()))
+        assertIs<PluginHostResult.Done>(enable(PluginId(id)))
     }
 
     private fun PluginHostRuntime.pid(id: String): Long =
@@ -220,9 +221,9 @@ class PluginTrustTest {
     fun secretsNeverReachHostLogStderrTelemetryResultsOrPlacedElements() {
         val tap = PluginTelemetryTap()
         val rig = PluginHostRig(secrets = listOf(SECRET))
-        val handlers = HostLcpHandlers(PLUGIN, rig.placement, rig.assets, SecretScrubber(listOf(SECRET)), rig.limits, rig.quota, rig.refusals)
+        val handlers = HostLcpHandlers(PLUGIN_ID, rig.placement, rig.assets, SecretScrubber(listOf(SECRET)), rig.limits, rig.quota, rig.refusals)
         val toTelemetry: (ProcessDriverOptions) -> ProcessDriverOptions = { options ->
-            options.copy(onStderr = { line -> options.onStderr(line); PluginHostEvents.record(PluginHostEvent.STDERR, PLUGIN, "line" to line) })
+            options.copy(onStderr = { line -> options.onStderr(line); PluginHostEvents.record(PluginHostEvent.STDERR, PLUGIN_ID, "line" to line) })
         }
         withDriver(options = toTelemetry, handlers = handlers) { fixture ->
             rig.openBoard()

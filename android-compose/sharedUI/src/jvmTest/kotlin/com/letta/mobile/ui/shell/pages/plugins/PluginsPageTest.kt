@@ -24,9 +24,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.catalog.PluginConsentItem
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginPackageFile
 import com.letta.mobile.data.plugin.catalog.PluginsPageController
 import com.letta.mobile.data.plugin.catalog.inMemoryLiveViewsSetting

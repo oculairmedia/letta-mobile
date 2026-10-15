@@ -3,6 +3,7 @@ package com.letta.mobile.data.plugin.host
 import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginActionInvoker
 import com.letta.mobile.data.plugin.PluginToolDefinition
 import com.letta.mobile.data.plugin.wire.LcpCallException
@@ -24,9 +25,9 @@ class LivePlugin(val driver: PluginDriver, val handlers: LcpHostHandlers, val bo
  * an agent origin, an `emit` in the answer is applied through the plugin's own handlers (rate
  * limits, placement, ownership), and failures come back as tool errors, never exceptions.
  */
-class PluginToolInvoker(private val live: (String) -> LivePlugin?) : PluginActionInvoker {
+class PluginToolInvoker(private val live: (PluginId) -> LivePlugin?) : PluginActionInvoker {
     override suspend fun invoke(definition: PluginToolDefinition, input: kotlinx.serialization.json.JsonObject, caller: ExternalToolCaller): ExternalToolResult {
-        val plugin = live(definition.pluginId) ?: return ExternalToolResult.Error("${definition.pluginId} is not running; enable it on the host")
+        val plugin = live(PluginId(definition.pluginId)) ?: return ExternalToolResult.Error("${definition.pluginId} is not running; enable it on the host")
         val agentId = caller.agentId ?: UNKNOWN_AGENT
         val callId = plugin.board.begin(HostCanvasCaller(agentId, caller.conversationId, caller.toolCallId))
         val origin = ActionOrigin.Agent(agentId, caller.conversationId, caller.toolCallId)

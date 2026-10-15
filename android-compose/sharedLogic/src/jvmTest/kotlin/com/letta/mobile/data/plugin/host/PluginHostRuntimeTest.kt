@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginPackageRef
 import com.letta.mobile.data.plugin.PluginRegistryState
@@ -43,8 +44,8 @@ class PluginHostRuntimeTest {
 
     private suspend fun PluginHostRuntime.running() {
         installed()
-        assertIs<PluginHostResult.Done>(consent(ID, canvasOnly, emptySet()))
-        assertIs<PluginHostResult.Done>(enable(ID))
+        assertIs<PluginHostResult.Done>(consent(PluginId(ID), canvasOnly, emptySet()))
+        assertIs<PluginHostResult.Done>(enable(PluginId(ID)))
     }
 
     private fun PluginHostRuntime.pid(): Long = requireNotNull(assertIs<PluginDriverState.Running>(health().single().driver).pid)
@@ -74,10 +75,10 @@ class PluginHostRuntimeTest {
     @Test
     fun enableWithoutConsentIsRefusedAndPartialConsentIsNotRecorded() = withHost { _, runtime ->
         runtime.installed()
-        val refused = assertIs<PluginHostResult.Refused>(runtime.enable(ID))
+        val refused = assertIs<PluginHostResult.Refused>(runtime.enable(PluginId(ID)))
         assertEquals(canvasOnly, refused.consentDiff?.addedCapabilities)
-        assertIs<PluginHostResult.Refused>(runtime.consent(ID, emptySet(), emptySet()))
-        assertIs<PluginHostResult.Refused>(runtime.enable(ID))
+        assertIs<PluginHostResult.Refused>(runtime.consent(PluginId(ID), emptySet(), emptySet()))
+        assertIs<PluginHostResult.Refused>(runtime.enable(PluginId(ID)))
         assertNull(runtime.health().single().driver)
         assertTrue(runtime.toolSource.tools.value.isEmpty())
     }
@@ -96,7 +97,7 @@ class PluginHostRuntimeTest {
     fun disableStopsTheDriverAndUnpublishesItsTools() = withHost { _, runtime ->
         runtime.running()
         val pid = runtime.pid()
-        assertIs<PluginHostResult.Done>(runtime.disable(ID))
+        assertIs<PluginHostResult.Done>(runtime.disable(PluginId(ID)))
         assertFalse(alive(pid))
         assertTrue(runtime.toolSource.tools.value.isEmpty())
         assertEquals(PluginState.Installed, runtime.health().single().state)
@@ -107,7 +108,7 @@ class PluginHostRuntimeTest {
     fun removeStopsAndDeletesThePackageAndTheEntry() = withHost { fixture, runtime ->
         runtime.running()
         val pid = runtime.pid()
-        assertIs<PluginHostResult.Done>(runtime.remove(ID))
+        assertIs<PluginHostResult.Done>(runtime.remove(PluginId(ID)))
         assertFalse(alive(pid))
         assertFalse(Files.exists(fixture.pluginsDir.resolve(ID)))
         assertTrue(runtime.health().isEmpty())
@@ -125,10 +126,10 @@ class PluginHostRuntimeTest {
         assertFalse(alive(oldPid))
         assertTrue(runtime.toolSource.tools.value.isEmpty())
         assertTrue(Files.isRegularFile(fixture.pluginsDir.resolve(ID).resolve("1.1.0").resolve("run.sh")))
-        val refused = assertIs<PluginHostResult.Refused>(runtime.enable(ID))
+        val refused = assertIs<PluginHostResult.Refused>(runtime.enable(PluginId(ID)))
         assertEquals(setOf(PluginCapability.ASSETS_WRITE), refused.consentDiff?.addedCapabilities)
-        assertIs<PluginHostResult.Done>(runtime.consent(ID, canvasOnly + PluginCapability.ASSETS_WRITE, emptySet()))
-        assertIs<PluginHostResult.Done>(runtime.enable(ID))
+        assertIs<PluginHostResult.Done>(runtime.consent(PluginId(ID), canvasOnly + PluginCapability.ASSETS_WRITE, emptySet()))
+        assertIs<PluginHostResult.Done>(runtime.enable(PluginId(ID)))
         assertEquals(ExternalToolResult.Success("ran plot"), runtime.callTool())
     }
 

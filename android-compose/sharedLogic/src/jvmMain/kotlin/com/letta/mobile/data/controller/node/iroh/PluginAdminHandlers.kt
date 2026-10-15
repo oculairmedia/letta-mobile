@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.InstalledPlugin
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
@@ -73,7 +74,7 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
         val before = runtime.state.value.plugins.map { it.id }.toSet()
         return when (val result = runtime.install(bytes, pin)) {
             is PluginHostResult.Refused -> adminError("install_refused: ${result.message}")
-            is PluginHostResult.Done -> requireNotNull(result.plugin).id.let { id -> inspected(id, newlyInstalled = id !in before) }
+            is PluginHostResult.Done -> requireNotNull(result.plugin).let { plugin -> inspected(plugin.pluginId, newlyInstalled = plugin.id !in before) }
         }
     }
 
@@ -84,10 +85,10 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
 
     private fun listed(): JsonElement = encode(PluginPluginsWire.serializer(), PluginPluginsWire(summaries()))
 
-    private fun inspected(pluginId: String, newlyInstalled: Boolean = false): JsonElement {
-        val plugin = runtime.state.value[pluginId] ?: adminError("not_found: $pluginId is not installed")
+    private fun inspected(pluginId: PluginId, newlyInstalled: Boolean = false): JsonElement {
+        val plugin = runtime.state.value[pluginId.value] ?: adminError("not_found: $pluginId is not installed")
         val all = summaries()
-        return encode(PluginInspectWire.serializer(), PluginInspectWire(all.first { it.id == pluginId }, request(plugin), all, newlyInstalled))
+        return encode(PluginInspectWire.serializer(), PluginInspectWire(all.first { it.id == pluginId.value }, request(plugin), all, newlyInstalled))
     }
 
     private suspend fun page(params: JsonObject?): JsonElement {
@@ -127,7 +128,7 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
     }
 
     private companion object {
-        fun pluginId(params: JsonObject?): String = params.requireParam(AdminParamKey(PluginAdminRpc.PLUGIN_ID))
+        fun pluginId(params: JsonObject?): PluginId = PluginId(params.requireParam(AdminParamKey(PluginAdminRpc.PLUGIN_ID)))
 
         /** The health to show: the driver's view when one runs, else the registry's. */
         fun healthOf(plugin: InstalledPlugin, driver: PluginDriverState?): PluginHealth = when (driver) {

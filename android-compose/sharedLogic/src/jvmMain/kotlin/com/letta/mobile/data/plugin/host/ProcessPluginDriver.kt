@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginRuntime
@@ -131,7 +132,7 @@ class ProcessPluginDriver(
             onFailure = { if (it is LcpCallException) "failed:${it.code}" else "failed" },
         )
         val tookMs = began.elapsedNow().inWholeMilliseconds
-        PluginHostEvents.timed(PluginHostEvent.INVOKE, pluginId, tookMs, "action" to call.action, "outcome" to label)
+        PluginHostEvents.timed(PluginHostEvent.INVOKE, PluginId(pluginId), tookMs, "action" to call.action, "outcome" to label)
         return outcome.getOrThrow()
     }
 
