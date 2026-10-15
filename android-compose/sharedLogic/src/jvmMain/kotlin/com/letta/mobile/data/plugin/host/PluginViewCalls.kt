@@ -73,7 +73,7 @@ class PluginViewCalls(private val runtime: PluginHostRuntime) {
     }
 
     private fun enabled(pluginId: PluginId): InstalledPlugin {
-        val plugin = runtime.state.value[pluginId.value] ?: refuse("$pluginId is not installed")
+        val plugin = runtime.state.value[pluginId] ?: refuse("$pluginId is not installed")
         if (!plugin.state.advertises) refuse("$pluginId is not enabled")
         return plugin
     }

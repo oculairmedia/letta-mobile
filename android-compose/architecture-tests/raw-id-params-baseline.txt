@@ -57,7 +57,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSession.kt 
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSessionPluginElements.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSnap.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasTools.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindCatalog.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindProps.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/channel/ChannelsPageController.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/approval/ApprovalOutbox.kt 1
@@ -149,10 +148,8 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/PairingAdminRepo
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/PairingFlow.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/pairing/SettingsPairedHostStore.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginActionTools.kt 1
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/PluginRegistryState.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/LcpViewShim.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/PluginViewSpec.kt 2
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/view/PluginViewsModel.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/presence/ConversationRunPhasePublisher.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/presence/ConversationRunRegistry.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/presence/RunPhaseReducer.kt 1
@@ -376,7 +373,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/Notebo
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/RetiredRunRegistry.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/chat/render/RenderDiagnostics.kt 16
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PlacementCompiler.kt 3
-sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginRegistryKinds.kt 2
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginViewCalls.kt 1
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/LcpAssetUploads.kt 2
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderLimits.kt 1

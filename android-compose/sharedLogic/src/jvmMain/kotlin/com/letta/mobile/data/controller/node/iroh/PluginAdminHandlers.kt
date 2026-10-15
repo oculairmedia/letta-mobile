@@ -86,7 +86,7 @@ class PluginAdminHandlers(private val runtime: PluginHostRuntime, private val as
     private fun listed(): JsonElement = encode(PluginPluginsWire.serializer(), PluginPluginsWire(summaries()))
 
     private fun inspected(pluginId: PluginId, newlyInstalled: Boolean = false): JsonElement {
-        val plugin = runtime.state.value[pluginId.value] ?: adminError("not_found: $pluginId is not installed")
+        val plugin = runtime.state.value[pluginId] ?: adminError("not_found: $pluginId is not installed")
         val all = summaries()
         return encode(PluginInspectWire.serializer(), PluginInspectWire(all.first { it.id == pluginId.value }, request(plugin), all, newlyInstalled))
     }
