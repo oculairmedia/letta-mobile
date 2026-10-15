@@ -29,7 +29,7 @@ git push --force-with-lease                 # safe force-push of your branch
 |-------|--------------|--------|
 | `.githooks/pre-commit` | Refuses commits on `main`/`master` | `git commit --no-verify` |
 | `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote; checks `JAVA_HOME`; optional CodeScene delta. Compile is **opt-in** via `PRE_PUSH_COMPILE=1` (off by default — cold Gradle configure OOMs the shared Proxmox host) | `git push --no-verify` |
-| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk-pass` + `shared-multiplatform` + `perf-gate` to pass, linear history only | Admin override in the UI |
+| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk-pass` + `shared-multiplatform` to pass, linear history only | Admin override in the UI |
 
 The local hooks are nudges — they save a round-trip to CI. The branch-protection rule is the wall.
 
@@ -134,7 +134,7 @@ CI takes ~20 minutes per iteration, and the most common reason PRs loop through 
 
 ## Required vs advisory CI
 
-Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`. (`codecov` runs on main pushes only.)
+Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`. (`codecov` runs on main pushes only.) `perf-gate` (emulator macrobenchmark) is not a PR gate: it runs nightly, on main pushes, and on PRs that edit the perf gate; other PRs run the cheap `perf-scripts` self-test.
 
 Not required, but honest (red means a new problem in your diff — fix it): `detekt` (baselined per module), `Platform UI gate`, and on main pushes `main module tests`.
 

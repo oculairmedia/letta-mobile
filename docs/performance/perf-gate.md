@@ -3,9 +3,33 @@
 This document describes the CI performance gate introduced for
 `letta-mobile-o7ob.4.1`.
 
+## When it runs (nightly + main, not a PR gate)
+
+The emulator macrobenchmark takes ~30 minutes, and as a required PR check it
+throttled merge throughput while its noise band sat on the ceiling. Since
+2026-10-15 `.github/workflows/android-perf.yml` runs it:
+
+- **nightly** (`schedule`, 07:00 UTC) against `main`;
+- on every **push to `main`** that touches `android-compose/**` or the workflow;
+- on demand via **`workflow_dispatch`** (optionally `rebaseline: true`);
+- on a **PR only** when the PR edits the gate itself
+  (`.github/workflows/android-perf.yml`, `android-compose/perf/**`,
+  `android-compose/macrobenchmark/**`) or has `[perf:rebaseline]` in its title.
+
+`perf-gate` is **not** a required status check. Every PR still runs the cheap
+`perf-scripts` job (perf script unit tests + Baseline Profile freshness, about
+a minute, no emulator).
+
+A failed nightly or main run fails the workflow and the `report perf
+regression` job opens a GitHub issue titled **`perf-gate regression`**, or
+comments on the open one (de-duplicated by that exact title). Triage it with
+the control table below and the playbook; close the issue once main is green.
+A regression is therefore caught after merge, within a day, and bisected over
+the main commits since the last green nightly.
+
 ## Canonical benchmark device
 
-The required perf gate runs the `playBenchmark` app variant on a
+The perf gate runs the `playBenchmark` app variant on a
 **GitHub Actions API 33 emulator** with the following configuration:
 
 - app distribution flavor: `play`
@@ -20,7 +44,7 @@ Why this device is the source of truth:
 - it is hermetic and reproducible inside CI
 - it avoids the Android 11 / API 30 `profileinstaller` handshake issue
   tracked in `letta-mobile-ce2c`
-- it gives stable enough numbers for per-PR regression detection without
+- it gives stable enough numbers for nightly regression detection without
   depending on physical-device scheduling
 
 Physical-device slow-floor runs are still valuable, but they belong in a
@@ -101,7 +125,8 @@ Now:
    a one-line reading per breached metric.
 3. The job fails. A **human** decides:
    - the control shows main at or over the same ceiling: the runner moved.
-     Rerun the job once and say so on the PR, quoting the control line;
+     Rerun the job once and say so on the `perf-gate regression` issue (or
+     the PR, for an opted-in PR run), quoting the control line;
    - main sits comfortably under it: the change is the suspect. Profile it
      (see the playbook) before any rerun. If the slowdown is real and
      accepted, rebaseline deliberately (below), never by widening a ceiling
@@ -122,7 +147,8 @@ profile shows up only as startup drift. Each perf-gate run executes
 resolves the profile's first-party (`com/letta/...`) classes against the
 Kotlin/Java sources (Hilt/Dagger/Room generated classes resolve through the
 class they are generated from). Over 25% unresolved it emits a workflow
-warning and a job-summary section; it never fails this required job.
+warning and a job-summary section; it never fails the job. This check runs
+in the `perf-scripts` job, so it reports on every PR as well.
 
 On 2026-10-14 the profile (captured 2026-06-25) had 145 of 283 first-party
 classes unresolved (51%): the bot/, client-mode, REST `data/api` and old
@@ -136,7 +162,7 @@ in CI. Run the check locally with
 ## Re-baselining
 
 The first green CI run on the canonical emulator must seed the `null`
-baselines before PR verification can pass.
+baselines before the gate can pass.
 
 ### Local / manual rebaseline
 
@@ -179,13 +205,10 @@ without updating `baselines.json`.
 
 ## Required check wiring
 
-After landing:
-
-1. enable branch protection on `main`
-2. add **Android Perf Gate / perf-gate** as a required status check
-
-This repo-level setting needs admin access and is intentionally documented
-here rather than hard-coded in the repo.
+`perf-gate` is deliberately **not** in branch protection: it runs nightly and
+on main pushes (see "When it runs"). The required set is `test`,
+`build-apk-pass` and `shared-multiplatform` (`scripts/bootstrap-branch-protection.sh`).
+`perf-scripts` is not required either; it is a cheap, honest self-test.
 
 ## Known quirks
 
@@ -228,8 +251,8 @@ If the job fails unexpectedly:
 `android-compose/perf/test_check_baselines.py` includes a regression test
 that verifies the parser exits non-zero when a benchmark value exceeds the
 allowed ceiling; `test_perf_control.py` covers the control table. The
-perf-gate job runs both (`python3 -m unittest discover -s perf -p 'test_*.py'`)
-on every run, so the gate itself cannot silently rot.
+perf-scripts job runs both (`python3 -m unittest discover -s perf -p 'test_*.py'`)
+on every PR, main push and nightly run, so the gate itself cannot silently rot.
 
 ### `reactivecircus/android-emulator-runner` `script:` line continuations
 

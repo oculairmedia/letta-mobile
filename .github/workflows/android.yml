@@ -32,14 +32,13 @@ on:
       # scripts/deploy/** is listed for the same reason (letta-mobile-lgns8.24):
       # host unit templates and the cron sensing check land as scripts+docs PRs
       # that would otherwise never report test/build-apk-pass/
-      # shared-multiplatform. perf-gate needs no entry — android-perf.yml has no
-      # pull_request paths filter and always runs.
+      # shared-multiplatform. android-perf.yml needs no entry: its perf-gate
+      # macrobenchmark is nightly + main only, not a required PR check.
       # *.md and scripts/bootstrap-branch-protection.sh feed the docs-freshness
       # check in `test`, so a README-only PR must run it rather than skip it.
-      # docs/** is here for the same reason: a docs-only PR reports perf-gate
-      # (android-perf.yml has no paths filter) but none of the other required
-      # contexts, so branch protection blocks it with nothing to fix and no
-      # check to re-run. letta-mobile-je4k7 tracks replacing this allowlist,
+      # docs/** is here for the same reason: a docs-only PR would otherwise
+      # report none of the required contexts, so branch protection blocks it
+      # with nothing to fix and no check to re-run. letta-mobile-je4k7 tracks replacing this allowlist,
       # which has now grown an entry per discovery, with heavy jobs that always
       # report and short-circuit when nothing they gate has changed.
       - ".github/workflows/**"

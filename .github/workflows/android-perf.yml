@@ -1,14 +1,27 @@
 name: Android Perf Gate
 
+# The emulator macrobenchmark (~30 min) is NOT a PR gate (letta-mobile perf
+# nightly decision, 2026-10-15): it ran on every PR and throttled merges while
+# its own noise band sat on the ceiling. It now measures main:
+#   - nightly (schedule) and on every push to main that touches android-compose/
+#   - on demand (workflow_dispatch, optionally in rebaseline mode)
+#   - on a PR only when that PR edits the gate itself (this workflow,
+#     android-compose/perf/**, android-compose/macrobenchmark/**) or opts in
+#     with `[perf:rebaseline]` in its title.
+# Every PR still runs the cheap `perf-scripts` job (perf script unit tests +
+# Baseline Profile freshness, ~1 min, no emulator). A failed nightly/main run
+# opens or updates the single "perf-gate regression" issue.
 on:
   push:
     branches: [main]
     paths:
       - ".github/workflows/android-perf.yml"
       - "android-compose/**"
+  schedule:
+    - cron: "0 7 * * *"
   pull_request:
-    # Required perf-gate must report on stacked letta/**, feat/**, and cursor/**
-    # PRs, not only PRs into main. pull_request.branches filters the PR *base*.
+    # pull_request.branches filters the PR *base*; stacked letta/**, feat/**
+    # and cursor/** PRs get the perf-scripts self-test too.
     branches:
       - main
       - "letta/**"
@@ -23,7 +36,9 @@ on:
         type: boolean
 
 concurrency:
-  group: android-perf-${{ github.workflow }}-${{ github.ref }}
+  # The event is part of the group so a main push never cancels the nightly
+  # run (or the other way round); a newer push still supersedes an older one.
+  group: android-perf-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -32,8 +47,76 @@ permissions:
   actions: read
 
 jobs:
+  # Cheap, emulator-free self-test of the gate. Runs on every event, PRs
+  # included, and decides whether a PR opted into the macrobenchmark.
+  perf-scripts:
+    name: perf-scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: android-compose
+    outputs:
+      run_benchmark: ${{ steps.classify.outputs.run_benchmark }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify performance impact
+        id: classify
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title || '' }}
+        run: |
+          set -euo pipefail
+          run_benchmark=true
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            # PRs measure only when they change the gate itself or ask for a
+            # rebaseline; everything else is measured nightly and on main.
+            run_benchmark=false
+            changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+            if grep -Eq '^\.github/workflows/android-perf\.yml$|^android-compose/perf/|^android-compose/macrobenchmark/' <<<"$changed_files" \
+              || [[ "$PR_TITLE" == *"[perf:rebaseline]"* ]]; then
+              run_benchmark=true
+            fi
+          fi
+          echo "run_benchmark=$run_benchmark" >> "$GITHUB_OUTPUT"
+          echo "Macrobenchmark on this run: $run_benchmark (PRs: only gate edits or [perf:rebaseline]; otherwise nightly + main)" >> "$GITHUB_STEP_SUMMARY"
+
+      # The checker and the control renderer are the gate. Keep them tested so
+      # the gate itself cannot rot silently.
+      - name: Test perf gate scripts
+        run: python3 -m unittest discover -s perf -p 'test_*.py'
+
+      # letta-mobile-by4vm.32: a Baseline Profile whose classes no longer exist
+      # is silently ignored by ART, which shows up here as startup drift. Warn
+      # (never fail) when too much of it no longer resolves.
+      - name: Check Baseline Profile freshness
+        run: |
+          status=0
+          python3 -u ../scripts/ci/baseline-profile-staleness.py --max-unresolved-pct 25 \
+            > baseline-profile-staleness.txt 2>&1 || status=$?
+          cat baseline-profile-staleness.txt
+          if [[ "$status" -ne 0 ]]; then
+            echo "::warning title=Stale Baseline Profile::$(grep -m1 '^unresolved:' baseline-profile-staleness.txt || tail -n 1 baseline-profile-staleness.txt) - regenerate it (docs/performance/perf-gate.md#baseline-profile-freshness)"
+          fi
+          {
+            echo "## Baseline Profile freshness"
+            echo
+            echo '```text'
+            cat baseline-profile-staleness.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   perf-gate:
     name: perf-gate
+    needs: perf-scripts
+    if: needs.perf-scripts.outputs.run_benchmark == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -54,80 +137,25 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Classify performance impact
-        id: classify
-        working-directory: ${{ github.workspace }}
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          run_benchmark=true
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
-            {
-              echo "## Performance scope"
-              echo
-              echo '```text'
-              printf '%s\n' "$changed_files"
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            if ! grep -Eq '^android-compose/|^\.github/workflows/android-perf\.yml$' <<<"$changed_files"; then
-              run_benchmark=false
-            fi
-          fi
-          echo "run_benchmark=$run_benchmark" >> "$GITHUB_OUTPUT"
-          echo "Macrobenchmark required: $run_benchmark" >> "$GITHUB_STEP_SUMMARY"
-
-      # The checker and the control renderer are the gate. Keep them tested so
-      # the gate itself cannot rot silently.
-      - name: Test perf gate scripts
-        run: python3 -m unittest discover -s perf -p 'test_*.py'
-
-      # letta-mobile-by4vm.32: a Baseline Profile whose classes no longer exist
-      # is silently ignored by ART, which shows up here as startup drift. Warn
-      # (never fail this required job) when too much of it no longer resolves.
-      - name: Check Baseline Profile freshness
-        run: |
-          status=0
-          python3 -u ../scripts/ci/baseline-profile-staleness.py --max-unresolved-pct 25 \
-            > baseline-profile-staleness.txt 2>&1 || status=$?
-          cat baseline-profile-staleness.txt
-          if [[ "$status" -ne 0 ]]; then
-            echo "::warning title=Stale Baseline Profile::$(grep -m1 '^unresolved:' baseline-profile-staleness.txt || tail -n 1 baseline-profile-staleness.txt) - regenerate it (docs/performance/perf-gate.md#baseline-profile-freshness)"
-          fi
-          {
-            echo "## Baseline Profile freshness"
-            echo
-            echo '```text'
-            cat baseline-profile-staleness.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Setup Java 26
-        if: steps.classify.outputs.run_benchmark == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
-        if: steps.classify.outputs.run_benchmark == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           # Android `test` is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Enable KVM group perms
-        if: steps.classify.outputs.run_benchmark == 'true'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
       - name: Run macrobenchmarks on API 33 emulator
-        if: steps.classify.outputs.run_benchmark == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -149,7 +177,6 @@ jobs:
       # rerun: retrying until green is what the deflake rule forbids. On a
       # breach the next step shows the control; a human decides whether to rerun.
       - name: Check perf baselines
-        if: steps.classify.outputs.run_benchmark == 'true'
         id: check_perf
         run: |
           set -euo pipefail
@@ -162,7 +189,7 @@ jobs:
             --summary-md "$PERF_SUMMARY_DIR/perf-summary.md"
 
       - name: Publish perf summary
-        if: always() && steps.classify.outputs.run_benchmark == 'true'
+        if: always()
         run: |
           if [[ -f "$PERF_SUMMARY_DIR/perf-summary.md" ]]; then
             cat "$PERF_SUMMARY_DIR/perf-summary.md" >> "$GITHUB_STEP_SUMMARY"
@@ -176,10 +203,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$CONTROL_DIR"
+          # Main's measurements: pushes to main and the nightly schedule.
           gh run list -R "$GITHUB_REPOSITORY" --workflow android-perf.yml --branch main \
-            --event push --status completed -L 20 \
-            --json databaseId,headSha,conclusion,createdAt,url \
-            | jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0:5]' \
+            --status completed -L 40 \
+            --json databaseId,headSha,conclusion,createdAt,url,event \
+            | jq '[.[] | select(.event == "push" or .event == "schedule")
+                       | select(.conclusion == "success" or .conclusion == "failure")][0:5]' \
             > "$CONTROL_DIR/runs.json"
           for id in $(jq -r '.[].databaseId' "$CONTROL_DIR/runs.json"); do
             gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'android-perf-summary-*' -D "$CONTROL_DIR/$id" 2>/dev/null \
@@ -193,7 +222,7 @@ jobs:
       # Small, separate artifact so a later breach's control step can fetch
       # five summaries without pulling five sets of traces.
       - name: Upload perf summary
-        if: always() && steps.classify.outputs.run_benchmark == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-perf-summary-${{ github.run_number }}
@@ -201,7 +230,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload perf benchmark results
-        if: always() && steps.classify.outputs.run_benchmark == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-perf-results-${{ github.run_number }}
@@ -213,9 +242,54 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload rebaselined perf baselines
-        if: always() && steps.classify.outputs.run_benchmark == 'true' && (inputs.rebaseline || contains(github.event.pull_request.title || '', '[perf:rebaseline]'))
+        if: always() && (inputs.rebaseline || contains(github.event.pull_request.title || '', '[perf:rebaseline]'))
         uses: actions/upload-artifact@v4
         with:
           name: android-perf-baselines-${{ github.run_number }}
           path: android-compose/perf/baselines.json
           if-no-files-found: error
+
+  # A red nightly/main run must not sit unnoticed in the Actions tab: open (or
+  # comment on) one tracking issue, de-duplicated by its exact title.
+  report-regression:
+    name: report perf regression
+    needs: [perf-scripts, perf-gate]
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the "perf-gate regression" issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: perf-gate regression
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          SCRIPTS_RESULT: ${{ needs.perf-scripts.result }}
+          GATE_RESULT: ${{ needs.perf-gate.result }}
+        run: |
+          set -euo pipefail
+          body="$(cat <<EOF
+          The \`Android Perf Gate\` ${EVENT_NAME} run on main failed.
+
+          - Run: ${RUN_URL}
+          - Commit: ${SHA}
+          - perf-scripts: ${SCRIPTS_RESULT}; perf-gate: ${GATE_RESULT}
+
+          The run's job summary has the perf summary and, on a breach, the control
+          (last 5 main runs). Triage with docs/performance/perf-gate.md and
+          docs/performance/playbook.md; close this issue once main is green again.
+          EOF
+          )"
+          number="$(gh issue list --state open --search "\"$TITLE\" in:title" \
+            --json number,title --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")"
+          if [[ -n "$number" ]]; then
+            gh issue comment "$number" --body "$body"
+            echo "Commented on #$number" >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh issue create --title "$TITLE" --body "$body"
+            echo "Opened a new \"$TITLE\" issue" >> "$GITHUB_STEP_SUMMARY"
+          fi

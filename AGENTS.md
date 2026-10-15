@@ -45,7 +45,7 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
-- **CI gates merges, not pushes.** Required status checks on `main` (branch protection, asserted by `scripts/tests/ci-policy-scripts-test.sh`): `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.) The CI map below is exactly what runs where.
+- **CI gates merges, not pushes.** Required status checks on `main` (branch protection, asserted by `scripts/tests/ci-policy-scripts-test.sh`): `test`, `build-apk-pass`, and `shared-multiplatform`. All must be green before squash-merge. `perf-gate` (the emulator macrobenchmark) is **not** a PR gate: it runs nightly and on main pushes. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.) The CI map below is exactly what runs where.
 - **Run the pre-push checklist before opening the PR.** See "Pre-push PR readiness checklist" below. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
 
 ### CI map (what runs where)
@@ -57,12 +57,13 @@ git push --force-with-lease                 # safe force-push to your branch
 | `test` | `android.yml` | PRs + main pushes touching the workflow's paths | CI policy script tests, stateful-mock gate, then one Gradle graph: `:app:compileSideloadDebugKotlin :core:android-data:testDebugUnitTest :app:testRootDebugUnitTest :app:testScreenshot :build-logic:test checkArchitectureBoundaries :architecture-tests:test :architecture-tests:architectureTest :quality:detekt-rules:check` (the last includes `guardrailDetekt`, blocking, on changed `.kt` files). **PRs only**, path-filtered additive tasks from `scripts/ci/changed-gradle-modules.sh` (`:feature-chat`, `:designsystem`, `:sharedUI:jvmTest`, `:desktop:test`, `:cli`, `:plugin-*`, … only when that module's own tree changed). |
 | `shared-multiplatform` | `android.yml` | same | `:sharedLogic:jvmTest` (12 min bound), `:appserver-cli:test`, `:iroh-wrapper-cli:test`, then **compiles only** for hostNative and wasmJs (`:sharedLogic`, `:sharedUI`) plus a Node unit test of the karma reporter config (`sharedLogic/karma.config.test.cjs`); browser tests run only in `web-wasm`. Not `:sharedLogic:allTests` (hostNativeTest hangs) and not `:desktop:test`. |
 | `build-apk-pass` | `android.yml` | same | `:app:assembleRootDebug`. `:app:assemblePlayRelease` + APK size/R8 validation run on **main pushes only**; on PRs that matrix leg skips its build but still reports success. |
-| `perf-gate` | `android-perf.yml` | every PR (benchmarks only when `android-compose/**` or the workflow changed) + main pushes | perf script unit tests, Baseline Profile freshness check (warns, never fails), then **one** cold/warm startup macrobenchmark on the API 33 emulator. No automatic rerun: on a breach the job summary shows the last 5 main runs as a control and a human decides (`docs/performance/perf-gate.md`). |
 
 **Not required, but honest** (they go red on a real problem; fix it, don't wave it through):
 
 | Check | Workflow | Runs on | What it runs |
 |---|---|---|---|
+| `perf-gate` | `android-perf.yml` | **nightly (07:00 UTC) + main pushes** (+ dispatch); on a PR only when it edits `android-perf.yml`, `android-compose/perf/**` or `android-compose/macrobenchmark/**`, or has `[perf:rebaseline]` in its title | **one** cold/warm startup macrobenchmark on the API 33 emulator (~30 min). No automatic rerun: on a breach the job summary shows the last 5 main runs as a control and a human decides (`docs/performance/perf-gate.md`). A red nightly/main run opens or comments on the single `perf-gate regression` issue. |
+| `perf-scripts` | `android-perf.yml` | every PR + main pushes + nightly | perf script unit tests and the Baseline Profile freshness check (warns, never fails); ~1 min, no emulator. |
 | `detekt` | `android.yml` | after the required jobs | `./gradlew detekt -Parchitecture.strict=true` against each module's `detekt-baseline.xml`: only findings not already in the baseline fail. Covers `app`, `core:android-data`, `designsystem`, `feature-chat`, `quality:detekt-rules`; the KMP modules report NO-SOURCE. |
 | `Platform UI gate` | `agents-policy.yml` | PRs into `main` | `platform-ui-gate.sh --enforce`: PUI001 (new platform `@Composable` file) and PUI004 (allowlist add/raise without `Platform-UI-Reason:`) fail; PUI002 growth warns. |
 | `main module tests (sharedUI jvm + desktop)` | `android.yml` | **main pushes only** (+ dispatch) | `:sharedUI:jvmTest :desktop:test` unconditionally, so main is never silently broken by a PR whose diff skipped them. |
@@ -211,7 +212,9 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 
 # 8. Required vs advisory — know which CI checks block merge and which don't.
 #    Required (any red = merge blocked):
-#      `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`
+#      `test`, `build-apk-pass`, `shared-multiplatform`
+#    Not a PR gate: `perf-gate` (emulator macrobenchmark) runs nightly +
+#    on main; a red run files the `perf-gate regression` issue.
 #    Not required but honest (red means a NEW problem in your diff; fix it):
 #    - `detekt` — fails only on findings outside detekt-baseline.xml.
 #    - `Platform UI gate` — new platform @Composable file / allowlist change.
