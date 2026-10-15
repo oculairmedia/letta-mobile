@@ -126,6 +126,26 @@ tasks.register<Delete>("cleanKotlinIC") {
 }
 
 // ---------------------------------------------------------------------------
+// Serialize the two root-level Wasm yarn installs (letta-mobile-zwvy4).
+//
+// KGP registers :kotlinWasmToolingSetup (installs webpack/karma into
+// .kotlin/) and :kotlinWasmNpmInstall (installs project npm deps such as
+// @js-joda/core into build/wasm/node_modules) with no ordering between them,
+// and with the configuration cache on Gradle runs them concurrently. Both
+// yarn processes then contend for yarn's `--mutex network` lock; the losing
+// one prints "Waiting for the other yarn instance to finish" and, under load,
+// sometimes exits 0 without installing anything. kotlinWasmNpmInstall then
+// "succeeds" with an empty install, webpack cannot resolve @js-joda/core, the
+// karma bundle never loads, and :web:wasmJsBrowserTest fails with
+// "Disconnected ... because no message in 30000 ms". Ordering the tasks
+// removes the contention entirely; passing CI runs already finish tooling
+// first, so this only makes the good ordering mandatory.
+// ---------------------------------------------------------------------------
+tasks.matching { it.name == "kotlinWasmNpmInstall" }.configureEach {
+    mustRunAfter(tasks.matching { it.name == "kotlinWasmToolingSetup" })
+}
+
+// ---------------------------------------------------------------------------
 // Build cache policy
 // ---------------------------------------------------------------------------
 // letta-mobile-pywa: Keep Gradle's build cache enabled for the broad set of
