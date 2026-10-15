@@ -56,6 +56,7 @@ import kotlinx.serialization.json.put
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.util.UUID
@@ -217,7 +218,6 @@ class IrohChannelTransport(
         scope = transportScope,
         secretKeyStore = secretKeyStore,
         onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
-        onCloseResources = ::handleCloseResources,
         externalToolRegistry = externalToolRegistry,
         notebookHandlerFactory = notebookHandlerFactory,
         syncBudget = syncBudget,
@@ -253,11 +253,13 @@ class IrohChannelTransport(
             .distinctUntilChanged { a, b -> a === b }
 
     /**
-     * letta-mobile-qygvv.16: the session is closing, so every turn it carried must still end. The
-     * cut-off lets each engine publish its own terminal before its job is cancelled, and stands
-     * in with a synthetic one when none arrives in time.
+     * letta-mobile-qygvv.16 / by4vm.96: the session ended for good, so every turn it carried must
+     * still end. The engine's turns end through the router, and the cut-off lets each publish its
+     * own terminal before its job is cancelled, standing in with a synthetic one when none arrives
+     * in time. A redial is not an end: the engine carries its turns across it.
      */
-    private fun handleCloseResources(reason: String) {
+    private fun endSessionTurns(reason: String) {
+        irohDialer.endSessionTurns()
         sessionLossCutOff.cutOff(reason)
     }
 
@@ -291,6 +293,7 @@ class IrohChannelTransport(
         } else {
             connectionSession.onNotReady()
             updateInterruptedTurns(state)
+            state.sessionEndReason()?.let(::endSessionTurns)
             livenessProbe.stop("state:${state::class.simpleName}")
         }
     }
@@ -298,7 +301,7 @@ class IrohChannelTransport(
     private fun updateInterruptedTurns(state: IrohConnectionState) {
         when (state) {
             is IrohConnectionState.Degraded -> {
-                if (state.reason == "config_changed") turnRegistry.clearInterruptedTurns()
+                if (state.reason == IROH_CONFIG_CHANGED) turnRegistry.clearInterruptedTurns()
                 else turnRegistry.rememberInterruptedTurns()
             }
             else -> Unit
@@ -421,7 +424,7 @@ class IrohChannelTransport(
             }
         }
         turnRegistry.activeTurnsSnapshot().forEach { turn ->
-            if (turn.conversationId in announced || turn.hasTerminal) return@forEach
+            if (turn.conversationId in announced || !turn.needsRedialRecovery) return@forEach
             _redialWhileTurnActive.tryEmit(
                 RedialWhileTurnActive(
                     agentId = turn.agentId,
@@ -446,6 +449,17 @@ class IrohChannelTransport(
             )
         }
     }
+
+    /**
+     * Test seam (letta-mobile-by4vm.96): attaches a scripted, already-authenticated [client] as a
+     * dial of this transport's one engine, for a [testDialer] that exercises redial survival.
+     */
+    internal suspend fun attachTestDial(config: IrohConnectConfig, client: AppServerClient): IrohConnectionHandle =
+        irohDialer.attachDial(IrohDialAttachment(config, ticket = config.baseShimUrl, client = client, serverCapabilities = null))
+
+    /** Test seam (letta-mobile-by4vm.96): [handle]'s connection died, as the QUIC loss watcher reports it. */
+    internal fun reportConnectionLostForTest(reason: String, handle: IrohConnectionHandle) =
+        supervisor.onConnectionLostAsync(reason, handle)
 
     /** Test/wiring visibility: current generation admin RPC retry state. */
     internal val adminRpcRetryState get() = adminRpcExecutor.currentRetryState()
