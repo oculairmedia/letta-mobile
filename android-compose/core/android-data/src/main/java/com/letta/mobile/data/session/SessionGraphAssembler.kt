@@ -3,7 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
-import com.letta.mobile.data.context.contextTokenReadingsOf
+import com.letta.mobile.data.session.graph.SharedSessionGraph
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
@@ -13,7 +13,6 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
@@ -31,9 +30,7 @@ import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
-import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
-import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -79,6 +76,12 @@ class SessionGraphAssembler @Inject constructor(
         val agentRepository = createAgentRepository(request)
         val conversationRepos = createConversationRepos(request, agentRepository)
         val adminRepositories = createAdminRepositories(request)
+        // letta-mobile-by4vm.24: the transport-bound repositories every host builds alike.
+        val transportBound = SharedSessionGraph.transportBound(
+            transport = request.channelTransport,
+            scope = request.scope,
+            snapshots = settingsStore?.let(::ContextReadingSnapshots),
+        )
         val forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
         val useIroh = request.activeConfig.sessionBackendBinding(forceIroh = forceIroh).bindsIroh()
         return SessionGraph(
@@ -93,10 +96,7 @@ class SessionGraphAssembler @Inject constructor(
             allConversationsRepository = conversationRepos.allConversations,
             channelTransport = request.channelTransport,
             conversationRepository = conversationRepos.conversation,
-            cronRepository = CronRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
+            cronRepository = transportBound.cronRepository,
             mcpServerRepository = adminRepositories.mcpServer,
             modelRepository = adminRepositories.model,
             passageRepository = adminRepositories.passage,
@@ -105,23 +105,13 @@ class SessionGraphAssembler @Inject constructor(
             runRepository = adminRepositories.run,
             providerRepository = adminRepositories.provider,
             scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
-            selfTodoRepository = SelfTodoRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
+            selfTodoRepository = transportBound.selfTodoRepository,
             stepRepository = StepRepository(remoteSources.steps.orNull()),
-            subagentRepository = SubagentRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
+            subagentRepository = transportBound.subagentRepository,
             toolRepository = adminRepositories.tool,
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
             capabilities = sessionCapabilities(request, forceIroh),
-            contextTokenReadings = contextTokenReadingsOf(
-                transport = request.channelTransport,
-                scope = request.scope,
-                snapshots = settingsStore?.let(::ContextReadingSnapshots),
-            ),
+            contextTokenReadings = transportBound.contextTokenReadings,
         )
     }
 

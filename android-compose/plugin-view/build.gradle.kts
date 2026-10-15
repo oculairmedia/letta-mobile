@@ -5,6 +5,8 @@
 // KMP like :sharedUI, and it depends on :sharedUI and :sharedLogic only.
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -33,24 +35,14 @@ kotlin {
 
     android {
         namespace = "com.letta.mobile.pluginview"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
 
         // Robolectric host tests of the WebView host read the merged manifest and resources.
         withHostTestBuilder {}.configure {
             isIncludeAndroidResources = true
         }
-
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
     sourceSets {
         commonMain {

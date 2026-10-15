@@ -27,6 +27,14 @@ gradlePlugin {
             id = "com.letta.mobile.embedded-runtime"
             implementationClass = "com.letta.mobile.embedded.EmbeddedRuntimePlugin"
         }
+        create("kmpLibrary") {
+            id = "com.letta.mobile.kmp.library"
+            implementationClass = "com.letta.mobile.kmp.KmpLibraryPlugin"
+        }
+        create("jni16Kb") {
+            id = "com.letta.mobile.jni-16kb"
+            implementationClass = "com.letta.mobile.jni.Jni16KbPlugin"
+        }
     }
 }
 

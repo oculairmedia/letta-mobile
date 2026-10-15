@@ -87,7 +87,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # Let same-repo PRs refresh Gradle User Home caches for later workflow
           # runs. Fork PRs stay read-only to avoid untrusted Gradle User Home
@@ -234,7 +234,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer. Advisory jobs
           # restore shared entries without uploading competing snapshots.
@@ -295,7 +295,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job owns cache writes.
           cache-read-only: true
@@ -343,7 +343,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
@@ -399,7 +399,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
@@ -477,12 +477,12 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Setup Rust with WASM target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249  # stable
         with:
           targets: wasm32-unknown-unknown
 
@@ -584,7 +584,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # Restore Gradle User Home state from prior trusted workflow runs;
           # keep all PR matrix consumers read-only and leave project-local state to the
@@ -676,7 +676,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 

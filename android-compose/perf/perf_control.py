@@ -19,10 +19,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import sys
+import tempfile
 
 GATED_METRICS = ("startup.cold.p95_ms", "startup.warm.p95_ms")
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+
+def allowed_roots() -> list[pathlib.Path]:
+    """Where input paths may live: the checkout, the temp dir, and the CI runner's temp dir."""
+    roots = [REPO_ROOT, pathlib.Path(tempfile.gettempdir())]
+    if os.environ.get("RUNNER_TEMP"):
+        roots.append(pathlib.Path(os.environ["RUNNER_TEMP"]))
+    return [root.resolve() for root in roots]
+
+
+def confined(path: pathlib.Path) -> pathlib.Path:
+    """`path` resolved, or ValueError when it escapes every allowed root (CLI-arg path traversal)."""
+    resolved = path.resolve()
+    if not any(resolved.is_relative_to(root) for root in allowed_roots()):
+        raise ValueError(f"{path} is outside {', '.join(map(str, allowed_roots()))}")
+    return resolved
 
 
 def load_summary(path: pathlib.Path) -> dict[str, dict]:
@@ -124,11 +143,12 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=5)
     args = parser.parse_args(argv)
     try:
-        runs = json.loads(args.runs.read_text(encoding="utf-8"))
+        current, runs_path, control_dir = (confined(p) for p in (args.current, args.runs, args.control_dir))
+        runs = json.loads(runs_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        print(f"perf_control: unreadable run list {args.runs}: {exc}", file=sys.stderr)
+        print(f"perf_control: unusable input {args.runs}: {exc}", file=sys.stderr)
         return 2
-    print(render(load_summary(args.current), control_rows(runs, args.control_dir, args.limit)), end="")
+    print(render(load_summary(current), control_rows(runs, control_dir, args.limit)), end="")
     return 0
 
 

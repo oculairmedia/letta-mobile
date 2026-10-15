@@ -2,6 +2,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -38,24 +40,14 @@ kotlin {
 
     android {
         namespace = "com.letta.mobile.sharedui"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
 
         // letta-mobile-bglj6.1: package the Compose Multiplatform strings into the APK.
         androidResources {
             enable = true
         }
-
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
     // letta-mobile-o4ygk.4: the web client compiles the same shared UI. The required
     // shared-multiplatform job compiles main and test for wasm; the browser tests are not run yet.

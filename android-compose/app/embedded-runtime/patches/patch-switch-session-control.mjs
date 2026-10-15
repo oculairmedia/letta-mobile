@@ -3,7 +3,8 @@
 // and sends this over stdin instead of stop()+start() re-entering node::Start.
 // verifyEmbeddedLettaCodeSwitchSessionControl asserts the marker below landed.
 import { readFileSync, writeFileSync } from 'fs';
-const file = process.argv[2];
+import { patchTarget } from './patch-target.mjs';
+const file = patchTarget();
 let src = readFileSync(file, 'utf8');
 const marker = 'letta-mobile-st78v-switch-session-control';
 if (src.includes(marker)) {
