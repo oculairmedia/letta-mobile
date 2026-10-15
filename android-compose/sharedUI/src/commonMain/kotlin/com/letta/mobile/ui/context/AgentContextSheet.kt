@@ -31,6 +31,7 @@ import com.letta.mobile.data.context.formatContextTokens
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerEntry
 import com.letta.mobile.data.repository.modelcontrol.ModelPickerState
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortStops
+import com.letta.mobile.data.repository.modelcontrol.ReasoningTier
 import com.letta.mobile.ui.modelcontrol.EffortSetting
 import com.letta.mobile.ui.modelcontrol.ReasoningEffortSlider
 import androidx.compose.animation.AnimatedVisibility
@@ -100,7 +101,7 @@ fun ColumnScope.AgentContextSheetContent(
         SheetHeading(AgentContextStrings.MODEL_TITLE, AgentContextStrings.scope(model.scope), Modifier.testTag(AgentContextTags.SCOPE))
         if (picker != null) {
             ModelRow(model, picker, onOpen = { levels.open(AgentSettingsLevel.Model) })
-            SelectedModelEffort(picker)
+            SelectedModelEffort(picker, model.effort)
         } else {
             Text(
                 text = modelLine(model),
@@ -134,7 +135,7 @@ private fun ModelRow(model: AgentContextCardModel, picker: AgentContextPicker, o
     val selected = picker.state.selected
     val name = selected?.displayName ?: modelLine(model)
     LettaListRow(
-        spec = LettaListRowSpec(title = name, trailing = selected?.tier?.let(ModelControlStrings::tierLabel)),
+        spec = LettaListRowSpec(title = name, trailing = EffortChoice.tierOf(model.effort, selected)?.let(ModelControlStrings::tierLabel)),
         onClick = onOpen,
         modifier = Modifier.padding(horizontal = LettaDimens.Space.sm).testTag(AgentContextTags.MODEL_ROW),
         end = { Icon(LettaIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon)) },
@@ -147,7 +148,7 @@ private fun ModelRow(model: AgentContextCardModel, picker: AgentContextPicker, o
  * or a single one; it unfolds rather than jumping in.
  */
 @Composable
-private fun SelectedModelEffort(picker: AgentContextPicker) {
+private fun SelectedModelEffort(picker: AgentContextPicker, conversationEffort: String?) {
     val choice = EffortChoice.of(picker)
     val reducedMotion = LocalReducedMotion.current
     AnimatedVisibility(
@@ -157,7 +158,7 @@ private fun SelectedModelEffort(picker: AgentContextPicker) {
     ) {
         choice ?: return@AnimatedVisibility
         ReasoningEffortSlider(
-            setting = EffortSetting(choice.stops, choice.entry.tier?.effort),
+            setting = EffortSetting(choice.stops, EffortChoice.tierOf(conversationEffort, choice.entry)?.effort),
             onApply = { effort -> choice.apply(choice.entry, effort) },
             modifier = Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs),
         )
@@ -173,6 +174,14 @@ private class EffortChoice(val entry: ModelPickerEntry, val stops: ReasoningEffo
             val stops = ReasoningEffortStops.of(entry.efforts) ?: return null
             return EffortChoice(entry, stops, apply)
         }
+
+        /**
+         * letta-mobile-by4vm.82: the tier the conversation runs at — its own effort (this session's
+         * pick, else the host's record) — else the catalog row's. The row's tier is only the
+         * catalog's first variant for the handle, so reading it alone snapped the slider back.
+         */
+        fun tierOf(conversationEffort: String?, entry: ModelPickerEntry?): ReasoningTier? =
+            ReasoningTier.of(conversationEffort) ?: entry?.tier
     }
 }
 
