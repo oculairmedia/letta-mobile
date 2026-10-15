@@ -132,7 +132,7 @@ private fun rememberShellContextUsage(context: DesktopShellContext, frame: Deskt
     val core = context.core
     val sessionGraph = core.sessionGraph.value
     val models by remember(sessionGraph) { sessionGraph.llmModelsOrEmpty() }.collectAsState()
-    val modelSelections by core.chatController.conversationModelSelections.collectAsState()
+    val modelSelections by core.chatController.models.selections.collectAsState()
     return rememberFocusedContextUsage(
         focus = DesktopContextFocus(
             agentId = frame.focus.selectedAgentId,

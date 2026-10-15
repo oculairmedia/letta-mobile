@@ -113,10 +113,8 @@ internal data class DesktopChatComposerHostInputs(
 internal data class DesktopChatComposerInputs(
     val surface: DesktopChatSurfaceState,
     val host: DesktopChatComposerHostInputs,
-    /** Model picker options as (label, selection value), the shape `buildModelOptions` returns. */
-    val modelOptions: List<Pair<String, String>>,
-    /** letta-mobile-by4vm.85: the selected conversation's effort and each option's efforts. */
-    val modelEfforts: DesktopModelEfforts = DesktopModelEfforts(),
+    /** letta-mobile-by4vm.98.1: the model chip, from the controller's [DesktopConversationModels]. */
+    val model: ChatModelUiState?,
     /** letta-mobile-by4vm.98: the shared working-directory chip; null where the gateway has none. */
     val workingDirectory: ChatWorkingDirectoryUiState?,
     val canQueueWhileStreaming: Boolean,
@@ -137,7 +135,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         attachmentLimits = inputs.attachmentLimits,
         commands = inputs.host.commands.map(ComposerCommand::toChatComposerCommand).toImmutableList(),
         mentionables = inputs.host.mentionables.toImmutableList(),
-        model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions, inputs.modelEfforts),
+        model = inputs.model,
         contextUsage = inputs.host.contextUsage,
         workingDirectory = inputs.workingDirectory,
         permissionMode = inputs.permissionMode,

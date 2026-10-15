@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
 import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
 import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -76,6 +77,8 @@ data class TimelineChatSessionOptions(
     val workingDirectory: ChatWorkingDirectorySource? = null,
     /** letta-mobile-by4vm.98: the conversation's permission-mode chip; null shows none. */
     val permissionModes: ChatPermissionModeSource? = null,
+    /** letta-mobile-by4vm.98.1: the conversation's model chip and switch; null: no chip, capability off. */
+    val models: ChatModelSource? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val placeholder: String? = null,
 )
@@ -90,8 +93,8 @@ data class TimelineChatSessionOptions(
  * [TimelineChatSession] and the run controls its transport has; the web client is the first host
  * that has no conversation owner of its own.
  *
- * Capabilities it does not have yet (model switch, search, paged history, goals, re-run, the send
- * queue) are reported off, so the page hides them; a host adds the rest through [TimelineChatSessionOptions].
+ * Capabilities it does not have yet (search, paged history, goals, re-run, the send queue) are
+ * reported off, so the page hides them; a host adds the rest through [TimelineChatSessionOptions].
  */
 class TimelineChatSessionPort(
     private val session: TimelineChatSession,
@@ -125,26 +128,28 @@ class TimelineChatSessionPort(
     private val workingDirectory: StateFlow<ChatWorkingDirectoryUiState?> =
         options.workingDirectory?.current ?: MutableStateFlow(null)
 
+    private val model: StateFlow<ChatModelUiState?> = options.models?.model ?: MutableStateFlow(null)
+
     override val composer: StateFlow<ChatComposerUiState> = combine(
         draft,
         uiState,
-        workingDirectory,
+        combine(workingDirectory, model, ::Pair),
         options.permissionModes?.permissionMode ?: flowOf(null),
-    ) { current, ui, directory, permissionMode ->
-        timelineComposerUiState(current, ui.isRunInFlight, options).copy(workingDirectory = directory, permissionMode = permissionMode)
+    ) { current, ui, (directory, chip), permissionMode ->
+        timelineComposerUiState(current, ui.isRunInFlight, options)
+            .copy(workingDirectory = directory, model = chip, permissionMode = permissionMode)
     }.stateIn(
         scope,
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        timelineComposerUiState(draft.value, false, options).copy(workingDirectory = workingDirectory.value),
+        timelineComposerUiState(draft.value, false, options).copy(workingDirectory = workingDirectory.value, model = model.value),
     )
 
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = workingDirectory
-        .map { timelineCapabilities(options.controls).copy(workingDirectory = it != null) }
-        .stateIn(
-            scope,
-            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            timelineCapabilities(options.controls).copy(workingDirectory = workingDirectory.value != null),
-        )
+        .map(::currentCapabilities)
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities(workingDirectory.value))
+
+    private fun currentCapabilities(directory: ChatWorkingDirectoryUiState?) =
+        timelineCapabilities(options.controls).copy(workingDirectory = directory != null, modelSwitch = options.models != null)
 
     override val actions: ChatActions = TimelineChatActions(this)
 
@@ -276,6 +281,10 @@ class TimelineChatSessionPort(
 
     internal fun setPermissionMode(mode: AppServerPermissionMode) {
         options.permissionModes?.setPermissionMode(mode)
+    }
+
+    internal fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
+        options.models?.selectModel(handle, effort)
     }
 
     internal fun retryLoad() {

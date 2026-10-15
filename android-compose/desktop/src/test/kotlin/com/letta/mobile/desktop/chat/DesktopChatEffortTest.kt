@@ -52,7 +52,7 @@ class DesktopChatEffortTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel(SOL, ReasoningEffortChoice.Named("high"))
+        controller.models.select(SOL, ReasoningEffortChoice.Named("high"))
         runCurrent()
 
         val change = gateway.changes.single()
@@ -60,7 +60,7 @@ class DesktopChatEffortTest {
         assertEquals(SOL, change.model.value)
         assertEquals(ReasoningEffortChoice.Named("high"), change.effort)
         // The host has not recorded it yet; the pick still shows.
-        assertEquals("high", controller.conversationModelSelections.value.efforts["conv-1"])
+        assertEquals("high", controller.models.selections.value.efforts["conv-1"])
         controller.close()
     }
 
@@ -71,13 +71,13 @@ class DesktopChatEffortTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel(SOL, ReasoningEffortChoice.Named("low"))
+        controller.models.select(SOL, ReasoningEffortChoice.Named("low"))
         runCurrent()
         // A later effort-free re-pick of the same model keeps what the host recorded.
-        controller.setConversationModel(SOL)
+        controller.models.select(SOL)
         runCurrent()
 
-        assertEquals("low", controller.conversationModelSelections.value.efforts["conv-1"])
+        assertEquals("low", controller.models.selections.value.efforts["conv-1"])
         assertEquals(ReasoningEffortChoice.Unchanged, gateway.changes.last().effort)
         controller.close()
     }
@@ -89,7 +89,7 @@ class DesktopChatEffortTest {
         controller.start()
         runCurrent()
 
-        assertEquals("medium", controller.conversationModelSelections.value.efforts["conv-1"])
+        assertEquals("medium", controller.models.selections.value.efforts["conv-1"])
         controller.close()
     }
 
@@ -99,14 +99,14 @@ class DesktopChatEffortTest {
         val controller = testController(gateway)
         controller.start()
         runCurrent()
-        assertFalse(controller.supportsReasoningEffort)
+        assertFalse(controller.models.supportsReasoningEffort)
 
-        controller.setConversationModel(SOL, ReasoningEffortChoice.Named("high"))
+        controller.models.select(SOL, ReasoningEffortChoice.Named("high"))
         runCurrent()
 
         assertTrue(gateway.modelUpdates.isEmpty())
         assertNotNull(controller.state.value.errorMessage)
-        assertNull(controller.conversationModelSelections.value.efforts["conv-1"])
+        assertNull(controller.models.selections.value.efforts["conv-1"])
         controller.close()
     }
 
@@ -117,7 +117,7 @@ class DesktopChatEffortTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel(SOL)
+        controller.models.select(SOL)
         runCurrent()
 
         assertEquals(listOf("conv-1" to SOL), gateway.modelUpdates)

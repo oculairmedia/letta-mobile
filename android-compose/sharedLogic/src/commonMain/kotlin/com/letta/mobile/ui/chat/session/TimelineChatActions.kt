@@ -66,7 +66,7 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun setFontScale(scale: Float) = Unit
 
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = Unit
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = port.selectModel(handle, effort)
 
     override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = port.changeWorkingDirectory(directory)
 

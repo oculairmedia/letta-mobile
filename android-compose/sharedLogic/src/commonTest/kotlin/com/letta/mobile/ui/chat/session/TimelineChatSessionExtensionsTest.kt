@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.runtime.ModeChangeResult
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
@@ -9,6 +10,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -136,6 +138,48 @@ class TimelineChatSessionExtensionsTest {
     }
 
     @Test
+    fun theTimelinePortShowsTheHostsModelChipAndRoutesAPick() = runTest {
+        val models = FakeModelSource()
+        val port = port(TimelineChatSessionOptions(models = models))
+        runCurrent()
+
+        assertEquals("Sol", port.composer.value.model?.currentLabel)
+        assertTrue(port.capabilities.value.modelSwitch)
+
+        port.actions.selectModel(ChatModelHandle("openai/gpt-sol"), ReasoningEffortChoice.Named("high"))
+        runCurrent()
+        val expected: List<Pair<ChatModelHandle, ReasoningEffortChoice>> = listOf(ChatModelHandle("openai/gpt-sol") to ReasoningEffortChoice.Named("high"))
+        assertEquals(expected, models.picks)
+        assertEquals("high", port.composer.value.model?.currentEffort)
+    }
+
+    @Test
+    fun theTimelinePortWithoutAModelSourceHasNoChip() = runTest {
+        val port = port(TimelineChatSessionOptions())
+        runCurrent()
+
+        assertNull(port.composer.value.model)
+        assertFalse(port.capabilities.value.modelSwitch)
+    }
+
+    @Test
+    fun aDerivedStateFlowReadsItsSourceNowAndEmitsEachDistinctChange() = runTest {
+        val source = MutableStateFlow(1)
+        val parity = DerivedStateFlow(source.map { it % 2 }) { source.value % 2 }
+        val seen = mutableListOf<Int>()
+        backgroundScope.launch { parity.collect { seen += it } }
+        runCurrent()
+
+        source.value = 3
+        runCurrent()
+        assertEquals(1, parity.value)
+        source.value = 4
+        runCurrent()
+        assertEquals(0, parity.value)
+        assertEquals(listOf(1, 0), seen)
+    }
+
+    @Test
     fun anAcknowledgedErrorIsHiddenUntilTheOwnerClearsItThenShowsAgain() {
         val shown = TimelineLocalState().acknowledge("boom")
         assertNull(shown.pageError("boom"))
@@ -170,6 +214,16 @@ private class FakeModeGateway(
 
     override suspend fun syncPermissionMode(runtime: AppServerRuntimeScope) {
         synced += runtime
+    }
+}
+
+private class FakeModelSource : ChatModelSource {
+    val picks = mutableListOf<Pair<ChatModelHandle, ReasoningEffortChoice>>()
+    override val model = MutableStateFlow<ChatModelUiState?>(ChatModelUiState(currentHandle = "openai/gpt-sol", currentLabel = "Sol"))
+
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
+        picks += handle to effort
+        model.value = model.value?.copy(currentEffort = (effort as? ReasoningEffortChoice.Named)?.effort)
     }
 }
 

@@ -46,9 +46,9 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
             compaction = CompactionController(desktopCompactionRepository(dataBindings.modelControlRpc), graph.contextTokenReadings),
             pickerSource = DesktopModelControlHost(
                 session = dataBindings.modelControl,
-                chatModels = chatController.availableModels,
-                reloadChatModels = chatController::reloadModelCatalog,
-                onModelSelected = chatController::setConversationModel,
+                chatModels = chatController.models.available,
+                reloadChatModels = chatController.models::reload,
+                onModelSelected = chatController.models::select,
                 recentModels = chatController.conversationManagement.recentModels,
             ).pickerSource(),
             contextLimit = ContextLimitController(desktopContextLimitRepository(dataBindings.modelControlRpc)),
@@ -56,7 +56,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
         )
     }
     val models by remember(graph) { graph.llmModelsOrEmpty() }.collectAsState()
-    val selections by chatController.conversationModelSelections.collectAsState()
+    val selections by chatController.models.selections.collectAsState()
     val conversationId = frame.chatState.selectedConversationId
     val agent = frame.focus.rosterAgents.firstOrNull { it.id.value == agentId }
     // letta-mobile-dxz5s: the same resolution Android uses — the conversation's own model and window first.
@@ -64,7 +64,7 @@ internal fun DesktopAgentContextCard(context: DesktopShellContext, frame: Deskto
     val binding = remember(deps, chatController) {
         AgentContextCardBinding(
             deps = deps,
-            actions = AgentContextCardActions(onModelSelected = { entry -> chatController.setConversationModel(entry.value) }),
+            actions = AgentContextCardActions(onModelSelected = { entry -> chatController.models.select(entry.value) }),
         )
     }
     AgentContextCardHost(
