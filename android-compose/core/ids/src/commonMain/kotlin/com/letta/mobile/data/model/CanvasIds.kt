@@ -1,6 +1,7 @@
 package com.letta.mobile.data.model
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmInline
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -38,4 +39,17 @@ data class CanvasId(val value: String) {
          */
         fun forConversation(conversationId: ConversationId): CanvasId = CanvasId(CONVERSATION_PREFIX + conversationId.value)
     }
+}
+
+/**
+ * Who wrote a canvas op (letta-mobile-by4vm.99): an agent's id, the local user
+ * (`CanvasSession.LOCAL_USER_ACTOR_ID`), or a system writer such as `system`. Ops carry it on the
+ * wire and in the op log as a bare string ([value]); the canvas session and the op-stamping
+ * helpers take it typed. Not blank-checked: an op built only to be validated or rebound names no
+ * one yet (`""`).
+ */
+@JvmInline
+@Serializable
+value class CanvasActorId(val value: String) {
+    override fun toString(): String = value
 }

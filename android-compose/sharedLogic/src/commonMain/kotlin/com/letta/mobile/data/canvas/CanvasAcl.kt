@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.PrincipalAcl
 import com.letta.mobile.data.document.UnauthorizedDocumentMutationException
+import com.letta.mobile.data.model.CanvasActorId
 
 /**
  * Access Control List for a collaborative [CanvasDocument]: the shared-document
@@ -13,7 +14,7 @@ typealias CanvasAcl = PrincipalAcl
  * Thrown when an actor attempts an unauthorized mutation on a [CanvasSession].
  */
 class UnauthorizedCanvasMutationException(
-    actorId: String?,
+    actorId: CanvasActorId?,
     val canvasId: CanvasId,
     message: String = "Actor '${actorId ?: "anonymous"}' is not authorized to mutate canvas '$canvasId'",
-) : UnauthorizedDocumentMutationException(actorId, canvasId.value, message)
+) : UnauthorizedDocumentMutationException(actorId?.value, canvasId.value, message)

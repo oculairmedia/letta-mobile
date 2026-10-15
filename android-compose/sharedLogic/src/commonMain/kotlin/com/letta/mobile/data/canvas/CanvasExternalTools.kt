@@ -9,6 +9,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
@@ -36,11 +37,11 @@ private data class CanvasToolContext(
     val agentId: String,
     val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
-    fun resolveCallerId(): String = agentId
+    fun resolveCallerId(): CanvasActorId = CanvasActorId(agentId)
 }
 
-private fun canRead(doc: CanvasDocument, callerId: String): Boolean =
-    doc.acl == null || doc.acl.canRead(callerId)
+private fun canRead(doc: CanvasDocument, callerId: CanvasActorId): Boolean =
+    doc.acl == null || doc.acl.canRead(callerId.value)
 
 /** Two tool calls both read revision N and raced to write N+1; one of them lost. */
 private fun revisionConflict(doc: CanvasDocument): ExternalToolResult.Error =
@@ -81,14 +82,14 @@ private suspend fun executeCreateCanvas(
     val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
     val candidate = CanvasDocument(
         id = CanvasId.generate(),
-        agentId = callerAgentId,
+        agentId = callerAgentId.value,
         conversationId = conversationId,
         title = title,
         revision = 1L,
         sceneJson = "",
         acl = CanvasAcl(
             ownerUserId = CanvasSession.LOCAL_USER_ACTOR_ID,
-            writerAgentIds = setOf(callerAgentId),
+            writerAgentIds = setOf(callerAgentId.value),
         ),
         updatedAtEpochMs = now,
     )
@@ -131,7 +132,7 @@ private suspend fun commitSceneUpdate(
     activeSession: CanvasSession?,
     doc: CanvasDocument,
     sceneJson: String,
-    callerId: String,
+    callerId: CanvasActorId,
 ): Long? = if (activeSession != null) {
     activeSession.applyAgentReplace(sceneJson, actorId = callerId).revision
 } else {
@@ -141,14 +142,14 @@ private suspend fun commitSceneUpdate(
 private suspend fun executeAuthorizedMutation(
     context: CanvasToolContext,
     input: JsonObject,
-    mutate: suspend (doc: CanvasDocument, callerId: String, activeSession: CanvasSession?) -> ExternalToolResult,
+    mutate: suspend (doc: CanvasDocument, callerId: CanvasActorId, activeSession: CanvasSession?) -> ExternalToolResult,
 ): ExternalToolResult {
     val callerId = context.resolveCallerId()
     val doc = when (val lookup = findCanvasDocument(context, input)) {
         is CanvasLookupResult.Error -> return lookup.result
         is CanvasLookupResult.Found -> lookup.doc
     }
-    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
+    if (doc.acl != null && !doc.acl.canWrite(callerId.value)) {
         return ExternalToolResult.Error("Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
     val activeSession = context.sessions.get(doc.id)
@@ -268,7 +269,7 @@ private suspend fun executeListCanvases(
     } else {
         // agentId and acl are independent fields, so a document can name an agent its ACL
         // has since stopped letting read; listing applies the same check as a direct lookup.
-        context.store.listForAgent(AgentId(callerAgentId)).filter { canRead(it, callerAgentId) }.map { it.id.value }
+        context.store.listForAgent(AgentId(callerAgentId.value)).filter { canRead(it, callerAgentId) }.map { it.id.value }
     }
 }
 
@@ -296,7 +297,7 @@ private suspend fun executeCompose(
     if (!canRead(doc, callerId)) {
         return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot read canvas '${doc.id.value}'")
     }
-    if (doc.acl != null && !doc.acl.canWrite(callerId)) {
+    if (doc.acl != null && !doc.acl.canWrite(callerId.value)) {
         return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
     return hosting.compose(input, ComposeTarget(doc.id, doc.sceneJson, doc.revision)) { ops ->

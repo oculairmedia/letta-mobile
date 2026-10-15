@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -509,7 +510,7 @@ class CanvasExternalToolsTest {
                 ),
             ),
         )
-        val rebound = nested.withActor("me") as CanvasOp.BatchOp
+        val rebound = nested.withActor(CanvasActorId("me")) as CanvasOp.BatchOp
         val inner = rebound.ops.single() as CanvasOp.BatchOp
         assertEquals("me", rebound.actorId)
         assertEquals("me", inner.actorId)

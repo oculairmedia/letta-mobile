@@ -21,6 +21,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.place
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.progress
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.props
 import com.letta.mobile.data.canvas.removePluginElement
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,7 +40,7 @@ class CanvasPluginElementMoveUndoTest {
         CanvasCreateOptions(title = "Plugins", acl = CanvasAcl(CanvasSession.LOCAL_USER_ACTOR_ID, writerAgentIds = setOf(AGENT, PLUGIN))),
     )
 
-    private suspend fun placed(): CanvasSession = session().also { it.applyAgentBatch(listOf(place(0)), AGENT) }
+    private suspend fun placed(): CanvasSession = session().also { it.applyAgentBatch(listOf(place(0)), CanvasActorId(AGENT)) }
 
     private fun CanvasSession.element(id: String = ID): CanvasPluginElement? = pluginElements().singleOrNull { it.id == id }
 
@@ -84,7 +85,7 @@ class CanvasPluginElementMoveUndoTest {
     fun undoingAMovePutsTheFrameBackAndKeepsThePluginStateAndRedoMovesItAgain() = runTest {
         val session = placed()
         val step = assertNotNull(session.movePluginElement(ID, moved))
-        session.applyAgentBatch(listOf(progress(0, 0.9)), AGENT)
+        session.applyAgentBatch(listOf(progress(0, 0.9)), CanvasActorId(AGENT))
 
         session.undo(step)
         val undone = assertNotNull(session.element())
@@ -116,7 +117,7 @@ class CanvasPluginElementMoveUndoTest {
         val session = session()
         val placement = place(0)
         val step = assertNotNull(CanvasPluginElementUndo.stepFor(placement, session.pluginElements(), "placed"))
-        session.applyAgentBatch(listOf(placement), AGENT)
+        session.applyAgentBatch(listOf(placement), CanvasActorId(AGENT))
         val placed = assertNotNull(session.element())
 
         session.undo(step)
@@ -128,7 +129,7 @@ class CanvasPluginElementMoveUndoTest {
     @Test
     fun aGroupMoveIsOneBatchAndOneStepAndSkipsWhatDoesNotMove() = runTest {
         val session = session()
-        session.applyAgentBatch(listOf(place(0), place(0, id = "pe-b"), place(0, id = "pe-c")), AGENT)
+        session.applyAgentBatch(listOf(place(0), place(0, id = "pe-b"), place(0, id = "pe-c")), CanvasActorId(AGENT))
         val revision = session.document.value!!.revision
         val elsewhere = CanvasDocumentFrame(0f, 0f, 320f, 240f)
         val step = assertNotNull(
@@ -150,7 +151,7 @@ class CanvasPluginElementMoveUndoTest {
         val placedCheckpoint = session.checkpoints.value.first()
         val placedElement = assertNotNull(session.element())
         session.movePluginElement(ID, moved)
-        session.applyAgentBatch(listOf(progress(0, 1.0)), AGENT)
+        session.applyAgentBatch(listOf(progress(0, 1.0)), CanvasActorId(AGENT))
 
         session.restoreCheckpoint(placedCheckpoint.checkpointId)
         assertEquals(placedElement, session.element())

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -98,7 +99,7 @@ class CanvasSessionTest {
         assertTrue(acl.canWrite(CanvasSession.LOCAL_USER_ACTOR_ID))
         assertFalse(acl.canWrite("some-agent"))
         assertFailsWith<UnauthorizedCanvasMutationException> {
-            session.applyAgentReplace("{}", actorId = "some-agent")
+            session.applyAgentReplace("{}", actorId = CanvasActorId("some-agent"))
         }
 
         val withAgent = CanvasSession.create(store = store, options = CanvasCreateOptions(agentId = "agent-7"))

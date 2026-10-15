@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
@@ -13,7 +14,10 @@ import kotlin.uuid.Uuid
  * [toolCallId] is the call's own id in the run (letta-mobile-bglj6.12), for a tool that must answer
  * a retried call the same way.
  */
-data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null)
+data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null) {
+    /** [agentId] as the actor its canvas ops are stamped with. */
+    val actor: CanvasActorId get() = CanvasActorId(agentId)
+}
 
 /** A canvas's scene as the host's log has it: [revision] is the log's head cursor. */
 data class HostCanvasScene(val sceneJson: String, val revision: Long, val lamport: Long)
@@ -144,7 +148,7 @@ class HostCanvasBackend(
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
-        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }, kinds))
+        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.actor) }, kinds))
     }
 
     private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>, atomic: Boolean): HostCanvasPublish {
@@ -156,9 +160,9 @@ class HostCanvasBackend(
             )
             val lamport = scene(entry).lamport
             val stamped = if (atomic) {
-                listOf(CanvasStampedBatch.of(ops, caller.agentId, lamport, newOpId))
+                listOf(CanvasStampedBatch.of(ops, caller.actor, lamport, newOpId))
             } else {
-                CanvasStampedBatch.separately(ops, caller.agentId, lamport, newOpId)
+                CanvasStampedBatch.separately(ops, caller.actor, lamport, newOpId)
             }
             stamped.forEach { link.receive(CanvasRelayMessage.Publish(entry.topic, it)) }
             return HostCanvasAcks(stamped).await(replies, ackTimeout)

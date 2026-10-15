@@ -39,7 +39,7 @@ class NotebookComposeStorageTest {
             val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId))
             val outcome = CanvasComposeService.compose(request, ComposeTarget(canvasId, session.sceneJsonOrEmpty())) { ops ->
                 var lamport = 0L
-                session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR_ID).withStamp("compose-${++lamport}", lamport) }).revision
+                session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR).withStamp("compose-${++lamport}", lamport) }).revision
             }
             assertEquals(ComposeStatus.PUBLISHED, assertIs<ComposeOutcome.Done>(outcome).receipt.status)
         }

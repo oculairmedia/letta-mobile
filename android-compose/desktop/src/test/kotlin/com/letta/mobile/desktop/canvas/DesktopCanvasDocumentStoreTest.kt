@@ -15,6 +15,7 @@ import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasActorId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -200,9 +201,9 @@ class DesktopCanvasDocumentStoreTest {
                 opLog = FileCanvasOpLog(rootDirectory = tempDir.resolve("ops")),
             ),
         )
-        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), agent)
+        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), CanvasActorId(agent))
         assertNotNull(session.movePluginElement("pe-a", moved))
-        session.applyAgentBatch(listOf(stateUpdate), agent)
+        session.applyAgentBatch(listOf(stateUpdate), CanvasActorId(agent))
         assertNotNull(session.removePluginElement("pe-b"))
         val before = session.pluginElements()
 

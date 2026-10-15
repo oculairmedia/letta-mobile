@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasActorId
+
 /**
  * A batch an agent writes as one thing (letta-mobile-bglj6.12): every op rebound to [actorId] and
  * stamped after [afterLamport] in order, each with an id of its own, wrapped in one
@@ -11,9 +13,9 @@ package com.letta.mobile.data.canvas
  * session ([CanvasSession.applyAgentBatch]) build it here, so the two publish the same ops.
  */
 object CanvasStampedBatch {
-    fun of(ops: List<CanvasOp>, actorId: String, afterLamport: Long, newOpId: () -> String): CanvasOp.BatchOp {
+    fun of(ops: List<CanvasOp>, actorId: CanvasActorId, afterLamport: Long, newOpId: () -> String): CanvasOp.BatchOp {
         val stamped = separately(ops, actorId, afterLamport, newOpId)
-        return CanvasOp.BatchOp(opId = newOpId(), actorId = actorId, lamport = stamped.lastOrNull()?.lamport ?: afterLamport, ops = stamped)
+        return CanvasOp.BatchOp(opId = newOpId(), actorId = actorId.value, lamport = stamped.lastOrNull()?.lamport ?: afterLamport, ops = stamped)
     }
 
     /**
@@ -21,7 +23,7 @@ object CanvasStampedBatch {
      * `canvas_apply_ops` publishes on both hosts (letta-mobile-s416w.5), so an update an agent sends
      * is newer than the board it read, whatever clock the model wrote.
      */
-    fun separately(ops: List<CanvasOp>, actorId: String, afterLamport: Long, newOpId: () -> String): List<CanvasOp> {
+    fun separately(ops: List<CanvasOp>, actorId: CanvasActorId, afterLamport: Long, newOpId: () -> String): List<CanvasOp> {
         var lamport = afterLamport
         return ops.map { it.withActor(actorId).withStamp(newOpId(), ++lamport) }
     }

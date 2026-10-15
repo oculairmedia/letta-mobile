@@ -33,4 +33,13 @@ class CanvasIdTest {
         assertTrue(first.value.startsWith(CanvasId.PREFIX))
         assertNotEquals(first, second)
     }
+
+    @Test
+    fun canvasActorIdSerializesAsItsBareString() {
+        val encoded = Json.encodeToString(CanvasActorId.serializer(), CanvasActorId("agent-1"))
+
+        assertEquals("\"agent-1\"", encoded)
+        assertEquals(CanvasActorId("agent-1"), Json.decodeFromString(CanvasActorId.serializer(), encoded))
+        assertEquals("agent-1", CanvasActorId("agent-1").toString())
+    }
 }
