@@ -69,7 +69,7 @@ internal fun rememberDesktopShellContext(
         overlays = overlays,
         chatState = chatState,
         onA2uiAction = onA2uiAction,
-        sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction),
+        sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),
         imageIntake = rememberDesktopImageIntake(core, navigator),
     )
 }
@@ -84,8 +84,9 @@ private fun resolveA2uiAction(action: A2uiAction, selectedConversationId: String
 private fun rememberDesktopSharedChatWiring(
     chatController: DesktopChatController,
     onA2uiAction: (A2uiAction) -> Unit,
+    modelCatalog: com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository?,
 ): DesktopSharedChatWiring {
-    val port = rememberDesktopChatSessionPort(chatController, onA2uiAction)
+    val port = rememberDesktopChatSessionPort(chatController, onA2uiAction, modelCatalog)
     val dockedCanvasRouter = remember { DesktopDockedCanvasRouter() }
     return DesktopSharedChatWiring(port = port, dockedCanvas = dockedCanvasRouter)
 }

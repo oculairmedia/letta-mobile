@@ -136,9 +136,11 @@ class DesktopChatControllerModelSwitchTest {
         )
 }
 
-private class ModelSwitchGateway(
+/** Also the model-only (direct App Server) gateway of DesktopChatEffortTest (letta-mobile-by4vm.85). */
+internal open class ModelSwitchGateway(
     conversationIds: List<String> = listOf("conv-1"),
     private val failModelUpdate: Boolean = false,
+    private val models: List<LlmModel> = emptyList(),
 ) : FakeDesktopChatGateway(conversationIds = conversationIds), ChatGatewayExtras {
     val modelUpdates = mutableListOf<Pair<String, String>>()
 
@@ -147,7 +149,7 @@ private class ModelSwitchGateway(
 
     override suspend fun createAgent(params: AgentCreateParams): Agent = error("not used by this test")
 
-    override suspend fun listLlmModels(): List<LlmModel> = emptyList()
+    override suspend fun listLlmModels(): List<LlmModel> = models
 
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
         if (failModelUpdate) error("model rejected")

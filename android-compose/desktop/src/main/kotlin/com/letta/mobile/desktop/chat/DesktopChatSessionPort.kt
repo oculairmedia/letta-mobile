@@ -6,6 +6,8 @@ import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.modelcontrol.CatalogModel
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
@@ -29,6 +31,7 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.chat.session.toUiState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -53,6 +56,11 @@ internal data class DesktopChatSessionBindings(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Persists a pinch/zoom font scale through the desktop font-scale host. */
     val onSetFontScale: (Float) -> Unit = {},
+    /**
+     * letta-mobile-by4vm.85: the host's model catalog (the window's model-control session), whose
+     * rows say which reasoning efforts each model takes; null leaves the effort chip off.
+     */
+    val modelCatalog: ModelCatalogRepository? = null,
 )
 
 /**
@@ -70,6 +78,10 @@ internal class DesktopChatSessionPort(
 ) : ChatSessionPort {
     private val hostInputs = MutableStateFlow(DesktopChatComposerHostInputs())
     private val localTimeline = MutableStateFlow(DesktopChatLocalTimelineState())
+
+    init {
+        followModelCatalog()
+    }
 
     /** Feeds the composer chrome the shell computes (commands, mentionables, context usage). */
     fun updateHostInputs(inputs: DesktopChatComposerHostInputs) {
@@ -215,6 +227,7 @@ internal class DesktopChatSessionPort(
         surface = controller.state.value,
         host = hostInputs.value,
         modelOptions = buildModelOptions(controller.availableModels.value),
+        modelEfforts = desktopModelEfforts(currentModelEffortInputs()),
         workingDirectory = DesktopWorkingDirectoryInputs(
             supported = controller.supportsWorkingDirectory,
             path = controller.selectedConversationWorkingDirectory.value,
@@ -227,19 +240,56 @@ internal class DesktopChatSessionPort(
     private fun composerInputs(): Flow<DesktopChatComposerInputs> = combine(
         controller.state,
         hostInputs,
-        controller.availableModels,
+        combine(controller.availableModels, modelEfforts(), ::Pair),
         combine(workingDirectoryInputs(), permissionModeUi(), ::Pair),
         controller.canonicalPresentation,
-    ) { surface, host, models, (workingDirectory, permissionMode), canonical ->
+    ) { surface, host, (models, efforts), (workingDirectory, permissionMode), canonical ->
         DesktopChatComposerInputs(
             surface = surface,
             host = host,
             modelOptions = buildModelOptions(models),
+            modelEfforts = efforts,
             workingDirectory = workingDirectory,
             canQueueWhileStreaming = canonical != null,
             attachmentLimits = controller.attachmentLimits,
             permissionMode = permissionMode,
         )
+    }
+
+    /** letta-mobile-by4vm.85: the efforts the composer offers, following the catalog and the picks. */
+    private fun modelEfforts(): Flow<DesktopModelEfforts> = combine(
+        controller.availableModels,
+        catalogRows(),
+        controller.conversationModelSelections,
+        controller.state.map { it.selectedConversationId }.distinctUntilChanged(),
+    ) { models, catalog, choices, selectedId ->
+        desktopModelEfforts(
+            DesktopModelEffortInputs(models, catalog, choices, selectedId, controller.supportsReasoningEffort),
+        )
+    }.distinctUntilChanged()
+
+    private fun catalogRows(): Flow<List<CatalogModel>> = bindings.modelCatalog?.models ?: flowOf(emptyList())
+
+    private fun currentModelEffortInputs() = DesktopModelEffortInputs(
+        models = controller.availableModels.value,
+        catalog = bindings.modelCatalog?.models?.value.orEmpty(),
+        choices = controller.conversationModelSelections.value,
+        selectedConversationId = controller.state.value.selectedConversationId,
+        supported = controller.supportsReasoningEffort,
+    )
+
+    /**
+     * letta-mobile-by4vm.85: the catalog is otherwise read only when the picker opens, so each
+     * model-list load (a connect, a host swap) re-reads it where the gateway can send an effort.
+     * A host without the admin catalog keeps an empty one: no effort chip.
+     */
+    private fun followModelCatalog() {
+        val catalog = bindings.modelCatalog ?: return
+        scope.launch {
+            controller.availableModels.collect { models ->
+                if (models.isNotEmpty() && controller.supportsReasoningEffort) refreshCatalogQuietly(catalog)
+            }
+        }
     }
 
     /**
@@ -318,6 +368,17 @@ internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCap
  * change stops on its own instead of needing a scope of its own to cancel.
  */
 private const val STOP_TIMEOUT_MS = 5_000L
+
+/** A catalog read that fails leaves the previous rows (or none: no effort chip); the next load tries again. */
+private suspend fun refreshCatalogQuietly(catalog: ModelCatalogRepository) {
+    try {
+        catalog.refresh()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        // Not every host answers model.list (the direct App Server session has no admin catalog).
+    }
+}
 
 /** [ChatActions] forwarded to [DesktopChatController]; what desktop cannot do is a no-op. */
 internal class DesktopChatActions(
@@ -414,8 +475,9 @@ internal class DesktopChatActions(
 
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 
-    /** Desktop's model switch takes a selection value only; the effort is chosen elsewhere. */
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = controller.setConversationModel(handle.value)
+    /** letta-mobile-by4vm.85: the selection value and the effort go to the conversation together. */
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) =
+        controller.setConversationModel(handle.value, effort)
 
     override fun setPermissionMode(mode: AppServerPermissionMode) = onSetPermissionMode(mode)
 
