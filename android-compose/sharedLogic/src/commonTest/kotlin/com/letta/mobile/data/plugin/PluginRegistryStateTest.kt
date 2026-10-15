@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginRegistryFixtures.NOW
 import com.letta.mobile.data.plugin.PluginRegistryFixtures.SHA_A
 import com.letta.mobile.data.plugin.PluginRegistryFixtures.SHA_B
@@ -19,7 +20,7 @@ import kotlin.test.assertTrue
  */
 class PluginRegistryStateTest {
     private val example = PluginRegistryFixtures.example
-    private val id = example.id
+    private val id = example.pluginId
 
     private fun reduce(state: PluginRegistryState, command: PluginCommand): PluginRegistryState =
         assertIs<PluginTransition.Applied>(PluginRegistryReducer.reduce(state, command), "$command").state
@@ -97,7 +98,7 @@ class PluginRegistryStateTest {
     fun aDriverEventForAPluginThatIsOffIsRefused() {
         assertEquals(PluginRefusal.INVALID_STATE, refusal(installed(), PluginCommand.Activated(id)).refusal)
         assertEquals(PluginRefusal.INVALID_STATE, refusal(installed(), PluginCommand.Fault(id, "x")).refusal)
-        assertEquals(PluginRefusal.UNKNOWN_PLUGIN, refusal(installed(), PluginCommand.Enable("no.such")).refusal)
+        assertEquals(PluginRefusal.UNKNOWN_PLUGIN, refusal(installed(), PluginCommand.Enable(PluginId("no.such"))).refusal)
     }
 
     @Test

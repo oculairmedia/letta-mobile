@@ -106,8 +106,8 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
             is PluginPackageResult.Read -> read.pkg
         }
         val problems = PluginManifestRules.check(pkg.manifest).joinToString("; ") { "${it.path}: ${it.message}" }
-        if (problems.isNotEmpty()) return refused(PluginHostEvent.INSTALL, PluginId(pkg.manifest.id), PluginHostResult.Refused(problems))
-        val installed = registry.value[pkg.manifest.id]
+        if (problems.isNotEmpty()) return refused(PluginHostEvent.INSTALL, pkg.manifest.pluginId, PluginHostResult.Refused(problems))
+        val installed = registry.value[pkg.manifest.pluginId]
         when {
             installed == null -> installNew(pkg)
             installed.packageSha256 == pkg.ref.sha256 -> PluginHostResult.Done(installed)
@@ -117,16 +117,16 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
 
     /** Records the owner's consent to [capabilities] and [origins] for the installed version. */
     suspend fun consent(pluginId: PluginId, capabilities: Set<PluginCapability>, origins: Set<String>): PluginHostResult = mutex.withLock {
-        val version = registry.value[pluginId.value]?.version.orEmpty()
-        apply(PluginHostEvent.CONSENT, PluginCommand.RecordConsent(pluginId.value, PluginConsent(capabilities, origins, config.nowMs(), version)))
+        val version = registry.value[pluginId]?.version.orEmpty()
+        apply(PluginHostEvent.CONSENT, PluginCommand.RecordConsent(pluginId, PluginConsent(capabilities, origins, config.nowMs(), version)))
     }
 
     /** Enables [pluginId] (refused without consent covering it) and starts its driver; answers the plugin once it runs or faults. */
     suspend fun enable(pluginId: PluginId): PluginHostResult = mutex.withLock {
-        val result = apply(PluginHostEvent.ENABLE, PluginCommand.Enable(pluginId.value))
+        val result = apply(PluginHostEvent.ENABLE, PluginCommand.Enable(pluginId))
         if (result !is PluginHostResult.Done) return result
-        registry.value[pluginId.value]?.takeIf { drivers.live(pluginId) == null }?.let { launch(it) }
-        PluginHostResult.Done(registry.value[pluginId.value])
+        registry.value[pluginId]?.takeIf { drivers.live(pluginId) == null }?.let { launch(it) }
+        PluginHostResult.Done(registry.value[pluginId])
     }
 
     /** Stops [pluginId]'s driver and unpublishes its tools. */
@@ -135,7 +135,7 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** Disables [pluginId], then deletes its packages and its registry entry. */
     suspend fun remove(pluginId: PluginId): PluginHostResult = mutex.withLock {
         drivers.stop(pluginId)
-        apply(PluginHostEvent.REMOVE, PluginCommand.Remove(pluginId.value)).also {
+        apply(PluginHostEvent.REMOVE, PluginCommand.Remove(pluginId)).also {
             if (it is PluginHostResult.Done) withContext(Dispatchers.IO) { store.delete(pluginId) }
         }
     }
@@ -162,36 +162,36 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
 
     private suspend fun disableLocked(pluginId: PluginId): PluginHostResult {
         drivers.stop(pluginId)
-        return apply(PluginHostEvent.DISABLE, PluginCommand.Disable(pluginId.value))
+        return apply(PluginHostEvent.DISABLE, PluginCommand.Disable(pluginId))
     }
 
     private suspend fun installNew(pkg: PluginPackage): PluginHostResult {
         val command = PluginCommand.Install(pkg.manifest, pkg.ref.sha256, PluginConsent.none(), config.nowMs(), awaitingConsent = true)
         val next = when (val decided = decide(command)) {
-            is PluginTransition.Refused -> return refused(PluginHostEvent.INSTALL, PluginId(command.pluginId), refusalOf(decided))
+            is PluginTransition.Refused -> return refused(PluginHostEvent.INSTALL, command.pluginId, refusalOf(decided))
             is PluginTransition.Applied -> decided.state
         }
         withContext(Dispatchers.IO) { store.unpack(pkg) }
         commit(next)
-        PluginHostEvents.record(PluginHostEvent.INSTALL, PluginId(pkg.manifest.id), "version" to pkg.manifest.version, "sha256" to pkg.ref.sha256)
-        return PluginHostResult.Done(next[pkg.manifest.id])
+        PluginHostEvents.record(PluginHostEvent.INSTALL, pkg.manifest.pluginId, "version" to pkg.manifest.version, "sha256" to pkg.ref.sha256)
+        return PluginHostResult.Done(next[pkg.manifest.pluginId])
     }
 
     /** Stages and completes an update at once; one asking for more than was consented comes back Installed, awaiting consent. */
     private suspend fun update(installed: InstalledPlugin, pkg: PluginPackage): PluginHostResult {
         val stage = PluginCommand.StageUpdate(pkg.manifest, pkg.ref.sha256, null, config.nowMs(), awaitingConsent = true)
         val staged = when (val decided = decide(stage)) {
-            is PluginTransition.Refused -> return refused(PluginHostEvent.UPDATE, PluginId(stage.pluginId), refusalOf(decided))
+            is PluginTransition.Refused -> return refused(PluginHostEvent.UPDATE, stage.pluginId, refusalOf(decided))
             is PluginTransition.Applied -> decided.state
         }
         withContext(Dispatchers.IO) { store.unpack(pkg) }
         drivers.stop(installed.pluginId)
-        val completed = (PluginRegistryReducer.reduce(staged, PluginCommand.CompleteUpdate(installed.id)) as PluginTransition.Applied).state
+        val completed = (PluginRegistryReducer.reduce(staged, PluginCommand.CompleteUpdate(installed.pluginId)) as PluginTransition.Applied).state
         commit(completed)
-        val plugin = requireNotNull(completed[installed.id])
+        val plugin = requireNotNull(completed[installed.pluginId])
         PluginHostEvents.record(PluginHostEvent.UPDATE, plugin.pluginId, "version" to plugin.version, "needsConsent" to (!plugin.consented).toString())
         if (plugin.state.advertises) launch(plugin)
-        return PluginHostResult.Done(registry.value[plugin.id])
+        return PluginHostResult.Done(registry.value[plugin.pluginId])
     }
 
     private suspend fun launch(plugin: InstalledPlugin) {
@@ -204,21 +204,21 @@ class PluginHostRuntime(private val config: PluginHostConfig, scope: CoroutineSc
     /** A driver state as registry facts: running is Active, faulted is Faulted (tools unpublished). */
     private suspend fun onDriverState(pluginId: PluginId, state: PluginDriverState) {
         when (state) {
-            is PluginDriverState.Running -> if (registry.value[pluginId.value]?.state != PluginState.Active) apply(PluginHostEvent.ACTIVE, PluginCommand.Activated(pluginId.value))
+            is PluginDriverState.Running -> if (registry.value[pluginId]?.state != PluginState.Active) apply(PluginHostEvent.ACTIVE, PluginCommand.Activated(pluginId))
             is PluginDriverState.Restarting -> PluginHostEvents.record(PluginHostEvent.RESTART, pluginId, "reason" to state.reason, "attempt" to state.attempt.toString())
             is PluginDriverState.Faulted -> {
                 drivers.forget(pluginId)
-                apply(PluginHostEvent.FAULT, PluginCommand.Fault(pluginId.value, state.reason))
+                apply(PluginHostEvent.FAULT, PluginCommand.Fault(pluginId, state.reason))
             }
             else -> Unit
         }
     }
 
     private suspend fun apply(event: PluginHostEvent, command: PluginCommand): PluginHostResult = when (val decided = decide(command)) {
-        is PluginTransition.Refused -> refused(event, PluginId(command.pluginId), refusalOf(decided))
+        is PluginTransition.Refused -> refused(event, command.pluginId, refusalOf(decided))
         is PluginTransition.Applied -> {
             commit(decided.state)
-            PluginHostEvents.record(event, PluginId(command.pluginId))
+            PluginHostEvents.record(event, command.pluginId)
             PluginHostResult.Done(decided.state[command.pluginId])
         }
     }

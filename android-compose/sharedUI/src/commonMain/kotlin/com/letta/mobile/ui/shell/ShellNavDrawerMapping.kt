@@ -6,9 +6,9 @@ import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState
 import com.letta.mobile.ui.shell.rail.ShellRailFocus

@@ -279,7 +279,6 @@
     <ID>TooGenericExceptionCaught:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$failure: Throwable</ID>
     <ID>TooGenericExceptionCaught:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration$failure: Exception</ID>
     <ID>TooGenericExceptionCaught:SessionManager.kt$SessionManager$t: Throwable</ID>
-    <ID>TooGenericExceptionCaught:ToolRepository.kt$ToolRepository$e: Exception</ID>
     <ID>TooGenericExceptionThrown:BackendSwitchInvalidatorTest.kt$BackendSwitchInvalidatorTest$throw RuntimeException("b")</ID>
     <ID>TooGenericExceptionThrown:CoroutineExtensionsTest.kt$CoroutineExtensionsTest$throw RuntimeException("Test Error")</ID>
     <ID>TooManyFunctions:ConfirmedTimelineSnapshotEntity.kt$ConfirmedTimelineSnapshotDao</ID>
@@ -294,7 +293,6 @@
     <ID>TooManyFunctions:SessionScopedConversationRepository.kt$SessionScopedConversationRepository : IConversationRepositoryBackendScopedCache</ID>
     <ID>TooManyFunctions:TimelineLedgerDatabase.kt$TimelineLedgerDao</ID>
     <ID>TooManyFunctions:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority</ID>
-    <ID>TooManyFunctions:ToolRepository.kt$ToolRepository : IToolRepository</ID>
     <ID>UnusedImports:AgentRepositoryTest.kt$import kotlinx.coroutines.flow.first</ID>
     <ID>UnusedImports:BlockRepositoryTest.kt$import kotlinx.serialization.json.buildJsonObject</ID>
     <ID>UnusedImports:BlockRepositoryTest.kt$import kotlinx.serialization.json.put</ID>

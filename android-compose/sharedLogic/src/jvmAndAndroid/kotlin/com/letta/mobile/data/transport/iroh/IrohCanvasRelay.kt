@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.CanvasRelayMessage
 import com.letta.mobile.data.canvas.CanvasRelayProtocol
 import com.letta.mobile.data.canvas.CanvasRelayStore
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Connection
 import kotlinx.coroutines.CancellationException
@@ -49,9 +50,9 @@ class IrohCanvasRelay(
      * Serves an accepted canvas connection from [origin] (the authenticated peer) on host [hostNodeId];
      * false when [alpn] is not the canvas protocol.
      */
-    fun accept(alpn: ByteArray, connection: Connection, origin: String, hostNodeId: String): Boolean {
+    fun accept(alpn: ByteArray, connection: Connection, origin: String, hostNodeId: HostId): Boolean {
         if (!handles(alpn)) return false
-        hostId = hostNodeId
+        hostId = hostNodeId.value
         scope.launch { serve(connection, origin) }
         return true
     }

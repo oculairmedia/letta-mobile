@@ -17,6 +17,8 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.CanvasArtifactId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
@@ -41,6 +43,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.runtime.ToolCallId
 import java.nio.file.Files
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.coroutines.flow.Flow
@@ -220,7 +223,7 @@ class CanvasComposeMultiCardEndToEndTest {
 
     private fun assertThePiecesAreOnTheBoard(board: Board, receipt: ComposeReceipt) {
         val pieces = piecesOf(receipt)
-        pieces.forEach { assertTrue("\"${it.boardId(receipt.artifactId)}\"" in board.sceneJson, it.key) }
+        pieces.forEach { assertTrue("\"${it.boardIdIn(receipt)}\"" in board.sceneJson, it.key) }
         val composedDocuments = board.documents().filter { it.compose?.artifactId == receipt.artifactId }
         assertEquals(pieces.count { it.kind in DOCUMENT_KINDS }, composedDocuments.size)
         composedDocuments.forEach { document ->
@@ -264,7 +267,7 @@ class CanvasComposeMultiCardEndToEndTest {
     private suspend fun assertASecondComposeLandsBeside(reloaded: Board, receipt: ComposeReceipt, existing: List<Rect>): Board {
         val occupied = CanvasComposePlacement.occupiedBounds(reloaded.sceneJson)
         val second = receiptOf(dispatch(ComposeCall("req-2", CALL_2, SECOND_REQUEST)))
-        assertEquals(CanvasComposeIds.derived(CALL_2), second.artifactId, "no artifact_id: named by the call")
+        assertEquals(CanvasComposeIds.derived(ToolCallId(CALL_2)).value, second.artifactId, "no artifact_id: named by the call")
         val secondBounds = assertNotNull(second.bounds)
         val (originX, originY) = CanvasComposePlacement.origin(occupied)
         assertEquals(originX, secondBounds.x)
@@ -321,7 +324,7 @@ class CanvasComposeMultiCardEndToEndTest {
     /** Each group's board id with the ids its frame holds: its children and its label. */
     private fun groupMembers(receipt: ComposeReceipt): Map<String, List<String>> =
         receipt.items.filter { it.kind == ComposeKind.GROUP }.associate { group ->
-            group.boardId(receipt.artifactId) to (group.children.orEmpty().map { it.boardId(receipt.artifactId) } + CanvasComposeIds.label(receipt.artifactId, group.key))
+            group.boardIdIn(receipt) to (group.children.orEmpty().map { it.boardIdIn(receipt) } + CanvasComposeIds.label(CanvasArtifactId(receipt.artifactId), group.key))
         }
 
     /** No two of [rects] overlap, but a group's frame and what it holds. */

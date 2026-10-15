@@ -34,7 +34,7 @@ internal data class DesktopMainContentInputs(
     val destinationInputs: DestinationContentInputs,
     val activeCanvasSession: CanvasSession? = null,
     /** The board the shared page has docked; the side pane never shows it a second time. */
-    val dockedCanvasId: com.letta.mobile.data.canvas.CanvasId? = null,
+    val dockedCanvasId: com.letta.mobile.data.model.CanvasId? = null,
     /** letta-mobile-ckmub.3.11: the shared KMP chat page, desktop's only chat. */
     val chatPage: @Composable (Modifier) -> Unit,
     /** letta-mobile-ckmub.2.6: the shared Runs, Templates and Projects pages, bound to this session. */

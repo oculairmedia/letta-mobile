@@ -35,16 +35,17 @@ enum class ReserveBlockType {
          * The level of a cascade-editor heading `typeId`, which carries it (`heading_1` .. `heading_6`,
          * as `BlockTypeCodec` 1.9.2 writes `BlockType.Heading(level)`); null for anything else.
          */
-        fun headingLevel(typeId: String?): Int? =
-            typeId?.takeIf { it.startsWith(HEADING_PREFIX) }?.removePrefix(HEADING_PREFIX)?.toIntOrNull()
+        fun headingLevel(blockType: String?): Int? =
+            blockType?.takeIf { it.startsWith(HEADING_PREFIX) }?.removePrefix(HEADING_PREFIX)?.toIntOrNull()
 
         /** The type of a Cascade `typeId`; anything unknown is booked as a paragraph. */
-        fun of(typeId: String?): ReserveBlockType = when {
-            headingLevel(typeId) != null -> HEADING
-            else -> ofPlain(typeId)
+        fun of(blockType: String?): ReserveBlockType = when {
+            headingLevel(blockType) != null -> HEADING
+            else -> ofPlain(blockType)
         }
 
-        private fun ofPlain(typeId: String?): ReserveBlockType = when (typeId) {
+        // The Cascade field is named `typeId`, but it is a block-type name, not an id (by4vm.99.3).
+        private fun ofPlain(blockType: String?): ReserveBlockType = when (blockType) {
             // A bare "heading" with a separate level is not what the library writes; read as one anyway.
             "heading" -> HEADING
             "bullet_list" -> BULLET

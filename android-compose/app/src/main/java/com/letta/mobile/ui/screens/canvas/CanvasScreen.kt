@@ -16,11 +16,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.pluginview.ProvidePluginViews

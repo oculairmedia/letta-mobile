@@ -7,7 +7,6 @@ import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
-import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -21,6 +20,7 @@ import computer.iroh.RelayMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -29,6 +29,7 @@ import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -41,7 +42,6 @@ internal class IrohDialer(
     private val scope: CoroutineScope,
     private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val onConnectionLost: (reason: String, handle: IrohConnectionHandle?) -> Unit,
-    private val onCloseResources: (reason: String) -> Unit = {},
     private val externalToolRegistry: ExternalToolRegistry? = null,
     // Create a fresh handler for each session; its peer policy is independent of App Server auth.
     private val notebookHandlerFactory: ((Endpoint, CoroutineScope) -> IrohNodeProtocolHandler?)? = null,
@@ -106,32 +106,69 @@ internal class IrohDialer(
     ): IrohConnectionHandle {
         val ticket = extractTicket(config, effectiveUrlOverride)
         onConnecting()
-        return runCatching {
-            val sharedEndpoint = startNotebook()
-            val localEndpoint = sharedEndpoint ?: bindLocalEndpoint(secretKeyStore.loadOrCreate())
-            var transport: IrohAppServerTransport? = null
-            try {
-                val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
-                val irohTransport = createTransport(localEndpoint, ticket, dialedHandle)
-                transport = irohTransport
-                val appServerClient = DefaultAppServerClient(irohTransport)
-                val serverCapabilities = authenticateClient(appServerClient, config.token)
-                irohTransport.awaitConnectionReady()
-                val engine = transportEngine.engine(config.clientVersion)
-                val bound = transportEngine.startDial(appServerClient) { router ->
-                    // letta-mobile-by4vm.50: per dial, since event_seq and capabilities are the dial's.
-                    bindIrohStreamIntegrity(router, appServerClient, serverCapabilities, scope)
-                }
-                buildHandle(
-                    HandleComponents(config, ticket, irohTransport, IrohDialedEngine(engine, bound), serverCapabilities, localEndpoint, sharedEndpoint == null),
-                ).also { dialedHandle.set(it) }
-            } catch (error: Throwable) {
-                closeIrohResources("dial_failed", transport, localEndpoint.takeIf { sharedEndpoint == null })
-                throw error
-            }
-        }.onFailure {
-            onCloseResources("dial_failed")
-        }.getOrThrow()
+        val sharedEndpoint = startNotebook()
+        val localEndpoint = sharedEndpoint ?: bindLocalEndpoint(secretKeyStore.loadOrCreate())
+        val ownedEndpoint = localEndpoint.takeIf { sharedEndpoint == null }
+        var transport: IrohAppServerTransport? = null
+        try {
+            val dialedHandle = AtomicReference<IrohConnectionHandle?>(null)
+            val irohTransport = createTransport(localEndpoint, ticket, dialedHandle)
+            transport = irohTransport
+            val appServerClient = DefaultAppServerClient(irohTransport)
+            val serverCapabilities = authenticateClient(appServerClient, config.token)
+            irohTransport.awaitConnectionReady()
+            return attachDial(
+                IrohDialAttachment(config, ticket, appServerClient, serverCapabilities, irohTransport),
+                openConnection = { alpn -> localEndpoint.connect(IrohAppServerTransportAdapter.parseIrohAddress(ticket), alpn) },
+                closeResources = { reason -> closeIrohResources(reason, irohTransport, ownedEndpoint) },
+            ).also { dialedHandle.set(it) }
+        } catch (error: Throwable) {
+            closeIrohResources("dial_failed", transport, ownedEndpoint)
+            throw error
+        }
+    }
+
+    /**
+     * Binds an authenticated dial's [IrohDialAttachment.client] to the transport's engine and
+     * resumes an interrupted session on it (letta-mobile-by4vm.96). Closing the returned handle
+     * interrupts the session again and then releases the dial's resources; turns end only when the
+     * transport ends the session ([endSessionTurns]). Tests attach scripted clients here.
+     */
+    internal suspend fun attachDial(
+        attachment: IrohDialAttachment,
+        openConnection: (suspend (alpn: ByteArray) -> Connection)? = null,
+        closeResources: suspend (reason: String) -> Unit = {},
+    ): IrohConnectionHandle {
+        val client = attachment.client
+        val engine = transportEngine.engine(attachment.config.clientVersion)
+        val bound = transportEngine.startDial(client) { router ->
+            // letta-mobile-by4vm.50: per dial, since event_seq and capabilities are the dial's.
+            bindIrohStreamIntegrity(router, client, attachment.serverCapabilities, scope)
+        }
+        try {
+            transportEngine.resumeSession()
+        } catch (error: Throwable) {
+            withContext(NonCancellable) { transportEngine.endDial(bound, "resume_failed") }
+            throw error
+        }
+        return IrohConnectionHandle(
+            config = attachment.config,
+            ticket = attachment.ticket,
+            sessionId = attachment.ticket.hashCode().toString(),
+            transport = attachment.transport,
+            turnEngine = engine,
+            serverCapabilities = attachment.serverCapabilities,
+            openConnection = openConnection,
+            close = { reason ->
+                transportEngine.endDial(bound, reason)
+                closeResources(reason)
+            },
+        )
+    }
+
+    /** letta-mobile-by4vm.96: the session ended for good (config change, disconnect, auth failure). */
+    fun endSessionTurns() {
+        transportEngine.endTurns()
     }
 
     private fun extractTicket(config: IrohConnectConfig, effectiveUrlOverride: String?): String {
@@ -188,34 +225,6 @@ internal class IrohDialer(
         )
         return auth.capabilities?.toSet()
     }
-
-    private fun buildHandle(components: HandleComponents): IrohConnectionHandle = IrohConnectionHandle(
-        config = components.config,
-        ticket = components.ticket,
-        sessionId = components.ticket.hashCode().toString(),
-        transport = components.transport,
-        turnEngine = components.engine.engine,
-        serverCapabilities = components.serverCapabilities,
-        openConnection = { alpn ->
-            components.localEndpoint.connect(IrohAppServerTransportAdapter.parseIrohAddress(components.ticket), alpn)
-        },
-        close = { reason ->
-            // Ends every turn the dial carried, as the per-dial router's detach did before by4vm.95.
-            transportEngine.endDial(components.engine.dial)
-            onCloseResources(reason)
-            closeIrohResources(reason, components.transport, components.localEndpoint.takeIf { components.ownsEndpoint })
-        },
-    )
-
-    private data class HandleComponents(
-        val config: IrohConnectConfig,
-        val ticket: String,
-        val transport: IrohAppServerTransport,
-        val engine: IrohDialedEngine,
-        val serverCapabilities: Set<String>?,
-        val localEndpoint: Endpoint,
-        val ownsEndpoint: Boolean,
-    )
 
     internal class InboundNotebook(
         private val endpoint: Endpoint,
@@ -306,9 +315,6 @@ internal class IrohDialer(
         }
     }
 
-    /** The transport's engine and the dial bound to it. */
-    private class IrohDialedEngine(val engine: AppServerTurnEngine, val dial: IrohBoundDial)
-
     /**
      * letta-mobile-by4vm.50: gap detection (and with it the busy/idle sync cadence, within
      * [syncBudget]) only against a host that advertises ordered event_seq; older hosts keep the
@@ -329,3 +335,12 @@ internal class IrohDialer(
         runCatching { endpoint?.close() }
     }
 }
+
+/** An authenticated dial to attach to the transport's engine: [transport] is null for scripted test dials. */
+internal class IrohDialAttachment(
+    val config: IrohConnectConfig,
+    val ticket: String,
+    val client: AppServerClient,
+    val serverCapabilities: Set<String>?,
+    val transport: IrohAppServerTransport? = null,
+)

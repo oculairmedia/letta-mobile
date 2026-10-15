@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
+
 /**
  * Applies a relayed op to a canvas no board has open in this app (letta-mobile-qygvv.23).
  *

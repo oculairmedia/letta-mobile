@@ -602,7 +602,7 @@ class CanvasWorkspaceUiTest {
     fun canvasWorkspace_withPresence_rendersPeerCursorAndRemovesOnLeave() = runComposeUiTest {
         val presenceTransport = com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport()
         val store = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
-        val canvasId = com.letta.mobile.data.canvas.CanvasId("presence-test-canvas")
+        val canvasId = com.letta.mobile.data.model.CanvasId("presence-test-canvas")
         val session = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(
                 store = store,
@@ -672,7 +672,7 @@ class CanvasWorkspaceUiTest {
         val sharedTransport = DesktopCanvasHostSync.syncTransport
         val storeA = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
         val storeB = com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore()
-        val canvasId = com.letta.mobile.data.canvas.CanvasId("host-sync-canvas")
+        val canvasId = com.letta.mobile.data.model.CanvasId("host-sync-canvas")
 
         val sessionA = kotlinx.coroutines.runBlocking {
             com.letta.mobile.data.canvas.CanvasSession.create(

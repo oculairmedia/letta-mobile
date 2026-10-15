@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.Block
@@ -29,12 +30,12 @@ import org.junit.jupiter.api.Tag
 class BlockRepositoryTest {
 
     private lateinit var fakeApi: FakeBlockApi
-    private lateinit var repository: BlockRepository
+    private lateinit var repository: CachedBlockRepository
 
     @Before
     fun setup() {
         fakeApi = FakeBlockApi()
-        repository = BlockRepository(fakeApi)
+        repository = CachedBlockRepository(fakeApi.bound())
     }
 
     @Test
@@ -96,8 +97,8 @@ class BlockRepositoryTest {
                 AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
             }
         }
-        val irohRepository = BlockRepository(
-            remote = fakeApi,
+        val irohRepository = CachedBlockRepository(
+            remote = fakeApi.bound(),
             irohBlockSource = IrohAdminRpcBlockSource(transport, irohSettings()),
         )
 
@@ -186,7 +187,7 @@ class BlockRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = BlockRepository(apiThatThrows)
+            val repo = CachedBlockRepository(apiThatThrows.bound())
             repo.retrieveBlock("b1")
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -222,7 +223,7 @@ class BlockRepositoryTest {
             }
         }
         // GREEN: wired repository routes via irohSource instead of raw API
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         val result = repo.retrieveBlock("b1")
         assertEquals("b1", result.id.value)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -257,7 +258,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         val result = repo.updateGlobalBlock("b1", BlockUpdateParams(value = "New value", description = "New desc"))
         assertEquals("New value", result.value)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -286,7 +287,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         val result = repo.createBlock(BlockCreateParams(label = "persona", value = "Created block"))
         assertEquals("Created block", result.value)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -309,7 +310,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         repo.deleteBlock("b1")
         assertEquals(1, transport.adminRpcCalls.size)
     }
@@ -340,7 +341,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         val result = repo.listAllBlocks()
         assertEquals(2, result.size)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -383,7 +384,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         val result = repo.getBlocks("agent-1")
         assertEquals(2, result.size)
         assertEquals("persona", result[0].label)
@@ -409,7 +410,7 @@ class BlockRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "Raw HTTP forbidden")
             }
         }
-        val repo = BlockRepository(apiThatThrows, irohSource)
+        val repo = CachedBlockRepository(apiThatThrows.bound(), irohSource)
         try {
             repo.getBlocks(" ")
             org.junit.Assert.fail("Expected an exception for blank agent_id")

@@ -2,6 +2,8 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -65,7 +67,7 @@ class CanvasSession(
         settlement.recovering {
             // letta-mobile-by4vm.68: a crash after logging an op but before queueing it for delivery
             // leaves it unsettled; queue it now. Remote ops among them are host duplicates (acked).
-            syncTransport?.reserveDelivery(canvasId, pending.map { it.opId })
+            syncTransport?.reserveDelivery(canvasId, pending.map { it.canvasOpId })
             val current = currentDoc()
             val scene = CanvasOpProjector.project(current.sceneJson, pending)
             if (scene == current.sceneJson) {
@@ -243,7 +245,7 @@ class CanvasSession(
             )
             return null
         }
-        if (opLog.has(canvasId, op.opId)) {
+        if (opLog.has(canvasId, op.canvasOpId)) {
             adoptNewerStored()
             return null
         }
@@ -294,7 +296,7 @@ class CanvasSession(
     }
 
     private suspend fun reserveDelivery(ops: List<CanvasOp>) {
-        if (ops.isNotEmpty()) syncTransport?.reserveDelivery(canvasId, ops.map { it.opId })
+        if (ops.isNotEmpty()) syncTransport?.reserveDelivery(canvasId, ops.map { it.canvasOpId })
     }
 
     private suspend fun recordSingleOp(op: CanvasOp) {
@@ -321,7 +323,7 @@ class CanvasSession(
             if (isRemote) return true
             throw UnauthorizedCanvasMutationException(CanvasActorId(op.actorId), canvasId)
         }
-        return isRemote && opLog.has(canvasId, op.opId)
+        return isRemote && opLog.has(canvasId, op.canvasOpId)
     }
 
     private suspend fun broadcastOps(ops: List<CanvasOp>) {
@@ -359,7 +361,7 @@ class CanvasSession(
      * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
      */
     suspend fun applyAgentOps(ops: List<CanvasOp>, actorId: CanvasActorId): CanvasDocument = locked {
-        applyOpsLocked(CanvasStampedBatch.separately(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") }, isRemote = false)
+        applyOpsLocked(CanvasStampedBatch.separately(ops, actorId, lamportClock) { CanvasOpDiffer.newOpId("agent") }, isRemote = false)
     }
 
     /**
@@ -489,7 +491,7 @@ class CanvasSession(
     suspend fun applyLocalStamped(ops: List<CanvasOp>): CanvasDocument? = locked {
         var last: CanvasDocument? = null
         ops.forEach { op ->
-            val stamped = op.withStamp(CanvasOpDiffer.generateOpId("undo"), ++lamportClock)
+            val stamped = op.withStamp(CanvasOpDiffer.newOpId("undo"), ++lamportClock)
             last = applyLocalLocked(stamped)
         }
         last
@@ -502,7 +504,7 @@ class CanvasSession(
      * half of it.
      */
     suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: CanvasActorId): CanvasDocument = locked {
-        applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") })
+        applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.newOpId("agent") })
     }
 
     /** Shared notebook history, independent of this person's undo stack. */

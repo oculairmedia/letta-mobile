@@ -209,7 +209,7 @@ class PluginTrustTest {
     @Test
     fun threeCrashesFaultThePluginAndWithdrawItsTools() = withHost { fixture, runtime ->
         runtime.running(mode = "crash")
-        withTimeout(60.seconds) { runtime.state.first { it[ID]?.state is PluginState.Faulted } }
+        withTimeout(60.seconds) { runtime.state.first { it[PluginId(ID)]?.state is PluginState.Faulted } }
         // The registry turns Faulted just before the tool set is republished; await the withdrawal.
         withTimeout(10.seconds) { runtime.toolSource.tools.first { it.isEmpty() } }
         assertNull(runtime.health().single().driver)

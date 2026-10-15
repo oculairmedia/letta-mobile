@@ -17,9 +17,9 @@ import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotShape
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions

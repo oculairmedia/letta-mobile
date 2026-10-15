@@ -40,8 +40,6 @@ interface BlockRemoteSource {
 /**
  * Iroh admin_rpc block surface. Implemented by
  * [com.letta.mobile.data.repository.IrohAdminRpcBlockSource].
- *
- * Distinct from desktop [com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository].
  */
 interface BlockIrohSource {
     fun shouldUseIroh(): Boolean

@@ -8,6 +8,7 @@ import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.withActor
 import com.letta.mobile.data.canvas.withStamp
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasOpId
 import kotlin.test.assertIs
 
 /**
@@ -22,7 +23,7 @@ internal class ComposeBoard(var sceneJson: String = "") {
     fun publish(ops: List<CanvasOp>): Long {
         published += ops
         var lamport = CanvasOpProjector.maxLamport(sceneJson)
-        val stamped = ops.map { it.withActor(CanvasActorId(AGENT)).withStamp("op-${++revision}-${lamport + 1}", ++lamport) }
+        val stamped = ops.map { it.withActor(CanvasActorId(AGENT)).withStamp(CanvasOpId("op-${++revision}-${lamport + 1}"), ++lamport) }
         sceneJson = CanvasOpProjector.project(sceneJson, stamped)
         return revision
     }
