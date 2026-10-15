@@ -3,10 +3,12 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
+import com.letta.mobile.data.session.graph.AdminRemoteRoutes
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.graph.adminRepositories
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
@@ -16,20 +18,8 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
-import com.letta.mobile.data.repository.IrohAdminRpcModelSource
-import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
-import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
-import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
-import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
-import com.letta.mobile.data.repository.McpServerRepository
-import com.letta.mobile.data.repository.ModelRepository
-import com.letta.mobile.data.repository.PassageRepository
-import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
-import com.letta.mobile.data.repository.ProviderRepository
-import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
@@ -99,16 +89,16 @@ class SessionGraphAssembler @Inject constructor(
                 agentRepository = agentRepository,
                 blockRepository = blockRepository,
                 conversationRepository = conversationRepos.conversation,
-                mcpServerRepository = adminRepositories.mcpServer,
-                modelRepository = adminRepositories.model,
-                passageRepository = adminRepositories.passage,
-                projectRepository = adminRepositories.project,
+                mcpServerRepository = adminRepositories.mcpServerRepository,
+                modelRepository = adminRepositories.modelRepository,
+                passageRepository = adminRepositories.passageRepository,
+                projectRepository = adminRepositories.projectRepository,
                 projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
-                runRepository = adminRepositories.run,
-                providerRepository = adminRepositories.provider,
+                runRepository = adminRepositories.runRepository,
+                providerRepository = adminRepositories.providerRepository,
                 scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
                 stepRepository = StepRepository(remoteSources.steps.orNull()),
-                toolRepository = adminRepositories.tool,
+                toolRepository = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
                 vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
             ),
             transportBound = transportBound,
@@ -163,20 +153,20 @@ class SessionGraphAssembler @Inject constructor(
         )
     }
 
-    private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories =
-        AdminRepositories(
-            mcpServer = McpServerRepository(remoteSources.mcpServers, request.irohSource(::IrohAdminRpcMcpSource)),
-            model = ModelRepository(
-                remote = remoteSources.models,
-                localModelSource = localModelSource,
-                settingsRepository = request.settingsRepository,
-                irohModelSource = request.irohSource(::IrohAdminRpcModelSource),
+    // letta-mobile-by4vm.87: the admin repositories desktop builds too, over the same builder.
+    private fun createAdminRepositories(request: SessionGraphAssembleRequest) =
+        SharedSessionGraph.adminRepositories(
+            transport = request.channelTransport,
+            settings = request.settingsRepository,
+            remotes = AdminRemoteRoutes(
+                mcpServers = remoteSources.mcpServers,
+                models = remoteSources.models,
+                passages = remoteSources.passages,
+                projects = remoteSources.projects,
+                providers = remoteSources.providers,
+                runs = remoteSources.runs,
             ),
-            passage = PassageRepository(remoteSources.passages, request.irohSource(::IrohAdminRpcPassageSource)),
-            project = ProjectRepository(remoteSources.projects, request.irohSource(::IrohAdminRpcProjectSource)),
-            run = RunRepository(remoteSources.runs, request.irohSource(::IrohAdminRpcRunSource)),
-            provider = ProviderRepository(remoteSources.providers, request.irohSource(::IrohAdminRpcProviderSource)),
-            tool = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
+            localModelSource = localModelSource,
         )
 
     /**
@@ -212,15 +202,5 @@ class SessionGraphAssembler @Inject constructor(
     private data class ConversationRepos(
         val allConversations: AllConversationsRepository,
         val conversation: ConversationRepository,
-    )
-
-    private data class AdminRepositories(
-        val mcpServer: McpServerRepository,
-        val model: ModelRepository,
-        val passage: PassageRepository,
-        val project: ProjectRepository,
-        val run: RunRepository,
-        val provider: ProviderRepository,
-        val tool: ToolRepository,
     )
 }

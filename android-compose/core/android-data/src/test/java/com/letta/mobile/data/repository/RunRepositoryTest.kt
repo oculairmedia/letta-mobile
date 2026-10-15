@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.runtime.RunId
@@ -26,12 +28,12 @@ import org.junit.jupiter.api.Tag
 class RunRepositoryTest {
 
     private lateinit var fakeApi: FakeRunApi
-    private lateinit var repository: RunRepository
+    private lateinit var repository: CachedRunRepository
 
     @Before
     fun setup() {
         fakeApi = FakeRunApi()
-        repository = RunRepository(fakeApi)
+        repository = CachedRunRepository(fakeApi.bound())
     }
 
     @Test
@@ -93,7 +95,7 @@ class RunRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = RunRepository(apiThatThrows)
+            val repo = CachedRunRepository(apiThatThrows.bound())
             repo.refreshRuns(RunListParams())
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -135,7 +137,7 @@ class RunRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
-        val repo = RunRepository(apiThatThrows, irohSource)
+        val repo = CachedRunRepository(apiThatThrows.bound(), irohSource)
         repo.refreshRuns(RunListParams(agentId = "a1", active = true, limit = 10, order = "desc"))
         assertEquals(2, repo.runs.value.size)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -174,7 +176,7 @@ class RunRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
             }
         }
-        val repo = RunRepository(apiThatThrows, irohSource)
+        val repo = CachedRunRepository(apiThatThrows.bound(), irohSource)
         val result = repo.getRecentRuns(limit = 5)
         assertEquals(1, result.size)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -188,7 +190,7 @@ class RunRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = RunRepository(apiThatThrows)
+            val repo = CachedRunRepository(apiThatThrows.bound())
             repo.getRecentRuns(limit = 5)
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -223,7 +225,7 @@ class RunRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
-        val repo = RunRepository(apiThatThrows, irohSource)
+        val repo = CachedRunRepository(apiThatThrows.bound(), irohSource)
         val result = repo.getRun(RunId("r1"))
         assertEquals("r1", result.id)
         assertEquals(1, transport.adminRpcCalls.size)
@@ -281,7 +283,7 @@ class RunRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.RUNS, "Raw HTTP forbidden")
             }
         }
-        val repo = RunRepository(apiThatThrows, irohSource)
+        val repo = CachedRunRepository(apiThatThrows.bound(), irohSource)
         val result = repo.getRunSteps(RunId("r1"))
         assertEquals(1, result.size)
         assertEquals("s1", result[0].id)

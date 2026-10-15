@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
@@ -194,7 +196,7 @@ class IrohHttpOnlyRoutesTest {
             }
         }
         val fakeApi = FakeRunApi()
-        val repository = RunRepository(fakeApi, IrohAdminRpcRunSource(transport, irohSettings()))
+        val repository = CachedRunRepository(fakeApi.bound(), IrohAdminRpcRunSource(transport, irohSettings()))
 
         assertFalse(repository.supportsRunDetail)
         repository.refreshRuns()
@@ -222,7 +224,7 @@ class IrohHttpOnlyRoutesTest {
         )
         val fakeApi = FakeRunApi()
         fakeApi.runs.add(Run(id = "r1", agentId = "a1", status = "completed"))
-        val repository = RunRepository(fakeApi, IrohAdminRpcRunSource(FakeChannelTransport(), httpSettings))
+        val repository = CachedRunRepository(fakeApi.bound(), IrohAdminRpcRunSource(FakeChannelTransport(), httpSettings))
 
         assertTrue(repository.supportsRunDetail)
         repository.getRunMessages(RunId("r1"))

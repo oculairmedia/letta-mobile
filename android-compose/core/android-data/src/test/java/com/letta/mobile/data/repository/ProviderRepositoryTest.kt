@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.LettaConfig
@@ -23,12 +25,12 @@ import org.junit.jupiter.api.Tag
 class ProviderRepositoryTest {
 
     private lateinit var fakeApi: FakeProviderApi
-    private lateinit var repository: ProviderRepository
+    private lateinit var repository: CachedProviderRepository
 
     @Before
     fun setup() {
         fakeApi = FakeProviderApi()
-        repository = ProviderRepository(fakeApi)
+        repository = CachedProviderRepository(fakeApi.bound())
     }
 
     @Test
@@ -60,7 +62,7 @@ class ProviderRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.PROVIDERS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = ProviderRepository(apiThatThrows)
+            val repo = CachedProviderRepository(apiThatThrows.bound())
             repo.refreshProviders(name = null, providerType = null)
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -106,7 +108,7 @@ class ProviderRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.PROVIDERS, "Raw HTTP forbidden")
             }
         }
-        val repo = ProviderRepository(apiThatThrows, irohSource)
+        val repo = CachedProviderRepository(apiThatThrows.bound(), irohSource)
         repo.refreshProviders(name = null, providerType = null)
         assertEquals(2, repo.providers.value.size)
         assertEquals(1, transport.adminRpcCalls.size)
