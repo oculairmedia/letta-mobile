@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
@@ -153,16 +152,9 @@ class TimelineChatSessionPort(
     }
 
     private fun timelineInputs(): Flow<TimelineInputs> =
-        combine(session.timeline, run, local, hostApprovals()) { timeline, runState, localState, approvals ->
+        combine(session.timeline, run, local, options.approvals.hostApprovals()) { timeline, runState, localState, approvals ->
             TimelineInputs(timeline, runState, localState, approvals)
         }
-
-    private fun hostApprovals(): Flow<TimelineHostApprovals> {
-        val source = options.approvals ?: return flowOf(TimelineHostApprovals())
-        return combine(source.submittingApprovals, source.queuedApprovals, source.pendingApprovalDetails) { submitting, queued, details ->
-            TimelineHostApprovals(submitting, queued, details)
-        }
-    }
 
     private fun present(inputs: TimelineInputs, previous: ChatUiState?): ChatUiState {
         val prior = previous ?: initialUiState()

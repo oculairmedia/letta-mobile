@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN
+import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.data.plugin.wire.LcpAssetUploads
 import com.letta.mobile.data.plugin.wire.LcpCallException
@@ -37,7 +38,7 @@ class HostLcpHandlersTest {
 
         assertTrue(rig.assets.has(ref))
         assertEquals("image/svg+xml", rig.assets.mediaType(ref))
-        assertEquals(100L, rig.quota.used(PLUGIN))
+        assertEquals(100L, rig.quota.used(PLUGIN_ID))
     }
 
     @Test
@@ -51,8 +52,8 @@ class HostLcpHandlersTest {
         assertEquals(LcpErrorCode.UPLOAD_REFUSED, error.code)
         assertEquals("asset_quota", error.reason())
         assertFalse(rig.assets.has("sha256:${second.sha256}"))
-        assertEquals(100L, rig.quota.used(PLUGIN))
-        assertEquals(1, rig.refusals.count(PLUGIN, PluginRefusal.ASSET_QUOTA))
+        assertEquals(100L, rig.quota.used(PLUGIN_ID))
+        assertEquals(1, rig.refusals.count(PLUGIN_ID, PluginRefusal.ASSET_QUOTA))
     }
 
     @Test
@@ -64,7 +65,7 @@ class HostLcpHandlersTest {
         val again = rig.handlers.storeAsset(asset(same))
 
         assertEquals(first, again)
-        assertEquals(100L, rig.quota.used(PLUGIN))
+        assertEquals(100L, rig.quota.used(PLUGIN_ID))
     }
 
     @Test
@@ -77,7 +78,7 @@ class HostLcpHandlersTest {
         assertEquals(LcpErrorCode.UPLOAD_REFUSED, error.code)
         assertEquals("content_type", error.reason())
         assertFalse(rig.assets.has("sha256:${html.sha256}"))
-        assertEquals(0L, rig.quota.used(PLUGIN))
+        assertEquals(0L, rig.quota.used(PLUGIN_ID))
     }
 
     @Test
@@ -99,7 +100,7 @@ class HostLcpHandlersTest {
         repeat(3) { rig.handlers.log(LogParams(LogLevel.INFO, "line $it")) }
 
         assertEquals(listOf("line 0", "line 1"), rig.logged.map { it.second.message })
-        assertEquals(1, rig.refusals.count(PLUGIN, PluginRefusal.LOG_DROPPED))
+        assertEquals(1, rig.refusals.count(PLUGIN_ID, PluginRefusal.LOG_DROPPED))
     }
 
     @Test

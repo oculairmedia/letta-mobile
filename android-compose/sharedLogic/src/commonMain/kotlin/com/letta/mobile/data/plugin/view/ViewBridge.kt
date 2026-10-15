@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.view
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.host.PluginHostEvent
 import com.letta.mobile.data.plugin.host.PluginHostEvents
 import kotlinx.coroutines.CompletableDeferred
@@ -148,9 +149,9 @@ class ViewBridge(
     }
 
     private fun recordHandshake(result: ViewCallResult) = when (result) {
-        is ViewCallResult.Ok -> PluginHostEvents.record(PluginHostEvent.VIEW_OPEN, spec.pluginId, "page" to spec.pageId)
+        is ViewCallResult.Ok -> PluginHostEvents.record(PluginHostEvent.VIEW_OPEN, PluginId(spec.pluginId), "page" to spec.pageId)
         is ViewCallResult.Err ->
-            PluginHostEvents.record(PluginHostEvent.VIEW_FAIL, spec.pluginId, "page" to spec.pageId, "reason" to result.error.code.name)
+            PluginHostEvents.record(PluginHostEvent.VIEW_FAIL, PluginId(spec.pluginId), "page" to spec.pageId, "reason" to result.error.code.name)
     }
 
     private suspend fun answer(call: ViewInbound.Call) {

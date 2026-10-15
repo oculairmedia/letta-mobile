@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -72,7 +73,7 @@ class PluginAssetQuotaFileTest {
     }
 
     private companion object {
-        const val PLUGIN = "letta.chart"
-        const val OTHER = "acme.other"
+        val PLUGIN = PluginId("letta.chart")
+        val OTHER = PluginId("acme.other")
     }
 }

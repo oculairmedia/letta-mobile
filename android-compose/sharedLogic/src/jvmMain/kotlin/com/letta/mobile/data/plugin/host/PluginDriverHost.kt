@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.InstalledPlugin
 import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginSecrets
@@ -32,13 +33,13 @@ class PluginDriverHost(
 ) {
     private class Entry(val live: LivePlugin, var watcher: Job? = null)
 
-    private val entries = ConcurrentHashMap<String, Entry>()
+    private val entries = ConcurrentHashMap<PluginId, Entry>()
     private val limits = PluginRateLimits()
     val refusals = PluginRefusals()
 
-    fun live(pluginId: String): LivePlugin? = entries[pluginId]?.live
+    fun live(pluginId: PluginId): LivePlugin? = entries[pluginId]?.live
 
-    fun driverState(pluginId: String): PluginDriverState? = live(pluginId)?.driver?.state?.value
+    fun driverState(pluginId: PluginId): PluginDriverState? = live(pluginId)?.driver?.state?.value
 
     /**
      * Starts [plugin] from [packageDir] and suspends until it runs or gives up; answers that state.
@@ -47,7 +48,7 @@ class PluginDriverHost(
      * stale `plugins.json`) is never spawned: it answers Faulted at once.
      */
     suspend fun launch(plugin: InstalledPlugin, packageDir: Path, onState: suspend (PluginDriver, PluginDriverState) -> Unit): PluginDriverState {
-        val id = plugin.id
+        val id = plugin.pluginId
         if (!plugin.consented) return PluginDriverState.Faulted("consent does not cover $id ${plugin.version}; consent again to run it")
         val board = CallerBoard(canvas)
         val secrets = PluginSecrets()
@@ -69,15 +70,15 @@ class PluginDriverHost(
     }
 
     /** Whether [driver] is still the one running [pluginId]. */
-    fun owns(pluginId: String, driver: PluginDriver): Boolean = entries[pluginId]?.live?.driver === driver
+    fun owns(pluginId: PluginId, driver: PluginDriver): Boolean = entries[pluginId]?.live?.driver === driver
 
     /** Forgets [pluginId]'s driver without stopping it (it ended on its own; its watcher ends with it). */
-    fun forget(pluginId: String) {
+    fun forget(pluginId: PluginId) {
         entries.remove(pluginId)
     }
 
     /** Stops [pluginId]'s driver, if one runs; its state changes no longer reach the runtime. */
-    suspend fun stop(pluginId: String) {
+    suspend fun stop(pluginId: PluginId) {
         val entry = entries.remove(pluginId) ?: return
         entry.watcher?.cancelAndJoin()
         entry.live.driver.stop()

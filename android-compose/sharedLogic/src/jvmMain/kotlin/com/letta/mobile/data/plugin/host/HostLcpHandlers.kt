@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.wire.LcpHostHandlers
 import com.letta.mobile.data.plugin.wire.LcpSecretGuard
@@ -18,7 +19,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** Where a plugin's scrubbed `host.log` lines go. [TELEMETRY] is the host's [Telemetry]. */
 fun interface PluginLogSink {
-    fun write(pluginId: String, line: LogParams)
+    fun write(pluginId: PluginId, line: LogParams)
 
     companion object {
         val TELEMETRY = PluginLogSink { pluginId, line ->
@@ -49,7 +50,7 @@ fun interface PluginLogSink {
  */
 @Suppress("LongParameterList")
 class HostLcpHandlers(
-    private val pluginId: String,
+    private val pluginId: PluginId,
     private val placement: PlacementCompiler,
     private val assets: AssetStore,
     scrubber: SecretScrubber,

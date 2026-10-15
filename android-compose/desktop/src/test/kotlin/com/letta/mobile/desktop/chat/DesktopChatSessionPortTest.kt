@@ -8,8 +8,10 @@ import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.ModeChangeResult
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -21,6 +23,7 @@ import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
 import com.letta.mobile.ui.chat.session.ChatSurfaceMode
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -258,21 +261,61 @@ class DesktopChatSessionPortTest {
     }
 
     @Test
-    fun theNewestOnScreenApprovalInFlightIsTheActiveOne() {
+    fun theControllersApprovalStateReachesThePageThroughTheSharedOverlay() = runTest {
+        val (controller, _) = startedPort()
         val older = approvalMessage("m-1", "req-1")
-        val newer = approvalMessage("m-2", "req-2")
-        assertNull(submittingApprovalOnScreen(emptySet(), listOf(older, newer)))
-        assertEquals("req-1", submittingApprovalOnScreen(setOf("req-1"), listOf(older, newer)))
-        assertEquals("req-2", submittingApprovalOnScreen(setOf("req-1", "req-2"), listOf(older, newer)))
-        assertNull(submittingApprovalOnScreen(setOf("req-other"), listOf(older, newer)))
+        val newer = approvalMessage("m-2", "req-2", toolCallId = "call-2")
+        val inputs = approvalInputs(controller, listOf(older, newer))
+
+        assertNull(desktopChatUiState(inputs, previous = null).activeApprovalRequestId)
+        val oneInFlight = inputs.copy(approvals = TimelineHostApprovals(submitting = setOf("req-1")))
+        assertEquals("req-1", desktopChatUiState(oneInFlight, previous = null).activeApprovalRequestId)
+        val bothInFlight = inputs.copy(approvals = TimelineHostApprovals(submitting = setOf("req-1", "req-2"), queued = setOf("req-2")))
+        val page = desktopChatUiState(bothInFlight, previous = null)
+        assertEquals("req-2", page.activeApprovalRequestId, "the newest on-screen answer in flight is the one disabled")
+        assertEquals(setOf("req-2"), page.queuedApprovalRequestIds)
+        val offScreen = inputs.copy(approvals = TimelineHostApprovals(submitting = setOf("req-other")))
+        assertNull(desktopChatUiState(offScreen, previous = null).activeApprovalRequestId)
+
+        controller.close()
     }
 
-    private fun approvalMessage(id: String, requestId: String) = UiMessage(
+    @Test
+    fun parkedDetailsJoinOnceAndAnUnchangedFrameKeepsTheList() = runTest {
+        val (controller, _) = startedPort()
+        val parked = PendingApprovalDetails(approvalId = "req-2", toolCallId = "call-2", toolName = "Bash")
+        val inputs = approvalInputs(controller, listOf(approvalMessage("m-2", "req-2", toolCallId = "call-2")))
+            .copy(approvals = TimelineHostApprovals(details = mapOf("call-2" to parked)))
+
+        val first = desktopChatUiState(inputs, previous = null)
+        assertEquals(parked, first.messages.single().approvalRequest?.details)
+        val second = desktopChatUiState(inputs, previous = first)
+
+        assertSame(first.messages, second.messages)
+        assertEquals(ChatMessageListChange.None, second.messageListChange)
+        controller.close()
+    }
+
+    private fun approvalInputs(controller: DesktopChatController, messages: List<UiMessage>): DesktopChatTimelineInputs {
+        val surface = controller.state.value
+        return DesktopChatTimelineInputs(
+            surface = surface.copy(messagesByConversationId = mapOf(surface.selectedConversationId.orEmpty() to messages)),
+            presence = ChatStreamingPresence(isStreaming = false, isAgentTyping = false),
+            cancellingConversationId = null,
+            sendQueue = ConversationSendQueue(),
+            local = DesktopChatLocalTimelineState(),
+        )
+    }
+
+    private fun approvalMessage(id: String, requestId: String, toolCallId: String? = null) = UiMessage(
         id = id,
         role = "assistant",
         content = "",
         timestamp = "2026-10-01T00:00:00Z",
-        approvalRequest = UiApprovalRequest(requestId = requestId, toolCalls = emptyList()),
+        approvalRequest = UiApprovalRequest(
+            requestId = requestId,
+            toolCalls = listOfNotNull(toolCallId?.let { UiApprovalToolCall(toolCallId = it, name = "Bash", arguments = "{}") }),
+        ),
     )
 
     @Test

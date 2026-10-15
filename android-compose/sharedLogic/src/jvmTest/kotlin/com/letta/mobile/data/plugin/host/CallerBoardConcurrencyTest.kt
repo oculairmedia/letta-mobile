@@ -8,6 +8,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.plugin.PluginToolDefinition
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN
+import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.props
 import com.letta.mobile.data.plugin.wire.LcpCallException
@@ -37,8 +38,8 @@ class CallerBoardConcurrencyTest {
     private val rig = PluginHostRig()
     private val board = CallerBoard(rig.backend)
     private var nextId = 0
-    private val placement = PlacementCompiler(PLUGIN, PluginHostRig.catalog, rig.backend, board, rig.refusals, newIdSuffix = { "e${++nextId}" })
-    private val handlers = HostLcpHandlers(PLUGIN, placement, rig.assets, SecretScrubber(emptyList()), rig.limits, rig.quota, rig.refusals)
+    private val placement = PlacementCompiler(PLUGIN_ID, PluginHostRig.catalog, rig.backend, board, rig.refusals, newIdSuffix = { "e${++nextId}" })
+    private val handlers = HostLcpHandlers(PLUGIN_ID, placement, rig.assets, SecretScrubber(emptyList()), rig.limits, rig.quota, rig.refusals)
     private val tool = PluginToolDefinition(PLUGIN, "plot", "chart_plot", "plot", JsonObject(emptyMap()))
 
     @Test

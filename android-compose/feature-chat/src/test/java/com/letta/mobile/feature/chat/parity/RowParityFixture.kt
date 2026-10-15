@@ -180,10 +180,14 @@ internal enum class ParityLayout {
     /** Timeline only: ChatTimelineSnapshot. */
     TIMELINE,
 
-    /** Timeline plus the composer's thinking token. */
+    /**
+     * Timeline plus the composer's thinking token. The token belongs to the composer, which docks at
+     * the foot of the page, and a short chat reads from the top (letta-mobile-ckmub.10), so this
+     * golden is page-shaped: the prompt at the top, the token at the bottom (letta-mobile-by4vm.64).
+     */
     THINKING,
 
-    /** The ChatSurface page with the agent's mascot in its COMPOSER_COMPANION seat. */
+    /** The ChatSurface page with the agent's mascot in its COMPOSER_COMPANION seat (page-shaped, as [THINKING]). */
     THINKING_MASCOT,
 }
 

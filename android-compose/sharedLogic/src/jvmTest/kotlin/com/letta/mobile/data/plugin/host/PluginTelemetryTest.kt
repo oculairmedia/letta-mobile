@@ -2,12 +2,13 @@ package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.canvas.compose.Sha256
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.SecretScrubber
 import com.letta.mobile.data.plugin.host.PluginHostFixture.Companion.ID
 import com.letta.mobile.data.plugin.host.PluginHostFixture.Companion.callTool
 import com.letta.mobile.data.plugin.host.PluginHostFixture.Companion.pkg
-import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN
+import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.view.FakeViewHost
 import com.letta.mobile.data.plugin.view.FakeViewPort
 import com.letta.mobile.data.plugin.view.FakeViewTransport
@@ -82,7 +83,7 @@ class PluginTelemetryTest {
     /** ASSET, REFUSED and LOG, from one plugin's handlers. */
     private suspend fun handlerEvents() {
         val rig = PluginHostRig()
-        val handlers = HostLcpHandlers(PLUGIN, rig.placement, rig.assets, SecretScrubber(emptyList()), rig.limits, rig.quota, rig.refusals)
+        val handlers = HostLcpHandlers(PLUGIN_ID, rig.placement, rig.assets, SecretScrubber(emptyList()), rig.limits, rig.quota, rig.refusals)
         val bytes = ByteArray(100) { it.toByte() }
         handlers.storeAsset(LcpUploadedAsset("image/png", bytes, LcpAssetUploads.hex(Sha256.digest(bytes))))
         assertFailsWith<LcpCallException> { handlers.readElements(ElementQuery()) }
@@ -115,18 +116,18 @@ class PluginTelemetryTest {
                 runtime.start()
                 assertIs<PluginHostResult.Refused>(runtime.install(byteArrayOf(1, 2, 3)))
                 runtime.install(pkg())
-                runtime.consent(ID, canvasOnly, emptySet())
-                runtime.enable(ID)
+                runtime.consent(PluginId(ID), canvasOnly, emptySet())
+                runtime.enable(PluginId(ID))
                 assertEquals(ExternalToolResult.Success("ran plot"), runtime.callTool())
                 runtime.install(pkg("1.0.1"))
-                runtime.disable(ID)
-                runtime.enable(ID)
+                runtime.disable(PluginId(ID))
+                runtime.enable(PluginId(ID))
                 withTimeout(30.seconds) { while (tap.named(PluginHostEvent.STDERR).isEmpty()) delay(20) }
                 runtime.disableAll()
-                runtime.remove(ID)
+                runtime.remove(PluginId(ID))
                 runtime.install(pkg(mode = "crash", id = CRASHING))
-                runtime.consent(CRASHING, canvasOnly, emptySet())
-                runtime.enable(CRASHING)
+                runtime.consent(PluginId(CRASHING), canvasOnly, emptySet())
+                runtime.enable(PluginId(CRASHING))
                 // FAULT is recorded just after the registry commits the Faulted state; await the event itself.
                 withTimeout(60.seconds) { while (tap.named(PluginHostEvent.FAULT).none { it.attrs["plugin"] == CRASHING }) delay(20) }
             }

@@ -32,6 +32,15 @@ class DomainIdsTest {
     }
 
     @Test
+    fun pluginIdSerializesAsItsBareString() {
+        val encoded = Json.encodeToString(PluginId.serializer(), PluginId("letta.chart"))
+
+        assertEquals("\"letta.chart\"", encoded)
+        assertEquals(PluginId("letta.chart"), Json.decodeFromString(PluginId.serializer(), encoded))
+        assertEquals("letta.chart", PluginId("letta.chart").toString())
+    }
+
+    @Test
     fun toStringIsTheRawValue() {
         assertEquals("run-1", RunId("run-1").toString())
         assertEquals("req-1", RequestId("req-1").toString())

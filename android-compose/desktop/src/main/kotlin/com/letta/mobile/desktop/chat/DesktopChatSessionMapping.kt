@@ -13,7 +13,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.CatalogModel
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.reasoningEffortsOf
-import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
@@ -22,6 +21,9 @@ import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
+import com.letta.mobile.ui.chat.session.TimelineHostApprovals
+import com.letta.mobile.ui.chat.session.TimelineRunState
+import com.letta.mobile.ui.chat.session.withHostApprovals
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
@@ -55,12 +57,11 @@ internal data class DesktopChatTimelineInputs(
     val cancellingConversationId: String?,
     val sendQueue: ConversationSendQueue,
     val local: DesktopChatLocalTimelineState,
-    /** Approval request ids whose answer is in flight (the controller's submittingApprovals). */
-    val submittingApprovals: Set<String> = emptySet(),
-    /** letta-mobile-bzvro.11/.12: what each parked control request offered, by tool call id. */
-    val approvalDetails: Map<String, PendingApprovalDetails> = emptyMap(),
-    /** letta-mobile-bzvro.14: requests answered offline, waiting for the connection. */
-    val queuedApprovals: Set<String> = emptySet(),
+    /**
+     * letta-mobile-by4vm.97: the controller's approval state as the shared overlay reads it: answers
+     * in flight, queued offline (bzvro.14), and each parked control request's details (bzvro.11/.12).
+     */
+    val approvals: TimelineHostApprovals = TimelineHostApprovals(),
 )
 
 /**
@@ -69,9 +70,11 @@ internal data class DesktopChatTimelineInputs(
  */
 internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: ChatUiState?): ChatUiState {
     val surface = inputs.surface
+    // Parked details join before the diff, so a join reads as the change it is rather than a
+    // full one; the overlay below then finds every row current and keeps the list as it is.
     val messages = nextMessages(
         previous?.messages,
-        withPendingApprovalDetails(surface.selectedMessages, inputs.approvalDetails),
+        withPendingApprovalDetails(surface.selectedMessages, inputs.approvals.details),
     )
     val selected = surface.selectedConversation
     return ChatUiState(
@@ -93,21 +96,11 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         isCancelling = surface.selectedConversationId != null &&
             inputs.cancellingConversationId == surface.selectedConversationId,
         sendQueue = inputs.sendQueue,
-        activeApprovalRequestId = submittingApprovalOnScreen(inputs.submittingApprovals, messages),
-        queuedApprovalRequestIds = inputs.queuedApprovals.toImmutableSet(),
-    )
+    ).withHostApprovals(HOST_OWNED_RUN, inputs.approvals)
 }
 
-/**
- * The approval being answered, so its row disables its buttons until the answer lands. The page
- * tracks one; the newest on-screen request in flight is the one the user can still press.
- */
-internal fun submittingApprovalOnScreen(submitting: Set<String>, messages: List<UiMessage>): String? {
-    if (submitting.isEmpty()) return null
-    return messages.asReversed().firstNotNullOfOrNull { message ->
-        message.approvalRequest?.requestId?.takeIf { it in submitting }
-    }
-}
+/** Desktop's controller owns every approval answer, so the shared overlay sees none of the port's own. */
+private val HOST_OWNED_RUN = TimelineRunState()
 
 /**
  * The page (snackbar) error: the surface error unless it is the composer's own error, which the

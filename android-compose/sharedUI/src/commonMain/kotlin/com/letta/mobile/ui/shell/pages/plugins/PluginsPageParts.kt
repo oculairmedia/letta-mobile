@@ -17,10 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginState
 import com.letta.mobile.data.plugin.catalog.PickedPluginPackage
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginSummary
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
 import com.letta.mobile.data.plugin.catalog.PluginsPageState

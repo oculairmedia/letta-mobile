@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.catalog
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginManifest

@@ -2,6 +2,7 @@ package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN
+import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.PLUGIN_ID
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.TYPE
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.place
 import com.letta.mobile.data.plugin.host.PluginHostRig.Companion.props
@@ -67,7 +68,7 @@ class PlacementCompilerTest {
         assertEquals(LcpErrorCode.CAPABILITY_REFUSED, error.code)
         assertEquals("foreign_kind", error.reason())
         assertTrue(rig.written().isEmpty())
-        assertEquals(1, rig.refusals.count(PLUGIN, PluginRefusal.FOREIGN_KIND))
+        assertEquals(1, rig.refusals.count(PLUGIN_ID, PluginRefusal.FOREIGN_KIND))
     }
 
     @Test
@@ -92,7 +93,7 @@ class PlacementCompilerTest {
         }
         assertEquals(1, (update.error.data as JsonObject)["index"]?.jsonPrimitive?.content?.toInt())
         assertTrue(rig.written().isEmpty())
-        assertEquals(3, rig.refusals.count(PLUGIN, PluginRefusal.FOREIGN_ELEMENT))
+        assertEquals(3, rig.refusals.count(PLUGIN_ID, PluginRefusal.FOREIGN_ELEMENT))
     }
 
     @Test
@@ -105,7 +106,7 @@ class PlacementCompilerTest {
         assertEquals(0, receipt.refused.single().index)
         assertTrue(receipt.refused.single().reason.startsWith("props_too_large:"), receipt.refused.single().reason)
         assertTrue(rig.written().isEmpty())
-        assertEquals(1, rig.refusals.count(PLUGIN, PluginRefusal.PROPS_TOO_LARGE))
+        assertEquals(1, rig.refusals.count(PLUGIN_ID, PluginRefusal.PROPS_TOO_LARGE))
     }
 
     @Test
