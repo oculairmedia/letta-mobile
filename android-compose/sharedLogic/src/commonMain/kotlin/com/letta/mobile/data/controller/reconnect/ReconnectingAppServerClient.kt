@@ -503,6 +503,21 @@ class ReconnectingAppServerClient(
 
     override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
 
+    // Without these forwarders the interface default throws UnsupportedOperationException, so the
+    // Iroh host answered every /context-limit (execute_command) with capability_unavailable and
+    // the drawer's context slider vanished (letta-mobile-by4vm.82 follow-up).
+    override suspend fun cronPause(command: AppServerCommand.CronPause) = ready().cronPause(command)
+
+    override suspend fun cronResume(command: AppServerCommand.CronResume) = ready().cronResume(command)
+
+    override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand) = ready().executeCommand(command)
+
+    override suspend fun monitorStop(command: AppServerCommand.MonitorStop) = ready().monitorStop(command)
+
+    override suspend fun updateToolset(command: AppServerCommand.UpdateToolset) = ready().updateToolset(command)
+
+    override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap) = ready().getCwdMap(command)
+
     override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) = ready().getReflectionSettings(command)
 
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) = ready().setReflectionSettings(command)
