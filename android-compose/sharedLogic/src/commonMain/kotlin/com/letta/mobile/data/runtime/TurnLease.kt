@@ -87,3 +87,10 @@ internal fun AppServerTurnEngine.ActiveTurnOwner.isFor(lease: TurnLease): Boolea
     runtimeId == lease.runtimeId &&
         conversationId == lease.conversationId &&
         acquiredAtMs == lease.acquiredAtMs
+
+/**
+ * letta-mobile-by4vm.55: a lease is superseded once the live connection generation has moved past
+ * it. A lease carried ahead into the next generation (see [carryActiveLeasesInto]) is not behind
+ * while the provider catches up, so a frame processed in that window cannot end its turn.
+ */
+internal fun TurnLease.isBehind(liveGeneration: Long): Boolean = connectionGeneration < liveGeneration

@@ -723,6 +723,9 @@ class AppServerServeIrohCommand : CliktCommand(
             // intervention. The CLI binary is the same `meridian agent-message
             // send` the operator flow already uses; this is purely additive.
             externalToolRegistry = productionToolRegistry,
+            // letta-mobile-by4vm.55: an upstream socket blip no longer fails the turns the App
+            // Server keeps running; they wait out the reconnect grace window instead.
+            turnsSurviveReconnect = true,
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
