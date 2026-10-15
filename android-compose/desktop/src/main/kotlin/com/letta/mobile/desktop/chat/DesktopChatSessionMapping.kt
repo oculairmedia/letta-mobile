@@ -7,7 +7,12 @@ import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsageState
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.modelcontrol.CatalogModel
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
+import com.letta.mobile.data.repository.modelcontrol.reasoningEffortsOf
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toConversationState
@@ -137,6 +142,8 @@ internal data class DesktopChatComposerInputs(
     val host: DesktopChatComposerHostInputs,
     /** Model picker options as (label, selection value), the shape `buildModelOptions` returns. */
     val modelOptions: List<Pair<String, String>>,
+    /** letta-mobile-by4vm.85: the selected conversation's effort and each option's efforts. */
+    val modelEfforts: DesktopModelEfforts = DesktopModelEfforts(),
     val workingDirectory: DesktopWorkingDirectoryInputs,
     val canQueueWhileStreaming: Boolean,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
@@ -156,7 +163,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         attachmentLimits = inputs.attachmentLimits,
         commands = inputs.host.commands.map(ComposerCommand::toChatComposerCommand).toImmutableList(),
         mentionables = inputs.host.mentionables.toImmutableList(),
-        model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions),
+        model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions, inputs.modelEfforts),
         contextUsage = inputs.host.contextUsage,
         workingDirectory = inputs.workingDirectory.toUiState(),
         permissionMode = inputs.permissionMode,
@@ -173,18 +180,53 @@ internal fun ComposerCommand.toChatComposerCommand(): ChatComposerCommand =
     )
 
 /**
+ * letta-mobile-by4vm.85: the reasoning efforts the composer offers. [byValue] holds each option's
+ * efforts by selection value (empty where the gateway cannot send an effort, so no effort chip
+ * shows); [current] is the selected conversation's effort, this session's pick else the host's.
+ */
+internal data class DesktopModelEfforts(
+    val byValue: Map<String, List<String>> = emptyMap(),
+    val current: String? = null,
+)
+
+/** Everything [desktopModelEfforts] reads, at one instant. */
+internal data class DesktopModelEffortInputs(
+    val models: List<LlmModel>,
+    /** The host catalog's rows (`model.list`), which advertise each model's efforts. */
+    val catalog: List<CatalogModel>,
+    val choices: ConversationModelChoices,
+    val selectedConversationId: String?,
+    /** False where the gateway cannot send an effort with a switch: no option offers one then. */
+    val supported: Boolean,
+)
+
+/** letta-mobile-by4vm.85: each option's efforts (by selection value) and the conversation's effort. */
+internal fun desktopModelEfforts(inputs: DesktopModelEffortInputs): DesktopModelEfforts {
+    if (!inputs.supported) return DesktopModelEfforts()
+    val byValue = inputs.models.mapNotNull { model ->
+        reasoningEffortsOf(inputs.catalog, model).takeIf { it.isNotEmpty() }
+            ?.let { ModelCatalog.selectionValue(inputs.models, model) to it }
+    }.toMap()
+    return DesktopModelEfforts(byValue = byValue, current = inputs.selectedConversationId?.let(inputs.choices.efforts::get))
+}
+
+/**
  * The composer model chip. Desktop stores either a display label or (after a switch) the selection
  * value in `composerModelLabel`, so the current option is matched on either.
  */
 internal fun desktopChatModelUiState(
     composerModelLabel: String,
     modelOptions: List<Pair<String, String>>,
+    efforts: DesktopModelEfforts = DesktopModelEfforts(),
 ): ChatModelUiState {
-    val options = modelOptions.map { (label, value) -> ChatModelOption(handle = value, label = label) }
+    val options = modelOptions.map { (label, value) ->
+        ChatModelOption(handle = value, label = label, reasoningEfforts = efforts.byValue[value].orEmpty().toImmutableList())
+    }
     val current = options.firstOrNull { it.handle == composerModelLabel || it.label == composerModelLabel }
     return ChatModelUiState(
         currentHandle = current?.handle,
         currentLabel = current?.label ?: composerModelLabel,
+        currentEffort = efforts.current,
         options = options.toImmutableList(),
     )
 }

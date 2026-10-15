@@ -26,6 +26,9 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
+import com.letta.mobile.data.repository.modelcontrol.ConversationEffortGateway
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -741,36 +744,43 @@ class DesktopChatController(
         modelCatalogHelper.startModelCatalogLoad(extras, replaceCurrent = true).await().getOrThrow()
     }
 
-    /** Apply a model override to the active conversation. */
-    fun setConversationModel(model: String) {
+    /**
+     * Apply a model override to the active conversation, with [effort] for its reasoning effort
+     * (letta-mobile-by4vm.85). A named effort shows at once and stays until the host confirms it.
+     */
+    fun setConversationModel(model: String, effort: ReasoningEffortChoice = ReasoningEffortChoice.Unchanged) {
         if (closed) return
         val conversationId = _state.value.selectedConversationId ?: return
         val previousOverride = conversationModels[conversationId]
         val previousLabel = _state.value.composerModelLabel
-        conversationModels.record(conversationId, model)
+        conversationModels.record(conversationId, model, effort)
         _state.update { it.copy(composerModelLabel = model) }
-        scope.launch {
-            applyConversationModel(conversationId, model, previousOverride, previousLabel)
-        }
+        val switch = DesktopModelSwitch(ConversationId(conversationId), model, effort, previousOverride, previousLabel)
+        scope.launch { applyConversationModel(switch) }
     }
 
-    private suspend fun applyConversationModel(
-        conversationId: String,
-        model: String,
-        previousOverride: String?,
-        previousLabel: String,
-    ) {
+    /**
+     * letta-mobile-by4vm.85: true when the active gateway can send a reasoning effort with a
+     * switch; the composer shows its effort chip only then.
+     */
+    val supportsReasoningEffort: Boolean
+        get() = gateway is ConversationEffortGateway
+
+    private suspend fun applyConversationModel(switch: DesktopModelSwitch) {
+        val conversationId = switch.conversationId.value
         try {
-            val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
-            val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
-            extras.setConversationModel(conversationId, transportModel)
-            conversationManagement.recordModel(model)
+            val transportModel = ModelCatalog.transportValue(_availableModels.value, switch.model).orEmpty()
+            val gw = gateway ?: error("This backend cannot change a conversation's model")
+            val recorded = gw.sendConversationModel(switch.conversationId, ModelHandle(transportModel), switch.effort)
+            // The host's record (model, effort, window) confirms the pick, as a reopen would read it.
+            conversationModels.seedFromHost(listOf(recorded))
+            conversationManagement.recordModel(switch.model)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            val restored = conversationModels.rollback(conversationId, model, previousOverride)
+            val restored = conversationModels.rollback(conversationId, switch.model, switch.previousOverride)
             if (restored && _state.value.selectedConversationId == conversationId) {
-                _state.update { it.copy(composerModelLabel = previousLabel) }
+                _state.update { it.copy(composerModelLabel = switch.previousLabel) }
             }
             _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
         }

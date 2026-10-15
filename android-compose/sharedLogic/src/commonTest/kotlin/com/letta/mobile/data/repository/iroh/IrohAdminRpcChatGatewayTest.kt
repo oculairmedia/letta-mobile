@@ -12,6 +12,9 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
@@ -32,6 +35,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -196,6 +200,38 @@ class IrohAdminRpcChatGatewayTest {
         assertEquals("agent-1", body["agent_id"]?.jsonPrimitive?.content)
         assertEquals("conv-1", body["conversation_id"]?.jsonPrimitive?.content)
         assertEquals("lmstudio/minimax-m3", body["model_handle"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun updateConversationModelSendsTheEffortWithTheModel() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        gateway.updateConversationModel(
+            ConversationModelChange(ConversationId("conv-1"), ModelHandle("openai/gpt-sol"), ReasoningEffortChoice.Named("high")),
+        )
+
+        val body = Json.parseToJsonElement(transport.rpcCalls.single { it.method == "model.update" }.body!!).jsonObject
+        assertEquals("agent-1", body["agent_id"]?.jsonPrimitive?.content)
+        assertEquals("conv-1", body["conversation_id"]?.jsonPrimitive?.content)
+        assertEquals("openai/gpt-sol", body["model_handle"]?.jsonPrimitive?.content)
+        assertEquals("high", body["reasoning_effort"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun updateConversationModelSendsAnExplicitNullForTheProviderDefault() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        gateway.updateConversationModel(
+            ConversationModelChange(ConversationId("conv-1"), ModelHandle("openai/gpt-sol"), ReasoningEffortChoice.ProviderDefault),
+        )
+
+        val body = Json.parseToJsonElement(transport.rpcCalls.single { it.method == "model.update" }.body!!).jsonObject
+        assertTrue("reasoning_effort" in body)
+        assertEquals(JsonNull, body["reasoning_effort"])
     }
 
     @Test

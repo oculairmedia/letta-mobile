@@ -26,6 +26,11 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.repository.modelcontrol.ConversationEffortGateway
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChange
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelTarget
+import com.letta.mobile.data.repository.modelcontrol.ModelControlWire
+import com.letta.mobile.data.repository.modelcontrol.ModelHandle
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -88,7 +93,9 @@ class IrohAdminRpcChatGateway(
     com.letta.mobile.data.chat.runtime.ApprovalQueueSource,
     com.letta.mobile.data.chat.runtime.PermissionModeGateway,
     AutoCloseable,
-    ConnectionStatusGateway {
+    ConnectionStatusGateway,
+    // letta-mobile-by4vm.85: the switch carries a reasoning effort (model.update).
+    ConversationEffortGateway {
 
     private val deviceLabel: IrohDeviceLabel = IrohDeviceLabel(deviceLabel)
 
@@ -434,15 +441,16 @@ class IrohAdminRpcChatGateway(
     }
 
     /** letta-mobile-w4q4p: the wrapper's `model.update` (App Server `update_model`) for this conversation. */
-    override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
-        val agentId = agentIdFor(ConversationId(conversationId))
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("conversation_id", conversationId)
-            put("model_handle", model)
-        }.toString()
-        rpc(AdminRpcCall.of(method = AdminRpcMethod("model.update"), path = AdminRpcPath(""), body = AdminRpcBody(body)))
-        return getConversation(conversationId)
+    override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
+        updateConversationModel(ConversationModelChange(ConversationId(conversationId), ModelHandle(model)))
+
+    /** letta-mobile-by4vm.85: `model.update` with the effort, built by the shared model-control wire. */
+    override suspend fun updateConversationModel(change: ConversationModelChange): Conversation {
+        val agentId = agentIdFor(change.conversationId)
+        val target = ConversationModelTarget(agentId.value, change.conversationId.value)
+        val body = ModelControlWire.updateParams(target, change.model, change.effort).toString()
+        rpc(AdminRpcCall.of(method = AdminRpcMethod(ModelControlWire.MODEL_UPDATE), path = AdminRpcPath(""), body = AdminRpcBody(body)))
+        return getConversation(change.conversationId.value)
     }
 
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {

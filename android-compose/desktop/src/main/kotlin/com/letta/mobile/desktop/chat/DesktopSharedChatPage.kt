@@ -79,17 +79,20 @@ import com.letta.mobile.ui.chat.surface.ambient.rememberChatAmbientStatus
 internal fun rememberDesktopChatSessionPort(
     controller: DesktopChatController,
     onA2uiAction: (A2uiAction) -> Unit,
+    /** letta-mobile-by4vm.85: the host catalog the effort chip reads; null leaves the chip off. */
+    modelCatalog: com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository? = null,
 ): DesktopChatSessionPort {
     val latestA2uiAction by rememberUpdatedState(onA2uiAction)
     val latestFontScaleSetter by rememberUpdatedState(LocalDesktopChatFontScaleSetter.current)
     val compositionScope = rememberCoroutineScope()
-    return remember(controller, compositionScope) {
+    return remember(controller, compositionScope, modelCatalog) {
         DesktopChatSessionPort(
             controller = controller,
             scope = compositionScope,
             bindings = DesktopChatSessionBindings(
                 onA2uiAction = { latestA2uiAction(it) },
                 onSetFontScale = { latestFontScaleSetter(it) },
+                modelCatalog = modelCatalog,
             ),
         )
     }
