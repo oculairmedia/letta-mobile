@@ -13,15 +13,13 @@ import com.letta.mobile.data.chat.branch.branchBackendOrNull
 import com.letta.mobile.data.chat.runtime.PinnedConversations
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.chat.session.ChatBranchView
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
 /** The conversation a branch starts from: the selected one. */
 internal data class DesktopBranchOrigin(val conversationId: String, val agentId: String?)
-
-/** The page's timeline at the moment the user asked for the branch. */
-internal data class DesktopBranchView(val messages: List<UiMessage>, val hasOlderMessages: Boolean)
 
 /** A finished branch: the fork to open, the prompt for its composer, and whether to send it at once (a rerun). */
 internal data class DesktopOpenedBranch(
@@ -102,7 +100,7 @@ internal class DesktopConversationBrancher(
 
     val state: StateFlow<BranchState> get() = controller.state
 
-    fun forkFrom(message: UiMessage, view: DesktopBranchView, name: String? = null) {
+    fun forkFrom(message: UiMessage, view: ChatBranchView, name: String? = null) {
         source(view)?.let { controller.fork(it, message, name) }
     }
 
@@ -111,17 +109,17 @@ internal class DesktopConversationBrancher(
         controller.forkConversation(BranchSource(origin.conversationId, origin.agentId?.takeIf(String::isNotBlank)), name)
     }
 
-    fun editAndResend(message: UiMessage, view: DesktopBranchView) {
+    fun editAndResend(message: UiMessage, view: ChatBranchView) {
         source(view)?.let { controller.editAndResend(it, message) }
     }
 
-    fun rerun(message: UiMessage, view: DesktopBranchView) {
+    fun rerun(message: UiMessage, view: ChatBranchView) {
         source(view)?.let { controller.rerun(it, message) }
     }
 
     fun dismissFailure() = controller.dismissFailure()
 
-    private fun source(view: DesktopBranchView): BranchSource? {
+    private fun source(view: ChatBranchView): BranchSource? {
         val origin = host.origin() ?: return null
         return BranchSource(origin.conversationId, origin.agentId, view.messages, !view.hasOlderMessages)
     }

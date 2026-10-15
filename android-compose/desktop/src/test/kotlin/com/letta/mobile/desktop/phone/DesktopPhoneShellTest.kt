@@ -29,7 +29,7 @@ import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
-import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopSharedChatPage
@@ -154,7 +154,7 @@ class DesktopPhoneShellTest {
                             state = DesktopSharedChatPageState(
                                 port = port,
                                 pagedTimeline = null,
-                                hostInputs = DesktopChatComposerHostInputs(),
+                                hostInputs = ChatComposerHostInputs(),
                                 errorMessage = null,
                                 canvasStore = InMemoryCanvasDocumentStore(),
                                 canvasOwner = DesktopCanvasOwner(conversationId = null, agentId = null, agentName = "Meridian"),

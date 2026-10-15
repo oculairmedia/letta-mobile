@@ -1,16 +1,18 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
+import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
 import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
 import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CancellationException
@@ -82,8 +84,17 @@ data class TimelineChatSessionOptions(
     val models: ChatModelSource? = null,
     /** letta-mobile-by4vm.98.2: the conversation's send queue; null: a send waits for the run to end. */
     val sendQueue: ChatSendQueueSource? = null,
+    /** letta-mobile-by4vm.98.3: the composer's commands, mentionables, context usage and placeholder. */
+    val composerHost: StateFlow<ChatComposerHostInputs>? = null,
+    /** letta-mobile-by4vm.98.3: where an A2UI surface's actions go; null drops them. */
+    val onA2uiAction: ((A2uiAction) -> Unit)? = null,
+    /** letta-mobile-by4vm.98.3: fork, edit and resend, and rerun; null: capabilities off. */
+    val branching: ChatBranchingSource? = null,
+    /** letta-mobile-by4vm.98.3: `/recompile` and its status; null keeps the status idle. */
+    val recompile: ConversationRecompileController? = null,
+    /** letta-mobile-by4vm.98.3: the conversation's live status line; null keeps it hidden. */
+    val liveStatus: Flow<RuntimeLiveStatus>? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
-    val placeholder: String? = null,
 )
 
 /**
@@ -130,36 +141,37 @@ class TimelineChatSessionPort(
     )
     private var clearedRunWatch: Job? = null
 
-    private val workingDirectory: StateFlow<ChatWorkingDirectoryUiState?> =
-        options.workingDirectory?.current ?: MutableStateFlow(null)
+    /** letta-mobile-by4vm.98.3: what the host's extension points add, read the way desktop's port reads them. */
+    private val extensions = ChatSessionExtensions(options, scope)
 
-    private val model: StateFlow<ChatModelUiState?> = options.models?.model ?: MutableStateFlow(null)
-
-    private val canQueue: StateFlow<Boolean> = options.sendQueue?.canQueueWhileStreaming ?: MutableStateFlow(false)
-
-    override val composer: StateFlow<ChatComposerUiState> = combine(
-        combine(draft, canQueue, ::Pair),
-        uiState,
-        combine(workingDirectory, model, ::Pair),
-        options.permissionModes?.permissionMode ?: flowOf(null),
-    ) { (current, queues), ui, (directory, chip), permissionMode ->
-        timelineComposerUiState(current, TimelineSendGate(ui.isRunInFlight, queues), options)
-            .copy(workingDirectory = directory, model = chip, permissionMode = permissionMode)
+    override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState, extensions.chrome) { current, ui, chrome ->
+        val gate = TimelineSendGate(ui.isRunInFlight, chrome.canQueueWhileStreaming)
+        timelineComposerUiState(current, gate, options).withChrome(chrome)
     }.stateIn(
         scope,
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        timelineComposerUiState(draft.value, TimelineSendGate(false, canQueue.value), options)
-            .copy(workingDirectory = workingDirectory.value, model = model.value),
+        timelineComposerUiState(draft.value, sendGate(runInFlight = false), options).withChrome(extensions.chrome.value),
     )
 
-    override val capabilities: StateFlow<ChatSurfaceCapabilities> = workingDirectory
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = extensions.facts
         .map(::currentCapabilities)
-        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities(workingDirectory.value))
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities(extensions.facts.value))
 
-    private fun currentCapabilities(directory: ChatWorkingDirectoryUiState?) =
-        timelineCapabilities(options.controls).copy(workingDirectory = directory != null, modelSwitch = options.models != null)
+    private fun currentCapabilities(facts: ChatExtensionFacts) = timelineCapabilities(options.controls).withExtensions(facts)
 
-    override val actions: ChatActions = TimelineChatActions(this)
+    override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
+
+    override val recompileStatus: StateFlow<RecompileStatus> get() = extensions.recompileStatus
+
+    override val actions: ChatActions = TimelineChatActions(
+        port = this,
+        options = options,
+        state = ChatExtensionActionState(
+            local = local,
+            branchView = { uiState.value.let { ChatBranchView(it.messages, it.hasMoreOlderMessages) } },
+            error = { run.value.error },
+        ),
+    )
 
     init {
         scope.launch { session.events.collect(::onSyncEvent) }
@@ -208,8 +220,6 @@ class TimelineChatSessionPort(
 
     internal fun updateDraft(transform: (TimelineComposerDraft) -> TimelineComposerDraft) = draft.update(transform)
 
-    internal fun updateLocal(transform: (TimelineLocalState) -> TimelineLocalState) = local.update(transform)
-
     internal fun updateRun(transform: (TimelineRunState) -> TimelineRunState) = run.update(transform)
 
     internal fun sendDraft() {
@@ -227,7 +237,8 @@ class TimelineChatSessionPort(
         launchSend(send, queued = gate.runInFlight)
     }
 
-    private fun sendGate() = TimelineSendGate(uiState.value.isRunInFlight, canQueue.value)
+    private fun sendGate(runInFlight: Boolean = uiState.value.isRunInFlight) =
+        TimelineSendGate(runInFlight, extensions.canQueue.value)
 
     /** A [queued] send goes to the host's queue behind the run in flight, which it leaves alone. */
     private fun launchSend(send: TimelineSend, queued: Boolean) {
@@ -292,20 +303,6 @@ class TimelineChatSessionPort(
         }
     }
 
-    internal fun changeWorkingDirectory(directory: ChatWorkingDirectory) {
-        options.workingDirectory?.changeWorkingDirectory(directory)
-    }
-
-    internal fun setPermissionMode(mode: AppServerPermissionMode) {
-        options.permissionModes?.setPermissionMode(mode)
-    }
-
-    internal fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
-        options.models?.selectModel(handle, effort)
-    }
-
-    internal val queuedSends: ChatSendQueueSource? get() = options.sendQueue
-
     internal fun retryLoad() {
         scope.launch { load() }
     }
@@ -319,8 +316,6 @@ class TimelineChatSessionPort(
             run.update { it.copy(error = failure.message ?: CONTROL_FAILED, cancelling = false) }
         }
     }
-
-    internal val currentRun: TimelineRunState get() = run.value
 
     internal val attachmentLimits: AttachmentLimits get() = options.attachmentLimits
 

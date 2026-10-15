@@ -19,8 +19,8 @@ import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.shell.ShellSkillsSection
 import com.letta.mobile.data.subagents.visibleRunningCount
 import com.letta.mobile.desktop.canvas.DesktopCanvasOwner
-import com.letta.mobile.desktop.chat.ComposerCommand
-import com.letta.mobile.desktop.chat.DesktopChatComposerHostInputs
+import com.letta.mobile.ui.chat.session.ChatHostCommand
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.desktop.chat.DesktopChatSubagents
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopContextFocus
@@ -40,7 +40,7 @@ import com.letta.mobile.ui.shell.sidebar.ShellRenameChatDialog
 
 /** What the shared chat page takes from the shell: the composer's commands and context reading, and the canvas. */
 private data class DesktopShellChatHost(
-    val composerCommands: List<ComposerCommand>,
+    val composerCommands: List<ChatHostCommand>,
     val contextUsage: ContextWindowUsageState,
     val openConversationCanvas: () -> Unit,
     val agentNamesById: Map<String, String>,
@@ -318,7 +318,7 @@ private fun DesktopShellSharedChatPage(
         state = DesktopSharedChatPageState(
             port = page.port,
             pagedTimeline = canonicalPresentation,
-            hostInputs = DesktopChatComposerHostInputs(
+            hostInputs = ChatComposerHostInputs(
                 commands = page.host.composerCommands,
                 mentionables = frame.lists.mentionables,
                 contextUsage = page.host.contextUsage,

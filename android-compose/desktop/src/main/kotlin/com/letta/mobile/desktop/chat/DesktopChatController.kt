@@ -737,6 +737,7 @@ class DesktopChatController(
         override val pins = conversationPrefs.pins
         override val lineage = conversationPrefs.lineage
         override val isClosed: Boolean get() = closed
+        override val surface: StateFlow<DesktopChatSurfaceState> get() = state
 
         override fun origin(): DesktopBranchOrigin? = _state.value.selectedConversation?.let {
             DesktopBranchOrigin(it.id, it.agentId?.takeIf(String::isNotBlank))
@@ -833,12 +834,6 @@ class DesktopChatController(
     private fun showPageError(message: String) {
         if (closed) return
         _state.update { it.copy(errorMessage = message) }
-    }
-
-    /** The shared page acknowledged (showed or dismissed) the surface error. */
-    fun clearErrorMessage() {
-        if (closed) return
-        _state.update { it.copy(errorMessage = null) }
     }
 
     /**
@@ -1216,8 +1211,6 @@ class DesktopChatController(
         canQueueWhileStreaming = DerivedStateFlow(canonicalPresentation.map { it != null }) { canonicalPresentation.value != null },
         current = ::selectedQueueTarget,
     )
-    private val _canonicalStatus = MutableStateFlow<String?>(null)
-    val canonicalStatus = _canonicalStatus.asStateFlow()
 
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
@@ -1237,9 +1230,7 @@ class DesktopChatController(
 
         _canonicalPresentation.value = null
         val canonical = canonicalOpen
-        _canonicalStatus.value = null
         if (canonical != null && canonicalEligible(conversationId)) {
-            _canonicalStatus.value = "Opening conversation..."
             timelineJob = scope.launch {
                 try {
                     val presentation = canonical(
@@ -1263,7 +1254,6 @@ class DesktopChatController(
                     throw cancelled
                 } catch (failure: Exception) {
                     if (isActiveSelection(generation)) {
-                        _canonicalStatus.value = failure.message ?: "Canonical timeline failed to open"
                         _state.update {
                             it.withRuntimeState(ChatSessionReducer.hydrateFailed(it.runtimeState, generation,
                                 failure.message ?: "Canonical timeline failed to open"))

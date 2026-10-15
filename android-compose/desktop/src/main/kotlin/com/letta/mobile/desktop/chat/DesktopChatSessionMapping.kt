@@ -5,8 +5,6 @@ import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
-import com.letta.mobile.data.composer.Mentionable
-import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.UiMessage
@@ -15,12 +13,9 @@ import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
 import com.letta.mobile.data.repository.modelcontrol.reasoningEffortsOf
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toConversationState
-import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
-import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
-import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.session.TimelineRunState
@@ -101,55 +96,18 @@ internal fun DesktopChatSurfaceState.pageError(local: TimelineLocalState): Strin
 private fun nextMessages(previous: ImmutableList<UiMessage>?, next: List<UiMessage>): ImmutableList<UiMessage> =
     if (previous != null && previous == next) previous else next.toImmutableList()
 
-/** Composer chrome the shell computes from state outside the controller. */
-internal data class DesktopChatComposerHostInputs(
-    val commands: List<ComposerCommand> = emptyList(),
-    val mentionables: List<Mentionable> = emptyList(),
-    val contextUsage: ContextWindowUsageState? = null,
-    val placeholder: String? = null,
+/**
+ * The controller's draft as the composer shows it; the extension points' chrome (chips, queue,
+ * host commands) is laid over it by [com.letta.mobile.ui.chat.session.withChrome].
+ */
+internal fun DesktopChatSurfaceState.composerUiState(limits: AttachmentLimits): ChatComposerUiState = ChatComposerUiState(
+    text = composerText,
+    attachments = pendingImageAttachments.toImmutableList(),
+    error = composerErrorMessage,
+    canSend = canSend,
+    maxAttachments = limits.maxAttachmentCount,
+    attachmentLimits = limits,
 )
-
-/** Everything the composer state is derived from, at one instant. */
-internal data class DesktopChatComposerInputs(
-    val surface: DesktopChatSurfaceState,
-    val host: DesktopChatComposerHostInputs,
-    /** letta-mobile-by4vm.98.1: the model chip, from the controller's [DesktopConversationModels]. */
-    val model: ChatModelUiState?,
-    /** letta-mobile-by4vm.98: the shared working-directory chip; null where the gateway has none. */
-    val workingDirectory: ChatWorkingDirectoryUiState?,
-    val canQueueWhileStreaming: Boolean,
-    val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
-    val permissionMode: ChatPermissionModeUiState? = null,
-)
-
-internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): ChatComposerUiState {
-    val surface = inputs.surface
-    return ChatComposerUiState(
-        text = surface.composerText,
-        attachments = surface.pendingImageAttachments.toImmutableList(),
-        error = surface.composerErrorMessage,
-        canSend = surface.canSend,
-        canQueueWhileStreaming = inputs.canQueueWhileStreaming,
-        placeholder = inputs.host.placeholder,
-        maxAttachments = inputs.attachmentLimits.maxAttachmentCount,
-        attachmentLimits = inputs.attachmentLimits,
-        commands = inputs.host.commands.map(ComposerCommand::toChatComposerCommand).toImmutableList(),
-        mentionables = inputs.host.mentionables.toImmutableList(),
-        model = inputs.model,
-        contextUsage = inputs.host.contextUsage,
-        workingDirectory = inputs.workingDirectory,
-        permissionMode = inputs.permissionMode,
-    )
-}
-
-/** Desktop commands are keyed by label: it is what the palette shows and what is unique there. */
-internal fun ComposerCommand.toChatComposerCommand(): ChatComposerCommand =
-    ChatComposerCommand(
-        id = label,
-        label = label,
-        description = description,
-        fillsComposer = fillsComposer,
-    )
 
 /**
  * letta-mobile-by4vm.85: the reasoning efforts the composer offers. [byValue] holds each option's

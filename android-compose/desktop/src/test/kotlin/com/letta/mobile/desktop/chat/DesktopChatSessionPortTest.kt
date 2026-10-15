@@ -19,6 +19,8 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
+import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSurfaceIntent
@@ -79,10 +81,10 @@ class DesktopChatSessionPortTest {
         val (controller, port) = startedPort()
         var ran = 0
         port.updateHostInputs(
-            DesktopChatComposerHostInputs(
+            ChatComposerHostInputs(
                 commands = listOf(
-                    ComposerCommand(label = "/canvas", description = "Open canvas", run = { ran++ }),
-                    ComposerCommand(label = "/skill", description = "Fill", fillsComposer = true, run = {}),
+                    ChatHostCommand(label = "/canvas", description = "Open canvas", run = { ran++ }),
+                    ChatHostCommand(label = "/skill", description = "Fill", fillsComposer = true, run = {}),
                 ),
                 placeholder = "Ask Ada",
             ),

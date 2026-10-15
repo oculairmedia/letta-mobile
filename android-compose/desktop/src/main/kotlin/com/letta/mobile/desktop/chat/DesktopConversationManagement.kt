@@ -11,18 +11,26 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.search.ConversationMessageReader
+import com.letta.mobile.ui.chat.session.ChatBranchSupport
+import com.letta.mobile.ui.chat.session.ChatBranchView
+import com.letta.mobile.ui.chat.session.ChatBranchingSource
+import com.letta.mobile.ui.chat.session.DerivedStateFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The controller state [DesktopConversationManagement] reads and writes, beyond what a branch needs. */
 internal interface DesktopConversationListHost : DesktopBranchHost {
     val isClosed: Boolean
+
+    /** The controller's state; the gateway has no flow of its own, so a change re-reads what it can do. */
+    val surface: StateFlow<DesktopChatSurfaceState>
 
     /** The title the list shows for the conversation, or null when it is not listed. */
     fun listedTitle(conversationId: ConversationId): String?
@@ -41,8 +49,13 @@ internal class DesktopConversationManagement(
     private val scope: CoroutineScope,
     private val host: DesktopConversationListHost,
     private val prefs: DesktopConversationPrefs,
-) {
+) : ChatBranchingSource {
     private val brancher = DesktopConversationBrancher(scope, host)
+
+    /** letta-mobile-7mys7, by4vm.98.3: whether the active backend can fork, and name a fork. */
+    override val support: StateFlow<ChatBranchSupport> = DerivedStateFlow(host.surface.map { branchSupport() }, ::branchSupport)
+
+    private fun branchSupport() = ChatBranchSupport(fork = brancher.supported, nameForks = brancher.canName)
 
     /** letta-mobile-zxk2n.5: settled chats, markers, auto-pin and the chat's display options. */
     val marks = DesktopConversationMarks(prefs)
@@ -134,16 +147,16 @@ internal class DesktopConversationManagement(
         withContext(Dispatchers.IO) { recents.record(model) }
     }
 
-    fun forkFrom(message: UiMessage, view: DesktopBranchView, name: String? = null) {
+    override fun forkFrom(message: UiMessage, view: ChatBranchView, name: String?) {
         if (!host.isClosed) brancher.forkFrom(message, view, name)
     }
 
-    fun editAndResend(message: UiMessage, view: DesktopBranchView) {
+    override fun editAndResend(message: UiMessage, view: ChatBranchView) {
         if (!host.isClosed) brancher.editAndResend(message, view)
     }
 
     /** letta-mobile-7mys7: forks before the prompt and sends it again there; the original keeps its answer. */
-    fun rerun(message: UiMessage, view: DesktopBranchView) {
+    override fun rerun(message: UiMessage, view: ChatBranchView) {
         if (!host.isClosed) brancher.rerun(message, view)
     }
 
@@ -151,9 +164,6 @@ internal class DesktopConversationManagement(
     fun forkConversation(origin: DesktopBranchOrigin, name: String? = null) {
         if (!host.isClosed) brancher.forkConversation(origin, name)
     }
-
-    /** Whether a fork can be named on this backend. */
-    val canNameForks: Boolean get() = brancher.canName
 
     /** The fork, edit or rerun in flight, or the last failure. */
     val branchState: StateFlow<BranchState> get() = brancher.state

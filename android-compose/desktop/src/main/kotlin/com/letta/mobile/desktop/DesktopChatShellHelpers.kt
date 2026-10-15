@@ -35,7 +35,7 @@ import com.letta.mobile.ui.shell.header.UnifiedSearchDestination
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.ui.shell.header.rememberConversationMessageIndex
-import com.letta.mobile.desktop.chat.ComposerCommand
+import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.memory.MemoryParityControllerState
@@ -328,7 +328,7 @@ internal data class DesktopClientCommandRoutes(
 internal fun desktopClientCommand(
     command: ClientSlashCommand,
     params: BuildComposerCommandsParams,
-): ComposerCommand {
+): ChatHostCommand {
     val controller = params.chatController
     val client = params.client
     val run: () -> Unit = when (command) {
@@ -342,32 +342,32 @@ internal fun desktopClientCommand(
         ClientSlashCommand.Connect -> { { params.onNavigate(DesktopDestination.Providers) } }
         ClientSlashCommand.Recompile -> controller.conversationManagement::recompileOpenConversation
     }
-    return ComposerCommand(command.id, command.description, run = run)
+    return ChatHostCommand(command.id, command.description, run = run)
 }
 
-internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
+internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ChatHostCommand> = buildList {
     val onNavigate = params.onNavigate
     ClientSlashCommand.entries.forEach { add(desktopClientCommand(it, params)) }
     // letta-mobile-7mys7: letta-code's /fork [name], run by the client (the App Server does not).
     if (params.chatController.conversationManagement.supportsBranching) {
         add(
-            ComposerCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) {
+            ChatHostCommand("fork", "Fork this chat (/fork [name])", fillsComposer = true) {
                 params.chatController.updateComposerText("/fork ")
             },
         )
     }
-    add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
-    add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
-    add(ComposerCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
-    add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
-    add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
-    add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
-    add(ComposerCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
-    add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
+    add(ChatHostCommand("agent", "Create a new agent") { params.onCreateAgent() })
+    add(ChatHostCommand("edit", "Edit this agent") { params.onEditAgent() })
+    add(ChatHostCommand("canvas", "Open canvas workspace") { params.onOpenCanvas?.invoke() })
+    add(ChatHostCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
+    add(ChatHostCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
+    add(ChatHostCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
+    add(ChatHostCommand("providers", "Open providers & models") { onNavigate(DesktopDestination.Providers) })
+    add(ChatHostCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
     // A server command named like a client command would shadow it (commands are keyed by label).
     params.agentSlashCommands.filter { ClientSlashCommand.fromId(it.command) == null }.forEach { cmd ->
         add(
-            ComposerCommand(
+            ChatHostCommand(
                 label = cmd.command,
                 description = cmd.description.ifBlank {
                     cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
@@ -429,7 +429,7 @@ internal data class DesktopComposerCommandsParams(
 )
 
 @Composable
-internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsParams): List<ComposerCommand> {
+internal fun rememberDesktopComposerCommands(params: DesktopComposerCommandsParams): List<ChatHostCommand> {
     return remember(
         params.selectedConversationId,
         params.agentSlashCommands,

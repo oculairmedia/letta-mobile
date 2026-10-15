@@ -1,18 +1,17 @@
 package com.letta.mobile.ui.chat.session
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 
 /*
  * letta-mobile-o4ygk.4.5: the page's intents, forwarded to a TimelineChatSessionPort.
  */
 
-/** [ChatActions] over a [TimelineChatSessionPort]; what it cannot do is a no-op its capabilities hide. */
-internal class TimelineChatActions(private val port: TimelineChatSessionPort) : ChatActions {
+/** [ChatActions] over a [TimelineChatSessionPort]; the extension points answer the rest. */
+internal class TimelineChatActions(
+    private val port: TimelineChatSessionPort,
+    options: TimelineChatSessionOptions,
+    state: ChatExtensionActionState,
+) : ChatExtensionActions(options, state) {
     override fun updateComposerText(text: String) = port.updateDraft { it.withText(text) }
 
     override fun send() = port.sendDraft()
@@ -27,56 +26,9 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun clearComposerError() = port.updateDraft { it.cleared() }
 
-    override fun runComposerCommand(command: ChatComposerCommand) = Unit
-
-    override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
-
     override fun stopRun() = port.stopRun()
-
-    override fun rerun(message: UiMessage) = Unit
 
     override fun submitApproval(answer: ChatApprovalAnswer) = port.answerApproval(answer)
 
-    override fun submitA2uiAction(action: A2uiAction) = Unit
-
-    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
-
-    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
-
-    override fun cancelQueuedSend(id: QueuedSendId) = port.queuedSends?.cancel(id) ?: Unit
-
-    override fun sendQueuedNow(id: QueuedSendId) = port.queuedSends?.sendNow(id) ?: Unit
-
-    override fun resumeSendQueue() = port.queuedSends?.resume() ?: Unit
-
-    override fun toggleRunCollapsed(runId: ChatRunId) = port.updateLocal { it.toggleRun(runId.value) }
-
-    override fun toggleReasoningExpanded(messageId: ChatMessageId) = port.updateLocal { it.toggleReasoning(messageId.value) }
-
-    override fun loadOlderMessages() = Unit
-
-    override fun releaseOlderMessages() = Unit
-
-    override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
-
     override fun retryLoad() = port.retryLoad()
-
-    /** The page showed the error: acknowledge it so it is not shown again; the glow keeps "failed". */
-    override fun clearError() = port.updateLocal { it.acknowledge(port.currentRun.error) }
-
-    override fun setFontScale(scale: Float) = Unit
-
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = port.selectModel(handle, effort)
-
-    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = port.changeWorkingDirectory(directory)
-
-    override fun setPermissionMode(mode: AppServerPermissionMode) = port.setPermissionMode(mode)
-
-    override fun updateSearchQuery(query: String) = Unit
-
-    override fun clearSearch() = Unit
-
-    override fun refreshGoalStatus() = Unit
-
-    override fun continueGoal() = Unit
 }
