@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
@@ -59,6 +60,12 @@ data class TimelineChatRunControls(
 /** What the port is built from besides the session itself. */
 data class TimelineChatSessionOptions(
     val controls: TimelineChatRunControls = TimelineChatRunControls(),
+    /**
+     * letta-mobile-by4vm.79: the host's own approval state (answers in flight, queued offline,
+     * parked details), e.g. the shared [com.letta.mobile.data.chat.approval.ChatApprovalAnswerer]'s.
+     * Null keeps the port's own in-flight tracking only, as the web client does.
+     */
+    val approvals: ChatApprovalStateSource? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val placeholder: String? = null,
 )
@@ -127,9 +134,16 @@ class TimelineChatSessionPort(
     }
 
     private fun timelineInputs(): Flow<TimelineInputs> =
-        combine(session.timeline, run, local) { timeline, runState, localState ->
-            TimelineInputs(timeline, runState, localState)
+        combine(session.timeline, run, local, hostApprovals()) { timeline, runState, localState, approvals ->
+            TimelineInputs(timeline, runState, localState, approvals)
         }
+
+    private fun hostApprovals(): Flow<TimelineHostApprovals> {
+        val source = options.approvals ?: return flowOf(TimelineHostApprovals())
+        return combine(source.submittingApprovals, source.queuedApprovals, source.pendingApprovalDetails) { submitting, queued, details ->
+            TimelineHostApprovals(submitting, queued, details)
+        }
+    }
 
     private fun present(inputs: TimelineInputs, previous: ChatUiState?): ChatUiState {
         val prior = previous ?: initialUiState()
@@ -141,7 +155,7 @@ class TimelineChatSessionPort(
             ownAgentId = target.agentId,
         )
         val presentation = presenter.present(projection, IdlePresenceSignals)
-        return timelineChatUiState(target, presentation, inputs.run, inputs.local)
+        return timelineChatUiState(target, presentation, inputs.run, inputs.local).withHostApprovals(inputs.run, inputs.approvals)
     }
 
     private fun initialUiState(): ChatUiState = ChatUiState(agentName = target.agentName, agentId = target.agentId)
@@ -189,6 +203,7 @@ class TimelineChatSessionPort(
     internal fun answerApproval(answer: ChatApprovalAnswer) {
         val submit = options.controls.answerApproval ?: return
         if (answer.requestId in run.value.submittingApprovals) return
+        if (options.approvals?.submittingApprovals?.value?.contains(answer.requestId) == true) return
         run.update { it.copy(submittingApprovals = it.submittingApprovals + answer.requestId) }
         scope.launch {
             try {
@@ -221,6 +236,7 @@ class TimelineChatSessionPort(
         val timeline: Timeline,
         val run: TimelineRunState,
         val local: TimelineLocalState,
+        val approvals: TimelineHostApprovals,
     )
 
     private companion object {

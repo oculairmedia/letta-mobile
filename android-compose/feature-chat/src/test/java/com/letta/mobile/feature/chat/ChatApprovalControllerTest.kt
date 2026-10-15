@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
-import com.letta.mobile.feature.chat.coordination.ChatApprovalResult
+import com.letta.mobile.data.chat.approval.ChatApprovalResult
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer

@@ -1,11 +1,14 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
+import com.letta.mobile.data.chat.projection.withQueuedApprovals
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.timeline.TimelineSyncLoop
@@ -109,6 +112,25 @@ private fun TimelineRunState.conversationState(conversationId: String): Conversa
     loadError != null -> ConversationState.Error(loadError)
     loading -> ConversationState.Loading
     else -> ConversationState.Ready(conversationId)
+}
+
+/** letta-mobile-by4vm.79: the approval state a host hands the port through [TimelineChatSessionOptions.approvals]. */
+data class TimelineHostApprovals(
+    val submitting: Set<String> = emptySet(),
+    val queued: Set<String> = emptySet(),
+    val details: Map<String, PendingApprovalDetails> = emptyMap(),
+)
+
+/**
+ * [this] with the host's approval state laid over it: parked details joined onto their rows, queued
+ * answers marked, and the row answered by either the port or the host disabled. Unchanged when the
+ * host reports nothing.
+ */
+fun ChatUiState.withHostApprovals(run: TimelineRunState, approvals: TimelineHostApprovals): ChatUiState {
+    if (approvals == TimelineHostApprovals()) return this
+    val joined = withPendingApprovalDetails(approvals.details).withQueuedApprovals(approvals.queued)
+    val answering = answeringApprovalOnScreen(run.submittingApprovals + approvals.submitting, joined.messages)
+    return if (answering == joined.activeApprovalRequestId) joined else joined.copy(activeApprovalRequestId = answering)
 }
 
 /** The newest on-screen approval whose answer is in flight; the page disables that row's buttons. */

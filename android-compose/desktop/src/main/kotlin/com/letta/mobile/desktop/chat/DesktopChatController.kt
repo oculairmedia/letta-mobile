@@ -875,16 +875,7 @@ class DesktopChatController(
     fun submitApproval(answer: ChatApprovalAnswer) {
         if (closed) return
         approvalCoordinator.submitApproval(
-            ApprovalSubmissionRequest(
-                gateway = gateway,
-                conversation = _state.value.selectedConversation,
-                requestId = answer.requestId,
-                toolCallIds = answer.toolCallIds,
-                approve = answer.approve,
-                reason = answer.reason,
-                selectedSuggestionIds = answer.selectedSuggestionIds,
-                suggestionBinding = answer.suggestionBinding,
-            ),
+            ApprovalSubmissionRequest(gateway = gateway, conversation = _state.value.selectedConversation, answer = answer),
         )
     }
 
@@ -1462,7 +1453,7 @@ class DesktopChatController(
         _boundProjection.value = BoundProjection(conversationId = conversationId, projection = projection)
         if (projection.noChange) return
         val messages = projection.ui
-        approvalCoordinator.reconcileSubmittedApprovals(conversationId, messages)
+        approvalCoordinator.reconcileSubmittedApprovals(ConversationId(conversationId), messages)
         val agentReplyLanded = projection.tailIsAssistant ||
             messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
         if (_thinkingConversationId.value == conversationId && agentReplyLanded) {

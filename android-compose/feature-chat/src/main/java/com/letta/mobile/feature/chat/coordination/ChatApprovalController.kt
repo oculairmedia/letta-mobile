@@ -1,12 +1,14 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
+import com.letta.mobile.data.chat.approval.ChatApprovalAnswerHost
+import com.letta.mobile.data.chat.approval.ChatApprovalAnswerer
+import com.letta.mobile.data.chat.approval.ChatApprovalResult
+import com.letta.mobile.data.chat.approval.ChatApprovalSubmission
 import com.letta.mobile.data.chat.approval.OutboxNotice
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,11 +29,11 @@ internal class ChatApprovalController(
     private val relay: ChatApprovalRelay? = null,
 ) {
     /**
-     * The shared in-flight tracker (letta-mobile-2dsi5.4), the same one desktop uses. An answer stays
+     * letta-mobile-by4vm.78: the shared answer lifecycle, the same one desktop uses. An answer stays
      * in flight until this conversation's timeline stops showing the request as pending, so a card
      * cannot turn actionable again between a successful submit and the server's decision.
      */
-    private val tracker = ApprovalSubmissionTracker()
+    private val answerer = ChatApprovalAnswerer(scope, AnswerHost())
 
     init {
         // letta-mobile-bzvro.14: an answer made offline that the host no longer needed is said so.
@@ -49,9 +51,8 @@ internal class ChatApprovalController(
             ) { timeline, parked -> timeline + parked }
                 .distinctUntilChanged()
                 .collect { pending ->
-                    if (tracker.submitting.value.isEmpty()) return@collect
-                    val conversationId = activeConversationId() ?: NO_CONVERSATION
-                    if (tracker.reconcile(conversationId, pending).isNotEmpty()) publishInFlight()
+                    val conversation = ConversationId(activeConversationId() ?: NO_CONVERSATION)
+                    if (answerer.reconcile(conversation, pending).isNotEmpty()) publishInFlight()
                 }
         }
     }
@@ -66,84 +67,59 @@ internal class ChatApprovalController(
 
     /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
     fun submit(answer: ChatApprovalAnswer, conversationOverride: ConversationId? = null) {
-        val conversationId = conversationOverride?.value ?: activeConversationId()
-        scope.launch {
-            markApprovalInFlight(answer, conversationId)
-            val result = try {
-                coordinator.submitApproval(agentId, conversationId, answer)
-            } catch (cancelled: CancellationException) {
-                failApprovalInFlight(answer)
-                throw cancelled
-            } catch (e: Exception) {
-                ChatApprovalResult.Failed(e.message ?: "Failed to submit approval")
+        val conversation = conversationOverride?.value ?: activeConversationId()
+        answerer.submit(
+            ChatApprovalSubmission(answer, ConversationId(conversation ?: NO_CONVERSATION)) {
+                coordinator.submitApproval(agentId, conversation, answer)
+            },
+        )
+    }
+
+    /** How each step of an answer lands on [uiState] and the banner. */
+    private inner class AnswerHost : ChatApprovalAnswerHost {
+        override fun onInFlight(answer: ChatApprovalAnswer) {
+            uiState.update {
+                it.copy(isStreaming = true, isAgentTyping = true, activeApprovalRequestId = answer.requestId)
             }
-            settle(answer, result)
         }
-    }
 
-    /**
-     * Presence flags reset as they always have; only an answer that went out (or waits in the
-     * offline outbox) keeps its card in flight, until the timeline reconciles it. Anything else is
-     * actionable again now.
-     */
-    private fun settle(answer: ChatApprovalAnswer, result: ChatApprovalResult) {
-        if (!accepted(result)) return failApprovalInFlight(answer)
-        // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot; a queued
-        // one (letta-mobile-bzvro.14) stays, marked as waiting for the connection.
-        if (result == ChatApprovalResult.Submitted) answer.toolCallIds.forEach { relay?.resolve(it) }
-        settleApprovalPresence(answer)
-    }
-
-    /** Whether [result] means the answer went out; anything else is shown on the banner. */
-    private fun accepted(result: ChatApprovalResult): Boolean {
-        val error = when (result) {
-            ChatApprovalResult.Submitted, ChatApprovalResult.Queued -> return true
-            ChatApprovalResult.MissingActiveAgent -> "No active agent available for approval"
-            ChatApprovalResult.MissingActiveConversation -> "No active conversation available for approval"
-            is ChatApprovalResult.Failed -> result.message
+        /**
+         * Presence flags reset as they always have; only an answer that went out (or waits in the
+         * offline outbox) keeps its card in flight, until the timeline reconciles it.
+         */
+        override fun onAccepted(answer: ChatApprovalAnswer, result: ChatApprovalResult) {
+            // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot; a queued
+            // one (letta-mobile-bzvro.14) stays, marked as waiting for the connection.
+            if (result == ChatApprovalResult.Submitted) answer.toolCallIds.forEach { relay?.resolve(it) }
+            val requestId = answer.requestId
+            uiState.update {
+                if (it.activeApprovalRequestId != requestId) it else it.copy(isStreaming = false, isAgentTyping = false)
+            }
         }
-        bannerController.showError(error)
-        return false
-    }
 
-    private fun settleApprovalPresence(answer: ChatApprovalAnswer) {
-        val requestId = answer.requestId
-        uiState.update {
-            if (it.activeApprovalRequestId != requestId) it else it.copy(isStreaming = false, isAgentTyping = false)
+        override fun onRejected(answer: ChatApprovalAnswer, message: String) {
+            bannerController.showError(message)
+            release(answer)
         }
-    }
 
-    private fun markApprovalInFlight(answer: ChatApprovalAnswer, conversationId: String?) {
-        val requestId = answer.requestId
-        tracker.begin(requestId, conversationId ?: NO_CONVERSATION)
-        uiState.update {
-            it.copy(
-                isStreaming = true,
-                isAgentTyping = true,
-                activeApprovalRequestId = requestId,
-            )
-        }
-    }
+        override fun onCancelled(answer: ChatApprovalAnswer) = release(answer)
 
-    private fun failApprovalInFlight(answer: ChatApprovalAnswer) {
-        val requestId = answer.requestId
-        tracker.clear(requestId)
-        uiState.update {
-            if (it.activeApprovalRequestId != requestId) {
-                it
-            } else {
-                it.copy(
-                    isStreaming = false,
-                    isAgentTyping = false,
-                    activeApprovalRequestId = tracker.latest,
-                )
+        /** The answer is no longer in flight: the UI points at whatever still is. */
+        private fun release(answer: ChatApprovalAnswer) {
+            val requestId = answer.requestId
+            uiState.update {
+                if (it.activeApprovalRequestId != requestId) {
+                    it
+                } else {
+                    it.copy(isStreaming = false, isAgentTyping = false, activeApprovalRequestId = answerer.latest)
+                }
             }
         }
     }
 
     /** The timeline decided some answers: point the UI at whatever is still in flight. */
     private fun publishInFlight() {
-        uiState.update { it.copy(activeApprovalRequestId = tracker.latest) }
+        uiState.update { it.copy(activeApprovalRequestId = answerer.latest) }
     }
 
     private companion object {
