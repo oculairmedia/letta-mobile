@@ -51,7 +51,6 @@ internal class WsChatSendCoordinator(
     private val uiState: MutableStateFlow<ChatUiState>,
     clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,
-    @Suppress("UNUSED_PARAMETER") isFreshRoute: Boolean = false,
     setActiveConversationId: (String) -> Unit,
     startTimelineObserver: (String) -> Unit,
     clientVersionProvider: ChatClientVersionProvider,

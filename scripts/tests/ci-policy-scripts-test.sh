@@ -177,7 +177,7 @@ touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/de
   "$repo/android-compose/desktop/src/Main.kt" "$repo/android-compose/cli/src/Cli.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
-assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:testDebugUnitTest"
+assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:test"
 
 # Stacked PR: designsystem landed on the lower branch; this commit only
 # touches app/. Diff vs the stack base must not schedule designsystem.

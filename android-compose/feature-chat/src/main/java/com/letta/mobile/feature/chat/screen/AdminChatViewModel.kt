@@ -91,7 +91,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
 import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
-import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.LocalRuntimeBootstrapConfig
 import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
 import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
@@ -784,7 +784,7 @@ internal class AdminChatViewModel @Inject constructor(
             currentConversationTracker = currentConversationTracker,
             uiState = _uiState,
             updateSessionState = ::updateSessionState,
-            bootstrap = ClientModeBootstrapConfig(
+            bootstrap = LocalRuntimeBootstrapConfig(
                 pendingMessages = { persistentListOf() },
                 setPendingUserMessage = { },
                 currentConversationId = { null },
@@ -803,7 +803,7 @@ internal class AdminChatViewModel @Inject constructor(
                 },
             ),
             send = ConversationSendConfig(
-                viaClientMode = ::sendCoordinatorMessage,
+                viaLocalRuntime = ::sendCoordinatorMessage,
                 viaTimeline = ::sendCoordinatorMessage,
                 markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
             ),
@@ -863,12 +863,10 @@ internal class AdminChatViewModel @Inject constructor(
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
             bannerController = chatBannerController,
-            setClientModeConversationId = { },
             refreshAvailableAgents = ::refreshAvailableAgents,
             observeLastChatSelection = agentSelectionCoordinator::observeLastChatSelection,
             seedAgentNameFromMemoryCache = agentSelectionCoordinator::seedAgentNameFromMemoryCache,
             observeAgentNameCache = agentSelectionCoordinator::observeAgentNameCache,
-            refreshClientModeLocation = { },
             loadProjectAgents = { projectChatCoordinator.loadProjectAgents() },
             loadProjectBrief = { projectChatCoordinator.loadProjectBrief() },
             loadRecentBugReports = { projectChatCoordinator.loadRecentBugReports() },
@@ -876,11 +874,8 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private fun resolveConversationAndLoad(
-        useClientModeForResolve: Boolean = false,
-    ) = chatConversationCoordinator.resolveConversationAndLoad(
-        if (useClientModeForResolve) ConversationAccessMode.Client else ConversationAccessMode.Timeline,
-    )
+    private fun resolveConversationAndLoad() =
+        chatConversationCoordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
 
     fun loadMessages() = chatConversationCoordinator.loadMessages(ConversationAccessMode.Timeline)
 
@@ -896,7 +891,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun loadOlderMessages() {
         if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
-        chatHistoryPager.loadOlderMessages(false)
+        chatHistoryPager.loadOlderMessages()
     }
 
     /** See [ChatHistoryPager.releaseOlderMessages]. */
@@ -978,13 +973,13 @@ internal class AdminChatViewModel @Inject constructor(
             }
             stopTimelineObserverLocked()
             if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-                startLegacyTimelineObserverLocked(conversationId)
+                startLegacyTimelineObserverLocked(ConversationId(conversationId))
                 return
             }
             val capturedRuntime = selectedRuntime
             val hostOpen = pagingHost.openCanonical
             if (capturedRuntime == null && hostOpen == null) {
-                startLegacyTimelineObserverLocked(conversationId)
+                startLegacyTimelineObserverLocked(ConversationId(conversationId))
                 return
             }
             val route = Triple(conversationId, generation, scrollToMessageId)
@@ -1058,8 +1053,8 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob?.start()
     }
 
-    private fun startLegacyTimelineObserverLocked(conversationId: String) {
-        chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+    private fun startLegacyTimelineObserverLocked(conversationId: ConversationId) {
+        chatTimelineObserver.start(agentId.value, conversationId.value, timelineObserverProvenance())
     }
 
     private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }

@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,6 +77,10 @@ internal class TimelineSendCoordinator(
                     sendToConversation(replacementId, otid, text, attachments)
                 }
                 enqueueTimer.stop("otid" to otid, "conversationId" to sentConversationId)
+            } catch (e: CancellationException) {
+                // A cancelled send (scope torn down mid-flight) is not a rejected send: no FAILED
+                // bubble, no error banner; cancellation must keep propagating.
+                throw e
             } catch (e: Exception) {
                 // letta-mobile-mxwtn: send rejected. Flip the optimistic
                 // Local bubble to FAILED so the user sees a retry affordance

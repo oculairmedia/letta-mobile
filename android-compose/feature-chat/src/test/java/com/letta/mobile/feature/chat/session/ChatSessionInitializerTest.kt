@@ -55,8 +55,7 @@ class ChatSessionInitializerTest {
         harness.initializer.run()
         advanceUntilIdle()
 
-        assertEquals(listOf(false), harness.resolveRequests)
-        assertEquals(0, harness.refreshClientModeLocationCount)
+        assertEquals(1, harness.resolveRequests)
         assertEquals(1, harness.loadProjectAgentsCount)
         assertEquals(1, harness.loadProjectBriefCount)
         assertEquals(1, harness.loadRecentBugReportsCount)
@@ -99,16 +98,14 @@ class ChatSessionInitializerTest {
         val runExpansionState = mockk<ChatRunExpansionState>(relaxed = true)
         val bannerController = ChatBannerController(uiState, ChatComposerController())
         val currentConversationTracker = CurrentConversationTracker()
-        var clientModeConversationId: String? = "conv-existing"
         var refreshedAgentsCount = 0
         var observedLastSelection = false
         var seededAgentName = false
         var observedAgentName = false
-        var refreshClientModeLocationCount = 0
         var loadProjectAgentsCount = 0
         var loadProjectBriefCount = 0
         var loadRecentBugReportsCount = 0
-        val resolveRequests = mutableListOf<Boolean>()
+        var resolveRequests = 0
 
         val initializer = ChatSessionInitializer(
             scope = scope,
@@ -123,16 +120,14 @@ class ChatSessionInitializerTest {
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
             bannerController = bannerController,
-            setClientModeConversationId = { clientModeConversationId = it },
             refreshAvailableAgents = { refreshedAgentsCount++ },
             observeLastChatSelection = { observedLastSelection = true },
             seedAgentNameFromMemoryCache = { seededAgentName = true },
             observeAgentNameCache = { observedAgentName = true },
-            refreshClientModeLocation = { refreshClientModeLocationCount++ },
             loadProjectAgents = { loadProjectAgentsCount++ },
             loadProjectBrief = { loadProjectBriefCount++ },
             loadRecentBugReports = { loadRecentBugReportsCount++ },
-            resolveConversationAndLoad = { resolveRequests += it },
+            resolveConversationAndLoad = { resolveRequests++ },
         )
 
         init {
