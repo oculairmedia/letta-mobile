@@ -244,7 +244,7 @@ Medium — Gradle source-set surgery.
 - **4b (this PR):** shared session backend selection + remote descriptor + connection key; Android transport factory is mode-first (LOCAL wins over leftover `iroh://`); both hosts call the same helpers.
 - **4c:** shrink desktop “unavailable repository” stubs where sharedLogic already has HTTP/Iroh/App Server impls.
   - CronRepository + SelfTodoRepository moved to `sharedLogic/commonMain` and bound on desktop.
-  - Iroh admin_rpc *Source clients live in `sharedLogic/jvmAndAndroid`; thin `IrohAdminReadRepositories` binders feed desktop Iroh mode.
+  - Iroh admin_rpc *Source clients live in `sharedLogic/jvmAndAndroid`; `SharedSessionGraph.adminRepositories` (data.session.graph) builds the admin repositories over them for Android and desktop alike (letta-mobile-by4vm.87).
   - Desktop drops `DesktopIroh{Agent,Schedule,Tool}Repository` wrappers (uses shared `Iroh*` directly).
   - Desktop session graph takes a live `channelTransport` slot (Iroh QUIC or HTTP WS side-channel) so Subagent/Cron/SelfTodo share the connected transport.
   - Still stubs (Phase 5): conversation list, project, projectWork, step, vibesync; HTTP-mode admin reads beyond agent/block/schedule/tool.

@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.model.LettaConfig
@@ -23,12 +25,12 @@ import org.junit.jupiter.api.Tag
 class McpServerRepositoryTest {
 
     private lateinit var fakeApi: FakeMcpServerApi
-    private lateinit var repository: McpServerRepository
+    private lateinit var repository: CachedMcpServerRepository
 
     @Before
     fun setup() {
         fakeApi = FakeMcpServerApi()
-        repository = McpServerRepository(fakeApi)
+        repository = CachedMcpServerRepository(fakeApi.bound())
     }
 
     @Test
@@ -60,7 +62,7 @@ class McpServerRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.MCP_SERVERS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = McpServerRepository(apiThatThrows)
+            val repo = CachedMcpServerRepository(apiThatThrows.bound())
             repo.refreshServers()
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -106,7 +108,7 @@ class McpServerRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.MCP_SERVERS, "Raw HTTP forbidden")
             }
         }
-        val repo = McpServerRepository(apiThatThrows, irohSource)
+        val repo = CachedMcpServerRepository(apiThatThrows.bound(), irohSource)
         repo.refreshServers()
         assertEquals(2, repo.servers.value.size)
         assertEquals(1, transport.adminRpcCalls.size)

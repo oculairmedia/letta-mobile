@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -217,7 +218,7 @@ class NotebookStorageFaultsTest {
             // The same canvas, found by id and by conversation, with the same content.
             val store = NotebookCanvasDocumentStore(notebooks)
             val doc = store.get(canvasId)!!
-            assertEquals(doc, store.getForConversation("conversation-bloated"))
+            assertEquals(doc, store.getForConversation(ConversationId("conversation-bloated")))
             assertEquals(Json.parseToJsonElement(bloatedScene), Json.parseToJsonElement(doc.sceneJson))
             assertEquals("Kept text", notebooks.read(moved)!!.markdown)
             // The deleted element is still restorable; its tombstone did not come along.

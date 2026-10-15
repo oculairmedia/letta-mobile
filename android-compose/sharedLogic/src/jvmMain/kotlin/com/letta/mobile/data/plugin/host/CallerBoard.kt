@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.HostCanvasAccess
 import com.letta.mobile.data.canvas.HostCanvasBackend
 import com.letta.mobile.data.canvas.HostCanvasCaller
 import com.letta.mobile.data.canvas.HostCanvasEntry
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlin.uuid.ExperimentalUuidApi
@@ -52,7 +53,7 @@ class CallerBoard(private val backend: HostCanvasBackend) : PluginCanvasAccess {
 
     override suspend fun boardFor(requestedCanvas: String?, call: PluginCallId?): HostCanvasEntry? {
         val who = callerFor(call) ?: return null
-        val access = if (requestedCanvas != null) backend.open(who, requestedCanvas) else backend.ownConversation(who)
+        val access = if (requestedCanvas != null) backend.open(who, CanvasId(requestedCanvas)) else backend.ownConversation(who)
         return (access as? HostCanvasAccess.Granted)?.entry
     }
 

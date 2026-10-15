@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -25,11 +26,11 @@ sealed interface ComposeCompilation {
         val dryRun: Boolean,
         val alreadyPublished: Boolean = false,
     ) : ComposeCompilation {
-        fun receipt(canvasId: String, status: ComposeStatus, revision: Long?, warnings: List<String> = emptyList()): ComposeReceipt =
+        fun receipt(canvasId: CanvasId, status: ComposeStatus, revision: Long?, warnings: List<String> = emptyList()): ComposeReceipt =
             ComposeReceiptFrames.fit(
                 ComposeReceipt(
                     artifactId = artifactId,
-                    canvasId = canvasId,
+                    canvasId = canvasId.value,
                     revision = revision,
                     status = status,
                     title = title,

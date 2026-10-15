@@ -20,7 +20,7 @@ object CanvasSceneRenderGuard {
     private val json = Json { prettyPrint = false }
 
     /** [sceneJson] with only the elements DrawBox can draw; unchanged when all of them can. */
-    fun renderable(sceneJson: String, canvasId: String?): String {
+    fun renderable(sceneJson: String, canvasId: CanvasId?): String {
         if (sceneJson.isBlank()) return sceneJson
         val root = runCatching { json.parseToJsonElement(sceneJson) }.getOrNull() as? JsonObject ?: return sceneJson
         val elements = root["elements"] as? JsonArray ?: return sceneJson
@@ -35,11 +35,11 @@ object CanvasSceneRenderGuard {
     private fun fault(element: JsonElement): String? =
         (element as? JsonObject)?.let(CanvasSceneElementFaults::undecodable) ?: "is not a JSON object".takeIf { element !is JsonObject }
 
-    private fun report(canvasId: String?, element: JsonElement, reason: String) {
+    private fun report(canvasId: CanvasId?, element: JsonElement, reason: String) {
         val obj = element as? JsonObject
         Telemetry.event(
             "Canvas", "scene.elementDropped",
-            "canvasId" to canvasId,
+            "canvasId" to canvasId?.value,
             "elementId" to obj?.stringOf("id"),
             "type" to obj?.stringOf("type"),
             "reason" to reason,

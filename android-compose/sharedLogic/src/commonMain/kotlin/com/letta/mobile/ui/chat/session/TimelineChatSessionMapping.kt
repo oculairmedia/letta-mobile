@@ -53,8 +53,6 @@ data class TimelineRunState(
     val loadError: String? = null,
     /** The last send or control failure; kept until the next send, so the glow reads "failed". */
     val error: String? = null,
-    /** The [error] the page already showed, so it is not shown twice. */
-    val acknowledgedError: String? = null,
     /** A stop was requested and the run has not ended yet. */
     val cancelling: Boolean = false,
     /**
@@ -66,10 +64,15 @@ data class TimelineRunState(
     val submittingApprovals: Set<String> = emptySet(),
 )
 
-/** Timeline view state the page toggles: collapsed runs and expanded reasoning. */
+/**
+ * Timeline view state a session port keeps for the page: collapsed runs, expanded reasoning, and the
+ * page error already shown. letta-mobile-by4vm.98: desktop's port keeps the same state.
+ */
 data class TimelineLocalState(
     val collapsedRunIds: Set<String> = emptySet(),
     val expandedReasoningMessageIds: Set<String> = emptySet(),
+    /** The page error the page already showed (its snackbar), so it is not shown twice. */
+    val acknowledgedError: String? = null,
 ) {
     fun toggleRun(runId: String) = copy(collapsedRunIds = collapsedRunIds.toggle(runId))
 
@@ -105,7 +108,7 @@ fun timelineChatUiState(
     isAgentTyping = presentation.isAgentTyping,
     agentName = target.agentName,
     agentId = target.agentId,
-    error = run.error.takeUnless { it == run.acknowledgedError },
+    error = local.pageError(run.error),
     runFailed = run.error != null,
     collapsedRunIds = local.collapsedRunIds.toImmutableSet(),
     expandedReasoningMessageIds = local.expandedReasoningMessageIds.toImmutableSet(),
@@ -169,7 +172,7 @@ fun ChatComposerError.message(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.AttachmentLoadFailed -> "Could not attach image."
 }
 
-/** What a timeline port can do: images and the controls its transport offers; nothing else yet. */
+/** What a timeline port can do: images, the controls its transport offers, and the host's extensions. */
 fun timelineCapabilities(controls: TimelineChatRunControls) = ChatSurfaceCapabilities(
     attachImages = true,
     rerun = false,

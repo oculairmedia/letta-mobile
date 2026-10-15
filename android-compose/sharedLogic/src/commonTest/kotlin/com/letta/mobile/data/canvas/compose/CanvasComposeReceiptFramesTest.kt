@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
+import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest
@@ -123,7 +124,7 @@ class CanvasComposeReceiptFramesTest {
         val ready = assertIs<ComposeCompilation.Ready>(
             CanvasComposeCompiler.compile(json.parseToJsonElement(REQUEST), JsonObject(scene).toString()) { error("named") },
         )
-        val note = ready.receipt(ComposeBoard.CANVAS, ComposeStatus.PUBLISHED, 2)
+        val note = ready.receipt(CanvasId(ComposeBoard.CANVAS), ComposeStatus.PUBLISHED, 2)
             .items.single { it.key == "n1" }
         assertNull(note.frame, "a missing stored frame is omitted, not a fresh placement")
     }

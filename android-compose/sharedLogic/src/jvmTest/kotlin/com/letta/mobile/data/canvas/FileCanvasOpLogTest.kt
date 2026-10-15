@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
+import com.letta.mobile.data.model.CanvasActorId
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
@@ -97,9 +98,9 @@ class FileCanvasOpLogTest {
                 opLog = FileCanvasOpLog(rootDirectory = tempDir),
             ),
         )
-        session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-b")), fixtures.AGENT)
+        session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-b")), CanvasActorId(fixtures.AGENT))
         session.movePluginElement(fixtures.ID, fixtures.moved)
-        session.applyAgentBatch(listOf(fixtures.progress(0, 0.25)), fixtures.AGENT)
+        session.applyAgentBatch(listOf(fixtures.progress(0, 0.25)), CanvasActorId(fixtures.AGENT))
         session.removePluginElement("pe-b")
         val written = session.opLog.getOps(canvasId, 0L)
 

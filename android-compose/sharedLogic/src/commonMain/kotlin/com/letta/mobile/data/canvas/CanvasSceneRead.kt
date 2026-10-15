@@ -22,10 +22,10 @@ internal object CanvasSceneRead {
         explicitNulls = false
     }
 
-    fun result(sceneJson: String, revision: Long, canvasId: String): CanvasGetSceneResult = CanvasGetSceneResult(
+    fun result(sceneJson: String, revision: Long, canvasId: CanvasId): CanvasGetSceneResult = CanvasGetSceneResult(
         sceneJson = withoutPluginEntries(sceneJson),
         revision = revision,
-        canvasId = canvasId,
+        canvasId = canvasId.value,
         schemaHint = CanvasSceneSchema.hint,
         pluginElements = CanvasOpProjector.pluginElementsOf(sceneJson).map(::compact),
     )

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -33,7 +34,7 @@ class CanvasDeliveryCrashTest {
         }
     }
 
-    private val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+    private val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
 
     private fun note(id: String, lamport: Long) = CanvasOp.AddElementOp(
         id, CanvasSession.LOCAL_USER_ACTOR_ID, lamport, "el-$id", """{"id":"el-$id","type":"Text","text":"$id"}""",

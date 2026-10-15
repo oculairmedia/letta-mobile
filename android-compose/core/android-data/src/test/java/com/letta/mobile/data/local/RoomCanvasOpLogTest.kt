@@ -18,6 +18,7 @@ import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.runBlocking
@@ -175,9 +176,9 @@ class RoomCanvasOpLogTest {
                 opLog = opLog,
             ),
         )
-        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), agent)
+        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), CanvasActorId(agent))
         assertTrue(session.movePluginElement("pe-a", moved) != null)
-        session.applyAgentBatch(listOf(update), agent)
+        session.applyAgentBatch(listOf(update), CanvasActorId(agent))
         assertTrue(session.removePluginElement("pe-b") != null)
         val before = session.pluginElements()
 

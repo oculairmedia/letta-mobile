@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.backend.unavailable
@@ -26,12 +28,12 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class PassageRepositoryTest {
     private lateinit var fakeApi: FakePassageApi
-    private lateinit var repository: PassageRepository
+    private lateinit var repository: CachedPassageRepository
 
     @Before
     fun setup() {
         fakeApi = FakePassageApi()
-        repository = PassageRepository(fakeApi)
+        repository = CachedPassageRepository(fakeApi.bound())
     }
 
     @Test
@@ -74,8 +76,8 @@ class PassageRepositoryTest {
                 AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
             }
         }
-        val irohRepository = PassageRepository(
-            remote = fakeApi,
+        val irohRepository = CachedPassageRepository(
+            remote = fakeApi.bound(),
             irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
         )
 
@@ -125,7 +127,7 @@ class PassageRepositoryTest {
                     throw AppServerRouteUnavailable(SessionRoute.PASSAGES, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = PassageRepository(apiThatThrows)
+            val repo = CachedPassageRepository(apiThatThrows.bound())
             repo.refreshPassages(AgentId("a1"))
         }.exceptionOrNull()
         org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
@@ -160,7 +162,7 @@ class PassageRepositoryTest {
                 throw AppServerRouteUnavailable(SessionRoute.PASSAGES, "Raw HTTP forbidden")
             }
         }
-        val repo = PassageRepository(apiThatThrows, irohSource)
+        val repo = CachedPassageRepository(apiThatThrows.bound(), irohSource)
         repo.refreshPassages(AgentId("a1"))
         repo.getPassages(AgentId("a1")).test {
             assertEquals(1, awaitItem().size)

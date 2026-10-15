@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
@@ -17,7 +18,7 @@ import kotlin.test.assertTrue
  * still joined to the canvas's topic; the op must reach the board, not be skipped.
  */
 class CanvasRelayClosedBoardTest {
-    private val topic = CanvasRelayProtocol.conversationTopic(CONVERSATION)
+    private val topic = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
 
     private class Host {
         val store = InMemoryCanvasRelayStore()
@@ -27,7 +28,7 @@ class CanvasRelayClosedBoardTest {
 
         /** The agent adds a text element through the host's own canvas backend. */
         suspend fun agentDraws(elementId: String): String {
-            val entry = assertIs<HostCanvasAccess.Granted>(backend.conversation(caller, CONVERSATION, claim = true)).entry
+            val entry = assertIs<HostCanvasAccess.Granted>(backend.conversation(caller, ConversationId(CONVERSATION), claim = true)).entry
             val element = buildJsonObject {
                 put("id", elementId)
                 put("type", "Text")
@@ -50,9 +51,9 @@ class CanvasRelayClosedBoardTest {
         return phone
     }
 
-    private suspend fun TestApp.cursor(): Long? = delivery.cursor(HOST, CanvasRelayProtocol.conversationTopic(CONVERSATION))
+    private suspend fun TestApp.cursor(): Long? = delivery.cursor(HOST, CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)))
 
-    private suspend fun TestApp.stored(): String = documents.get(CanvasId.forConversation(CONVERSATION))!!.sceneJson
+    private suspend fun TestApp.stored(): String = documents.get(CanvasId.forConversation(ConversationId(CONVERSATION)))!!.sceneJson
 
     @Test
     fun anOpArrivingWhileTheBoardIsClosedIsOnTheBoardWhenItOpens() = runTest {
@@ -64,7 +65,7 @@ class CanvasRelayClosedBoardTest {
 
         assertTrue("drawn by the agent" in phone.stored(), "written into the stored canvas: ${phone.stored()}")
         assertEquals(host.store.head(topic), phone.cursor(), "applied, so the cursor moves past it")
-        val reopened = CanvasSession.open(phone.documents, CanvasId.forConversation(CONVERSATION), CanvasConversationOptions(opLog = phone.opLog))!!
+        val reopened = CanvasSession.open(phone.documents, CanvasId.forConversation(ConversationId(CONVERSATION)), CanvasConversationOptions(opLog = phone.opLog))!!
         assertTrue("drawn by the agent" in reopened.sceneJsonOrEmpty(), "the board opened later shows it")
         assertEquals(1, phone.opIds().count { it == opId })
     }
@@ -121,7 +122,7 @@ class CanvasRelayClosedBoardTest {
         val host = Host()
         val phone = phoneWithClosedBoard(host, backgroundScope, closedBoard = true)
         val options = CanvasConversationOptions(opLog = phone.opLog, syncTransport = phone.client)
-        val stale = CanvasSession.open(phone.documents, CanvasId.forConversation(CONVERSATION), options)!!
+        val stale = CanvasSession.open(phone.documents, CanvasId.forConversation(ConversationId(CONVERSATION)), options)!!
 
         host.agentDraws("agent-text")
         runCurrent()

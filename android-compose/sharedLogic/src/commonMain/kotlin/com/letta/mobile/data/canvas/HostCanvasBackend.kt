@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
+import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -12,7 +14,10 @@ import kotlin.uuid.Uuid
  * [toolCallId] is the call's own id in the run (letta-mobile-bglj6.12), for a tool that must answer
  * a retried call the same way.
  */
-data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null)
+data class HostCanvasCaller(val agentId: String, val conversationId: String? = null, val toolCallId: String? = null) {
+    /** [agentId] as the actor its canvas ops are stamped with. */
+    val actor: CanvasActorId get() = CanvasActorId(agentId)
+}
 
 /** A canvas's scene as the host's log has it: [revision] is the log's head cursor. */
 data class HostCanvasScene(val sceneJson: String, val revision: Long, val lamport: Long)
@@ -48,10 +53,10 @@ class HostCanvasBackend(
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
     /** The canvas [canvasId] for [caller]: known to the directory, or its own conversation's. */
-    suspend fun open(caller: HostCanvasCaller, canvasId: String): HostCanvasAccess {
+    suspend fun open(caller: HostCanvasCaller, canvasId: CanvasId): HostCanvasAccess {
         directory.get(canvasId)?.let { return readable(caller, it) }
-        val own = caller.conversationId
-        if (own != null && canvasId == CanvasId.forConversation(own).value) return claimConversation(caller, own)
+        val own = caller.conversationId?.let(::ConversationId)
+        if (own != null && canvasId == CanvasId.forConversation(own)) return claimConversation(caller, own)
         return HostCanvasAccess.Denied("Canvas not found: $canvasId")
     }
 
@@ -60,9 +65,9 @@ class HostCanvasBackend(
      * use); another conversation's is the caller's only if the directory lets it read, and otherwise
      * a refusal when the caller asked to [claim] it, or null (nothing to show) when it only looked.
      */
-    suspend fun conversation(caller: HostCanvasCaller, conversationId: String, claim: Boolean): HostCanvasAccess? {
+    suspend fun conversation(caller: HostCanvasCaller, conversationId: ConversationId, claim: Boolean): HostCanvasAccess? {
         directory.forConversation(conversationId)?.let { return readable(caller, it) }
-        if (conversationId == caller.conversationId) return claimConversation(caller, conversationId)
+        if (conversationId.value == caller.conversationId) return claimConversation(caller, conversationId)
         return if (claim) HostCanvasAccess.Denied(notOwnConversation(caller, conversationId)) else null
     }
 
@@ -71,7 +76,7 @@ class HostCanvasBackend(
      * call that names no canvas; null when the caller is in no conversation.
      */
     suspend fun ownConversation(caller: HostCanvasCaller): HostCanvasAccess? =
-        caller.conversationId?.let { conversation(caller, it, claim = true) }
+        caller.conversationId?.let { conversation(caller, ConversationId(it), claim = true) }
 
     /** A new canvas of no conversation, owned by the local user, the caller its writer. */
     suspend fun create(caller: HostCanvasCaller, title: String): HostCanvasEntry {
@@ -83,7 +88,7 @@ class HostCanvasBackend(
 
     /** Every canvas [caller] may read, its own conversation's included. */
     suspend fun list(caller: HostCanvasCaller): List<HostCanvasEntry> {
-        caller.conversationId?.let { conversation(caller, it, claim = false) }
+        caller.conversationId?.let { conversation(caller, ConversationId(it), claim = false) }
         return directory.all().filter { it.acl.canRead(caller.agentId) }
     }
 
@@ -143,7 +148,7 @@ class HostCanvasBackend(
             return HostCanvasCheck.Denied("Unauthorized: actor '${caller.agentId}' cannot write to canvas '${entry.canvasId}'")
         }
         val scene = scene(entry)
-        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.agentId) }, kinds))
+        return HostCanvasCheck.Checked(scene.revision, CanvasBatchValidator.check(scene.sceneJson, ops.map { it.withActor(caller.actor) }, kinds))
     }
 
     private suspend fun send(caller: HostCanvasCaller, entry: HostCanvasEntry, ops: List<CanvasOp>, atomic: Boolean): HostCanvasPublish {
@@ -155,9 +160,9 @@ class HostCanvasBackend(
             )
             val lamport = scene(entry).lamport
             val stamped = if (atomic) {
-                listOf(CanvasStampedBatch.of(ops, caller.agentId, lamport, newOpId))
+                listOf(CanvasStampedBatch.of(ops, caller.actor, lamport, newOpId))
             } else {
-                CanvasStampedBatch.separately(ops, caller.agentId, lamport, newOpId)
+                CanvasStampedBatch.separately(ops, caller.actor, lamport, newOpId)
             }
             stamped.forEach { link.receive(CanvasRelayMessage.Publish(entry.topic, it)) }
             return HostCanvasAcks(stamped).await(replies, ackTimeout)
@@ -167,11 +172,11 @@ class HostCanvasBackend(
         }
     }
 
-    private suspend fun claimConversation(caller: HostCanvasCaller, conversationId: String): HostCanvasAccess {
+    private suspend fun claimConversation(caller: HostCanvasCaller, conversationId: ConversationId): HostCanvasAccess {
         val topic = CanvasRelayProtocol.conversationTopic(conversationId)
         val bound = store.bind(topic, CanvasId.forConversation(conversationId))
         val entry = directory.putIfAbsent(
-            HostCanvasEntry(bound.value, topic, CONVERSATION_CANVAS_TITLE, conversationId, aclFor(caller)),
+            HostCanvasEntry(bound.value, topic, CONVERSATION_CANVAS_TITLE, conversationId.value, aclFor(caller)),
         )
         return readable(caller, entry)
     }
@@ -183,7 +188,7 @@ class HostCanvasBackend(
             HostCanvasAccess.Denied("Unauthorized: actor '${caller.agentId}' cannot read canvas '${entry.canvasId}'")
         }
 
-    private fun notOwnConversation(caller: HostCanvasCaller, conversationId: String): String =
+    private fun notOwnConversation(caller: HostCanvasCaller, conversationId: ConversationId): String =
         "Unauthorized: actor '${caller.agentId}' cannot open the canvas of conversation '$conversationId'"
 
     private companion object {

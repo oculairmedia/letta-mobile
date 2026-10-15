@@ -18,7 +18,6 @@ import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
 import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
-import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.SlashCommandRepository
@@ -194,16 +193,6 @@ abstract class AppModule {
             settingsRepository: ISettingsRepository,
         ): IrohAdminRpcBlockSource = IrohAdminRpcBlockSource(
             channelTransportProvider = transport::get,
-            settingsRepository = settingsRepository,
-        )
-
-        @Provides
-        @Singleton
-        fun provideIrohAdminRpcToolSource(
-            transport: IChannelTransport,
-            settingsRepository: ISettingsRepository,
-        ): IrohAdminRpcToolSource = IrohAdminRpcToolSource(
-            channelTransport = transport,
             settingsRepository = settingsRepository,
         )
 

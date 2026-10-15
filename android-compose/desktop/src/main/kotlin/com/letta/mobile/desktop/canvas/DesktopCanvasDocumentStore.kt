@@ -3,6 +3,8 @@ package com.letta.mobile.desktop.canvas
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -48,9 +50,9 @@ class DesktopCanvasDocumentStore(
         mutex.withLock { readDocumentLocked(id) }
     }
 
-    override suspend fun getForConversation(conversationId: String): CanvasDocument? = withContext(Dispatchers.IO) {
+    override suspend fun getForConversation(conversationId: ConversationId): CanvasDocument? = withContext(Dispatchers.IO) {
         mutex.withLock {
-            loadAllDocumentsInternal().firstOrNull { it.conversationId == conversationId }
+            loadAllDocumentsInternal().firstOrNull { it.conversationId == conversationId.value }
         }
     }
 
@@ -122,9 +124,9 @@ class DesktopCanvasDocumentStore(
         }
     }
 
-    override suspend fun listForAgent(agentId: String): List<CanvasDocument> = withContext(Dispatchers.IO) {
+    override suspend fun listForAgent(agentId: AgentId): List<CanvasDocument> = withContext(Dispatchers.IO) {
         mutex.withLock {
-            loadAllDocumentsInternal().filter { it.agentId == agentId }
+            loadAllDocumentsInternal().filter { it.agentId == agentId.value }
         }
     }
 

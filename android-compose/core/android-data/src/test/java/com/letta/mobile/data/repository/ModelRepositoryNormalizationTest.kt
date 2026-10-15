@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.testutil.FakeModelApi
 import io.mockk.coEvery
@@ -16,7 +18,7 @@ class ModelRepositoryNormalizationTest {
             llmModels += model("lmstudio/MiniMax-M3")
             llmModels += model("openai/MiniMax-M3")
         }
-        val repository = ModelRepository(remote = api)
+        val repository = CachedModelRepository(remote = api.bound())
 
         repository.refreshLlmModels()
 
@@ -29,7 +31,7 @@ class ModelRepositoryNormalizationTest {
 
     @Test
     fun httpCatalogRetainsAllModelsWithoutProviderFiltering() = runTest {
-        val repository = ModelRepository(remote = defaultCatalogApi())
+        val repository = CachedModelRepository(remote = defaultCatalogApi().bound())
 
         repository.refreshLlmModels()
 
@@ -46,8 +48,8 @@ class ModelRepositoryNormalizationTest {
                 model("google/gemini-1.5-pro"),
             )
         }
-        val repository = ModelRepository(
-            remote = FakeModelApi(),
+        val repository = CachedModelRepository(
+            remote = FakeModelApi().bound(),
             irohModelSource = irohSource,
         )
 

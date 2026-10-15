@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -47,7 +48,7 @@ class HostCanvasToolsTest {
     )
 
     private fun ops(vararg op: CanvasOp) = buildJsonObject {
-        put("canvas_id", CanvasId.forConversation("conv-1").value)
+        put("canvas_id", CanvasId.forConversation(ConversationId("conv-1")).value)
         put("ops", JsonArray(op.map { json.encodeToJsonElement<CanvasOp>(it) }))
     }
 
@@ -99,7 +100,7 @@ class HostCanvasToolsTest {
         assertEquals(0L, result.revision)
         assertEquals(393, result.viewport.widthPx)
         assertTrue("candidate" in fixture.rendered.single().first)
-        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
         assertTrue(fixture.store.readAfter(topic, 0L).isEmpty())
 
         val published = fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW, fixture.viewport,
@@ -157,7 +158,7 @@ class HostCanvasToolsTest {
 
         val forbidden = buildJsonObject {
             fixture.viewport.forEach { (key, value) -> put(key, value) }
-            put("canvas_id", CanvasId.forConversation("conv-1").value)
+            put("canvas_id", CanvasId.forConversation(ConversationId("conv-1")).value)
         }
         assertTrue("cannot read" in assertIs<ExternalToolResult.Error>(fixture.registry.invoke(CanvasToolContract.RENDER_PREVIEW,
             forbidden, agentId = "agent-2", conversationId = "conv-2")).error)
@@ -174,7 +175,7 @@ class HostCanvasToolsTest {
         runCurrent()
 
         val listed = host.call(CanvasToolContract.LIST, input(), "agent-1", "conv-1")
-        val canvasId = CanvasId.forConversation("conv-1").value
+        val canvasId = CanvasId.forConversation(ConversationId("conv-1")).value
         assertEquals(listOf(canvasId), json.decodeFromString<CanvasListResult>(listed.content()).ids)
 
         val applied = host.call(CanvasToolContract.APPLY_OPS, ops(addText("el-agent", "from the agent")), "agent-1", "conv-1")
@@ -183,7 +184,7 @@ class HostCanvasToolsTest {
 
         assertTrue("from the agent" in phone.scene(), "the phone shows it: ${phone.scene()}")
         assertTrue("from the agent" in desktop.scene(), "the desktop shows it: ${desktop.scene()}")
-        val logged = host.store.readAfter(CanvasRelayProtocol.conversationTopic("conv-1"), 0L).last()
+        val logged = host.store.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1")), 0L).last()
         assertEquals("agent:agent-1", logged.origin, "the relay knows who it came from")
         assertEquals("agent-1", logged.op.actorId, "the op is the caller's, whatever actor the input named")
         assertEquals(revision, logged.cursor)
@@ -206,14 +207,14 @@ class HostCanvasToolsTest {
     @Test
     fun anAgentCanReachOnlyItsOwnConversationsCanvas() = runTest {
         val host = Host()
-        val canvasId = CanvasId.forConversation("conv-1").value
+        val canvasId = CanvasId.forConversation(ConversationId("conv-1")).value
         host.call(CanvasToolContract.APPLY_OPS, ops(addText("el-1", "private")), "agent-1", "conv-1").content()
 
         val stranger = "agent-2" to "conv-2"
         val strangers = json.decodeFromString<CanvasListResult>(
             host.call(CanvasToolContract.LIST, input(), stranger.first, stranger.second).content(),
         ).ids
-        assertEquals(listOf(CanvasId.forConversation("conv-2").value), strangers, "its own conversation's canvas only")
+        assertEquals(listOf(CanvasId.forConversation(ConversationId("conv-2")).value), strangers, "its own conversation's canvas only")
         assertEquals(
             emptyList(),
             json.decodeFromString<CanvasListResult>(
@@ -309,8 +310,8 @@ class HostCanvasToolsTest {
         phone.connect(host.relay)
         runCurrent()
         val other = RecordingApp("desktop").connect(host.relay)
-        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
-        other.send(CanvasRelayMessage.Join(topic, CanvasId.forConversation("conv-1").value))
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
+        other.send(CanvasRelayMessage.Join(topic, CanvasId.forConversation(ConversationId("conv-1")).value))
         other.send(CanvasRelayMessage.Publish(topic, addText("el-stranger", "from a stranger").copy(opId = "s-1", actorId = "stranger", lamport = 9L)))
         other.send(CanvasRelayMessage.Publish(topic, addText("el-forged", "claims to be the agent").copy(opId = "s-2", actorId = "agent-1", lamport = 10L)))
         runCurrent()
