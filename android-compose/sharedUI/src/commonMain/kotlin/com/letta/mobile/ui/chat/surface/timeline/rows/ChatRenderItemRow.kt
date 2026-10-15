@@ -11,6 +11,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.ui.common.GroupPosition
 
 /**
  * letta-mobile-bglj6.1: renders one timeline item (a single message or a run block) with
@@ -30,18 +32,16 @@ internal fun ChatRenderItemRow(
     LocalRowComposed.current?.invoke(item.key)
     WithRowFontScale(context.fontScale) {
         Column(modifier = modifier.fillMaxWidth()) {
-            when (item) {
-                is ChatRenderItem.RunBlock -> RunBlockRow(item.messages.map { it.first }, context, callbacks)
-                // A lone message holding its run's key draws as that run, as Android does, so the
-                // row keeps its shape when a sibling step lands and it becomes a run block.
-                is ChatRenderItem.Single -> {
-                    val inRun = item.stableRunId != null || item.stableRunKey != null
-                    if (inRun) {
-                        RunBlockRow(listOf(item.message), context, callbacks, item.groupPosition)
-                    } else {
-                        ChatMessageRow(item.message, context, callbacks, item.groupPosition)
-                    }
-                }
+            // A lone message holding its run's key draws as that run, as Android does, so the row
+            // keeps its shape when a sibling step lands and it becomes a run block. Both shapes go
+            // through the one RunBlockRow call: a live reply streams as such a lone message and
+            // settles as a one-message run block, and two call sites tore the run down and rebuilt
+            // it at settle, its body drawing empty for a frame (letta-mobile-by4vm.105).
+            val run = item.runMessages()
+            if (run != null) {
+                RunBlockRow(run, context, callbacks, item.loneGroupPosition())
+            } else if (item is ChatRenderItem.Single) {
+                ChatMessageRow(item.message, context, callbacks, item.groupPosition)
             }
         }
     }
@@ -136,4 +136,16 @@ internal object ChatRowTestTags {
     const val IMAGE_VIEWER = "chat-image-viewer"
     const val CLOCK = "chat-row-clock"
     const val SPEAKER_HEADER = "chat-row-speaker-header"
+}
+
+/** The messages [this] draws as a run, or null for a lone message outside any run. */
+private fun ChatRenderItem.runMessages(): List<UiMessage>? = when (this) {
+    is ChatRenderItem.RunBlock -> messages.map { it.first }
+    is ChatRenderItem.Single -> listOf(message).takeIf { stableRunId != null || stableRunKey != null }
+}
+
+/** A lone message's place in its speaker's group; a run block has none of its own. */
+private fun ChatRenderItem.loneGroupPosition(): GroupPosition = when (this) {
+    is ChatRenderItem.RunBlock -> GroupPosition.None
+    is ChatRenderItem.Single -> groupPosition
 }
