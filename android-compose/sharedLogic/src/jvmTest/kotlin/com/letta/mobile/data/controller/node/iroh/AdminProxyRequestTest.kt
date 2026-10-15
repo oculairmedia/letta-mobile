@@ -82,7 +82,7 @@ class AdminProxyRequestTest {
     fun deprecatedGoalCommandIsCapabilityUnavailable() = runTest {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        GoalAdminHandlers.register(router, "http://admin.local")
+        GoalAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(
