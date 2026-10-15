@@ -13,10 +13,10 @@ assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to con
 # Keep the required Android jobs fanned out. Reintroducing a dependency from
 # build-apk to test adds the full test duration to the workflow critical path.
 android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
-# Required Android/perf workflows must report on Cloud Agent stacked feat/**
-# and cursor/** PRs, not only main and letta/**. pull_request.branches filters
-# the PR base. Missing these patterns is why stacked reviews never got
-# test / build-apk-pass / shared-multiplatform / perf-gate.
+# Required Android workflows (and the perf-scripts self-test) must report on
+# Cloud Agent stacked feat/** and cursor/** PRs, not only main and letta/**.
+# pull_request.branches filters the PR base. Missing these patterns is why
+# stacked reviews never got test / build-apk-pass / shared-multiplatform.
 android_workflow_text="$(<"$android_workflow")"
 assert_contains "$android_workflow_text" '- "feat/**"'
 assert_contains "$android_workflow_text" '- "cursor/**"'
@@ -63,8 +63,16 @@ assert_contains "$perf_workflow" '- "cursor/**"'
 assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
 assert_contains "$perf_workflow" '  perf-gate:'
 assert_contains "$perf_workflow" 'Classify performance impact'
-assert_contains "$perf_workflow" "if: steps.classify.outputs.run_benchmark == 'true'"
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
+# The ~30 min emulator macrobenchmark is nightly + main, not a PR gate. PRs run
+# only the cheap perf-scripts self-test unless they edit the gate itself or ask
+# for [perf:rebaseline]; a red nightly/main run files "perf-gate regression".
+assert_contains "$perf_workflow" '  perf-scripts:'
+assert_contains "$perf_workflow" '    - cron: '
+assert_contains "$perf_workflow" "if: needs.perf-scripts.outputs.run_benchmark == 'true'"
+assert_contains "$perf_workflow" 'run_benchmark=false'
+assert_contains "$perf_workflow" 'TITLE: perf-gate regression'
+assert_contains "$perf_workflow" 'issues: write'
 
 # The pre-push PR readiness checklist (AGENTS.md) names exactly which checks are
 # required (block merge) versus advisory (never block). Lock the truth into CI
@@ -76,9 +84,14 @@ branch_protection="$(
     --jq '.required_status_checks.contexts | sort | join(",")' \
     2>/dev/null || echo ''
 )"
-if [[ -n "$branch_protection" ]]; then
+# perf-gate left the required set when it moved to nightly + main. Until the
+# live protection rule is updated, tolerate the old set with a loud note so this
+# suite does not go red on a repo-admin setting it cannot change.
+if [[ "$branch_protection" == 'build-apk-pass,perf-gate,shared-multiplatform,test' ]]; then
+  echo "ci-policy-scripts-test: branch protection still requires perf-gate; remove it (perf-gate is nightly + main now)" >&2
+elif [[ -n "$branch_protection" ]]; then
   assert_eq "$branch_protection" \
-    'build-apk-pass,perf-gate,shared-multiplatform,test'
+    'build-apk-pass,shared-multiplatform,test'
 else
   echo "ci-policy-scripts-test: skipping branch-protection assertion (gh unavailable)" >&2
 fi

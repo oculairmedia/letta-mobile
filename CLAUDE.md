@@ -98,7 +98,8 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 ```
 
 **CI at a glance** (full table: "CI map" in `AGENTS.md`):
-- **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`, `perf-gate` (one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry).
+- **Required** (branch protection): `test`, `build-apk-pass` (play-release builds on main pushes only), `shared-multiplatform`.
+- **Nightly + main, not a PR gate:** `perf-gate` (emulator startup macrobenchmark, one measurement; on a breach the job summary shows the last 5 main runs as a control and a human decides whether to rerun — no automatic retry; a red nightly/main run opens or updates the `perf-gate regression` issue). PRs run only the cheap `perf-scripts` self-test unless they edit the perf gate or use `[perf:rebaseline]`.
 - **Not required, but honest** (red = a new problem in your diff): `detekt` (baselined), `Platform UI gate` (`--enforce`: a new platform `@Composable` file fails), `main module tests` (main pushes only: `:sharedUI:jvmTest :desktop:test`).
 - **Advisory** (never fail): `Advisory AGENTS.md policy`, `row goldens (advisory)`, `Export architecture graph`; CodeScene is external and still expected green.
 - **Not run in CI:** `:sharedLogic:allTests`, the `app/src/androidTest` device tests. Qodana was removed (its license token had been declined since 2026-09).

@@ -22,7 +22,7 @@ reference docs land. Tracked in `letta-mobile-84oa`.
 
 | Symptom | Branch | Primary tool |
 | --- | --- | --- |
-| CI perf gate failed on a PR | [Cold start regressed](#1-cold-start-regressed) | Perf gate artifact + local macrobench |
+| CI perf gate failed (nightly / main; `perf-gate regression` issue) | [Cold start regressed](#1-cold-start-regressed) | Perf gate artifact + local macrobench |
 | Field reports of choppy scroll / typing in release | [Release jank regressed](#2-release-jank-regressed) | Sentry jank events + sample-rate bump |
 | ANR rate climbing in Play vitals or Sentry | [ANR rate climbing](#3-anr-rate-climbing) | Sentry ANR/crash dashboard |
 | Crash-free sessions dropped below budget | [Crash-free dropped](#4-crash-free-sessions-dropped) | Sentry ANR/crash dashboard |
@@ -33,7 +33,9 @@ reference docs land. Tracked in `letta-mobile-84oa`.
 
 ### 1. Cold start regressed
 
-**Trigger.** `Android Perf Gate / perf-gate` CI job failed on a PR, or a
+**Trigger.** `Android Perf Gate / perf-gate` failed on the nightly or a main
+push (the `perf-gate regression` issue was opened or updated), or on a PR that
+opted in, or a
 local macrobench run shows `startup.cold.p95_ms` above the
 `+50%` ceiling defined in `android-compose/perf/baselines.json` (letta-mobile-3gpwo).
 
@@ -51,7 +53,8 @@ local macrobench run shows `startup.cold.p95_ms` above the
 3. Read the "Perf control: last main runs" table in the failing job's summary.
    The gate measures once and never reruns itself (letta-mobile-by4vm.32). If
    main runs also sit at or over the ceiling, the runner moved: one manual rerun,
-   noted on the PR with the control line, is legitimate.
+   noted on the `perf-gate regression` issue with the control line, is legitimate.
+   Otherwise bisect over the main commits since the last green nightly.
 4. If main stays under the ceiling, treat it as a real regression. Do **not**
    widen tolerances reactively or rerun repeatedly to get green.
 5. Reproduce locally if you have the canonical emulator available — see

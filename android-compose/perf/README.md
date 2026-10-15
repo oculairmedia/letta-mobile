@@ -16,9 +16,10 @@ Tracks issue `letta-mobile-o7ob.4.1`.
   next to the last 5 main runs in the job summary. There is no automatic
   retry; a human reruns only when that control shows the runner moved.
 
-The perf-gate job runs `python3 -m unittest discover -s perf -p 'test_*.py'`
+The `perf-scripts` job runs `python3 -m unittest discover -s perf -p 'test_*.py'`
 and `scripts/ci/baseline-profile-staleness.py` (warns when the committed
-Baseline Profile no longer resolves) on every run.
+Baseline Profile no longer resolves) on every PR, main push and nightly run.
+The `perf-gate` macrobenchmark itself runs nightly and on main pushes, not on PRs.
 
 ## Workflow
 
