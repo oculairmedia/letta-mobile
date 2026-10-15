@@ -70,6 +70,15 @@ class ReconnectingAppServerClientTest {
             AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = true)
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
+
+        val executed = mutableListOf<AppServerCommand.ExecuteCommand>()
+
+        override suspend fun executeCommand(
+            command: AppServerCommand.ExecuteCommand,
+        ): AppServerInboundFrame.ExecuteCommandResponse {
+            executed += command
+            return AppServerInboundFrame.ExecuteCommandResponse(requestId = command.requestId, success = true)
+        }
     }
 
     private class FakeGeneration {
@@ -145,6 +154,23 @@ class ReconnectingAppServerClientTest {
             client.sync(AppServerCommand.Sync(runtime = runtime, requestId = "s1"))
         }
         job.cancel()
+    }
+
+    @Test
+    fun forwardsExecuteCommandToTheReadyGeneration() = runTest {
+        val gen = FakeGeneration()
+        val client = ReconnectingAppServerClient(connect = { gen.handle() }, backoff = backoff())
+        client.start(backgroundScope)
+        runCurrent()
+        gen.ready()
+        runCurrent()
+
+        val response = client.executeCommand(
+            AppServerCommand.ExecuteCommand(requestId = "e1", commandId = "context-limit", args = "500000", runtime = runtime),
+        )
+
+        assertTrue(response.success)
+        assertEquals(listOf("context-limit"), gen.client.executed.map { it.commandId })
     }
 
     @Test
