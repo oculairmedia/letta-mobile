@@ -25,13 +25,13 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * The boards a plugin may place on. The host runtime (letta-mobile-cdgpr.6) binds it to the board
- * of the call that invoked the plugin; [requestedCanvasId] is what the emit named, if anything.
+ * The boards a plugin may place on. The host runtime binds it to the board of the call [call] names
+ * (letta-mobile-cdgpr.16, [CallerBoard]); [requestedCanvas] is what the emit named, if anything.
  * Null refuses the emit. Being handed a board is the plugin's write grant on it: a board's ACL lists
  * agents and users, never plugins.
  */
 fun interface PluginCanvasAccess {
-    suspend fun boardFor(requestedCanvasId: String?): HostCanvasEntry?
+    suspend fun boardFor(requestedCanvas: String?, call: PluginCallId?): HostCanvasEntry?
 }
 
 /**
@@ -74,7 +74,8 @@ class PlacementCompiler(
         checkOwnership(emit)
         val compiled = compile(emit)
         if (compiled.ops.isEmpty()) return EmitReceipt(refused = compiled.refused)
-        val board = access.boardFor(boardOf(emit)) ?: throw refuse(PluginRefusal.NO_CANVAS, "no board is open to $pluginId")
+        val board = access.boardFor(boardOf(emit), emit.callId?.let(::PluginCallId))
+            ?: throw refuse(PluginRefusal.NO_CANVAS, "no board is open to $pluginId for this emit; echo the call's context.callId")
         val granted = board.copy(acl = board.acl.copy(writerAgentIds = board.acl.writerAgentIds + actorId))
         return when (val published = backend.publish(HostCanvasCaller(actorId), granted, compiled.ops, atomic = true)) {
             is HostCanvasPublish.Published -> EmitReceipt(compiled.placed, compiled.refused)

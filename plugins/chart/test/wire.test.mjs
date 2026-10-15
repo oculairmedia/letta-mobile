@@ -43,13 +43,13 @@ test('the handshake chooses contract 1, or refuses -32004 with what it supports'
   assert.equal(refused.error.code, -32004);
   assert.deepEqual(refused.error.data, { supported: [1] });
   const ok = await host.request('plugin.initialize', SESSION.initialize);
-  assert.deepEqual(ok.result, { ok: true, contractVersion: 1, pluginInfo: { build: '1.0.0' } });
+  assert.deepEqual(ok.result, { ok: true, contractVersion: 1, pluginInfo: { build: '1.1.0' } });
   assert.equal((await host.request('plugin.initialize', SESSION.initialize)).error.code, -32003);
   assert.equal((await host.request('action.invoke', SESSION.plot)).error.code, -32003, 'action.invoke needs active');
   assert.equal(await host.close(), 0);
 });
 
-test('plot uploads a PNG and places a chart whose snapshot is that asset', async () => {
+test('plot uploads a PNG and places a v2 chart (array props) whose snapshot is that asset, for the invoking call', async () => {
   const host = await ready(new FakeHost());
   const answer = await host.request('action.invoke', SESSION.plot);
   assert.deepEqual(answer.result, { text: 'Placed a bar chart "Revenue" (el-1)', structured: { elementId: 'el-1', kind: 'bar' } });
@@ -59,11 +59,12 @@ test('plot uploads a PNG and places a chart whose snapshot is that asset', async
   assert.deepEqual(emit, {
     place: [{
       kind: 'chart',
-      v: 1,
-      props: { kind: 'bar', title: 'Revenue', labels: '["Q1","Q2","Q3","Q4"]', values: '[3,5,2,6]' },
+      v: 2,
+      props: { kind: 'bar', title: 'Revenue', labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [3, 5, 2, 6] },
       fallback: { title: 'Revenue', subtitle: 'bar chart, 4 points', icon: 'chart' },
       snapshot: { type: 'asset', ref: `sha256:${host.assets[0].sha256}` },
     }],
+    callId: 'c-1',
   });
   assert.equal(await host.close(), 0);
 });
@@ -86,9 +87,16 @@ test('toggle flips the kind, re-uploads and updates the element; again flips bac
 
 test('toggle of a chart the plugin does not know uses the props the page sent, or fails unknown_element', async () => {
   const host = await ready(new FakeHost());
-  const props = { kind: 'line', title: 'Load', labels: '["a","b"]', values: '[1,2]' };
+  const props = { kind: 'line', title: 'Load', labels: ['a', 'b'], values: [1, 2] };
   const fromPage = await host.request('action.invoke', { ...SESSION.toggle, input: props });
   assert.equal(fromPage.result.structured.kind, 'bar');
+  assert.deepEqual(host.emits[0].update[0].props, { kind: 'bar', title: 'Load', labels: ['a', 'b'], values: [1, 2] });
+  assert.equal('callId' in host.emits[0], false, 'a call without a callId emits none');
+  const v1 = { kind: 'bar', title: 'Old', labels: '["x"]', values: '[7]' };
+  const fromV1 = await host.request('action.invoke', { ...SESSION.toggle, input: v1, context: { origin: { type: 'view', elementId: 'el-7' }, elementId: 'el-7', callId: 'c-9' } });
+  assert.equal(fromV1.result.structured.kind, 'line', 'a v1 element\'s JSON-text props still toggle');
+  assert.deepEqual(host.emits[1].update[0].props, { kind: 'line', title: 'Old', labels: ['x'], values: [7] }, 'and are written back as v2 arrays');
+  assert.equal(host.emits[1].callId, 'c-9', 'the emit names the call it belongs to');
   const unknown = await host.request('action.invoke', { ...SESSION.toggle, context: { origin: { type: 'view', elementId: 'el-9' }, elementId: 'el-9' } });
   assert.deepEqual(unknown.error, { code: -32010, message: 'no chart el-9 to toggle', data: { code: 'unknown_element' } });
   assert.equal(await host.close(), 0);

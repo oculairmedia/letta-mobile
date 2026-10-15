@@ -77,7 +77,9 @@ class ChartPluginEndToEndTest {
         val placed = host.emits[0].place.single()
         assertEquals("chart", placed.kind)
         assertEquals("bar", placed.props.getValue("kind").jsonPrimitive.content)
-        assertEquals("[3,5,2,6]", placed.props.getValue("values").jsonPrimitive.content)
+        assertEquals(2, placed.v, "the chart kind's v2 props")
+        assertEquals(JsonArray(listOf(3, 5, 2, 6).map(::JsonPrimitive)), placed.props.getValue("values"))
+        assertEquals("c-1", host.emits[0].callId, "the emit names the call that asked for it")
         assertEquals(SnapshotSource.Asset("sha256:${host.assets[0].sha256}"), placed.snapshot)
         val updated = host.emits[1].update.single()
         assertEquals("el-1", updated.elementId)
@@ -105,7 +107,7 @@ class ChartPluginEndToEndTest {
                 put("labels", JsonArray(listOf("Q1", "Q2", "Q3", "Q4").map(::JsonPrimitive)))
                 put("values", JsonArray(listOf(3, 5, 2, 6).map(::JsonPrimitive)))
             },
-            ActionContext(ActionOrigin.Agent("agent-1", "conv-1", "call-1")),
+            ActionContext(ActionOrigin.Agent("agent-1", "conv-1", "call-1"), callId = "c-1"),
         )
 
         val TOGGLE = ActionCall(

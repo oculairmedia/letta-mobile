@@ -2,14 +2,14 @@
   "manifestVersion": 1,
   "id": "letta.chart",
   "name": "Chart",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "oculairmedia",
   "contract": { "version": 1 },
   "runtime": { "kind": "process", "command": "node", "args": ["server.mjs"], "cwd": "." },
   "capabilities": ["canvas:place", "assets:write", "ui:pages"],
   "elements": {
     "chart": {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "props": {
         "type": "object",
         "additionalProperties": false,
@@ -17,8 +17,8 @@
         "properties": {
           "kind": { "enum": ["bar", "line"] },
           "title": { "type": "string", "maxLength": 120 },
-          "labels": { "type": "string", "maxLength": 1024, "description": "the labels as a JSON array of strings (props are flat)" },
-          "values": { "type": "string", "maxLength": 1024, "description": "the values as a JSON array of numbers (props are flat)" }
+          "labels": { "type": "array", "maxItems": 24, "items": { "type": "string", "maxLength": 32 } },
+          "values": { "type": "array", "maxItems": 24, "items": { "type": "number" } }
         }
       },
       "defaultSize": { "width": 320, "height": 200 },
@@ -49,8 +49,8 @@
         "properties": {
           "kind": { "enum": ["bar", "line"] },
           "title": { "type": "string", "maxLength": 120 },
-          "labels": { "type": "string", "maxLength": 1024 },
-          "values": { "type": "string", "maxLength": 1024 }
+          "labels": { "type": "array", "maxItems": 24, "items": { "type": "string", "maxLength": 32 } },
+          "values": { "type": "array", "maxItems": 24, "items": { "type": "number" } }
         }
       }
     }

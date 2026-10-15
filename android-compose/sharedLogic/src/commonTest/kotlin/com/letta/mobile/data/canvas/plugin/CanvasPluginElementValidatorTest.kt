@@ -69,6 +69,8 @@ class CanvasPluginElementValidatorTest {
             "/props" to good.copy(props = props("blob" to "x".repeat(CanvasPluginElementSchema.PROPS.max))),
             "/props/nested" to good.copy(props = JsonObject(mapOf("nested" to JsonObject(emptyMap())))),
             "/meta/list" to good.copy(meta = JsonObject(mapOf("list" to JsonArray(emptyList())))),
+            "/props/rows" to good.copy(props = JsonObject(mapOf("rows" to JsonArray(listOf(JsonObject(emptyMap())))))),
+            "/props/many" to good.copy(props = JsonObject(mapOf("many" to JsonArray(List(CanvasPluginElementSchema.MAX_PROPS_ARRAY_ITEMS + 1) { JsonPrimitive(1) })))),
             "/snapshot/assetRef" to good.copy(snapshot = snapshot.copy(assetRef = "https://example.test/a.png")),
             "/snapshot/mediaType" to good.copy(snapshot = snapshot.copy(mediaType = "text/html")),
             "/snapshot/width" to good.copy(snapshot = snapshot.copy(width = 0)),
@@ -83,6 +85,20 @@ class CanvasPluginElementValidatorTest {
         assertRefusedAt("/fallback/openUrl", good.copy(fallback = fallback.copy(openUrl = "https://x.test/" + "p".repeat(CanvasPluginElementSchema.OPEN_URL.max))))
         assertRefusedAt("/v", good.copy(v = null))
         assertRefusedAt("/v", progress(2, 0.5).copy(v = 2))
+    }
+
+    @Test
+    fun propsMayHoldArraysOfScalarsWithinTheirSize() {
+        val arrays = JsonObject(
+            mapOf(
+                "labels" to JsonArray(listOf("Q1", "Q2").map(::JsonPrimitive)),
+                "values" to JsonArray(listOf(3, 5).map(::JsonPrimitive)),
+                "empty" to JsonArray(emptyList()),
+            ),
+        )
+        assertEquals(emptyList(), CanvasPluginElementSchema.check(place(1).copy(props = arrays)))
+        val nulls = place(1).copy(props = JsonObject(mapOf("labels" to JsonArray(listOf(kotlinx.serialization.json.JsonNull)))))
+        assertRefusedAt("/props/labels", nulls)
     }
 
     @Test

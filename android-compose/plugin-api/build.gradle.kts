@@ -13,7 +13,7 @@ plugins {
 
 // The SPI version; its major is the manifest's `contract.version` (PluginApi.CONTRACT_VERSION).
 group = "com.letta.mobile"
-version = "1.0.0"
+version = "1.1.0"
 
 kotlin {
     explicitApi()

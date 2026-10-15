@@ -55,6 +55,17 @@ class PluginManifestTest {
     }
 
     @Test
+    fun aPropsFieldMayBeABoundedArrayOfScalars() {
+        val manifest = manifest(
+            "/elements/widget/props/properties/labels" to json("""{"type":"array","maxItems":24,"items":{"type":"string","maxLength":32}}"""),
+            "/elements/widget/props/properties/values" to json("""{"type":"array","maxItems":256,"items":{"type":"number"}}"""),
+            "/elements/widget/props/properties/modes" to json("""{"type":"array","maxItems":2,"items":{"enum":["bar","line"]}}"""),
+        )
+        val fields = (manifest.elements.getValue("widget").props.getValue("properties") as kotlinx.serialization.json.JsonObject).keys
+        assertTrue(fields.containsAll(listOf("labels", "values", "modes")), "fields $fields")
+    }
+
+    @Test
     fun anAgentToolNameOverSixtyFourCharactersIsRefusedAtTheAction() {
         val segment = "a".repeat(40)
         val document = JsonPatch.set(exampleDocument, "/id", JsonPrimitive("letta.$segment"))

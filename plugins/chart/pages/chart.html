@@ -43,9 +43,13 @@
     return svg.appendChild(node);
   }
 
-  // Element props are flat: labels and values are JSON arrays carried as strings.
+  // v2 props carry labels and values as arrays; a v1 element carried them as JSON text.
+  function arrayOf(v) { return typeof v === 'string' ? JSON.parse(v) : v; }
   function parse(p) {
-    try { return { kind: p.kind, title: p.title, labels: JSON.parse(p.labels), values: JSON.parse(p.values) }; }
+    try {
+      var c = { kind: p.kind, title: p.title, labels: arrayOf(p.labels), values: arrayOf(p.values) };
+      return Array.isArray(c.labels) && Array.isArray(c.values) ? c : null;
+    }
     catch (e) { return null; }
   }
 
@@ -89,7 +93,7 @@
   }
 
   if (!view) {
-    props = { kind: 'bar', title: 'Demo', labels: '["Q1","Q2","Q3","Q4"]', values: '[3,5,2,6]' };
+    props = { kind: 'bar', title: 'Demo', labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [3, 5, 2, 6] };
     draw();
     return;
   }
@@ -105,7 +109,7 @@
   button.addEventListener('click', function () {
     if (!props) return;
     button.disabled = true;
-    view.action('toggle', props).then(function (result) {
+    view.action('toggle', parse(props) || props).then(function (result) {
       var kind = result && result.structured && result.structured.kind;
       if (kind) { props = Object.assign({}, props, { kind: kind }); draw(); }
     }, function (error) {

@@ -39,7 +39,8 @@ Related guarantees with their own tests: LCP method deadlines and the 4 MiB mess
 Every plugin event is a typed `PluginHostEvent`, reported as `plugin.<wire>` under the `PluginHost`
 tag through `PluginHostEvents`. The events are install, update, consent, enable, disable, remove,
 active, fault, restart, invoke (with latency and outcome), refused (with reason), asset (bytes),
-log, stderr (scrubbed, WARN), view_open, view_fail, kill_switch and registry_unreadable.
+log, stderr (scrubbed, WARN), view_open, view_fail, kill_switch, registry_unreadable and
+quota_store_failed.
 `PluginTelemetryTest.everyEventInTheSetIsEmittedBySomePath` fails if any event has no emitter or if
 an untyped one appears.
 
