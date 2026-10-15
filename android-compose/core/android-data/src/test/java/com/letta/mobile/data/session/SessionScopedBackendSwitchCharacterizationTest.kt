@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
@@ -28,23 +27,19 @@ import org.junit.Test
 /**
  * letta-mobile-by4vm.88: characterization of what the Hilt-bound session-scoped repositories do
  * when the user switches backends. Written against the hand-written SessionScoped* proxies before
- * they were replaced; [Bound] is the only part that names the implementation.
+ * they were replaced by [sessionScoped]; [Bound] is the only part that names the implementation
+ * (it constructed the old proxies, and the proxies themselves were the caches).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionScopedBackendSwitchCharacterizationTest {
 
     /** How production binds each interface; the tests below never construct an implementation. */
-    private class Bound(sessionManager: SessionManager, scope: CoroutineScope) {
-        val agents: IAgentRepository = SessionScopedAgentRepository(sessionManager, scope)
-        val conversations: IConversationRepository = SessionScopedConversationRepository(sessionManager)
-        val allConversations: IAllConversationsRepository = SessionScopedAllConversationsRepository(sessionManager, scope)
-        val passages: IPassageRepository = SessionScopedPassageRepository(sessionManager, scope)
-        val caches: Set<BackendScopedCache> = setOf(
-            agents as BackendScopedCache,
-            conversations as BackendScopedCache,
-            allConversations as BackendScopedCache,
-            passages as BackendScopedCache,
-        )
+    private class Bound(sessionManager: SessionManager) {
+        val agents: IAgentRepository = sessionManager.scopedAgentRepository()
+        val conversations: IConversationRepository =
+            sessionManager.sessionScoped(IConversationRepository::class) { it.conversationRepository }
+        val allConversations: IAllConversationsRepository = sessionManager.scopedAllConversationsRepository()
+        val caches: Set<BackendScopedCache> = sessionManager.sessionBackendScopedCaches()
     }
 
     private class Harness(val settings: FakeSettingsRepository, val bound: Bound) {
@@ -61,7 +56,7 @@ class SessionScopedBackendSwitchCharacterizationTest {
             sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory(setup),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        return Harness(settings, Bound(sessionManager, CoroutineScope(SupervisorJob() + dispatcher)))
+        return Harness(settings, Bound(sessionManager))
     }
 
     @Test
@@ -69,7 +64,8 @@ class SessionScopedBackendSwitchCharacterizationTest {
         val api = FakeAgentApi().apply { agents = mutableListOf(TestData.agent(id = "agent-a")) }
         val h = harness { agentApi = api }
         val seen = mutableListOf<List<String>>()
-        val collector = h.bound.agents.agents.onEach { list -> seen += list.map { it.id.value } }.launchIn(backgroundScope)
+        // A foreground collector: advanceUntilIdle does not wait for backgroundScope tasks.
+        val collector = h.bound.agents.agents.onEach { list -> seen += list.map { it.id.value } }.launchIn(this)
 
         h.bound.agents.refreshAgents()
         advanceUntilIdle()
@@ -94,9 +90,9 @@ class SessionScopedBackendSwitchCharacterizationTest {
         }
         val h = harness { conversationApi = api }
         val seen = mutableListOf<List<String>>()
-        h.bound.conversations.getConversations(AgentId("agent-1"))
+        val collector = h.bound.conversations.getConversations(AgentId("agent-1"))
             .onEach { list -> seen += list.map { it.id.value } }
-            .launchIn(backgroundScope)
+            .launchIn(this)
 
         h.bound.conversations.refreshConversations(AgentId("agent-1"))
         advanceUntilIdle()
@@ -108,6 +104,7 @@ class SessionScopedBackendSwitchCharacterizationTest {
 
         assertTrue(seen.contains(listOf("conv-a")))
         assertEquals(listOf("conv-b"), seen.last())
+        collector.cancel()
     }
 
     @Test
