@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySour
 import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
+import com.letta.mobile.data.controller.node.iroh.NativeSlashCommandCatalog
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistryPublisher
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -100,8 +101,11 @@ fun buildProductionAdminRouter(
         null
     }
     val subagentSource = subagentRegistrySource ?: requireNotNull(nativeSource)
+    // letta-mobile-by4vm.84: slash commands ride update_device_status on the runtime lane.
+    val slashCommands = nativeClient?.let { NativeSlashCommandCatalog() }
     if (nativeClient != null && eventScope != null) {
         skillsCatalog.start(eventScope, nativeClient.events)
+        slashCommands?.start(eventScope, nativeClient.events)
     }
     return AdminRpcRegistry.buildRouter(
         controller = controller,
@@ -111,6 +115,7 @@ fun buildProductionAdminRouter(
         vibesyncBaseUrl = vibesyncBaseUrl,
         localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
+        slashCommands = slashCommands,
         agentChanges = agentChanges,
         conversationChanges = conversationChanges,
         modelExposureFile = modelExposureFile,
