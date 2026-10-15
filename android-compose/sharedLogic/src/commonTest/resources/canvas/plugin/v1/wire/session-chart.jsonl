@@ -1,16 +1,16 @@
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":1,"method":"plugin.initialize","params":{"contractVersion":1,"contractVersions":[1],"pluginId":"letta.chart","settings":{},"hostInfo":{"name":"letta-host","version":"test"}}}}
-{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"build":"1.0.0"}}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":1,"result":{"ok":true,"contractVersion":1,"pluginInfo":{"build":"1.1.0"}}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":2,"method":"plugin.activate","params":{}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","method":"host.log","params":{"level":"info","message":"chart plugin activated"}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":2,"result":{}}}
-{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":3,"method":"action.invoke","params":{"action":"plot","input":{"kind":"bar","title":"Revenue","labels":["Q1","Q2","Q3","Q4"],"values":[3,5,2,6]},"context":{"origin":{"type":"agent","agentId":"agent-1","conversationId":"conv-1","toolCallId":"call-1"}}}}}
+{"dir":"host->plugin","message":{"jsonrpc":"2.0","id":3,"method":"action.invoke","params":{"action":"plot","input":{"kind":"bar","title":"Revenue","labels":["Q1","Q2","Q3","Q4"],"values":[3,5,2,6]},"context":{"origin":{"type":"agent","agentId":"agent-1","conversationId":"conv-1","toolCallId":"call-1"},"callId":"c-1"}}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-1","method":"host.putAsset.begin","params":{"mediaType":"image/png","byteSize":414}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-1","result":{"uploadId":"upload-1"}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-2","method":"host.putAsset.chunk","params":{"uploadId":"upload-1","index":0,"base64":"iVBORw0KGgoAAAANSUhEUgAAAUAAAADICAMAAACu2siZAAAADFBMVEX///9gYGhnUKTk5Or3kBpZAAABTUlEQVR42u3bMQ6AIBBFwVXvf2d7CwlRkiV/Xi8hI1tulSRJkiRJ4R1XSudEj09fAWOeygzgzAsECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIECBAgQIAAAQIEmAa46LoAAQIECBAgQIAAAQIECBAgQIC7A/ZbrLLqZYQBAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAowDXLShlbrq9dtvSh1hgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAA3PgggQIAAAQIECBAgQIAAAQIECPALYPdVrw4HeYFGGCBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECBAgAABAgQIECDAxYAaV5IkSZIkSdKW3TbJp8ouflkCAAAAAElFTkSuQmCC"}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-2","result":{}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-3","method":"host.putAsset.end","params":{"uploadId":"upload-1","sha256":"62c1ae98879e0cfe4ecf04e02c2f06047f27d34db912f81a01cadaaf26a08c64"}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-3","result":{"ref":"sha256:62c1ae98879e0cfe4ecf04e02c2f06047f27d34db912f81a01cadaaf26a08c64"}}}
-{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-4","method":"host.emit","params":{"place":[{"kind":"chart","v":1,"props":{"kind":"bar","title":"Revenue","labels":"[\"Q1\",\"Q2\",\"Q3\",\"Q4\"]","values":"[3,5,2,6]"},"fallback":{"title":"Revenue","subtitle":"bar chart, 4 points","icon":"chart"},"snapshot":{"type":"asset","ref":"sha256:62c1ae98879e0cfe4ecf04e02c2f06047f27d34db912f81a01cadaaf26a08c64"}}]}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-4","method":"host.emit","params":{"place":[{"kind":"chart","v":2,"props":{"kind":"bar","title":"Revenue","labels":["Q1","Q2","Q3","Q4"],"values":[3,5,2,6]},"fallback":{"title":"Revenue","subtitle":"bar chart, 4 points","icon":"chart"},"snapshot":{"type":"asset","ref":"sha256:62c1ae98879e0cfe4ecf04e02c2f06047f27d34db912f81a01cadaaf26a08c64"}}],"callId":"c-1"}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-4","result":{"receipt":{"placed":["el-1"]}}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":3,"result":{"text":"Placed a bar chart \"Revenue\" (el-1)","structured":{"elementId":"el-1","kind":"bar"}}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":4,"method":"action.invoke","params":{"action":"toggle","input":{},"context":{"origin":{"type":"view","elementId":"el-1","peerId":"peer-1"},"canvasId":"canvas-1","elementId":"el-1"}}}}
@@ -20,7 +20,7 @@
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-6","result":{}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-7","method":"host.putAsset.end","params":{"uploadId":"upload-2","sha256":"4389df2773259c52a49e8cbd5273bf5821a2e46766faa801ad5f1a6ba26ff5e6"}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-7","result":{"ref":"sha256:4389df2773259c52a49e8cbd5273bf5821a2e46766faa801ad5f1a6ba26ff5e6"}}}
-{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-8","method":"host.emit","params":{"update":[{"elementId":"el-1","props":{"kind":"line","title":"Revenue","labels":"[\"Q1\",\"Q2\",\"Q3\",\"Q4\"]","values":"[3,5,2,6]"},"fallback":{"title":"Revenue","subtitle":"line chart, 4 points","icon":"chart"},"snapshot":{"type":"asset","ref":"sha256:4389df2773259c52a49e8cbd5273bf5821a2e46766faa801ad5f1a6ba26ff5e6"}}]}}}
+{"dir":"plugin->host","message":{"jsonrpc":"2.0","id":"p-8","method":"host.emit","params":{"update":[{"elementId":"el-1","props":{"kind":"line","title":"Revenue","labels":["Q1","Q2","Q3","Q4"],"values":[3,5,2,6]},"fallback":{"title":"Revenue","subtitle":"line chart, 4 points","icon":"chart"},"snapshot":{"type":"asset","ref":"sha256:4389df2773259c52a49e8cbd5273bf5821a2e46766faa801ad5f1a6ba26ff5e6"}}]}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":"p-8","result":{"receipt":{}}}}
 {"dir":"plugin->host","message":{"jsonrpc":"2.0","id":4,"result":{"text":"Switched el-1 to a line chart","structured":{"elementId":"el-1","kind":"line"}}}}
 {"dir":"host->plugin","message":{"jsonrpc":"2.0","id":5,"method":"plugin.deactivate","params":{}}}

@@ -61,7 +61,7 @@ internal object CanvasSceneSchemaText {
     /** The plugin element ops in a paragraph, for canvas_apply_ops' description and a plugin element refusal. */
     const val PLUGIN_OPS: String =
         "set_plugin_element {elementId, elementType \"ext:<pluginId>/<kind>\", v, frame?, owner?, ref?, props?, snapshot?, " +
-            "fallback?, meta?} places or updates a plugin's element (frame in world units; props and meta flat scalars, " +
+            "fallback?, meta?} places or updates a plugin's element (frame in world units; props scalars or arrays of scalars, meta flat scalars, " +
             "props at most 4 KiB; snapshot {assetRef \"sha256:...\", mediaType?, width?, height?, rev?}; fallback " +
             "{title, subtitle?, icon?, openUrl? http(s)|meridian:} is the card every app draws without the plugin). " +
             "Null fields keep what the element has; a move and a state update never overwrite each other. The first " +

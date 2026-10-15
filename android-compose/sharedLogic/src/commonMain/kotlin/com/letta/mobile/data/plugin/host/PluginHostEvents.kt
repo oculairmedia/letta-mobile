@@ -55,6 +55,9 @@ enum class PluginHostEvent(val wire: String, val level: Telemetry.Level = Teleme
 
     /** `plugins.json` did not decode and was moved aside. */
     REGISTRY_UNREADABLE("registry_unreadable", Telemetry.Level.WARN),
+
+    /** `asset-quota.json` did not load (`step` load; the window starts empty) or save (`step` save): `error`. */
+    QUOTA_STORE_FAILED("quota_store_failed", Telemetry.Level.WARN),
     ;
 
     /** The telemetry event name. */

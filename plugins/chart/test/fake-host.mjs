@@ -119,7 +119,7 @@ export const SESSION = {
   plot: {
     action: 'plot',
     input: { kind: 'bar', title: 'Revenue', labels: ['Q1', 'Q2', 'Q3', 'Q4'], values: [3, 5, 2, 6] },
-    context: { origin: { type: 'agent', agentId: 'agent-1', conversationId: 'conv-1', toolCallId: 'call-1' } },
+    context: { origin: { type: 'agent', agentId: 'agent-1', conversationId: 'conv-1', toolCallId: 'call-1' }, callId: 'c-1' },
   },
   toggle: {
     action: 'toggle',

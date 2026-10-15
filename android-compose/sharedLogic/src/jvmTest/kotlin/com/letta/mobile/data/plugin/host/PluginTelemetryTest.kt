@@ -59,6 +59,7 @@ class PluginTelemetryTest {
         runBlocking {
             handlerEvents()
             PluginPackageStore(unreadableRegistry()).load()
+            PluginAssetQuota(file = PluginAssetQuotaFile(unreadableRegistry().resolve(PluginPackageStore.REGISTRY_FILE))).load()
             viewEvents()
         }
         runtimeEvents(tap)
