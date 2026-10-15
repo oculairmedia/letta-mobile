@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.plugin
 
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.schema.JsonSchemaCheck
 import com.letta.mobile.data.schema.JsonSchemaExample
 import com.letta.mobile.util.Telemetry
@@ -80,7 +81,7 @@ object PluginKindProps {
 
     private fun reportUnknown(elementId: String, kind: PluginKindRef, kinds: PluginKindCatalog) {
         val pluginId = kind.type.removePrefix(CanvasPluginElement.TYPE_PREFIX).substringBefore('/')
-        val known = kinds.knows(pluginId)
+        val known = kinds.knows(PluginId(pluginId))
         Telemetry.event(
             "Canvas", UNKNOWN_KIND_EVENT,
             "elementId" to elementId,

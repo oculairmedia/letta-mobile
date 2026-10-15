@@ -29,7 +29,7 @@ data class PluginKindSummary(
  */
 object PluginKinds {
     fun specsOf(manifest: PluginManifest): List<PluginKindSpec> =
-        InMemoryPluginKindCatalog.specsOf(manifest.id, elementsJson(manifest))
+        InMemoryPluginKindCatalog.specsOf(manifest.pluginId, elementsJson(manifest))
 
     fun catalogOf(state: PluginRegistryState): PluginKindCatalog =
         InMemoryPluginKindCatalog(state.plugins.flatMap { specsOf(it.manifest) })

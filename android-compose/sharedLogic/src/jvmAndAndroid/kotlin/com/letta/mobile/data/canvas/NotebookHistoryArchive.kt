@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.HistoryBudget
+import com.letta.mobile.data.model.CanvasId
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel

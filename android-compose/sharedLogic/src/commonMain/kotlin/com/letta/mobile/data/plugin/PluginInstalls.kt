@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
 internal object PluginInstalls {
     fun install(state: PluginRegistryState, command: PluginCommand.Install): PluginTransition {
         val manifest = command.manifest
-        if (state[manifest.id] != null) return refuse(PluginRefusal.ALREADY_INSTALLED, "${manifest.id} is installed; update it instead")
+        if (state[manifest.pluginId] != null) return refuse(PluginRefusal.ALREADY_INSTALLED, "${manifest.id} is installed; update it instead")
         packageProblem(state, manifest, command.packageSha256)?.let { return it }
         if (!command.awaitingConsent) consentProblem(manifest, command.consent)?.let { return it }
         val consent = if (command.awaitingConsent) PluginConsent.none() else command.consent
@@ -30,7 +30,7 @@ internal object PluginInstalls {
 
     fun stageUpdate(state: PluginRegistryState, command: PluginCommand.StageUpdate): PluginTransition {
         val manifest = command.manifest
-        val plugin = state[manifest.id] ?: return refuse(PluginRefusal.UNKNOWN_PLUGIN, "${manifest.id} is not installed; install it first")
+        val plugin = state[manifest.pluginId] ?: return refuse(PluginRefusal.UNKNOWN_PLUGIN, "${manifest.id} is not installed; install it first")
         PluginRegistryReducer.updating(plugin)?.let { return it }
         packageProblem(state, manifest, command.packageSha256)?.let { return it }
         versionProblem(plugin, manifest)?.let { return it }

@@ -53,3 +53,25 @@ data class CanvasId(val value: String) {
 value class CanvasActorId(val value: String) {
     override fun toString(): String = value
 }
+
+/**
+ * The id of one canvas op (letta-mobile-by4vm.99.1): what the op log, the journal and the
+ * delivery queue key ops by. Ops carry it on the wire, in Room and in the persisted delivery
+ * record as a bare string ([value]); the op-log and delivery-store APIs take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasOpId(val value: String) {
+    override fun toString(): String = value
+}
+
+/**
+ * The id of a composed canvas artifact (letta-mobile-by4vm.99.3): the `artifact_id` an agent sends
+ * to `canvas_compose`, or the one derived from its tool call. Receipts and compose provenance carry
+ * it as a bare string ([value]); the compose compiler and the board-id helpers take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasArtifactId(val value: String) {
+    override fun toString(): String = value
+}

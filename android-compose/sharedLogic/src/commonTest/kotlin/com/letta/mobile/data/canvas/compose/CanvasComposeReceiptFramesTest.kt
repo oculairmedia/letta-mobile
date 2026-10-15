@@ -1,11 +1,11 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -40,7 +40,7 @@ class CanvasComposeReceiptFramesTest {
         val scene = host.scene().sceneJson
         val documents = CanvasOpProjector.documentsOf(scene).associateBy { it.id }
         receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.forEach { item ->
-            val id = item.boardId(receipt.artifactId)
+            val id = item.boardIdIn(receipt)
             val document = documents[id]
             if (document != null) {
                 assertEquals(document.frame!!.frameInts(), item.frame, id)

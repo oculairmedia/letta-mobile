@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
+import com.letta.mobile.data.model.HostId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -16,43 +18,46 @@ import kotlinx.serialization.Serializable
  *   of the canvas, which is how canvases made before sharing (or on another host) reach it.
  */
 interface CanvasDeliveryStore {
-    suspend fun queued(topic: String): List<String>
-    suspend fun enqueue(topic: String, opIds: Collection<String>)
-    suspend fun acknowledge(topic: String, opId: String)
-    suspend fun reject(topic: String, opId: String, reason: String)
-    suspend fun rejected(topic: String): Map<String, String>
-    suspend fun cursor(hostId: String, topic: String): Long?
-    suspend fun advanceCursor(hostId: String, topic: String, cursor: Long)
+    suspend fun queued(topic: String): List<CanvasOpId>
+    suspend fun enqueue(topic: String, opIds: Collection<CanvasOpId>)
+    suspend fun acknowledge(topic: String, opId: CanvasOpId)
+    suspend fun reject(topic: String, opId: CanvasOpId, reason: String)
+    suspend fun rejected(topic: String): Map<CanvasOpId, String>
+    suspend fun cursor(hostId: HostId, topic: String): Long?
+    suspend fun advanceCursor(hostId: HostId, topic: String, cursor: Long)
 }
 
-/** The whole delivery record, as the durable stores keep it. */
+/**
+ * The whole delivery record, as the durable stores keep it. Op ids and host ids are stored as their
+ * bare strings (the persisted shape); the operations take them typed.
+ */
 @Serializable
 data class CanvasDeliveryState(
     val queues: Map<String, List<String>> = emptyMap(),
     val rejected: Map<String, Map<String, String>> = emptyMap(),
     val cursors: Map<String, Long> = emptyMap(),
 ) {
-    fun enqueue(topic: String, opIds: Collection<String>): CanvasDeliveryState {
+    fun enqueue(topic: String, opIds: Collection<CanvasOpId>): CanvasDeliveryState {
         val queue = queues[topic].orEmpty()
-        val added = opIds.filter { it !in queue && it !in rejected[topic].orEmpty() }
+        val added = opIds.map { it.value }.filter { it !in queue && it !in rejected[topic].orEmpty() }
         return if (added.isEmpty()) this else copy(queues = queues + (topic to queue + added))
     }
 
-    fun acknowledge(topic: String, opId: String): CanvasDeliveryState {
+    fun acknowledge(topic: String, opId: CanvasOpId): CanvasDeliveryState {
         val queue = queues[topic] ?: return this
-        return if (opId !in queue) this else copy(queues = queues + (topic to queue - opId))
+        return if (opId.value !in queue) this else copy(queues = queues + (topic to queue - opId.value))
     }
 
-    fun reject(topic: String, opId: String, reason: String): CanvasDeliveryState =
-        acknowledge(topic, opId).let { it.copy(rejected = it.rejected + (topic to it.rejected[topic].orEmpty() + (opId to reason))) }
+    fun reject(topic: String, opId: CanvasOpId, reason: String): CanvasDeliveryState =
+        acknowledge(topic, opId).let { it.copy(rejected = it.rejected + (topic to it.rejected[topic].orEmpty() + (opId.value to reason))) }
 
-    fun advanceCursor(hostId: String, topic: String, cursor: Long): CanvasDeliveryState {
+    fun advanceCursor(hostId: HostId, topic: String, cursor: Long): CanvasDeliveryState {
         val key = cursorKey(hostId, topic)
         return if ((cursors[key] ?: -1L) >= cursor) this else copy(cursors = cursors + (key to cursor))
     }
 
     companion object {
-        fun cursorKey(hostId: String, topic: String): String = "$hostId|$topic"
+        fun cursorKey(hostId: HostId, topic: String): String = "${hostId.value}|$topic"
     }
 }
 
@@ -76,14 +81,16 @@ abstract class StateCanvasDeliveryStore : CanvasDeliveryStore {
         }
     }
 
-    override suspend fun queued(topic: String): List<String> = mutex.withLock { state().queues[topic].orEmpty() }
-    override suspend fun enqueue(topic: String, opIds: Collection<String>) = update { it.enqueue(topic, opIds) }
-    override suspend fun acknowledge(topic: String, opId: String) = update { it.acknowledge(topic, opId) }
-    override suspend fun reject(topic: String, opId: String, reason: String) = update { it.reject(topic, opId, reason) }
-    override suspend fun rejected(topic: String): Map<String, String> = mutex.withLock { state().rejected[topic].orEmpty() }
-    override suspend fun cursor(hostId: String, topic: String): Long? =
+    override suspend fun queued(topic: String): List<CanvasOpId> =
+        mutex.withLock { state().queues[topic].orEmpty().map(::CanvasOpId) }
+    override suspend fun enqueue(topic: String, opIds: Collection<CanvasOpId>) = update { it.enqueue(topic, opIds) }
+    override suspend fun acknowledge(topic: String, opId: CanvasOpId) = update { it.acknowledge(topic, opId) }
+    override suspend fun reject(topic: String, opId: CanvasOpId, reason: String) = update { it.reject(topic, opId, reason) }
+    override suspend fun rejected(topic: String): Map<CanvasOpId, String> =
+        mutex.withLock { state().rejected[topic].orEmpty().mapKeys { (opId, _) -> CanvasOpId(opId) } }
+    override suspend fun cursor(hostId: HostId, topic: String): Long? =
         mutex.withLock { state().cursors[CanvasDeliveryState.cursorKey(hostId, topic)] }
-    override suspend fun advanceCursor(hostId: String, topic: String, cursor: Long) = update { it.advanceCursor(hostId, topic, cursor) }
+    override suspend fun advanceCursor(hostId: HostId, topic: String, cursor: Long) = update { it.advanceCursor(hostId, topic, cursor) }
 }
 
 /** Delivery record for tests; [snapshot] is what a durable store would have written. */

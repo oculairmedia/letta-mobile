@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json

@@ -1,8 +1,10 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.model.PluginId
+
 /** A change to the registry, as the management API (.30) and the drivers (.28) ask for it. */
 sealed interface PluginCommand {
-    val pluginId: String
+    val pluginId: PluginId
 
     /** Installs [manifest] from the package hashing to [packageSha256], with the owner's [consent]. */
     data class Install(
@@ -15,7 +17,7 @@ sealed interface PluginCommand {
         /** Install now and ask later: [consent] is ignored, the plugin holds [PluginConsent.none] until [RecordConsent]. */
         val awaitingConsent: Boolean = false,
     ) : PluginCommand {
-        override val pluginId: String get() = manifest.id
+        override val pluginId: PluginId get() = manifest.pluginId
     }
 
     /** Stages [manifest] as the next version; [consent] is needed when it asks for more than the installed one. */
@@ -28,40 +30,40 @@ sealed interface PluginCommand {
         /** Stage even when the update asks for more: it keeps the old consent, so it cannot be enabled until [RecordConsent]. */
         val awaitingConsent: Boolean = false,
     ) : PluginCommand {
-        override val pluginId: String get() = manifest.id
+        override val pluginId: PluginId get() = manifest.pluginId
     }
 
     /** The staged version started: it becomes current, the old one is kept for [Rollback]. */
-    data class CompleteUpdate(override val pluginId: String) : PluginCommand
+    data class CompleteUpdate(override val pluginId: PluginId) : PluginCommand
 
     /** The staged version failed to start: it is dropped and the installed one resumes (rollback on failure). */
-    data class FailUpdate(override val pluginId: String, val reason: String) : PluginCommand
+    data class FailUpdate(override val pluginId: PluginId, val reason: String) : PluginCommand
 
     /** Back to the version before the last completed update. */
-    data class Rollback(override val pluginId: String) : PluginCommand
+    data class Rollback(override val pluginId: PluginId) : PluginCommand
 
-    data class Enable(override val pluginId: String) : PluginCommand
+    data class Enable(override val pluginId: PluginId) : PluginCommand
 
-    data class Disable(override val pluginId: String) : PluginCommand
+    data class Disable(override val pluginId: PluginId) : PluginCommand
 
-    data class Remove(override val pluginId: String) : PluginCommand
+    data class Remove(override val pluginId: PluginId) : PluginCommand
 
-    data class RecordConsent(override val pluginId: String, val consent: PluginConsent) : PluginCommand
+    data class RecordConsent(override val pluginId: PluginId, val consent: PluginConsent) : PluginCommand
 
-    data class SettingsSet(override val pluginId: String, val summary: PluginSettingsSummary) : PluginCommand
+    data class SettingsSet(override val pluginId: PluginId, val summary: PluginSettingsSummary) : PluginCommand
 
-    data class SecretsSet(override val pluginId: String, val status: Map<String, SecretState>) : PluginCommand
+    data class SecretsSet(override val pluginId: PluginId, val status: Map<String, SecretState>) : PluginCommand
 
     /** The driver started (on the first action or event, or at enable for jvm). */
-    data class Activated(override val pluginId: String) : PluginCommand
+    data class Activated(override val pluginId: PluginId) : PluginCommand
 
     /** The driver stopped while idle; the plugin stays enabled. */
-    data class Stopped(override val pluginId: String) : PluginCommand
+    data class Stopped(override val pluginId: PluginId) : PluginCommand
 
     /** The driver crashed past its restarts. */
-    data class Fault(override val pluginId: String, val reason: String) : PluginCommand
+    data class Fault(override val pluginId: PluginId, val reason: String) : PluginCommand
 
-    data class HealthReported(override val pluginId: String, val health: PluginHealth) : PluginCommand
+    data class HealthReported(override val pluginId: PluginId, val health: PluginHealth) : PluginCommand
 }
 
 enum class PluginRefusal {
@@ -100,14 +102,14 @@ object PluginRegistryReducer {
         is PluginCommand.Install -> PluginInstalls.install(state, command)
         is PluginCommand.StageUpdate -> PluginInstalls.stageUpdate(state, command)
         else -> state[command.pluginId]?.let { plugin -> reduceInstalled(state, plugin, command) }
-            ?: refuse(PluginRefusal.UNKNOWN_PLUGIN, "no plugin '${command.pluginId}' is installed")
+            ?: refuse(PluginRefusal.UNKNOWN_PLUGIN, "no plugin '${command.pluginId.value}' is installed")
     }
 
     private fun reduceInstalled(state: PluginRegistryState, plugin: InstalledPlugin, command: PluginCommand): PluginTransition = when (command) {
         is PluginCommand.CompleteUpdate -> PluginInstalls.completeUpdate(state, plugin)
         is PluginCommand.FailUpdate -> PluginInstalls.failUpdate(state, plugin, command.reason)
         is PluginCommand.Rollback -> PluginInstalls.rollback(state, plugin)
-        is PluginCommand.Remove -> updating(plugin) ?: PluginTransition.Applied(state.without(plugin.id))
+        is PluginCommand.Remove -> updating(plugin) ?: PluginTransition.Applied(state.without(plugin.pluginId))
         is PluginCommand.RecordConsent -> recordConsent(state, plugin, command.consent)
         is PluginCommand.SettingsSet -> applied(state, plugin.copy(settingsSummary = command.summary))
         is PluginCommand.SecretsSet -> applied(state, plugin.copy(secretsStatus = plugin.manifest.secrets.associate { it.name to (command.status[it.name] ?: SecretState.UNSET) }))

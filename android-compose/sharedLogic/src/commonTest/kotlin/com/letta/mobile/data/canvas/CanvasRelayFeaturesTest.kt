@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.HostId
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -69,7 +70,7 @@ class CanvasRelayFeaturesTest {
 
         val published = legacy.sent.filterIsInstance<CanvasRelayMessage.Publish>().map { it.op.opId }
         assertEquals(listOf("n-1"), published, "the plugin op never reaches a host that would refuse the connection over it")
-        assertEquals(listOf(CanvasPluginElementFixtures.place(2).opId), phone.delivery.queued(topic), "held, not dropped")
+        assertEquals(listOf(CanvasPluginElementFixtures.place(2).canvasOpId), phone.delivery.queued(topic), "held, not dropped")
         assertNull(legacy.refusal)
 
         // The host is redeployed: the next connection says it reads them, and the op goes up.
@@ -95,7 +96,7 @@ class CanvasRelayFeaturesTest {
      * features, and a frame it cannot decode would get the connection refused (recorded in [refusal]).
      */
     private class LegacyHostConnection private constructor() : CanvasRelayConnection {
-        override val hostId: String = "host-1"
+        override val hostId: HostId = HostId("host-1")
         val sent = mutableListOf<CanvasRelayMessage>()
         var refusal: String? = null
         private val inbox = Channel<CanvasRelayMessage?>(Channel.UNLIMITED)

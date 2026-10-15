@@ -1,9 +1,9 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasPresence
 import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasPresenceTransport
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import computer.iroh.BiStream
 import computer.iroh.Connection

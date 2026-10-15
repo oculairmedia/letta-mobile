@@ -5,7 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.model.CanvasId
 
 /**
  * letta-mobile-bglj6.1: while the shared chat page is on, the conversation's board lives in the

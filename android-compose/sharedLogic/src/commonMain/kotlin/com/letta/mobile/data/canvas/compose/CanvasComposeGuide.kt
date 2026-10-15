@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract as Contract
+import com.letta.mobile.data.model.CanvasArtifactId
 
 /**
  * What `canvas_compose_guide` answers: the "read me first" an agent calls once before composing
@@ -94,7 +95,7 @@ object CanvasComposeGuide {
     val text: String by lazy {
         val keyMax = Contract.KEY_PATTERN.maxLength()
         val idMax = Contract.ARTIFACT_ID_PATTERN.maxLength()
-        val piece = CanvasComposeIds.piece("<artifact_id>", "<key>")
+        val piece = CanvasComposeIds.piece(CanvasArtifactId("<artifact_id>"), "<key>")
         buildString {
             appendLine("# ${CanvasToolContract.COMPOSE} (${Contract.CATALOG}, version ${Contract.VERSION})")
             appendLine()

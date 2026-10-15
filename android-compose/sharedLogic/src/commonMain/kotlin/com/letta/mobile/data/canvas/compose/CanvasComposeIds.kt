@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
+import com.letta.mobile.data.model.CanvasArtifactId
+import com.letta.mobile.runtime.ToolCallId
 import kotlin.random.Random
 
 /**
@@ -21,20 +23,20 @@ object CanvasComposeIds {
      * sha256([toolCallId]), so a tool call the runtime retries lands on the same artifact; a random
      * one when the caller has no tool call id.
      */
-    fun derived(toolCallId: String?): String {
-        val hex = if (toolCallId.isNullOrEmpty()) {
+    fun derived(toolCallId: ToolCallId?): CanvasArtifactId {
+        val hex = if (toolCallId == null) {
             Random.nextBytes(DERIVED_HEX / 2).toHex()
         } else {
-            Sha256.digest(toolCallId.encodeToByteArray()).toHex()
+            Sha256.digest(toolCallId.value.encodeToByteArray()).toHex()
         }
-        return DERIVED_PREFIX + hex.take(DERIVED_HEX)
+        return CanvasArtifactId(DERIVED_PREFIX + hex.take(DERIVED_HEX))
     }
 
     /** The board id of the piece [key] of [artifactId]: `cmp-<artifactId>-<key>`. */
-    fun piece(artifactId: String, key: String): String = "$PREFIX-$artifactId-$key"
+    fun piece(artifactId: CanvasArtifactId, key: String): String = "$PREFIX-${artifactId.value}-$key"
 
     /** The board id of a GROUP's label text. */
-    fun label(artifactId: String, key: String): String = piece(artifactId, key) + LABEL_SUFFIX
+    fun label(artifactId: CanvasArtifactId, key: String): String = piece(artifactId, key) + LABEL_SUFFIX
 
     /** The key an item without one gets: its index in `items`, and in its group's `children`. */
     fun defaultKey(index: Int, childIndex: Int? = null): String = if (childIndex == null) "i$index" else "i$index-c$childIndex"

@@ -55,7 +55,7 @@ class CanvasComposeFixturesTest {
         val slim = assertRoundTrips("receipt.json", ComposeReceipt.serializer())
         val legacy = assertRoundTrips("receipt-with-ids.json", ComposeReceipt.serializer())
         fun all(receipt: ComposeReceipt) = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }
-        fun ids(receipt: ComposeReceipt) = all(receipt).map { it.boardId(receipt.artifactId) }
+        fun ids(receipt: ComposeReceipt) = all(receipt).map { it.boardIdIn(receipt) }
         assertEquals(ids(legacy), ids(slim))
         assertEquals(all(legacy).map { it.id }, ids(slim), "the derived id is the one an older receipt wrote")
         fun stripped(items: List<ComposeReceiptItem>): List<ComposeReceiptItem> =

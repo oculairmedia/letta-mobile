@@ -13,7 +13,9 @@ import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -93,7 +95,7 @@ class HostCanvasComposeToolsTest {
             assertEquals(CanvasComposeContract.CATALOG, document.compose!!.catalog)
         }
         receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.forEach { item: ComposeReceiptItem ->
-            val id = item.boardId(receipt.artifactId)
+            val id = item.boardIdIn(receipt)
             assertTrue("\"$id\"" in scene.sceneJson, "$id is not on the board")
         }
     }
@@ -135,14 +137,14 @@ class HostCanvasComposeToolsTest {
         val host = Host()
         val request = """{"items":[{"kind":"NOTE","markdown":"Hello"}]}"""
         val first = receipt(host.compose(request, toolCallId = "toolu_01ABC"))
-        assertEquals(CanvasComposeIds.derived("toolu_01ABC"), first.artifactId)
+        assertEquals(CanvasComposeIds.derived(ToolCallId("toolu_01ABC")).value, first.artifactId)
         // The runtime retrying the same call lands on the same artifact.
         val retried = receipt(host.compose(request, toolCallId = "toolu_01ABC"))
         assertEquals(first.artifactId, retried.artifactId)
         assertEquals(1, host.logged().size)
         // Another call is another artifact.
         val other = receipt(host.compose(request, toolCallId = "toolu_02DEF"))
-        assertEquals(CanvasComposeIds.derived("toolu_02DEF"), other.artifactId)
+        assertEquals(CanvasComposeIds.derived(ToolCallId("toolu_02DEF")).value, other.artifactId)
         assertEquals(2, host.logged().size)
     }
 

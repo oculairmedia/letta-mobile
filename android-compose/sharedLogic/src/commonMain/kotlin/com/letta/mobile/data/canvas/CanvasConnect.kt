@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import kotlin.jvm.JvmInline
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -127,6 +128,9 @@ internal object CanvasConnect {
     private const val LABEL_SIZE = 13.0
 }
 
+/** The id every scratch op is stamped with: they are projected, never logged or sent. */
+private val SCRATCH_OP_ID = CanvasOpId("connect-scratch")
+
 /**
  * The board as a batch leaves it so far. Ops are projected only when a connect reads the board,
  * all that arrived since the last read in one pass, so a batch is not re-projected op by op.
@@ -138,7 +142,7 @@ private class ConnectScratch(sceneJson: String) {
 
     fun add(op: CanvasOp) {
         lamport += 1
-        pending += op.withStamp("connect-scratch", lamport)
+        pending += op.withStamp(SCRATCH_OP_ID, lamport)
     }
 
     fun scene(): String {
