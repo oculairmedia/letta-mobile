@@ -35,7 +35,7 @@ internal data class DesktopModelControlHost(
     val chatModels: StateFlow<List<LlmModel>>,
     /** Re-reads the chat's model list, which routes the model a pick names. */
     val reloadChatModels: suspend () -> Unit,
-    /** The per-conversation switch (`DesktopChatController.setConversationModel`). */
+    /** The per-conversation switch (`DesktopConversationModels.select`). */
     val onModelSelected: (String) -> Unit,
     /** letta-mobile-bzvro.18: recently used models, newest first (`DesktopChatController.recentModels`). */
     val recentModels: Flow<List<String>> = flowOf(emptyList()),

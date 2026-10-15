@@ -32,7 +32,7 @@ class DesktopChatControllerModelSwitchTest {
         runCurrent()
         assertEquals("anthropic/old", controller.state.value.composerModelLabel)
 
-        controller.setConversationModel("openai/new")
+        controller.models.select("openai/new")
         runCurrent()
 
         assertEquals("openai/new", controller.state.value.composerModelLabel)
@@ -47,7 +47,7 @@ class DesktopChatControllerModelSwitchTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel("openai/new")
+        controller.models.select("openai/new")
         runCurrent()
         controller.selectConversation("conv-2")
         runCurrent()
@@ -75,7 +75,7 @@ class DesktopChatControllerModelSwitchTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel("openai/new")
+        controller.models.select("openai/new")
         runCurrent()
         agentLookup.complete(Unit)
         runCurrent()
@@ -91,7 +91,7 @@ class DesktopChatControllerModelSwitchTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel("openai/new")
+        controller.models.select("openai/new")
         runCurrent()
 
         val state = controller.state.value
@@ -115,7 +115,7 @@ class DesktopChatControllerModelSwitchTest {
         controller.start()
         runCurrent()
 
-        controller.setConversationModel("openai/new")
+        controller.models.select("openai/new")
         runCurrent()
 
         assertEquals("anthropic/old", controller.state.value.composerModelLabel)

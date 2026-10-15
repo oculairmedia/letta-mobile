@@ -34,7 +34,7 @@ class DesktopChatControllerModelCatalogTest {
             // that's the exact "looks like no models" symptom this test guards
             // against being un-diagnosable. The fix is the telemetry event, not a
             // change in _availableModels' empty-on-failure behavior.
-            assertTrue(controller.availableModels.value.isEmpty())
+            assertTrue(controller.models.available.value.isEmpty())
             // Telemetry.emit prepends (newest first), so events added by this test
             // sit at the FRONT of the list, not appended at the end.
             val after = com.letta.mobile.util.Telemetry.events.value
