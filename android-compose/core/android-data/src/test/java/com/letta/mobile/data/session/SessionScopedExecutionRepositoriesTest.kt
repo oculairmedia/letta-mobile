@@ -1,5 +1,7 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IStepRepository
+import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunRequestConfig
@@ -22,7 +24,7 @@ class SessionScopedExecutionRepositoriesTest {
             testScheduler,
             ProxySwitchScenario(
                 setupGraph = { runApi = fakeRunApi },
-                createProxy = { sm, scope -> SessionScopedRunRepository(sm, scope) },
+                createProxy = { sm, _ -> sm.sessionScoped(IRunRepository::class) { it.runRepository } },
                 refresh = { it.refreshRuns(RunListParams()) },
                 observeIds = { it.runs.value.map { r -> r.id } },
                 mutateForBackendB = {
@@ -43,7 +45,7 @@ class SessionScopedExecutionRepositoriesTest {
             testScheduler,
             ProxySwitchScenario(
                 setupGraph = { stepApi = fakeStepApi },
-                createProxy = { sm, scope -> SessionScopedStepRepository(sm, scope) },
+                createProxy = { sm, _ -> sm.sessionScoped(IStepRepository::class) { it.stepRepository } },
                 refresh = { it.refreshSteps(StepListParams()) },
                 observeIds = { it.steps.value.map { s -> s.id } },
                 mutateForBackendB = {

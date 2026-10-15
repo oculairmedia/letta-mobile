@@ -32,6 +32,14 @@
 }
 
 # ---------------------------------------------------------------------------
+# letta-mobile-by4vm.88: session-scoped repositories are java.lang.reflect.Proxy
+# instances over these interfaces (SessionForwarding.kt). Keep each
+# interface a real type (no merging into its single implementation); renaming
+# is fine because the proxy invokes the same Method on the graph's repository.
+# ---------------------------------------------------------------------------
+-keep,allowobfuscation,allowshrinking interface com.letta.mobile.data.repository.api.I*Repository
+
+# ---------------------------------------------------------------------------
 # OkHttp — keep public API + TLS internals; let R8 shrink implementation.
 # The blanket `keep class okhttp3.** { *; }` prevented R8 from eliminating
 # dead OkHttp code (~300 kB of bytecode in practice).

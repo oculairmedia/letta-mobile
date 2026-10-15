@@ -58,10 +58,7 @@ class SessionScopedAllConversationsRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val conversationsProxy = SessionScopedAllConversationsRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val conversationsProxy = sessionManager.scopedAllConversationsRepository()
 
         conversationsProxy.refresh()
         advanceUntilIdle()
@@ -97,10 +94,7 @@ class SessionScopedAllConversationsRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val conversationsProxy = SessionScopedAllConversationsRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
         var error: Throwable? = null
@@ -135,10 +129,7 @@ class SessionScopedAllConversationsRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val conversationsProxy = SessionScopedAllConversationsRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
         var error: Throwable? = null
@@ -171,10 +162,7 @@ class SessionScopedAllConversationsRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val conversationsProxy = SessionScopedAllConversationsRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
         var error: Throwable? = null
@@ -205,10 +193,7 @@ class SessionScopedAllConversationsRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val conversationsProxy = SessionScopedAllConversationsRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val conversationsProxy = sessionManager.scopedAllConversationsRepository()
         advanceUntilIdle()
 
         var error: Throwable? = null

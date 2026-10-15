@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.testutil.FakeProviderApi
@@ -17,7 +18,7 @@ class SessionScopedAdminRepositoriesTest {
         val scenarios = listOf(
             AdminProxySwitchSpec(providerApi,
                 setup = { this.providerApi = providerApi },
-                createProxy = { sm, scope -> SessionScopedProviderRepository(sm, scope) },
+                createProxy = { sm, _ -> sm.sessionScoped(IProviderRepository::class) { it.providerRepository } },
                 refresh = { it.refreshProviders() },
                 observeIds = { it.providers.value.map { p -> p.id } },
                 mutate = { it.providers = mutableListOf(sampleProvider(ProviderId("provider-b"), "Backend B Provider")) },
