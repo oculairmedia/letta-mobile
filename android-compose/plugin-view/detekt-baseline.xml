@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>FunctionOnlyReturningConstant:PluginPageDocumentTest.kt$PluginPageDocumentTest$private fun injected(): String</ID>
+    <ID>TooManyFunctions:PluginWebViewTest.kt$PluginWebViewTest</ID>
+  </CurrentIssues>
+</SmellBaseline>
