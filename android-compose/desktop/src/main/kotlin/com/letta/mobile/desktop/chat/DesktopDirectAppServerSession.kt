@@ -53,31 +53,58 @@ internal class DesktopDirectDial(
     val preflight: (suspend () -> AppServerProbeResult)?,
 )
 
+/** How a session mints its generations, and what it releases once it stops (letta-mobile-by4vm.56). */
+internal class SessionDial(
+    val mint: suspend () -> AppServerClientGeneration,
+    /** Runs before every dial; null when the address cannot be probed or was just proven. */
+    val preflight: (suspend () -> AppServerProbeResult)?,
+    val telemetryComponent: String,
+    /** Resources shared by every generation, released after the supervisor stops. */
+    val releaseSteps: List<suspend () -> Unit> = emptyList(),
+)
+
 /**
- * letta-mobile-by4vm.9: the desktop's ws:// App Server session. The shared
- * [ReconnectingAppServerClient] owns reconnect: it mints a socket generation per dial (each proven
- * by the readiness handshake), runs the shared preflight hook before every dial, and keeps one
- * stable [client] for the gateway's turn engine and router, so a dropped socket no longer needs a
+ * letta-mobile-by4vm.9: the desktop's self-reconnecting App Server session. The shared
+ * [ReconnectingAppServerClient] owns reconnect: it mints a generation per dial (each proven ready
+ * before it is handed over), runs the preflight hook before every dial, and keeps one stable
+ * [client] for the gateway's turn engine and router, so a dropped connection no longer needs a
  * gateway rebuild ([DesktopChatController.retryConnection] is the escalation of last resort, once
- * this owner has given up).
+ * this owner has given up). ws:// generations are WebSocket dials ([open]); iroh:// generations are
+ * QUIC dials plus the auth handshake ([openWith] over a [DesktopIrohGenerationSource],
+ * letta-mobile-by4vm.56).
  */
 internal class DesktopDirectAppServerSession private constructor(
     val client: ReconnectingAppServerClient,
     override val connectionState: StateFlow<ChannelTransportState>,
     private val supervisor: Job,
-    private val httpClient: HttpClient,
+    private val releaseSteps: List<suspend () -> Unit>,
 ) : DesktopSelfReconnectingSession {
     override fun resumeNow() = client.resumeNow()
 
-    /** Stops reconnecting, closes the live generation, then the HTTP client. */
+    /** Stops reconnecting, closes the live generation, then whatever the dial shares across generations. */
     fun resources(): DesktopTransportResources = DesktopTransportResources(
-        teardownSteps = listOf(
-            { supervisor.cancelAndJoin() },
-            { httpClient.close() },
-        ),
+        teardownSteps = listOf<suspend () -> Unit>({ supervisor.cancelAndJoin() }) + releaseSteps,
     )
 
     companion object {
+        /** ws:// — one WebSocket per generation over a shared HTTP client. */
+        suspend fun open(
+            dial: DesktopDirectDial,
+            scope: CoroutineScope,
+            listener: ReconnectingClientListener,
+            httpClient: HttpClient = createDesktopAppServerHttpClient(),
+        ): DesktopDirectAppServerSession = openWith(
+            serverId = dial.serverUrl,
+            scope = scope,
+            listener = listener,
+            dial = SessionDial(
+                mint = { mintGeneration(dial, httpClient, scope) },
+                preflight = dial.preflight,
+                telemetryComponent = "DesktopAppServerReconnect",
+                releaseSteps = listOf { httpClient.close() },
+            ),
+        )
+
         /**
          * Dials the first generation and returns once it is Ready. A first dial that fails is
          * reported at once, as before, instead of backing off: the user is looking at it.
@@ -86,16 +113,16 @@ internal class DesktopDirectAppServerSession private constructor(
          * status projection shared on it ends with the session.
          */
         @Suppress("NoDetachedCoroutineLifecycle")
-        suspend fun open(
-            dial: DesktopDirectDial,
+        suspend fun openWith(
+            serverId: String,
             scope: CoroutineScope,
             listener: ReconnectingClientListener,
-            httpClient: HttpClient = createDesktopAppServerHttpClient(),
+            dial: SessionDial,
         ): DesktopDirectAppServerSession {
             val client = ReconnectingAppServerClient(
-                connect = { mintGeneration(dial, httpClient, scope) },
+                connect = dial.mint,
                 listener = listener,
-                telemetryComponent = "DesktopAppServerReconnect",
+                telemetryComponent = dial.telemetryComponent,
                 preflight = dial.preflight,
                 // Turns survive a reconnect here, so they are not fenced by generation.
                 stampGenerations = false,
@@ -107,13 +134,13 @@ internal class DesktopDirectAppServerSession private constructor(
             }
             if (settled !is ReconnectingClientState.Ready) {
                 supervisor.cancelAndJoin()
-                httpClient.close()
+                dial.releaseSteps.forEach { release -> runCatching { release() } }
                 throw settled.firstDialFailure()
             }
             val status = client.state
-                .map { it.toChannelTransportState(serverId = dial.serverUrl) }
-                .stateIn(scope, SharingStarted.Eagerly, client.state.value.toChannelTransportState(dial.serverUrl))
-            return DesktopDirectAppServerSession(client, status, supervisor, httpClient)
+                .map { it.toChannelTransportState(serverId = serverId) }
+                .stateIn(scope, SharingStarted.Eagerly, client.state.value.toChannelTransportState(serverId))
+            return DesktopDirectAppServerSession(client, status, supervisor, dial.releaseSteps)
         }
 
         /** One generation's job is a child of the session scope, closable on its own (as the wrapper's). */

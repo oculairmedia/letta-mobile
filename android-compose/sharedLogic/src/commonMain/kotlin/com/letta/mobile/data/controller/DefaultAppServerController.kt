@@ -10,6 +10,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerQueueSnapshot
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.carryActiveLeasesInto
 import com.letta.mobile.data.runtime.CancelledQueuedInput
 import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.data.runtime.reanswerReplayedApproval
@@ -96,6 +97,16 @@ class DefaultAppServerController(
     private val defaultPermissionMode: () -> AppServerPermissionMode = {
         RuntimePermissionDefaults.DEFAULT_MODE
     },
+    /**
+     * letta-mobile-by4vm.55: when true, a turn in flight across a transport disconnect survives
+     * it, as on the desktop's ws:// path (by4vm.9): its lease is carried into the next generation
+     * and the router is interrupted instead of the lease being cancelled, so the turn waits out
+     * [com.letta.mobile.data.runtime.SESSION_RECONNECT_GRACE_MS] for [markConnected]. Only for a
+     * client whose events are one stable pipe across generations (a
+     * [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]); false keeps the
+     * lgns8.22.4 behaviour of ending every in-flight turn on disconnect.
+     */
+    private val turnsSurviveReconnect: Boolean = false,
 ) : AppServerController {
     @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle owned; cancelled in close().
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
@@ -521,6 +532,8 @@ class DefaultAppServerController(
         // stable pipe across generations. Detaching would drop recovery
         // runtime_start/sync terminals before markConnected() re-attaches.
         val priorGeneration = connectionGeneration.value
+        // by4vm.55: carried BEFORE the advance, so no frame sees a surviving lease as superseded.
+        if (turnsSurviveReconnect) turnEngine.carryActiveLeasesInto(priorGeneration + 1)
         connectionGeneration.incrementAndGet()
         eventRouter.inboundControlRegistry().failGeneration(priorGeneration)
         runtimeMutex.withLock {
@@ -531,10 +544,16 @@ class DefaultAppServerController(
             runtimeCache.clear()
         }
         turnEngine.invalidateRuntime(notifyHost = false)
-        turnEngine.cancelActiveLeaseForGeneration(
-            failedGeneration = priorGeneration,
-            reason = "connection generation superseded: ${reason ?: "disconnect"}",
-        )
+        if (turnsSurviveReconnect) {
+            // Pending approvals and tool calls of the dead generation were failed above; the
+            // reconnect's runtime_start/sync(recoverApprovals) replays them under the new one.
+            eventRouter.interruptSession(reason)
+        } else {
+            turnEngine.cancelActiveLeaseForGeneration(
+                failedGeneration = priorGeneration,
+                reason = "connection generation superseded: ${reason ?: "disconnect"}",
+            )
+        }
         _state.value = AppServerControllerState.Disconnected(reason)
     }
 
@@ -545,6 +564,8 @@ class DefaultAppServerController(
         if (!eventRouter.isAttached()) {
             eventRouter.attach(controllerScope, client.events)
         }
+        // by4vm.55: ends the interruption surviving turns are waiting out; a no-op otherwise.
+        eventRouter.restoreSession()
         _state.value = AppServerControllerState.Connected
     }
 
