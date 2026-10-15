@@ -32,5 +32,14 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
             }
         }
+        // letta-mobile-by4vm.58: the runtime contract tests live with the contracts (they used to sit
+        // in :sharedLogic's commonTest). Kotlin/Native: keep test names punctuation-free camelCase.
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.kotlinx.serialization.json)
+            }
+        }
     }
 }

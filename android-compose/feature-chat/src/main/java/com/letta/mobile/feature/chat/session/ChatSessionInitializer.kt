@@ -18,23 +18,21 @@ internal class ChatSessionInitializer(
     private val isFreshRoute: Boolean,
     private val explicitNewChat: Boolean,
     private val resumeCacheMaxAgeMs: Long,
-    @Suppress("UNUSED_PARAMETER") private val projectContext: ProjectChatContext?,
+    private val projectContext: ProjectChatContext?,
     private val settingsRepository: ISettingsRepository,
     private val sessionResolver: ChatSessionResolver,
     private val conversationCoordinator: ChatConversationCoordinator,
     private val runExpansionState: ChatRunExpansionState,
     private val currentConversationTracker: CurrentConversationTracker,
     private val bannerController: ChatBannerController,
-    @Suppress("UNUSED_PARAMETER") private val setClientModeConversationId: (String?) -> Unit,
     private val refreshAvailableAgents: () -> Unit,
     private val observeLastChatSelection: () -> Unit,
     private val seedAgentNameFromMemoryCache: () -> Unit,
     private val observeAgentNameCache: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") private val refreshClientModeLocation: () -> Unit,
     private val loadProjectAgents: () -> Unit,
     private val loadProjectBrief: () -> Unit,
     private val loadRecentBugReports: () -> Unit,
-    private val resolveConversationAndLoad: (Boolean) -> Unit,
+    private val resolveConversationAndLoad: () -> Unit,
 ) {
     fun run() {
         observeActiveConfigChanges()
@@ -50,7 +48,7 @@ internal class ChatSessionInitializer(
         runExpansionState.hydrateUiState()
         bootstrapProjectContext()
         conversationCoordinator.recordOpenRequested()
-        resolveConversationAndLoad(false)
+        resolveConversationAndLoad()
     }
 
     private fun observeActiveConfigChanges() {

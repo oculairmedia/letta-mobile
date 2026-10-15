@@ -55,8 +55,9 @@ while IFS= read -r file; do
     android-compose/plugin-view/*) TASKS[":plugin-view:jvmTest"]=1; TASKS[":plugin-view:testAndroidHostTest"]=1 ;;
     android-compose/core/android-data/*) TASKS[":core:android-data:testDebugUnitTest"]=1 ;;
     android-compose/core/ids/*) TASKS[":core:ids:jvmTest"]=1 ;;
+    android-compose/core/runtime/*) TASKS[":core:runtime:jvmTest"]=1 ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
-    android-compose/cli/*) TASKS[":cli:testDebugUnitTest"]=1 ;;
+    android-compose/cli/*) TASKS[":cli:test"]=1 ;;
     android-compose/appserver-cli/*) TASKS[":appserver-cli:test"]=1 ;;
     android-compose/iroh-wrapper-cli/*) TASKS[":iroh-wrapper-cli:test"]=1 ;;
     # The conformance kit is the SPI's executable contract: an SPI change re-runs it too.
@@ -74,8 +75,9 @@ ORDERED=(
   ":plugin-view:testAndroidHostTest"
   ":core:android-data:testDebugUnitTest"
   ":core:ids:jvmTest"
+  ":core:runtime:jvmTest"
   ":desktop:test"
-  ":cli:testDebugUnitTest"
+  ":cli:test"
   ":appserver-cli:test"
   ":iroh-wrapper-cli:test"
   ":plugin-api:jvmTest"

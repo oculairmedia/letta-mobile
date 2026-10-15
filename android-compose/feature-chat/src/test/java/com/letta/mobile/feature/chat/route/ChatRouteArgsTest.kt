@@ -181,17 +181,14 @@ class ChatRouteArgsTest {
     }
 
     @Test
-    fun `persists route and client-mode conversation ids through typed mutators`() {
+    fun `persists route conversation id through typed mutator`() {
         val savedState = SavedStateHandle(mapOf("agentId" to "agent-1"))
         val args = ChatRouteArgs(savedState)
 
-        args.setClientModeConversationId("client-conv")
         args.setRouteConversationId("route-conv")
-
-        assertEquals("client-conv", args.currentClientModeConversationId())
         assertEquals("route-conv", savedState.get<String>("conversationId"))
 
-        args.setClientModeConversationId("")
-        assertNull(args.currentClientModeConversationId())
+        args.setRouteConversationId("")
+        assertNull(savedState.get<String>("conversationId"))
     }
 }

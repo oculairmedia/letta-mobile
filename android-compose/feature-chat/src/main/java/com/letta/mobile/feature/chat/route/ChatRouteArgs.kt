@@ -77,13 +77,6 @@ internal class ChatRouteArgs @Inject constructor(
             )
         }
 
-    fun currentClientModeConversationId(): String? =
-        savedStateHandle.get<String>(CLIENT_MODE_CONVERSATION_ID_KEY)?.takeIf { it.isNotBlank() }
-
-    fun setClientModeConversationId(conversationId: String?) {
-        savedStateHandle[CLIENT_MODE_CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
-    }
-
     fun setRouteConversationId(conversationId: String?) {
         savedStateHandle[CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
     }
@@ -105,6 +98,5 @@ internal class ChatRouteArgs @Inject constructor(
         const val PROJECT_GIT_URL_KEY = "projectGitUrl"
         const val PROJECT_LAST_SYNC_AT_KEY = "projectLastSyncAt"
         const val PROJECT_ACTIVE_CODING_AGENTS_KEY = "projectActiveCodingAgents"
-        const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 }

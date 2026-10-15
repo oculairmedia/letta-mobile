@@ -111,8 +111,8 @@ git -C "$W" fetch origin && git -C "$W" checkout --detach <DEPLOY_SHA>
 cd "$W/android-compose"
 find . -path ./node_modules -prune -o -type d -name build -prune -exec rm -rf {} +
 rm -rf .gradle/configuration-cache
-# The inputs of :cli:run (android-compose/cli/build.gradle.kts): its debug unit-test classpath.
-JAVA_HOME=/usr/lib/jvm/jdk-26 ./gradlew --no-daemon :cli:compileDebugUnitTestKotlin :cli:processDebugUnitTestJavaRes :cli:assembleDebugUnitTest
+# The inputs of :cli:run (android-compose/cli/build.gradle.kts, a plain JVM application since by4vm.57).
+JAVA_HOME=/usr/lib/jvm/jdk-26 ./gradlew --no-daemon :cli:classes
 systemctl start meridian-iroh-wrapper     # a gradlew-:cli:run unit rebuilds on start anyway
 ```
 
@@ -181,7 +181,7 @@ re-capture the classpath from `/proc/<pid>/cmdline` of the running JVM, as the
   systemctl stop meridian-iroh-wrapper
   git -C "$W" checkout --detach "$(cat /root/iroh-wrapper.pre-bzvro37.sha)"
   cd "$W/android-compose" && find . -type d -name build -prune -exec rm -rf {} + && rm -rf .gradle/configuration-cache
-  JAVA_HOME=/usr/lib/jvm/jdk-26 ./gradlew --no-daemon :cli:compileDebugUnitTestKotlin :cli:processDebugUnitTestJavaRes :cli:assembleDebugUnitTest
+  JAVA_HOME=/usr/lib/jvm/jdk-26 ./gradlew --no-daemon :cli:classes
   systemctl start meridian-iroh-wrapper
   ```
 

@@ -43,7 +43,7 @@ class ChatHistoryPagerTest {
             secondArg<List<UiMessage>>() + thirdArg<List<UiMessage>>()
         }
 
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         advanceUntilIdle()
 
         assertEquals(listOf("older-1", "live-1"), harness.uiState.value.messages.map { it.id })
@@ -58,7 +58,7 @@ class ChatHistoryPagerTest {
         val harness = Harness(scope = this)
         harness.uiState.value = harness.uiState.value.copy(isStreaming = true)
 
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         advanceUntilIdle()
 
         assertFalse(harness.uiState.value.isLoadingOlderMessages)
@@ -88,7 +88,7 @@ class ChatHistoryPagerTest {
         val b = CompletableDeferred<OlderMessagesPage>()
         coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), any()) } coAnswers { a.await() }
         coEvery { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), any()) } coAnswers { b.await() }
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         runCurrent()
         harness.activeConversationId = "conv-2"
         harness.selectionGeneration++
@@ -97,14 +97,14 @@ class ChatHistoryPagerTest {
             hasMoreOlderMessages = true,
             isLoadingOlderMessages = false,
         )
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         runCurrent()
         val pendingB = harness.uiState.value
         assertTrue(pendingB.isLoadingOlderMessages)
         a.completeA()
         runCurrent()
         assertEquals(pendingB, harness.uiState.value)
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         runCurrent()
         coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-2"), "live-2") }
         b.complete(OlderMessagesPage(listOf(appMessage("older-2", "old")), hasMore = false))
@@ -120,7 +120,7 @@ class ChatHistoryPagerTest {
         val a = CompletableDeferred<OlderMessagesPage>()
         coEvery { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } coAnswers { a.await() }
 
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         runCurrent()
         harness.selectionGeneration++
         harness.uiState.value = harness.uiState.value.copy(
@@ -153,7 +153,7 @@ class ChatHistoryPagerTest {
             harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any())
         } returns OlderMessagesPage(listOf(older), hasMore = true)
 
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         advanceUntilIdle()
 
         assertTrue(
@@ -171,7 +171,7 @@ class ChatHistoryPagerTest {
             harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any())
         } returns OlderMessagesPage(listOf(older), hasMore = null)
 
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        harness.pager.loadOlderMessages()
         advanceUntilIdle()
 
         assertFalse(harness.uiState.value.hasMoreOlderMessages)

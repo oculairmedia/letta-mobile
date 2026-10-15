@@ -450,8 +450,10 @@ jobs:
         # that ship no wasm artifact, without making web-wasm required
         # (letta-mobile-o4ygk.2). :sharedUI compiles for wasm too, so JVM-only
         # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
+        # :core:runtime owns its contract tests (letta-mobile-by4vm.58): JVM run
+        # plus native/wasm test compiles, in the same invocation.
         run: |
-          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 

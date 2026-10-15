@@ -13,7 +13,7 @@ import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
 import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
-import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.LocalRuntimeBootstrapConfig
 import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
 import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
@@ -398,7 +398,7 @@ class AdminChatParityTest {
                     currentConversationTracker = currentConversationTracker,
                     uiState = uiState,
                     updateSessionState = ::updateSessionState,
-                    bootstrap = ClientModeBootstrapConfig(
+                    bootstrap = LocalRuntimeBootstrapConfig(
                         pendingMessages = { pendingBootstrapMessages },
                         setPendingUserMessage = { pendingBootstrapMessages = persistentListOf(it) },
                         currentConversationId = { null },

@@ -2,7 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CyclomaticComplexMethod:ErrorMapper.kt$fun mapErrorToUserMessage(e: Throwable, fallback: String = "Something went wrong"): String</ID>
     <ID>CyclomaticComplexMethod:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: Any?): List&lt;String&gt;</ID>
     <ID>CyclomaticComplexMethod:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$private suspend fun commitNormalizedApply(commit: NormalizedTimelineCommit): NormalizedTimelineWriteResult</ID>
     <ID>CyclomaticComplexMethod:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$private suspend fun audit(count: Int, chained: Boolean): Meter.Snapshot</ID>
@@ -272,7 +271,6 @@
     <ID>SpreadOperator:LettaDatabase.kt$LettaDatabase.Companion$(*LettaDatabaseMigrations.ALL)</ID>
     <ID>SwallowedException:MessageApiTimelineTransport.kt$MessageApiTimelineTransport$e: NoActiveRunException</ID>
     <ID>ThrowsCount:SessionScopedAllConversationsRepository.kt$SessionScopedAllConversationsRepository$private suspend fun &lt;T&gt; withCurrentSessionAndRetryOnSwitch(block: suspend (SessionGraph) -&gt; T): T</ID>
-    <ID>TooGenericExceptionCaught:ApiResult.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CapabilityRepository.kt$CapabilityRepository$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ConversationPagingSource.kt$ConversationPagingSource$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ConversationRepository.kt$ConversationRepository$e: Exception</ID>

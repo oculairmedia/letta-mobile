@@ -98,7 +98,7 @@ QUOTEPY
 # Pre-build the CLI once so the backgrounded serve invocation and the probe
 # invocation are both cheap `run` tasks instead of two concurrent full builds.
 echo "[iroh-probe-hermetic] pre-building :cli..." >&2
-./gradlew --quiet :cli:compileDebugUnitTestKotlin :cli:processDebugUnitTestJavaRes >/dev/null
+./gradlew --quiet :cli:classes >/dev/null
 
 STUB_ENV=("IGNORED_EMPTY_ENV=1")
 case "${SELF_CHECK}" in
