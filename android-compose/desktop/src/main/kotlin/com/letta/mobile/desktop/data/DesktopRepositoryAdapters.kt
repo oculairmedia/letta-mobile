@@ -30,6 +30,7 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAgentRepository
+import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.session.DEFAULT_REMOTE_BACKEND_LABEL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
@@ -186,7 +187,6 @@ class DesktopRepositoryAdapters(
     }
     private val transportBoundJob = SupervisorJob()
     private val transportBoundScope = CoroutineScope(transportBoundJob + Dispatchers.Default)
-    private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
 
     // The Iroh agent roster follows Meridian's agent_updated pushes (and refreshes on reconnect) on
     // the transport-bound scope, so changes made on another device show without a restart.
@@ -196,8 +196,8 @@ class DesktopRepositoryAdapters(
         null
     }
     private val irohSettings = ActiveConfigSettingsRepository(config)
-    // letta-mobile-by4vm.87: the admin repositories (projects included) Android builds too; only an
-    // Iroh host serves them here.
+    // letta-mobile-by4vm.87/.103: the admin repositories (projects, tools and memory blocks included)
+    // Android builds too; only an Iroh host serves them here.
     private val irohAdmin = if (irohMode) {
         SharedSessionGraph.adminRepositories(transport = channelTransport, settings = irohSettings)
     } else {
@@ -228,7 +228,7 @@ class DesktopRepositoryAdapters(
         ?: irohAgentRepository
         ?: unavailable(SessionRoute.AGENTS)
     val blockRepository: IAgentBlockRepository = appServerRepositories?.blockRepository
-        ?: irohRepositories?.blockRepository
+        ?: irohAdmin?.blockRepository
         ?: unavailable(SessionRoute.BLOCKS)
     val conversationRepository: IConversationRepository = unavailable(SessionRoute.CONVERSATIONS)
     val cronRepository: ICronRepository = transportBound.cronRepository
@@ -244,11 +244,12 @@ class DesktopRepositoryAdapters(
         irohAdmin?.providerRepository ?: unavailable(SessionRoute.PROVIDERS)
     val runRepository: IRunRepository =
         irohAdmin?.runRepository ?: unavailable(SessionRoute.RUNS)
-    val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailable(SessionRoute.SCHEDULES)
+    val scheduleRepository: IScheduleRepository =
+        if (irohMode) IrohScheduleRepository(irohAgentDirectoryProvider) else unavailable(SessionRoute.SCHEDULES)
     val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     val stepRepository: IStepRepository = unavailable(SessionRoute.STEPS)
     val subagentRepository: ISubagentRepository = boundSubagentRepository
-    val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailable(SessionRoute.TOOLS)
+    val toolRepository: IToolRepository = irohAdmin?.toolRepository ?: unavailable(SessionRoute.TOOLS)
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailable(SessionRoute.VIBESYNC)
 
     /** The repositories desktop binds itself; the transport-bound ones come from [transportBound]. */

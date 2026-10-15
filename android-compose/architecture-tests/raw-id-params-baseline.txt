@@ -24,7 +24,6 @@ core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcMes
 core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcSlashCommandSource.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/repository/ScheduleRepository.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/repository/StepRepository.kt 5
-core/android-data/src/main/java/com/letta/mobile/data/repository/ToolRepository.kt 5
 core/android-data/src/main/java/com/letta/mobile/data/repository/api/ConversationCrudRemoteSource.kt 3
 core/android-data/src/main/java/com/letta/mobile/data/repository/api/ScheduleRemoteSource.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/runtime/RuntimeEventMappers.kt 2
@@ -202,7 +201,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/appserver/App
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/appserver/AppServerLocalAdminGateway.kt 8
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/appserver/AppServerLocalRepositoryTransport.kt 6
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/iroh/IrohAdminRpcChatGateway.kt 12
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/iroh/IrohAgentBlockRepository.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/iroh/IrohAgentRepository.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/iroh/IrohApprovalSubmitBody.kt 4
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/iroh/IrohBlockApi.kt 4
@@ -363,6 +361,7 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/IrohAdminR
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/IrohAdminRpcPassageSource.kt 4
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/IrohAdminRpcRunSource.kt 2
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/MessageRepositoryFetch.kt 3
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/ToolRepository.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/AllConversationsDataSources.kt 1
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/IMessageRepository.kt 14
 sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/MessageDataSources.kt 5

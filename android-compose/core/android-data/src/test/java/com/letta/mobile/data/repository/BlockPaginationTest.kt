@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.BlockRemoteSource
@@ -17,8 +18,8 @@ import org.junit.jupiter.api.Tag
 
 /**
  * Phase 2.2 (data-efficiency-audit Q3): focused pagination tests for
- * [BlockRepository.listAllBlocks] (offset-based) and
- * [BlockRepository.listAgentsForBlock] (cursor-based).
+ * [CachedBlockRepository.listAllBlocks] (offset-based) and
+ * [CachedBlockRepository.listAgentsForBlock] (cursor-based).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("integration")
@@ -29,7 +30,7 @@ class BlockPaginationTest {
         // 75 blocks, default pageSize = 50 -> first page full, second short.
         val blocks = (1..75).map { Block(id = BlockId("b-$it"), label = "label-$it", value = "value-$it") }
         val api = PaginatingBlockApi(blocks)
-        val repo = BlockRepository(api)
+        val repo = CachedBlockRepository(api.bound())
 
         val result = repo.listAllBlocks()
 
@@ -42,7 +43,7 @@ class BlockPaginationTest {
     fun `listAgentsForBlock fetches both cursor pages when API returns exactly two`() = runTest {
         val agents = (1..60).map { Agent(id = AgentId("a-$it"), name = "Agent $it") }
         val api = PaginatingBlockApi(blocks = emptyList(), agents = agents)
-        val repo = BlockRepository(api)
+        val repo = CachedBlockRepository(api.bound())
 
         val result = repo.listAgentsForBlock("block-1")
 

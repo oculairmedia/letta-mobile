@@ -16,15 +16,12 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
-import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
-import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
@@ -52,7 +49,6 @@ class SessionGraphAssembler @Inject constructor(
     private val conversationDao: Lazy<ConversationDao>,
     /** letta-mobile-ckmub.4: the backend seam; production binds [SessionRemoteSources.None]. */
     private val remoteSources: SessionRemoteSources = SessionRemoteSources.None,
-    private val blockRepository: BlockRepository? = null,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val localModelSource: LocalRuntimeModelSource? = null,
@@ -87,7 +83,7 @@ class SessionGraphAssembler @Inject constructor(
             ),
             host = HostSessionRepositories(
                 agentRepository = agentRepository,
-                blockRepository = blockRepository,
+                blockRepository = adminRepositories.blockRepository,
                 conversationRepository = conversationRepos.conversation,
                 mcpServerRepository = adminRepositories.mcpServerRepository,
                 modelRepository = adminRepositories.modelRepository,
@@ -98,7 +94,7 @@ class SessionGraphAssembler @Inject constructor(
                 providerRepository = adminRepositories.providerRepository,
                 scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
                 stepRepository = StepRepository(remoteSources.steps.orNull()),
-                toolRepository = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
+                toolRepository = adminRepositories.toolRepository,
                 vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
             ),
             transportBound = transportBound,
@@ -153,7 +149,8 @@ class SessionGraphAssembler @Inject constructor(
         )
     }
 
-    // letta-mobile-by4vm.87: the admin repositories desktop builds too, over the same builder.
+    // letta-mobile-by4vm.87/.103: the admin repositories (tools and memory blocks included) desktop
+    // builds too, over the same builder.
     private fun createAdminRepositories(request: SessionGraphAssembleRequest) =
         SharedSessionGraph.adminRepositories(
             transport = request.channelTransport,
@@ -165,6 +162,7 @@ class SessionGraphAssembler @Inject constructor(
                 projects = remoteSources.projects,
                 providers = remoteSources.providers,
                 runs = remoteSources.runs,
+                tools = remoteSources.tools,
             ),
             localModelSource = localModelSource,
         )
