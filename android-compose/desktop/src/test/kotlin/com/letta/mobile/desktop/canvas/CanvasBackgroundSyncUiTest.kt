@@ -5,16 +5,18 @@ package com.letta.mobile.desktop.canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasCreateOptions
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import io.ak1.drawbox.domain.usecase.UseCase
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
 import com.letta.mobile.data.canvas.CanvasBackgroundPattern
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -45,9 +47,11 @@ class CanvasBackgroundSyncUiTest {
         relay.published.clear()
         controller.setBgColor(Color(0xFF112233))
         mainClock.advanceTimeBy(3_000)
-        waitUntil(timeoutMillis = 5000) {
+        val colourSent: () -> Boolean = {
             relay.published.any { it is CanvasOp.SetBackgroundOp && it.colorHex.startsWith("#112233", ignoreCase = true) }
         }
+        waitUntil(timeoutMillis = 5000) { colourSent() }
+        assertTrue(colourSent(), "the background colour went out on its own")
     }
 
     /** Delivers what another app sent. */
@@ -72,5 +76,7 @@ class CanvasBackgroundSyncUiTest {
         mainClock.advanceTimeBy(3_000)
         waitUntil(timeoutMillis = 5000) { session.backgroundPattern() == dots }
         waitUntil(timeoutMillis = 5000) { controller.state.value.bgPattern?.tint == Color(0xFFE5484D) }
+        assertEquals(dots, session.backgroundPattern())
+        assertEquals(Color(0xFFE5484D), controller.state.value.bgPattern?.tint)
     }
 }

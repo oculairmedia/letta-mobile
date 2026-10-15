@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent

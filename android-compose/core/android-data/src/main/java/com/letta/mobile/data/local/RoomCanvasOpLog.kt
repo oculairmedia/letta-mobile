@@ -1,6 +1,7 @@
 package com.letta.mobile.data.local
 
-import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpLog
 import java.util.concurrent.ConcurrentHashMap
@@ -32,16 +33,16 @@ class RoomCanvasOpLog(
         return dao.getSince(canvasId.value, sinceLamport).map { it.toCanvasOp() }
     }
 
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean {
-        return dao.has(canvasId.value, opId)
+    override suspend fun has(canvasId: CanvasId, opId: CanvasOpId): Boolean {
+        return dao.has(canvasId.value, opId.value)
     }
 
     override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> =
         dao.getUnsettled(canvasId.value).map { it.toCanvasOp() }
 
-    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) {
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
         // SQLite caps bound parameters; a recovery after a long outage can settle many at once.
-        opIds.distinct().chunked(SETTLE_CHUNK).forEach { chunk -> dao.settle(canvasId.value, chunk) }
+        opIds.map { it.value }.distinct().chunked(SETTLE_CHUNK).forEach { chunk -> dao.settle(canvasId.value, chunk) }
     }
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> {

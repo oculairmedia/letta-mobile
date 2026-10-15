@@ -2,6 +2,8 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.InMemoryOpLog
 import com.letta.mobile.data.document.OpLog
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,14 +23,19 @@ import kotlinx.coroutines.sync.withLock
 interface CanvasOpLog : OpLog<CanvasId, CanvasOp> {
     override suspend fun append(canvasId: CanvasId, op: CanvasOp)
     override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp>
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean
+    /** Whether [canvasId]'s log holds op [opId] (dropped or not). */
+    suspend fun has(canvasId: CanvasId, opId: CanvasOpId): Boolean
+
+    /** The generic [OpLog] lookup, which [com.letta.mobile.data.document.SharedDocument] calls with the op's wire id. */
+    override suspend fun has(documentId: CanvasId, opId: String): Boolean = has(documentId, CanvasOpId(opId))
+
     override fun observe(canvasId: CanvasId): Flow<CanvasOp>
 
     /** Ops on [canvasId] appended but not yet [settle]d, in the order they were appended. */
     suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> = emptyList()
 
     /** Records that the stored document of [canvasId] now holds [opIds]. Idempotent. */
-    suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) = Unit
+    suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) = Unit
 }
 
 /**
@@ -40,21 +47,24 @@ class InMemoryCanvasOpLog : InMemoryOpLog<CanvasId, CanvasOp>(), CanvasOpLog {
     private val pending = mutableMapOf<CanvasId, LinkedHashMap<String, CanvasOp>>()
 
     override suspend fun append(canvasId: CanvasId, op: CanvasOp) {
-        if (super.has(canvasId, op.opId)) return
+        if (super<InMemoryOpLog>.has(canvasId, op.opId)) return
         journalLock.withLock { pending.getOrPut(canvasId) { LinkedHashMap() }[op.opId] = op }
         super.append(canvasId, op)
     }
 
     override suspend fun getOps(canvasId: CanvasId, sinceLamport: Long): List<CanvasOp> = super.getOps(canvasId, sinceLamport)
 
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean = super.has(canvasId, opId)
+    override suspend fun has(canvasId: CanvasId, opId: CanvasOpId): Boolean = super<InMemoryOpLog>.has(canvasId, opId.value)
+
+    // Both supertypes implement the generic lookup; the in-memory log's own index answers it.
+    override suspend fun has(documentId: CanvasId, opId: String): Boolean = super<InMemoryOpLog>.has(documentId, opId)
 
     override fun observe(canvasId: CanvasId): Flow<CanvasOp> = super.observe(canvasId)
 
     override suspend fun unsettled(canvasId: CanvasId): List<CanvasOp> =
         journalLock.withLock { pending[canvasId]?.values?.toList().orEmpty() }
 
-    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) {
-        journalLock.withLock { pending[canvasId]?.keys?.removeAll(opIds.toSet()) }
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
+        journalLock.withLock { pending[canvasId]?.keys?.removeAll(opIds.mapTo(mutableSetOf()) { it.value }) }
     }
 }

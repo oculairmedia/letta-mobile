@@ -15,7 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.canvas.CanvasId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.shell.rail.ShellAgentRail
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellAgentRailState

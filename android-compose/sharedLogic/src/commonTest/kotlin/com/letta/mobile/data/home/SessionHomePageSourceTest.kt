@@ -39,12 +39,9 @@ import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.FakeIrohAdminTransport
-import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
-import com.letta.mobile.data.repository.iroh.IrohToolRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -59,7 +56,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -85,22 +81,6 @@ class SessionHomePageSourceTest {
         assertNull(state.shortcutInfo(HomeShortcut.TOOLS), "the Tools tile degrades to its label")
         assertFalse(state.statTiles().any { it.label == "Tools" }, "the stat strip drops the Tools tile")
         assertTrue(state.statTiles().any { it.label.startsWith("Tokens") }, "the figures that loaded stay")
-    }
-
-    @Test
-    fun theIrohToolCountIsRoutedOverAdminRpc() = runTest {
-        val transport = FakeIrohAdminTransport().apply {
-            rpcResponder = { call ->
-                assertEquals("tool.list", call.method)
-                toolListResponse(listOf("search", "fetch"))
-            }
-        }
-
-        val stats = loadedStats(tools = IrohToolRepository { IrohAdminRpcAgentDirectory(transport) })
-
-        assertNull(stats.error)
-        assertEquals(2, stats.toolCount)
-        assertTrue(transport.rpcCalls.isNotEmpty() && transport.rpcCalls.all { it.method == "tool.list" })
     }
 
     @Test
@@ -160,16 +140,6 @@ class SessionHomePageSourceTest {
     }
 
     private fun homeState(stats: HomeStats): HomePageState = HomePageReducer.withStats(HomePageState(), stats)
-
-    /** A successful `tool.list` admin_rpc answer carrying one tool per name. */
-    private fun toolListResponse(names: List<String>): AppServerInboundFrame.AdminRpcResponse {
-        val tools = names.mapIndexed { index, name -> """{"id":"tool-$index","name":"$name"}""" }
-        return AppServerInboundFrame.AdminRpcResponse(
-            requestId = "req",
-            success = true,
-            result = Json.parseToJsonElement(tools.joinToString(",", "[", "]")),
-        )
-    }
 
     /** Stand-in for a route failure the session's capabilities did not predict (a host-side guard). */
     private class IrohGuardException : IllegalStateException(

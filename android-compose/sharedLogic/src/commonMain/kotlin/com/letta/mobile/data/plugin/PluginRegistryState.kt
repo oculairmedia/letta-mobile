@@ -84,7 +84,7 @@ data class InstalledPlugin(
     val id: String get() = manifest.id
 
     /** [id] as a typed [PluginId], for the host's per-plugin services. */
-    val pluginId: PluginId get() = PluginId(manifest.id)
+    val pluginId: PluginId get() = manifest.pluginId
     val version: String get() = manifest.version
     val consent: PluginConsent get() = current.consent
     val packageSha256: String get() = current.packageSha256
@@ -109,15 +109,15 @@ data class InstalledPlugin(
 /** The whole registry: every installed plugin by id, in install order. */
 @Serializable
 data class PluginRegistryState(val plugins: List<InstalledPlugin> = emptyList()) {
-    operator fun get(pluginId: String): InstalledPlugin? = plugins.firstOrNull { it.id == pluginId }
+    operator fun get(pluginId: PluginId): InstalledPlugin? = plugins.firstOrNull { it.pluginId == pluginId }
 
     /** The plugins whose agent tools are advertised. */
     val advertised: List<InstalledPlugin> get() = plugins.filter { it.advertised }
 
     internal fun with(plugin: InstalledPlugin): PluginRegistryState =
-        if (this[plugin.id] == null) copy(plugins = plugins + plugin) else copy(plugins = plugins.map { if (it.id == plugin.id) plugin else it })
+        if (this[plugin.pluginId] == null) copy(plugins = plugins + plugin) else copy(plugins = plugins.map { if (it.id == plugin.id) plugin else it })
 
-    internal fun without(pluginId: String): PluginRegistryState = copy(plugins = plugins.filterNot { it.id == pluginId })
+    internal fun without(pluginId: PluginId): PluginRegistryState = copy(plugins = plugins.filterNot { it.pluginId == pluginId })
 
     /** The registry as `plugins.json`. */
     fun encode(): String = json.encodeToString(serializer(), this)

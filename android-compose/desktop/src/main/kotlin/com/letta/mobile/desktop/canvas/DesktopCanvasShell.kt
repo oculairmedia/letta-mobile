@@ -7,9 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.desktop.OpenDesktopCanvasParams
 import com.letta.mobile.desktop.openDesktopCanvasSession
 import kotlinx.coroutines.CoroutineScope

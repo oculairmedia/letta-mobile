@@ -1,13 +1,13 @@
 package com.letta.mobile.ui.shell.sidebar
 
 import com.letta.mobile.data.canvas.CanvasDocument
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.ConversationListGroups
 import com.letta.mobile.data.chat.runtime.ConversationListOrder
 import com.letta.mobile.data.chat.runtime.displayTitle
+import com.letta.mobile.data.model.CanvasId
 import kotlin.time.Instant
 
 /** Which conversations a host marks: the open one, the one whose agent is working, those being deleted. */

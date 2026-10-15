@@ -68,13 +68,13 @@ class PluginViewsModelTest {
         runCurrent()
 
         assertEquals(CHART_PROPS, model.kinds.schemaFor("ext:letta.chart/chart", 1))
-        assertTrue(model.kinds.knows("letta.chart"))
-        assertFalse(model.kinds.knows("letta.off"))
+        assertTrue(model.kinds.knows(PluginId("letta.chart")))
+        assertFalse(model.kinds.knows(PluginId("letta.off")))
         assertNull(model.kinds.schemaFor("ext:letta.off/chart", 1))
 
         host.list.value = emptyList()
         runCurrent()
-        assertFalse(model.kinds.knows("letta.chart"), "the kinds follow the host's list")
+        assertFalse(model.kinds.knows(PluginId("letta.chart")), "the kinds follow the host's list")
     }
 
     @Test

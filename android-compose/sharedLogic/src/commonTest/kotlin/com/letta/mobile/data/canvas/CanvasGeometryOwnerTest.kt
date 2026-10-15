@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

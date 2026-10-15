@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest

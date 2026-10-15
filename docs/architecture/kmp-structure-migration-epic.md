@@ -286,11 +286,11 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5b (conversations — #1265):** `CachedConversationRepository` + Room/Iroh/HTTP seams. `AllConversationsRepository` (paging) deferred as **5b.2**.
 
-**5c (tools — #1267):** `CachedToolRepository` + `ToolRemoteSource` / `ToolIrohSource`; Android thin binder. Desktop `IrohToolRepository` unify deferred.
+**5c (tools — #1267):** `CachedToolRepository` + `ToolRemoteSource` / `ToolIrohSource`; Android thin binder. Desktop `IrohToolRepository` unified in by4vm.103: one `ToolRepository` (sharedLogic jvmAndAndroid) built by `SharedSessionGraph.adminRepositories` for both platforms.
 
 **5d (schedules — #1268):** `CachedScheduleRepository` + `ScheduleRemoteSource`; Android thin binder. Desktop keeps `IrohScheduleRepository`.
 
-**5e (memory blocks — #1269):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; `PaginationHelpers` moved into `sharedLogic`. Desktop `IrohAgentBlockRepository` unify deferred.
+**5e (memory blocks — #1269):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; `PaginationHelpers` moved into `sharedLogic`. Desktop `IrohAgentBlockRepository` unified in by4vm.103: `CachedBlockRepository` built by `SharedSessionGraph.adminRepositories` for both platforms.
 
 **5f (folders — #1270):** `CachedFolderRepository` + `FolderRemoteSource` / `FolderIrohSource`; Android thin binder. Desktop folder admin reads stay on existing Iroh path until unify.
 

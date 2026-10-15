@@ -5,7 +5,6 @@ package com.letta.mobile.desktop.canvas
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasConversationOptions
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasRelayClient
 import com.letta.mobile.data.canvas.CanvasSession
@@ -13,6 +12,7 @@ import com.letta.mobile.data.canvas.CanvasSyncHealth
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

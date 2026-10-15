@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -23,7 +25,7 @@ class CanvasDeliveryCrashTest {
     /** The relay client, except the process dies at [crashAt]. */
     private class CrashingTransport(private val inner: CanvasRelayClient, private val crashAt: CrashPoint) :
         CanvasSyncTransport by inner {
-        override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) {
+        override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
             if (crashAt == CrashPoint.BEFORE_RESERVE) throw ProcessDied(crashAt)
             inner.reserveDelivery(canvasId, opIds)
         }

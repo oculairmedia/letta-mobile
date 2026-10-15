@@ -5,9 +5,10 @@ import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasComposeProvenance
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.runtime.ToolCallId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -157,7 +158,7 @@ class CanvasComposeCompilerTest {
         assertEquals(listOf(840, 335, 320, 196), walk.frame)
         // Every derived board id is an op the batch makes (letta-mobile-bglj6.14).
         val made = ready.ops.map { (it as? CanvasOp.SetDocumentOp)?.documentId ?: (it as CanvasOp.AddElementOp).elementId }.toSet()
-        val derived = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.map { it.boardId(receipt.artifactId) }
+        val derived = receipt.items.flatMap { listOf(it) + it.children.orEmpty() }.map { it.boardIdIn(receipt) }
         assertEquals(listOf("cmp-weekend-plan-heading", "cmp-weekend-plan-shopping", "cmp-weekend-plan-meals", "cmp-weekend-plan-selfcare", "cmp-weekend-plan-walk", "cmp-weekend-plan-read"), derived)
         assertTrue(made.containsAll(derived), "$derived not all in $made")
         // The bounds are the placement's: everything the artifact put on the board.
@@ -317,12 +318,12 @@ class CanvasComposeCompilerTest {
     @Test
     fun aDerivedArtifactIdIsTheToolCallsDigest() {
         // sha256("call-1") = 3a0e6cbb...; the first 12 hex digits name the artifact.
-        assertEquals("a-" + hex(Sha256.digest("call-1".encodeToByteArray())).take(12), CanvasComposeIds.derived("call-1"))
-        assertEquals(CanvasComposeIds.derived("call-1"), CanvasComposeIds.derived("call-1"))
-        assertNotEquals(CanvasComposeIds.derived("call-1"), CanvasComposeIds.derived("call-2"))
-        assertTrue(CanvasComposeContract.isArtifactId(CanvasComposeIds.derived("call-1")))
-        assertTrue(CanvasComposeContract.isArtifactId(CanvasComposeIds.derived(null)))
-        assertNotEquals(CanvasComposeIds.derived(null), CanvasComposeIds.derived(null))
+        assertEquals("a-" + hex(Sha256.digest("call-1".encodeToByteArray())).take(12), CanvasComposeIds.derived(ToolCallId("call-1")).value)
+        assertEquals(CanvasComposeIds.derived(ToolCallId("call-1")).value, CanvasComposeIds.derived(ToolCallId("call-1")).value)
+        assertNotEquals(CanvasComposeIds.derived(ToolCallId("call-1")).value, CanvasComposeIds.derived(ToolCallId("call-2")).value)
+        assertTrue(CanvasComposeContract.isArtifactId(CanvasComposeIds.derived(ToolCallId("call-1")).value))
+        assertTrue(CanvasComposeContract.isArtifactId(CanvasComposeIds.derived(null).value))
+        assertNotEquals(CanvasComposeIds.derived(null).value, CanvasComposeIds.derived(null).value)
     }
 
     @Test

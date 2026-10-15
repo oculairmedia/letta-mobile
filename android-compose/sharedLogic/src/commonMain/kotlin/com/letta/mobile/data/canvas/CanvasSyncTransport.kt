@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.document.getOrCreate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,7 +23,7 @@ interface CanvasSyncTransport {
      * Idempotent; an op the far end already holds is acknowledged as a duplicate. A transport with
      * no durable queue keeps the default, which does nothing.
      */
-    suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) = Unit
+    suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<CanvasOpId>) = Unit
 
     fun subscribe(canvasId: CanvasId): Flow<CanvasOp>
 

@@ -5,6 +5,7 @@ import com.letta.mobile.data.document.DocumentBackend
 import com.letta.mobile.data.document.DocumentReducer
 import com.letta.mobile.data.document.SharedDocument
 import com.letta.mobile.data.document.SharedDocumentOptions
+import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.json.Json
 
 /**

@@ -12,11 +12,11 @@ import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.session.BackendScopedCache
-import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
-import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
@@ -178,16 +178,6 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideIrohAdminRpcBlockSource(
-            transport: javax.inject.Provider<IChannelTransport>,
-            settingsRepository: ISettingsRepository,
-        ): IrohAdminRpcBlockSource = IrohAdminRpcBlockSource(
-            channelTransportProvider = transport::get,
-            settingsRepository = settingsRepository,
-        )
-
-        @Provides
-        @Singleton
         fun provideIrohAdminRpcProjectSource(
             transport: IChannelTransport,
             settingsRepository: ISettingsRepository,
@@ -272,6 +262,14 @@ abstract class AppModule {
         fun provideToolRepository(sessions: SessionManager): IToolRepository =
             sessions.sessionScoped(IToolRepository::class) { it.toolRepository }
 
+        // letta-mobile-by4vm.103: the session graph's memory blocks, built by the shared admin builder.
+        @Provides @Singleton
+        fun provideBlockRepository(sessions: SessionManager): IBlockRepository =
+            sessions.sessionScoped(IBlockRepository::class) { graph ->
+                graph.blockRepository as? IBlockRepository
+                    ?: throw AppServerRouteUnavailable(SessionRoute.BLOCKS, "IBlockRepository")
+            }
+
         @Provides @Singleton
         fun provideMcpServerRepository(sessions: SessionManager): IMcpServerRepository =
             sessions.sessionScoped(IMcpServerRepository::class) { it.mcpServerRepository }
@@ -334,15 +332,6 @@ abstract class AppModule {
     abstract fun bindSelectedChatRuntimeProvider(
         impl: ProductionSelectedChatRuntimeProvider,
     ): com.letta.mobile.feature.chat.coordination.SelectedChatRuntimeProvider
-
-    @Binds
-    @Singleton
-    abstract fun bindBlockRepository(impl: BlockRepository): IBlockRepository
-
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindBlockBackendScopedCache(impl: BlockRepository): BackendScopedCache
 
     @Binds
     @Singleton

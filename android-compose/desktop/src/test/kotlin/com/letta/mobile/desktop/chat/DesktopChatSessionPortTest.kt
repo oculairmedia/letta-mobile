@@ -2,10 +2,10 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall

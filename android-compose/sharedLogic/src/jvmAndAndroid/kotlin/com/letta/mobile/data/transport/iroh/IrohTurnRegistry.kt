@@ -24,6 +24,13 @@ class IrohActiveTurn(request: IrohTurnRequest) {
     val agentId: String get() = agent.value
     val runId: String get() = runIdRef.value
     val hasTerminal: Boolean get() = terminalClaimed.value != null
+
+    /**
+     * Whether a redial must announce this turn for recovery: it has no terminal and no running
+     * send job. letta-mobile-by4vm.96: a running send job is the engine's turn, which survives the
+     * redial on its own (it waits out the reconnect grace), so it is not announced as well.
+     */
+    val needsRedialRecovery: Boolean get() = !hasTerminal && job?.isActive != true
     val terminalSource: IrohTerminalSource? get() = terminalClaimed.value
 
     fun promoteRunId(promotion: IrohRunPromotion): Boolean {
@@ -144,7 +151,7 @@ class IrohTurnRegistry {
     }
 
     fun rememberInterruptedTurns() {
-        activeTurns.values.filterNot(IrohActiveTurn::hasTerminal).forEach { turn ->
+        activeTurns.values.filter(IrohActiveTurn::needsRedialRecovery).forEach { turn ->
             interruptedTurns[turn.token.conversationId.value] = RedialWhileTurnActive(
                 agentId = turn.agentId,
                 conversationId = turn.token.conversationId.value,

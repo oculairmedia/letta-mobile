@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex

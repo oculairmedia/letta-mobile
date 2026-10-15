@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasId
 import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit

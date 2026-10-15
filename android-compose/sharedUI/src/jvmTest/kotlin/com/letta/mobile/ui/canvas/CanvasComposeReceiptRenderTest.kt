@@ -23,7 +23,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.data.canvas.CanvasCreateOptions
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasRelayHost
 import com.letta.mobile.data.canvas.CanvasRelayProtocol
@@ -43,6 +42,7 @@ import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import io.ak1.drawbox.DrawingPreview
 import io.ak1.drawbox.domain.model.DrawingSerializer
@@ -151,7 +151,7 @@ class CanvasComposeReceiptRenderTest {
             val screen = screenOf(shot.viewport, item.frame!!)
             assertInside(screen, shot.size, item.key)
             if (item.kind in NOTE_KINDS) {
-                val drawn = shot.notes.getValue(item.boardId(receipt.artifactId))
+                val drawn = shot.notes.getValue(item.boardIdIn(receipt))
                 val frame = item.frame!!
                 // The card's semantics box is its world size; graphicsLayer applies the zoom on
                 // draw, so width stays in world units while the origin is on screen. Compose
@@ -169,7 +169,7 @@ class CanvasComposeReceiptRenderTest {
     private fun assertReceiptFramesAreTheNotes(session: CanvasSession, receipt: ComposeReceipt) {
         val documents = session.documents().associateBy { it.id }
         pieces(receipt).filter { it.kind in NOTE_KINDS }.forEach { item ->
-            val frame = documents.getValue(item.boardId(receipt.artifactId)).frame!!
+            val frame = documents.getValue(item.boardIdIn(receipt)).frame!!
             assertEquals(listOf(frame.x, frame.y, frame.width, frame.height).map(::halfUp), item.frame, item.key)
         }
     }

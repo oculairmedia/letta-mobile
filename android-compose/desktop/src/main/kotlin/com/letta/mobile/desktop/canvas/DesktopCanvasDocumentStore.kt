@@ -2,8 +2,8 @@ package com.letta.mobile.desktop.canvas
 
 import com.letta.mobile.data.canvas.CanvasDocument
 import com.letta.mobile.data.canvas.CanvasDocumentStore
-import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import java.io.IOException
 import java.nio.channels.FileChannel

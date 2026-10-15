@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas.compose
 
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.CanvasArtifactId
 import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.json.JsonElement
 
@@ -81,7 +82,7 @@ object CanvasComposeCompiler {
 
     /** [request] (already decoded) compiled against the board [sceneJson]. */
     fun compile(request: ComposeRequest, sceneJson: String, artifactIdFallback: () -> String): ComposeCompilation {
-        val artifactId = request.artifactId ?: artifactIdFallback()
+        val artifactId = CanvasArtifactId(request.artifactId ?: artifactIdFallback())
         val entries = keyed(request.items)
         keyProblems(entries, artifactId).takeIf { it.isNotEmpty() }?.let { return validation(it) }
 
@@ -94,7 +95,7 @@ object CanvasComposeCompiler {
         val ready = ComposeCompilation.Ready(
             ops = emitted.map { it.op },
             itemPaths = emitted.map { it.path },
-            artifactId = artifactId,
+            artifactId = artifactId.value,
             title = request.title,
             bounds = placement.bounds,
             items = built.map { receiptItem(it, placement) },
@@ -115,18 +116,18 @@ object CanvasComposeCompiler {
             ops = emptyList(),
             itemPaths = emptyList(),
             bounds = existing.bounds(),
-            items = ready.items.map { it.withFrames(frames, ready.artifactId) },
+            items = ready.items.map { it.withFrames(frames, CanvasArtifactId(ready.artifactId)) },
             alreadyPublished = true,
         )
     }
 
-    private fun ComposeReceiptItem.withFrames(frames: Map<String, List<Int>>, artifactId: String): ComposeReceiptItem =
+    private fun ComposeReceiptItem.withFrames(frames: Map<String, List<Int>>, artifactId: CanvasArtifactId): ComposeReceiptItem =
         copy(frame = frames[boardId(artifactId)], children = children?.map { it.withFrames(frames, artifactId) })
-    private fun artifactExists(request: ComposeRequest, artifactId: String): ComposeCompilation.Refused {
+    private fun artifactExists(request: ComposeRequest, artifactId: CanvasArtifactId): ComposeCompilation.Refused {
         val problem = ComposeProblem(
             if (request.artifactId != null) "/artifact_id" else "",
             ComposeErrorCode.ARTIFACT_EXISTS.name,
-            "artifact '$artifactId' is already on the board with other content; " +
+            "artifact '${artifactId.value}' is already on the board with other content; " +
                 "send a new artifact_id to make another (compose never changes an artifact)",
         )
         return ComposeCompilation.Refused(CanvasComposeContract.refusal(ComposeErrorCode.ARTIFACT_EXISTS, listOf(problem)))
@@ -153,7 +154,7 @@ object CanvasComposeCompiler {
      * is left is a given key that takes another item's default key, or a group's label id. The
      * problem goes on the GIVEN key: that is the one the agent chose and can change.
      */
-    private fun keyProblems(entries: List<Entry>, artifactId: String): List<ComposeProblem> {
+    private fun keyProblems(entries: List<Entry>, artifactId: CanvasArtifactId): List<ComposeProblem> {
         val all = entries.flatMap { listOf(it) + it.children }
         val givenAt = all.filter { !it.defaulted }.associate { it.key to it.path }
         val problems = mutableListOf<ComposeProblem>()
