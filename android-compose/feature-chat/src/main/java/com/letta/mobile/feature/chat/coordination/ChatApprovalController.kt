@@ -51,6 +51,9 @@ internal class ChatApprovalController(
             ) { timeline, parked -> timeline + parked }
                 .distinctUntilChanged()
                 .collect { pending ->
+                    // Nothing in flight: do not touch activeConversationId, which the owning
+                    // view model may still be initialising when this first emission lands.
+                    if (answerer.submitting.value.isEmpty()) return@collect
                     val conversation = ConversationId(activeConversationId() ?: NO_CONVERSATION)
                     if (answerer.reconcile(conversation, pending).isNotEmpty()) publishInFlight()
                 }
