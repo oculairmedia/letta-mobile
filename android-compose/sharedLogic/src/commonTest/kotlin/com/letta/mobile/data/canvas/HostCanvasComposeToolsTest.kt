@@ -13,6 +13,7 @@ import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -72,7 +73,7 @@ class HostCanvasComposeToolsTest {
 
         assertEquals(ComposeStatus.PUBLISHED, receipt.status)
         assertEquals("weekend-plan", receipt.artifactId)
-        assertEquals(CanvasId.forConversation(CONVERSATION).value, receipt.canvasId)
+        assertEquals(CanvasId.forConversation(ConversationId(CONVERSATION)).value, receipt.canvasId)
         val batch = assertIs<CanvasOp.BatchOp>(host.logged().single().op, "the artifact is one entry in the log")
         assertEquals(AGENT, batch.actorId)
         assertTrue(batch.ops.isNotEmpty())
@@ -149,7 +150,7 @@ class HostCanvasComposeToolsTest {
     fun anotherAgentsCanvasIsRefusedAsUnauthorized() = runTest {
         val host = Host()
         receipt(host.compose(WEEKEND_PLAN))
-        val request = """{"canvas_id":"${CanvasId.forConversation(CONVERSATION).value}","items":[{"kind":"NOTE","markdown":"mine now"}]}"""
+        val request = """{"canvas_id":"${CanvasId.forConversation(ConversationId(CONVERSATION)).value}","items":[{"kind":"NOTE","markdown":"mine now"}]}"""
         val refusal = refusal(host.compose(request, agent = "agent-2", conversation = "conv-2"))
         assertEquals(ComposeErrorCode.UNAUTHORIZED, refusal.code)
         assertEquals(1, host.logged().size)
@@ -179,7 +180,7 @@ class HostCanvasComposeToolsTest {
     internal companion object {
         const val AGENT = "agent-1"
         const val CONVERSATION = "conv-1"
-        val TOPIC = CanvasRelayProtocol.conversationTopic(CONVERSATION)
+        val TOPIC = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
         val WEEKEND_PLAN: String get() = CanvasComposeGuide.EXAMPLE_REQUEST
 
         fun receipt(result: ExternalToolResult): ComposeReceipt = CanvasComposeContract.json.decodeFromString(

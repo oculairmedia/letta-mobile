@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -130,7 +131,7 @@ class CanvasOfflineQueueTest {
 
         phone.edit(note("op-offline", 5))
         runCurrent()
-        assertEquals(listOf("op-offline"), phone.delivery.queued(CanvasRelayProtocol.conversationTopic("conv-1")))
+        assertEquals(listOf("op-offline"), phone.delivery.queued(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))))
         assertTrue("op-offline" in phone.opIds(), "the edit is in the local log before anything else")
 
         // The app restarts: a new client over the same durable stores still has it queued...
@@ -146,7 +147,7 @@ class CanvasOfflineQueueTest {
         // ...uploads it on reconnect, and only the host's ack clears it.
         restarted.connect(host)
         runCurrent()
-        assertTrue(restarted.delivery.queued(CanvasRelayProtocol.conversationTopic("conv-1")).isEmpty())
+        assertTrue(restarted.delivery.queued(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))).isEmpty())
         assertEquals(CanvasSyncHealth.Synced, restarted.health())
     }
 }
@@ -169,13 +170,13 @@ class CanvasRelayConvergenceTest {
         runCurrent()
         // Reconnect: the app replays its queue and catches up again.
         phone.disconnect()
-        phone.delivery.enqueue(CanvasRelayProtocol.conversationTopic("conv-1"), listOf("op-1"))
+        phone.delivery.enqueue(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1")), listOf("op-1"))
         phone.connect(host)
         desktop.disconnect()
         desktop.connect(host)
         runCurrent()
 
-        assertEquals(1L, store.head(CanvasRelayProtocol.conversationTopic("conv-1")), "one op on the host")
+        assertEquals(1L, store.head(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))), "one op on the host")
         assertEquals(listOf("op-1"), desktop.opIds(), "one op, applied once, on the other app")
         assertEquals(phone.digest(), desktop.digest())
     }
@@ -211,7 +212,7 @@ class CanvasRelayConvergenceTest {
         jobs.forEach { it.join() }
         runCurrent()
 
-        val topic = CanvasRelayProtocol.conversationTopic("conv-jitter")
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-jitter"))
         assertEquals(40L, store.head(topic), "seed=$seed: every op once on the host")
         for (app in listOf(phone, desktop)) {
             val ids = app.opIds()
@@ -228,7 +229,7 @@ class CanvasRelayGenerationTest {
 
     @Test
     fun staleAckCannotClearSuccessorQueue() = runTest {
-        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
         val host = CanvasRelayHost(InMemoryCanvasRelayStore(), hostId = { "host-1" })
         val phone = TestApp("phone", backgroundScope).open("conv-1")
         val first = phone.connect(host)
@@ -263,7 +264,7 @@ class CanvasSyncBarrierTest {
 
     @Test
     fun syncedRequiresUploadAndCatchUpBarrier() = runTest {
-        val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
         val host = CanvasRelayHost(InMemoryCanvasRelayStore(), hostId = { "host-1" })
         val desktop = TestApp("desktop", backgroundScope).open("conv-1")
         desktop.connect(host)
@@ -294,7 +295,7 @@ class CanvasCrossClientE2ETest {
 
     @Test
     fun androidAndDesktopConvergeAfterDisconnect() = runTest {
-        val topic = CanvasRelayProtocol.conversationTopic("conv-e2e")
+        val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-e2e"))
         val store = InMemoryCanvasRelayStore()
         val host = CanvasRelayHost(store, hostId = { "host-1" })
         val android = TestApp("android", backgroundScope).open("conv-e2e")

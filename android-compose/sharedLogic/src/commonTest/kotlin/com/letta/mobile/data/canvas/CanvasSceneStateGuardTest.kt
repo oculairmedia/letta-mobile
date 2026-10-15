@@ -34,7 +34,7 @@ class CanvasSceneStateGuardTest {
     @Test
     fun aSceneWithDuplicateIdsOpensDedupedAndIsReported() {
         Telemetry.clear()
-        val guard = CanvasSceneStateGuard(CANVAS)
+        val guard = CanvasSceneStateGuard(CanvasId(CANVAS))
 
         val drawn = guard.drawable(withDuplicate(sceneOf(listOf(box1.add(), box2.add()))))
 
@@ -47,7 +47,7 @@ class CanvasSceneStateGuardTest {
 
     @Test
     fun aSyncThatBreaksTheBoardKeepsTheLastSceneThatDrew() {
-        val guard = CanvasSceneStateGuard(CANVAS)
+        val guard = CanvasSceneStateGuard(CanvasId(CANVAS))
         val good = sceneOf(listOf(box1.add()))
         val firstDrawn = guard.drawable(good)
 
@@ -59,7 +59,7 @@ class CanvasSceneStateGuardTest {
     @Test
     fun aDanglingLabelIsReportedButTheBoardStillFollowsTheLog() {
         Telemetry.clear()
-        val guard = CanvasSceneStateGuard(CANVAS)
+        val guard = CanvasSceneStateGuard(CanvasId(CANVAS))
         val dangling = sceneOf(labelledBox(box1, label1) + box2.add() + box1.remove())
 
         val drawn = guard.drawable(dangling)
@@ -73,9 +73,9 @@ class CanvasSceneStateGuardTest {
     fun aSoundSceneDrawsAsTheRenderGuardHasIt() {
         val scene = sceneOf(listOf(box1.add()))
 
-        val drawn = CanvasSceneStateGuard(CANVAS).drawable(scene)
+        val drawn = CanvasSceneStateGuard(CanvasId(CANVAS)).drawable(scene)
 
-        assertEquals(CanvasSceneRenderGuard.renderable(CanvasOpProjector.stripMetadataForDrawBox(scene), CANVAS), drawn)
+        assertEquals(CanvasSceneRenderGuard.renderable(CanvasOpProjector.stripMetadataForDrawBox(scene), CanvasId(CANVAS)), drawn)
     }
 
     private companion object {

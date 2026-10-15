@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -81,8 +82,8 @@ internal sealed class PluginToolHost(val name: String) {
         const val INTRUDER = "agent-2"
         const val CONVERSATION = "conv-plugin"
         const val TOOL_CALL = "toolu_plugin_1"
-        val CANVAS: String = CanvasId.forConversation(CONVERSATION).value
-        val TOPIC: String = CanvasRelayProtocol.conversationTopic(CONVERSATION)
+        val CANVAS: String = CanvasId.forConversation(ConversationId(CONVERSATION)).value
+        val TOPIC: String = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
 
         val json = Json { ignoreUnknownKeys = true }
 

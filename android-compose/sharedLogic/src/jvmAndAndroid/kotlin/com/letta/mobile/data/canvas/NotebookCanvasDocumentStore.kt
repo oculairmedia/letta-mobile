@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -62,8 +64,8 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
         findCanvas(id)?.let(notebooks::canvasDocument)
     }
 
-    override suspend fun getForConversation(conversationId: String): CanvasDocument? = locked {
-        find { it.conversationId == conversationId }?.let(notebooks::canvasDocument)
+    override suspend fun getForConversation(conversationId: ConversationId): CanvasDocument? = locked {
+        find { it.conversationId == conversationId.value }?.let(notebooks::canvasDocument)
     }
 
     override suspend fun upsert(doc: CanvasDocument) = locked {
@@ -102,9 +104,9 @@ class NotebookCanvasDocumentStore(private val notebooks: NotebookLocalStore) :
         }
     }
 
-    override suspend fun listForAgent(agentId: String): List<CanvasDocument> = locked {
+    override suspend fun listForAgent(agentId: AgentId): List<CanvasDocument> = locked {
         notebooks.listDocuments()
-            .filter { id -> notebooks.canvasMetadata(id)?.agentId == agentId }
+            .filter { id -> notebooks.canvasMetadata(id)?.agentId == agentId.value }
             .mapNotNull(notebooks::canvasDocument)
             .sortedByDescending { it.updatedAtEpochMs }
     }

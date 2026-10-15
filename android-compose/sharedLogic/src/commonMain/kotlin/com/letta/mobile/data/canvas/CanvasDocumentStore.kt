@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentStore
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 
 /**
  * Persistence contract for [CanvasDocument]: the shared-document [DocumentStore] (get, upsert,
@@ -18,8 +20,8 @@ interface CanvasDeletedElementStore {
 }
 
 interface CanvasDocumentStore : DocumentStore<CanvasId, CanvasDocument> {
-    suspend fun getForConversation(conversationId: String): CanvasDocument?
-    suspend fun listForAgent(agentId: String): List<CanvasDocument>
+    suspend fun getForConversation(conversationId: ConversationId): CanvasDocument?
+    suspend fun listForAgent(agentId: AgentId): List<CanvasDocument>
 
     /**
      * Returns the canvas already bound to [doc]'s `conversationId`, or inserts [doc] and

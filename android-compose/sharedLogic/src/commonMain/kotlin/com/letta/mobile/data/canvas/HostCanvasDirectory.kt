@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -16,7 +17,10 @@ data class HostCanvasEntry(
     val title: String,
     val conversationId: String? = null,
     val acl: CanvasAcl,
-)
+) {
+    /** [canvasId] typed; not serialized (no backing field), so the directory file keeps its shape. */
+    val id: CanvasId get() = CanvasId(canvasId)
+}
 
 /**
  * The host's record of the canvases its agents use, keyed by canvas id. Entries are only ever
@@ -24,9 +28,9 @@ data class HostCanvasEntry(
  * cannot rewrite an ACL by creating the same canvas again.
  */
 interface HostCanvasDirectory {
-    suspend fun get(canvasId: String): HostCanvasEntry?
+    suspend fun get(canvasId: CanvasId): HostCanvasEntry?
 
-    suspend fun forConversation(conversationId: String): HostCanvasEntry?
+    suspend fun forConversation(conversationId: ConversationId): HostCanvasEntry?
 
     /** Stores [entry] unless its canvas (or its conversation's canvas) is known; returns the stored one. */
     suspend fun putIfAbsent(entry: HostCanvasEntry): HostCanvasEntry
@@ -39,10 +43,10 @@ class InMemoryHostCanvasDirectory : HostCanvasDirectory {
     private val mutex = Mutex()
     private val entries = linkedMapOf<String, HostCanvasEntry>()
 
-    override suspend fun get(canvasId: String): HostCanvasEntry? = mutex.withLock { entries[canvasId] }
+    override suspend fun get(canvasId: CanvasId): HostCanvasEntry? = mutex.withLock { entries[canvasId.value] }
 
-    override suspend fun forConversation(conversationId: String): HostCanvasEntry? =
-        mutex.withLock { entries.values.firstOrNull { it.conversationId == conversationId } }
+    override suspend fun forConversation(conversationId: ConversationId): HostCanvasEntry? =
+        mutex.withLock { entries.values.firstOrNull { it.conversationId == conversationId.value } }
 
     override suspend fun putIfAbsent(entry: HostCanvasEntry): HostCanvasEntry = mutex.withLock {
         existing(entries.values, entry) ?: entry.also { entries[it.canvasId] = it }

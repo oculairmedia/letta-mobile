@@ -293,7 +293,7 @@ internal class CanvasBoard(
 internal fun rememberCanvasBoard(host: CanvasWorkspaceHost): CanvasBoard {
     val ui = remember { CanvasBoardUi() }
     val session = host.session
-    val kept = remember(session) { CanvasSessionBoardState(CanvasSceneStateGuard(session?.canvasId?.value)) }
+    val kept = remember(session) { CanvasSessionBoardState(CanvasSceneStateGuard(session?.canvasId)) }
     val flows = collectBoardFlows(host, kept.history)
     val docs = rememberBoardDocuments(session, flows.sessionDoc.value, ui)
     val work = rememberBoardWork(host, ui, kept.history)

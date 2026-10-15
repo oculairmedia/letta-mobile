@@ -49,6 +49,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
 import com.letta.mobile.data.model.ToolCall
@@ -114,7 +115,7 @@ class CanvasComposeEndToEndRenderTest {
     private val registry = ExternalToolRegistry.hostTools(
         HostCanvasTools.all(HostCanvasBackend(CanvasRelayHost(relay, hostId = { "host-1" }), relay, InMemoryHostCanvasDirectory())),
     )
-    private val canvasId = CanvasId.forConversation(CONVERSATION)
+    private val canvasId = CanvasId.forConversation(ConversationId(CONVERSATION))
 
     /** One canvas_compose call: its input and the tool call id it comes under. */
     private data class ComposeCall(val input: String, val toolCallId: String)
@@ -153,7 +154,7 @@ class CanvasComposeEndToEndRenderTest {
     /** The relay log from [after] applied by an app, as its canvas client applies what the host relays. */
     private suspend fun takeRelay(session: CanvasSession, after: Long): Long {
         var cursor = after
-        relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), after).forEach { entry ->
+        relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), after).forEach { entry ->
             assertNotNull(session.applyRemote(entry.op, vouchedActor = entry.op.actorId), "relay entry ${entry.cursor}")
             cursor = entry.cursor
         }
@@ -193,7 +194,7 @@ class CanvasComposeEndToEndRenderTest {
 
             // --- a second compose renders beside the first ---------------------------------------
             val second = runBlocking {
-                val cursor = relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).last().cursor
+                val cursor = relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), 0L).last().cursor
                 val (receipt, _) = compose(ComposeCall(SECOND_REQUEST, CALL_2))
                 takeRelay(session, cursor)
                 receipt
@@ -208,11 +209,11 @@ class CanvasComposeEndToEndRenderTest {
 
             // --- a retry writes nothing ----------------------------------------------------------
             runBlocking {
-                val logged = relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).size
+                val logged = relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), 0L).size
                 val (retried, _) = compose(firstCall)
                 assertEquals(listOf(CanvasComposeService.ALREADY_PUBLISHED_WARNING), retried.warnings)
                 assertEquals(first.bounds, retried.bounds)
-                assertEquals(logged, relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).size)
+                assertEquals(logged, relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), 0L).size)
             }
         }
     }

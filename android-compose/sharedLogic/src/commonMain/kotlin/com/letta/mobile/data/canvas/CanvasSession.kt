@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -812,7 +813,7 @@ class CanvasSession(
             options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val createOptions = CanvasCreateOptions(
-                canvasId = CanvasId.forConversation(conversationId),
+                canvasId = CanvasId.forConversation(ConversationId(conversationId)),
                 title = options.title,
                 conversationId = conversationId,
                 agentId = options.agentId,

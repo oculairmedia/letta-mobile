@@ -41,6 +41,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import io.ak1.drawbox.DrawingPreview
 import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Element
@@ -79,7 +80,7 @@ class CanvasGetLayoutRenderTest {
     private val registry = ExternalToolRegistry.hostTools(
         HostCanvasTools.all(HostCanvasBackend(CanvasRelayHost(relay, hostId = { "host-1" }), relay, InMemoryHostCanvasDirectory())),
     )
-    private val canvasId = CanvasId.forConversation(CONVERSATION)
+    private val canvasId = CanvasId.forConversation(ConversationId(CONVERSATION))
     private var cursor = 0L
 
     @Test
@@ -211,7 +212,7 @@ class CanvasGetLayoutRenderTest {
         registry.invoke(tool, input, ExternalToolCaller(agentId = AGENT, conversationId = CONVERSATION))
 
     private suspend fun catchUp(session: CanvasSession) {
-        relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), cursor).forEach { entry ->
+        relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), cursor).forEach { entry ->
             assertNotNull(session.applyRemote(entry.op, vouchedActor = entry.op.actorId), "relay ${entry.cursor}")
             cursor = entry.cursor
         }

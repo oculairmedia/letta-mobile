@@ -25,7 +25,7 @@ internal object CanvasAppDryRun {
     /** [ops] checked against [doc] as [callerId] would write them, plugin props against [kinds]; nothing is written. */
     fun answer(doc: CanvasDocument, ops: List<CanvasOp>, callerId: String, kinds: PluginKindCatalog): ExternalToolResult {
         val check = CanvasBatchValidator.check(doc.sceneJson, ops.map { it.withActor(callerId) }, kinds)
-        val result = CanvasDryRun.result(check, doc.revision, doc.id.value)
+        val result = CanvasDryRun.result(check, doc.revision, doc.id)
         return ExternalToolResult.Success(json.encodeToString(CanvasDryRunResult.serializer(), result))
     }
 }

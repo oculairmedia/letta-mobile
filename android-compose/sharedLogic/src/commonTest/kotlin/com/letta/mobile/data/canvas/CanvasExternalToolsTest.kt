@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -522,7 +523,7 @@ class CanvasExternalToolsTest {
         val results = (1..5).map { async { createTool.invoke(input, agentId = "agent-1") } }.map { it.await() }
         val ids = results.map { assertIs<ExternalToolResult.Success>(it); json.decodeFromString<CanvasCreateResult>(it.content).canvasId }
         assertEquals(1, ids.toSet().size, "every creator must get the same canvas: $ids")
-        assertEquals(ids.first(), store.getForConversation("conv-shared")?.id?.value)
+        assertEquals(ids.first(), store.getForConversation(ConversationId("conv-shared"))?.id?.value)
 
         // The same holds for a session-level open.
         val session = CanvasSession.getOrCreateForConversation(store, "conv-shared")

@@ -14,6 +14,8 @@ import com.letta.mobile.data.canvas.FileCanvasOpLog
 import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Files
@@ -79,15 +81,15 @@ class DesktopCanvasDocumentStoreTest {
         assertEquals("""{"bgColor":-16777216,"elements":[{"id":"e1"}]}""", recoveredDoc.sceneJson)
 
         // Verify conversation lookup
-        val byConv = store2.getForConversation("conv-77")
+        val byConv = store2.getForConversation(ConversationId("conv-77"))
         assertEquals(originalDoc, byConv)
 
         // Verify agent lookup
-        val byAgent = store2.listForAgent("agent-42")
+        val byAgent = store2.listForAgent(AgentId("agent-42"))
         assertEquals(listOf(originalDoc), byAgent)
 
         // Verify absent conversation
-        assertNull(store2.getForConversation("non-existent-conv"))
+        assertNull(store2.getForConversation(ConversationId("non-existent-conv")))
     }
 
     @Test

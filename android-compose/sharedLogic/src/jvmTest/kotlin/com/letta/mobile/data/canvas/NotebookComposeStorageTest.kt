@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.compose.ComposeCompilation
 import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.canvas.compose.ComposeTarget
+import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -30,13 +31,13 @@ class NotebookComposeStorageTest {
     @Test
     fun aComposedArtifactSurvivesTheNotebookAndARestart() = runBlocking {
         val path = Files.createTempDirectory("canvas-compose-storage-")
-        val canvasId = CanvasId.forConversation("conv-compose")
+        val canvasId = CanvasId.forConversation(ConversationId("conv-compose"))
         val request = Json.parseToJsonElement(CanvasComposeGuide.EXAMPLE_REQUEST)
         val compiled = assertIs<ComposeCompilation.Ready>(CanvasComposeCompiler.compile(request, "") { error("named") })
 
         NotebookLocalStore(path, "compose-peer").use { notebooks ->
             val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId))
-            val outcome = CanvasComposeService.compose(request, ComposeTarget(canvasId.value, session.sceneJsonOrEmpty())) { ops ->
+            val outcome = CanvasComposeService.compose(request, ComposeTarget(canvasId, session.sceneJsonOrEmpty())) { ops ->
                 var lamport = 0L
                 session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR_ID).withStamp("compose-${++lamport}", lamport) }).revision
             }

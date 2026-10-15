@@ -8,6 +8,8 @@ import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -259,14 +261,14 @@ private suspend fun executeListCanvases(
     val conversationId = input["conversation_id"]?.jsonPrimitive?.contentOrNull
     val callerAgentId = context.resolveCallerId()
     return if (conversationId != null) {
-        context.store.getForConversation(conversationId)
+        context.store.getForConversation(ConversationId(conversationId))
             ?.takeIf { canRead(it, callerAgentId) }
             ?.let { listOf(it.id.value) }
             .orEmpty()
     } else {
         // agentId and acl are independent fields, so a document can name an agent its ACL
         // has since stopped letting read; listing applies the same check as a direct lookup.
-        context.store.listForAgent(callerAgentId).filter { canRead(it, callerAgentId) }.map { it.id.value }
+        context.store.listForAgent(AgentId(callerAgentId)).filter { canRead(it, callerAgentId) }.map { it.id.value }
     }
 }
 
@@ -286,7 +288,7 @@ private suspend fun executeCompose(
     fun refused(code: ComposeErrorCode, message: String) = hosting.refused(code, message)
     val named = (input["canvas_id"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
     val canvasId = named?.let(::CanvasId)
-        ?: caller.conversationId?.let { context.store.getForConversation(it)?.id }
+        ?: caller.conversationId?.let { context.store.getForConversation(ConversationId(it))?.id }
         ?: return refused(ComposeErrorCode.CANVAS_NOT_FOUND, NO_CONVERSATION_CANVAS)
     val session = context.sessions.get(canvasId)
     val doc = session?.document?.value ?: context.store.get(canvasId)
@@ -297,7 +299,7 @@ private suspend fun executeCompose(
     if (doc.acl != null && !doc.acl.canWrite(callerId)) {
         return refused(ComposeErrorCode.UNAUTHORIZED, "Unauthorized: actor '$callerId' cannot write to canvas '${doc.id.value}'")
     }
-    return hosting.compose(input, ComposeTarget(doc.id.value, doc.sceneJson, doc.revision)) { ops ->
+    return hosting.compose(input, ComposeTarget(doc.id, doc.sceneJson, doc.revision)) { ops ->
         publishComposed(context, session, doc, ops)
     }
 }
@@ -400,7 +402,7 @@ class CanvasGetSceneTool(
             when (val lookup = findCanvasDocument(context, input)) {
                 is CanvasLookupResult.Error -> lookup.result
                 is CanvasLookupResult.Found -> ExternalToolResult.Success(
-                    canvasJson.encodeToString(CanvasSceneRead.result(lookup.doc.sceneJson, lookup.doc.revision, lookup.doc.id.value)),
+                    canvasJson.encodeToString(CanvasSceneRead.result(lookup.doc.sceneJson, lookup.doc.revision, lookup.doc.id)),
                 )
             }
         }
