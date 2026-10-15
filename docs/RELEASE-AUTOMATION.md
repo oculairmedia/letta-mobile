@@ -86,14 +86,16 @@ install through an authenticated conversation:
 ```bash
 make verify-device-ready \
   DEVICE=<serial> \
-  APK=/absolute/path/to/app-debug.apk \
+  APK=/absolute/path/to/app-play-benchmark.apk \
   BASE_URL=http://192.168.50.90:8289 \
   API_KEY=<disposable-token> \
   AGENT=<agent-id> \
   CONV=<conversation-id>
 ```
 
-The underlying script is `scripts/release/bootstrap-device.sh`.
+The underlying script is `scripts/release/bootstrap-device.sh`. It targets the benchmark build
+(`ca.oculair.meridian.benchmark`) because release ignores the automation launch extras; set
+`APP_PACKAGE` to point it at another build type that honours them.
 
 It performs these steps:
 

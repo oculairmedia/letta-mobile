@@ -18,7 +18,7 @@ internal data class ChatConversationCoordinatorConfig(
     val currentConversationTracker: CurrentConversationTracker,
     val uiState: MutableStateFlow<ChatUiState>,
     val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
-    val bootstrap: ClientModeBootstrapConfig,
+    val bootstrap: LocalRuntimeBootstrapConfig,
     val observer: TimelineObserverConfig,
     val reconcileLauncher: RecentMessagesReconcileLauncher,
     val send: ConversationSendConfig,
@@ -35,7 +35,7 @@ internal data class ChatConversationRoute(
     val isFresh: Boolean,
 )
 
-internal data class ClientModeBootstrapConfig(
+internal data class LocalRuntimeBootstrapConfig(
     val pendingMessages: () -> ImmutableList<UiMessage>,
     val setPendingUserMessage: (UiMessage) -> Unit,
     val currentConversationId: () -> String?,
@@ -47,7 +47,7 @@ internal data class TimelineObserverConfig(
 )
 
 internal data class ConversationSendConfig(
-    val viaClientMode: (String) -> Unit,
+    val viaLocalRuntime: (String) -> Unit,
     val viaTimeline: (String) -> Unit,
     val markDuplicateInitialMessageInFlight: () -> Unit,
 )
