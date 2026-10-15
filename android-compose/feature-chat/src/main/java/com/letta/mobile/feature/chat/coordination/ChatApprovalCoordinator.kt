@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.chat.approval.ChatApprovalResult
 import com.letta.mobile.data.chat.approval.OutboxApproval
 import com.letta.mobile.data.chat.approval.OutboxSubmitResult
 import com.letta.mobile.data.chat.approval.OutboxTarget
@@ -53,13 +54,4 @@ private fun OutboxSubmitResult.toChatResult(): ChatApprovalResult = when (this) 
     OutboxSubmitResult.Sent, OutboxSubmitResult.Duplicate -> ChatApprovalResult.Submitted
     OutboxSubmitResult.Queued -> ChatApprovalResult.Queued
     OutboxSubmitResult.NoLongerPending -> ChatApprovalResult.Failed("This approval is no longer pending.")
-}
-
-internal sealed interface ChatApprovalResult {
-    /** letta-mobile-bzvro.14: the link is down; the answer waits in the outbox and sends on reconnect. */
-    data object Queued : ChatApprovalResult
-    data object MissingActiveAgent : ChatApprovalResult
-    data object MissingActiveConversation : ChatApprovalResult
-    data object Submitted : ChatApprovalResult
-    data class Failed(val message: String) : ChatApprovalResult
 }

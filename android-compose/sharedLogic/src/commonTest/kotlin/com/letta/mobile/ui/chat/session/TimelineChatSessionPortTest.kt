@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -165,6 +166,30 @@ class TimelineChatSessionPortTest {
     }
 
     @Test
+    fun aHostsApprovalStateReachesThePageAndGuardsItsAnswers() = runTest {
+        val approvals = FakeApprovalState()
+        val answers = mutableListOf<ChatApprovalAnswer>()
+        val port = TimelineChatSessionPort(
+            FakeTimelineChatSession(),
+            target,
+            backgroundScope,
+            TimelineChatSessionOptions(controls = TimelineChatRunControls(answerApproval = { answers += it }), approvals = approvals),
+        )
+        backgroundScope.launch { port.uiState.collect {} }
+        runCurrent()
+
+        approvals.queuedApprovals.value = setOf("req-queued")
+        approvals.submittingApprovals.value = setOf("req-1")
+        runCurrent()
+        assertEquals(setOf("req-queued"), port.uiState.value.queuedApprovalRequestIds.toSet())
+
+        port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null))
+        port.actions.submitApproval(ChatApprovalAnswer("req-2", listOf("call-2"), approve = true, reason = null))
+        runCurrent()
+        assertEquals(listOf("req-2"), answers.map { it.requestId }, "the host already has req-1 in flight")
+    }
+
+    @Test
     fun capabilitiesFollowTheControlsAndHideWhatTheWebCannotDo() = runTest {
         val bare = port(FakeTimelineChatSession()).capabilities.value
         assertFalse(bare.approvals)
@@ -237,4 +262,10 @@ private class FakeTimelineChatSession(
         sendFailure?.let { throw it }
         sends += text to attachments
     }
+}
+
+private class FakeApprovalState : ChatApprovalStateSource {
+    override val submittingApprovals = MutableStateFlow<Set<String>>(emptySet())
+    override val queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
+    override val pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
 }

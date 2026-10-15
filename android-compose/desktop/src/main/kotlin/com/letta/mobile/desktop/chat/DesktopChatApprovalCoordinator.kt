@@ -1,42 +1,47 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.chat.approval.ApprovalSubmissionTracker
+import com.letta.mobile.data.chat.approval.ChatApprovalAnswerHost
+import com.letta.mobile.data.chat.approval.ChatApprovalAnswerer
+import com.letta.mobile.data.chat.approval.ChatApprovalResult
+import com.letta.mobile.data.chat.approval.ChatApprovalSubmission
 import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
 import com.letta.mobile.data.chat.runtime.ApprovalQueueSource
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.runtime.ApprovalBinding
 import com.letta.mobile.data.runtime.PendingApprovalDetails
-import kotlinx.coroutines.CancellationException
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 internal data class ApprovalSubmissionRequest(
     val gateway: DesktopChatGateway?,
     val conversation: DesktopConversationSummary?,
-    val requestId: String,
-    val toolCallIds: List<String>,
-    val approve: Boolean,
-    val reason: String?,
-    val selectedSuggestionIds: List<String> = emptyList(),
-    val suggestionBinding: ApprovalBinding? = null,
+    val answer: ChatApprovalAnswer,
 )
 
 /**
- * Tracks, submits, and reconciles user approvals with the backend.
+ * Binds the active gateway's approval surface (can it answer, what it parked, what waits in its
+ * outbox) and delivers answers over it. The answer lifecycle itself - in flight, released, reconciled
+ * against the timeline - is the shared [ChatApprovalAnswerer] Android's chat screen uses too
+ * (letta-mobile-by4vm.78).
  */
 internal class DesktopChatApprovalCoordinator(
     private val scope: CoroutineScope,
     private val onError: (String) -> Unit,
-) {
-    /** The shared in-flight tracker (letta-mobile-2dsi5.4): the same one Android's approval controller uses. */
-    private val tracker = ApprovalSubmissionTracker()
-    val submittingApprovals: StateFlow<Set<String>> = tracker.submitting
+) : ChatApprovalStateSource {
+    private val answerer = ChatApprovalAnswerer(
+        scope,
+        object : ChatApprovalAnswerHost {
+            override fun onRejected(answer: ChatApprovalAnswer, message: String) = onError(message)
+        },
+    )
+    override val submittingApprovals: StateFlow<Set<String>> = answerer.submitting
 
     private val _canSubmitApprovals = MutableStateFlow(false)
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
@@ -44,30 +49,14 @@ internal class DesktopChatApprovalCoordinator(
     private val _queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
 
     /** letta-mobile-bzvro.14: requests answered offline and waiting in the bound gateway's outbox. */
-    val queuedApprovals: StateFlow<Set<String>> = _queuedApprovals.asStateFlow()
+    override val queuedApprovals: StateFlow<Set<String>> = _queuedApprovals.asStateFlow()
     private var queueJob: Job? = null
 
     private val _pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
 
     /** What each parked control request of the bound gateway offered, by tool call id (empty when it reports none). */
-    val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = _pendingApprovalDetails.asStateFlow()
+    override val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = _pendingApprovalDetails.asStateFlow()
     private var detailsJob: Job? = null
-
-    /**
-     * Requests answered one parallel call at a time: request id to (the call answered, its sibling
-     * calls). The tracker holds a request "submitting" until the whole request is decided; once the
-     * answered call's gate has resolved and a sibling is parked in its place, the card is for that
-     * sibling and must be actionable again.
-     */
-    private val answeredCalls = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Set<String>>>()
-
-    private fun releaseAnsweredCalls(parked: Map<String, PendingApprovalDetails>) {
-        answeredCalls.entries.removeIf { (requestId, calls) ->
-            val release = calls.first !in parked && calls.second.any { it in parked }
-            if (release) tracker.clear(requestId)
-            release
-        }
-    }
 
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
@@ -78,7 +67,7 @@ internal class DesktopChatApprovalCoordinator(
         detailsJob = scope.launch {
             source.pendingApprovalDetails.collect {
                 _pendingApprovalDetails.value = it
-                releaseAnsweredCalls(it)
+                answerer.releaseAnsweredCalls(it)
             }
         }
     }
@@ -96,11 +85,15 @@ internal class DesktopChatApprovalCoordinator(
         val conversationId: String,
     )
 
+    /** Answers over the request's gateway; a request without one that can answer is dropped silently. */
     fun submitApproval(request: ApprovalSubmissionRequest) {
         val target = validateSubmissionTarget(request) ?: return
-        tracker.begin(request.requestId, target.conversationId)
-        request.suggestionBinding?.let { answeredCalls[request.requestId] = it.toolCallId to (request.toolCallIds - it.toolCallId).toSet() }
-        launchSubmission(target, request)
+        answerer.submit(
+            ChatApprovalSubmission(request.answer, ConversationId(target.conversationId)) {
+                dispatchToGateway(target, request.answer)
+                ChatApprovalResult.Submitted
+            },
+        )
     }
 
     private fun validateSubmissionTarget(request: ApprovalSubmissionRequest): SubmissionTarget? {
@@ -111,69 +104,45 @@ internal class DesktopChatApprovalCoordinator(
         return SubmissionTarget(gw, agentId, conversation.id)
     }
 
-    private fun launchSubmission(target: SubmissionTarget, request: ApprovalSubmissionRequest) {
-        scope.launch {
-            try {
-                dispatchToGateway(target.gateway, target.agentId, target.conversationId, request)
-            } catch (cancelled: CancellationException) {
-                clearSubmittedApproval(request.requestId)
-                throw cancelled
-            } catch (t: Throwable) {
-                clearSubmittedApproval(request.requestId)
-                onError(t.message ?: t::class.simpleName ?: "Could not submit answer")
-            }
-        }
-    }
-
-    private suspend fun dispatchToGateway(
-        gw: DesktopChatGateway,
-        agentId: String,
-        conversationId: String,
-        request: ApprovalSubmissionRequest,
-    ) {
+    private suspend fun dispatchToGateway(target: SubmissionTarget, answer: ChatApprovalAnswer) {
+        val gw = target.gateway
         // An always-allow targets exactly the call whose card offered the rule, not the first of the row.
-        val toolCallId = request.suggestionBinding?.toolCallId ?: request.toolCallIds.firstOrNull()
-        val alwaysAllow = request.alwaysAllow(SubmissionTarget(gw, agentId, conversationId))
+        val toolCallId = answer.suggestionBinding?.toolCallId ?: answer.toolCallIds.firstOrNull()
+        val alwaysAllow = answer.alwaysAllow(target)
         when {
             // letta-mobile-bzvro.40: an Iroh gateway carries the rule to its host, bound to the request the card drew.
             gw is ApprovalSubmittingGateway && alwaysAllow != null -> gw.submitAlwaysAllow(alwaysAllow)
             gw is ApprovalSubmittingGateway -> gw.submitApproval(
-                agentId = agentId,
-                conversationId = conversationId,
-                approvalRequestId = request.requestId,
+                agentId = target.agentId,
+                conversationId = target.conversationId,
+                approvalRequestId = answer.requestId,
                 toolCallId = toolCallId,
-                approve = request.approve,
-                reason = request.reason,
+                approve = answer.approve,
+                reason = answer.reason,
             )
             gw is DesktopApprovalSubmitter -> gw.submitApproval(
                 DesktopApprovalSubmission(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    requestId = request.requestId,
+                    agentId = target.agentId,
+                    conversationId = target.conversationId,
+                    requestId = answer.requestId,
                     toolCallId = toolCallId,
-                    approve = request.approve,
-                    reason = request.reason,
-                    selectedSuggestionIds = request.selectedSuggestionIds,
-                    suggestionBinding = request.suggestionBinding,
+                    approve = answer.approve,
+                    reason = answer.reason,
+                    selectedSuggestionIds = answer.selectedSuggestionIds,
+                    suggestionBinding = answer.suggestionBinding,
                 ),
             )
         }
     }
 
     /** The always-allow [this] asks for, or null for a plain decision. */
-    private fun ApprovalSubmissionRequest.alwaysAllow(target: SubmissionTarget): AlwaysAllowAnswer? {
+    private fun ChatApprovalAnswer.alwaysAllow(target: SubmissionTarget): AlwaysAllowAnswer? {
         val binding = suggestionBinding ?: return null
         if (selectedSuggestionIds.isEmpty()) return null
         return AlwaysAllowAnswer(target.agentId, target.conversationId, binding, selectedSuggestionIds)
     }
 
-    fun clearSubmittedApproval(requestId: String) {
-        answeredCalls.remove(requestId)
-        tracker.clear(requestId)
-    }
-
-    fun reconcileSubmittedApprovals(conversationId: String, messages: List<UiMessage>) {
-        if (tracker.submitting.value.isEmpty()) return
-        tracker.reconcile(conversationId, messages.mapNotNull { it.approvalRequest?.requestId }.toSet())
+    fun reconcileSubmittedApprovals(conversation: ConversationId, messages: List<UiMessage>) {
+        answerer.reconcile(conversation, messages.mapNotNull { it.approvalRequest?.requestId }.toSet())
     }
 }

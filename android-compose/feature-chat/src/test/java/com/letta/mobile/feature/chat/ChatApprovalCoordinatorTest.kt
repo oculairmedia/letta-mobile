@@ -14,7 +14,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
-import com.letta.mobile.feature.chat.coordination.ChatApprovalResult
+import com.letta.mobile.data.chat.approval.ChatApprovalResult
 
 @Tag("unit")
 class ChatApprovalCoordinatorTest {

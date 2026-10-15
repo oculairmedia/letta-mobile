@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.binding
+import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -59,11 +60,13 @@ class DesktopChatApprovalCoordinatorTest {
         ApprovalSubmissionRequest(
             gateway = gateway,
             conversation = conversation,
-            requestId = "req",
-            toolCallIds = calls,
-            approve = true,
-            reason = null,
-            suggestionBinding = details(answering).binding,
+            answer = ChatApprovalAnswer(
+                requestId = "req",
+                toolCallIds = calls,
+                approve = true,
+                reason = null,
+                suggestionBinding = details(answering).binding,
+            ),
         )
 
     private fun details(call: String) = PendingApprovalDetails(approvalId = "perm-$call", toolCallId = call, toolName = "Bash")
