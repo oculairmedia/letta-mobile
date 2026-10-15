@@ -30,6 +30,8 @@ import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
+import com.letta.mobile.ui.chat.session.currentHostApprovals
+import com.letta.mobile.ui.chat.session.hostApprovals
 import com.letta.mobile.ui.chat.session.toUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -126,7 +128,7 @@ internal class DesktopChatSessionPort(
      * construction. The gateway has no flow of its own, so a state change re-reads it.
      */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
-        controller.canSubmitApprovals,
+        controller.approvals.canSubmitApprovals,
         controller.canonicalPresentation,
         controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
         controller.state.map { branchFacts() }.distinctUntilChanged(),
@@ -145,7 +147,7 @@ internal class DesktopChatSessionPort(
 
     private fun currentCapabilities(): ChatSurfaceCapabilities = desktopCapabilities(
         DesktopCapabilityFacts(
-            approvals = controller.canSubmitApprovals.value,
+            approvals = controller.approvals.canSubmitApprovals.value,
             paged = controller.canonicalPresentation.value != null,
             workingDirectory = controller.supportsWorkingDirectory,
             branching = controller.conversationManagement.supportsBranching,
@@ -165,9 +167,7 @@ internal class DesktopChatSessionPort(
         cancellingConversationId = controller.cancellingConversationId.value,
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
-        submittingApprovals = controller.submittingApprovals.value,
-        approvalDetails = controller.pendingApprovalDetails.value,
-        queuedApprovals = controller.queuedApprovals.value,
+        approvals = controller.approvals.currentHostApprovals(),
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
@@ -175,34 +175,15 @@ internal class DesktopChatSessionPort(
         controller.replyPresence,
         controller.cancellingConversationId,
         selectedSendQueue(),
-        approvalInputs(),
+        combine(localTimeline, controller.approvals.hostApprovals(), ::Pair),
     ) { surface, presence, cancelling, queue, (local, approvals) ->
-        DesktopChatTimelineInputs(
-            surface, presence, cancelling, queue, local,
-            submittingApprovals = approvals.submitting,
-            approvalDetails = approvals.details,
-            queuedApprovals = approvals.queued,
-        )
+        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
         if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
             localTimeline.update { it.copy(acknowledgedError = null) }
         }
     }
-
-    /** What the cards draw about answers: in flight, parked details, queued offline. */
-    private class ApprovalInputs(
-        val submitting: Set<String>,
-        val details: Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>,
-        val queued: Set<String>,
-    )
-
-    private fun approvalInputs(): Flow<Pair<DesktopChatLocalTimelineState, ApprovalInputs>> = combine(
-        localTimeline,
-        controller.submittingApprovals,
-        controller.pendingApprovalDetails,
-        controller.queuedApprovals,
-    ) { local, submitting, details, queued -> local to ApprovalInputs(submitting, details, queued) }
 
     /**
      * The selected conversation's queue, re-resolved whenever the selection or the canonical route
@@ -433,8 +414,8 @@ internal class DesktopChatActions(
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.
-        if (answer.requestId in controller.submittingApprovals.value) return
-        if (controller.canSubmitApprovals.value) {
+        if (answer.requestId in controller.approvals.submittingApprovals.value) return
+        if (controller.approvals.canSubmitApprovals.value) {
             controller.submitApproval(answer)
         }
     }

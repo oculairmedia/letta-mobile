@@ -132,22 +132,10 @@ class DesktopChatController(
     }
 
     /**
-     * Approval request ids whose decision (answer / dismiss) is in flight, so the
-     * structured AskUserQuestion card can disable its buttons while submitting.
+     * letta-mobile-by4vm.97: the approval state the session port overlays on the timeline (answers
+     * in flight, queued offline, parked details) and whether the active gateway can answer at all.
      */
-    val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
-
-    /** letta-mobile-bzvro.14: requests answered offline, waiting in the gateway's outbox. */
-    val queuedApprovals: StateFlow<Set<String>> = approvalCoordinator.queuedApprovals
-    val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
-        approvalCoordinator.pendingApprovalDetails
-
-    /**
-     * Whether the active gateway can actually submit approvals (i.e. is a
-     * [DesktopApprovalSubmitter]). Demo / HTTP-only gateways can't, so the UI must
-     * disable/hide the approval-answer buttons instead of offering a silent no-op.
-     */
-    val canSubmitApprovals: StateFlow<Boolean> = approvalCoordinator.canSubmitApprovals
+    val approvals: DesktopChatApprovalState = approvalCoordinator
 
     /**
      * letta-mobile folder-settings #2: the SELECTED conversation's working
