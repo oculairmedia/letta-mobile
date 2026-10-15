@@ -9,15 +9,11 @@ import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.context.ContextReadingSnapshots
 import com.letta.mobile.data.context.ContextTokenReadings
-import com.letta.mobile.data.context.contextTokenReadingsOf
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
 import com.letta.mobile.data.repository.CachedProjectRepository
-import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
-import com.letta.mobile.data.repository.SelfTodoRepository
-import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -44,6 +40,8 @@ import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
 import com.letta.mobile.data.session.SessionBackendBinding
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphFactory
+import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.SubagentListing
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
 import com.letta.mobile.data.session.sessionBackendBinding
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -261,17 +259,18 @@ class DesktopRepositoryAdapters(
     } else {
         null
     }
-    private val boundCronRepository = CronRepository(channelTransport, transportBoundScope)
-
-    /** Fed by the same transport-bound scope, so it retires with the transport generation. */
-    val contextTokenReadings: ContextTokenReadings =
-        contextTokenReadingsOf(channelTransport, transportBoundScope, contextReadingSnapshots)
-    private val boundSelfTodoRepository = SelfTodoRepository(channelTransport, transportBoundScope)
-    private val boundSubagentRepository = SubagentRepository(
+    // letta-mobile-by4vm.24: built by the shared graph builder, as Android's are. The desktop
+    // Background tasks panel has a "Finished" section, so it lists every subagent.
+    private val transportBound = SharedSessionGraph.transportBound(
         transport = channelTransport,
         scope = transportBoundScope,
-        includeAll = true,
+        snapshots = contextReadingSnapshots,
+        subagents = SubagentListing.ALL,
     )
+    private val boundSubagentRepository = transportBound.subagentRepository
+
+    /** Fed by the same transport-bound scope, so it retires with the transport generation. */
+    val contextTokenReadings: ContextTokenReadings = transportBound.contextTokenReadings
 
     val closeables: List<AutoCloseable> = listOf(
         AutoCloseable {
@@ -287,7 +286,7 @@ class DesktopRepositoryAdapters(
         ?: irohRepositories?.blockRepository
         ?: unavailable(SessionRoute.BLOCKS)
     val conversationRepository: IConversationRepository = unavailable(SessionRoute.CONVERSATIONS)
-    val cronRepository: ICronRepository = boundCronRepository
+    val cronRepository: ICronRepository = transportBound.cronRepository
     val mcpServerRepository: IMcpServerRepository =
         irohAdminReads?.mcpServerRepository ?: unavailable(SessionRoute.MCP_SERVERS)
     val modelRepository: IModelRepository =
@@ -301,7 +300,7 @@ class DesktopRepositoryAdapters(
     val runRepository: IRunRepository =
         irohAdminReads?.runRepository ?: unavailable(SessionRoute.RUNS)
     val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailable(SessionRoute.SCHEDULES)
-    val selfTodoRepository: ISelfTodoRepository = boundSelfTodoRepository
+    val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     val stepRepository: IStepRepository = unavailable(SessionRoute.STEPS)
     val subagentRepository: ISubagentRepository = boundSubagentRepository
     val toolRepository: IToolRepository = irohRepositories?.toolRepository ?: unavailable(SessionRoute.TOOLS)
