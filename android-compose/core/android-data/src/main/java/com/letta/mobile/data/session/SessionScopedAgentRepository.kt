@@ -88,7 +88,7 @@ class SessionScopedAgentRepository internal constructor(
         _agents.value = emptyList()
         _isRefreshing.value = false
         _refreshError.value = null
-        sessionManager.current.agentRepository.clearForBackendSwitch()
+        clearBackendScopedCache(sessionManager.current.agentRepository)
     }
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession {
