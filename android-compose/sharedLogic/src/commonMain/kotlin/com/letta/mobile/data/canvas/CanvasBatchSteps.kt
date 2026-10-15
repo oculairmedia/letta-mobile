@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.serialization.json.JsonElement
 
 /** One op of a batch as the projector applies it: nested batch ops opened out, each labelled by where it sat. */
@@ -17,7 +18,7 @@ internal object CanvasBatchSteps {
     fun of(ops: List<CanvasOp>, baseLamport: Long): List<CanvasBatchStep> {
         val flat = ops.flatMapIndexed { index, op -> open(index.toString(), op) }
         return flat.mapIndexed { position, (label, op) ->
-            CanvasBatchStep(label, op, op.withStamp("validate-$position", baseLamport + position + 1))
+            CanvasBatchStep(label, op, op.withStamp(CanvasOpId("validate-$position"), baseLamport + position + 1))
         }
     }
 

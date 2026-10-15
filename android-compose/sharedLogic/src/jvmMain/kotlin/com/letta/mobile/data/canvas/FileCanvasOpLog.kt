@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -98,10 +99,10 @@ class FileCanvasOpLog(
         }
     }
 
-    override suspend fun has(canvasId: CanvasId, opId: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun has(canvasId: CanvasId, opId: CanvasOpId): Boolean = withContext(Dispatchers.IO) {
         mutex.withLock {
             val opIds = getOrLoadOpIds(canvasId)
-            opIds.contains(opId)
+            opIds.contains(opId.value)
         }
     }
 
@@ -111,9 +112,9 @@ class FileCanvasOpLog(
         }
     }
 
-    override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>): Unit = withContext(Dispatchers.IO) {
+    override suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>): Unit = withContext(Dispatchers.IO) {
         mutex.withLock {
-            journal.settle(canvasId, opIds)
+            journal.settle(canvasId, opIds.map { it.value })
         }
     }
 

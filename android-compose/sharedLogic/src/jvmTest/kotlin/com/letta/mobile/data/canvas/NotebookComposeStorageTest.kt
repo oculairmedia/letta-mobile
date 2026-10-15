@@ -7,6 +7,7 @@ import com.letta.mobile.data.canvas.compose.ComposeCompilation
 import com.letta.mobile.data.canvas.compose.ComposeOutcome
 import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.canvas.compose.ComposeTarget
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
@@ -39,7 +40,7 @@ class NotebookComposeStorageTest {
             val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId))
             val outcome = CanvasComposeService.compose(request, ComposeTarget(canvasId, session.sceneJsonOrEmpty())) { ops ->
                 var lamport = 0L
-                session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR).withStamp("compose-${++lamport}", lamport) }).revision
+                session.applyOps(ops.map { it.withActor(CanvasSession.LOCAL_USER_ACTOR).withStamp(CanvasOpId("compose-${++lamport}"), lamport) }).revision
             }
             assertEquals(ComposeStatus.PUBLISHED, assertIs<ComposeOutcome.Done>(outcome).receipt.status)
         }

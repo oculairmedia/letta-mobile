@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +31,7 @@ class CanvasOpJournalTest {
     private class SettleFailingLog(private val inner: InMemoryCanvasOpLog = InMemoryCanvasOpLog()) : CanvasOpLog by inner {
         var failSettle = false
 
-        override suspend fun settle(canvasId: CanvasId, opIds: Collection<String>) {
+        override suspend fun settle(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
             if (failSettle) throw IllegalStateException("process died before the ops were settled")
             inner.settle(canvasId, opIds)
         }

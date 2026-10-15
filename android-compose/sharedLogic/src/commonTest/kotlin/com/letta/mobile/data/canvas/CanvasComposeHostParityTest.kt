@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.WEEKEND
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -71,7 +72,7 @@ class CanvasComposeHostParityTest {
         }
     }
 
-    private fun unstamped(batch: CanvasOp.BatchOp): List<CanvasOp> = batch.ops.map { it.withStamp("", it.lamport) }
+    private fun unstamped(batch: CanvasOp.BatchOp): List<CanvasOp> = batch.ops.map { it.withStamp(CanvasOpId(""), it.lamport) }
 
     /** A scene with every op id dropped: the ids each host mints are the one thing that differs. */
     private fun withoutOpIds(sceneJson: String): JsonElement = strip(Json.parseToJsonElement(sceneJson))

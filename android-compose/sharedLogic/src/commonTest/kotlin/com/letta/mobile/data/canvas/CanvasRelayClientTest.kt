@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.HostId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -18,7 +20,7 @@ import kotlin.test.assertTrue
  * A connection between one app and a [CanvasRelayHost], in memory. While [hold] is set, what the host
  * sends waits here, so a test can decide when the app reads it.
  */
-internal class TestConnection private constructor(override val hostId: String) : CanvasRelayConnection {
+internal class TestConnection private constructor(override val hostId: HostId) : CanvasRelayConnection {
     private lateinit var session: CanvasRelayHost.Session
     private val inbox = Channel<CanvasRelayMessage?>(Channel.UNLIMITED)
     private val held = mutableListOf<CanvasRelayMessage>()
@@ -53,7 +55,7 @@ internal class TestConnection private constructor(override val hostId: String) :
 
     companion object {
         suspend fun to(host: CanvasRelayHost, origin: String, hostId: String = "host-1"): TestConnection =
-            TestConnection(hostId).also { connection -> connection.session = host.connect(origin) { connection.fromHost(it) } }
+            TestConnection(HostId(hostId)).also { connection -> connection.session = host.connect(origin) { connection.fromHost(it) } }
     }
 }
 
@@ -131,7 +133,7 @@ class CanvasOfflineQueueTest {
 
         phone.edit(note("op-offline", 5))
         runCurrent()
-        assertEquals(listOf("op-offline"), phone.delivery.queued(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))))
+        assertEquals(listOf(CanvasOpId("op-offline")), phone.delivery.queued(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))))
         assertTrue("op-offline" in phone.opIds(), "the edit is in the local log before anything else")
 
         // The app restarts: a new client over the same durable stores still has it queued...
@@ -170,7 +172,7 @@ class CanvasRelayConvergenceTest {
         runCurrent()
         // Reconnect: the app replays its queue and catches up again.
         phone.disconnect()
-        phone.delivery.enqueue(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1")), listOf("op-1"))
+        phone.delivery.enqueue(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1")), listOf(CanvasOpId("op-1")))
         phone.connect(host)
         desktop.disconnect()
         desktop.connect(host)
@@ -239,7 +241,7 @@ class CanvasRelayGenerationTest {
         first.hold = true
         phone.edit(note("op-1", 1))
         runCurrent()
-        assertEquals(listOf("op-1"), phone.delivery.queued(topic))
+        assertEquals(listOf(CanvasOpId("op-1")), phone.delivery.queued(topic))
 
         // A successor connection takes over (a reconnect) and has not heard from the host yet.
         val second = TestConnection.to(host, "phone").apply { hold = true }
@@ -249,7 +251,7 @@ class CanvasRelayGenerationTest {
         // The first connection's ack arrives now: it belongs to a superseded generation.
         first.release()
         runCurrent()
-        assertEquals(listOf("op-1"), phone.delivery.queued(topic), "a stale ack cleared the successor's queue")
+        assertEquals(listOf(CanvasOpId("op-1")), phone.delivery.queued(topic), "a stale ack cleared the successor's queue")
         assertIs<CanvasSyncHealth.Connecting>(phone.health())
 
         // The successor's own upload and ack settle it.
@@ -329,7 +331,7 @@ class CanvasCrossClientE2ETest {
             assertEquals(CanvasSyncHealth.Synced, app.health(), app.name)
             val view = app.client.relayView(app.canvasId)
             assertEquals(head, view.hostCursor, "${app.name} cursor")
-            assertEquals("host-1", view.hostId)
+            assertEquals(HostId("host-1"), view.hostId)
         }
         assertEquals(android.client.relayView(android.canvasId).canonicalId, desktop.client.relayView(desktop.canvasId).canonicalId)
         assertEquals(android.digest(), desktop.digest())

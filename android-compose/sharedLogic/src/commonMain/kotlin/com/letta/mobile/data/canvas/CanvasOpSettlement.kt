@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 
@@ -18,7 +19,7 @@ import kotlinx.coroutines.CancellationException
  */
 internal class CanvasOpSettlement(private val canvasId: CanvasId, private val opLog: CanvasOpLog) {
     /** Op ids appended since the last document write, which that write carries. */
-    private val carried = mutableListOf<String>()
+    private val carried = mutableListOf<CanvasOpId>()
 
     /** True until the log's unsettled ops have been checked: on open, and after any failed write. */
     private var recoveryDue = true
@@ -36,14 +37,14 @@ internal class CanvasOpSettlement(private val canvasId: CanvasId, private val op
 
     suspend fun append(op: CanvasOp) {
         opLog.append(canvasId, op)
-        carried += op.opId
+        carried += op.canvasOpId
     }
 
     /** The ops to fold in now, oldest first, carried by the next write; null when the log cannot say. */
     suspend fun takeUnsettled(): List<CanvasOp>? = guarded("read") {
         opLog.unsettled(canvasId).also { pending ->
             recoveryDue = false
-            pending.mapTo(carried) { it.opId }
+            pending.mapTo(carried) { it.canvasOpId }
         }
     }
 

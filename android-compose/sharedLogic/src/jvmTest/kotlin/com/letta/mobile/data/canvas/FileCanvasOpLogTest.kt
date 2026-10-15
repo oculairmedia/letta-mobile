@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasOpId
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
@@ -136,12 +137,12 @@ class FileCanvasOpLogTest {
         val log = FileCanvasOpLog(rootDirectory = tempDir)
         log.append(canvasId, background("j-1", 1L))
         log.append(canvasId, background("j-2", 2L))
-        log.settle(canvasId, listOf("j-1"))
+        log.settle(canvasId, listOf(CanvasOpId("j-1")))
 
         val restarted = FileCanvasOpLog(rootDirectory = tempDir)
         assertEquals(listOf("j-2"), restarted.unsettled(canvasId).map { it.opId }, "a settled op came back, or a pending one was lost")
 
-        restarted.settle(canvasId, listOf("j-2", "j-2"))
+        restarted.settle(canvasId, listOf(CanvasOpId("j-2"), CanvasOpId("j-2")))
         assertEquals(emptyList(), FileCanvasOpLog(rootDirectory = tempDir).unsettled(canvasId).map { it.opId })
     }
 

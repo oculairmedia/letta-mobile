@@ -53,3 +53,14 @@ data class CanvasId(val value: String) {
 value class CanvasActorId(val value: String) {
     override fun toString(): String = value
 }
+
+/**
+ * The id of one canvas op (letta-mobile-by4vm.99.1): what the op log, the journal and the
+ * delivery queue key ops by. Ops carry it on the wire, in Room and in the persisted delivery
+ * record as a bare string ([value]); the op-log and delivery-store APIs take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasOpId(val value: String) {
+    override fun toString(): String = value
+}

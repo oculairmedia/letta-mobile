@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.getOrCreate
+import com.letta.mobile.data.model.CanvasOpId
+import com.letta.mobile.data.model.HostId
 import com.letta.mobile.data.storage.AssetRef
 import com.letta.mobile.data.storage.AssetRefs
 import com.letta.mobile.data.storage.AssetStore
@@ -24,7 +26,7 @@ import kotlinx.coroutines.sync.withLock
 /** One connection to the host, as [CanvasRelayClient] drives it. */
 interface CanvasRelayConnection {
     /** The host's identity (its Iroh node id), which scopes this app's cursors into its logs. */
-    val hostId: String
+    val hostId: HostId
 
     suspend fun send(message: CanvasRelayMessage)
 
@@ -139,7 +141,7 @@ class CanvasRelayClient(
     private class Live(val generation: Long, val connection: CanvasRelayConnection) {
         val joinSent = mutableSetOf<String>()
         val caughtUp = mutableSetOf<String>()
-        val inFlight = mutableSetOf<String>()
+        val inFlight = mutableSetOf<CanvasOpId>()
 
         /** Assets sent to (or already held by) the host on this connection. */
         val assetsUp = mutableSetOf<String>()
@@ -152,7 +154,7 @@ class CanvasRelayClient(
     private enum class SendClaim { SEND, HELD, SUPERSEDED }
 
     /** What this app knows of a canvas on its host, for settle comparisons and diagnostics. */
-    data class RelayView(val hostId: String?, val topic: String, val canonicalId: CanvasId?, val hostCursor: Long, val queued: Int)
+    data class RelayView(val hostId: HostId?, val topic: String, val canonicalId: CanvasId?, val hostCursor: Long, val queued: Int)
 
     // ---- Host availability ----
 
@@ -170,7 +172,7 @@ class CanvasRelayClient(
     override suspend fun publish(canvasId: CanvasId, op: CanvasOp) {
         val canvas = canvas(canvasId)
         // Durable before the network: a publish that fails leaves the op queued, not lost (I3).
-        delivery.enqueue(canvas.topic, listOf(op.opId))
+        delivery.enqueue(canvas.topic, listOf(op.canvasOpId))
         lock.withLock { canvasesOf(canvas.topic) }.forEach { it.local.tryEmit(op) }
         val live = lock.withLock {
             current?.takeIf { canvas.topic in it.joinSent && claimSend(it, canvas.topic, op) == SendClaim.SEND }
@@ -182,13 +184,13 @@ class CanvasRelayClient(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                lock.withLock { live.inFlight -= op.opId }
+                lock.withLock { live.inFlight -= op.canvasOpId }
             }
         }
         refresh(canvas.topic)
     }
 
-    override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) {
+    override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<CanvasOpId>) {
         if (opIds.isEmpty()) return
         // The same durable queue [publish] fills; a reconnect's join uploads whatever is in it.
         delivery.enqueue(canvas(canvasId).topic, opIds)
@@ -453,9 +455,10 @@ class CanvasRelayClient(
     }
 
     private suspend fun ack(live: Live, message: CanvasRelayMessage.Ack) {
-        val mine = lock.withLock { live.inFlight.remove(message.opId) }
+        val opId = CanvasOpId(message.opId)
+        val mine = lock.withLock { live.inFlight.remove(opId) }
         if (mine) {
-            delivery.acknowledge(message.topic, message.opId)
+            delivery.acknowledge(message.topic, opId)
             // The host acks in log order, after every earlier op it fanned out to this app, so the
             // log is applied here up to this op too - unless one of them was not.
             if (gate.mayAdvance(CanvasRelayTopic(message.topic))) delivery.advanceCursor(live.connection.hostId, message.topic, message.cursor)
@@ -465,8 +468,9 @@ class CanvasRelayClient(
     }
 
     private suspend fun rejected(live: Live, message: CanvasRelayMessage.Rejected) {
-        lock.withLock { live.inFlight -= message.opId }
-        delivery.reject(message.topic, message.opId, message.reason)
+        val opId = CanvasOpId(message.opId)
+        lock.withLock { live.inFlight -= opId }
+        delivery.reject(message.topic, opId, message.reason)
         refresh(message.topic)
     }
 
@@ -491,18 +495,18 @@ class CanvasRelayClient(
             live.hostReads[message.topic] = message.features.toSet()
             canvasesOf(message.topic).onEach { it.canonicalId = CanvasId(message.canvasId) }.map { it.id }
         }
-        val localOps = locals.flatMap { opLog.getOps(it, 0L) }.associateBy { it.opId }
+        val localOps = locals.flatMap { opLog.getOps(it, 0L) }.associateBy { it.canvasOpId }
         if (firstTimeHere) {
             // First time on this host: everything this app has for the canvas goes up, which is how
             // canvases made before sharing - or on another host - arrive. Idempotent on the host.
-            delivery.enqueue(message.topic, localOps.values.sortedWith(CanvasOpOrder).map { it.opId })
+            delivery.enqueue(message.topic, localOps.values.sortedWith(CanvasOpOrder).map { it.canvasOpId })
             delivery.advanceCursor(live.connection.hostId, message.topic, 0L)
         }
         if (sendQueued(live, message.topic, localOps)) refresh(message.topic)
     }
 
     /** Every op still queued for [topic], each after its assets; false if [live] was superseded meanwhile. */
-    private suspend fun sendQueued(live: Live, topic: String, localOps: Map<String, CanvasOp>): Boolean {
+    private suspend fun sendQueued(live: Live, topic: String, localOps: Map<CanvasOpId, CanvasOp>): Boolean {
         for (opId in delivery.queued(topic)) {
             val op = localOps[opId]
             if (op == null) {
@@ -531,7 +535,7 @@ class CanvasRelayClient(
         current !== live -> SendClaim.SUPERSEDED
         !CanvasRelayFeatures.readableBy(op, live.hostReads[topic].orEmpty()) -> SendClaim.HELD
         else -> {
-            live.inFlight += op.opId
+            live.inFlight += op.canvasOpId
             SendClaim.SEND
         }
     }

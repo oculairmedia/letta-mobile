@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.PluginKindCatalog
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
 import kotlin.time.Duration
@@ -48,7 +49,7 @@ class HostCanvasBackend(
     private val relay: CanvasRelayHost,
     private val store: CanvasRelayStore,
     private val directory: HostCanvasDirectory,
-    private val newOpId: () -> String = { "agent-op-${Uuid.random()}" },
+    private val newOpId: () -> CanvasOpId = { CanvasOpId("agent-op-${Uuid.random()}") },
     private val ackTimeout: Duration = DEFAULT_ACK_TIMEOUT,
     private val kinds: PluginKindCatalog = PluginKindCatalog.Empty,
 ) {
