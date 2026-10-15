@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ToolAudience
+import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.SessionSurvivingReconnectListener
 import com.letta.mobile.data.controller.reconnect.reattachRuntimes
 import com.letta.mobile.data.meridian.AgentToolsModePolicy
@@ -17,21 +18,14 @@ import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
-import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
-import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +66,13 @@ class DesktopAppServerChatGatewayBuilder(
     private val preflightProbe: suspend (String, String?) -> AppServerProbeResult? = ::probeDesktopAppServer,
     /** letta-mobile-bzvro.13: the app's one permission-mode settings; null runs every runtime Unrestricted, with no chip. */
     permissionModeSettings: PermissionModeSettings? = null,
+    /**
+     * letta-mobile-by4vm.56: where an iroh:// session's generations come from, given the address,
+     * the access token and the session's client scope. Tests substitute generations that need no
+     * QUIC endpoint.
+     */
+    private val irohGenerations: (serverUrl: String, accessToken: String?, scope: CoroutineScope) -> DesktopIrohGenerationSource =
+        { serverUrl, accessToken, scope -> DesktopIrohGenerationMinter(serverUrl, accessToken, irohIdentity, scope) },
 ) : DesktopAppServerChatGatewayFactory {
     private val permissionModes = permissionModeSettings?.modes
 
@@ -96,98 +97,112 @@ class DesktopAppServerChatGatewayBuilder(
         CoroutineScope(controllerScope.coroutineContext + SupervisorJob(controllerScope.coroutineContext[Job]))
 
     /**
-     * iroh:// — one QUIC connection per gateway. Its reconnect stays with the Iroh transport and,
-     * past the outage window, [DesktopChatController.retryConnection] (letta-mobile-by4vm.9 map).
+     * iroh:// — the shared reconnect owner mints one QUIC connection per generation
+     * (letta-mobile-by4vm.56), exactly as it mints sockets for ws://, so a dropped connection is
+     * redialled behind the same client and a turn in flight survives it. Over Iroh the node sets
+     * its own mode and the chip is not offered: the engine runs Unrestricted and the persisted
+     * default does not reach it.
      */
     private suspend fun createIrohGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
-        val (transport, transportResources) = buildIrohTransport(serverUrl, lettaConfig)
-        val clientScope = childScope()
-        val client = DefaultAppServerClient(transport, parentScope = clientScope)
-        val router = AppServerRuntimeEventRouter()
-        var localClientLease: AutoCloseable? = null
-        try {
-            if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-                localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
-            }
-            // letta-mobile-by4vm.50: gap detection only when this host advertises ordered event_seq.
-            startStreamIntegrity(router, client, clientScope, irohHostCapabilities = transport.serverCapabilities)
-            val turnEngine = buildDesktopAppServerTurnEngine(
-                client = client,
-                scope = controllerScope,
-                externalToolRegistry = desktopCanvasToolRegistry(isIroh = true, canvasSessions),
-                // Over Iroh the node sets its own mode and the chip is not offered: the engine runs
-                // Unrestricted, as it always did, and the persisted default does not reach it.
-                config = DesktopAppServerEngineConfig(eventRouter = router),
-            )
-            return DesktopAppServerChatGateway(
-                turnEngine = turnEngine,
-                client = client,
-                transportResources = transportResources,
-                onClose = {
-                    router.detach()
-                    localClientLease?.close()
-                    client.failPendingRequests("Desktop App Server gateway closed")
-                    clientScope.cancel()
+        var generations: DesktopIrohGenerationSource? = null
+        return createSessionGateway(
+            SessionGatewaySpec(
+                isIroh = true,
+                local = lettaConfig.mode == LettaConfig.Mode.LOCAL,
+                permissionModes = null,
+                // letta-mobile-by4vm.50: gap detection only when this host advertises ordered event_seq.
+                irohHostCapabilities = { generations?.hostCapabilities.orEmpty() },
+                open = { scope, listener ->
+                    val source = irohGenerations(serverUrl, lettaConfig.accessToken, scope).also { generations = it }
+                    DesktopDirectAppServerSession.openWith(
+                        serverId = serverUrl,
+                        scope = scope,
+                        listener = listener,
+                        dial = SessionDial(mint = source::mint, preflight = null, telemetryComponent = "DesktopIrohReconnect"),
+                    )
                 },
-            )
-        } catch (error: Throwable) {
-            router.detach()
-            localClientLease?.close()
-            client.failPendingRequests("Desktop App Server gateway creation failed")
-            clientScope.cancel()
-            transportResources.close()
-            throw error
-        }
+            ),
+        )
     }
 
     /**
      * ws:// — the shared [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]
-     * owns the socket (letta-mobile-by4vm.9). The router and turn engine are built once over its
-     * stable client and outlive each socket, so a turn in flight across a brief drop reconnects
-     * instead of failing ([SessionSurvivingReconnectListener]).
+     * owns the socket (letta-mobile-by4vm.9).
      */
     private suspend fun createDirectGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
         val local = lettaConfig.mode == LettaConfig.Mode.LOCAL
+        return createSessionGateway(
+            SessionGatewaySpec(
+                isIroh = false,
+                local = local,
+                permissionModes = permissionModes,
+                irohHostCapabilities = { null },
+                open = { scope, listener ->
+                    DesktopDirectAppServerSession.open(
+                        dial = DesktopDirectDial(
+                            serverUrl = serverUrl,
+                            bearerToken = lettaConfig.accessToken,
+                            readiness = readinessExpectationFor(lettaConfig),
+                            // The bundled local child was just started by us and is checked by the readiness handshake.
+                            preflight = if (local) null else ({ preflightProbe(serverUrl, lettaConfig.accessToken) ?: notProbeable() }),
+                        ),
+                        scope = scope,
+                        listener = listener,
+                    )
+                },
+            ),
+        )
+    }
+
+    /** What differs between the ws:// and iroh:// self-reconnecting gateways. */
+    private class SessionGatewaySpec(
+        val isIroh: Boolean,
+        val local: Boolean,
+        val permissionModes: PermissionModeRegistry?,
+        /** Null on a direct socket; on Iroh, what the host advertised (read once the session is open). */
+        val irohHostCapabilities: () -> Set<String>?,
+        val open: suspend (scope: CoroutineScope, listener: ReconnectingClientListener) -> DesktopDirectAppServerSession,
+    )
+
+    /**
+     * The router and turn engine are built once over the session's stable client and outlive each
+     * generation, so a turn in flight across a brief drop reconnects instead of failing
+     * ([SessionSurvivingReconnectListener]).
+     */
+    private suspend fun createSessionGateway(spec: SessionGatewaySpec): DesktopAppServerChatGateway {
         val clientScope = childScope()
         val router = AppServerRuntimeEventRouter()
-        val toolRegistry = desktopCanvasToolRegistry(isIroh = false, canvasSessions)
+        val toolRegistry = desktopCanvasToolRegistry(isIroh = spec.isIroh, canvasSessions)
         var engine: AppServerTurnEngine? = null
         var session: DesktopDirectAppServerSession? = null
         val leases = mutableListOf<AutoCloseable>()
         try {
-            val opened = DesktopDirectAppServerSession.open(
-                dial = DesktopDirectDial(
-                    serverUrl = serverUrl,
-                    bearerToken = lettaConfig.accessToken,
-                    readiness = readinessExpectationFor(lettaConfig),
-                    // The bundled local child was just started by us and is checked by the readiness handshake.
-                    preflight = if (local) null else ({ preflightProbe(serverUrl, lettaConfig.accessToken) ?: notProbeable() }),
-                ),
-                scope = clientScope,
-                listener = SessionSurvivingReconnectListener(
+            val opened = spec.open(
+                clientScope,
+                SessionSurvivingReconnectListener(
                     router = router,
                     onSessionLost = { engine?.invalidateRuntime(notifyHost = false) },
                     reattach = { client, runtimes ->
-                        client.reattachRuntimes(runtimes) { desktopReattachCommand(it, toolRegistry, permissionModes) }
+                        client.reattachRuntimes(runtimes) { desktopReattachCommand(it, toolRegistry, spec.permissionModes) }
                     },
                 ),
             )
             session = opened
-            if (local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
-            leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
-            startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = null)
+            if (spec.local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
+            if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
+            startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = spec.irohHostCapabilities())
             val turnEngine = buildDesktopAppServerTurnEngine(
                 client = opened.client,
                 scope = controllerScope,
                 externalToolRegistry = toolRegistry,
-                config = DesktopAppServerEngineConfig(eventRouter = router, permissionModes = permissionModes),
+                config = DesktopAppServerEngineConfig(eventRouter = router, permissionModes = spec.permissionModes),
             )
             engine = turnEngine
             return DesktopAppServerChatGateway(
                 turnEngine = turnEngine,
                 client = opened.client,
                 transportResources = opened.resources(),
-                permissionModes = permissionModes,
+                permissionModes = spec.permissionModes,
                 session = opened,
                 onClose = {
                     router.detach()
@@ -228,42 +243,6 @@ class DesktopAppServerChatGatewayBuilder(
 
     private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
         if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
-
-    /**
-     * iroh://<ticket> — bind a local iroh endpoint, dial the backend over QUIC,
-     * wait for the connection, and run the auth/capability handshake. Any
-     * failure between bind and the authed hand-off tears the endpoint and
-     * transport down before rethrowing (mirrors IrohChannelTransport.dial).
-     */
-    private suspend fun buildIrohTransport(
-        serverUrl: String,
-        lettaConfig: LettaConfig,
-    ): Pair<IrohAppServerTransport, DesktopTransportResources> {
-        val normalizedAddress = IrohChannelTransport.normalizeIrohAddress(serverUrl)
-        val irohEndpoint = Endpoint.bind(
-            EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = irohIdentity()),
-        )
-        var resources: DesktopTransportResources? = null
-        try {
-            val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(
-                endpoint = AppServerEndpoint(scheme = "iroh", address = normalizedAddress),
-                scope = controllerScope,
-            ) as IrohAppServerTransport
-            resources = DesktopTransportResources(irohEndpoint, irohTransport)
-            irohTransport.awaitConnectionReady()
-            authenticateDesktopIrohAppServer(
-                client = DefaultAppServerClient(irohTransport),
-                accessToken = lettaConfig.accessToken,
-            )
-            return irohTransport to resources
-        } catch (t: Throwable) {
-            resources?.close() ?: run {
-                runCatching { irohEndpoint.shutdown() }
-                runCatching { irohEndpoint.close() }
-            }
-            throw t
-        }
-    }
 }
 
 /**
@@ -391,6 +370,9 @@ internal suspend fun authenticateDesktopIrohAppServer(
         ),
     )
     if (!auth.success) {
-        error("Desktop iroh App Server auth failed: ${auth.error ?: "unknown error"}")
+        throw DesktopIrohAuthRefusedException("Desktop iroh App Server auth failed: ${auth.error ?: "unknown error"}")
     }
 }
+
+/** The iroh host refused this desktop's auth: terminal, never redialled (letta-mobile-by4vm.56). */
+internal class DesktopIrohAuthRefusedException(message: String) : IllegalStateException(message)
