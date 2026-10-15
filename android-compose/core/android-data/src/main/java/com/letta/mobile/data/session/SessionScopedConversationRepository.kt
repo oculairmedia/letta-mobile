@@ -30,7 +30,7 @@ class SessionScopedConversationRepository @Inject constructor(
         sessionManager.withCurrentSession { it.conversationRepository.refreshConversations(agentId) }
 
     override suspend fun clearForBackendSwitch() {
-        sessionManager.current.conversationRepository.clearForBackendSwitch()
+        clearBackendScopedCache(sessionManager.current.conversationRepository)
     }
 
     override suspend fun refreshConversationsIfStale(agentId: AgentId, maxAgeMs: Long): Boolean =

@@ -1,7 +1,5 @@
 package com.letta.mobile.di
 
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.ChannelNotificationPublisher
 import com.letta.mobile.channel.ChannelSyncStateStore
@@ -47,6 +45,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.session.ProcessScope
 import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.session.SessionScopedAllConversationsRepository
 import com.letta.mobile.data.session.SessionScopedChannelTransport
@@ -92,6 +91,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
+import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
 @Module
@@ -266,6 +266,7 @@ abstract class AppModule {
             conversationCursorStore: ConversationCursorStore,
             confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
             settingsRepository: ISettingsRepository,
+            @ProcessScope processScope: CoroutineScope,
         ): TimelineRepository {
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
@@ -275,7 +276,7 @@ abstract class AppModule {
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
                 backendIdProvider = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
-                repositoryScope = ProcessLifecycleOwner.get().lifecycleScope,
+                repositoryScope = processScope,
             )
         }
     }

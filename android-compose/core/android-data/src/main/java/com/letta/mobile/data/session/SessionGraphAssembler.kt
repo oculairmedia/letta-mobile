@@ -3,7 +3,10 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
+import com.letta.mobile.data.session.graph.HostSessionRepositories
+import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
@@ -84,34 +87,39 @@ class SessionGraphAssembler @Inject constructor(
         )
         val forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
         val useIroh = request.activeConfig.sessionBackendBinding(forceIroh = forceIroh).bindsIroh()
+        val repositories = SharedSessionRepositoryGraph(
+            identity = SessionGraphIdentity(
+                id = request.graphId,
+                backendDescriptor = request.backendDescriptor,
+                localRuntimeBackend = request.localRuntimeBackend,
+                channelTransport = request.channelTransport,
+                capabilities = sessionCapabilities(request, forceIroh),
+            ),
+            host = HostSessionRepositories(
+                agentRepository = agentRepository,
+                blockRepository = blockRepository,
+                conversationRepository = conversationRepos.conversation,
+                mcpServerRepository = adminRepositories.mcpServer,
+                modelRepository = adminRepositories.model,
+                passageRepository = adminRepositories.passage,
+                projectRepository = adminRepositories.project,
+                projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
+                runRepository = adminRepositories.run,
+                providerRepository = adminRepositories.provider,
+                scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
+                stepRepository = StepRepository(remoteSources.steps.orNull()),
+                toolRepository = adminRepositories.tool,
+                vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
+            ),
+            transportBound = transportBound,
+        )
         return SessionGraph(
-            id = request.graphId,
-            capturedConfig = request.activeConfig,
-            backendDescriptor = request.backendDescriptor,
-            conversationCursorStore = request.capturedCursorStore,
+            repositories = repositories,
             localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
-            agentRepository = agentRepository,
-            blockRepository = blockRepository,
             allConversationsRepository = conversationRepos.allConversations,
-            channelTransport = request.channelTransport,
-            conversationRepository = conversationRepos.conversation,
-            cronRepository = transportBound.cronRepository,
-            mcpServerRepository = adminRepositories.mcpServer,
-            modelRepository = adminRepositories.model,
-            passageRepository = adminRepositories.passage,
-            projectRepository = adminRepositories.project,
-            projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
-            runRepository = adminRepositories.run,
-            providerRepository = adminRepositories.provider,
-            scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
-            selfTodoRepository = transportBound.selfTodoRepository,
-            stepRepository = StepRepository(remoteSources.steps.orNull()),
-            subagentRepository = transportBound.subagentRepository,
-            toolRepository = adminRepositories.tool,
-            vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
-            capabilities = sessionCapabilities(request, forceIroh),
-            contextTokenReadings = transportBound.contextTokenReadings,
+            conversationCursorStore = request.capturedCursorStore,
+            capturedConfig = request.activeConfig,
         )
     }
 
