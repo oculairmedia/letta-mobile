@@ -130,7 +130,7 @@ internal class DesktopChatSessionPort(
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
         controller.approvals.canSubmitApprovals,
         controller.canonicalPresentation,
-        controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
+        controller.workingDirectory.current.map { it != null }.distinctUntilChanged(),
         controller.state.map { branchFacts() }.distinctUntilChanged(),
     ) { approvals, canonical, workingDirectory, branching ->
         desktopCapabilities(
@@ -149,7 +149,7 @@ internal class DesktopChatSessionPort(
         DesktopCapabilityFacts(
             approvals = controller.approvals.canSubmitApprovals.value,
             paged = controller.canonicalPresentation.value != null,
-            workingDirectory = controller.supportsWorkingDirectory,
+            workingDirectory = controller.workingDirectory.current.value != null,
             branching = controller.conversationManagement.supportsBranching,
             namedForks = controller.conversationManagement.canNameForks,
         ),
@@ -209,11 +209,7 @@ internal class DesktopChatSessionPort(
         host = hostInputs.value,
         modelOptions = buildModelOptions(controller.availableModels.value),
         modelEfforts = desktopModelEfforts(currentModelEffortInputs()),
-        workingDirectory = DesktopWorkingDirectoryInputs(
-            supported = controller.supportsWorkingDirectory,
-            path = controller.selectedConversationWorkingDirectory.value,
-            loading = controller.workingDirectoryLoading.value,
-        ),
+        workingDirectory = controller.workingDirectory.current.value,
         canQueueWhileStreaming = controller.canonicalPresentation.value != null,
         attachmentLimits = controller.attachmentLimits,
     )
@@ -222,7 +218,7 @@ internal class DesktopChatSessionPort(
         controller.state,
         hostInputs,
         combine(controller.availableModels, modelEfforts(), ::Pair),
-        combine(workingDirectoryInputs(), permissionModeUi(), ::Pair),
+        combine(controller.workingDirectory.current, permissionModeUi(), ::Pair),
         controller.canonicalPresentation,
     ) { surface, host, (models, efforts), (workingDirectory, permissionMode), canonical ->
         DesktopChatComposerInputs(
@@ -304,13 +300,6 @@ internal class DesktopChatSessionPort(
         val modes = controller.activeGateway as? DesktopPermissionModeController ?: return
         if (modes.permissionModes == null) return
         scope.launch { modes.setPermissionMode(AppServerRuntimeScope(agentId, conversation.id), mode) }
-    }
-
-    private fun workingDirectoryInputs(): Flow<DesktopWorkingDirectoryInputs> = combine(
-        controller.selectedConversationWorkingDirectory,
-        controller.workingDirectoryLoading,
-    ) { path, loading ->
-        DesktopWorkingDirectoryInputs(supported = controller.supportsWorkingDirectory, path = path, loading = loading)
     }
 }
 
@@ -463,7 +452,7 @@ internal class DesktopChatActions(
     override fun setPermissionMode(mode: AppServerPermissionMode) = onSetPermissionMode(mode)
 
     override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
-        controller.changeSelectedConversationWorkingDirectory(directory.path)
+        controller.workingDirectory.changeWorkingDirectory(directory)
 
     override fun updateSearchQuery(query: String) = Unit
 

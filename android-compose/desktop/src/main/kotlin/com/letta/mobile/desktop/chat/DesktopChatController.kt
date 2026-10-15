@@ -42,6 +42,7 @@ import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryState
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
@@ -138,24 +139,16 @@ class DesktopChatController(
     val approvals: DesktopChatApprovalState = approvalCoordinator
 
     /**
-     * letta-mobile folder-settings #2: the SELECTED conversation's working
-     * directory, as last read from the runtime via
-     * [DesktopWorkingDirectoryController.currentWorkingDirectory]. Null while
-     * unknown/loading, or when the active gateway doesn't support this
-     * (remote/HTTP backends) — see [supportsWorkingDirectory].
+     * letta-mobile folder-settings #2, by4vm.98: the SELECTED conversation's working directory, as
+     * the shared extension point the session port reads (null where the active gateway cannot
+     * report one: remote/HTTP backends). The shell re-reads it on a selection change.
      */
-    private val _selectedConversationWorkingDirectory = MutableStateFlow<String?>(null)
-    val selectedConversationWorkingDirectory: StateFlow<String?> =
-        _selectedConversationWorkingDirectory.asStateFlow()
-
-    private val _workingDirectoryLoading = MutableStateFlow(false)
-    val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
+    val workingDirectory = ChatWorkingDirectoryState(scope) {
+        gateway.takeUnless { closed }.workingDirectoryTarget(_state.value.selectedConversation)
+    }
 
     /** The active gateway, for capabilities a port reads off it (the permission mode). */
     internal val activeGateway: DesktopChatGateway? get() = gateway
-
-    /** Whether the active gateway can report/change a conversation's working directory. */
-    val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
 
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
@@ -438,6 +431,7 @@ class DesktopChatController(
         _deleteBehavior.value = next?.deleteBehavior ?: ConversationDeleteBehavior.Permanent
         runPhases.bind(next)
         approvalCoordinator.bindGateway(next)
+        workingDirectory.bindSupport(next is DesktopWorkingDirectoryController)
         connectionWatcher.start(next)
     }
 
@@ -926,49 +920,6 @@ class DesktopChatController(
             withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS.milliseconds) { selection?.join() }
             updateComposerText(trimmed)
             send()
-        }
-    }
-
-    /**
-     * Refreshes [selectedConversationWorkingDirectory] from the runtime for
-     * the currently selected conversation.
-     */
-    fun refreshSelectedConversationWorkingDirectory() {
-        if (closed) return
-        val controller = gateway as? DesktopWorkingDirectoryController
-        val conversation = state.value.selectedConversation
-        val agentId = conversation?.agentId
-        if (controller == null || agentId == null) {
-            _selectedConversationWorkingDirectory.value = null
-            return
-        }
-        val conversationId = conversation.id
-        scope.launch {
-            _workingDirectoryLoading.value = true
-            _selectedConversationWorkingDirectory.value =
-                runCatching { controller.currentWorkingDirectory(agentId, conversationId) }.getOrNull()
-            _workingDirectoryLoading.value = false
-        }
-    }
-
-    /**
-     * Changes the SELECTED conversation's working directory to [path].
-     */
-    fun changeSelectedConversationWorkingDirectory(path: String) {
-        if (closed) return
-        val controller = gateway as? DesktopWorkingDirectoryController ?: return
-        val conversation = state.value.selectedConversation ?: return
-        val agentId = conversation.agentId ?: return
-        val conversationId = conversation.id
-        scope.launch {
-            _workingDirectoryLoading.value = true
-            val succeeded = runCatching {
-                controller.setWorkingDirectory(agentId, conversationId, path)
-            }.getOrDefault(false)
-            if (succeeded) {
-                _selectedConversationWorkingDirectory.value = path
-            }
-            _workingDirectoryLoading.value = false
         }
     }
 

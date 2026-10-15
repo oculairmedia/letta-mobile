@@ -122,13 +122,6 @@ internal data class DesktopChatComposerHostInputs(
     val placeholder: String? = null,
 )
 
-/** The controller's working-directory facts, for gateways that have one. */
-internal data class DesktopWorkingDirectoryInputs(
-    val supported: Boolean,
-    val path: String?,
-    val loading: Boolean,
-)
-
 /** Everything the composer state is derived from, at one instant. */
 internal data class DesktopChatComposerInputs(
     val surface: DesktopChatSurfaceState,
@@ -137,7 +130,8 @@ internal data class DesktopChatComposerInputs(
     val modelOptions: List<Pair<String, String>>,
     /** letta-mobile-by4vm.85: the selected conversation's effort and each option's efforts. */
     val modelEfforts: DesktopModelEfforts = DesktopModelEfforts(),
-    val workingDirectory: DesktopWorkingDirectoryInputs,
+    /** letta-mobile-by4vm.98: the shared working-directory chip; null where the gateway has none. */
+    val workingDirectory: ChatWorkingDirectoryUiState?,
     val canQueueWhileStreaming: Boolean,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val permissionMode: ChatPermissionModeUiState? = null,
@@ -158,7 +152,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         mentionables = inputs.host.mentionables.toImmutableList(),
         model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions, inputs.modelEfforts),
         contextUsage = inputs.host.contextUsage,
-        workingDirectory = inputs.workingDirectory.toUiState(),
+        workingDirectory = inputs.workingDirectory,
         permissionMode = inputs.permissionMode,
     )
 }
@@ -223,6 +217,3 @@ internal fun desktopChatModelUiState(
         options = options.toImmutableList(),
     )
 }
-
-private fun DesktopWorkingDirectoryInputs.toUiState(): ChatWorkingDirectoryUiState? =
-    if (supported) ChatWorkingDirectoryUiState(path = path, isLoading = loading) else null

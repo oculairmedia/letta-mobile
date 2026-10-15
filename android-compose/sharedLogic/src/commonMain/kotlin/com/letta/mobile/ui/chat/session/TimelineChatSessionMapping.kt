@@ -169,13 +169,13 @@ fun ChatComposerError.message(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.AttachmentLoadFailed -> "Could not attach image."
 }
 
-/** What a timeline port can do: images and the controls its transport offers; nothing else yet. */
-fun timelineCapabilities(controls: TimelineChatRunControls) = ChatSurfaceCapabilities(
+/** What a timeline port can do: images, the controls its transport offers, and the host's extensions. */
+fun timelineCapabilities(controls: TimelineChatRunControls, workingDirectory: Boolean = false) = ChatSurfaceCapabilities(
     attachImages = true,
     rerun = false,
     approvals = controls.answerApproval != null,
     modelSwitch = false,
-    workingDirectory = false,
+    workingDirectory = workingDirectory,
     search = false,
     pagedHistory = false,
     fontScale = false,

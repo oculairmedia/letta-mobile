@@ -126,7 +126,7 @@ class DesktopChatSessionPortTest {
         assertFalse(capabilities.search)
         assertTrue(capabilities.modelSwitch)
         assertTrue(capabilities.fontScale)
-        assertEquals(controller.supportsWorkingDirectory, capabilities.workingDirectory)
+        assertEquals(controller.workingDirectory.current.value != null, capabilities.workingDirectory)
         assertFalse(capabilities.pagedHistory, "no canonical presentation in the fake")
 
         controller.close()

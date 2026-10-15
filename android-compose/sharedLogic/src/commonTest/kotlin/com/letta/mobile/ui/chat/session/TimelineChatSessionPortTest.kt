@@ -326,7 +326,7 @@ class TimelineChatSessionPortTest {
         Timeline(conversationId = "conv-1", events = persistentListOf(*events))
 }
 
-private class FakeTimelineChatSession(
+internal class FakeTimelineChatSession(
     var hydrateFailure: Exception? = null,
     private val sendFailure: Exception? = null,
 ) : TimelineChatSession {

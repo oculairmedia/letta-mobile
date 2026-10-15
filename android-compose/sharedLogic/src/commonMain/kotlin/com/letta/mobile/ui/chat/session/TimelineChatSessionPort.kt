@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -71,6 +70,8 @@ data class TimelineChatSessionOptions(
      * Null keeps the port's own in-flight tracking only, as the web client does.
      */
     val approvals: ChatApprovalStateSource? = null,
+    /** letta-mobile-by4vm.98: the conversation's working directory; null: no chip, capability off. */
+    val workingDirectory: ChatWorkingDirectorySource? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val placeholder: String? = null,
 )
@@ -85,8 +86,8 @@ data class TimelineChatSessionOptions(
  * [TimelineChatSession] and the run controls its transport has; the web client is the first host
  * that has no conversation owner of its own.
  *
- * Capabilities it does not have yet (model switch, working directory, search, paged history, goals,
- * re-run, the send queue) are reported off, so the page hides them.
+ * Capabilities it does not have yet (model switch, search, paged history, goals, re-run, the send
+ * queue) are reported off, so the page hides them; a host adds the rest through [TimelineChatSessionOptions].
  */
 class TimelineChatSessionPort(
     private val session: TimelineChatSession,
@@ -117,12 +118,24 @@ class TimelineChatSessionPort(
     )
     private var clearedRunWatch: Job? = null
 
-    override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState) { current, ui ->
-        timelineComposerUiState(current, ui.isRunInFlight, options)
-    }.stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), timelineComposerUiState(draft.value, false, options))
+    private val workingDirectory: StateFlow<ChatWorkingDirectoryUiState?> =
+        options.workingDirectory?.current ?: MutableStateFlow(null)
 
-    override val capabilities: StateFlow<ChatSurfaceCapabilities> =
-        MutableStateFlow(timelineCapabilities(options.controls)).asStateFlow()
+    override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState, workingDirectory) { current, ui, directory ->
+        timelineComposerUiState(current, ui.isRunInFlight, options).copy(workingDirectory = directory)
+    }.stateIn(
+        scope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        timelineComposerUiState(draft.value, false, options).copy(workingDirectory = workingDirectory.value),
+    )
+
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = workingDirectory
+        .map { timelineCapabilities(options.controls, workingDirectory = it != null) }
+        .stateIn(
+            scope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            timelineCapabilities(options.controls, workingDirectory = workingDirectory.value != null),
+        )
 
     override val actions: ChatActions = TimelineChatActions(this)
 
@@ -245,6 +258,10 @@ class TimelineChatSessionPort(
                 run.update { it.copy(submittingApprovals = it.submittingApprovals - answer.requestId) }
             }
         }
+    }
+
+    internal fun changeWorkingDirectory(directory: ChatWorkingDirectory) {
+        options.workingDirectory?.changeWorkingDirectory(directory)
     }
 
     internal fun retryLoad() {

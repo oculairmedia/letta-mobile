@@ -246,7 +246,7 @@ private fun rememberDesktopShellLists(
     val archiveFilter by chatController.archiveFilter.collectAsState()
     val conversations = chatState.conversations
     val selectedConversationId = chatState.selectedConversationId
-    val workingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
+    val workingDirectory = chatController.workingDirectory.current.collectAsState().value?.path
     // letta-mobile-bzvro.26: `@` file suggestions from the conversation's workspace.
     val fileMentions = rememberDesktopFileMentions(context.core.chatScope, chatState.composerText, workingDirectory)
     // For a "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by
