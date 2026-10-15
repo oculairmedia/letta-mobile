@@ -139,11 +139,11 @@ class TimelineChatSessionPort(
     )
 
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = workingDirectory
-        .map { timelineCapabilities(options.controls, workingDirectory = it != null) }
+        .map { timelineCapabilities(options.controls).copy(workingDirectory = it != null) }
         .stateIn(
             scope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            timelineCapabilities(options.controls, workingDirectory = workingDirectory.value != null),
+            timelineCapabilities(options.controls).copy(workingDirectory = workingDirectory.value != null),
         )
 
     override val actions: ChatActions = TimelineChatActions(this)
@@ -216,7 +216,8 @@ class TimelineChatSessionPort(
         // A new run starts clean: no earlier error, and no stop request left over from the last run.
         interrupter.retire()
         clearedRunWatch?.cancel()
-        run.update { it.copy(error = null, acknowledgedError = null, cancelling = false, clearedLocally = false) }
+        run.update { it.copy(error = null, cancelling = false, clearedLocally = false) }
+        local.update { it.forgetAcknowledgedOnceCleared(error = null) }
         scope.launch {
             try {
                 session.send(send.text, send.attachments)

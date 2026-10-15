@@ -29,7 +29,10 @@ import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.chat.session.GatewayPermissionModes
+import com.letta.mobile.ui.chat.session.TimelineLocalState
+import com.letta.mobile.ui.chat.session.acknowledge
 import com.letta.mobile.ui.chat.session.currentHostApprovals
+import com.letta.mobile.ui.chat.session.forgetAcknowledgedOnceCleared
 import com.letta.mobile.ui.chat.session.hostApprovals
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +79,7 @@ internal class DesktopChatSessionPort(
     private val bindings: DesktopChatSessionBindings = DesktopChatSessionBindings(),
 ) : ChatSessionPort {
     private val hostInputs = MutableStateFlow(DesktopChatComposerHostInputs())
-    private val localTimeline = MutableStateFlow(DesktopChatLocalTimelineState())
+    private val localTimeline = MutableStateFlow(TimelineLocalState())
 
     /** letta-mobile-bzvro.13, by4vm.98: the selected conversation's mode chip, the shared gateway binding. */
     private val permissionModes = GatewayPermissionModes(
@@ -184,9 +187,7 @@ internal class DesktopChatSessionPort(
         DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
-        if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
-            localTimeline.update { it.copy(acknowledgedError = null) }
-        }
+        localTimeline.update { it.forgetAcknowledgedOnceCleared(inputs.surface.errorMessage) }
     }
 
     /**
@@ -326,7 +327,7 @@ internal class DesktopChatActions(
     private val controller: DesktopChatController,
     private val bindings: DesktopChatSessionBindings,
     private val commandsById: () -> Map<String, ComposerCommand>,
-    private val localTimeline: MutableStateFlow<DesktopChatLocalTimelineState>,
+    private val localTimeline: MutableStateFlow<TimelineLocalState>,
     /** The page's timeline now, which a fork or edit plans against. */
     private val branchView: () -> DesktopBranchView = { DesktopBranchView(emptyList(), hasOlderMessages = true) },
     private val onSetPermissionMode: (AppServerPermissionMode) -> Unit = {},
@@ -409,10 +410,7 @@ internal class DesktopChatActions(
      * The page showed the error in its snackbar: acknowledge it so it is not shown again, but
      * leave the controller's error in place so the ambient glow stays "failed" until the next send.
      */
-    override fun clearError() {
-        val shown = controller.state.value.errorMessage ?: return
-        localTimeline.update { it.copy(acknowledgedError = shown) }
-    }
+    override fun clearError() = localTimeline.update { it.acknowledge(controller.state.value.errorMessage) }
 
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 

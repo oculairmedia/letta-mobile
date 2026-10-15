@@ -135,6 +135,18 @@ class TimelineChatSessionExtensionsTest {
         assertEquals(emptyList(), gateway.requested)
     }
 
+    @Test
+    fun anAcknowledgedErrorIsHiddenUntilTheOwnerClearsItThenShowsAgain() {
+        val shown = TimelineLocalState().acknowledge("boom")
+        assertNull(shown.pageError("boom"))
+        assertEquals("other", shown.pageError("other"))
+        assertEquals(shown, shown.forgetAcknowledgedOnceCleared("boom"), "kept while the owner still holds it")
+
+        val cleared = shown.forgetAcknowledgedOnceCleared(null)
+        assertEquals("boom", cleared.pageError("boom"))
+        assertEquals(cleared, cleared.acknowledge(null))
+    }
+
     private fun TestScope.port(options: TimelineChatSessionOptions): TimelineChatSessionPort {
         val port = TimelineChatSessionPort(FakeTimelineChatSession(), target, backgroundScope, options)
         backgroundScope.launch { port.uiState.collect {} }

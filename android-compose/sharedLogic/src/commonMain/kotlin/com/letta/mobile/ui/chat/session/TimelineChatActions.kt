@@ -62,10 +62,7 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
     override fun retryLoad() = port.retryLoad()
 
     /** The page showed the error: acknowledge it so it is not shown again; the glow keeps "failed". */
-    override fun clearError() {
-        val shown = port.currentRun.error ?: return
-        port.updateRun { it.copy(acknowledgedError = shown) }
-    }
+    override fun clearError() = port.updateLocal { it.acknowledge(port.currentRun.error) }
 
     override fun setFontScale(scale: Float) = Unit
 
