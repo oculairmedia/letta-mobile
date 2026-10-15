@@ -48,6 +48,6 @@ class SessionGraph internal constructor(
  * Clears [repository]'s per-backend cache. The graph exposes repositories by interface
  * (letta-mobile-by4vm.86); the Android ones that cache per backend implement [BackendScopedCache].
  */
-internal suspend fun clearBackendScopedCache(repository: Any) {
+internal suspend fun <T> clearBackendScopedCache(repository: T) {
     (repository as? BackendScopedCache)?.clearForBackendSwitch()
 }
