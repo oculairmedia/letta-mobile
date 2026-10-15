@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.storage.AssetRef
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,10 +31,17 @@ object CanvasRelayProtocol {
      */
     const val AGENT_ORIGIN_PREFIX = "agent:"
 
-    fun conversationTopic(conversationId: String): String = "conversation:$conversationId"
+    fun conversationTopic(conversationId: ConversationId): String = "conversation:${conversationId.value}"
 
     /** The topic of a canvas that belongs to no conversation, shared by its id. */
     fun canvasTopic(canvasId: CanvasId): String = "canvas:${canvasId.value}"
+
+    /**
+     * letta-mobile-cdgpr.8: the topic an app puts an asset on outside any canvas (a plugin package
+     * before `plugins.install`). It is never joined. The host takes `asset_put` on it from any app
+     * it serves, which is no more than joining any topic already allowed.
+     */
+    const val UPLOAD_TOPIC: String = "uploads"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -195,5 +203,5 @@ sealed interface CanvasRelayMessage {
  * conversation shares one canvas), or its own for a canvas that belongs to no conversation.
  */
 suspend fun CanvasDocumentStore.relayTopicOf(id: CanvasId): String =
-    get(id)?.conversationId?.takeIf { it.isNotBlank() }?.let(CanvasRelayProtocol::conversationTopic)
+    get(id)?.conversationId?.takeIf { it.isNotBlank() }?.let { CanvasRelayProtocol.conversationTopic(ConversationId(it)) }
         ?: CanvasRelayProtocol.canvasTopic(id)

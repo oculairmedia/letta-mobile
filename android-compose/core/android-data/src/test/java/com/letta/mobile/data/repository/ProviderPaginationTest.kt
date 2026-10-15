@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.ProviderRemoteSource
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderId
@@ -13,7 +16,7 @@ import org.junit.jupiter.api.Tag
 
 /**
  * Phase 2.2 (data-efficiency-audit Q3): focused pagination test for
- * [ProviderRepository.refreshProviders]. The previous implementation used
+ * [CachedProviderRepository.refreshProviders]. The previous implementation used
  * `limit = 1000`; the new implementation routes through [exhaustCursorPages].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -26,7 +29,7 @@ class ProviderPaginationTest {
             Provider(id = ProviderId("provider-$it"), name = "Provider $it", providerType = "openai")
         }
         val api = PaginatingProviderApi(providers)
-        val repo = ProviderRepository(api)
+        val repo = CachedProviderRepository(api.bound())
 
         repo.refreshProviders(name = null, providerType = null)
 
@@ -42,7 +45,7 @@ class ProviderPaginationTest {
             Provider(id = null, name = "Provider B", providerType = "openai"),
         )
         val api = PaginatingProviderApi(providers)
-        val repo = ProviderRepository(api)
+        val repo = CachedProviderRepository(api.bound())
 
         val error = runCatching {
             repo.refreshProviders(name = null, providerType = null)
@@ -58,7 +61,7 @@ class ProviderPaginationTest {
             Provider(id = ProviderId("provider-$it"), name = "Provider $it", providerType = "openai")
         } + Provider(id = null, name = "Tail null", providerType = "openai")
         val api = PaginatingProviderApi(providers)
-        val repo = ProviderRepository(api)
+        val repo = CachedProviderRepository(api.bound())
 
         val error = runCatching {
             repo.refreshProviders(name = null, providerType = null)
@@ -70,7 +73,7 @@ class ProviderPaginationTest {
 
     private class PaginatingProviderApi(
         private val providers: List<Provider>,
-    ) : ProviderRemoteSource by noAppServerRoute<ProviderRemoteSource>() {
+    ) : ProviderRemoteSource by unavailable<ProviderRemoteSource>(SessionRoute.PROVIDERS) {
         val observedAfters = mutableListOf<String?>()
         val observedLimits = mutableListOf<Int?>()
 

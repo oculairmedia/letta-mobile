@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,14 +11,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.security.MessageDigest
-import java.util.Base64
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
  * lgns8.9: shared low-level primitives for the on-disk LocalBackend admin-query
- * readers. Holds the single [json] instance, base64url key codec, timestamp
+ * readers. Holds the single [json] instance, the base64url key codec (delegating to
+ * [LocalBackendLayout]), timestamp
  * helpers, and the sidecar readers (real-times / string-map / attachment-map)
  * used across more than one reader. Split out of the former monolithic
  * `LocalBackendAdminStore` as pure code motion — no behavior change.
@@ -27,14 +29,13 @@ internal class LocalBackendStoreSupport(
 ) {
     val json = Json { ignoreUnknownKeys = true }
 
+    // letta-mobile-by4vm.21: key naming and the base64url codec live in [LocalBackendLayout].
     fun conversationKey(conversationId: String, agentId: String): String =
-        if (conversationId == "default") "default:$agentId" else "conversation:$conversationId"
+        LocalBackendLayout.conversationKey(ConversationId(conversationId), AgentId(agentId))
 
-    fun b64UrlEncode(value: String): String =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(Charsets.UTF_8))
+    fun b64UrlEncode(value: String): String = LocalBackendLayout.b64UrlEncode(value)
 
-    fun b64UrlDecode(value: String): String =
-        String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
+    fun b64UrlDecode(value: String): String = LocalBackendLayout.b64UrlDecode(value)
 
     fun isSentinelDate(iso: String): Boolean = iso.startsWith("2026-01-01T")
 
@@ -91,7 +92,7 @@ internal class LocalBackendStoreSupport(
 
     /** Port of maxRealMessageTime: legacy _real-times.json map, then overlay _real-times.jsonl (later wins), max iso. */
     fun maxRealMessageTime(conversationId: String, agentId: String): String {
-        val dir = File(File(baseDir, "conversations"), b64UrlEncode(conversationKey(conversationId, agentId)))
+        val dir = LocalBackendLayout.conversationDir(baseDir, ConversationId(conversationId), AgentId(agentId))
         val map = HashMap<String, String>()
         runCatching {
             File(dir, "_real-times.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }

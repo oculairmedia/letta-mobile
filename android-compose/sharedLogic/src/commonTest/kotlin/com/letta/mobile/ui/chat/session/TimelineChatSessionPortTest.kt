@@ -1,6 +1,12 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
+import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.chat.send.QueueConversationId
+import com.letta.mobile.data.chat.send.QueuedChatSend
+import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -14,6 +20,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -74,6 +81,51 @@ class TimelineChatSessionPortTest {
         assertEquals(listOf("hello" to 1), session.sends.map { (text, images) -> text to images.size })
         assertEquals("", port.composer.value.text)
         assertTrue(port.composer.value.attachments.isEmpty())
+    }
+
+    @Test
+    fun aHostQueueTakesASendDuringARunAndShowsWhatWaits() = runTest {
+        val session = FakeTimelineChatSession()
+        val queue = FakeSendQueue()
+        val port = port(session, sendQueue = queue)
+        runCurrent()
+
+        session.timeline.value = timelineWith(pendingPrompt("first"))
+        port.actions.updateComposerText("second")
+        runCurrent()
+        assertTrue(port.uiState.value.isRunInFlight)
+        assertTrue(port.composer.value.canQueueWhileStreaming)
+        assertTrue(port.composer.value.canSend)
+
+        port.actions.send()
+        runCurrent()
+        assertEquals(listOf("second"), session.sends.map { it.first })
+        assertEquals("", port.composer.value.text)
+
+        val waiting = QueuedChatSend(QueuedSendId("q-1"), QueueConversationId("conv-1"), "second")
+        queue.queue.value = ConversationSendQueue(items = listOf(waiting))
+        runCurrent()
+        assertEquals(listOf(waiting), port.uiState.value.sendQueue.items)
+
+        port.actions.sendQueuedNow(waiting.id)
+        port.actions.cancelQueuedSend(waiting.id)
+        port.actions.resumeSendQueue()
+        assertEquals(listOf("now q-1", "cancel q-1", "resume"), queue.calls)
+    }
+
+    @Test
+    fun aHostQueueThatCannotQueueNowStillBlocksASendDuringARun() = runTest {
+        val session = FakeTimelineChatSession()
+        val port = port(session, sendQueue = FakeSendQueue(canQueue = false))
+        runCurrent()
+
+        session.timeline.value = timelineWith(pendingPrompt("first"))
+        port.actions.updateComposerText("second")
+        runCurrent()
+        assertFalse(port.composer.value.canSend)
+        port.actions.send()
+        runCurrent()
+        assertTrue(session.sends.isEmpty())
     }
 
     @Test
@@ -144,6 +196,72 @@ class TimelineChatSessionPortTest {
     }
 
     @Test
+    fun aStopSettlesWhenTheTimelinesRunEnds() = runTest {
+        val (session, port) = runningPort { true }
+        pressStop(port)
+        assertTrue(port.uiState.value.isCancellingRun)
+
+        session.timeline.value = timelineWith()
+        runCurrent()
+
+        assertFalse(port.uiState.value.isCancelling)
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun aSecondStopPressClearsTheRunLocallyWithoutAskingAgain() = runTest {
+        var stops = 0
+        val (_, port) = runningPort { stops++; true }
+
+        pressStop(port)
+        pressStop(port)
+
+        assertEquals(1, stops)
+        assertFalse(port.uiState.value.isRunInFlight)
+        assertFalse(port.uiState.value.isCancelling)
+    }
+
+    @Test
+    fun anAbortThatDidNotGoOutOrThrewClearsTheRunLocally() = runTest {
+        val (_, notSent) = runningPort { false }
+        pressStop(notSent)
+        assertFalse(notSent.uiState.value.isRunInFlight)
+        assertNull(notSent.uiState.value.error)
+
+        val (_, threw) = runningPort { throw IllegalStateException("socket closed") }
+        pressStop(threw)
+        assertFalse(threw.uiState.value.isRunInFlight)
+        assertEquals("socket closed", threw.uiState.value.error)
+    }
+
+    @Test
+    fun aRunWhoseTerminalNeverLandsIsClearedAfterTheSharedTimeout() = runTest {
+        val (_, port) = runningPort { true }
+
+        port.actions.stopRun()
+        advanceTimeBy(ChatRunInterrupter.CANCEL_TERMINAL_TIMEOUT_MS - 1)
+        runCurrent()
+        assertTrue(port.uiState.value.isCancellingRun)
+
+        advanceTimeBy(2)
+        runCurrent()
+        assertFalse(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
+    fun aLocalClearLiftsOnceTheTimelinesRunEndsSoTheNextRunShows() = runTest {
+        val (session, port) = runningPort { false }
+        pressStop(port)
+
+        session.timeline.value = timelineWith()
+        runCurrent()
+        session.timeline.value = timelineWith(pendingPrompt("from another client"))
+        runCurrent()
+
+        assertTrue(port.uiState.value.isRunInFlight)
+    }
+
+    @Test
     fun anApprovalIsAnsweredOnceWhileItsAnswerIsInFlight() = runTest {
         val session = FakeTimelineChatSession()
         val answers = mutableListOf<ChatApprovalAnswer>()
@@ -162,6 +280,30 @@ class TimelineChatSessionPortTest {
         port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = false, reason = "no"))
         runCurrent()
         assertEquals(2, answers.size)
+    }
+
+    @Test
+    fun aHostsApprovalStateReachesThePageAndGuardsItsAnswers() = runTest {
+        val approvals = FakeApprovalState()
+        val answers = mutableListOf<ChatApprovalAnswer>()
+        val port = TimelineChatSessionPort(
+            FakeTimelineChatSession(),
+            target,
+            backgroundScope,
+            TimelineChatSessionOptions(controls = TimelineChatRunControls(answerApproval = { answers += it }), approvals = approvals),
+        )
+        backgroundScope.launch { port.uiState.collect {} }
+        runCurrent()
+
+        approvals.queuedApprovals.value = setOf("req-queued")
+        approvals.submittingApprovals.value = setOf("req-1")
+        runCurrent()
+        assertEquals(setOf("req-queued"), port.uiState.value.queuedApprovalRequestIds.toSet())
+
+        port.actions.submitApproval(ChatApprovalAnswer("req-1", listOf("call-1"), approve = true, reason = null))
+        port.actions.submitApproval(ChatApprovalAnswer("req-2", listOf("call-2"), approve = true, reason = null))
+        runCurrent()
+        assertEquals(listOf("req-2"), answers.map { it.requestId }, "the host already has req-1 in flight")
     }
 
     @Test
@@ -197,12 +339,28 @@ class TimelineChatSessionPortTest {
     private fun TestScope.port(
         session: FakeTimelineChatSession,
         controls: TimelineChatRunControls = TimelineChatRunControls(),
+        sendQueue: ChatSendQueueSource? = null,
     ): TimelineChatSessionPort {
-        val port = TimelineChatSessionPort(session, target, backgroundScope, TimelineChatSessionOptions(controls = controls))
+        val options = TimelineChatSessionOptions(controls = controls, sendQueue = sendQueue)
+        val port = TimelineChatSessionPort(session, target, backgroundScope, options)
         // The page's flows share while collected, as ChatSurface collects them.
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
         return port
+    }
+
+    /** A port whose conversation has a run in flight, with [stopRun] as the transport's abort. */
+    private fun TestScope.runningPort(stopRun: suspend () -> Boolean): Pair<FakeTimelineChatSession, TimelineChatSessionPort> {
+        val session = FakeTimelineChatSession()
+        val port = port(session, TimelineChatRunControls(stopRun = stopRun))
+        session.timeline.value = timelineWith(pendingPrompt("long task"))
+        runCurrent()
+        return session to port
+    }
+
+    private fun TestScope.pressStop(port: TimelineChatSessionPort) {
+        port.actions.stopRun()
+        runCurrent()
     }
 
     private fun image() = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
@@ -219,7 +377,7 @@ class TimelineChatSessionPortTest {
         Timeline(conversationId = "conv-1", events = persistentListOf(*events))
 }
 
-private class FakeTimelineChatSession(
+internal class FakeTimelineChatSession(
     var hydrateFailure: Exception? = null,
     private val sendFailure: Exception? = null,
 ) : TimelineChatSession {
@@ -237,4 +395,28 @@ private class FakeTimelineChatSession(
         sendFailure?.let { throw it }
         sends += text to attachments
     }
+}
+
+private class FakeSendQueue(canQueue: Boolean = true) : ChatSendQueueSource {
+    val calls = mutableListOf<String>()
+    override val queue = MutableStateFlow(ConversationSendQueue())
+    override val canQueueWhileStreaming = MutableStateFlow(canQueue)
+
+    override fun cancel(id: QueuedSendId) {
+        calls += "cancel ${id.value}"
+    }
+
+    override fun sendNow(id: QueuedSendId) {
+        calls += "now ${id.value}"
+    }
+
+    override fun resume() {
+        calls += "resume"
+    }
+}
+
+private class FakeApprovalState : ChatApprovalStateSource {
+    override val submittingApprovals = MutableStateFlow<Set<String>>(emptySet())
+    override val queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
+    override val pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
 }

@@ -279,7 +279,7 @@ internal fun buildPaletteDestinations(workPlayMode: WorkPlayMode): List<UnifiedS
         // Picker rows are keyed by id: a page reached through two lens entries is listed once.
         .distinctBy { it.id }
 
-private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects)
+private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects, DesktopDestination.Plugins)
 
 /**
  * The window's one unified search, shared by the header, the command palette and the quick-query bar:
@@ -501,9 +501,9 @@ internal fun createDesktopOverlayActions(
 ): DesktopOverlayActions = DesktopOverlayActions(
     modelControl = DesktopModelControlHost(
         session = params.dataBindings.modelControl,
-        chatModels = params.chatController.availableModels,
-        reloadChatModels = params.chatController::reloadModelCatalog,
-        onModelSelected = params.chatController::setConversationModel,
+        chatModels = params.chatController.models.available,
+        reloadChatModels = params.chatController.models::reload,
+        onModelSelected = params.chatController.models::select,
         recentModels = params.chatController.conversationManagement.recentModels,
     ),
     onOpenAgent = params.onOpenAgent,

@@ -177,7 +177,7 @@ class CanvasRelayHost(
 
         /** Why this host will not take [message] as a chunk of its asset, or null when it will. */
         private suspend fun refusalOf(message: CanvasRelayMessage.AssetPut): String? = when {
-            !isJoined(message.topic) -> "not joined"
+            message.topic != CanvasRelayProtocol.UPLOAD_TOPIC && !isJoined(message.topic) -> "not joined"
             !AssetRefs.isValid(message.asset.ref) -> "not an asset ref"
             message.asset.byteSize !in 0..maxAssetBytes -> "larger than this host keeps"
             !isChunkOf(message) -> "not a chunk of it"

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.model.AgentId
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Passage
@@ -17,7 +18,7 @@ class CachedPassageRepositoryTest {
     @Test
     fun createPassageReturnsCommittedPassageWhenFollowUpListFails() = runTest {
         val remote = FakePassageRemoteSource()
-        val repository = CachedPassageRepository(remote)
+        val repository = CachedPassageRepository(remote.bound())
 
         repository.getPassages(AgentId("agent-1")).test {
             assertEquals(emptyList(), awaitItem())

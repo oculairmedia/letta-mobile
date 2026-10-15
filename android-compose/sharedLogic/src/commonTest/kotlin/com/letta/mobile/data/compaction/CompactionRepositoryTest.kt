@@ -70,6 +70,16 @@ class CompactionRepositoryTest {
         assertIs<CompactionOutcome.AlreadyCompact>(unchanged.compact(request))
     }
 
+    @Test
+    fun irohResultMissingARequiredFieldIsAFailedOutcomeNotAThrow() = runTest {
+        val mismatched = AdminRpcCompactionRepository(
+            AdminRpcInvoker { _, _ -> Json.parseToJsonElement("""{"num_messages_before":48,"num_messages_after":12}""") },
+        )
+
+        val outcome = assertIs<CompactionOutcome.Failed>(mismatched.compact(request))
+        assertTrue(outcome.message.startsWith("The host returned an unreadable compaction result"), outcome.message)
+    }
+
     // ── direct App Server ──────────────────────────────────────────────────
 
     @Test

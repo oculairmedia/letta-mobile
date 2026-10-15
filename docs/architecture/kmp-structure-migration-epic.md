@@ -244,7 +244,7 @@ Medium — Gradle source-set surgery.
 - **4b (this PR):** shared session backend selection + remote descriptor + connection key; Android transport factory is mode-first (LOCAL wins over leftover `iroh://`); both hosts call the same helpers.
 - **4c:** shrink desktop “unavailable repository” stubs where sharedLogic already has HTTP/Iroh/App Server impls.
   - CronRepository + SelfTodoRepository moved to `sharedLogic/commonMain` and bound on desktop.
-  - Iroh admin_rpc *Source clients live in `sharedLogic/jvmAndAndroid`; thin `IrohAdminReadRepositories` binders feed desktop Iroh mode.
+  - Iroh admin_rpc *Source clients live in `sharedLogic/jvmAndAndroid`; `SharedSessionGraph.adminRepositories` (data.session.graph) builds the admin repositories over them for Android and desktop alike (letta-mobile-by4vm.87).
   - Desktop drops `DesktopIroh{Agent,Schedule,Tool}Repository` wrappers (uses shared `Iroh*` directly).
   - Desktop session graph takes a live `channelTransport` slot (Iroh QUIC or HTTP WS side-channel) so Subagent/Cron/SelfTodo share the connected transport.
   - Still stubs (Phase 5): conversation list, project, projectWork, step, vibesync; HTTP-mode admin reads beyond agent/block/schedule/tool.
@@ -312,7 +312,7 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5o (bug reports / slash commands / vibesync — merged #1278):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
 
-**5p (messages — merged #5p stack):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stays in Android `MessageRepository` binder (`MessagePagingSource`). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
+**5p (messages — merged #5p stack):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stayed in the Android binder (`MessagePagingSource`) until both were deleted as unused (letta-mobile-by4vm.34). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
 
 **5b.2 (all conversations list — #5p stack):** `CachedAllConversationsRepository` + `ConversationRemoteSource` / `AllConversationsLocalCache` (`ConversationApi`, `RoomAllConversationsLocalCache`, existing `LocalRuntimeConversationSource` + `IrohAdminRpcConversationListSource`); refresh/cache/hasMore/cursor/optimistic updates in sharedLogic with `kotlin.time.Clock` + `Telemetry`; `getConversationsPaged` stays in Android `AllConversationsRepository` binder (`ConversationPagingSource`).
 
@@ -371,7 +371,7 @@ Medium for Option B; low for Option A / 6a docs.
 
 | Module | Direction |
 |---|---|
-| `feature-chat`, `feature-editagent` | Keep Android **presentation shells** (Hilt, Roborazzi). Logic stays in sharedLogic. |
+| `feature-chat` (`feature-editagent` since removed) | Keep Android **presentation shells** (Hilt, Roborazzi). Logic stays in sharedLogic. |
 | `designsystem` | Migrate reusable pieces to `sharedUI` as touched; keep Android-specific (Paparazzi, Material extensions) until parity |
 | `desktop/chat/*` | Shrink to thin hosts over `sharedUI` composables |
 

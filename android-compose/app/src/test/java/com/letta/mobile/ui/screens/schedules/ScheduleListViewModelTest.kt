@@ -1,8 +1,9 @@
 package com.letta.mobile.ui.screens.schedules
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.backend.NoAppServerRouteException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
@@ -124,7 +125,7 @@ class ScheduleListViewModelTest {
 
     @Test
     fun `loadData shows unavailable state when schedule routes are missing`() = runTest {
-        fakeScheduleRepo.error = NoAppServerRouteException("schedule.list")
+        fakeScheduleRepo.error = AppServerRouteUnavailable(SessionRoute.SCHEDULES, "schedule.list")
 
         viewModel.loadData()
 
@@ -137,7 +138,7 @@ class ScheduleListViewModelTest {
     @Test
     fun `selectAgent shows unavailable state when schedule routes are missing`() = runTest {
         awaitSuccessState()
-        fakeScheduleRepo.error = NoAppServerRouteException("schedule.list")
+        fakeScheduleRepo.error = AppServerRouteUnavailable(SessionRoute.SCHEDULES, "schedule.list")
 
         viewModel.selectAgent("a2")
 

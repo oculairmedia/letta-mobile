@@ -11,7 +11,6 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.modelvalidation.ModelHandleValidator
-import com.letta.mobile.data.repository.api.FeatureFlag
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.settings.AppearanceSettings
@@ -61,8 +60,6 @@ data class ConfigUiState(
     val enableProjects: Boolean = false,
     val hapticsEnabled: Boolean = true,
     val openChatsOnCanvas: Boolean = true,
-    /** The Settings preview switches that are on. */
-    val enabledFeatureFlags: Set<FeatureFlag> = emptySet(),
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -171,7 +168,7 @@ class ConfigViewModel @Inject constructor(
             val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
             if (!beginLoad(requestId, retainedState)) return@launch
             try {
-                val configUiState = buildConfigUiState().copy(enabledFeatureFlags = loadEnabledFeatureFlags())
+                val configUiState = buildConfigUiState()
                 if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
                     _uiState.value = UiState.Success(configUiState)
                 }
@@ -286,9 +283,6 @@ class ConfigViewModel @Inject constructor(
             openChatsOnCanvas = openChatsOnCanvas.await(),
         )
     }
-
-    private suspend fun loadEnabledFeatureFlags(): Set<FeatureFlag> =
-        FeatureFlag.entries.filter { settingsRepository.getFeatureFlag(it).first() }.toSet()
 
     private data class DisplayPreferences(
         val theme: AppTheme,
@@ -429,15 +423,6 @@ class ConfigViewModel @Inject constructor(
         _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, openChatsOnCanvas = enabled))
         viewModelScope.launch {
             settingsRepository.setOpenChatsOnCanvas(enabled)
-        }
-    }
-
-    fun updateFeatureFlag(flag: FeatureFlag, enabled: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        val flags = if (enabled) currentState.enabledFeatureFlags + flag else currentState.enabledFeatureFlags - flag
-        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, enabledFeatureFlags = flags))
-        viewModelScope.launch {
-            settingsRepository.setFeatureFlag(flag, enabled)
         }
     }
 

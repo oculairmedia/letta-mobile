@@ -1,0 +1,324 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:AndroidNetworkBridge.kt$BridgeEgressGuard$java.lang.Boolean.getBoolean(ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY) &amp;&amp; (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")</ID>
+    <ID>CyclomaticComplexMethod:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
+    <ID>CyclomaticComplexMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readContacts(input: JsonObject): ProviderReadResult</ID>
+    <ID>CyclomaticComplexMethod:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
+    <ID>CyclomaticComplexMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
+    <ID>CyclomaticComplexMethod:DeviceActionCommandRunner.kt$DeviceActionCommandRunner$fun run(commandJson: String): DeviceActionCommandResult</ID>
+    <ID>CyclomaticComplexMethod:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
+    <ID>CyclomaticComplexMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:HomeScreen.kt$val (navigation, routes, backend, title) = spec</ID>
+    <ID>LargeClass:ConfigViewModelTest.kt$ConfigViewModelTest</ID>
+    <ID>LongMethod:AdminGraph.kt$fun NavGraphBuilder.adminGraph( navController: NavHostController, activeBackendLabel: String?, openBackendSwitcher: () -&gt; Unit, clearAllData: () -&gt; Unit, )</ID>
+    <ID>LongMethod:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$private suspend fun readyLeaseGuarded(target: TimelineScope): TimelineOwnershipAuthority.Lease?</ID>
+    <ID>LongMethod:AndroidDeviceSensorSampler.kt$AndroidDeviceSensorSampler$override fun sample( descriptor: SensorDescriptor, sampleCount: Int, timeoutMs: Long, ): SensorSampleResponse</ID>
+    <ID>LongMethod:AndroidEmbeddedLettaCodeLaunchSpecTest.kt$AndroidEmbeddedLettaCodeLaunchSpecTest$@Test fun `shared launch spec preserves Android env bridge preload and stream-json fallback parity`()</ID>
+    <ID>LongMethod:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean</ID>
+    <ID>LongMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readCalendar(input: JsonObject): ProviderReadResult</ID>
+    <ID>LongMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readContacts(input: JsonObject): ProviderReadResult</ID>
+    <ID>LongMethod:BackendSwitcherSheet.kt$@OptIn(ExperimentalFoundationApi::class) @Composable private fun BackendSwitcherRow( config: ServerConfig, onSelect: () -&gt; Unit, onEdit: () -&gt; Unit, onLongPress: () -&gt; Unit, )</ID>
+    <ID>LongMethod:BackendSwitcherSheet.kt$@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) @Composable fun BackendSwitcherSheet( onDismiss: () -&gt; Unit, onNavigateToAddNewServer: () -&gt; Unit, onNavigateToEditServer: () -&gt; Unit, viewModel: ConfigListViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
+    <ID>LongMethod:ChannelNotificationPublisher.kt$ChannelNotificationPublisher$override fun publish(notification: ChannelNotification): Boolean</ID>
+    <ID>LongMethod:ChatPushService.kt$ChatPushService$private fun warmupSubscribers()</ID>
+    <ID>LongMethod:ConfigListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ConfigCard( config: ServerConfig, onSetActive: () -&gt; Unit, onDelete: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
+    <ID>LongMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
+    <ID>LongMethod:DeviceSensorReadTool.kt$DeviceSensorReadTool$fun handle(input: JsonObject, nowMillis: Long = System.currentTimeMillis()): ReadSensorsToolResponse</ID>
+    <ID>LongMethod:ImagePipelineSchemaTest.kt$ImagePipelineSchemaTest$@Test fun caseB_secondImageAfterStripProducesValidProviderRequest()</ID>
+    <ID>LongMethod:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$suspend fun readTranscript(agentId: String): List&lt;LettaMessage&gt;</ID>
+    <ID>LongMethod:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
+    <ID>LongMethod:MobileActionRegistry.kt$AndroidMobileActionCapabilityProvider$override fun capabilities(): List&lt;MobileActionCapability&gt;</ID>
+    <ID>LongMethod:MobileIntentActionTool.kt$MobileIntentActionTool$private fun handleIntent( toolName: String, dryRun: Boolean, userActionRequired: Boolean, buildIntent: () -&gt; Intent, ): MobileIntentActionResponse</ID>
+    <ID>LongMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
+    <ID>LongMethod:TagDrillInDialog.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun TagDrillInItemCard(item: TagDrillInItem)</ID>
+    <ID>LongMethod:TelemetryScreen.kt$@Composable private fun TelemetryEventRow(ev: Telemetry.Event)</ID>
+    <ID>LoopWithTooManyJumpStatements:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$while</ID>
+    <ID>LoopWithTooManyJumpStatements:LocalConversationHealer.kt$LocalConversationHealer$for</ID>
+    <ID>LoopWithTooManyJumpStatements:LocalImageContextStripper.kt$LocalImageContextStripper$for</ID>
+    <ID>MatchingDeclarationName:AgentEditorScreen.kt$AgentEditorNavigation</ID>
+    <ID>MatchingDeclarationName:AppStartDestination.kt$AppStartInputs</ID>
+    <ID>MatchingDeclarationName:CanvasScreen.kt$CanvasViewModel : ViewModel</ID>
+    <ID>MatchingDeclarationName:HomeScreenDrawer.kt$HomeScreenDrawerParams</ID>
+    <ID>MatchingDeclarationName:ProjectHomeScreen.kt$ProjectHomeNavigation</ID>
+    <ID>MaxLineLength:AboutScreen.kt$modifier = Modifier.padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, top = LettaDimens.Space.sm, bottom = LettaDimens.Space.md)</ID>
+    <ID>MaxLineLength:AgentEditorScreen.kt$ShellPageDeps(agentEditor = shellAgentEditorPage(AgentEditorBinding(controller = { viewModel.controller }, options = { _, _ -&gt; options(viewModel, navigation) })))</ID>
+    <ID>MaxLineLength:AgentEditorViewModel.kt$AgentEditorViewModel$dreamingSources.subagents.activeSubagentsFlow(SubagentParentScope(agent.value, ConversationCompactRpc.DEFAULT_CONVERSATION))</ID>
+    <ID>MaxLineLength:AgentListScreen.kt$FloatingActionButton</ID>
+    <ID>MaxLineLength:AgentListViewModelTest.kt$AgentListViewModelTest$metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME))</ID>
+    <ID>MaxLineLength:AgentListViewModelTest.kt$AgentListViewModelTest$viewModel = viewModelWith(Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha")), Agent(id = AgentId("a2"), name = "Agent2"))</ID>
+    <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$assertEquals("MiniMax-M3", captured.captured.metadata?.get(LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY)?.jsonPrimitive?.contentOrNull)</ID>
+    <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$private fun remoteConfig(): LettaConfig</ID>
+    <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$val params = AgentCreateParams(name = "Remote", model = "openai/gpt-4o", toolIds = persistentListOf(ToolId("t1")), includeBaseTools = true)</ID>
+    <ID>MaxLineLength:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$BindResult.Canonical(Binding(coordinator, owner, com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission), admission))</ID>
+    <ID>MaxLineLength:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$check(!retired &amp;&amp; graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true &amp;&amp; scope.backendId == backendId) { "Stale canonical backend generation" }</ID>
+    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))</ID>
+    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assetExtractor = FakeAssetExtractor(File(System.getProperty("java.io.tmpdir"), "letta-timeout-${System.nanoTime()}").apply { mkdirs() })</ID>
+    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$val events = controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).let { flow -&gt; async { flow.toList() } }</ID>
+    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$val job = launch { controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).collect {} }</ID>
+    <ID>MaxLineLength:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$json.encodeToString(com.letta.mobile.runtime.actions.MobileActionToolResponse.serializer(), mobileActionRegistry.handle(toolName, input, actionId))</ID>
+    <ID>MaxLineLength:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$socket.outputStream.writeJsonResponse(401, errorBody("unauthorized", "Android bridge authorization token is missing or invalid."))</ID>
+    <ID>MaxLineLength:AndroidNetworkBridgeReadSensorsTest.kt$AndroidNetworkBridgeReadSensorsTest.&lt;no name provided&gt;$HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)</ID>
+    <ID>MaxLineLength:AndroidNetworkBridgeReadSensorsTest.kt$AndroidNetworkBridgeReadSensorsTest.&lt;no name provided&gt;$audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test")</ID>
+    <ID>MaxLineLength:AndroidNetworkBridgeStreamingTest.kt$AndroidNetworkBridgeStreamingTest.&lt;no name provided&gt;$HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)</ID>
+    <ID>MaxLineLength:AndroidNetworkBridgeStreamingTest.kt$AndroidNetworkBridgeStreamingTest.&lt;no name provided&gt;$audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test")</ID>
+    <ID>MaxLineLength:AndroidSettingsBindings.kt$SettingsContribution(SettingsGroup.Notifications, backgroundDeliverySection(inputs.battery.exempt, inputs.battery.requestExemption))</ID>
+    <ID>MaxLineLength:AndroidSettingsBindings.kt$is UiState.Error -&gt; return listOf(SettingsContribution(SettingsGroup.Backend, loadFailedSection(state.message, inputs.viewModel::loadConfig)))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$(download as? EmbeddedModelDownloadState.Failed)?.let { add(SettingsRow.Note("$key-failed", SettingsStatus(it.message, SettingsTone.Error))) }</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Actions("$key-actions", listOf(SettingsAction("$key-cancel", "Cancel") { context.vm.cancelEmbeddedModelDownload(item) }))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Text("model-handle", "Model handle", state.localModelHandle, placeholder = "local/model", onChange = vm::updateLocalModelHandle)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Text("model-max-tokens", "Max tokens", state.localModelMaxTokens, numeric = true, onChange = vm::updateLocalModelMaxTokens)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Text("model-path", "Model file", state.localModelPath, placeholder = "/…/model.litertlm", onChange = vm::updateLocalModelPath)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Text("provider-api-key", "Model server API key", state.localProviderApiKey, secret = true, onChange = vm::updateLocalProviderApiKey)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsRow.Text("provider-model", "Model server model", state.localProviderModel, placeholder = "lmstudio/…", onChange = vm::updateLocalProviderModel)</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$SettingsStatus("Or use a model server on your network (an OpenAI-compatible endpoint): agents still run on this device, model calls go there.")</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$add(SettingsRow.Actions("$key-actions", listOf(SettingsAction("$key-download", "Download", enabled = canDownload) { context.vm.downloadEmbeddedModel(item) })))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$add(SettingsRow.Actions("model-save", listOf(SettingsAction("model-save", if (state.isSaving) "Saving…" else "Save model settings", primary = true, enabled = !state.isSaving) { actions.onSave() })))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$listOf(SettingsAction("$key-select", if (selected) "In use" else "Use this model", primary = !selected, enabled = !selected) { context.vm.selectEmbeddedModel(item) })</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$listOf(SettingsAction("model-import", if (state.isImportingLocalModel) "Importing…" else "Import a .litertlm file", enabled = !state.isImportingLocalModel) { actions.onImportModel() })</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$rows += SettingsRow.Note("$key-token", SettingsStatus("Needs a Hugging Face token: add one above to download it.", SettingsTone.Warning))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$rows += SettingsRow.Note("$key-unsupported", SettingsStatus(entry.unsupportedReason ?: "Not supported on this device.", SettingsTone.Warning))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$rows = listOf(SettingsRow.Actions("saved-backends", listOf(SettingsAction("saved-backends-open", "Manage saved backends") { onOpen() })))</ID>
+    <ID>MaxLineLength:AndroidSettingsSections.kt$val size = "${FormatHelpers.formatByteSize(entry.sizeInBytes)} · ${FormatHelpers.formatByteSize(entry.estimatedPeakMemoryInBytes)} peak memory"</ID>
+    <ID>MaxLineLength:AppDisclosureChevronContractTest.kt$AppDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
+    <ID>MaxLineLength:AppRefreshButtonGuardTest.kt$AppRefreshButtonGuardTest.Companion$"ConversationAdminDialog.kt" to "the conversation inspector's \"Recompile\" item: a rebuild of the agent's context, not a reload"</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest$"shopping checklist" to document(B("todo", "Milk", checked = false), B("todo", "Eggs", checked = true), B("todo", "Bread", checked = false))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest$CanvasSession.create(store = InMemoryCanvasDocumentStore(), options = CanvasCreateOptions(title = "Gate", initialSceneJson = ""))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest$println(report.joinToString("\n") { (name, size, reserve) -&gt; "android-reserve-gate@xxhdpi $name: rendered=${size.height} reserve=$reserve" })</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest$private val lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest$put("typeId", if (block.typeId == "heading" &amp;&amp; block.level != null) "heading_${block.level}" else block.typeId)</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitAndroidRenderTest.kt$CanvasNoteAutoFitAndroidRenderTest.B$private data</ID>
+    <ID>MaxLineLength:CanvasPluginFallbackAndroidRenderTest.kt$CanvasPluginFallbackAndroidRenderTest$CanvasSession.create(store = InMemoryCanvasDocumentStore(), options = CanvasCreateOptions(title = "Plugins", initialSceneJson = ""))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$ConversationInspectorMessage(id = "assistant-1", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Earlier")</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$ConversationInspectorMessage(id = "assistant-2", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "A proactive ping")</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$ConversationInspectorMessage(id = "assistant-2", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Already delivered")</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$ConversationInspectorMessage(id = "user-2", messageType = "user_message", date = null, runId = null, stepId = null, otid = null, summary = "Hey there")</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "assistant-buried", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Buried ping"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "assistant-deep", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Deep ping"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "assistant-new", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Newest ping"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "assistant-old", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Old ping"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "reasoning-$index", messageType = "reasoning_message", date = null, runId = null, stepId = null, otid = null, summary = "thinking $index"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "tool-$index", messageType = "tool_call_message", date = null, runId = null, stepId = null, otid = null, summary = "tool $index"))</ID>
+    <ID>MaxLineLength:ChannelHeartbeatSyncTest.kt$ChannelHeartbeatSyncTest$add(ConversationInspectorMessage(id = "user-$index", messageType = "user_message", date = null, runId = null, stepId = null, otid = null, summary = "chatter $index"))</ID>
+    <ID>MaxLineLength:ConfigViewModel.kt$ConfigViewModel$.</ID>
+    <ID>MaxLineLength:ConfigViewModel.kt$ConfigViewModel$dynamicColor = if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S) setting(false, { it.dynamicColor }, ::updateDynamicColor) else null</ID>
+    <ID>MaxLineLength:ConfigViewModelTest.kt$ConfigViewModelTest$state = EmbeddedModelDownloadState.Downloaded("/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm")</ID>
+    <ID>MaxLineLength:ConversationsAgentsShellTest.kt$ConversationsAgentsShellTest$AgentListRouteContent(AgentsPageState(agents = AGENTS, sharePreview = share.sharedText), ShellAgentRailActions(), AgentListChrome())</ID>
+    <ID>MaxLineLength:ConversationsAgentsShellTest.kt$ConversationsAgentsShellTest$composable&lt;AgentListRoute&gt; { AgentListRouteContent(AgentsPageState(agents = AGENTS), ShellAgentRailActions(), AgentListChrome()) }</ID>
+    <ID>MaxLineLength:ConversationsScreen.kt$ConversationsBinding$conversations = uiState.conversations.map { it.conversation.toChatConversationSummary(mapOf(it.conversation.agentId.value to it.agentName)) }</ID>
+    <ID>MaxLineLength:ConversationsScreen.kt$ConversationsBinding$onRenameConversation = { id, title -&gt; display(id)?.let { viewModel.renameConversation(it.conversation.id, it.conversation.agentId, title) } }</ID>
+    <ID>MaxLineLength:ConversationsScreen.kt$agents.map { agent -&gt; PickerItem(key = agent.id.value, value = agent, title = agent.name.ifBlank { agent.id.value }, subtitle = agent.model) }</ID>
+    <ID>MaxLineLength:ConversationsViewModel.kt$ConversationsViewModel$selectedConversation = if (_uiState.value.selectedConversation?.conversation?.id == conversationId) null else _uiState.value.selectedConversation</ID>
+    <ID>MaxLineLength:ConversationsViewModelTest.kt$ConversationsViewModelTest$assertEquals("Download or import a model in Settings before creating a local agent.", viewModel.uiState.value.localLettaCodeReadiness.setupMessage)</ID>
+    <ID>MaxLineLength:DashboardViewModelTest.kt$DashboardViewModelTest$private fun sampleStep(id: String, model: String, totalTokens: Int)</ID>
+    <ID>MaxLineLength:DatabaseModule.kt$DatabaseModule$fun</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$example = "{\"command\":\"intent.execute\",\"input\":{\"tool\":\"compose_email\",\"to\":\"ada@example.com\",\"subject\":\"Hello\"}}"</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$input = "required: {tool: open_wifi_settings|show_location_on_map|compose_email|insert_contact|insert_calendar_event, ...toolFields}"</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$input = "required: {tool: open_wifi_settings|show_location_on_map|compose_email|insert_contact|insert_calendar_event, ...toolFields}; returns opened UI awaiting user confirmation"</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$summary = "Open a user-mediated Android UI intent. The user must confirm send/save/settings changes; the app never completes them silently."</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$summary = "Query CalendarContract.Events for calendar events (title, dtstart, dtend, location) within a time window, bounded to ~50 rows. Requires READ_CALENDAR permission."</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$summary = "Query ContactsContract for contacts (display name, phone, email) with optional query filter, bounded to ~50 rows. Requires READ_CONTACTS permission."</ID>
+    <ID>MaxLineLength:DeviceActionCommandCatalog.kt$DeviceActionCommandCatalog$summary = "Return compact no-permission device context: battery, thermal, memory, storage, network, sensor count, gated status."</ID>
+    <ID>MaxLineLength:DeviceActionCommandRunner.kt$DeviceActionCommandRunner$"hardware.flashlight_off" -&gt; ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("enabled" to false, "dryRun" to false))))</ID>
+    <ID>MaxLineLength:DeviceActionCommandRunner.kt$DeviceActionCommandRunner$"hardware.flashlight_on" -&gt; ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("enabled" to true, "dryRun" to false))))</ID>
+    <ID>MaxLineLength:DeviceActionCommandRunnerTest.kt$DeviceActionCommandRunnerTest.&lt;no name provided&gt;$HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)</ID>
+    <ID>MaxLineLength:DeviceActionCommandRunnerTest.kt$DeviceActionCommandRunnerTest.&lt;no name provided&gt;$audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test")</ID>
+    <ID>MaxLineLength:DeviceHardwareControlToolTest.kt$DeviceHardwareControlToolTest.FakeHardwareProvider$HardwareControlResponse("adjust_music_volume", HardwareControlStatus.BlockedByAndroidPolicy, false, "Fixed volume policy.", audio = audio)</ID>
+    <ID>MaxLineLength:DeviceHardwareControlToolTest.kt$DeviceHardwareControlToolTest.FakeHardwareProvider$return HardwareControlResponse("set_flashlight", HardwareControlStatus.DryRun, true, "Fake dry run.", flashlight = capability)</ID>
+    <ID>MaxLineLength:DeviceHardwareControlToolTest.kt$DeviceHardwareControlToolTest.FakeHardwareProvider$return HardwareControlResponse("set_flashlight", HardwareControlStatus.Success, true, "Fake flashlight changed.", flashlight = capability)</ID>
+    <ID>MaxLineLength:DeviceSensorGatedCapabilitiesTest.kt$DeviceSensorGatedCapabilitiesTest$assertEquals(DeviceSensorGatedStatus.Disabled, caps.single { it.id == DeviceSensorGatedCapabilityIds.NOTIFICATION_NOW_PLAYING }.status)</ID>
+    <ID>MaxLineLength:DeviceSensorReadTool.kt$DeviceSensorReadTool$timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS</ID>
+    <ID>MaxLineLength:DeviceSensorReadTool.kt$DeviceSensorReadTool$val timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS</ID>
+    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$val corrupt = json.decodeFromJsonElement(com.letta.mobile.data.model.LettaMessage.serializer(), readConversation(base, DEFAULT_CONV_ID).single())</ID>
+    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$val restored = json.decodeFromString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), encoded).toConfirmedTimelineEvent()</ID>
+    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$writeTranscript(base, DEFAULT_CONV_KEY, listOf(sessionHeader(), messageEnvelope("m-ref", userRow("ui-ref", JsonArray(listOf(pointer))))))</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"m1","role":"assistant","content":[{"type":"text","text":"on it"},{"type":"toolCall","id":"call_9","name":"Read","arguments":{"file_path":"/tmp/x"}}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"ui-msg-2","role":"assistant","content":[{"type":"thinking","thinking":"hm"},{"type":"toolCall","id":"call_1","name":"Bash","arguments":{"command":"echo hi"}}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"ui-msg-3","role":"toolResult","toolCallId":"call_1","toolName":"Bash","content":[{"type":"text","text":"hi\n"}],"isError":false}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"look at this"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"$ref","mediaType":"image/png"}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"missing image"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"sha256:nonexistent","mediaType":"image/png"}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val latestImageRow = """{"id":"u2","role":"user","content":[{"type":"text","text":"new"},{"type":"image","mimeType":"image/jpeg","data":"TEVTVF9MQVRFU1Q="}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val latestImageRow = """{"id":"u2","role":"user","content":[{"type":"text","text":"second image"},{"type":"image","mimeType":"image/png","data":"TEFURVNU"}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val olderImageRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"first image"},{"type":"image","mimeType":"image/jpeg","data":"$base64Image"}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val olderImageRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"old"},{"type":"image","mimeType":"image/png","data":"$base64Image"}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$writer.write("""{"id":"u1","role":"user","content":[{"type":"text","text":"huge one"},{"type":"image","mimeType":"image/png","data":"""")</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"control_request","request_id":"approval-random-123","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"control_request","request_id":"perm-call-1","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-126","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"Hey"}],"run_id":"local-run-2","seq_id":17}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-127","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"!"}],"run_id":"local-run-2","seq_id":18}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-16","message_type":"approval_request_message","tool_call":{"tool_call_id":"call_00_abc","name":"Bash","arguments":"{\"command\":\"echo hi\"}"},"run_id":"local-run-1"}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-17","message_type":"tool_return_message","tool_call_id":"call_00_abc","status":"error","tool_return":"boom","run_id":"local-run-1"}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"m","message_type":"tool_return_message","tool_call_id":"call_b","is_err":true,"tool_return":"nope"}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"msg-1","message_type":"assistant_message","content":[{"type":"text","text":"hello"}],"run_id":"run-1"}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"stream_event","run_id":"run-wrapper","event":{"type":"message","id":"msg-1","message_type":"assistant_message","content":"hello"}}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"tool_call","run_id":"run-1","tool_calls":[{"id":"call-1","function":{"name":"Write","arguments":{"file_path":"README.md"}}}]}"""</ID>
+    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"tool_return_message","run_id":"run-1","tool_call_id":"call-1","status":"error","func_response":"permission denied"}"""</ID>
+    <ID>MaxLineLength:LettaCodeTurnEngine.kt$LettaCodeTurnEngine$Log.i("LOCAL_HANDOFF", "engine_runTurn_start agent=${command.agentId.value} conversation=${command.conversationId.value} model=${config.localModelHandle} serverUrl=${config.serverUrl}")</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}"</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} key=$key backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}"</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} runtime=${modelSelection.runtime} accelerator=${modelSelection.accelerator} maxTokens=${modelSelection.maxTokens}"</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"modelPath=${modelFile.absolutePath} backend=${backend.javaClass.simpleName} vision=$visionEnabled cacheDir=${cacheDir.absolutePath}"</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"path=${modelFile.absolutePath} exists=${modelFile.exists()} isFile=${modelFile.isFile} size=${modelFile.takeIf { it.exists() }?.length() ?: -1L}"</ID>
+    <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$logLiteRtInfo("engine_initialize_success", "modelPath=${modelFile.absolutePath} backend=${backend.javaClass.simpleName} vision=$visionEnabled")</ID>
+    <ID>MaxLineLength:LocalImageContextStripperTest.kt$LocalImageContextStripperTest$val assistantImage = """{"id":"a99","role":"assistant","content":[{"type":"image","mimeType":"image/png","data":"QVNTU1RfSU1BRw=="}]}"""</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S)</ID>
+    <ID>MaxLineLength:MobileActionRegistryTest.kt$MobileActionRegistryTest$assertEquals("android.settings.APPLICATION_DETAILS_SETTINGS", capability["requiredSettings"]!!.jsonArray.single().jsonPrimitive.content)</ID>
+    <ID>MaxLineLength:MobileIntentActionTool.kt$MobileIntentActionTool.COMPOSE_EMAIL -&gt; "Opened Android email composer. The user must review and tap send; the app did not send the email."</ID>
+    <ID>MaxLineLength:MobileIntentActionTool.kt$MobileIntentActionTool.INSERT_CALENDAR_EVENT -&gt; "Opened Android calendar event editor. The user must confirm save; the app did not save the event."</ID>
+    <ID>MaxLineLength:MobileIntentActionTool.kt$MobileIntentActionTool.INSERT_CONTACT -&gt; "Opened Android contact insert UI. The user must confirm save; the app did not save the contact."</ID>
+    <ID>MaxLineLength:MobileIntentActionTool.kt$MobileIntentActionTool.SHOW_LOCATION_ON_MAP -&gt; "Opened Android maps UI for this location. The user remains in control of navigation or follow-up actions."</ID>
+    <ID>MaxLineLength:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge$"handle=${modelSelection.modelHandle} routesToProvider=${modelSelection.routesToOpenAiCompatibleProvider} modelPath=${modelSelection.modelPath}"</ID>
+    <ID>MaxLineLength:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$errorBody("on_device_degenerate_output", "On-device model produced degenerate repeated output; try a shorter prompt or reset the conversation.")</ID>
+    <ID>MaxLineLength:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$logLiteRtInfo("bridge_repetition_guard", "handle=${modelSelection.modelHandle} rawChars=${raw.length} preview=${raw.take(80).lineSafe()}")</ID>
+    <ID>MaxLineLength:OnDeviceOpenAiBridgeTest.kt$OnDeviceOpenAiBridgeTest$private</ID>
+    <ID>MaxLineLength:OnDeviceToolCallProtocol.kt$OnDeviceToolCallProtocol$"You are a concise assistant. Answer the user's latest message in natural language. Do not repeat a single character, syllable, or word. If unsure, say so briefly."</ID>
+    <ID>MaxLineLength:PanePopupLeakTest.kt$PanePopupLeakTest$private fun describe()</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set&lt;String&gt;)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun reconcileExternalTransportSend(conversationId: String, agentId: String, externalConversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun reconcileExternalTransportSendScoped(agentId: String?, conversationId: String, externalConversationId: String, otid: String)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean, connectionGeneration: Long)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean)</ID>
+    <ID>MaxLineLength:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter$override suspend fun turnStarted(agentId: String?, conversationId: String, runId: String?, turnId: String?)</ID>
+    <ID>MaxLineLength:QrScanScreen.kt$.</ID>
+    <ID>MaxLineLength:ScheduleListViewModelTest.kt$ScheduleListViewModelTest.FakeAgentRepo$override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams): Agent</ID>
+    <ID>MaxLineLength:ScreenCaptureTool.kt$ScreenCaptureTool$description = "Captures only the Letta app's current window hierarchy as a base64 PNG with width, height, and mimeType; full-screen or other-app capture requires future privileged MediaProjection/Shizuku escalation."</ID>
+    <ID>MaxLineLength:ScreenCaptureTool.kt$ScreenCaptureTool$reason = "Own-window capture reads the app's visible view hierarchy without Android screen-capture permission; arbitrary system or other-app screen capture is intentionally out of scope for this slice."</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$onSuccess = { fileName -&gt; snackbar.dispatch(context.getString(R.string.screen_config_local_model_import_success, fileName)) }</ID>
+    <ID>MaxLineLength:ShellHeaderPageLayoutTest.kt$ShellHeaderPageLayoutTest$search = rememberShellSearchSlot(home = NoopHome, context = ShellSearchContext(onHome = true), sources = UnifiedSearchSources(), onOpen = {})</ID>
+    <ID>NestedBlockDepth:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readCalendar(input: JsonObject): ProviderReadResult</ID>
+    <ID>NestedBlockDepth:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readContacts(input: JsonObject): ProviderReadResult</ID>
+    <ID>NestedBlockDepth:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
+    <ID>NestedBlockDepth:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readSingleLineFull(file: File, targetLineIndex: Int): String?</ID>
+    <ID>NestedBlockDepth:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$private suspend fun streamDownloadToFile( url: String, target: File, expectedTotalBytes: Long?, state: MutableStateFlow&lt;EmbeddedModelDownloadState&gt;, )</ID>
+    <ID>NestedBlockDepth:ImagePipelineSchemaTest.kt$ImagePipelineSchemaTest$private fun extractProviderImageUrls(transcript: List&lt;JsonObject&gt;): List&lt;String&gt;</ID>
+    <ID>NestedBlockDepth:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
+    <ID>NestedBlockDepth:LocalConversationHealer.kt$LocalConversationHealer$private fun rewriteSelectively( source: File, out: OutputStream, dropIndices: Set&lt;Int&gt;, insertAfterIndex: Map&lt;Int, List&lt;JsonObject&gt;&gt;, )</ID>
+    <ID>NestedBlockDepth:LocalImageContextStripper.kt$LocalImageContextStripper$private fun copyWithReplacements(source: File, replacements: Map&lt;Int, String&gt;, out: java.io.Writer)</ID>
+    <ID>NewLineAtEndOfFile:ConversationsGraph.kt$com.letta.mobile.ui.navigation.ConversationsGraph.kt</ID>
+    <ID>ReturnCount:AndroidNetworkBridge.kt$BridgeEgressGuard$fun isBlockedHost( host: String, resolve: (String) -&gt; List&lt;InetAddress&gt; = { InetAddress.getAllByName(it).toList() }, ): Boolean</ID>
+    <ID>ReturnCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleFetch(output: OutputStream, body: String)</ID>
+    <ID>ReturnCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
+    <ID>ReturnCount:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$private fun readDefaultConversation(directory: File): Conversation?</ID>
+    <ID>ReturnCount:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
+    <ID>ReturnCount:LocalImageContextStripper.kt$LocalImageContextStripper$fun stripTranscript(transcript: File): StripReport</ID>
+    <ID>ReturnCount:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision</ID>
+    <ID>ReturnCount:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
+    <ID>ReturnCount:OnDeviceToolCallProtocol.kt$OnDeviceToolCallProtocol$private fun parseToolCallObject(candidate: String): ModelTurn.ToolCall?</ID>
+    <ID>SpreadOperator:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$( "NotificationDelivery", "deferred", *telemetryAttrs(notificationId), "reason" to reason.name, )</ID>
+    <ID>SpreadOperator:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$( "NotificationDelivery", "published", *telemetryAttrs(notificationId), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$( "NotificationDelivery", "suppressed", *telemetryAttrs(notificationId), "reason" to reason.name, )</ID>
+    <ID>SwallowedException:ConversationsViewModel.kt$ConversationsViewModel$e: Exception</ID>
+    <ID>ThrowsCount:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean</ID>
+    <ID>ThrowsCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun fetchViaHttpUrlConnection( output: OutputStream, url: String, method: String, headers: List&lt;Pair&lt;String, String&gt;&gt;, bodyText: String?, )</ID>
+    <ID>TooGenericExceptionCaught:AgentListViewModel.kt$AgentListViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AndroidProviderReadTool.kt$AndroidProviderReadTool$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ChannelNotificationPublisher.kt$ChannelNotificationPublisher$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatPushAlarmReceiver.kt$ChatPushAlarmReceiver$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatPushAlarmScheduler.kt$ChatPushAlarmScheduler$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatPushService.kt$ChatPushService$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatPushService.kt$ChatPushService.Companion$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ConfigListViewModel.kt$ConfigListViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConfigViewModel.kt$ConfigViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConversationsViewModel.kt$ConversationsViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CrashReporter.kt$CrashReporter$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LocalLettaCodeService.kt$LocalLettaCodeService$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:LocalLettaCodeService.kt$LocalLettaCodeService.Companion$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:MobileIntentActionTool.kt$MobileIntentActionTool$error: Exception</ID>
+    <ID>TooManyFunctions:AgentListViewModel.kt$AgentListViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge$BridgeServerSession</ID>
+    <ID>TooManyFunctions:AppModule.kt$AppModule</ID>
+    <ID>TooManyFunctions:AppModule.kt$AppModule$Companion</ID>
+    <ID>TooManyFunctions:ConfigViewModel.kt$ConfigViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:ConversationsViewModel.kt$ConversationsViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:DatabaseModule.kt$DatabaseModule</ID>
+    <ID>TooManyFunctions:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore : LocalRuntimeConversationSourceLocalRuntimeAgentSource</ID>
+    <ID>TooManyFunctions:LocalImageContextStripper.kt$LocalImageContextStripper</ID>
+    <ID>TooManyFunctions:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge$BridgeServerSession</ID>
+    <ID>TooManyFunctions:OnDeviceToolCallProtocol.kt$OnDeviceToolCallProtocol</ID>
+    <ID>TooManyFunctions:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter : TimelineExternalTransportWriter</ID>
+    <ID>TooManyFunctions:RuntimeModule.kt$RuntimeModule</ID>
+    <ID>TooManyFunctions:SystemAccessDashboardScreen.kt$com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen.kt</ID>
+    <ID>UnusedImports:AboutScreen.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:AndroidMascotHost.kt$import com.letta.mobile.ui.mascot.MascotStillStore</ID>
+    <ID>UnusedImports:AndroidMascotHost.kt$import com.letta.mobile.ui.mascot.MascotStills</ID>
+    <ID>UnusedImports:BackendSwitcherSheet.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ChatPushAlarmSchedulerTest.kt$import android.content.Intent</ID>
+    <ID>UnusedImports:ChatPushService.kt$import com.letta.mobile.data.channel.CurrentConversationTracker</ID>
+    <ID>UnusedImports:ChatPushService.kt$import com.letta.mobile.data.repository.api.IAgentRepository</ID>
+    <ID>UnusedImports:ChatPushService.kt$import com.letta.mobile.data.transport.appserver.BackgroundStreamBudget</ID>
+    <ID>UnusedImports:ChatPushService.kt$import kotlinx.coroutines.CoroutineScope</ID>
+    <ID>UnusedImports:ChatPushService.kt$import kotlinx.coroutines.SupervisorJob</ID>
+    <ID>UnusedImports:ConfigListScreen.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:EncodeUserTurnWireLineTest.kt$import kotlinx.serialization.json.JsonPrimitive</ID>
+    <ID>UnusedImports:ImagePipelineEndToEndTest.kt$import org.junit.Assert.assertNull</ID>
+    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import java.io.File</ID>
+    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import java.nio.file.Files</ID>
+    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import kotlinx.serialization.json.JsonPrimitive</ID>
+    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:LettaCodeStreamJsonMapperTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:LocalImageContextStripperTest.kt$import kotlinx.serialization.json.JsonArray</ID>
+    <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertNotNull</ID>
+    <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:ScheduleListViewModelTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SystemAccessDashboardScreen.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:TagDrillInDialog.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:TelemetryScreen.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:TelemetryScreen.kt$import androidx.compose.ui.unit.sp</ID>
+    <ID>UnusedPrivateMember:AboutScreen.kt$@PreviewLightDark @Composable private fun AboutHeaderPreview()</ID>
+    <ID>UnusedPrivateMember:BackendSwitcherSheet.kt$@PreviewLightDark @Composable private fun BackendSwitcherRowPreview()</ID>
+    <ID>UnusedPrivateMember:BackendSwitcherSheet.kt$@PreviewLightDark @Composable private fun EmbeddedRuntimeConnectActionPreview()</ID>
+    <ID>UnusedPrivateMember:ConfigListScreen.kt$@PreviewLightDark @Composable private fun ConfigCardPreview()</ID>
+    <ID>UnusedPrivateMember:ConfigListScreen.kt$@PreviewLightDark @Composable private fun ConfigListContentPreview()</ID>
+    <ID>UnusedPrivateMember:ConfigListScreen.kt$@PreviewLightDark @Composable private fun EmbeddedRuntimeConnectCardPreview()</ID>
+    <ID>UnusedPrivateMember:ConversationAdminDialog.kt$@PreviewLightDark @Composable private fun ConversationAdminInspectorPreview()</ID>
+    <ID>UnusedPrivateMember:ConversationAdminDialog.kt$@PreviewLightDark @Composable private fun ConversationAdminSectionsPreview()</ID>
+    <ID>UnusedPrivateMember:HealthIndicator.kt$@PreviewLightDark @Composable private fun HealthDotPreview()</ID>
+    <ID>UnusedPrivateMember:HealthIndicator.kt$@PreviewLightDark @Composable private fun HealthRowShellPreview()</ID>
+    <ID>UnusedPrivateMember:SystemAccessDashboardScreen.kt$@PreviewLightDark @Composable private fun CapabilityDetailsPreview()</ID>
+    <ID>UnusedPrivateMember:SystemAccessDashboardScreen.kt$@PreviewLightDark @Composable private fun CapabilityHeadlinePreview()</ID>
+    <ID>UnusedPrivateMember:SystemAccessDashboardScreen.kt$@PreviewLightDark @Composable private fun DetailLinePreview()</ID>
+    <ID>UnusedPrivateMember:SystemAccessDashboardScreen.kt$@PreviewLightDark @Composable private fun MetadataChipPreview()</ID>
+    <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventListEmptyPreview()</ID>
+    <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventListPopulatedPreview()</ID>
+    <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventRowErrorPreview()</ID>
+    <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventRowInfoPreview()</ID>
+    <ID>UnusedPrivateProperty:ConversationAdminDialog.kt$i</ID>
+    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode custom provider requires a selected provider model before it can start.", )</ID>
+    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.", )</ID>
+    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode requires an imported .litertlm model path before it can start.", )</ID>
+    <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Redirect response missing Location header.")</ID>
+    <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Redirect to unsupported target: $location")</ID>
+    <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Response body exceeds $limit bytes.")</ID>
+    <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Too many redirects.")</ID>
+    <ID>UseCheckOrError:ConversationsViewModelTest.kt$ConversationsViewModelTest.FakeMessageRepository$throw IllegalStateException("Inspector failed")</ID>
+    <ID>UseCheckOrError:EmbeddedLettaCodeAssetExtractor.kt$EmbeddedLettaCodeAssetExtractor$throw IllegalStateException("Embedded LettaCode entrypoint was not found at ${entrypoint.absolutePath}.")</ID>
+    <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("Downloaded checksum did not match the catalog metadata.")</ID>
+    <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("Downloaded model file is empty.")</ID>
+    <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("No download URL is configured for ${entry.name}.")</ID>
+    <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("Not enough storage is available for ${entry.name}.")</ID>
+    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local agent ${agentId.value} is not persisted in the embedded LettaCode store")</ID>
+    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local conversation record for ${agentId.value} could not be created")</ID>
+    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local conversation record for ${agentId.value} is unreadable")</ID>
+    <ID>UseCheckOrError:OnDeviceModelImporter.kt$SafOnDeviceModelImporter$throw IllegalStateException("Could not open the selected model file.")</ID>
+    <ID>UseCheckOrError:OnDeviceModelImporter.kt$SafOnDeviceModelImporter$throw IllegalStateException("The selected model file is empty.")</ID>
+    <ID>UseRequire:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalArgumentException("Request body too large.")</ID>
+    <ID>WildcardImport:ConfigListScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:SelectedRuntimeBindingTest.kt$import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

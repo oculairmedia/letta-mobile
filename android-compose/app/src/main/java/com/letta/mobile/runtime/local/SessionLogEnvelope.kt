@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.controller.node.iroh.LocalBackendLayout
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -20,9 +21,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * live store at the time of writing held 89,991 envelope rows vs 27 flat ones,
  * so both shapes must keep working.
  *
- * The read/projection path already unwraps correctly
- * (`LocalBackendMessageReader.normalizeMessage` — the reference implementation
- * this object mirrors). The MUTATING passes ([LocalImageContextStripper],
+ * The envelope test itself is sharedLogic's [LocalBackendLayout.isMessageEnvelope]
+ * (letta-mobile-by4vm.21), the same check `LocalBackendMessageReader` uses. The MUTATING passes ([LocalImageContextStripper],
  * [LocalConversationHealer]) and [LettaCodeLocalBackendStore.readToolResults]
  * used to read the top level only, which made them silent no-ops on every real
  * 0.29.x transcript.
@@ -47,8 +47,7 @@ object SessionLogEnvelope {
      * `LocalBackendMessageReader.normalizeMessage`'s unwrap condition exactly —
      * anything else (flat legacy row, session header, junk) is false.
      */
-    fun isEnvelope(row: JsonObject): Boolean =
-        row["type"].asStringOrNull() == MESSAGE_ENVELOPE_TYPE && row["message"] is JsonObject
+    fun isEnvelope(row: JsonObject): Boolean = LocalBackendLayout.isMessageEnvelope(row)
 
     /** True for the `{"type":"session",…}` header line, which carries no message at all. */
     fun isSessionHeader(row: JsonObject): Boolean =
@@ -59,8 +58,7 @@ object SessionLogEnvelope {
      * or the row itself for a legacy flat row. `role` / `content` / `toolCallId`
      * must always be read from THIS object, never from the raw row.
      */
-    fun body(row: JsonObject): JsonObject =
-        if (isEnvelope(row)) row["message"] as JsonObject else row
+    fun body(row: JsonObject): JsonObject = LocalBackendLayout.messageBody(row)
 
     /**
      * Rebuilds [row] carrying [newBody] as its message body.

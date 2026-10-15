@@ -31,6 +31,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -171,6 +173,31 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         } finally {
             releaseStreamCollector.complete(Unit)
             streamCollector.cancel()
+            transport.close()
+        }
+    }
+
+    @Test
+    fun inboundFramesKeepSocketOrderAcrossLanes() = runBlocking {
+        // letta-mobile-by4vm.5: a turn_finished (control lane) sent after stream deltas is
+        // delivered after them on inboundFrames, whatever lane each frame is labelled with.
+        val sequence = (1..ORDERED_DELTA_COUNT).map { orderedDelta(it) } + orderedTurnFinished(ORDERED_DELTA_COUNT + 1)
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) sequence.forEach { send(Frame.Text(it)) }
+            }
+        }
+        val transport = transport(port)
+        val inbound = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(TIMEOUT) { transport.inboundFrames.take(sequence.size).toList() }
+        }
+        try {
+            withTimeout(TIMEOUT) { transport.connectionState.first { it == AppServerConnectionState.Ready } }
+            transport.sendControl(AppServerCommand.Auth(requestId = "ordered", token = ""))
+
+            val types = inbound.await().map { it.frame.type }
+            assertEquals(List(ORDERED_DELTA_COUNT) { "stream_delta" } + "turn_finished", types)
+        } finally {
             transport.close()
         }
     }
@@ -359,9 +386,20 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     private companion object {
         val TIMEOUT = 5.seconds
         const val STREAM_BURST_SIZE = 256
-        // Must exceed KtorAppServerWebSocketTransport's DELIVERY_QUEUE_CAPACITY (1_024).
+        // Must exceed AppServerInboundDelivery.DELIVERY_QUEUE_CAPACITY (1_024).
         const val OVERFLOW_BURST_SIZE = 2_048
         const val DRAIN_BURST_SIZE = 128
+        const val ORDERED_DELTA_COUNT = 200
+        const val ORDERED_RUNTIME = """"runtime":{"agent_id":"a","conversation_id":"c"}"""
+
+        fun orderedEnvelope(seq: Int) =
+            """$ORDERED_RUNTIME,"event_seq":$seq,"emitted_at":"t","idempotency_key":"k$seq""""
+
+        fun orderedDelta(seq: Int) =
+            """{"type":"stream_delta",${orderedEnvelope(seq)},"delta":{"message_type":"assistant_message"}}"""
+
+        fun orderedTurnFinished(seq: Int) =
+            """{"type":"turn_finished",${orderedEnvelope(seq)},"turn_id":"t1","stop_reason":"end_turn"}"""
         const val AUTH_RESPONSE_FRAME =
             """{"type":"auth_response","request_id":"backpressure","success":true}"""
         const val STREAM_STATUS_FRAME =

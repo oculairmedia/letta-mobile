@@ -76,6 +76,9 @@ class CanvasRelayClient(
     private var hostExpected = false
     private var refusal: String? = null
 
+    /** Assets going up outside any canvas ([uploadAsset]). */
+    private val uploads = CanvasRelayUploads()
+
     /** Assets being fetched from the host, by ref (under [lock]); one fetch however many ask. */
     private val fetches = mutableMapOf<String, AssetFetch>()
 
@@ -183,6 +186,12 @@ class CanvasRelayClient(
             }
         }
         refresh(canvas.topic)
+    }
+
+    override suspend fun reserveDelivery(canvasId: CanvasId, opIds: Collection<String>) {
+        if (opIds.isEmpty()) return
+        // The same durable queue [publish] fills; a reconnect's join uploads whatever is in it.
+        delivery.enqueue(canvas(canvasId).topic, opIds)
     }
 
     override fun subscribe(canvasId: CanvasId): Flow<CanvasOp> = channelFlow {
@@ -297,6 +306,19 @@ class CanvasRelayClient(
         lock.withLock { fetches.remove(ref) }?.result?.complete(bytes)
     }
 
+    /**
+     * letta-mobile-cdgpr.8: puts [bytes] in the host's asset store outside any canvas, over the
+     * current connection, and answers their ref once the host has kept them. They are pinned: refused
+     * before anything is sent unless they hash to [sha256]. Throws [CanvasRelayUploadException] when
+     * there is no connection, or the host rejects them or does not answer in [timeoutMs].
+     */
+    suspend fun uploadAsset(mediaType: String, bytes: ByteArray, sha256: String, timeoutMs: Long = ASSET_FETCH_TIMEOUT_MS): String {
+        val asset = CanvasRelayUploads.pinned(mediaType, bytes, sha256)
+        val live = lock.withLock { current } ?: throw CanvasRelayUploadException(NO_HOST)
+        uploads.upload(asset, bytes, timeoutMs) { live.connection.send(it) }
+        return asset.ref
+    }
+
     // ---- CanvasPresenceTransport ----
 
     override suspend fun updatePresence(canvasId: CanvasId, presence: CanvasPresence) {
@@ -332,12 +354,18 @@ class CanvasRelayClient(
                 if (!handle(live, message)) break
             }
         } finally {
-            lock.withLock { if (current === live) current = null }
+            retire(live)
             // Fetches asked on this connection will not be answered on it.
             val pending = lock.withLock { fetches.values.toList().also { fetches.clear() } }
             pending.forEach { it.result.complete(null) }
             refreshAll()
         }
+    }
+
+    /** [live] is over: no longer current, and uploads waiting on it end (only when it was still current). */
+    private suspend fun retire(live: Live) {
+        val ended = lock.withLock { (current === live).also { if (it) current = null } }
+        if (ended) uploads.connectionEnded()
     }
 
     /**
@@ -377,15 +405,21 @@ class CanvasRelayClient(
             is CanvasRelayMessage.PresenceRelayed -> relayedPresence(message.topic, message.presence)
             is CanvasRelayMessage.PresenceGone ->
                 relayedPresence(message.topic, CanvasPresence(message.peerId, "", "", 0f, 0f, isActive = false))
-            is CanvasRelayMessage.AssetStored -> lock.withLock { live.assetsUp += message.ref }
+            is CanvasRelayMessage.AssetStored -> {
+                lock.withLock { live.assetsUp += message.ref }
+                uploads.stored(message)
+            }
             is CanvasRelayMessage.AssetData -> assetData(message)
             is CanvasRelayMessage.AssetMissing -> finishFetch(message.ref, null)
             // The host will not keep it (too large, say); the op that refers to it still goes up, and
             // other apps draw its preview.
-            is CanvasRelayMessage.AssetRejected -> com.letta.mobile.util.Telemetry.event(
-                "CanvasRelayClient", "asset.rejected", "ref" to message.ref, "reason" to message.reason,
-                level = com.letta.mobile.util.Telemetry.Level.WARN,
-            )
+            is CanvasRelayMessage.AssetRejected -> {
+                com.letta.mobile.util.Telemetry.event(
+                    "CanvasRelayClient", "asset.rejected", "ref" to message.ref, "reason" to message.reason,
+                    level = com.letta.mobile.util.Telemetry.Level.WARN,
+                )
+                uploads.rejected(message)
+            }
             is CanvasRelayMessage.Refused -> return refused(message.reason)
             // App-to-host messages coming this way: not a host speaking the protocol.
             else -> return refused("the host sent ${message::class.simpleName}")

@@ -3,7 +3,7 @@ package com.letta.mobile.data.health
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendKind
-import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.data.repository.routedBackendKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,7 +20,7 @@ import org.junit.Test
  *
  * The other historical cases went away with the code they guarded: the shim
  * `WebSocketConnection` in g70jb.3, and the `/v1/health` shim probe in g70jb.4
- * ([ShimBackendDetector] no longer holds an HTTP client, so it cannot dial).
+ * (classification is now the pure [routedBackendKind], which holds no client and cannot dial).
  */
 class IrohBackendNeverDialsShimTest {
 
@@ -34,20 +34,29 @@ class IrohBackendNeverDialsShimTest {
     }
 
     @Test
-    fun `detector classifies an iroh config as IROH`() {
-        val detector = ShimBackendDetector(MutableStateFlow(config("iroh://node-abc")))
+    fun `routed kind classifies an iroh config as IROH`() {
+        val kind = config("iroh://node-abc").routedBackendKind()
 
-        assertEquals(BackendKind.IROH, detector.cachedActiveBackendKind())
-        assertTrue(detector.cachedActiveUsesChannelTransport())
+        assertEquals(BackendKind.IROH, kind)
+        assertTrue(kind.usesChannelTransport)
     }
 
     @Test
-    fun `detector classifies a local runtime config as LOCAL_RUNTIME`() {
-        val config = config("http://localhost:8291").copy(mode = LettaConfig.Mode.LOCAL)
-        val detector = ShimBackendDetector(MutableStateFlow(config))
+    fun `routed kind classifies a local runtime config as LOCAL_RUNTIME`() {
+        val kind = config("http://localhost:8291").copy(mode = LettaConfig.Mode.LOCAL).routedBackendKind()
 
-        assertEquals(BackendKind.LOCAL_RUNTIME, detector.cachedActiveBackendKind())
-        assertFalse(detector.cachedActiveUsesChannelTransport())
+        assertEquals(BackendKind.LOCAL_RUNTIME, kind)
+        assertFalse(kind.usesChannelTransport)
+    }
+
+    @Test
+    fun `routed kind classifies a ws address and a missing config as DIRECT_WS`() {
+        for (config in listOf(config("ws://localhost:8291"), null)) {
+            val kind = config.routedBackendKind()
+
+            assertEquals("config=$config", BackendKind.DIRECT_WS, kind)
+            assertFalse(kind.usesChannelTransport)
+        }
     }
 
     private fun config(url: String) = LettaConfig(

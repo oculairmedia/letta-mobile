@@ -16,29 +16,48 @@ import org.cef.network.CefRequest
 import java.awt.Component
 import javax.swing.SwingUtilities
 
-/** What one view's browser is wired to: the page it serves, its request policy, its router, and where faults go. */
+/** What one view's browser is wired to: the page it serves (and its policy), its router, and where faults go. */
 internal class JcefViewWiring(
     val server: PluginPageServer,
-    val policy: PluginViewRequestPolicy,
     val queries: PluginViewQueryRouter,
     val work: PluginViewWork,
     val onFault: (String) -> Unit,
-)
+) {
+    val gate: JcefRequestGate = JcefRequestGate(server.policy)
+}
+
+/** The native side of one live view: the component the board shows, scripts run in its page, and how to release it. */
+internal interface PluginBrowserHandle : PageScriptRunner {
+    val component: Component
+
+    /** Closes the browser and frees what it holds; called once, after the bridge's teardown. */
+    fun dispose()
+}
+
+/** Opens one view's browser on the process's browser runtime [T] (a `CefApp`; a fake in tests). */
+internal fun interface PluginBrowserFactory<T> {
+    fun open(app: T, wiring: JcefViewWiring): PluginBrowserHandle
+}
 
 /**
  * One live view's JCEF browser (plan section 7.3): its own [CefClient] and an in-memory
  * [CefRequestContext] (no cookies, storage or cache shared with any other view or the app), a
- * windowed browser whose AWT component the board embeds, the [PluginViewRequestPolicy] enforced on
- * every navigation and resource, popups, downloads and the context menu refused, and a
+ * windowed browser whose AWT component the board embeds, the shared page policy ([JcefRequestGate])
+ * enforced on every navigation and resource, popups, downloads and the context menu refused, and a
  * [CefMessageRouter] whose queries reach the view's port through [PluginViewQueryRouter].
  */
 internal class JcefPluginBrowser private constructor(
     private val client: CefClient,
     private val context: CefRequestContext,
     private val router: CefMessageRouter,
-    val browser: CefBrowser,
+    private val browser: CefBrowser,
+    private val pageUrl: String,
 ) : PluginBrowserHandle {
     override val component: Component get() = browser.uiComponent
+
+    override fun run(script: String) {
+        browser.executeJavaScript(script, pageUrl, 0)
+    }
 
     override fun dispose() {
         val release = {
@@ -51,8 +70,8 @@ internal class JcefPluginBrowser private constructor(
         if (SwingUtilities.isEventDispatchThread()) release() else SwingUtilities.invokeLater(release)
     }
 
-    companion object {
-        fun open(app: CefApp, wiring: JcefViewWiring): JcefPluginBrowser {
+    companion object : PluginBrowserFactory<CefApp> {
+        override fun open(app: CefApp, wiring: JcefViewWiring): JcefPluginBrowser {
             val client = app.createClient()
             val config = CefMessageRouter.CefMessageRouterConfig(PluginPageShim.QUERY_FUNCTION, PluginPageShim.CANCEL_FUNCTION)
             val router = CefMessageRouter.create(config)
@@ -65,7 +84,7 @@ internal class JcefPluginBrowser private constructor(
             client.addLoadHandler(LoadFaults(wiring))
             val context = isolatedContext(ResourceHandler(wiring))
             val browser = client.createBrowser(wiring.server.url, false, false, context)
-            return JcefPluginBrowser(client, context, router, browser)
+            return JcefPluginBrowser(client, context, router, browser, wiring.server.url)
         }
 
         /**
@@ -94,24 +113,15 @@ private class RenderFaults(private val wiring: JcefViewWiring) : CefRequestHandl
 
 /**
  * Navigations are resource loads of the main frame or a subframe, so one check covers them and every
- * other resource: a request the policy does not admit is cancelled before it is sent. The view's own
- * page (and 404s on its origin) come from the [PluginPageServer].
+ * other resource: a request the [JcefRequestGate] refuses is cancelled before it is sent. The view's
+ * own page comes from the [PluginPageServer], never the network.
  */
 private class ResourceHandler(private val wiring: JcefViewWiring) : CefResourceRequestHandlerAdapter() {
     override fun onBeforeResourceLoad(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?): Boolean =
-        !wiring.policy.admits(PluginRequest(request?.url.orEmpty(), kindOf(request?.resourceType)))
+        wiring.gate.cancels(request?.url.orEmpty(), mainFrame = request?.resourceType == CefRequest.ResourceType.RT_MAIN_FRAME)
 
     override fun getResourceHandler(browser: CefBrowser?, frame: CefFrame?, request: CefRequest?): CefResourceHandler? =
-        when (wiring.policy.resource(request?.url.orEmpty())) {
-            PluginResourceDecision.PAGE, PluginResourceDecision.NOT_FOUND -> PluginPageResourceHandler(wiring.server, wiring.work)
-            else -> null
-        }
-
-    private fun kindOf(type: CefRequest.ResourceType?): PluginRequestKind = when (type) {
-        CefRequest.ResourceType.RT_MAIN_FRAME -> PluginRequestKind.MAIN_FRAME
-        CefRequest.ResourceType.RT_SUB_FRAME -> PluginRequestKind.SUB_FRAME
-        else -> PluginRequestKind.RESOURCE
-    }
+        if (wiring.gate.serves(request?.url.orEmpty())) PluginPageResourceHandler(wiring.server, wiring.work) else null
 }
 
 /**

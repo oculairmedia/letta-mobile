@@ -43,7 +43,7 @@ class CanvasSceneRenderGuardTest {
 
     @Test
     fun undrawableElementsAreDroppedAndTheRestKept() {
-        val kept = CanvasSceneRenderGuard.renderable(scene(invented, badPoint, drawable), CANVAS)
+        val kept = CanvasSceneRenderGuard.renderable(scene(invented, badPoint, drawable), CanvasId(CANVAS))
 
         assertEquals(listOf("title-1"), idsOf(kept))
     }
@@ -52,7 +52,7 @@ class CanvasSceneRenderGuardTest {
     fun eachDroppedElementIsReportedAsAWarning() {
         Telemetry.clear()
 
-        CanvasSceneRenderGuard.renderable(scene(invented, drawable), CANVAS)
+        CanvasSceneRenderGuard.renderable(scene(invented, drawable), CanvasId(CANVAS))
 
         val warning = Telemetry.snapshot().single { it.name == "scene.elementDropped" }
         assertEquals(Telemetry.Level.WARN, warning.level)
@@ -65,7 +65,7 @@ class CanvasSceneRenderGuardTest {
     fun aDrawableSceneIsHandedOnUnchanged() {
         val original = scene(drawable)
 
-        assertEquals(original, CanvasSceneRenderGuard.renderable(original, CANVAS))
+        assertEquals(original, CanvasSceneRenderGuard.renderable(original, CanvasId(CANVAS)))
     }
 
     private companion object {

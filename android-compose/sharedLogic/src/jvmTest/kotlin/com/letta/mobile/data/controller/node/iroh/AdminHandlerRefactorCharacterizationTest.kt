@@ -78,7 +78,7 @@ class AdminHandlerRefactorCharacterizationTest {
         })
         checkNativeFailClosed("conversation.create", buildJsonObject { put("agent_id", "ag-1") })
         checkNativeFailClosed("model.list", null)
-        checkNativeFailClosed("goal.get", buildJsonObject { put("agent_id", "ag-1") })
+        checkNativeWithoutProxy("goal.get", buildJsonObject { put("agent_id", "ag-1") })
         checkNativeFailClosed("slash_command.list", null)
 
         // lgns8.9: there is no admin REST proxy left. The former admin_rest rows

@@ -22,3 +22,11 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v0.62.0 ---
+
+# Chain the repo's own guard hook (core.hooksPath points here, so
+# .githooks/ would otherwise never run). Same args; its exit code wins.
+_repo_root=$(git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$_repo_root" ] && [ -x "$_repo_root/.githooks/pre-commit" ]; then
+  "$_repo_root/.githooks/pre-commit" "$@"
+  exit $?
+fi

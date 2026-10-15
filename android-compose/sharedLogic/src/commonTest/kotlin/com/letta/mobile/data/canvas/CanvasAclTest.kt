@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -133,7 +134,7 @@ class CanvasAclTest {
 
         // Unauthorized agent replace
         assertFailsWith<UnauthorizedCanvasMutationException> {
-            session.applyAgentReplace("""{"bgColor":-2,"elements":[]}""", actorId = "eve-agent")
+            session.applyAgentReplace("""{"bgColor":-2,"elements":[]}""", actorId = CanvasActorId("eve-agent"))
         }
 
         // Unauthorized remote op is silently dropped

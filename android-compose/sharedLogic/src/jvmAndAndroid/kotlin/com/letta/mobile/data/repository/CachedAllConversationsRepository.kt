@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
@@ -35,7 +36,7 @@ fun defaultCachedAllConversationsRepositoryScope(): CoroutineScope =
 
 /** Phase 5b.2: platform-neutral cached all-conversations repository. Paging stays in the Android binder. */
 open class CachedAllConversationsRepository(
-    private val remote: ConversationRemoteSource,
+    private val remote: RemoteRoute<ConversationRemoteSource>,
     private val localCache: (() -> AllConversationsLocalCache)? = null,
     private val repositoryScope: CoroutineScope = defaultCachedAllConversationsRepositoryScope(),
     private val localConversationSource: LocalRuntimeConversationSource? = null,
@@ -253,7 +254,7 @@ open class CachedAllConversationsRepository(
                 orderBy = "last_message_at",
             )
         } else {
-            remote.listConversations(
+            remote.source().listConversations(
                 agentId = null,
                 limit = PAGE_SIZE,
                 after = after,

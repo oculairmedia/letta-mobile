@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LettaConfig
@@ -40,7 +41,7 @@ class CachedMcpServerRepositoryTest {
     @Test
     fun createServerUpsertsReturnedServerWithoutListRefresh() = runTest {
         val remote = FakeMcpRemoteSource()
-        val repository = CachedMcpServerRepository(remote)
+        val repository = CachedMcpServerRepository(remote.bound())
 
         val created = repository.createServer(
             McpServerCreateParams(serverName = "New Server", config = JsonObject(emptyMap())),
@@ -54,7 +55,7 @@ class CachedMcpServerRepositoryTest {
     @Test
     fun deleteServerRemovesServerAndToolsWithoutListRefresh() = runTest {
         val remote = FakeMcpRemoteSource()
-        val repository = CachedMcpServerRepository(remote)
+        val repository = CachedMcpServerRepository(remote.bound())
         val serverId = McpServerId("server-1")
         repository.refreshServers()
         repository.refreshServerTools(serverId)
@@ -68,7 +69,7 @@ class CachedMcpServerRepositoryTest {
     @Test
     fun resyncServerToolsReturnsMutationWhenFollowUpListFails() = runTest {
         val remote = FakeMcpRemoteSource(listToolsShouldFail = true)
-        val repository = CachedMcpServerRepository(remote)
+        val repository = CachedMcpServerRepository(remote.bound())
         val serverId = McpServerId("server-1")
         repository.refreshServers()
 
@@ -82,7 +83,7 @@ class CachedMcpServerRepositoryTest {
     fun fetchAllMcpToolsInIrohModeDoesNotCallRemote() = runTest {
         val remote = FakeMcpRemoteSource(shouldThrowIfCalled = true)
         val irohSource = FakeMcpIrohSource(servers = listOf(testMcpServer("server-1")))
-        val repository = CachedMcpServerRepository(remote, irohSource)
+        val repository = CachedMcpServerRepository(remote.bound(), irohSource)
 
         val tools = repository.fetchAllMcpTools()
 
@@ -95,7 +96,7 @@ class CachedMcpServerRepositoryTest {
     fun unsupportedOperationsInIrohModeDoNotCallRemote() = runTest {
         val remote = FakeMcpRemoteSource(shouldThrowIfCalled = true)
         val irohSource = FakeMcpIrohSource()
-        val repository = CachedMcpServerRepository(remote, irohSource)
+        val repository = CachedMcpServerRepository(remote.bound(), irohSource)
         val serverId = McpServerId("server-1")
 
         assertFailsWith<UnsupportedOperationException> { repository.refreshServerTools(serverId) }
@@ -116,7 +117,7 @@ class CachedMcpServerRepositoryTest {
     @Test
     fun fetchAllMcpToolsRethrowsCancellation() = runTest {
         val remote = FakeMcpRemoteSource(cancelOnListTools = true)
-        val repository = CachedMcpServerRepository(remote)
+        val repository = CachedMcpServerRepository(remote.bound())
         repository.refreshServers()
 
         assertFailsWith<CancellationException> { repository.fetchAllMcpTools() }
@@ -210,7 +211,7 @@ class CachedModelRepositoryTest {
                 serverUrl = "local-lettacode://device",
             ),
         )
-        val repository = CachedModelRepository(remote, local, settings)
+        val repository = CachedModelRepository(remote.bound(), local, settings)
 
         repository.refreshLlmModels()
 
@@ -222,7 +223,7 @@ class CachedModelRepositoryTest {
     fun refreshLlmModelsUsesIrohSourceWhenActive() = runTest {
         val remote = FakeModelRemoteSource(llmModels = listOf(model("remote/model")))
         val iroh = FakeModelIrohSource(llmModels = listOf(model("iroh/model")))
-        val repository = CachedModelRepository(remote, irohModelSource = iroh)
+        val repository = CachedModelRepository(remote.bound(), irohModelSource = iroh)
 
         repository.refreshLlmModels()
 
@@ -236,7 +237,7 @@ class CachedModelRepositoryTest {
         val remote = FakeModelRemoteSource(
             llmModels = listOf(duplicate, duplicate, model("anthropic/claude")),
         )
-        val repository = CachedModelRepository(remote)
+        val repository = CachedModelRepository(remote.bound())
 
         repository.refreshLlmModels()
         assertEquals(
@@ -255,7 +256,7 @@ class CachedModelRepositoryTest {
         val remote = FakeModelRemoteSource(
             embeddingModels = listOf(EmbeddingModel(id = "embed-1", name = "Embed", handle = "openai/embed")),
         )
-        val repository = CachedModelRepository(remote)
+        val repository = CachedModelRepository(remote.bound())
 
         repository.refreshEmbeddingModels()
 

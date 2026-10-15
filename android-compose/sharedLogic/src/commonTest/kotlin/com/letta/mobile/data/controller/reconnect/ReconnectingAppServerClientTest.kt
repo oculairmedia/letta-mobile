@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.reconnect
 
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -69,6 +70,15 @@ class ReconnectingAppServerClientTest {
             AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = true)
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
+
+        val executed = mutableListOf<AppServerCommand.ExecuteCommand>()
+
+        override suspend fun executeCommand(
+            command: AppServerCommand.ExecuteCommand,
+        ): AppServerInboundFrame.ExecuteCommandResponse {
+            executed += command
+            return AppServerInboundFrame.ExecuteCommandResponse(requestId = command.requestId, success = true)
+        }
     }
 
     private class FakeGeneration {
@@ -120,6 +130,19 @@ class ReconnectingAppServerClientTest {
 
     private fun backoff() = FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 1_000)
 
+    private fun frame(type: String): AppServerReceivedFrame {
+        val raw = kotlinx.serialization.json.buildJsonObject { }
+        return AppServerReceivedFrame(
+            channel = AppServerChannel.Stream,
+            frame = AppServerInboundFrame.Unknown(type = type, raw = raw),
+            raw = raw,
+        )
+    }
+
+    private companion object {
+        const val SERVER = "ws://app-server"
+    }
+
     @Test
     fun failsFastBeforeFirstGenerationIsReady() = runTest {
         val gen = FakeGeneration()
@@ -131,6 +154,23 @@ class ReconnectingAppServerClientTest {
             client.sync(AppServerCommand.Sync(runtime = runtime, requestId = "s1"))
         }
         job.cancel()
+    }
+
+    @Test
+    fun forwardsExecuteCommandToTheReadyGeneration() = runTest {
+        val gen = FakeGeneration()
+        val client = ReconnectingAppServerClient(connect = { gen.handle() }, backoff = backoff())
+        client.start(backgroundScope)
+        runCurrent()
+        gen.ready()
+        runCurrent()
+
+        val response = client.executeCommand(
+            AppServerCommand.ExecuteCommand(requestId = "e1", commandId = "context-limit", args = "500000", runtime = runtime),
+        )
+
+        assertTrue(response.success)
+        assertEquals(listOf("context-limit"), gen.client.executed.map { it.commandId })
     }
 
     @Test
@@ -365,7 +405,10 @@ class ReconnectingAppServerClientTest {
         assertEquals(0, dials)
         val state = assertIs<ReconnectingClientState.GaveUp>(client.state.value)
         assertEquals(GiveUpKind.Authentication, state.kind)
-        assertEquals(AppServerSessionStatus.AuthenticationError("HTTP 401"), state.toSessionStatus())
+        val status = assertIs<ChannelTransportState.Disconnected>(state.toChannelTransportState(SERVER))
+        assertTrue(status.isAuthFailure, "a revoked token reads as an auth failure, not a retryable drop")
+        assertEquals(false, status.willReconnect)
+        assertEquals("HTTP 401", status.reason)
         assertEquals<List<String?>>(listOf("HTTP 401"), listener.gaveUp)
     }
 
@@ -433,11 +476,66 @@ class ReconnectingAppServerClientTest {
         assertEquals(listOf(100L, 200L, 400L, 800L), backingOff.map { backoff().ceilingMs(it.attempt) })
         assertEquals("socket lost", backingOff.first().reason)
         assertTrue(backingOff.drop(1).all { it.reason == "probe: connection refused" })
-        assertIs<AppServerSessionStatus.Reconnecting>(backingOff.last().toSessionStatus())
+        val reconnecting = assertIs<ChannelTransportState.Disconnected>(backingOff.last().toChannelTransportState(SERVER))
+        assertTrue(reconnecting.willReconnect)
+        assertEquals(4, reconnecting.reconnectAttempt)
         assertEquals(2, generations.size, "the server came back and was redialled once")
         generations.last().ready()
         runCurrent()
-        assertEquals(AppServerSessionStatus.Connected, client.state.value.toSessionStatus())
+        assertIs<ChannelTransportState.Connected>(client.state.value.toChannelTransportState(SERVER))
+    }
+
+    @Test
+    fun preflightMissingDiscoveryRouteStillDials() = runTest {
+        // letta-mobile-by4vm.9: the rule desktop's own preflight carried, now in the one owner.
+        val generations = mutableListOf<FakeGeneration>()
+        val client = ReconnectingAppServerClient(
+            connect = { FakeGeneration().also { generations += it }.handle() },
+            backoff = backoff(),
+            sleep = { },
+            preflight = { AppServerProbeResult.Incompatible("HTTP 404", endpointMissing = true) },
+        )
+        client.start(backgroundScope)
+        runCurrent()
+        generations.single().ready()
+        runCurrent()
+
+        assertEquals(1, generations.size, "an App Server older than /app-server-info is dialled")
+        assertEquals(ReconnectingClientState.Ready, client.state.value)
+    }
+
+    @Test
+    fun everyTerminalStopProjectsToANonReconnectingDisconnect() {
+        GiveUpKind.entries.forEach { kind ->
+            val status = assertIs<ChannelTransportState.Disconnected>(
+                ReconnectingClientState.GaveUp("why", kind).toChannelTransportState(SERVER),
+            )
+            assertEquals(false, status.willReconnect, "$kind stops retrying")
+            assertEquals(kind == GiveUpKind.Authentication, status.isAuthFailure, "$kind auth classification")
+        }
+        assertEquals(ChannelTransportState.Idle, ReconnectingClientState.Stopped.toChannelTransportState(SERVER))
+        assertEquals(
+            ChannelTransportState.Connecting(reconnecting = true, attempt = 2),
+            ReconnectingClientState.Connecting(2).toChannelTransportState(SERVER),
+        )
+        assertEquals(ChannelTransportState.Connecting(), ReconnectingClientState.Connecting(0).toChannelTransportState(SERVER))
+    }
+
+    @Test
+    fun unstampedGenerationsPipeFramesUnchanged() = runTest {
+        val gen = FakeGeneration()
+        val client = ReconnectingAppServerClient(connect = { gen.handle() }, stampGenerations = false)
+        val received = mutableListOf<AppServerReceivedFrame>()
+        backgroundScope.launch { client.events.collect { received += it } }
+        client.start(backgroundScope)
+        runCurrent()
+        gen.ready()
+        runCurrent()
+
+        gen.client.emitted.emit(frame("stream_delta"))
+        runCurrent()
+
+        assertEquals(null, received.single().connectionGeneration)
     }
 
     @Test

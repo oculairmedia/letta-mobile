@@ -11,13 +11,19 @@ import com.letta.mobile.data.plugin.view.PluginViewActionOutcome
 import com.letta.mobile.data.plugin.view.PluginViewPageRef
 import com.letta.mobile.data.plugin.view.PluginViewSpec
 import com.letta.mobile.data.plugin.view.PluginViewTransport
+import com.letta.mobile.data.plugin.view.ViewBridge
 import com.letta.mobile.data.plugin.view.ViewBridgeHost
+import com.letta.mobile.data.plugin.view.ViewBridgeOptions
+import com.letta.mobile.data.plugin.view.ViewBridgeServices
 import com.letta.mobile.data.plugin.view.ViewElement
 import com.letta.mobile.data.plugin.view.ViewHostContext
 import com.letta.mobile.data.plugin.view.ViewLink
 import com.letta.mobile.data.plugin.view.ViewLogLevel
 import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.data.plugin.view.ViewTheme
+import com.letta.mobile.pluginview.PluginPagePolicy
+import com.letta.mobile.ui.canvas.plugin.PluginPageChannel
+import com.letta.mobile.ui.canvas.plugin.PluginViewSession
 import kotlinx.serialization.json.JsonObject
 import java.awt.Component
 import java.awt.Panel
@@ -56,7 +62,18 @@ internal object PluginViewTestFixtures {
 
     val pageRef: PluginViewPageRef get() = spec().pageRef
 
-    val pageUrl: String get() = PluginViewScheme.urlOf(pageRef)
+    val pageUrl: String get() = PluginPagePolicy(spec()).pageUrl
+
+    /** A shared session over [transport] whose bridge answers through [host]. */
+    fun session(
+        host: ViewBridgeHost = RecordingViewHost(),
+        transport: PluginViewTransport = FakePageTransport(),
+        options: ViewBridgeOptions = ViewBridgeOptions(),
+        granted: Set<PluginCapability> = emptySet(),
+    ): PluginViewSession {
+        val channel = PluginPageChannel()
+        return PluginViewSession(ViewBridge(spec(), channel, ViewBridgeServices(host, transport), options), channel, transport, granted)
+    }
 
     val context = ViewHostContext(
         theme = ViewTheme.DARK,
@@ -102,12 +119,17 @@ internal class RecordingViewHost : ViewBridgeHost {
     }
 }
 
-/** A browser handle that only counts its disposals. */
-internal class FakeBrowserHandle(private val onDispose: () -> Unit = {}) : PluginBrowserHandle {
+/** A browser handle that keeps the scripts run in its page and counts its disposals. */
+internal class FakeBrowserHandle(
+    private val onScript: (String) -> Unit = {},
+    private val onDispose: () -> Unit = {},
+) : PluginBrowserHandle {
     var disposals = 0
         private set
 
     override val component: Component = Panel()
+
+    override fun run(script: String) = onScript(script)
 
     override fun dispose() {
         disposals++

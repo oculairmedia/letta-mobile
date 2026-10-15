@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
@@ -15,7 +16,7 @@ import kotlinx.coroutines.flow.update
 
 /** Phase 5k: platform-neutral cached passage / archival-memory repository. */
 open class CachedPassageRepository(
-    private val remote: PassageRemoteSource,
+    private val remote: RemoteRoute<PassageRemoteSource>,
     private val irohPassageSource: PassageIrohSource? = null,
 ) : IPassageRepository, BackendScopedCache {
     private val _passages = MutableStateFlow<Map<AgentId, List<Passage>>>(emptyMap())
@@ -32,7 +33,7 @@ open class CachedPassageRepository(
         val passages = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.listPassages(agentId.value)
         } else {
-            remote.listPassages(agentId.value, limit = 100)
+            remote.source().listPassages(agentId.value, limit = 100)
         }
         replaceCachedPassages(agentId, passages)
     }
@@ -50,7 +51,7 @@ open class CachedPassageRepository(
             appendCachedPassage(agentId, passage)
             return passage
         }
-        val passage = remote.createPassage(agentId.value, PassageCreateParams(text = text))
+        val passage = remote.source().createPassage(agentId.value, PassageCreateParams(text = text))
         appendCachedPassage(agentId, passage)
         runCatchingCancellable { refreshPassages(agentId) }
         return passage
@@ -61,7 +62,7 @@ open class CachedPassageRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deletePassage(agentId.value, passageId)
         } else {
-            remote.deletePassage(agentId.value, passageId)
+            remote.source().deletePassage(agentId.value, passageId)
         }
         replaceCachedPassages(
             agentId = agentId,
@@ -70,7 +71,7 @@ open class CachedPassageRepository(
     }
 
     override suspend fun searchArchival(agentId: AgentId, query: String): List<Passage> {
-        return remote.searchArchival(agentId.value, query, limit = 50)
+        return remote.source().searchArchival(agentId.value, query, limit = 50)
     }
 
     private fun appendCachedPassage(agentId: AgentId, passage: Passage) {

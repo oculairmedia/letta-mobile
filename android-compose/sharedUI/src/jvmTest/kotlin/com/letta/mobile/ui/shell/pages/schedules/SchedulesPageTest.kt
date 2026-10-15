@@ -24,6 +24,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
+import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleMessage
+import com.letta.mobile.data.model.SchedulePayload
+import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleClock
 import com.letta.mobile.data.schedules.ScheduleCreateRequest
@@ -119,16 +123,57 @@ class SchedulesPageTest {
 
     @Test
     fun deletingFromARuleAsksFirst() = runComposeUiTest {
-        val deleted = mutableListOf<String>()
-        show(state(), SchedulesPageActions(onDelete = { deleted += it }), initialView = SchedulesView.Rules)
+        val deleted = mutableListOf<CronTaskId>()
+        show(state(), SchedulesPageActions(onDeleteCron = { deleted += it }), initialView = SchedulesView.Rules)
         onNodeWithTag(SchedulesPageTags.rule("c2")).performClick()
         onNodeWithText("Delete").performClick()
         onNodeWithTag(LettaPaneTags.CONFIRM).assertExists()
         assertEquals(emptyList(), deleted)
         onNode(hasText("Delete") and hasAnyAncestor(hasTestTag(LettaPaneTags.CONFIRM))).performClick()
-        assertEquals(listOf("c2"), deleted)
+        assertEquals(listOf(CronTaskId("c2")), deleted)
         onNodeWithTag(LettaPaneTags.CONFIRM).assertDoesNotExist()
     }
+
+    @Test
+    fun aCronIdEqualToAScheduleIdDeletesOnlyTheCron() = runComposeUiTest {
+        val crons = mutableListOf<CronTaskId>()
+        val schedules = mutableListOf<NativeScheduleRef>()
+        val library = ScheduleLibraryState(isLoading = false, selectedAgentId = "a1", schedules = listOf(native("c2", "a1")))
+        val actions = SchedulesPageActions(onDeleteSchedule = { schedules += it }, onDeleteCron = { crons += it })
+        show(state(library = library), actions, initialView = SchedulesView.Rules)
+        onNodeWithTag(SchedulesPageTags.rule("c2")).performClick()
+        onNodeWithText("Delete").performClick()
+        onNode(hasText("Delete") and hasAnyAncestor(hasTestTag(LettaPaneTags.CONFIRM))).performClick()
+        assertEquals(listOf(CronTaskId("c2")), crons)
+        assertEquals(emptyList(), schedules)
+    }
+
+    @Test
+    fun aNativeScheduleDeletesWithItsAgent() {
+        val library = ScheduleLibraryState(isLoading = false, selectedAgentId = "a1", schedules = listOf(native("s1", "a1")))
+        assertEquals(
+            ScheduleDeleteTarget.Native(NativeScheduleRef(agentId = "a1", scheduleId = "s1")),
+            state(library = library).deleteTarget("s1"),
+        )
+    }
+
+    @Test
+    fun anotherAgentsCronDoesNotShadowTheFocusedAgentsSchedule() {
+        val otherAgentsCron = CronTask(id = "s1", agentId = "a2", name = "Other", cron = "0 9 * * *", recurring = true)
+        val library = ScheduleLibraryState(isLoading = false, selectedAgentId = "a1", schedules = listOf(native("s1", "a1")))
+        assertEquals(
+            ScheduleDeleteTarget.Native(NativeScheduleRef(agentId = "a1", scheduleId = "s1")),
+            state(crons = listOf(otherAgentsCron), library = library).deleteTarget("s1"),
+        )
+        assertEquals(null, state(library = library).deleteTarget("gone"))
+    }
+
+    private fun native(id: String, agentId: String) = ScheduledMessage(
+        id = id,
+        agentId = agentId,
+        message = SchedulePayload(messages = listOf(ScheduleMessage(content = "hello", role = "user"))),
+        schedule = ScheduleDefinition(type = "recurring", cronExpression = "0 9 * * *"),
+    )
 
     @Test
     fun aPhoneOpensTheScheduleDetailInASheet() = runComposeUiTest {

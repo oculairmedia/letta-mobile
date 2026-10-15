@@ -76,7 +76,7 @@ QUOTEPY
 }
 
 echo "[iroh-2client-hermetic] pre-building :cli..." >&2
-./gradlew --quiet :cli:compileDebugUnitTestKotlin :cli:processDebugUnitTestJavaRes >/dev/null
+./gradlew --quiet :cli:classes >/dev/null
 
 SERVE_ARGS="$(quote_cli_args \
   app-server-serve-iroh-stub \

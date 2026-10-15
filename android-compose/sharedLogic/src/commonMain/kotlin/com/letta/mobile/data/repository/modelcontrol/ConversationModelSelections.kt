@@ -26,9 +26,12 @@ class ConversationModelSelections {
 
     operator fun get(conversationId: String): String? = choices.value.models[conversationId]
 
-    /** Records [model] as this session's pick for [conversationId]; a blank model clears the pick. */
-    fun record(conversationId: String, model: String?) {
-        if (conversationId.isNotBlank()) ledger.pick(ConversationPick(conversationId, model))
+    /**
+     * Records [model] (with the [effort] sent with it) as this session's pick for [conversationId];
+     * a blank model clears the pick.
+     */
+    fun record(conversationId: String, model: String?, effort: ReasoningEffortChoice = ReasoningEffortChoice.Unchanged) {
+        if (conversationId.isNotBlank()) ledger.pick(ConversationPick(conversationId, model, effort))
     }
 
     /**

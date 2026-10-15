@@ -2,18 +2,15 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.send.ConversationSendQueue
-import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.desktop.buildModelOptions
-import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.A2uiSnackbarId
 import com.letta.mobile.ui.chat.session.A2uiSurfaceId
@@ -23,29 +20,28 @@ import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.chat.session.ChatModelHandle
-import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
-import com.letta.mobile.ui.chat.session.toUiState
+import com.letta.mobile.ui.chat.session.GatewayPermissionModes
+import com.letta.mobile.ui.chat.session.TimelineLocalState
+import com.letta.mobile.ui.chat.session.acknowledge
+import com.letta.mobile.ui.chat.session.currentHostApprovals
+import com.letta.mobile.ui.chat.session.forgetAcknowledgedOnceCleared
+import com.letta.mobile.ui.chat.session.hostApprovals
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 /** What the shell hands the port beyond the controller itself. */
 internal data class DesktopChatSessionBindings(
@@ -53,6 +49,11 @@ internal data class DesktopChatSessionBindings(
     val onA2uiAction: (A2uiAction) -> Unit = {},
     /** Persists a pinch/zoom font scale through the desktop font-scale host. */
     val onSetFontScale: (Float) -> Unit = {},
+    /**
+     * letta-mobile-by4vm.85: the host's model catalog (the window's model-control session), whose
+     * rows say which reasoning efforts each model takes; null leaves the effort chip off.
+     */
+    val modelCatalog: ModelCatalogRepository? = null,
 )
 
 /**
@@ -69,7 +70,18 @@ internal class DesktopChatSessionPort(
     private val bindings: DesktopChatSessionBindings = DesktopChatSessionBindings(),
 ) : ChatSessionPort {
     private val hostInputs = MutableStateFlow(DesktopChatComposerHostInputs())
-    private val localTimeline = MutableStateFlow(DesktopChatLocalTimelineState())
+    private val localTimeline = MutableStateFlow(TimelineLocalState())
+
+    /** letta-mobile-bzvro.13, by4vm.98: the selected conversation's mode chip, the shared gateway binding. */
+    private val permissionModes = GatewayPermissionModes(
+        scope = scope,
+        targets = controller.state.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
+        current = { controller.activeGateway.permissionModeTarget(controller.state.value.selectedConversation) },
+    )
+
+    init {
+        controller.models.bindCatalog(bindings.modelCatalog, follow = scope)
+    }
 
     /** Feeds the composer chrome the shell computes (commands, mentionables, context usage). */
     fun updateHostInputs(inputs: DesktopChatComposerHostInputs) {
@@ -105,7 +117,7 @@ internal class DesktopChatSessionPort(
         commandsById = { hostInputs.value.commands.associateBy(ComposerCommand::label) },
         localTimeline = localTimeline,
         branchView = { uiState.value.let { DesktopBranchView(it.messages, it.hasMoreOlderMessages) } },
-        onSetPermissionMode = ::requestPermissionMode,
+        onSetPermissionMode = permissionModes::setPermissionMode,
     )
 
     /**
@@ -114,9 +126,9 @@ internal class DesktopChatSessionPort(
      * construction. The gateway has no flow of its own, so a state change re-reads it.
      */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
-        controller.canSubmitApprovals,
+        controller.approvals.canSubmitApprovals,
         controller.canonicalPresentation,
-        controller.state.map { controller.supportsWorkingDirectory }.distinctUntilChanged(),
+        controller.workingDirectory.current.map { it != null }.distinctUntilChanged(),
         controller.state.map { branchFacts() }.distinctUntilChanged(),
     ) { approvals, canonical, workingDirectory, branching ->
         desktopCapabilities(
@@ -133,9 +145,9 @@ internal class DesktopChatSessionPort(
 
     private fun currentCapabilities(): ChatSurfaceCapabilities = desktopCapabilities(
         DesktopCapabilityFacts(
-            approvals = controller.canSubmitApprovals.value,
+            approvals = controller.approvals.canSubmitApprovals.value,
             paged = controller.canonicalPresentation.value != null,
-            workingDirectory = controller.supportsWorkingDirectory,
+            workingDirectory = controller.workingDirectory.current.value != null,
             branching = controller.conversationManagement.supportsBranching,
             namedForks = controller.conversationManagement.canNameForks,
         ),
@@ -153,133 +165,47 @@ internal class DesktopChatSessionPort(
         cancellingConversationId = controller.cancellingConversationId.value,
         sendQueue = ConversationSendQueue(),
         local = localTimeline.value,
-        submittingApprovals = controller.submittingApprovals.value,
-        approvalDetails = controller.pendingApprovalDetails.value,
-        queuedApprovals = controller.queuedApprovals.value,
+        approvals = controller.approvals.currentHostApprovals(),
     )
 
     private fun timelineInputs(): Flow<DesktopChatTimelineInputs> = combine(
         controller.state,
         controller.replyPresence,
         controller.cancellingConversationId,
-        selectedSendQueue(),
-        approvalInputs(),
+        controller.sendQueue.queue,
+        combine(localTimeline, controller.approvals.hostApprovals(), ::Pair),
     ) { surface, presence, cancelling, queue, (local, approvals) ->
-        DesktopChatTimelineInputs(
-            surface, presence, cancelling, queue, local,
-            submittingApprovals = approvals.submitting,
-            approvalDetails = approvals.details,
-            queuedApprovals = approvals.queued,
-        )
+        DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
     }.onEach { inputs ->
         // Once the error is gone (a send cleared it), the same message later is a new error.
-        if (inputs.surface.errorMessage == null && inputs.local.acknowledgedError != null) {
-            localTimeline.update { it.copy(acknowledgedError = null) }
-        }
+        localTimeline.update { it.forgetAcknowledgedOnceCleared(inputs.surface.errorMessage) }
     }
-
-    /** What the cards draw about answers: in flight, parked details, queued offline. */
-    private class ApprovalInputs(
-        val submitting: Set<String>,
-        val details: Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>,
-        val queued: Set<String>,
-    )
-
-    private fun approvalInputs(): Flow<Pair<DesktopChatLocalTimelineState, ApprovalInputs>> = combine(
-        localTimeline,
-        controller.submittingApprovals,
-        controller.pendingApprovalDetails,
-        controller.queuedApprovals,
-    ) { local, submitting, details, queued -> local to ApprovalInputs(submitting, details, queued) }
-
-    /**
-     * The selected conversation's queue, re-resolved whenever the selection or the canonical route
-     * changes.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun selectedSendQueue(): Flow<ConversationSendQueue> = combine(
-        controller.canonicalPresentation,
-        controller.state.map { it.selectedConversationId }.distinctUntilChanged(),
-    ) { _, selectedId -> selectedId }
-        .flatMapLatest { selectedId ->
-            val queues = controller.canonicalSendQueue()?.state
-            if (selectedId == null || queues == null) {
-                flowOf(ConversationSendQueue())
-            } else {
-                queues.map { it[QueueConversationId(selectedId)] ?: ConversationSendQueue() }
-            }
-        }
-        .distinctUntilChanged()
 
     private fun currentComposerInputs() = DesktopChatComposerInputs(
         surface = controller.state.value,
         host = hostInputs.value,
-        modelOptions = buildModelOptions(controller.availableModels.value),
-        workingDirectory = DesktopWorkingDirectoryInputs(
-            supported = controller.supportsWorkingDirectory,
-            path = controller.selectedConversationWorkingDirectory.value,
-            loading = controller.workingDirectoryLoading.value,
-        ),
-        canQueueWhileStreaming = controller.canonicalPresentation.value != null,
+        model = controller.models.model.value,
+        workingDirectory = controller.workingDirectory.current.value,
+        canQueueWhileStreaming = controller.sendQueue.canQueueWhileStreaming.value,
         attachmentLimits = controller.attachmentLimits,
     )
 
     private fun composerInputs(): Flow<DesktopChatComposerInputs> = combine(
         controller.state,
         hostInputs,
-        controller.availableModels,
-        combine(workingDirectoryInputs(), permissionModeUi(), ::Pair),
-        controller.canonicalPresentation,
-    ) { surface, host, models, (workingDirectory, permissionMode), canonical ->
+        controller.models.model,
+        combine(controller.workingDirectory.current, permissionModes.permissionMode, ::Pair),
+        controller.sendQueue.canQueueWhileStreaming,
+    ) { surface, host, model, (workingDirectory, permissionMode), canQueue ->
         DesktopChatComposerInputs(
             surface = surface,
             host = host,
-            modelOptions = buildModelOptions(models),
+            model = model,
             workingDirectory = workingDirectory,
-            canQueueWhileStreaming = canonical != null,
+            canQueueWhileStreaming = canQueue,
             attachmentLimits = controller.attachmentLimits,
             permissionMode = permissionMode,
         )
-    }
-
-    /**
-     * letta-mobile-bzvro.13: the selected conversation's permission mode, for a gateway that runs the
-     * turn engine; null (no chip) for one that cannot read or change it.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun permissionModeUi(): Flow<ChatPermissionModeUiState?> =
-        controller.state
-            .map { state -> state.selectedConversation?.let { it.agentId?.takeIf(String::isNotBlank) to it.id } to controller.activeGateway }
-            .distinctUntilChanged()
-            .flatMapLatest { (target, gateway) ->
-                val agentId = target?.first
-                val controller = gateway as? DesktopPermissionModeController
-                val modes = controller?.permissionModes
-                if (agentId == null || modes == null) {
-                    flowOf(null)
-                } else {
-                    val runtime = AppServerRuntimeScope(agentId, target.second)
-                    // letta-mobile-bzvro.40: a relaying host's mode is read (or this client's choice re-sent) on open.
-                    // letta-mobile-a4tm7: the chip names the runtime it governs (an Iroh host, or this desktop's own).
-                    modes.observe(runtime).map { it.toUiState(runtime = controller?.permissionModeRuntime) }
-                        .onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
-                }
-            }
-
-    /** Asks the selected conversation's runtime for [mode]; the chip shows it pending until the server echoes it. */
-    private fun requestPermissionMode(mode: AppServerPermissionMode) {
-        val conversation = controller.state.value.selectedConversation ?: return
-        val agentId = conversation.agentId?.takeIf(String::isNotBlank) ?: return
-        val modes = controller.activeGateway as? DesktopPermissionModeController ?: return
-        if (modes.permissionModes == null) return
-        scope.launch { modes.setPermissionMode(AppServerRuntimeScope(agentId, conversation.id), mode) }
-    }
-
-    private fun workingDirectoryInputs(): Flow<DesktopWorkingDirectoryInputs> = combine(
-        controller.selectedConversationWorkingDirectory,
-        controller.workingDirectoryLoading,
-    ) { path, loading ->
-        DesktopWorkingDirectoryInputs(supported = controller.supportsWorkingDirectory, path = path, loading = loading)
     }
 }
 
@@ -324,13 +250,11 @@ internal class DesktopChatActions(
     private val controller: DesktopChatController,
     private val bindings: DesktopChatSessionBindings,
     private val commandsById: () -> Map<String, ComposerCommand>,
-    private val localTimeline: MutableStateFlow<DesktopChatLocalTimelineState>,
+    private val localTimeline: MutableStateFlow<TimelineLocalState>,
     /** The page's timeline now, which a fork or edit plans against. */
     private val branchView: () -> DesktopBranchView = { DesktopBranchView(emptyList(), hasOlderMessages = true) },
     private val onSetPermissionMode: (AppServerPermissionMode) -> Unit = {},
 ) : ChatActions {
-    private val queue = desktopQueuedSendActions(controller)
-
     private val selectedConversationId: String?
         get() = controller.state.value.selectedConversationId
 
@@ -372,8 +296,8 @@ internal class DesktopChatActions(
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.
-        if (answer.requestId in controller.submittingApprovals.value) return
-        if (controller.canSubmitApprovals.value) {
+        if (answer.requestId in controller.approvals.submittingApprovals.value) return
+        if (controller.approvals.canSubmitApprovals.value) {
             controller.submitApproval(answer)
         }
     }
@@ -384,11 +308,11 @@ internal class DesktopChatActions(
 
     override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
-    override fun cancelQueuedSend(id: QueuedSendId) = queue.onCancel(id)
+    override fun cancelQueuedSend(id: QueuedSendId) = controller.sendQueue.cancel(id)
 
-    override fun sendQueuedNow(id: QueuedSendId) = queue.onSendNow(id)
+    override fun sendQueuedNow(id: QueuedSendId) = controller.sendQueue.sendNow(id)
 
-    override fun resumeSendQueue() = queue.onResume()
+    override fun resumeSendQueue() = controller.sendQueue.resume()
 
     override fun toggleRunCollapsed(runId: ChatRunId) = localTimeline.update { it.toggleRun(runId.value) }
 
@@ -407,20 +331,17 @@ internal class DesktopChatActions(
      * The page showed the error in its snackbar: acknowledge it so it is not shown again, but
      * leave the controller's error in place so the ambient glow stays "failed" until the next send.
      */
-    override fun clearError() {
-        val shown = controller.state.value.errorMessage ?: return
-        localTimeline.update { it.copy(acknowledgedError = shown) }
-    }
+    override fun clearError() = localTimeline.update { it.acknowledge(controller.state.value.errorMessage) }
 
     override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
 
-    /** Desktop's model switch takes a selection value only; the effort is chosen elsewhere. */
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = controller.setConversationModel(handle.value)
+    /** letta-mobile-by4vm.85: the selection value and the effort go to the conversation together. */
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = controller.models.selectModel(handle, effort)
 
     override fun setPermissionMode(mode: AppServerPermissionMode) = onSetPermissionMode(mode)
 
     override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
-        controller.changeSelectedConversationWorkingDirectory(directory.path)
+        controller.workingDirectory.changeWorkingDirectory(directory)
 
     override fun updateSearchQuery(query: String) = Unit
 

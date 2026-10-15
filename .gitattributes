@@ -1,0 +1,24 @@
+# Normalize line endings: LF in the repo and the working tree.
+* text=auto eol=lf
+
+# Windows scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaries: never diff/normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.jar binary
+*.so binary
+*.aar binary
+*.apk binary
+*.keystore binary
+*.jks binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.riv binary

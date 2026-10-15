@@ -50,6 +50,16 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
     /** Lease -> server run binding for THIS key (letta-mobile-qygvv.8). */
     val runBinding = TurnRunBinding()
 
+    /**
+     * A new turn lease starts collecting on this key: its run-id gate, boundary gate and run binding
+     * all reset to it. lgns8.22.4: run ids from before a mid-turn reassignment are superseded.
+     */
+    fun beginLease(token: Long, clientMessageId: String?) {
+        runIdGate.beginLease(token)
+        boundaryGate.beginLease(token)
+        runBinding.beginLease(token, clientMessageId)
+    }
+
     /** Cached `runtime_start` scope for this key (was one global slot). */
     private val runtimeScopeRef = atomic<AppServerRuntimeScope?>(null)
 

@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.AdminRpcMethod
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.serialization.builtins.ListSerializer
@@ -25,12 +26,7 @@ import kotlinx.serialization.json.put
 class IrohAdminRpcToolSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) {
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()

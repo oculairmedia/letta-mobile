@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
@@ -45,7 +46,7 @@ fun defaultCachedAgentRepositoryScope(): CoroutineScope =
 // Phase 5a: platform-neutral cached agent repository. Android supplies Room via
 // [localCache]; Iroh via [irohAgentSource].
 open class CachedAgentRepository(
-    private val remote: AgentRemoteSource,
+    private val remote: RemoteRoute<AgentRemoteSource>,
     private val localCache: (() -> AgentLocalCache)? = null,
     private val repositoryScope: CoroutineScope = defaultCachedAgentRepositoryScope(),
     private val localAgentSource: LocalRuntimeAgentSource? = null,
@@ -99,7 +100,7 @@ open class CachedAgentRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.countAgents()
         }
-        return remote.countAgents()
+        return remote.source().countAgents()
     }
 
     /**
@@ -128,7 +129,7 @@ open class CachedAgentRepository(
         val merged = mutableListOf<AgentSummary>()
         var offset = 0
         while (true) {
-            val page = remote.listAgentsSlim(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
+            val page = remote.source().listAgentsSlim(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
             if (page.isEmpty()) break
             val existingIds = merged.asSequence().map { it.id }.toSet()
             val newAgents = page.filter { it.id !in existingIds }
@@ -230,7 +231,7 @@ open class CachedAgentRepository(
         val merged = mutableListOf<Agent>()
         var offset = 0
         while (true) {
-            val page = remote.listAgents(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
+            val page = remote.source().listAgents(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
             if (page.isEmpty()) break
 
             val existingIds = merged.asSequence().map { it.id }.toSet()
@@ -254,10 +255,10 @@ open class CachedAgentRepository(
     private suspend fun fetchAgentsWithoutOffsetFallback(
         onProgress: suspend (List<Agent>) -> Unit,
     ): List<Agent> {
-        val fallbackLimit = runCatchingCancellable { remote.countAgents() }
+        val fallbackLimit = runCatchingCancellable { remote.source().countAgents() }
             .getOrDefault(FALLBACK_FULL_FETCH_LIMIT)
             .coerceAtLeast(CACHE_REFRESH_PAGE_SIZE)
-        val fullList = remote.listAgents(limit = fallbackLimit, offset = null)
+        val fullList = remote.source().listAgents(limit = fallbackLimit, offset = null)
             .distinctBy { it.id }
         if (fullList.isNotEmpty()) {
             onProgress(fullList)
@@ -348,7 +349,7 @@ open class CachedAgentRepository(
         if (irohAgentSource?.shouldUseIroh() == true) {
             irohAgentSource.getAgent(id)
         } else {
-            remote.getAgent(id)
+            remote.source().getAgent(id)
         }
 
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
@@ -410,7 +411,7 @@ open class CachedAgentRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.getContextBreakdown(agentId, conversationId, reportedTotal)
         }
-        return remote.getContextWindow(agentId, conversationId)
+        return remote.source().getContextWindow(agentId, conversationId)
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent {
@@ -425,7 +426,7 @@ open class CachedAgentRepository(
             val paramsJson = json.encodeToString(AgentCreateParams.serializer(), params)
             irohSource.createAgent(paramsJson)
         } else {
-            remote.createAgent(params)
+            remote.source().createAgent(params)
         }
         refreshAgents()
         return agent
@@ -489,7 +490,7 @@ open class CachedAgentRepository(
             refreshAgents()
             return agent
         }
-        val agent = remote.updateAgent(id, params)
+        val agent = remote.source().updateAgent(id, params)
         refreshAgents()
         return agent
     }
@@ -510,7 +511,7 @@ open class CachedAgentRepository(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteAgent(id)
         } else {
-            remote.deleteAgent(id)
+            remote.source().deleteAgent(id)
         }
         _agents.update { current -> current.filterNot { it.id == id } }
         try {
@@ -523,22 +524,22 @@ open class CachedAgentRepository(
     }
 
     override suspend fun exportAgent(id: AgentId): String {
-        return remote.exportAgent(id)
+        return remote.source().exportAgent(id)
     }
 
     override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
-        val response = remote.importAgent(params)
+        val response = remote.source().importAgent(params)
         refreshAgents()
         return response
     }
 
     override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
-        remote.attachArchive(agentId, archiveId)
+        remote.source().attachArchive(agentId, archiveId)
         refreshAgents()
     }
 
     override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
-        remote.detachArchive(agentId, archiveId)
+        remote.source().detachArchive(agentId, archiveId)
         refreshAgents()
     }
 

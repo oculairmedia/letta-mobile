@@ -43,6 +43,7 @@ import com.letta.mobile.data.canvas.compose.ComposeReceiptItem
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import io.ak1.drawbox.DrawingPreview
 import io.ak1.drawbox.domain.model.DrawingSerializer
 import io.ak1.drawbox.domain.model.Viewport
@@ -88,7 +89,7 @@ class CanvasComposeReceiptRenderTest {
         val registry = ExternalToolRegistry.hostTools(
             HostCanvasTools.all(HostCanvasBackend(CanvasRelayHost(relay, hostId = { "host-1" }), relay, InMemoryHostCanvasDirectory())),
         )
-        val canvasId = CanvasId.forConversation(CONVERSATION)
+        val canvasId = CanvasId.forConversation(ConversationId(CONVERSATION))
         val path = Files.createTempDirectory("canvas-receipt-frames-")
         val notebooks = NotebookLocalStore(path, PEER)
         val published = runBlocking {
@@ -104,7 +105,7 @@ class CanvasComposeReceiptRenderTest {
                 NotebookCanvasDocumentStore(notebooks),
                 CanvasCreateOptions(canvasId = canvasId, conversationId = CONVERSATION, agentId = AGENT),
             )
-            relay.readAfter(CanvasRelayProtocol.conversationTopic(CONVERSATION), 0L).forEach { entry ->
+            relay.readAfter(CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION)), 0L).forEach { entry ->
                 check(session.applyRemote(entry.op, vouchedActor = entry.op.actorId) != null) { "relay ${entry.cursor}" }
             }
             session.load()

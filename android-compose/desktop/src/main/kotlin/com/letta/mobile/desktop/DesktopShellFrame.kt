@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.session.agentRosterOrEmpty
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -109,8 +111,10 @@ internal fun rememberDesktopShellFrame(context: DesktopShellContext, chatState: 
 @Composable
 private fun rememberDesktopAgentFocus(context: DesktopShellContext, chatState: DesktopChatSurfaceState): DesktopAgentFocus {
     val sessionGraph = context.core.sessionGraph.value
-    val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
+    // letta-mobile-by4vm.13: a session with no agents (no backend configured) shows an empty rail.
+    val rosterAgents by remember(sessionGraph) { sessionGraph.agentRosterOrEmpty() }.collectAsState()
     LaunchedEffect(sessionGraph, chatState.connectionState) {
+        if (!sessionGraph.capabilities.supports(SessionRoute.AGENTS)) return@LaunchedEffect
         runCatching {
             sessionGraph.agentRepository.refreshAgentsIfStale(
                 maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS,
@@ -242,7 +246,7 @@ private fun rememberDesktopShellLists(
     val archiveFilter by chatController.archiveFilter.collectAsState()
     val conversations = chatState.conversations
     val selectedConversationId = chatState.selectedConversationId
-    val workingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
+    val workingDirectory = chatController.workingDirectory.current.collectAsState().value?.path
     // letta-mobile-bzvro.26: `@` file suggestions from the conversation's workspace.
     val fileMentions = rememberDesktopFileMentions(context.core.chatScope, chatState.composerText, workingDirectory)
     // For a "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by

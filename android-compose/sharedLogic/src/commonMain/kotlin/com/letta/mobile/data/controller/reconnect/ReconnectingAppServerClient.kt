@@ -1,13 +1,10 @@
 package com.letta.mobile.data.controller.reconnect
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInfoData
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerWorkspaceCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -116,8 +113,10 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * with [AppServerNotConnectedException] — nothing queues, nothing blind-replays.
  * Whether a failed call may be retried is the caller's decision via
  * [com.letta.mobile.data.transport.appserver.AppServerCommandRetryClass];
- * ambiguous writes must reconcile against the committed
- * transcript first (see [AmbiguousTurnReconciler]).
+ * ambiguous writes must reconcile against the committed transcript first:
+ * the pinned App Server does not dedupe by `client_message_id`, so resend only
+ * when no committed user message has `otid == client_message_id` (lgns8.15
+ * restart/replay evidence).
  *
  * Terminal handshake failures (the transport's `Failed(terminal = true)`:
  * policy violation, auth rejection) stop the supervisor without retries —
@@ -127,9 +126,20 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * `GET /app-server-info` [com.letta.mobile.data.transport.appserver.AppServerProbe], which never
  * opens a socket. An `Authentication` or `Incompatible` answer stops the loop with that
  * [GiveUpKind], so a revoked token is reported once instead of retried forever; `Unavailable`
- * backs off without dialling. [resumeNow] (F04) cuts the current backoff short after the system
- * wakes from sleep. [start] may be called again after a terminal stop (the user pressed Retry or
- * changed settings).
+ * backs off without dialling. A 404 on the discovery route (`Incompatible.endpointMissing`) dials
+ * anyway: App Servers older than that route still speak the socket protocol, and the generation's
+ * own readiness handshake decides. [resumeNow] (F04) cuts the current backoff short after the
+ * system wakes from sleep. [start] may be called again after a terminal stop (the user pressed
+ * Retry or changed settings).
+ *
+ * letta-mobile-by4vm.9: this is the one owner of App-Server-session reconnect over a direct socket
+ * (the wrapper's runtime and admin lanes, the desktop's ws:// gateway). Its [state] projects onto
+ * the shared UI model with [toChannelTransportState]. [stampGenerations] stamps every piped frame
+ * with its generation for hosts that fence frames by generation (the wrapper's controller, which
+ * carries its surviving turns into each new generation, letta-mobile-by4vm.55); a host with no
+ * generation fence whose turns survive a reconnect (see
+ * [com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter.interruptSession]) passes
+ * false, which is safe because generations are piped strictly one after another.
  */
 class ReconnectingAppServerClient(
     private val connect: suspend () -> AppServerClientGeneration,
@@ -140,7 +150,8 @@ class ReconnectingAppServerClient(
     private val random: kotlin.random.Random = kotlin.random.Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it.milliseconds) },
     private val preflight: (suspend () -> AppServerProbeResult)? = null,
-) : AppServerClient {
+    private val stampGenerations: Boolean = true,
+): ForwardingAppServerClient() {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
     val state: StateFlow<ReconnectingClientState> = _state.asStateFlow()
     private val emptyServerInfoFlow: StateFlow<AppServerInfoData?> = MutableStateFlow(null)
@@ -161,6 +172,8 @@ class ReconnectingAppServerClient(
             ?.client?.serverInfo
             ?: emptyServerInfoFlow
 
+    // Written by the supervise loop, read by every caller's target(): visible across threads.
+    @kotlin.concurrent.Volatile
     private var current: AppServerClientGeneration? = null
     /**
      * lgns8.22.4: mirrors DefaultAppServerController.connectionGeneration.
@@ -269,13 +282,8 @@ class ReconnectingAppServerClient(
     /** Null when the dial may proceed; otherwise the outcome that replaces it. */
     private suspend fun runPreflight(): GenerationOutcome? {
         val probe = preflight ?: return null
-        val result = try {
-            probe()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppServerProbeResult.Unavailable(e.message ?: "probe failed")
-        }
+        val result = probeOrUnavailable(probe)
+        if (result is AppServerProbeResult.Incompatible && result.endpointMissing) return null
         return when (result) {
             is AppServerProbeResult.Ok -> null
             is AppServerProbeResult.Authentication -> GenerationOutcome.Terminal(result.detail, GiveUpKind.Authentication)
@@ -283,6 +291,18 @@ class ReconnectingAppServerClient(
             is AppServerProbeResult.Unavailable -> GenerationOutcome.NeverReady("probe: ${result.detail}")
         }
     }
+
+    private suspend fun probeOrUnavailable(probe: suspend () -> AppServerProbeResult): AppServerProbeResult =
+        try {
+            probe()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppServerProbeResult.Unavailable(e.message ?: "probe failed")
+        }
+
+    private fun AppServerReceivedFrame.stampedWith(generation: Long): AppServerReceivedFrame =
+        if (stampGenerations) copy(connectionGeneration = generation) else this
 
     private suspend fun runGeneration(scope: CoroutineScope, attempt: Int): GenerationOutcome {
         runPreflight()?.let { return it }
@@ -314,7 +334,7 @@ class ReconnectingAppServerClient(
         val pipeGeneration = pipeGenerationSeq.getAndIncrement()
         val pipe = scope.launch {
             generation.client.events.collect { frame ->
-                _events.emit(frame.copy(connectionGeneration = pipeGeneration))
+                _events.emit(frame.stampedWith(pipeGeneration))
             }
         }
 
@@ -360,7 +380,7 @@ class ReconnectingAppServerClient(
         listener.onGaveUp(reason)
     }
 
-    private fun ready(): AppServerClient =
+    override fun target(): AppServerClient =
         current
             ?.takeIf {
                 _state.value is ReconnectingClientState.Ready ||
@@ -371,135 +391,6 @@ class ReconnectingAppServerClient(
                 "App Server connection is not ready (state=${_state.value}); " +
                     "callers must not queue writes across generations",
             )
-
-    override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
-        ready().auth(command)
-
-    override suspend fun appServerInfo(command: AppServerCommand.AppServerInfo): AppServerInboundFrame.AppServerInfoResponse =
-        ready().appServerInfo(command)
-
-    override suspend fun runtimeStart(
-        command: AppServerCommand.RuntimeStart,
-    ): AppServerInboundFrame.RuntimeStartResponse = ready().runtimeStart(command)
-
-    override suspend fun input(command: AppServerCommand.Input) = ready().input(command)
-
-    override suspend fun inputAwaitingAcceptance(command: AppServerCommand.Input): AppServerInboundFrame.InputAccepted =
-        ready().inputAwaitingAcceptance(command)
-
-    override suspend fun changeDeviceState(command: AppServerCommand.ChangeDeviceState) = ready().changeDeviceState(command)
-
-    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-        ready().sync(command)
-
-    override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-        ready().abort(command)
-
-    override suspend fun resumeQueue(command: AppServerCommand.ResumeQueue): AppServerInboundFrame.ResumeQueueResponse =
-        ready().resumeQueue(command)
-
-    override suspend fun removeQueueItem(
-        command: AppServerCommand.RemoveQueueItem,
-    ): AppServerInboundFrame.RemoveQueueItemResponse = ready().removeQueueItem(command)
-
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        ready().adminRpc(command)
-
-    override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
-        ready().sendExternalToolResponse(command)
-
-    override suspend fun agentList(command: AppServerCommand.AgentList) = ready().agentList(command)
-
-    override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = ready().agentRetrieve(command)
-
-    override suspend fun agentCreate(command: AppServerCommand.AgentCreate) = ready().agentCreate(command)
-
-    override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate) = ready().agentUpdate(command)
-
-    override suspend fun agentDelete(command: AppServerCommand.AgentDelete) = ready().agentDelete(command)
-
-    override suspend fun conversationList(command: AppServerCommand.ConversationList) = ready().conversationList(command)
-
-    override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve) =
-        ready().conversationRetrieve(command)
-
-    override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate) =
-        ready().conversationCreate(command)
-
-    override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
-        ready().conversationUpdate(command)
-
-    override suspend fun conversationFork(command: com.letta.mobile.data.transport.appserver.AppServerConversationFork) =
-        ready().conversationFork(command)
-
-    override suspend fun conversationRecompile(command: com.letta.mobile.data.transport.appserver.AppServerConversationRecompile) =
-        ready().conversationRecompile(command)
-
-    override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
-        ready().conversationMessagesList(command)
-
-    override suspend fun conversationCompact(command: AppServerCommand.ConversationCompact) =
-        ready().conversationCompact(command)
-
-    override suspend fun listModels(command: AppServerCommand.ListModels) = ready().listModels(command)
-
-    override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
-
-    override suspend fun listConnectProviders(command: AppServerCommand.ListConnectProviders) =
-        ready().listConnectProviders(command)
-
-    override suspend fun connectProvider(command: AppServerCommand.ConnectProvider) = ready().connectProvider(command)
-
-    override suspend fun disconnectProvider(command: AppServerCommand.DisconnectProvider) =
-        ready().disconnectProvider(command)
-
-    override suspend fun updateModel(command: AppServerCommand.UpdateModel) = ready().updateModel(command)
-
-    override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
-
-    // bfooy.5: without these forwarders the interface default throws
-    // UnsupportedOperationException, so the wrapper's block.update_agent /
-    // block.create_agent / block.delete_agent (routed through DualLane's
-    // runtime lane, a ReconnectingAppServerClient) could never reach the socket.
-    override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) = ready().writeMemoryFile(command)
-
-    override suspend fun deleteMemoryFile(command: AppServerCommand.DeleteMemoryFile) = ready().deleteMemoryFile(command)
-
-    override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
-
-    override suspend fun cronAdd(command: AppServerCommand.CronAdd) = ready().cronAdd(command)
-
-    override suspend fun cronGet(command: AppServerCommand.CronGet) = ready().cronGet(command)
-
-    override suspend fun cronRuns(command: AppServerCommand.CronRuns) = ready().cronRuns(command)
-
-    override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) = ready().cronTrigger(command)
-
-    override suspend fun cronUpdate(command: AppServerCommand.CronUpdate) = ready().cronUpdate(command)
-
-    override suspend fun cronDelete(command: AppServerCommand.CronDelete) = ready().cronDelete(command)
-
-    override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
-
-    override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) = ready().getReflectionSettings(command)
-
-    override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) = ready().setReflectionSettings(command)
-
-    override suspend fun workspaceRequest(command: AppServerWorkspaceCommand) = ready().workspaceRequest(command)
-
-    // lgns8.23: admitted while Recovering so ChannelRestoreCoordinator can run
-    // inside onRecovered, on the same generation whose socket ingress binds to.
-
-    override suspend fun channelsList(command: AppServerCommand.ChannelsList) = ready().channelsList(command)
-
-    override suspend fun channelAccountsList(command: AppServerCommand.ChannelAccountsList) =
-        ready().channelAccountsList(command)
-
-    override suspend fun channelStart(command: AppServerCommand.ChannelStart) = ready().channelStart(command)
-
-    override suspend fun channelAccountUpdate(command: AppServerCommand.ChannelAccountUpdate) =
-        ready().channelAccountUpdate(command)
-
 
     companion object {
         private const val EVENT_BUFFER = 256

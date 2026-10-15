@@ -180,7 +180,12 @@ class PermissionModeRegistry(
         val seq = seqs.incrementAndGet()
         // Memory follows the store: a choice that could not be written is flagged, not silently kept.
         val saved = persist(runtime, mode)
-        update(runtime) { it.copy(requested = mode, unconfirmed = false, seq = seq, unsaved = !saved) }
+        if (!record(runtime, seq, mode, saved)) {
+            // letta-mobile-by4vm.38: a newer change was recorded while this one was being written. It
+            // supersedes this one: nothing is sent, and the store is put back to the newer choice.
+            restoreNewerChoice(runtime)
+            return false
+        }
         val result = try {
             apply(mode)
         } catch (cancelled: CancellationException) {
@@ -191,6 +196,22 @@ class PermissionModeRegistry(
         }
         settle(runtime, seq, mode, result)
         return result == ModeChangeResult.Confirmed
+    }
+
+    /** Records [mode] as requested unless a newer change ([seq]) already did; true when this one won. */
+    private fun record(runtime: AppServerRuntimeScope, seq: Int, mode: AppServerPermissionMode, saved: Boolean): Boolean {
+        var won = false
+        update(runtime) { entry ->
+            won = seq > entry.seq
+            if (won) entry.copy(requested = mode, unconfirmed = false, seq = seq, unsaved = !saved) else entry
+        }
+        return won
+    }
+
+    /** A superseded write may have landed after the newer one: the store goes back to what memory holds. */
+    private fun restoreNewerChoice(runtime: AppServerRuntimeScope) {
+        val entry = entries.value[runtime] ?: return
+        (entry.requested ?: entry.mode)?.let { persist(runtime, it) }
     }
 
     private fun settle(runtime: AppServerRuntimeScope, seq: Int, mode: AppServerPermissionMode, result: ModeChangeResult) {

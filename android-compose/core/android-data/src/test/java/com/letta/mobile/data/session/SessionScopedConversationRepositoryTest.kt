@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
@@ -54,7 +55,7 @@ class SessionScopedConversationRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val proxy = SessionScopedConversationRepository(sessionManager)
+        val proxy = sessionManager.sessionScoped(IConversationRepository::class) { it.conversationRepository }
 
         proxy.refreshConversations("agent-1")
         advanceUntilIdle()

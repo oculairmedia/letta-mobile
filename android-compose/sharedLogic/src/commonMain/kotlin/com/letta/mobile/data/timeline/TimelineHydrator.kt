@@ -1,9 +1,11 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.IdFormats
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 
 /**
@@ -16,6 +18,7 @@ internal class TimelineHydrator(
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val timelineProcessor: TimelineProcessor,
     private val onHydrationCommitted: (() -> Unit)? = null,
+    private val pendingScope: PendingLocalScope = PendingLocalScope(backendId = null, conversationId = conversationId),
 ) {
     private val nextGeneration = atomic(timelineProcessor.state.value.hydrateGeneration)
 
@@ -25,14 +28,14 @@ internal class TimelineHydrator(
         fallbackCursorSeq: Long? = null,
     ): TimelineHydrationOutcome {
         val timer = Telemetry.startTimer("TimelineSync", "hydrate")
-        if (conversationId.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)) return acceptDefaultShim(timer)
+        if (IdFormats.hasDefaultConversationPrefix(conversationId)) return acceptDefaultShim(timer)
 
         val generation = nextGeneration.incrementAndGet()
         val timelineBeforeFetch = timelineProcessor.state.value.timeline
         try {
             val response = fetchChronologicalMessages(limit)
             val cursorSequence = response.cursorSequence(recordConversationCursor, fallbackCursorSeq)
-            val diskRecords = runCatching { pendingLocalStore.load(conversationId) }.getOrDefault(emptyList())
+            val diskRecords = loadPendingLocals(response)
             return handleAcknowledgement(
                 acknowledgement = timelineProcessor.submit(
                 TimelineMutation.HydrateSnapshot(
@@ -53,6 +56,48 @@ internal class TimelineHydrator(
         } catch (t: Throwable) {
             timer.stopError(t, "conversationId" to conversationId)
             throw t
+        }
+    }
+
+    /**
+     * letta-mobile-by4vm.17: a failed Room read no longer degrades silently to "no unsent
+     * messages". The rows stay on disk (hydration never deletes what it did not load), the
+     * failure is logged at ERROR and surfaced on [events] as a [TimelineSyncEvent.StreamError]
+     * so the session's existing error state shows it. Cancellation is never swallowed.
+     *
+     * Rows the server already echoed are deleted here: a reconcile-time delete that failed
+     * is retried on every hydrate until it lands (delete-by-otid is idempotent).
+     */
+    private suspend fun loadPendingLocals(response: List<LettaMessage>): List<PendingLocalRecord> {
+        val records = try {
+            pendingLocalStore.load(pendingScope)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "hydrate.pendingLocalLoadFailed", failure,
+                "conversationId" to conversationId,
+            )
+            events.emit(TimelineSyncEvent.StreamError(PENDING_LOCAL_UNAVAILABLE, PENDING_LOCAL_UNAVAILABLE_MESSAGE))
+            return emptyList()
+        }
+        val echoedOtids = response.mapNotNullTo(HashSet()) { it.otid }
+        val (echoed, pending) = records.partition { it.otid in echoedOtids }
+        echoed.forEach { deleteEchoedPendingLocal(it.otid) }
+        return pending
+    }
+
+    private suspend fun deleteEchoedPendingLocal(otid: String) {
+        try {
+            pendingLocalStore.delete(otid)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "hydrate.pendingLocalDeleteFailed", failure,
+                "conversationId" to conversationId,
+                "otid" to otid,
+            )
         }
     }
 
@@ -140,16 +185,16 @@ internal class TimelineHydrator(
         onHydrationCommitted?.invoke()
     }
 
-    private companion object {
-        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
-    }
-
     private data class HydrationAckContext(
         val generation: Long,
         val responseCount: Int,
         val cursorSequence: Long?,
     )
 }
+
+/** [TimelineSyncEvent.StreamError.type] for a pending-local (unsent message) store read failure. */
+const val PENDING_LOCAL_UNAVAILABLE = "pendingLocalUnavailable"
+internal const val PENDING_LOCAL_UNAVAILABLE_MESSAGE = "Unsent messages couldn't be restored"
 
 internal enum class TimelineHydrationOutcome {
     Accepted,

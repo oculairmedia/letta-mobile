@@ -68,7 +68,6 @@ class ChatPresentationGoldenTest {
     /** Signals for a settled, non-streaming, server-mode turn (the common idle case). */
     private fun idleSignals(a2uiThinkingActive: Boolean = false) = ChatPresenceSignals(
         replyStreaming = false,
-        clientModeStreamInFlight = false,
         a2uiThinkingActive = a2uiThinkingActive,
         duplicateInitialMessageInFlight = false,
     )
@@ -89,8 +88,6 @@ class ChatPresentationGoldenTest {
         val presentation = presenter.present(
             projection = projection,
             signals = idleSignals(),
-            previousIsStreaming = true,
-            previousIsAgentTyping = true,
         )
 
         // The a2ui-only reply strips to empty text, so it leaves the visible list —
@@ -119,7 +116,7 @@ class ChatPresentationGoldenTest {
             ),
             version = 1,
         )
-        val presentation = presenter.present(projection, idleSignals(), previousIsStreaming = false, previousIsAgentTyping = false)
+        val presentation = presenter.present(projection, idleSignals())
 
         // Prose survives as a visible assistant message; the block is stripped out.
         assertEquals(2, presentation.messages.size)
@@ -144,12 +141,9 @@ class ChatPresentationGoldenTest {
             ),
             signals = ChatPresenceSignals(
                 replyStreaming = true,
-                clientModeStreamInFlight = false,
                 a2uiThinkingActive = false,
                 duplicateInitialMessageInFlight = false,
             ),
-            previousIsStreaming = false,
-            previousIsAgentTyping = false,
         )
         assertTrue(streaming.isStreaming)
         assertTrue(streaming.isAgentTyping)
@@ -166,8 +160,6 @@ class ChatPresentationGoldenTest {
         val settled = presenter.present(
             projection = settledProjection,
             signals = idleSignals(),
-            previousIsStreaming = streaming.isStreaming,
-            previousIsAgentTyping = streaming.isAgentTyping,
         )
         assertEquals("Hello", settled.messages.last().content)
         assertFalse(settled.isStreaming)

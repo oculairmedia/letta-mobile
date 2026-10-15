@@ -48,14 +48,15 @@ internal class DesktopConversationManagement(
     val marks = DesktopConversationMarks(prefs)
 
     /**
-     * letta-mobile-zxk2n.5: `/recompile` for the open conversation, and where it stands. The local
-     * App Server and REST backends recompile; over Iroh the host has no relay yet, which is the
-     * only desktop backend without a route.
+     * letta-mobile-zxk2n.5: `/recompile` for the open conversation, and where it stands. Every
+     * desktop backend recompiles: the local App Server and REST directly, Iroh through the host's
+     * `conversation.recompile` relay (letta-mobile-by4vm.51). A host deployed before that relay
+     * does not advertise it, and the chat says the host needs an update.
      */
     val recompile = ConversationRecompileController(
         scope = scope,
         gateway = { host.gateway as? ConversationRecompileGateway },
-        unavailableReason = { ConversationRecompileController.UNAVAILABLE_OVER_IROH },
+        unavailableReason = { ConversationRecompileController.UNAVAILABLE_HOST_OUTDATED },
     )
 
     /**

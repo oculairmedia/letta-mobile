@@ -6,7 +6,7 @@ WebSocket server the host connects to) speak with the Letta host. It mirrors the
 runtime. Design: `docs/design/canvas-plugin-platform-plan.md` section 5. The method registry
 (names, directions, SPI members, deadlines, size limits) and the message shapes are `:plugin-api`'s
 (`com.letta.mobile.plugin.api.LcpMethod` and its DTOs); the codec, framing, peer, session and
-guards are `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
+guards are `sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/` (typed table
 `LcpCalls`).
 
 The golden transcripts in
@@ -97,17 +97,23 @@ host. Either way the host closes the connection.
 
 Shapes (see the transcripts for complete examples):
 
-- `action.invoke {action, input, context: {origin, canvasId?, elementId?}}` where `origin` is
+- `action.invoke {action, input, context: {origin, canvasId?, elementId?, callId?}}` where `origin` is
   `{"type":"agent","agentId","conversationId?","toolCallId?"}`, `{"type":"view","elementId","peerId?"}`
   or `{"type":"host","reason"}`. Result `{text, structured?, emit?}`. The plugin's own failure is
-  the error `{"code":-32010,"message":...,"data":{"code":"<its code>"}}`.
+  the error `{"code":-32010,"message":...,"data":{"code":"<its code>"}}`. `callId` is the host's
+  opaque token for the call: echo it on every `host.emit` made for the call (below).
 - `element.event {kind, elementId, event: moved|removed|focused|viewOpened|viewClosed, frame?, canvasId?}`.
-- `host.emit {place[], update[], remove[], placeImages[]}` with `place` entries
+- `host.emit {place[], update[], remove[], placeImages[], callId?}` with `place` entries
   `{kind, v, props, fallback: {title, subtitle?, icon?, openUrl?}, ref?, frame?: {x, y, width, height}, snapshot?, canvasId?}`,
   `update` entries `{elementId, props?, fallback?, snapshot?, ref?}` and `placeImages` entries
   `{image, frame?, alt?, canvasId?}`. A snapshot or image is `{"type":"asset","ref":"sha256:<hex>"}` or
   small inline bytes `{"type":"bytes","mediaType","bytes":"<base64>"}`. Result
   `{"receipt":{"placed":[ids],"refused":[{"index","reason"}]}}`: a refused entry never fails the call.
+  `callId` is the `context.callId` of the call the emit belongs to: the host places on that call's
+  board (the conversation canvas of the agent that called), so a plugin serving two conversations
+  at once keeps each call's elements on its own board. An emit with no `callId` goes to the only
+  call in flight, or with none in flight to the last caller; with two or more in flight it is
+  refused `-32006` (`no_canvas`). An `emit` in an `action.invoke` result always belongs to that call.
 - `host.putAsset.begin {mediaType, byteSize}` (at most 8 MiB, at most 4 uploads open) answers
   `{uploadId}`; `host.putAsset.chunk {uploadId, index, base64}` in order from 0, each at most 1 MiB
   of bytes; `host.putAsset.end {uploadId, sha256}` (lowercase hex of all the bytes) answers
@@ -142,3 +148,27 @@ Notifications run in arrival order.
 - Everything a plugin sends is held to its secrets (verbatim and base64), failing closed: a
   `host.log` keeps its shape with each leaking string replaced; any other call or result holding a
   secret is refused whole with `-32007`; an error's message is scrubbed and its data dropped.
+
+## Host limits (v1)
+
+What the host's handlers hold a plugin to beyond its capabilities (`data/plugin/host/`). Every
+refusal carries `data.reason` and is counted per plugin.
+
+- **Ownership.** `host.emit` places only the plugin's own kinds (`<kind>` or `ext:<pluginId>/<kind>`)
+  and updates or removes only elements it placed: the host mints their ids as `p-<pluginId>-<suffix>`.
+  Anything else refuses the whole emit with `-32006` (`reason` `foreign_kind` or `foreign_element`,
+  `index` the entry); nothing is written. This is the one exception to "a refused entry never
+  fails the call".
+- **Entries** the host cannot take are left out and named in the receipt as `<reason>: <detail>`:
+  `unknown_kind` (no schema for the kind at that `v`), `props_too_large` (over 4 KiB; props hold
+  scalars and arrays of at most 256 scalars, never objects),
+  `inline_bytes_unsupported` (upload with `host.putAsset` and place the ref) and
+  `place_images_unsupported`. The rest is written as `plugin:<pluginId>` in one atomic batch
+  through the canvas validator; a batch it refuses answers `-32602` (`invalid_batch`), writing nothing.
+- **Rates.** `host.emit` at most 10 per second per plugin (`-32008`, `rate_limited`); `host.log`
+  at most 50 per second, the rest dropped.
+- **Assets.** `image/png`, `image/jpeg`, `image/svg+xml` and `application/json` only, and at most
+  64 MiB per plugin per trailing 24 hours (bytes the host already has are free); otherwise `-32011`
+  (`content_type` or `asset_quota`). The day's usage is kept beside the registry
+  (`asset-quota.json`), so a host restart does not reset it.
+- `host.readElements` is refused with `-32006` (`canvas:read`): contract v1 grants no reads.

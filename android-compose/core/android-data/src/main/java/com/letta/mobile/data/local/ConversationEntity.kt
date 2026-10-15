@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
         Index(value = ["agentId"]),
         Index(value = ["lastMessageAt"]),
         Index(value = ["createdAt"]),
+        Index(value = ["agentId", "lastMessageAtEpochMs"]),
     ],
 )
 data class ConversationEntity(
@@ -39,6 +40,15 @@ data class ConversationEntity(
     val model: String? = null,
     val contextWindowLimit: Int? = null,
     val modelEffort: String? = null,
+    /**
+     * letta-mobile-by4vm.19 (v22): the three timestamps above as epoch millis, parsed once at write
+     * time by [ConversationTimestamps]. Lists sort on these, not on the ISO strings, whose mixed
+     * formats (`Z` vs `+00:00`, fraction precision) do not sort chronologically as text. The String
+     * columns stay for compatibility this release.
+     */
+    val lastMessageAtEpochMs: Long? = null,
+    val updatedAtEpochMs: Long? = null,
+    val createdAtEpochMs: Long? = null,
 ) {
     fun toConversation(): Conversation = Conversation(
         id = ConversationId(id),
@@ -75,6 +85,9 @@ data class ConversationEntity(
             model = conversation.model,
             contextWindowLimit = conversation.hostContextWindowLimit,
             modelEffort = conversation.modelSettings?.effectiveEffort,
+            lastMessageAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.lastMessageAt),
+            updatedAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.updatedAt),
+            createdAtEpochMs = ConversationTimestamps.epochMillisOrNull(conversation.createdAt),
         )
 
         fun encodeStringList(values: List<String>): String = json.encodeToString(stringListSerializer, values)

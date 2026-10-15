@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.plugin.CanvasPluginSnapshot
 import com.letta.mobile.data.document.DocumentOp
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -194,20 +195,20 @@ sealed interface CanvasOp : DocumentOp {
  * externally supplied op names whoever the model chose; before it is validated, logged,
  * broadcast or stamped into scene provenance it is rebound to the authenticated caller.
  */
-fun CanvasOp.withActor(actorId: String): CanvasOp = when (this) {
-    is CanvasOp.ReplaceSceneOp -> copy(actorId = actorId)
-    is CanvasOp.AddElementOp -> copy(actorId = actorId)
-    is CanvasOp.UpdateElementOp -> copy(actorId = actorId)
-    is CanvasOp.RemoveElementOp -> copy(actorId = actorId)
-    is CanvasOp.SetBackgroundOp -> copy(actorId = actorId)
-    is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId)
-    is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId)
-    is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId)
-    is CanvasOp.SetDocumentOp -> copy(actorId = actorId)
-    is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId)
-    is CanvasOp.SetPluginElementOp -> copy(actorId = actorId)
-    is CanvasOp.RemovePluginElementOp -> copy(actorId = actorId)
-    is CanvasOp.BatchOp -> copy(actorId = actorId, ops = ops.map { it.withActor(actorId) })
+fun CanvasOp.withActor(actorId: CanvasActorId): CanvasOp = when (this) {
+    is CanvasOp.ReplaceSceneOp -> copy(actorId = actorId.value)
+    is CanvasOp.AddElementOp -> copy(actorId = actorId.value)
+    is CanvasOp.UpdateElementOp -> copy(actorId = actorId.value)
+    is CanvasOp.RemoveElementOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetBackgroundOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetBackgroundPatternOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetArrowBindingOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetLabelOwnerOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetDocumentOp -> copy(actorId = actorId.value)
+    is CanvasOp.RemoveDocumentOp -> copy(actorId = actorId.value)
+    is CanvasOp.SetPluginElementOp -> copy(actorId = actorId.value)
+    is CanvasOp.RemovePluginElementOp -> copy(actorId = actorId.value)
+    is CanvasOp.BatchOp -> copy(actorId = actorId.value, ops = ops.map { it.withActor(actorId) })
 }
 
 /**

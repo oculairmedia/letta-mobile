@@ -37,7 +37,7 @@ class AppServerConversationRecompileTest {
     @Test
     fun theResponseIsReadFromItsRawEnvelope() {
         val ok = AppServerProtocol.decodeFrame("""{"type":"conversation_recompile_response","request_id":"rc-1","success":true,"result":"prompt"}""")
-        assertEquals(AppServerConversationRecompileResponse("rc-1", true, null), AppServerConversationRecompileResponse.from(ok.frame))
+        assertEquals(AppServerConversationRecompileResponse("rc-1", true, null, result = "prompt"), AppServerConversationRecompileResponse.from(ok.frame))
 
         val failed = AppServerProtocol.decodeFrame(
             """{"type":"conversation_recompile_response","request_id":"rc-2","success":false,"result":null,"error":"Prompt recompile is not supported by this backend yet"}""",

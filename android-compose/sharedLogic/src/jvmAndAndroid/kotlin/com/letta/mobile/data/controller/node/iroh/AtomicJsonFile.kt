@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.nio.channels.FileLock
+import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -54,10 +56,28 @@ internal object AtomicJsonFile {
             absolute.parent?.let(Files::createDirectories)
             val lockPath = absolute.resolveSibling("${absolute.fileName}.lock")
             FileChannel.open(lockPath, StandardOpenOption.WRITE, StandardOpenOption.CREATE).use { channel ->
-                channel.lock().use { block() }
+                channel.lockWaitingForOtherHolders().use { block() }
             }
         }
     }
+
+    /**
+     * [FileChannel.lock] blocks while another PROCESS holds the lock, but throws
+     * [OverlappingFileLockException] when another channel in THIS JVM holds it
+     * outside our monitor (a second classloader, a tool, a test standing in for
+     * another process). Treat both the same way: wait, never clobber.
+     */
+    private fun FileChannel.lockWaitingForOtherHolders(): FileLock {
+        while (true) {
+            try {
+                return lock()
+            } catch (_: OverlappingFileLockException) {
+                Thread.sleep(IN_JVM_HOLDER_RETRY_MS)
+            }
+        }
+    }
+
+    private const val IN_JVM_HOLDER_RETRY_MS = 10L
 
     /** The in-process half of [withProcessLock]: one monitor per absolute state-file path. */
     private class PathMonitor

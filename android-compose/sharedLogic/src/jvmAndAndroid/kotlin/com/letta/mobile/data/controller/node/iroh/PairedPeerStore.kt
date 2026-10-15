@@ -63,30 +63,33 @@ class InMemoryPairedPeerStore : PairedPeerStore {
 /**
  * JSON-file-backed store with atomic writes ([AtomicJsonFile]); the file holds
  * only public NodeIds and metadata (no secrets).
+ *
+ * The file is shared by separate processes — the serving wrapper (redeem,
+ * last-seen touch, revoke) and the host `pair` CLI — and by independent
+ * instances inside one process, so every read-modify-write runs under
+ * [AtomicJsonFile.withProcessLock] (an OS file lock on a `.lock` sibling plus
+ * a per-path JVM monitor). Without it a concurrent pair and revoke could drop
+ * the new peer or resurrect the revoked one (letta-mobile-by4vm.43). Reads
+ * stay lock-free: the atomic rename means they always see a whole snapshot.
  */
 class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
-    @Synchronized
     override fun isPaired(nodeId: String): Boolean = load().containsKey(nodeId)
 
-    @Synchronized
     override fun get(nodeId: String): PairedPeer? = load()[nodeId]
 
-    @Synchronized
     override fun list(): List<PairedPeer> = load().values.sortedBy { it.pairedAtMs }
 
-    @Synchronized
     override fun save(peer: PairedPeer) {
-        persist(load() + (peer.nodeId to peer))
+        AtomicJsonFile.withProcessLock(path) { persist(load() + (peer.nodeId to peer)) }
     }
 
-    @Synchronized
-    override fun remove(nodeId: String): Boolean {
+    override fun remove(nodeId: String): Boolean = AtomicJsonFile.withProcessLock(path) {
         val current = load()
-        if (nodeId !in current) return false
-        persist(current - nodeId)
-        return true
+        val present = nodeId in current
+        if (present) persist(current - nodeId)
+        present
     }
 
     private fun load(): Map<String, PairedPeer> {

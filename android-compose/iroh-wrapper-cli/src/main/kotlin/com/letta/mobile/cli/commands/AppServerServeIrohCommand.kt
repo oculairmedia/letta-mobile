@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
+import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.cli.meridian.MeridianToolsEndpoint
 import com.letta.mobile.cli.meridian.MeridianToolsOptions
@@ -144,6 +145,19 @@ class AppServerServeIrohCommand : CliktCommand(
         help = "Directory for the assets (images, files) apps put on shared canvases " +
             "(default ~/.letta/canvas-relay/assets), kept by their hash and served to the other apps.",
     )
+
+    private val pluginsDir by option(
+        "--plugins-dir",
+        envvar = "LETTA_PLUGINS_DIR",
+        help = "Directory of the host's installed plugins and their registry plugins.json (default ~/.letta/plugins).",
+    )
+
+    private val pluginsMode by option(
+        "--plugins",
+        envvar = "LETTA_PLUGINS",
+        help = "Plugin host: 'on' (default) runs enabled plugins and offers their actions as agent tools; " +
+            "'off' is the global kill switch (no plugin runs, no plugin tool is advertised).",
+    ).choice(PluginHostFlags.ON, PluginHostFlags.OFF).default(PluginHostFlags.ON)
 
     private val modelExposureFile by option(
         "--model-exposure-file",
@@ -324,6 +338,7 @@ class AppServerServeIrohCommand : CliktCommand(
         var notebookStore: NotebookLocalStore? = null
         var notebookProtocol: AutomergeIrohRepoProtocol? = null
         var ownedServer: com.letta.mobile.cli.appserver.OwnedAppServerProcess? = null
+        var pluginHost: com.letta.mobile.data.plugin.host.PluginHostRuntime? = null
 
         runWithLifecycleCleanup(
             scope = scope,
@@ -333,6 +348,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 runCatching { notebookProtocol?.close() }
                 runCatching { notebookStore?.close() }
                 runCatching { ownedServer?.close() }
+                runCatching { pluginHost?.close() }
                 scope.cancel()
             },
         ) {
@@ -345,6 +361,7 @@ class AppServerServeIrohCommand : CliktCommand(
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             val canvasRelay = startCanvasRelay(scope)
+            pluginHost = startPluginHost(PluginHostFlags(pluginsMode, pluginsDir), pluginCanvas, productionToolRegistry, scope)
             val (store, protocol) = initNotebookSync(scope) { irohEndpoint }
             notebookStore = store
             notebookProtocol = protocol
@@ -380,6 +397,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 admin = AdminContext(controller, nativeAdminClient, pairingService, turnIdentity, identityRows),
                 scope = scope,
                 pairingQr = access.pairingQrConfig(endpoint, irohSecretKeyPath),
+                pluginRoutes = pluginHost?.let { com.letta.mobile.data.controller.node.iroh.PluginAdminHandlers(it, pluginCanvas.assets) },
             )
 
             printChannelsHostBanner()
@@ -516,6 +534,7 @@ class AppServerServeIrohCommand : CliktCommand(
         admin: AdminContext,
         scope: CoroutineScope,
         pairingQr: PairingQrConfig?,
+        pluginRoutes: com.letta.mobile.data.controller.node.iroh.AdminRpcRoutes? = null,
     ) {
         admin.nativeClient?.let(admin.identityRows::bind)
         val agentChanges = com.letta.mobile.data.controller.node.iroh.AgentChangeNotifier(scope)
@@ -543,6 +562,7 @@ class AppServerServeIrohCommand : CliktCommand(
                     .also { subagentPublisher = it }
             },
             permissionModes = permissionModes,
+            pluginRoutes = pluginRoutes,
         )
         endpoint.attachPermissionModePublisher(permissionModes)
         endpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
@@ -703,6 +723,9 @@ class AppServerServeIrohCommand : CliktCommand(
             // intervention. The CLI binary is the same `meridian agent-message
             // send` the operator flow already uses; this is purely additive.
             externalToolRegistry = productionToolRegistry,
+            // letta-mobile-by4vm.55: an upstream socket blip no longer fails the turns the App
+            // Server keeps running; they wait out the reconnect grace window instead.
+            turnsSurviveReconnect = true,
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
@@ -762,25 +785,27 @@ class AppServerServeIrohCommand : CliktCommand(
         val canvasOps = canvasOpsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "topics")
         val canvasAssets = canvasAssetsDir?.let { java.nio.file.Path.of(it) } ?: java.nio.file.Path.of(home, ".letta", "canvas-relay", "assets")
         val canvasStore = com.letta.mobile.data.canvas.FileCanvasRelayStore(canvasOps)
-        val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(
-            scope = scope,
-            store = canvasStore,
-            assets = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile()),
-        )
+        val assetStore = com.letta.mobile.data.storage.FileAssetStore(canvasAssets.toFile())
+        val canvasRelay = com.letta.mobile.data.transport.iroh.IrohCanvasRelay(scope = scope, store = canvasStore, assets = assetStore)
         val canvasDirectory = canvasOps.resolveSibling("host-canvases.json")
-        hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(
-            com.letta.mobile.data.canvas.HostCanvasBackend(
-                relay = canvasRelay.host,
-                store = canvasStore,
-                directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
-            ),
+        val pluginKinds = com.letta.mobile.data.plugin.host.LateBoundPluginKinds()
+        val backend = com.letta.mobile.data.canvas.HostCanvasBackend(
+            relay = canvasRelay.host,
+            store = canvasStore,
+            directory = com.letta.mobile.data.canvas.FileHostCanvasDirectory(canvasDirectory),
+            kinds = pluginKinds,
         )
+        hostCanvasTools = com.letta.mobile.data.canvas.HostCanvasTools.all(backend)
+        pluginCanvas = PluginHostCanvas(backend, assetStore, pluginKinds)
         println("[iroh-app-server] Canvas relay: ON (ops: $canvasOps, assets: $canvasAssets, agent tools: ${hostCanvasTools.size}, directory: $canvasDirectory)")
         return canvasRelay
     }
 
     private fun resolvedModelExposureFile(): String =
         com.letta.mobile.data.controller.node.iroh.FileModelExposureStore.resolvePath(modelExposureFile, canvasOpsDir)
+
+    /** The canvas side plugins place through, set by [startCanvasRelay]. */
+    private lateinit var pluginCanvas: PluginHostCanvas
 
     /** The host's canvas_* tools, set by [startCanvasRelay]. */
     private var hostCanvasTools: List<com.letta.mobile.data.controller.extras.HostExternalTool> = emptyList()

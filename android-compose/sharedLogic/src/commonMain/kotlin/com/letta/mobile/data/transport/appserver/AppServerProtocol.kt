@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.appserver
 
+import com.letta.mobile.data.serialization.LettaJson
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,11 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 
 object AppServerProtocol {
-    val json: Json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    /** Alias of [LettaJson.wire]; see that instance for the flag rationale (letta-mobile-by4vm.20). */
+    val json: Json = LettaJson.wire
 
     /** Placeholder substituted for credential values in redacted diagnostics. */
     const val REDACTED_PLACEHOLDER: String = "<redacted>"
@@ -23,8 +21,10 @@ object AppServerProtocol {
 
     /**
      * Upstream stream-channel message types (Letta Code `STREAM_CHANNEL_MESSAGE_TYPES`).
-     * On one-socket transports these are demuxed into [AppServerChannel.Stream];
-     * everything else (including malformed JSON) lands on [AppServerChannel.Control].
+     * On one-socket transports these are labelled [AppServerChannel.Stream];
+     * everything else (including malformed JSON) is [AppServerChannel.Control].
+     * The label picks a frame's per-type view only; delivery order is the socket's
+     * (letta-mobile-by4vm.5, see [AppServerInboundDelivery]).
      */
     private val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
         "stream_delta",

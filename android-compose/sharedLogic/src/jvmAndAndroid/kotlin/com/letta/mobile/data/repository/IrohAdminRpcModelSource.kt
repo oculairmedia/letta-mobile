@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -14,7 +15,7 @@ import kotlinx.serialization.json.JsonArray
  *
  * Same P4-purity class as [IrohAdminRpcAgentSource] (letta-mobile-71orq): the
  * LettaApiClient choke-point hard-fails raw HTTP admin calls in `iroh://`
- * mode, so [ModelRepository.refreshLlmModels]'s raw `ModelApi` call threw and
+ * mode, so [CachedModelRepository.refreshLlmModels]'s raw `ModelApi` call threw and
  * the model picker dropdown rendered empty. The server side already registers
  * `model.list` (ModelAdminHandlers proxying `/v1/models`); this is the missing
  * client wiring.
@@ -23,12 +24,7 @@ class IrohAdminRpcModelSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
     // Match the raw API client Json config (explicit nulls coerced to defaults).
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.ModelIrohSource {
     override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()

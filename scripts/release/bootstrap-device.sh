@@ -8,8 +8,11 @@ BASE_URL=""
 API_KEY=""
 AGENT=""
 CONV=""
-APP_PACKAGE="ca.oculair.meridian"
-APP_COMPONENT="ca.oculair.meridian/com.letta.mobile.MainActivity"
+# The benchmark build (release-shaped, debuggable) is the automation target: release ignores the
+# automation/notification launch extras this script sends (#1932, #1950; letta-mobile-by4vm.53).
+# Override APP_PACKAGE for another build type that honours them (e.g. com.letta.mobile.dev).
+APP_PACKAGE="${APP_PACKAGE:-ca.oculair.meridian.benchmark}"
+APP_COMPONENT="${APP_PACKAGE}/com.letta.mobile.MainActivity"
 
 usage() {
   printf 'Usage: %s --device <serial> --apk <path> --base-url <url> --api-key <token> --agent <id> --conv <id>\n' "$0"

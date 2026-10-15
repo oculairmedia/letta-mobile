@@ -102,20 +102,24 @@ Run these from `android-compose/` before pushing when you have the resources (CI
 ./gradlew :app:testRootDebugUnitTest
 ```
 
-If you touched `sharedLogic/` or `sharedUI/` (KMP common code), also run what the required
-`shared-multiplatform` CI check actually runs. `commonMain`/`commonTest` must stay platform-neutral
-(no JVM-only APIs); the native and wasmJs **compiles** are what catch a leak:
+If you touched `sharedLogic/` or `sharedUI/` (KMP common code), also run its consumers locally —
+commonMain/commonTest must stay platform-neutral (no JVM-only APIs). The required
+`shared-multiplatform` check runs a bounded `:sharedLogic:jvmTest` and only *compiles* hostNative
+and wasmJs (main + test, for `:sharedLogic` and `:sharedUI`); on PRs `:sharedUI:jvmTest` /
+`:desktop:test` run as additive tasks in the required `test` job only when their own trees change
+(see `scripts/ci/changed-gradle-modules.sh`), and every main push runs them regardless. The exact
+task lists live in `.github/workflows/android.yml`:
 
 ```bash
-./gradlew :sharedLogic:jvmTest
+./gradlew :sharedLogic:jvmTest :sharedUI:jvmTest :desktop:test
 ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative
-./gradlew :sharedLogic:compileKotlinWasmJs :sharedUI:compileKotlinWasmJs
+./gradlew :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
 ```
 
 Do **not** run `./gradlew :sharedLogic:allTests` as your gate. Its `hostNativeTest` phase hangs,
 which is exactly why `shared-multiplatform` runs bounded `:sharedLogic:jvmTest` plus the compiles
 instead. `:desktop:test` is likewise excluded from that job (it has a history of consuming the
-whole timeout) and runs as an additive task in the required `test` job when desktop files change.
+whole timeout).
 
 Device install (the app has `play`/`sideload`/`root` distribution flavors, so name one):
 
@@ -125,15 +129,15 @@ Device install (the app has `play`/`sideload`/`root` distribution flavors, so na
 
 ## Pre-push PR readiness
 
-CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that Qodana flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
+CI takes ~20 minutes per iteration, and the most common reason PRs loop through 2–4 review rounds is *avoidable* mechanical debt: stale-base phantom rollbacks, unused imports that detekt flags on every PR, and concurrent-collection defaults that sharedLogic transport code is expected to apply on first commit. **Before opening a PR, run the readiness checklist in [`AGENTS.md`](AGENTS.md)** — scope audit, sensitive-path grep, stale-base detection, mechanical-debt preflight. Catching these at dev cost saves a full CI cycle.
 
 ## Required vs advisory CI
 
-Required (blocks merge — exactly these four, from branch protection): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`.
+Required (blocks merge): `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`. (`codecov` runs on main pushes only.)
 
-`codecov` is **not** a required check: coverage uploads run on `main` via `codecov.yml`, not on PRs.
+Not required, but honest (red means a new problem in your diff — fix it): `detekt` (baselined per module), `Platform UI gate`, and on main pushes `main module tests`.
 
-Advisory only (does **not** block merge): `qodana`, `detekt`, CodeScene Code Health Review, `agents-policy`, `row-parity`, `platform-ui-gate`, `iroh-probe-gate` (with `probe-unit`/`probe-hermetic`/`probe-red-path`), `architecture-graph`, `web-wasm`, `shared-multiplatform-pass`, `build-iroh-wrapper-pass`, `desktop-installer-pass`, and the scheduled `appserver-contract-baseline`. Do not iterate to "fix" advisory-only findings; the cost outweighs the value. Required-gate failures are the ones worth fixing — though `row-parity` and `platform-ui-gate` guard the hard cuts and are worth reading before you merge.
+Advisory only (findings never fail the job): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Required-gate failures come first. The full "CI map" is in [`AGENTS.md`](AGENTS.md).
 
 ## Releases
 

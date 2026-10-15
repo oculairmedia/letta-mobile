@@ -22,6 +22,10 @@ object AutomationAuthBootstrap {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Debug builds always accept the launch-intent payload (release gates it). */
+    val acceptsLaunchPayload: Boolean
+        get() = true
+
     fun importPendingConfig(context: Context, settingsRepository: ISettingsRepository) {
         importPendingConfig(
             context = context,

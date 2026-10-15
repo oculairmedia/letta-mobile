@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.canvas.plugin.CanvasPluginElementSchema
 import com.letta.mobile.data.schema.SchemaProblem
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -11,16 +12,22 @@ import kotlinx.serialization.json.intOrNull
 
 /**
  * A manifest's element kinds and pages (plan sections 3.1 and 4): props schemas that are closed
- * objects of scalars and short strings within 4 KiB, migrations from earlier versions only, pages
- * that exist and live under `pages/`, CSP domains that are origins, page permissions the plugin
- * declares.
+ * objects of scalars, short strings and bounded arrays of those (letta-mobile-cdgpr.12) within
+ * 4 KiB, migrations from earlier versions only, pages that exist and live under `pages/`, CSP
+ * domains that are origins, page permissions the plugin declares.
  */
 internal object PluginContentRules {
     /** The largest props schema a kind may declare, serialised. */
     const val MAX_PROPS_SCHEMA_BYTES: Int = 4096
 
-    /** The longest string a props field may hold: props are small and flat; big content is a snapshot asset. */
+    /** The longest string a props field may hold: props are small; big content is a snapshot asset. */
     const val MAX_PROPS_STRING_LENGTH: Int = 1024
+
+    /**
+     * The most items an array props field may declare (`maxItems`). Arrays hold scalars only, never
+     * objects or arrays; the element's serialised props stay within 4 KiB whatever the schema says.
+     */
+    const val MAX_PROPS_ARRAY_ITEMS: Int = CanvasPluginElementSchema.MAX_PROPS_ARRAY_ITEMS
 
     private val SCALAR_TYPES = setOf("string", "integer", "number", "boolean")
 
@@ -46,17 +53,33 @@ internal object PluginContentRules {
     private fun isClosedObject(schema: JsonObject): Boolean =
         (schema["type"] as? JsonPrimitive)?.content == "object" && (schema["additionalProperties"] as? JsonPrimitive)?.booleanOrNull == false
 
-    /** Why one props field is not a scalar or a short string, or null when it is. */
+    /** Why one props field is not a scalar, a short string or a bounded array of those, or null when it is. */
     private fun propsField(field: JsonElement, at: ManifestPointer): SchemaProblem? {
         val schema = field as? JsonObject ?: return badProps(at, "a props field is a schema object")
+        if ((schema["type"] as? JsonPrimitive)?.content == "array") return arrayField(schema, at)
+        return scalarField(schema, at, "each field is a string, integer, number, boolean, enum or array of those")
+    }
+
+    /** Why [schema] (a field, or an array's items) is not a scalar or a short string, or null when it is. */
+    private fun scalarField(schema: JsonObject, at: ManifestPointer, expected: String): SchemaProblem? {
         val enum = schema["enum"] as? JsonArray
         if (enum != null) {
             return badProps(at / "enum", "an enum props field lists scalars only").takeIf { enum.any { it !is JsonPrimitive || it is JsonNull } }
         }
         val type = (schema["type"] as? JsonPrimitive)?.content
-        if (type !in SCALAR_TYPES) return badProps(at, "props are flat: each field is a string, integer, number, boolean or enum")
+        if (type !in SCALAR_TYPES) return badProps(at, "props hold scalars: $expected")
         return badProps(at / "maxLength", "a string props field declares a maxLength of at most $MAX_PROPS_STRING_LENGTH")
             .takeIf { type == "string" && !isShortString(schema) }
+    }
+
+    /** An array field declares `maxItems` within [MAX_PROPS_ARRAY_ITEMS] and scalar `items`. */
+    private fun arrayField(schema: JsonObject, at: ManifestPointer): SchemaProblem? {
+        val maxItems = (schema["maxItems"] as? JsonPrimitive)?.intOrNull
+        if (maxItems == null || maxItems !in 0..MAX_PROPS_ARRAY_ITEMS) {
+            return badProps(at / "maxItems", "an array props field declares a maxItems of at most $MAX_PROPS_ARRAY_ITEMS")
+        }
+        val items = schema["items"] as? JsonObject ?: return badProps(at / "items", "an array props field declares its items' schema")
+        return scalarField(items, at / "items", "an array's items are strings, integers, numbers, booleans or an enum")
     }
 
     private fun isShortString(schema: JsonObject): Boolean =

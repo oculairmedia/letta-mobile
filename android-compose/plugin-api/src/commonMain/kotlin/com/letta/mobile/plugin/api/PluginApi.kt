@@ -9,7 +9,7 @@ package com.letta.mobile.plugin.api
  */
 public object PluginApi {
     /** The semantic version of `:plugin-api` (the published artifact's version). */
-    public const val VERSION: String = "1.0.0"
+    public const val VERSION: String = "1.1.0"
 
     /** The contract major a plugin built against this SPI declares in `letta-plugin.json`. */
     public const val CONTRACT_VERSION: Int = 1

@@ -56,5 +56,9 @@ internal fun rememberDesktopHttpApis(
     irohAgentDirectory: IrohAdminRpcAgentDirectory?,
 ): DesktopHttpApis {
     val directory = irohAgentDirectory.takeIf { irohMode }
-    return remember(directory) { createDesktopHttpApis(directory) }
+    return remember(directory) { desktopHttpApisFor(irohMode, directory) }
 }
+
+/** The panels' APIs for a session: only an Iroh session's relays serve them (the matrix test's probe). */
+internal fun desktopHttpApisFor(irohMode: Boolean, irohAgentDirectory: IrohAdminRpcAgentDirectory?): DesktopHttpApis =
+    createDesktopHttpApis(irohAgentDirectory.takeIf { irohMode })

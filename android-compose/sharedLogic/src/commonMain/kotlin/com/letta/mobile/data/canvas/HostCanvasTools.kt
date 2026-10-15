@@ -7,6 +7,7 @@ import com.letta.mobile.data.controller.capability.Capability
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.extras.HostExternalTool
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -66,7 +67,7 @@ object HostCanvasTools {
 
     private suspend fun getScene(backend: HostCanvasBackend, entry: HostCanvasEntry): ExternalToolResult {
         val scene = backend.scene(entry)
-        return success(CanvasSceneRead.result(scene.sceneJson, scene.revision, entry.canvasId))
+        return success(CanvasSceneRead.result(scene.sceneJson, scene.revision, entry.id))
     }
 
     private suspend fun getLayout(backend: HostCanvasBackend, entry: HostCanvasEntry, input: JsonObject): ExternalToolResult {
@@ -85,7 +86,7 @@ object HostCanvasTools {
         val entry = if (conversationId == null) {
             backend.create(caller, title)
         } else {
-            when (val access = backend.conversation(caller, conversationId, claim = true)) {
+            when (val access = backend.conversation(caller, ConversationId(conversationId), claim = true)) {
                 is HostCanvasAccess.Granted -> access.entry
                 is HostCanvasAccess.Denied -> return ExternalToolResult.Error(access.reason)
                 null -> return ExternalToolResult.Error("Canvas not found for conversation '$conversationId'")
@@ -103,7 +104,7 @@ object HostCanvasTools {
         val entries = if (conversationId == null) {
             backend.list(caller)
         } else {
-            listOfNotNull((backend.conversation(caller, conversationId, claim = false) as? HostCanvasAccess.Granted)?.entry)
+            listOfNotNull((backend.conversation(caller, ConversationId(conversationId), claim = false) as? HostCanvasAccess.Granted)?.entry)
         }
         val listed = entries.map { it.listed(current = it.conversationId != null && it.conversationId == caller.conversationId) }
             .sortedByDescending { it.current }
@@ -126,7 +127,7 @@ object HostCanvasTools {
      */
     private suspend fun compose(backend: HostCanvasBackend, caller: HostCanvasCaller, input: JsonObject): ExternalToolResult {
         val hosting = CanvasComposeHosting(CanvasComposeHosting.IROH_HOST, caller.toolCallId)
-        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }
+        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }?.let(::CanvasId)
         val entry = when (val access = if (canvasId != null) backend.open(caller, canvasId) else backend.ownConversation(caller)) {
             is HostCanvasAccess.Granted -> access.entry
             is HostCanvasAccess.Denied ->
@@ -138,7 +139,7 @@ object HostCanvasTools {
             return hosting.refused(ComposeErrorCode.UNAUTHORIZED, reason)
         }
         val scene = backend.scene(entry)
-        return hosting.compose(input, ComposeTarget(entry.canvasId, scene.sceneJson, scene.revision)) { ops ->
+        return hosting.compose(input, ComposeTarget(entry.id, scene.sceneJson, scene.revision)) { ops ->
             when (val published = backend.publish(caller, entry, ops, atomic = true)) {
                 is HostCanvasPublish.Published -> published.revision
                 is HostCanvasPublish.Denied -> throw ComposePublishException(
@@ -164,7 +165,7 @@ object HostCanvasTools {
         input: JsonObject,
         action: suspend (HostCanvasEntry) -> ExternalToolResult,
     ): ExternalToolResult {
-        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }
+        val canvasId = HostCanvasToolInputs.string(input, "canvas_id")?.takeIf { it.isNotBlank() }?.let(::CanvasId)
         val access = if (canvasId != null) backend.open(caller, canvasId) else backend.ownConversation(caller)
         return when (access) {
             is HostCanvasAccess.Granted -> action(access.entry)
@@ -181,7 +182,7 @@ object HostCanvasTools {
         ops: List<CanvasOp>,
     ): ExternalToolResult = when (val checked = backend.check(caller, entry, ops)) {
         is HostCanvasCheck.Denied -> ExternalToolResult.Error(checked.reason)
-        is HostCanvasCheck.Checked -> success(CanvasDryRun.result(checked.result, checked.revision, entry.canvasId))
+        is HostCanvasCheck.Checked -> success(CanvasDryRun.result(checked.result, checked.revision, entry.id))
     }
 
     private inline fun <reified T> published(outcome: HostCanvasPublish, result: (Long) -> T): ExternalToolResult =

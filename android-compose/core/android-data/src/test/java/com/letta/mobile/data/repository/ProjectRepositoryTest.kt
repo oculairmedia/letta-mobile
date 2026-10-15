@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.ProjectDataFreshness
 import com.letta.mobile.data.model.ProjectId
@@ -24,12 +26,12 @@ import org.junit.jupiter.api.Tag
 class ProjectRepositoryTest {
 
     private lateinit var fakeApi: FakeProjectApi
-    private lateinit var repository: ProjectRepository
+    private lateinit var repository: CachedProjectRepository
 
     @Before
     fun setup() {
         fakeApi = FakeProjectApi()
-        repository = ProjectRepository(fakeApi)
+        repository = CachedProjectRepository(fakeApi.bound())
     }
 
     @Test
@@ -166,9 +168,10 @@ class ProjectRepositoryTest {
         assertTrue(fakeApi.calls.isEmpty())
     }
 
-    @Test(expected = ApiException::class)
+    @Test
     fun `refreshProjects throws on api failure`() = runTest {
         fakeApi.shouldFail = true
-        repository.refreshProjects()
+        val failure = runCatching { repository.refreshProjects() }.exceptionOrNull()
+        assertTrue(failure is ApiException)
     }
 }

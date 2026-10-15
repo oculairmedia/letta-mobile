@@ -44,7 +44,7 @@ internal class CanvasComposeHosting(private val host: String, private val toolCa
             // artifact; without either, a retry would put a second copy on the board.
             Telemetry.event(
                 CanvasComposeService.TAG, "compose.noToolCallId",
-                "host" to host, "canvasId" to target.canvasId,
+                "host" to host, "canvasId" to target.canvasId.value,
                 level = Telemetry.Level.WARN,
             )
         }
@@ -65,12 +65,12 @@ internal class CanvasComposeHosting(private val host: String, private val toolCa
     }
 
     /** One event per answered call, as the board's other writes are recorded. */
-    private fun record(canvasId: String?, outcome: ComposeOutcome) {
+    private fun record(canvasId: CanvasId?, outcome: ComposeOutcome) {
         when (outcome) {
             is ComposeOutcome.Done -> Telemetry.event(
                 CanvasComposeService.TAG, "compose.answered",
                 "host" to host,
-                "canvasId" to canvasId,
+                "canvasId" to canvasId?.value,
                 "artifactId" to outcome.receipt.artifactId,
                 "status" to outcome.receipt.status.name,
                 "revision" to outcome.receipt.revision,
@@ -81,7 +81,7 @@ internal class CanvasComposeHosting(private val host: String, private val toolCa
             is ComposeOutcome.Refused -> Telemetry.event(
                 CanvasComposeService.TAG, "compose.refused",
                 "host" to host,
-                "canvasId" to canvasId,
+                "canvasId" to canvasId?.value,
                 "code" to outcome.refusal.code.name,
                 "problems" to outcome.refusal.problems.size,
                 "toolCallId" to toolCallId,

@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonObject
  *
  * One guard per open board; not thread-safe, it is called from the board's one loader.
  */
-class CanvasSceneStateGuard(private val canvasId: String?) {
+class CanvasSceneStateGuard(private val canvasId: CanvasId?) {
     private var lastValid: String? = null
     private var reported: Set<Pair<CanvasStateInvariant, String>> = emptySet()
 
@@ -45,7 +45,7 @@ class CanvasSceneStateGuard(private val canvasId: String?) {
         val first = violations.firstOrNull() ?: return
         Telemetry.event(
             "Canvas", "scene.invalidState",
-            "canvasId" to canvasId,
+            "canvasId" to canvasId?.value,
             "invariant" to first.invariant.wire,
             "subject" to first.subject,
             "detail" to first.detail,

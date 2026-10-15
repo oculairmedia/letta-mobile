@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.dashboard
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.home.HomeAgentRef
 import com.letta.mobile.data.home.HomePinnedItem
 import com.letta.mobile.data.home.HomeShortcut
@@ -9,7 +11,8 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.MessageRepository
-import com.letta.mobile.data.repository.RunRepository
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.repository.CachedRunRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
@@ -74,9 +77,11 @@ class DashboardViewModelTest {
         graph = mockk(relaxed = true)
         every { graph.agentRepository } returns agentRepository
         every { graph.toolRepository } returns tools
-        every { graph.runRepository } returns RunRepository(fakeRunApi)
+        every { graph.runRepository } returns CachedRunRepository(fakeRunApi.bound())
         every { graph.blockRepository } returns null
         every { graph.localRuntimeBackend } returns null
+        // letta-mobile-by4vm.13: an Iroh-shaped session serving every route the home reads.
+        every { graph.capabilities } returns SessionCapabilities(SessionRoute.entries.toSet())
     }
 
     @After

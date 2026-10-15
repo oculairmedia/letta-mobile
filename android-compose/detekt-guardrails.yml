@@ -15,13 +15,19 @@ letta-mobile-guardrails:
     active: true
   CoroutineTestGuardrails:
     active: true
+  NoAdHocJsonInstance:
+    active: true
 
 letta-mobile-design-system:
   active: true
-  # Off by default: the alignment pass (letta-mobile beads) is still working
-  # through ~2800 existing findings, tracked in config/ui-design-lint-baseline.json
-  # and enumerated by scripts/ui-design-lint.py. Flip these on per rule as each
-  # one reaches zero, so cleaned surfaces cannot drift back.
+  # Off: guardrailDetekt has no baseline and checks every changed file, so a
+  # rule may only turn on once it has zero findings, or any PR touching an
+  # affected file would fail on pre-existing debt. As of 2026-10-14
+  # (letta-mobile-by4vm.32) `python3 scripts/ui-design-lint.py --summary` still
+  # reports 356 findings in 100 files (raw-dimension 226, hardcoded-color 77,
+  # low-content-alpha 53) against the 419 frozen in
+  # config/ui-design-lint-baseline.json, so none can be enabled yet. Flip each
+  # rule on when its count reaches zero, so cleaned surfaces cannot drift back.
   RawDimensionLiteral:
     active: false
   HardcodedComposeColor:

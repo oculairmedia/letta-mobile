@@ -5,6 +5,7 @@ import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasComposeProvenance
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasGeometryOwner
+import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import kotlinx.serialization.json.JsonArray
@@ -131,7 +132,7 @@ class CanvasComposeCompilerTest {
     @Test
     fun theReceiptListsEveryItemByKeyAndKindAndItsBoardIdIsDerived() {
         val ready = readyOf(compileText(WEEKEND_PLAN))
-        val receipt = ready.receipt(ComposeBoard.CANVAS, ComposeStatus.PUBLISHED, 42)
+        val receipt = ready.receipt(CanvasId(ComposeBoard.CANVAS), ComposeStatus.PUBLISHED, 42)
         assertEquals("weekend-plan", receipt.artifactId)
         assertEquals("Weekend plan", receipt.title)
         assertEquals(42L, receipt.revision)
@@ -272,7 +273,7 @@ class CanvasComposeCompilerTest {
                     """{"kind":"GROUP","children":[{"kind":"NOTE","markdown":"b"},{"kind":"NOTE","key":"named","markdown":"c"}]}]}""",
             ),
         )
-        val receipt = ready.receipt(ComposeBoard.CANVAS, ComposeStatus.PUBLISHED, 1)
+        val receipt = ready.receipt(CanvasId(ComposeBoard.CANVAS), ComposeStatus.PUBLISHED, 1)
         assertEquals(listOf("i0", "i1", "i2"), receipt.items.map { it.key })
         assertEquals(listOf("i2-c0", "named"), receipt.items[2].children!!.map { it.key })
         assertEquals(

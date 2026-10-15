@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -35,12 +36,23 @@ class AppServerRuntimeEventRouter(
     private val attachLock = SynchronizedObject()
     private val integrity = atomic<StreamIntegrityMonitor?>(null)
 
+    init {
+        // letta-mobile-by4vm.4: a subscriber the fanout detached for falling behind lost frames;
+        // resync the watched runtimes so what is on screen catches up.
+        fanout.bindSubscriberOverflowListener { requestResync() }
+    }
+
     /**
      * letta-mobile-bzvro.6: every inbound frame is shown to [monitor] (gap detection, sync cadence)
      * before it is fanned out. One monitor per router; binding again replaces it.
      */
     fun bindStreamIntegrity(monitor: StreamIntegrityMonitor) {
         integrity.value = monitor
+    }
+
+    /** letta-mobile-by4vm.95: the connection the monitor watched is gone; frames go unobserved until the next bind. */
+    fun unbindStreamIntegrity() {
+        integrity.value = null
     }
 
     /** letta-mobile-bzvro.6: ask the bound monitor to resync what is on screen; no-op without one. */
@@ -85,10 +97,40 @@ class AppServerRuntimeEventRouter(
         }
     }
 
+    private val sessionLinkState = RuntimeSessionLinkState()
+
+    /** letta-mobile-by4vm.9: whether the session behind this router is carrying frames right now. */
+    val sessionLink: StateFlow<RuntimeSessionLink> = sessionLinkState.link
+
+    /**
+     * letta-mobile-by4vm.9: the socket under a stable inbound pipe dropped and its owner is
+     * redialling. Unlike [detach], nothing is closed: the collector and every subscriber stay, so
+     * frames from the successor socket reach the same turns. Turns fail only if the session is not
+     * restored within their grace window.
+     */
+    fun interruptSession(reason: String?) = sessionLinkState.interrupt(reason)
+
+    /**
+     * letta-mobile-by4vm.9: the successor socket is attached. Ends an interruption and resyncs the
+     * watched runtimes so what streamed during the gap is recovered; a no-op while linked.
+     */
+    fun restoreSession() {
+        if (sessionLinkState.restore()) requestResync()
+    }
+
+    /** Permanent teardown: every subscriber's turn ends now (see [RuntimeEventFanout.closeAllSubscribersSync]). */
     fun detach() {
         collectorJob.getAndSet(null)?.cancel()
-        // Closing subscriber channels unblocks turn collectors waiting on fanout
-        // (otherwise they sit until idle watchdog / forever under a user-input gate).
+        endSubscribedTurns()
+    }
+
+    /**
+     * Every subscriber's turn ends now, as on [detach], but the collector stays attached for the
+     * next connection behind a stable inbound pipe (letta-mobile-by4vm.95: an Android Iroh dial
+     * ended). Closing subscriber channels unblocks turn collectors waiting on fanout (otherwise
+     * they sit until idle watchdog / forever under a user-input gate).
+     */
+    fun endSubscribedTurns() {
         fanout.closeAllSubscribersSync()
     }
 

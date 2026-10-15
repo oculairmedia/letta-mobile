@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.controller.node.iroh.BoundedTranscriptReader
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.controller.node.iroh.MessagePage
 import com.letta.mobile.data.timeline.toTimelineEvent

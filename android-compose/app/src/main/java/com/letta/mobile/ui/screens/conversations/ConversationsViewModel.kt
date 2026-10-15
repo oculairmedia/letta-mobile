@@ -63,6 +63,8 @@ data class ConversationsUiState(
     val isInspectorLoading: Boolean = false,
     val inspectorError: String? = null,
     val recompilePreview: String? = null,
+    /** letta-mobile-by4vm.12: why the inspector's last cancel / recompile failed or has no route. */
+    val adminActionError: String? = null,
     val error: String? = null,
     val createConversationError: String? = null,
     val localLettaCodeReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
@@ -111,6 +113,10 @@ class ConversationsViewModel @Inject constructor(
         } else {
             ConversationDeleteBehavior.Permanent
         }
+
+    /** letta-mobile-by4vm.12: which inspector actions the active backend routes. */
+    val adminRoutes: ConversationAdminRoutes
+        get() = ConversationAdminRoutes.of(conversationRepository)
 
     private var agentNameCache = mutableMapOf<AgentId, String>()
     private var pinnedConversationIds: Set<ConversationId> = emptySet()
@@ -376,6 +382,7 @@ class ConversationsViewModel @Inject constructor(
                 inspectorMessages = persistentListOf(),
                 inspectorError = null,
                 recompilePreview = null,
+                adminActionError = null,
             )
             try {
                 val conversation = conversationRepository.getConversation(display.conversation.id)
@@ -409,6 +416,7 @@ class ConversationsViewModel @Inject constructor(
             isInspectorLoading = false,
             inspectorError = null,
             recompilePreview = null,
+            adminActionError = null,
         )
     }
 
@@ -450,26 +458,36 @@ class ConversationsViewModel @Inject constructor(
     }
 
     fun cancelConversationRuns(display: ConversationDisplay) {
-        viewModelScope.launch {
-            try {
-                conversationRepository.cancelConversation(display.conversation.id, display.conversation.agentId)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (e: Exception) {
-                Log.w("ConversationsVM", "Cancel failed", e)
-            }
+        runAdminAction(ConversationAdminAction.CancelRuns) {
+            conversationRepository.cancelConversation(display.conversation.id, display.conversation.agentId)
         }
     }
 
     fun recompileConversation(display: ConversationDisplay) {
+        runAdminAction(ConversationAdminAction.Recompile) {
+            val result = conversationRepository.recompileConversation(display.conversation.id, false, display.conversation.agentId)
+            _uiState.update { it.copy(recompilePreview = result) }
+        }
+    }
+
+    /**
+     * letta-mobile-by4vm.12: runs an inspector action only where the backend routes it, and shows
+     * the user why when it has no route or fails (it used to throw into a log line).
+     */
+    private fun runAdminAction(action: ConversationAdminAction, block: suspend () -> Unit) {
+        if (!adminRoutes.supports(action)) {
+            _uiState.update { it.copy(adminActionError = action.unavailableMessage) }
+            return
+        }
+        _uiState.update { it.copy(adminActionError = null) }
         viewModelScope.launch {
             try {
-                val result = conversationRepository.recompileConversation(display.conversation.id, false, display.conversation.agentId)
-                _uiState.value = _uiState.value.copy(recompilePreview = result)
+                block()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
-                Log.w("ConversationsVM", "Recompile failed", e)
+                Log.w("ConversationsVM", "${action.name} failed", e)
+                _uiState.update { it.copy(adminActionError = action.errorMessage(e)) }
             }
         }
     }

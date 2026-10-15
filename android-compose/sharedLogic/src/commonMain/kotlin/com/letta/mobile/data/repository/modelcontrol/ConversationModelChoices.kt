@@ -32,8 +32,16 @@ suspend fun ConversationModelSelections.followHost(conversations: Flow<List<Conv
         .collect { seedFromHost(it) }
 }
 
-/** A model picked for one conversation in this session; a null [model] withdraws the pick. */
-internal data class ConversationPick(val conversationId: String, val model: String?)
+/**
+ * A model picked for one conversation in this session; a null [model] withdraws the pick.
+ * [effort] is the reasoning effort sent with it (letta-mobile-by4vm.82): a named effort shows at
+ * once, before the host's record catches up.
+ */
+internal data class ConversationPick(
+    val conversationId: String,
+    val model: String?,
+    val effort: ReasoningEffortChoice = ReasoningEffortChoice.Unchanged,
+)
 
 /**
  * The two sources of [ConversationModelChoices]: this session's picks and the host's records.
@@ -41,7 +49,7 @@ internal data class ConversationPick(val conversationId: String, val model: Stri
  */
 internal class ConversationModelLedger {
     private val lock = SynchronizedObject()
-    private var picks: Map<String, String> = emptyMap()
+    private var picks: Map<String, PendingPick> = emptyMap()
     private var reports: Map<String, HostReport> = emptyMap()
     private val _choices = MutableStateFlow(ConversationModelChoices())
 
@@ -51,7 +59,7 @@ internal class ConversationModelLedger {
 
     /** Restores [previous] in place of [failed], unless a newer pick replaced [failed] meanwhile. True when it restored. */
     fun replace(failed: ConversationPick, previous: ConversationPick): Boolean = update {
-        val current = picks[failed.conversationId] == failed.model
+        val current = picks[failed.conversationId]?.model == failed.model
         if (current) set(previous)
         current
     }
@@ -62,13 +70,21 @@ internal class ConversationModelLedger {
             val id = conversation.id.value.takeIf { it.isNotBlank() } ?: return@forEach
             val reported = HostReport.of(conversation)
             reports = if (reported == null) reports - id else reports + (id to reported)
-            if (reported != null && picks[id] == reported.model) picks = picks - id
+            if (reported != null && picks[id]?.confirmedBy(reported) == true) picks = picks - id
         }
     }
 
     private fun set(change: ConversationPick) {
         val model = change.model?.takeIf { it.isNotBlank() }
-        picks = if (model == null) picks - change.conversationId else picks + (change.conversationId to model)
+        picks = if (model == null) picks - change.conversationId else picks + (change.conversationId to pending(change, model))
+    }
+
+    /** Re-picking the same model without an effort keeps the effort still pending for it. */
+    private fun pending(change: ConversationPick, model: String): PendingPick {
+        val kept = picks[change.conversationId]
+            ?.takeIf { it.model == model && change.effort == ReasoningEffortChoice.Unchanged }
+            ?.effort
+        return PendingPick(model, kept ?: change.effort)
     }
 
     private inline fun <T> update(change: () -> T): T = synchronized(lock) {
@@ -83,13 +99,26 @@ internal class ConversationModelLedger {
         (picks.keys + reports.keys).forEach { id ->
             val pick = picks[id]
             val reported = reports[id]
-            (pick ?: reported?.model)?.let { models[id] = it }
-            reported?.takeIf { it.describes(pick) }?.let { report ->
-                report.window?.let { windows[id] = it }
-                report.effort?.let { efforts[id] = it }
-            }
+            (pick?.model ?: reported?.model)?.let { models[id] = it }
+            val report = reported?.takeIf { it.describes(pick?.model) }
+            report?.window?.let { windows[id] = it }
+            (if (pick != null) pick.shownEffort(report) else report?.effort)?.let { efforts[id] = it }
         }
         return ConversationModelChoices(models, windows, efforts)
+    }
+
+    /** A pick not yet confirmed by the host: its model and the effort sent with it. */
+    private data class PendingPick(val model: String, val effort: ReasoningEffortChoice) {
+        /** The host reports this pick: same model and, for a named effort, that effort. */
+        fun confirmedBy(report: HostReport): Boolean = report.model == model &&
+            (effort !is ReasoningEffortChoice.Named || report.effort.equals(effort.effort, ignoreCase = true))
+
+        /** The effort to show while pending; a provider-default pick shows none whatever [report] says. */
+        fun shownEffort(report: HostReport?): String? = when (effort) {
+            is ReasoningEffortChoice.Named -> effort.effort
+            ReasoningEffortChoice.ProviderDefault -> null
+            ReasoningEffortChoice.Unchanged -> report?.effort
+        }
     }
 
     /** What the host records for one conversation. */

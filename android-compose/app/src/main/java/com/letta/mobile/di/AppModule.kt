@@ -1,7 +1,5 @@
 package com.letta.mobile.di
 
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.ChannelNotificationPublisher
 import com.letta.mobile.channel.ChannelSyncStateStore
@@ -20,7 +18,6 @@ import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
 import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
-import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.SlashCommandRepository
@@ -47,24 +44,15 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
-import com.letta.mobile.data.session.SessionScopedAgentRepository
-import com.letta.mobile.data.session.SessionScopedAllConversationsRepository
+import com.letta.mobile.data.session.ProcessScope
+import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.session.SessionScopedChannelTransport
-import com.letta.mobile.data.session.SessionScopedConversationRepository
-import com.letta.mobile.data.session.SessionScopedCronRepository
-import com.letta.mobile.data.session.SessionScopedMcpServerRepository
-import com.letta.mobile.data.session.SessionScopedModelRepository
-import com.letta.mobile.data.session.SessionScopedPassageRepository
-import com.letta.mobile.data.session.SessionScopedProviderRepository
-import com.letta.mobile.data.session.SessionScopedProjectRepository
-import com.letta.mobile.data.session.SessionScopedProjectWorkRepository
-import com.letta.mobile.data.session.SessionScopedRunRepository
-import com.letta.mobile.data.session.SessionScopedScheduleRepository
-import com.letta.mobile.data.session.SessionScopedStepRepository
-import com.letta.mobile.data.session.SessionScopedSelfTodoRepository
-import com.letta.mobile.data.session.SessionScopedSubagentRepository
-import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
+import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
+import com.letta.mobile.data.session.scopedAgentRepository
+import com.letta.mobile.data.session.scopedAllConversationsRepository
+import com.letta.mobile.data.session.sessionBackendScopedCaches
+import com.letta.mobile.data.session.sessionScoped
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
@@ -90,7 +78,9 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoSet
+import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
 @Module
@@ -198,16 +188,6 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideIrohAdminRpcToolSource(
-            transport: IChannelTransport,
-            settingsRepository: ISettingsRepository,
-        ): IrohAdminRpcToolSource = IrohAdminRpcToolSource(
-            channelTransport = transport,
-            settingsRepository = settingsRepository,
-        )
-
-        @Provides
-        @Singleton
         fun provideIrohAdminRpcProjectSource(
             transport: IChannelTransport,
             settingsRepository: ISettingsRepository,
@@ -251,6 +231,75 @@ abstract class AppModule {
             // conversation is an Iroh host's. There is no HTTP timeline any more.
             com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(local = local, remote = remote)
 
+        // letta-mobile-by4vm.88: each repository below forwards to the current session graph
+        // (SessionForwarding.kt), so a backend switch retargets it without a rebuild here.
+        @Provides @Singleton
+        fun provideAgentRepository(sessions: SessionManager): IAgentRepository = sessions.scopedAgentRepository()
+
+        @Provides @Singleton
+        fun provideAllConversationsRepository(sessions: SessionManager): IAllConversationsRepository =
+            sessions.scopedAllConversationsRepository()
+
+        @Provides @ElementsIntoSet
+        fun provideSessionBackendScopedCaches(sessions: SessionManager): Set<BackendScopedCache> =
+            sessions.sessionBackendScopedCaches()
+
+        @Provides @Singleton
+        fun provideConversationRepository(sessions: SessionManager): IConversationRepository =
+            sessions.sessionScoped(IConversationRepository::class) { it.conversationRepository }
+
+        @Provides @Singleton
+        fun provideCronRepository(sessions: SessionManager): ICronRepository =
+            sessions.sessionScoped(ICronRepository::class) { it.cronRepository }
+
+        @Provides @Singleton
+        fun provideSubagentRepository(sessions: SessionManager): ISubagentRepository =
+            sessions.sessionScoped(ISubagentRepository::class) { it.subagentRepository }
+
+        @Provides @Singleton
+        fun provideSelfTodoRepository(sessions: SessionManager): ISelfTodoRepository =
+            sessions.sessionScoped(ISelfTodoRepository::class) { it.selfTodoRepository }
+
+        @Provides @Singleton
+        fun provideProjectRepository(sessions: SessionManager): IProjectRepository =
+            sessions.sessionScoped(IProjectRepository::class) { it.projectRepository }
+
+        @Provides @Singleton
+        fun provideProjectWorkRepository(sessions: SessionManager): IProjectWorkRepository =
+            sessions.sessionScoped(IProjectWorkRepository::class) { it.projectWorkRepository }
+
+        @Provides @Singleton
+        fun provideToolRepository(sessions: SessionManager): IToolRepository =
+            sessions.sessionScoped(IToolRepository::class) { it.toolRepository }
+
+        @Provides @Singleton
+        fun provideMcpServerRepository(sessions: SessionManager): IMcpServerRepository =
+            sessions.sessionScoped(IMcpServerRepository::class) { it.mcpServerRepository }
+
+        @Provides @Singleton
+        fun provideModelRepository(sessions: SessionManager): IModelRepository =
+            sessions.sessionScoped(IModelRepository::class) { it.modelRepository }
+
+        @Provides @Singleton
+        fun providePassageRepository(sessions: SessionManager): IPassageRepository =
+            sessions.sessionScoped(IPassageRepository::class) { it.passageRepository }
+
+        @Provides @Singleton
+        fun provideProviderRepository(sessions: SessionManager): IProviderRepository =
+            sessions.sessionScoped(IProviderRepository::class) { it.providerRepository }
+
+        @Provides @Singleton
+        fun provideRunRepository(sessions: SessionManager): IRunRepository =
+            sessions.sessionScoped(IRunRepository::class) { it.runRepository }
+
+        @Provides @Singleton
+        fun provideScheduleRepository(sessions: SessionManager): IScheduleRepository =
+            sessions.sessionScoped(IScheduleRepository::class) { it.scheduleRepository }
+
+        @Provides @Singleton
+        fun provideStepRepository(sessions: SessionManager): IStepRepository =
+            sessions.sessionScoped(IStepRepository::class) { it.stepRepository }
+
         /** letta-mobile-ckmub.4: the backend seam; the App Server is the only backend for now. */
         @Provides
         @Singleton
@@ -265,6 +314,7 @@ abstract class AppModule {
             conversationCursorStore: ConversationCursorStore,
             confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
             settingsRepository: ISettingsRepository,
+            @ProcessScope processScope: CoroutineScope,
         ): TimelineRepository {
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
@@ -273,8 +323,8 @@ abstract class AppModule {
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
-                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: "default" },
-                repositoryScope = ProcessLifecycleOwner.get().lifecycleScope,
+                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
+                repositoryScope = processScope,
             )
         }
     }
@@ -302,39 +352,16 @@ abstract class AppModule {
     @Singleton
     abstract fun bindChannelTransport(impl: SessionScopedChannelTransport): IChannelTransport
 
-    @Binds
-    @Singleton
-    abstract fun bindCronRepository(impl: SessionScopedCronRepository): ICronRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindSubagentRepository(impl: SessionScopedSubagentRepository): ISubagentRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindSelfTodoRepository(impl: SessionScopedSelfTodoRepository): ISelfTodoRepository
 
     @Binds
     @Singleton
     abstract fun bindSlashCommandRepository(impl: SlashCommandRepository): ISlashCommandRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindAgentRepository(impl: SessionScopedAgentRepository): IAgentRepository
 
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindAgentBackendScopedCache(impl: SessionScopedAgentRepository): BackendScopedCache
 
-    @Binds
-    @Singleton
-    abstract fun bindConversationRepository(impl: SessionScopedConversationRepository): IConversationRepository
 
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindConversationBackendScopedCache(impl: SessionScopedConversationRepository): BackendScopedCache
 
     @Binds
     @Singleton
@@ -346,22 +373,9 @@ abstract class AppModule {
     @Singleton
     abstract fun bindMessageRepository(impl: MessageRepository): IMessageRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindAllConversationsRepository(impl: SessionScopedAllConversationsRepository): IAllConversationsRepository
 
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindAllConversationsBackendScopedCache(impl: SessionScopedAllConversationsRepository): BackendScopedCache
 
-    @Binds
-    @Singleton
-    abstract fun bindProjectRepository(impl: SessionScopedProjectRepository): IProjectRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindProjectWorkRepository(impl: SessionScopedProjectWorkRepository): IProjectWorkRepository
 
     @Binds
     @Singleton
@@ -369,46 +383,18 @@ abstract class AppModule {
         impl: SessionScopedVibesyncEventStreamRepository,
     ): IVibesyncEventStreamRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindToolRepository(impl: SessionScopedToolRepository): IToolRepository
 
     @Binds
     @Singleton
     abstract fun bindBugReportRepository(impl: BugReportRepository): IBugReportRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindMcpServerRepository(impl: SessionScopedMcpServerRepository): IMcpServerRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindModelRepository(impl: SessionScopedModelRepository): IModelRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindPassageRepository(impl: SessionScopedPassageRepository): IPassageRepository
 
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindPassageBackendScopedCache(impl: SessionScopedPassageRepository): BackendScopedCache
 
-    @Binds
-    @Singleton
-    abstract fun bindProviderRepository(impl: SessionScopedProviderRepository): IProviderRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindRunRepository(impl: SessionScopedRunRepository): IRunRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindScheduleRepository(impl: SessionScopedScheduleRepository): IScheduleRepository
 
-    @Binds
-    @Singleton
-    abstract fun bindStepRepository(impl: SessionScopedStepRepository): IStepRepository
 
     @Binds
     @Singleton
@@ -428,6 +414,14 @@ abstract class AppModule {
     @IntoSet
     @Singleton
     abstract fun bindTimelineBackendScopedCache(impl: TimelineRepository): BackendScopedCache
+
+    /** letta-mobile-by4vm.17: unsent messages are backend-owned too; drop them on a switch. */
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindPendingLocalBackendScopedCache(
+        impl: com.letta.mobile.data.local.RoomPendingLocalStore,
+    ): BackendScopedCache
 
     @Binds
     @Singleton

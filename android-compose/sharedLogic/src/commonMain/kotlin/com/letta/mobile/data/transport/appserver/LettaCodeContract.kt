@@ -4,8 +4,9 @@ package com.letta.mobile.data.transport.appserver
  * letta-mobile-ckmub.5: the one letta-code wire contract the clients are built against, and the
  * one runtime that is knowingly below it. User-facing text cites these instead of spelling
  * versions out. `LettaCodeVersionPinsTest` (appserver-cli) fails when they disagree with the
- * contract matrix, the desktop bundle, the CI job or `app/build.gradle.kts`. The README next to
- * this file has the full pin table.
+ * contract matrix, the desktop bundle, the CI job or the embedded pin in
+ * `app/embedded-runtime/embedded-runtime.properties`. The README next to this file has the full
+ * pin table.
  */
 object LettaCodeContract {
     /**

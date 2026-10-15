@@ -140,13 +140,8 @@ opening a PR.**
 - `perf-gate` — perf-budget benchmarks
 
 Coverage uploads run on `main` via `codecov.yml`, not as a required PR check.
-
-Everything else is **advisory** (cannot block merge), but several of these catch real breakage and
-are worth reading before you merge: `detekt`, `row-parity` (legacy vs shared chat rows),
-`platform-ui-gate` (platform-UI ratchet), `iroh-probe-gate` (`probe-unit`, `probe-hermetic`,
-`probe-red-path`), `architecture-graph`, `agents-policy`, `web-wasm`, `shared-multiplatform-pass`,
-`build-iroh-wrapper-pass`, `desktop-installer-pass`, `appserver-contract-baseline` (scheduled),
-`qodana`, and CodeScene Code Health Review.
+**Not required, but honest** (red means a new problem): `detekt` (fails only on findings outside each module's `detekt-baseline.xml`), `Platform UI gate` (new platform `@Composable` files), `main module tests` (main pushes: `:sharedUI:jvmTest :desktop:test`).
+**Advisory only** (findings never fail): CodeScene Code Health Review, `Advisory AGENTS.md policy`, `row goldens (advisory)`. Full table: "CI map" in [`AGENTS.md`](AGENTS.md).
 
 ## Releases
 

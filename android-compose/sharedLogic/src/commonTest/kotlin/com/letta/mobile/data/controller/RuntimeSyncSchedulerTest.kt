@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -131,6 +132,79 @@ class RuntimeSyncSchedulerTest {
         scheduler.tick()
         assertEquals(emptyList(), synced)
     }
+
+    @Test
+    fun aCadenceSyncWaitsWhileTheBudgetSaysNoAndGoesOutOnceItAllows() = runTest {
+        var allowed = false
+        var asked = 0
+        val budgeted = budgetedScheduler(SyncBudgetPolicy { asked++; allowed })
+        budgeted.tick() // first sight starts the cadence
+        assertEquals(0, asked, "the budget is only asked when a cadence sync is due")
+        now += 30_000
+        budgeted.tick()
+        assertEquals(emptyList(), synced)
+        assertEquals(1, asked)
+        now += 1_000
+        allowed = true
+        budgeted.tick()
+        assertEquals(listOf("conv-1" to SyncReason.Periodic), synced)
+    }
+
+    @Test
+    fun aGapResyncsEvenWhenTheBudgetSaysNo() = runTest {
+        val budgeted = budgetedScheduler(SyncBudgetPolicy { false })
+        val monitor = StreamIntegrityMonitor(budgeted, detectGaps = true)
+        listOf(1L, 2L, 4L).forEach { seq -> monitor.observe(delta(seq)) }
+        budgeted.tick()
+        assertEquals(listOf("conv-1" to SyncReason.Gap), synced)
+        now += 60_000
+        budgeted.tick()
+        assertEquals(1, synced.size, "no cadence sync while the budget says no")
+    }
+
+    @Test
+    fun thePhoneBudgetSuppressesCadenceOnMeteredOrUnpluggedWithTheScreenOff() {
+        fun allows(unmetered: Boolean, charging: Boolean, screenOn: Boolean) =
+            DeviceConditionsSyncBudget { DeviceSyncConditions(unmetered, charging, screenOn) }.allowsPeriodicSync()
+
+        assertFalse(allows(unmetered = false, charging = true, screenOn = true), "metered")
+        assertFalse(allows(unmetered = false, charging = false, screenOn = false), "metered and unplugged")
+        assertFalse(allows(unmetered = true, charging = false, screenOn = false), "unplugged, screen off")
+        assertTrue(allows(unmetered = true, charging = true, screenOn = false), "unmetered and charging")
+        assertTrue(allows(unmetered = true, charging = false, screenOn = true), "unmetered, screen on")
+    }
+
+    @Test
+    fun aMeteredPhoneGetsGapResyncsButNoCadence() = runTest {
+        val budgeted = budgetedScheduler(
+            DeviceConditionsSyncBudget { DeviceSyncConditions(unmeteredNetwork = false, charging = true, screenOn = true) },
+        )
+        budgeted.tick()
+        now += 30_000
+        budgeted.tick()
+        assertEquals(emptyList(), synced)
+        budgeted.request(SyncReason.Gap)
+        budgeted.tick()
+        assertEquals(listOf("conv-1" to SyncReason.Gap), synced)
+    }
+
+    @Test
+    fun anUnmeteredChargingPhoneKeepsTheCadence() = runTest {
+        val budgeted = budgetedScheduler(
+            DeviceConditionsSyncBudget { DeviceSyncConditions(unmeteredNetwork = true, charging = true, screenOn = false) },
+        )
+        budgeted.tick()
+        now += 30_000
+        budgeted.tick()
+        assertEquals(listOf("conv-1" to SyncReason.Periodic), synced)
+    }
+
+    private fun budgetedScheduler(budget: SyncBudgetPolicy) = RuntimeSyncScheduler(
+        runtimes = { watched },
+        sync = { scope, reason -> synced += scope.conversationId to reason },
+        clock = { now },
+        budget = budget,
+    )
 
     private fun delta(seq: Long, generation: Long = 1) = AppServerReceivedFrame(
         channel = AppServerChannel.Stream,

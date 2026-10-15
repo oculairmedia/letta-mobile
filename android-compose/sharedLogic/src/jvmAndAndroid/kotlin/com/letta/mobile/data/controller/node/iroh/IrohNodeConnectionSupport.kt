@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -216,6 +217,13 @@ internal class ConversationViewerSubscription(
         }
     }
 }
+
+/**
+ * letta-mobile-by4vm.50: advertised in every auth_response. [IrohViewerHandle] draws each frame's
+ * [ConnectionEventSeq] value inside the connection's stream write lock, so wire order is seq order
+ * and a client may read a jump as a lost frame.
+ */
+internal const val ORDERED_EVENT_SEQ_CAPABILITY: String = StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY
 
 /**
  * Per-connection, atomically-incrementing `event_seq` source with a

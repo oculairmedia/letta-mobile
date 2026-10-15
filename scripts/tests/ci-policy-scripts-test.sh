@@ -115,6 +115,32 @@ detekt_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$detekt_job" 'needs: [test, shared-multiplatform, build-apk-pass]'
+# letta-mobile-by4vm.32: honest gates. detekt fails on findings outside the
+# per-module baselines; main pushes always run sharedUI/desktop tests; the perf
+# gate measures once (no automatic rerun) and the Qodana workflow stays gone.
+assert_contains "$detekt_job" '-Parchitecture.strict=true'
+assert_not_contains "$detekt_job" 'continue-on-error'
+main_module_job="$(
+  awk '
+    /^  main-module-tests:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$main_module_job" "if: github.event_name != 'pull_request'"
+assert_contains "$main_module_job" './gradlew :sharedUI:jvmTest :desktop:test'
+assert_not_contains "$perf_workflow" 'attempt 2'
+assert_not_contains "$perf_workflow" '--retryable-single-startup-exit-code'
+[[ ! -e "$SOURCE_ROOT/.github/workflows/qodana_code_quality.yml" ]] || fail "Qodana workflow is back; see letta-mobile-by4vm.32"
+platform_ui_job="$(
+  awk '
+    /^  platform-ui-gate:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$SOURCE_ROOT/.github/workflows/agents-policy.yml"
+)"
+assert_contains "$platform_ui_job" '--enforce'
+assert_not_contains "$platform_ui_job" 'continue-on-error'
 
 build_apk_pass_job="$(
   awk '
@@ -151,7 +177,7 @@ touch "$repo/android-compose/feature-chat/src/Chat.kt" "$repo/android-compose/de
   "$repo/android-compose/desktop/src/Main.kt" "$repo/android-compose/cli/src/Cli.kt"
 git -C "$repo" add . && git -C "$repo" commit -qm modules
 actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base")"
-assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:testDebugUnitTest"
+assert_eq "$actual" ":feature-chat:testDebugUnitTest :designsystem:testDebugUnitTest :sharedUI:jvmTest :desktop:test :cli:test"
 
 # Stacked PR: designsystem landed on the lower branch; this commit only
 # touches app/. Diff vs the stack base must not schedule designsystem.

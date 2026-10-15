@@ -1,14 +1,16 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.document.DocumentStore
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 
 /**
  * Persistence contract for [CanvasDocument]: the shared-document [DocumentStore] (get, upsert,
  * compare-and-set by revision, library listing) plus the canvas's conversation lookups.
  *
- * Implemented over the Automerge notebook repository ([NotebookCanvasDocumentStore]), via Room on
- * Android ([com.letta.mobile.data.local.RoomCanvasDocumentStore]) and atomic JSON files on Desktop
- * ([com.letta.mobile.desktop.canvas.DesktopCanvasDocumentStore]).
+ * Implemented over the Automerge notebook repository ([NotebookCanvasDocumentStore]), the one owner
+ * of every canvas document on Android and desktop (letta-mobile-by4vm.22); the op log beside it is
+ * its write-ahead journal ([CanvasOpLog.unsettled]). [InMemoryCanvasDocumentStore] serves tests.
  */
 data class CanvasDeletedElement(val elementId: String, val elementJson: String)
 
@@ -18,8 +20,8 @@ interface CanvasDeletedElementStore {
 }
 
 interface CanvasDocumentStore : DocumentStore<CanvasId, CanvasDocument> {
-    suspend fun getForConversation(conversationId: String): CanvasDocument?
-    suspend fun listForAgent(agentId: String): List<CanvasDocument>
+    suspend fun getForConversation(conversationId: ConversationId): CanvasDocument?
+    suspend fun listForAgent(agentId: AgentId): List<CanvasDocument>
 
     /**
      * Returns the canvas already bound to [doc]'s `conversationId`, or inserts [doc] and

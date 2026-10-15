@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
+import com.letta.mobile.data.model.CanvasActorId
 import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -51,9 +52,9 @@ class NotebookCanvasPluginElementStorageTest {
         val written: String
         NotebookLocalStore(path, "plugin-peer").use { notebooks ->
             val session = session(notebooks, canvasId)
-            session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-gone")), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-gone")), CanvasActorId(fixtures.AGENT))
             assertNotNull(session.movePluginElement(fixtures.ID, fixtures.moved))
-            session.applyAgentBatch(listOf(fixtures.progress(0, 0.6), fixtures.remove(0, id = "pe-gone")), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.progress(0, 0.6), fixtures.remove(0, id = "pe-gone")), CanvasActorId(fixtures.AGENT))
             written = session.sceneJsonOrEmpty()
         }
         NotebookLocalStore(path, "plugin-peer").use { notebooks ->
@@ -101,9 +102,9 @@ class NotebookCanvasPluginElementStorageTest {
         val path = Files.createTempDirectory("canvas-plugin-fields-")
         NotebookLocalStore(path, "fields-peer").use { notebooks ->
             val session = session(notebooks, CanvasId("plugin-fields"))
-            session.applyAgentBatch((0 until 5).map { fixtures.place(0, id = "pe-$it") }, fixtures.AGENT)
+            session.applyAgentBatch((0 until 5).map { fixtures.place(0, id = "pe-$it") }, CanvasActorId(fixtures.AGENT))
             val before = notebooks.readDocument { it.heads }
-            session.applyAgentBatch(listOf(fixtures.progress(0, 0.3, id = "pe-2")), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.progress(0, 0.3, id = "pe-2")), CanvasActorId(fixtures.AGENT))
             val written = notebooks.readDocument { it.writtenPaths(before, it.heads) }
 
             val entryPrefix = "boardArrays/${CanvasPluginElements.KEY}/pe-2/"
@@ -124,8 +125,8 @@ class NotebookCanvasPluginElementStorageTest {
             NotebookLocalStore(Files.createTempDirectory("canvas-plugin-growth-"), "growth-peer").use { notebooks ->
                 runBlocking {
                     val session = session(notebooks, CanvasId("plugin-growth"))
-                    session.applyAgentBatch((0 until ELEMENTS).map { fixtures.place(0, id = "pe-$it") }, fixtures.AGENT)
-                    repeat(updates) { i -> session.applyAgentBatch(listOf(fixtures.progress(0, i / 1000.0, id = "pe-3")), fixtures.AGENT) }
+                    session.applyAgentBatch((0 until ELEMENTS).map { fixtures.place(0, id = "pe-$it") }, CanvasActorId(fixtures.AGENT))
+                    repeat(updates) { i -> session.applyAgentBatch(listOf(fixtures.progress(0, i / 1000.0, id = "pe-3")), CanvasActorId(fixtures.AGENT)) }
                     notebooks.readDocument { it.save().size.toLong() } to session.sceneJsonOrEmpty()
                 }
             }
@@ -156,7 +157,7 @@ class NotebookCanvasPluginElementStorageTest {
 
             val session = CanvasSession.open(store, canvasId)!!
             assertEquals(fixtures.ID, session.pluginElements().single().id, "it still loads")
-            session.applyAgentBatch(listOf(fixtures.progress(0, 0.4)), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.progress(0, 0.4)), CanvasActorId(fixtures.AGENT))
             assertNotNull(session.movePluginElement(fixtures.ID, fixtures.moved))
         }
         NotebookLocalStore(path, "newer-peer").use { notebooks ->
@@ -188,9 +189,9 @@ class NotebookCanvasPluginElementStorageTest {
         NotebookLocalStore(path, "failing-peer", storage = failing).use { notebooks ->
             val canvasId = CanvasId("plugin-failing")
             val session = session(notebooks, canvasId)
-            session.applyAgentBatch(listOf(fixtures.place(0)), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.place(0)), CanvasActorId(fixtures.AGENT))
             failPuts = true
-            session.applyAgentBatch(listOf(fixtures.progress(0, 0.7)), fixtures.AGENT)
+            session.applyAgentBatch(listOf(fixtures.progress(0, 0.7)), CanvasActorId(fixtures.AGENT))
             val deadline = System.currentTimeMillis() + 10_000
             while (session.storageFaults.value.affecting(canvasId).none { it.kind == CanvasStorageFault.Kind.SAVE_FAILED }) {
                 check(System.currentTimeMillis() < deadline) { "no SAVE_FAILED fault for the plugin write" }

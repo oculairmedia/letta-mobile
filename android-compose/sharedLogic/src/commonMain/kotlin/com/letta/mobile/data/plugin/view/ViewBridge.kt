@@ -1,5 +1,8 @@
 package com.letta.mobile.data.plugin.view
 
+import com.letta.mobile.data.model.PluginId
+import com.letta.mobile.data.plugin.host.PluginHostEvent
+import com.letta.mobile.data.plugin.host.PluginHostEvents
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,8 +143,15 @@ class ViewBridge(
         if (call.method != ViewMethod.READY) return refuseCall(call, ViewErrorCode.NOT_READY, "send view.ready first")
         val result = handler.ready(call.params)
         if (result is ViewCallResult.Ok) mutableState.compareAndSet(ViewBridgeState.AWAITING_READY, ViewBridgeState.READY)
+        recordHandshake(result)
         reply(call, result)
         return null
+    }
+
+    private fun recordHandshake(result: ViewCallResult) = when (result) {
+        is ViewCallResult.Ok -> PluginHostEvents.record(PluginHostEvent.VIEW_OPEN, PluginId(spec.pluginId), "page" to spec.pageId)
+        is ViewCallResult.Err ->
+            PluginHostEvents.record(PluginHostEvent.VIEW_FAIL, PluginId(spec.pluginId), "page" to spec.pageId, "reason" to result.error.code.name)
     }
 
     private suspend fun answer(call: ViewInbound.Call) {

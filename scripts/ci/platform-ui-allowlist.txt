@@ -11,6 +11,7 @@ android-compose/app/src/main/java/com/letta/mobile/ui/mascot/MascotIdentitySync.
 android-compose/app/src/main/java/com/letta/mobile/ui/mascot/ProvideMascotShell.kt 42 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AdaptiveScaffold.kt 220 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AppNavGraph.kt 315 legacy-pending(ckmub.2)
+android-compose/app/src/main/java/com/letta/mobile/ui/navigation/AppStartDestination.kt 73 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/ConversationsGraph.kt 180 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/ProjectsGraphSupport.kt 78 legacy-pending(ckmub.2)
 android-compose/app/src/main/java/com/letta/mobile/ui/navigation/SharedTransitionExt.kt 20 legacy-pending(ckmub.2)
@@ -103,6 +104,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopChatShel
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopConversationStepping.kt 55 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopConversationTabsSync.kt 46 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopDeepLink.kt 19 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopDreamNotifications.kt 51 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopImageIngress.kt 126 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopIrohBindings.kt 376 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopIrohHttpApis.kt 86 legacy-pending(ckmub.3)
@@ -121,7 +123,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopProvider
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopQuickQuery.kt 208 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRailPrefs.kt 33 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopRecentInteractions.kt 47 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSettingsPage.kt 177 container
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopSettingsPage.kt 178 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellContent.kt 248 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellContext.kt 123 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopShellEffects.kt 205 legacy-pending(ckmub.3)
@@ -135,7 +137,6 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/Main.kt 308 leg
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/agent/DesktopAgentEditor.kt 133 container
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/DesktopMascotHost.kt 127 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveBenchInstruments.kt 158 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopSpike.kt 708 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopSurface.kt 267 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/RiveDesktopTelemetry.kt 250 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/avatar/rive/Surround.kt 132 legacy-pending(ckmub.3)
@@ -148,6 +149,7 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopAmb
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopComposerContextUsageLoader.kt 62 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopModelControlOverlays.kt 164 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopSharedChatPage.kt 326 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopWorkingDirectoryPicker.kt 129 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/components/DesktopCatalog.kt 12 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/input/InstallTabletPen.kt 39 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/lookdev/ShaderLookdevMain.kt 473 legacy-pending(ckmub.3)
@@ -159,8 +161,8 @@ android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/phone/DesktopPh
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/phone/DesktopPhoneShellUi.kt 232 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/phone/DesktopPhoneSystemChrome.kt 308 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/phone/DesktopPhoneWindow.kt 168 legacy-pending(ckmub.3)
-android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/plugin/view/DesktopLivePluginElement.kt 213 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/touch/DesktopTouchKeyboardHost.kt 46 legacy-pending(ckmub.3)
+android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/workspace/DesktopDreamingPane.kt 108 legacy-pending(ckmub.3)
 android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/workspace/DesktopWorkspaceFiles.kt 54 legacy-pending(ckmub.3)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AdminChatViewModel.kt 1349 legacy-pending(ckmub.2)
 android-compose/feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentContextCardSession.kt 99 container

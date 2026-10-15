@@ -35,8 +35,8 @@ internal class ChatHistoryPager(
     private var activeOwner: RequestOwner? = null
     private var nextRequestId = 0L
 
-    fun loadOlderMessages(clientModeEnabled: Boolean) {
-        val request = classifyLoadRequest(clientModeEnabled) ?: return
+    fun loadOlderMessages() {
+        val request = classifyLoadRequest() ?: return
         val owner = claimOwner(request) ?: return
         reportLoadAttempt(owner, request)
         scope.launch { fetchAndApply(owner, request) }
@@ -49,8 +49,7 @@ internal class ChatHistoryPager(
         val beforeMessageId: String,
     )
 
-    private fun classifyLoadRequest(clientModeEnabled: Boolean): LoadRequest? {
-        if (clientModeEnabled) return skipLoadForAgent("clientModeEnabled")
+    private fun classifyLoadRequest(): LoadRequest? {
         val conversationId = activeConversationId()
             ?: return skipLoadForAgent("noActiveConversation")
         val state = uiState.value

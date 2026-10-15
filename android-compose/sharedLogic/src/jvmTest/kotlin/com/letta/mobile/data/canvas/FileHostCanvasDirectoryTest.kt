@@ -1,6 +1,11 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,12 +31,29 @@ class FileHostCanvasDirectoryTest {
 
             val reopened = FileHostCanvasDirectory(file)
             assertEquals(listOf("c1", "c2"), reopened.all().map { it.canvasId })
-            assertEquals("c1", reopened.forConversation("conv-1")?.canvasId)
+            assertEquals("c1", reopened.forConversation(ConversationId("conv-1"))?.canvasId)
+            assertEquals("c2", reopened.get(CanvasId("c2"))?.canvasId)
 
             val claimAgain = reopened.putIfAbsent(entry("c1", "agent-2"))
             assertEquals(setOf("agent-1"), claimAgain.acl.writerAgentIds, "a second claim cannot rewrite the ACL")
             val sameConversation = reopened.putIfAbsent(entry("c9", "agent-2", conversation = "conv-1"))
             assertEquals("c1", sameConversation.canvasId, "one canvas per conversation")
+        } finally {
+            dir.toFile().deleteRecursively()
+        }
+    }
+
+    /** The typed [HostCanvasEntry.id] is derived, not stored: the file keeps the keys it always had. */
+    @Test
+    fun directoryFileKeepsItsShape() = runTest {
+        val dir = Files.createTempDirectory("host-canvases")
+        try {
+            val file = dir.resolve("host-canvases.json")
+            FileHostCanvasDirectory(file).putIfAbsent(entry("c1", "agent-1", conversation = "conv-1"))
+
+            val stored = Json.parseToJsonElement(Files.readString(file)).jsonArray.single().jsonObject
+            assertEquals(setOf("canvasId", "topic", "title", "conversationId", "acl"), stored.keys)
+            assertEquals("c1", stored["canvasId"]?.jsonPrimitive?.content)
         } finally {
             dir.toFile().deleteRecursively()
         }

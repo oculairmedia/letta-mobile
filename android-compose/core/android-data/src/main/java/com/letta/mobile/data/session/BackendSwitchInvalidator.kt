@@ -42,7 +42,7 @@ class BackendSwitchInvalidator @Inject constructor(
         var successes = 0
         val failures = mutableListOf<BackendSwitchClearResult.Failure>()
         caches.forEach { cache ->
-            val cacheName = cache.javaClass.simpleName
+            val cacheName = (cache as? CurrentGraphCache)?.name ?: cache.javaClass.simpleName
             runCatching {
                 cache.clearForBackendSwitch()
             }.onSuccess {

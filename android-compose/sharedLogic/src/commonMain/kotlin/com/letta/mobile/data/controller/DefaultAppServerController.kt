@@ -10,6 +10,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerQueueSnapshot
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.carryActiveLeasesInto
 import com.letta.mobile.data.runtime.CancelledQueuedInput
 import com.letta.mobile.data.runtime.TurnRuntimeKey
 import com.letta.mobile.data.runtime.reanswerReplayedApproval
@@ -28,6 +29,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
@@ -62,7 +64,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 class DefaultAppServerController(
     private val client: AppServerClient,
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
-    private val requestIdFactory: () -> String = ::defaultRequestId,
+    private val requestIdFactory: () -> String = defaultRequestId,
     /**
      * Optional durable registry of desired runtimes (lgns8.5). When provided,
      * every successful runtime_start upserts a [RuntimeRecord] so the reconnect
@@ -95,6 +97,16 @@ class DefaultAppServerController(
     private val defaultPermissionMode: () -> AppServerPermissionMode = {
         RuntimePermissionDefaults.DEFAULT_MODE
     },
+    /**
+     * letta-mobile-by4vm.55: when true, a turn in flight across a transport disconnect survives
+     * it, as on the desktop's ws:// path (by4vm.9): its lease is carried into the next generation
+     * and the router is interrupted instead of the lease being cancelled, so the turn waits out
+     * [com.letta.mobile.data.runtime.SESSION_RECONNECT_GRACE_MS] for [markConnected]. Only for a
+     * client whose events are one stable pipe across generations (a
+     * [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]); false keeps the
+     * lgns8.22.4 behaviour of ending every in-flight turn on disconnect.
+     */
+    private val turnsSurviveReconnect: Boolean = false,
 ) : AppServerController {
     @Suppress("NoDetachedCoroutineLifecycle") // Controller lifecycle owned; cancelled in close().
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
@@ -203,14 +215,19 @@ class DefaultAppServerController(
      * Thread-safe access via [runtimeMutex].
      */
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
-    private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
+
+    /**
+     * letta-mobile-by4vm.8: written under [runtimeMutex] but read lock-free by the turn engine's
+     * permission-mode provider, which runs concurrently across per-key leases.
+     */
+    private val runtimePermissionModes = CopyOnWriteMap<RuntimeKey, AppServerPermissionMode>()
 
     /**
      * letta-mobile-bzvro.40: modes a relayed client chose with [changePermissionMode]. A later start
      * (a client's `runtime_start` naming its own default, a reconnect, an eviction) never runs the
      * runtime looser than this; only another [changePermissionMode] can relax it.
      */
-    private val pinnedPermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
+    private val pinnedPermissionModes = CopyOnWriteMap<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
     /**
@@ -243,10 +260,7 @@ class DefaultAppServerController(
     /** letta-mobile-qygvv.7: in-place mode changes over the controller-owned router. */
     private val deviceState = DeviceStateChanger(client, TurnInboundSource(client, eventRouter))
 
-    /**
-     * Turn engine instance. Created lazily and reused for all turns.
-     * The engine itself serializes turns, so we don't need additional locking here.
-     */
+    /** Turn engine instance. Created lazily and reused for all turns. */
     private val turnEngine by lazy {
         AppServerTurnEngine(
             client = client,
@@ -518,6 +532,8 @@ class DefaultAppServerController(
         // stable pipe across generations. Detaching would drop recovery
         // runtime_start/sync terminals before markConnected() re-attaches.
         val priorGeneration = connectionGeneration.value
+        // by4vm.55: carried BEFORE the advance, so no frame sees a surviving lease as superseded.
+        if (turnsSurviveReconnect) turnEngine.carryActiveLeasesInto(priorGeneration + 1)
         connectionGeneration.incrementAndGet()
         eventRouter.inboundControlRegistry().failGeneration(priorGeneration)
         runtimeMutex.withLock {
@@ -528,10 +544,16 @@ class DefaultAppServerController(
             runtimeCache.clear()
         }
         turnEngine.invalidateRuntime(notifyHost = false)
-        turnEngine.cancelActiveLeaseForGeneration(
-            failedGeneration = priorGeneration,
-            reason = "connection generation superseded: ${reason ?: "disconnect"}",
-        )
+        if (turnsSurviveReconnect) {
+            // Pending approvals and tool calls of the dead generation were failed above; the
+            // reconnect's runtime_start/sync(recoverApprovals) replays them under the new one.
+            eventRouter.interruptSession(reason)
+        } else {
+            turnEngine.cancelActiveLeaseForGeneration(
+                failedGeneration = priorGeneration,
+                reason = "connection generation superseded: ${reason ?: "disconnect"}",
+            )
+        }
         _state.value = AppServerControllerState.Disconnected(reason)
     }
 
@@ -542,6 +564,8 @@ class DefaultAppServerController(
         if (!eventRouter.isAttached()) {
             eventRouter.attach(controllerScope, client.events)
         }
+        // by4vm.55: ends the interruption surviving turns are waiting out; a no-op otherwise.
+        eventRouter.restoreSession()
         _state.value = AppServerControllerState.Connected
     }
 
@@ -732,11 +756,6 @@ class DefaultAppServerController(
             version = "0.2.0",
         )
 
-        private var nextRequestId = 0
-
-        private fun defaultRequestId(): String {
-            nextRequestId += 1
-            return "controller-req-$nextRequestId"
-        }
+        private val defaultRequestId = AppServerRequestIdFactory("controller-req")
     }
 }

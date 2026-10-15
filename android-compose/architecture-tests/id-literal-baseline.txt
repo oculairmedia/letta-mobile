@@ -1,0 +1,25 @@
+# Hardcoded id-prefix literals per production file (letta-mobile-by4vm.23), `<path> <count>`,
+# sorted by path. Counted: string literals opening with "conv-default-", "client-" or "cm-",
+# the bare "agent-" prefix or template, and "default" on a line about an id or conversation.
+# core/ids (IdFormats) is exempt. A rise fails as NEW; a fall fails as STALE until this line is
+# lowered (or deleted at 0). See docs/architecture/typed-ids-and-id-ratchets.md.
+cli/src/main/java/com/letta/mobile/cli/runtime/CliRuntime.kt 1
+desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatControllerSupport.kt 1
+desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopCanonicalTimelineHost.kt 1
+feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatConversationCoordinator.kt 1
+feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/WsChatSendCoordinator.kt 1
+feature-chat/src/main/java/com/letta/mobile/feature/chat/route/ChatGraph.kt 2
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/branch/ConversationBranchPlanner.kt 4
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/chat/send/ChatSendCoordinator.kt 1
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/compaction/ConversationCompactRpc.kt 1
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/ContextReadingKey.kt 1
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/SubagentNativeProgress.kt 1
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/WorkingDirectoryScopeKey.kt 2
+sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/templates/AgentTemplatesController.kt 1
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationTurnFanout.kt 1
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnectionSupport.kt 4
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendConversationReader.kt 2
+sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendMessageReader.kt 5
+sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/context/AgentContextCardHost.kt 2
+sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/shell/pages/conversations/ConversationsPage.kt 1
+web/src/wasmJsMain/kotlin/com/letta/mobile/web/data/WebSettingsStore.kt 1

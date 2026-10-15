@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.ProjectWorkRemoteSource
 import com.letta.mobile.data.model.IssueAnalyticsResponse
@@ -15,7 +16,7 @@ import com.letta.mobile.data.model.ProjectIssuePage
 import com.letta.mobile.data.model.ProjectIssueSummary
 import com.letta.mobile.data.model.ProjectReadyWorkResponse
 
-open class FakeProjectWorkApi : ProjectWorkRemoteSource by noAppServerRoute<ProjectWorkRemoteSource>() {
+open class FakeProjectWorkApi : ProjectWorkRemoteSource by unavailable<ProjectWorkRemoteSource>(SessionRoute.PROJECT_WORK) {
     val readyWork = mutableMapOf<String, List<ProjectIssueSummary>>()
     val issues = mutableMapOf<String, List<ProjectIssueSummary>>()
     val issueAnalytics = mutableMapOf<String, IssueAnalyticsResponse>()

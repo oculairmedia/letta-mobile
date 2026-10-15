@@ -1,0 +1,795 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: Any?): List&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$private suspend fun commitNormalizedApply(commit: NormalizedTimelineCommit): NormalizedTimelineWriteResult</ID>
+    <ID>CyclomaticComplexMethod:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$private suspend fun audit(count: Int, chained: Boolean): Meter.Snapshot</ID>
+    <ID>CyclomaticComplexMethod:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$private fun read(scope: TimelineScope): State</ID>
+    <ID>LargeClass:MessageMapperTest.kt$MessageMapperTest : WordSpec</ID>
+    <ID>LargeClass:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest</ID>
+    <ID>LongMethod:AgentUpdateParamsSerializationTest.kt$AgentUpdateParamsSerializationTest$@Test fun `agent update advanced settings serialize with server wire keys and typed values`()</ID>
+    <ID>LongMethod:LettaDatabaseMigrationTest.kt$LettaDatabaseMigrationTest$@Test fun `migrates v12 normalized heads with explicit empty row digest marker`()</ID>
+    <ID>LongMethod:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$private suspend fun commitNormalizedApply(commit: NormalizedTimelineCommit): NormalizedTimelineWriteResult</ID>
+    <ID>LongMethod:RoomLedgerCardinalityTest.kt$RoomLedgerCardinalityTest$@Test fun twentyEightThousandRowsUseIndexedBoundedMetadataAndStableSnapshot()</ID>
+    <ID>LongMethod:RoomTimelineBoundedStoreTest.kt$RoomTimelineBoundedStoreTest$@Test fun largeInlineImageSurvivesCanonicalColdReopenByteIdentically()</ID>
+    <ID>LongMethod:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$private suspend fun audit(count: Int, chained: Boolean): Meter.Snapshot</ID>
+    <ID>LongMethod:RuntimeEventMappers.kt$fun LettaMessage.toRuntimeEventDrafts( backend: BackendDescriptor, fallbackAgentId: AgentId? = null, fallbackConversationId: ConversationId? = null, source: RuntimeEventSource = RuntimeEventSource.RemoteLetta, ): List&lt;RuntimeEventDraft&gt;</ID>
+    <ID>LongMethod:RuntimeEventMappers.kt$fun WsTimelineEvent.toRuntimeEventDrafts( backend: BackendDescriptor, fallbackAgentId: AgentId? = null, fallbackConversationId: ConversationId? = null, ): List&lt;RuntimeEventDraft&gt;</ID>
+    <ID>LongMethod:TimelineOwnedStorageHandoffTest.kt$TimelineOwnedStorageHandoffTest$@Test fun mappedMigrationUsesRawSourceAndReopensOnlyCanonicalTarget()</ID>
+    <ID>LongMethod:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest$@Test fun localMutationsProduceNoWorkAndDoNotConsumeRevision()</ID>
+    <ID>LongParameterList:CanvasDocumentDao.kt$CanvasDocumentDao$( id: String, expectedRevision: Long, agentId: String?, conversationId: String?, title: String, revision: Long, sceneJson: String, updatedAtEpochMs: Long, aclJson: String?, )</ID>
+    <ID>LongParameterList:SessionGraph.kt$SessionGraph$( override val id: Long, override val backendDescriptor: BackendDescriptor, override val localRuntimeBackend: LocalLettaBackend?, val scope: CoroutineScope, override val agentRepository: AgentRepository, val allConversationsRepository: AllConversationsRepository, override val channelTransport: IChannelTransport, override val conversationRepository: ConversationRepository, override val cronRepository: CronRepository, override val mcpServerRepository: McpServerRepository, override val modelRepository: ModelRepository, override val passageRepository: PassageRepository, override val projectRepository: ProjectRepository, override val projectWorkRepository: ProjectWorkRepository, override val runRepository: RunRepository, override val providerRepository: ProviderRepository, override val scheduleRepository: IScheduleRepository, override val selfTodoRepository: SelfTodoRepository, override val stepRepository: StepRepository, override val subagentRepository: SubagentRepository, override val toolRepository: ToolRepository, override val vibesyncEventStreamRepository: VibesyncEventStreamRepository, override val capabilities: SessionCapabilities, override val blockRepository: BlockRepository? = null, val conversationCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null, /** Configuration captured at creation, never resolved from mutable settings. */ val capturedConfig: LettaConfig? = null, /** letta-mobile-r2zo8: each conversation's latest context total, fed by [channelTransport]. */ val contextTokenReadings: ContextTokenReadings = contextTokenReadingsOf(channelTransport, scope), )</ID>
+    <ID>LongParameterList:SessionRemoteSources.kt$SessionRemoteSources$( val agents: RemoteRoute&lt;AgentRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.AGENTS), val conversations: RemoteRoute&lt;ConversationCrudRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.CONVERSATIONS), val mcpServers: RemoteRoute&lt;McpServerRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.MCP_SERVERS), val models: RemoteRoute&lt;ModelRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.MODELS), val passages: RemoteRoute&lt;PassageRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.PASSAGES), val projects: RemoteRoute&lt;ProjectRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.PROJECTS), val projectWork: RemoteRoute&lt;ProjectWorkRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.PROJECT_WORK), val providers: RemoteRoute&lt;ProviderRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.PROVIDERS), val runs: RemoteRoute&lt;RunRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.RUNS), val schedules: RemoteRoute&lt;ScheduleRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.SCHEDULES), /** Absent: no backend answers step queries, so the step repository reports none. */ val steps: RemoteRoute&lt;StepRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.STEPS), val tools: RemoteRoute&lt;ToolRemoteSource&gt; = RemoteRoute.Absent(SessionRoute.TOOLS), )</ID>
+    <ID>LongParameterList:SessionTestFixtures.kt$TestDefaultSessionRepositoryGraphFactoryBuilder$( var agentApi: FakeAgentApi = FakeAgentApi(), var agentDao: dagger.Lazy&lt;AgentDao&gt; = lazyOf(FakeAgentDao()), var conversationApi: FakeConversationApi = FakeConversationApi(), var conversationDao: dagger.Lazy&lt;ConversationDao&gt; = lazyOf(FakeConversationDao()), var mcpServerApi: FakeMcpServerApi = FakeMcpServerApi(), var modelApi: FakeModelApi = FakeModelApi(), var passageApi: FakePassageApi = FakePassageApi(), var projectApi: FakeProjectApi = FakeProjectApi(), var projectWorkApi: FakeProjectWorkApi = FakeProjectWorkApi(), var runApi: FakeRunApi = FakeRunApi(), var providerApi: FakeProviderApi = FakeProviderApi(), var scheduleApi: FakeScheduleApi = FakeScheduleApi(), var stepApi: FakeStepApi = FakeStepApi(), var toolApi: FakeToolApi = FakeToolApi(), var settingsRepository: ISettingsRepository? = null, var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled, var appContext: android.content.Context = mockk(relaxed = true), var cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null, )</ID>
+    <ID>LongParameterList:TestData.kt$TestData$( id: String = "msg-1", messageType: MessageType = MessageType.USER, content: String = "Hello", runId: String? = null, stepId: String? = null, isPending: Boolean = false, localId: String? = null, toolName: String? = null, toolCallId: String? = null, date: Instant = Instant.parse("2024-03-15T10:00:00Z"), )</ID>
+    <ID>MatchingDeclarationName:ApprovalMessageMapper.kt$FoldedToolApproval</ID>
+    <ID>MatchingDeclarationName:NoAppServerRoute.kt$NoAppServerRouteException : UnsupportedOperationException</ID>
+    <ID>MatchingDeclarationName:SessionFakeDaos.kt$FakeAgentDao : AgentDao</ID>
+    <ID>MatchingDeclarationName:TestSettingsStorage.kt$InMemorySecureSettingsStore : SecureSettingsStore</ID>
+    <ID>MatchingDeclarationName:TimelineSyncLoopTestFixtures.kt$TimelineTestMessageSpec</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, fakeDao.get().getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RUNTIME_KEY]?.jsonPrimitive?.contentOrNull)</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = kotlinx.serialization.json.JsonNull, error = null)</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME))</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME))</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$requestId = "req"</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest$val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)</ID>
+    <ID>MaxLineLength:AgentRepositoryTest.kt$AgentRepositoryTest.&lt;no name provided&gt;$override suspend fun listAgents(limit: Int?, offset: Int?, tags: List&lt;String&gt;?): List&lt;com.letta.mobile.data.model.Agent&gt;</ID>
+    <ID>MaxLineLength:AgentSearchTest.kt$AgentSearchTest$TestData.agent(id = "1", name = "General Assistant", model = "letta/letta-free", tags = listOf("default", "chat"), description = "A general purpose agent")</ID>
+    <ID>MaxLineLength:AgentSearchTest.kt$AgentSearchTest$TestData.agent(id = "2", name = "Code Helper", model = "openai/gpt-4o", tags = listOf("code", "programming"), description = "Helps with code")</ID>
+    <ID>MaxLineLength:AgentSearchTest.kt$AgentSearchTest$TestData.agent(id = "3", name = "Research Bot", model = "anthropic/claude-3.5-sonnet", tags = listOf("research"), description = "Does research")</ID>
+    <ID>MaxLineLength:AgentSearchTest.kt$AgentSearchTest$TestData.agent(id = "4", name = "Writer", model = "openai/gpt-4o", tags = listOf("writing"), description = "Creative writing assistant")</ID>
+    <ID>MaxLineLength:AllConversationsRepositoryTest.kt$AllConversationsRepositoryTest$result = Json.parseToJsonElement("""{"id":"1","agent_id":"agent-1","summary":"Archived elsewhere","archived":true}""")</ID>
+    <ID>MaxLineLength:BackendConversationCursorStore.kt$BackendConversationCursorDao$@Query("DELETE FROM backend_conversation_cursors WHERE backendId = :backend AND conversationId = :conversation AND highestSeenSeq = :expected")</ID>
+    <ID>MaxLineLength:BackendConversationCursorStore.kt$BackendConversationCursorDao$@Query("INSERT INTO backend_conversation_cursors (backendId, conversationId, highestSeenSeq) VALUES (:backend, :conversation, :seq) ON CONFLICT(backendId, conversationId) DO UPDATE SET highestSeenSeq = MAX(highestSeenSeq, excluded.highestSeenSeq)")</ID>
+    <ID>MaxLineLength:BackendConversationCursorStore.kt$BackendConversationCursorDao$@Query("SELECT backendId, conversationId, highestSeenSeq FROM backend_conversation_cursors WHERE backendId = :backend ORDER BY conversationId")</ID>
+    <ID>MaxLineLength:BackendConversationCursorStore.kt$BackendConversationCursorDao$@Query("UPDATE backend_conversation_cursors SET highestSeenSeq = :replacement WHERE backendId = :backend AND conversationId = :conversation AND highestSeenSeq = :expected")</ID>
+    <ID>MaxLineLength:BackendConversationCursorStoreTest.kt$BackendConversationCursorStoreTest.&lt;no name provided&gt;$db.execSQL("CREATE TABLE conversation_cursors (conv_id TEXT NOT NULL PRIMARY KEY, highest_seen_seq INTEGER NOT NULL, updated_at INTEGER NOT NULL)")</ID>
+    <ID>MaxLineLength:BlockRepositoryTest.kt$BlockRepositoryTest$initialActiveConfig = LettaConfig(id = "test", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")</ID>
+    <ID>MaxLineLength:ConversationPagingSourceTest.kt$ConversationPagingSourceTest$"""{"agent_id":"agent-1","limit":"20","archive_status":"unarchived","summary_search":"important","order":"desc","order_by":"last_message_at"}"""</ID>
+    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken</ID>
+    <ID>MaxLineLength:FakeMcpServerApi.kt$FakeMcpServerApi$customHeaders = config?.get("custom_headers")?.jsonObject?.mapValues { (_, value) -&gt; value.jsonPrimitive.content } ?: current.customHeaders</ID>
+    <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$override suspend</ID>
+    <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$val provider = Provider(id = ProviderId("provider-${providers.size + 1}"), name = params.name, providerType = params.providerType, apiKey = params.apiKey, baseUrl = params.baseUrl, accessKey = params.accessKey, region = params.region)</ID>
+    <ID>MaxLineLength:FakeProviderApi.kt$FakeProviderApi$val updated = providers[index].copy(apiKey = params.apiKey, baseUrl = params.baseUrl, accessKey = params.accessKey, region = params.region)</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$"""{"index":1,"kind":"rest_messages","conversation_id":"conv-1","messages":[{"id":"cm-rest","message_type":"assistant_message","date":"2026-05-26T00:00:00Z","content":"from rest"}]}"""</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$"approval tool_return return-approval for tool_call_id=approval-call landed on run run-primary instead of approval run run-approval"</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$lines = sequenceOf(recorded("""{"v":1,"type":"error","id":"err-1","ts":"2026-05-26T00:00:00Z","code":"cursor_expired","message":"too old","run_id":"run-1"}"""))</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"approval_request_message","id":"toolcall-approval","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-approval","run_id":"run-approval","tool_call":{"tool_call_id":"approval-call","name":"Bash","arguments":"{}"},"otid":"stable-1"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"approval_request_message","id":"toolcall-approval","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-approval","run_id":"run-approval","tool_call":{"tool_call_id":"approval-call","name":"Bash","arguments":"{}"},"otid":"stable-2"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-a","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"second","seq_id":2}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-b","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"first","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-empty","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-full","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-full","ts":"2026-05-26T00:00:03Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":3}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-open","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open","content":"still running","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-prefix","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":2}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"done","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"first","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":2}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-2","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"second","seq_id":2}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-3","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"first","seq_id":1}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-3","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"third","seq_id":3}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"error","id":"err-1","ts":"2026-05-26T00:00:00Z","code":"cursor_expired","message":"too old","run_id":"run-1"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"stop_reason","id":"stop-1","ts":"2026-05-26T00:00:02Z","turn_id":"turn-1","run_id":"run-1","stop_reason":"end_turn"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"tool_call_message","id":"toolcall-1","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-2","run_id":"run-done","tool_call":{"tool_call_id":"call-1","name":"Bash","arguments":"{}"}}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"tool_return_message","id":"return-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","tool_call_id":"call-missing","tool_return":"ok"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"tool_return_message","id":"return-approval","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-primary","run_id":"run-primary","tool_call_id":"approval-call","tool_return":"ok"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:02Z","turn_id":"turn-1","run_id":"run-1","status":"failed"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:03Z","turn_id":"turn-1","run_id":"run-1","status":"completed"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:03Z","turn_id":"turn-2","run_id":"run-done","status":"completed"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"turn_started","id":"start-1","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$recorded("""{"v":1,"type":"turn_started","id":"start-1","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open"}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineReplayTest.kt$HeadlessTimelineReplayTest$val ws = recorded("""{"v":1,"type":"assistant_message","id":"cm-live","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"live answer","seq_id":2}""")</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","content":"$POST_TOOL_ASSISTANT""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","content":"Starting long lookup."""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","content":"chunk 1""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","content":"chunk 2""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","content":"chunk 3""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","reasoning":"still waiting at 120s""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","reasoning":"still waiting at 150s""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","reasoning":"still waiting at 60s""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","reasoning":"verified lookup output""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","tool_call":{"tool_call_id":"$LONG_TOOL_CALL_ID","name":"long_lookup","arguments":"{\"duration_seconds\":180}"}"""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","tool_call":{"tool_call_id":"call-chaos","name":"lookup","arguments":"{}"}"""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","tool_call_id":"$LONG_TOOL_CALL_ID","tool_return":"$LONG_TOOL_RESULT""""</ID>
+    <ID>MaxLineLength:HeadlessTimelineResumeChaosTest.kt$HeadlessTimelineResumeChaosTest.Companion$extra = """"agent_id":"$AGENT_ID","conversation_id":"$CONVERSATION_ID","turn_id":"$TURN_ID","run_id":"$RUN_ID","tool_call_id":"call-chaos","tool_return":"ok""""</ID>
+    <ID>MaxLineLength:IrohAdminRpcTimelineTransportOlderMessagesTest.kt$IrohAdminRpcTimelineTransportOlderMessagesTest$adminRpcHandler = { _, _, _ -&gt; ok("""{"messages":[{"id":"first","message_type":"assistant_message","content":"a"},{"id":"last","message_type":"assistant_message","content":"b"}],"has_more":true,"next_before":"wrong-direction"}""") }</ID>
+    <ID>MaxLineLength:IrohAdminRpcTimelineTransportOlderMessagesTest.kt$IrohAdminRpcTimelineTransportOlderMessagesTest$adminRpcHandler = { _, _, _ -&gt; ok("""{"messages":[{"id":"last","message_type":"assistant_message","content":"duplicate"}],"has_more":true,"next_before":"wrong-direction"}""") }</ID>
+    <ID>MaxLineLength:IrohAdminRpcTimelineTransportOlderMessagesTest.kt$IrohAdminRpcTimelineTransportOlderMessagesTest$adminRpcHandler = { _, _, _ -&gt; ok("""{"messages":[{"id":"old","message_type":"assistant_message","content":"a"}],"has_more":true,"next_before":" "}""") }</ID>
+    <ID>MaxLineLength:IrohAdminRpcTimelineTransportOlderMessagesTest.kt$IrohAdminRpcTimelineTransportOlderMessagesTest$kotlinx.coroutines.runBlocking { transport(fake).listConversationMessagePage(typedRequest(TimelineContinuation.Before(TimelineMessageId("cursor")))) }</ID>
+    <ID>MaxLineLength:LettaDatabaseMigrations.kt$LettaDatabaseMigrations.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS backend_conversation_cursors (backendId TEXT NOT NULL, conversationId TEXT NOT NULL, highestSeenSeq INTEGER NOT NULL, PRIMARY KEY(backendId, conversationId))")</ID>
+    <ID>MaxLineLength:MessageMapperTest.kt$MessageMapperTest$content = """{"subagent_type":"general","description":"Review implementation","run_in_background":true,"prompt":"Do the review"}"""</ID>
+    <ID>MaxLineLength:MessageMapperTest.kt$MessageMapperTest$content = """{"subagent_type":"researcher","description":"Investigate qd5gq","run_in_background":true,"prompt":"Huge private prompt body"}"""</ID>
+    <ID>MaxLineLength:MessageMapperTest.kt$MessageMapperTest$content = "{\"type\":\"generated_ui\",\"component\":\"suggestion_chips\",\"props\":{\"title\":\"Next steps\",\"suggestions\":[{\"label\":\"Explain coroutines\",\"message\":\"Explain Kotlin coroutines\"}]},\"text\":\"Choose a follow-up\"}"</ID>
+    <ID>MaxLineLength:MessageMapperTest.kt$MessageMapperTest$content = "{\"type\":\"generated_ui\",\"component\":\"summary_card\",\"props\":{\"title\":\"Today\",\"body\":\"3 tasks pending\"},\"text\":\"Here is your summary\"}"</ID>
+    <ID>MaxLineLength:PassageRepositoryTest.kt$PassageRepositoryTest$org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)</ID>
+    <ID>MaxLineLength:ProviderRepositoryTest.kt$ProviderRepositoryTest.&lt;no name provided&gt;$override suspend</ID>
+    <ID>MaxLineLength:RoomCanvasDocumentStoreTest.kt$RoomCanvasDocumentStoreTest$store.upsert(CanvasDocument(id = CanvasId("canvas-room-no-acl"), title = "Open", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L))</ID>
+    <ID>MaxLineLength:RoomCanvasDocumentStoreTest.kt$RoomCanvasDocumentStoreTest$val first = CanvasDocument(id = CanvasId("c-1"), conversationId = "conv-x", title = "First", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L)</ID>
+    <ID>MaxLineLength:RoomCanvasDocumentStoreTest.kt$RoomCanvasDocumentStoreTest$val second = CanvasDocument(id = CanvasId("c-2"), conversationId = "conv-x", title = "Second", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 2L)</ID>
+    <ID>MaxLineLength:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$return</ID>
+    <ID>MaxLineLength:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$val payload = TimelineSnapshotCodec.json.encodeToString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), row.event).toByteArray(StandardCharsets.UTF_8)</ID>
+    <ID>MaxLineLength:RoomConfirmedTimelineStoreTest.kt$RoomConfirmedTimelineStoreTest$assertRejected(SnapshotReadFailure.CHECKSUM_MISMATCH, rows = originalRows.mapIndexed { index, row -&gt; if (index == 0) row.copy(checksum = "0".repeat(64)) else row })</ID>
+    <ID>MaxLineLength:RoomConfirmedTimelineStoreTest.kt$RoomConfirmedTimelineStoreTest$assertRejected(SnapshotReadFailure.METADATA_INVALID, rows = originalRows.mapIndexed { index, row -&gt; row.copy(eventOrder = index + 1) })</ID>
+    <ID>MaxLineLength:RoomLedgerCardinalityTest.kt$RoomLedgerCardinalityTest$"EXPLAIN QUERY PLAN SELECT * FROM ledger_row WHERE scope = ? AND position &lt; ? ORDER BY position DESC, identity DESC LIMIT 128"</ID>
+    <ID>MaxLineLength:RoomLedgerCardinalityTest.kt$RoomLedgerCardinalityTest$"EXPLAIN QUERY PLAN SELECT * FROM ledger_row WHERE scope = ? AND position = ? AND identity &lt; ? ORDER BY identity DESC LIMIT 128"</ID>
+    <ID>MaxLineLength:RoomLedgerCardinalityTest.kt$RoomLedgerCardinalityTest$val sql = db.openHelper.writableDatabase.compileStatement("INSERT INTO ledger_row(scope, identity, position, pointer, bytes, contentType, revision) VALUES (?, ?, ?, ?, ?, ?, ?)")</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration$check</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration$if (row.bytes &gt; maxEventBytes) return@transaction RoomCanonicalMigrationResult.Deferred(row.position, row.bytes, maxEventBytes)</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration.ConversionProgress$private data</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration.ConversionProgress.Companion$return</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$assertEquals(RoomCanonicalMigrationResult.LegacyFallback("canonical_revision_changed"), migration().validateForActivation(scope, 1))</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$assertEquals(RoomCanonicalMigrationResult.LegacyFallback("integrity_or_storage_failure"), migration.validateForActivation(scope, 2))</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$assertEquals(RoomCanonicalMigrationResult.Progress(1, true), RoomLegacyCanonicalMigration(source, db, { _, _ -&gt; true }).step(scope))</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$db.openHelper.writableDatabase.execSQL("CREATE TEMP TRIGGER interrupt_head BEFORE INSERT ON ledger_head BEGIN SELECT RAISE(ABORT, 'interrupted'); END")</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$db.openHelper.writableDatabase.execSQL("CREATE TEMP TRIGGER interrupt_write BEFORE INSERT ON $table BEGIN SELECT RAISE(ABORT, 'interrupted'); END")</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$db.openHelper.writableDatabase.execSQL("UPDATE ledger_chunk SET payload = X'00' WHERE pointer IN (SELECT pointer FROM ledger_evidence)")</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$db.openHelper.writableDatabase.execSQL("UPDATE ledger_chunk SET payload = X'00' WHERE pointer IN (SELECT pointer FROM ledger_row)")</ID>
+    <ID>MaxLineLength:RoomLegacyCanonicalMigrationTest.kt$RoomLegacyCanonicalMigrationTest$val event = TimelineSnapshotCodec.json.decodeFromString(StoredTimelineEvent.serializer(), body(row.body, 0, 65536).decodeToString())</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopy.kt$ResumableLedgerSha256.Companion$if (state.isEmpty()) return ResumableLedgerSha256(intArrayOf(0x6a09e667, 0xbb67ae85.toInt(), 0x3c6ef372, 0xa54ff53a.toInt(), 0x510e527f, 0x9b05688c.toInt(), 0x1f83d9ab, 0x5be0cd19), 0)</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopy.kt$RoomLegacyLedgerCopy$check(bytes.size.toLong() == minOf(RoomTimelineBoundedStore.CHUNK_BYTES.toLong(), row.bytes - state.pendingOffset)) { "Short source body" }</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopy.kt$RoomLegacyLedgerCopy$dao.chunk(LedgerChunk(key, pointer, state.pendingOffset / RoomTimelineBoundedStore.CHUNK_BYTES, bytes.copyOf(), checksum(bytes)))</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopy.kt$RoomLegacyLedgerCopy$dao.migration(state.copy(afterOrder = row.order, copiedRows = state.copiedRows + 1, pendingPointer = null, pendingOffset = 0, pendingDigest = ""))</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopy.kt$RoomLegacyLedgerCopy$dao.migrationRow(LedgerMigrationRow(key, state.generation, row.order, row.primary, row.secondary, pointer, row.bytes, exact))</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopySource.kt$RoomLegacyLedgerCopySource.&lt;no name provided&gt;$"SELECT agent_id, storage_layout_version, revision, envelope_schema_version, live_cursor, backfill_cursor, released_older_count, row_count, root_digest, row_digest, generation, written_at_millis FROM normalized_timeline_snapshot_heads WHERE backend_id = ? AND conversation_id = ?"</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopySource.kt$RoomLegacyLedgerCopySource.&lt;no name provided&gt;$"SELECT event_order, identity_primary, identity_secondary, length(payload), checksum FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND event_order &gt; ? ORDER BY event_order LIMIT min(128, max(0, CAST(? AS INTEGER)))"</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopySource.kt$RoomLegacyLedgerCopySource.&lt;no name provided&gt;$"SELECT substr(payload, ? + 1, min(65536, max(0, CAST(? AS INTEGER)))) FROM normalized_timeline_snapshot_rows WHERE backend_id = ? AND conversation_id = ? AND identity_primary = ? AND identity_secondary = ?"</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopySource.kt$RoomLegacyLedgerCopySource.&lt;no name provided&gt;$arrayOf(offset.toString(), maxBytes.toString(), scope.backendId, scope.conversationId, row.primary.toString(), row.secondary.toString())</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopySource.kt$RoomLegacyLedgerCopySource.&lt;no name provided&gt;$while (cursor.moveToNext()) add(LegacyLedgerCopyRow(cursor.getLong(0), cursor.getLong(1), cursor.getLong(2), cursor.getLong(3), cursor.getString(4)))</ID>
+    <ID>MaxLineLength:RoomLegacyLedgerCopyTest.kt$RoomLegacyLedgerCopyTest.&lt;no name provided&gt;.&lt;no name provided&gt;$return if (afterOrder &lt; 0) listOf(LegacyLedgerCopyRow(0, 12, 34, bytes.size.toLong(), checksum(bytes))) else emptyList()</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$assertEquals(1L, requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId)).revision)</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$assertEquals(2L, requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId)).revision)</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$assertTrue("cursor-only change must still be an Apply plan (empty upserts/deletes)", commitPlan is NormalizedTimelineCommitPlan.Apply)</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$assertTrue(store.commitNormalized(plan(null, droppedEnvelope), droppedEnvelope, checkpointLegacyEnvelope = true) is NormalizedTimelineWriteResult.Committed)</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$assertTrue(store.commitNormalized(plan(null, retainedEnvelope), retainedEnvelope, checkpointLegacyEnvelope = true) is NormalizedTimelineWriteResult.Committed)</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$val digestAfter = requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId)).rootDigest</ID>
+    <ID>MaxLineLength:RoomNormalizedIncrementalCommitTest.kt$RoomNormalizedIncrementalCommitTest$val digestBefore = requireNotNull(db.confirmedTimelineSnapshotDao().getNormalizedHead(scope.backendId, scope.conversationId)).rootDigest</ID>
+    <ID>MaxLineLength:RoomTimelineBoundedStore.kt$RoomTimelineBoundedStore.Session$is TimelineReadPosition.Before -&gt; dao.before(scope, position.key.order, ledgerKey(position.key.identity.value), maxRows).reversed()</ID>
+    <ID>MaxLineLength:RoomTimelineBoundedStore.kt$RoomTimelineBoundedStore.Session$older + listOfNotNull(exact) + dao.after(scope, key.order, ledgerKey(key.identity.value), maxRows - older.size - if (exact == null) 0 else 1)</ID>
+    <ID>MaxLineLength:RoomTimelineBoundedStore.kt$RoomTimelineBoundedStore.Session$rows.map { TimelineLedgerMetadata(it.key(), TimelineBodyPointer(it.pointer, it.bytes), it.contentType, if (it.revision == -1L) revision ?: checkpoint().revision else it.revision) }</ID>
+    <ID>MaxLineLength:RoomTimelineOwnershipEnforcementTest.kt$RoomTimelineOwnershipEnforcementTest$rejected { RoomConfirmedTimelineStore(db, ownership = TimelineOwnershipAuthority(temporary.root.toPath())).readSnapshotResult(scope) }</ID>
+    <ID>MaxLineLength:RoomTimelineToolIndexTest.kt$RoomTimelineToolIndexTest$"EXPLAIN QUERY PLAN SELECT * FROM ledger_tool_call WHERE scope = ? AND unresolved = 1 AND callId &gt; ? AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT 37"</ID>
+    <ID>MaxLineLength:RoomTimelineToolIndexTest.kt$RoomTimelineToolIndexTest.&lt;no name provided&gt;$db.execSQL("CREATE TABLE ledger_blob (scope BLOB NOT NULL, pointer TEXT NOT NULL, bytes INTEGER NOT NULL, checksum TEXT NOT NULL, PRIMARY KEY(scope,pointer))")</ID>
+    <ID>MaxLineLength:RoomTimelineToolIndexTest.kt$RoomTimelineToolIndexTest.&lt;no name provided&gt;$db.execSQL("CREATE TABLE ledger_head (scope BLOB NOT NULL PRIMARY KEY, revision INTEGER NOT NULL, checkpoint BLOB NOT NULL)")</ID>
+    <ID>MaxLineLength:RoomTimelineValidation.kt$RoomTimelineValidation$checksum</ID>
+    <ID>MaxLineLength:RoomTimelineValidation.kt$RoomTimelineValidation$suspend</ID>
+    <ID>MaxLineLength:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$fun blobCount(): Long</ID>
+    <ID>MaxLineLength:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$val legacy = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java).setQueryExecutor(legacyQueries).openHelperFactory(meter).build()</ID>
+    <ID>MaxLineLength:SessionManagerTest.kt$SessionManagerTest$settingsRepository.activeConfigState.value = LettaConfig(id = "backend-b", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "https://backend-a.example.test")</ID>
+    <ID>MaxLineLength:SessionScopedAdminRepositoriesTest.kt$SessionScopedAdminRepositoriesTest$val providerApi = FakeProviderApi().apply { providers = mutableListOf(sampleProvider(ProviderId("provider-a"), "Backend A Provider")) }</ID>
+    <ID>MaxLineLength:SessionScopedAgentRepository.kt$SessionScopedAgentRepository$override suspend fun attachArchive(agentId: AgentId, archiveId: String): Unit</ID>
+    <ID>MaxLineLength:SessionScopedAgentRepository.kt$SessionScopedAgentRepository$override suspend fun createAgent(params: AgentCreateParams): Agent</ID>
+    <ID>MaxLineLength:SessionScopedAgentRepository.kt$SessionScopedAgentRepository$override suspend fun createLocalAgent(params: AgentCreateParams): Agent</ID>
+    <ID>MaxLineLength:SessionScopedAgentRepository.kt$SessionScopedAgentRepository$override suspend fun detachArchive(agentId: AgentId, archiveId: String): Unit</ID>
+    <ID>MaxLineLength:SessionScopedAgentRepository.kt$SessionScopedAgentRepository$override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent</ID>
+    <ID>MaxLineLength:SessionScopedAllConversationsRepository.kt$SessionScopedAllConversationsRepository$override</ID>
+    <ID>MaxLineLength:SessionScopedChannelTransport.kt$SessionScopedChannelTransport$)</ID>
+    <ID>MaxLineLength:SessionScopedChannelTransport.kt$SessionScopedChannelTransport$override suspend</ID>
+    <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun addSchedule(params: CronAddParams): Result&lt;CronTask&gt;</ID>
+    <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun deleteSchedule(target: CronScheduleRef): Result&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun pauseSchedule(target: CronScheduleRef): Result&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun refresh(scope: AgentScheduleScope): Result&lt;List&lt;CronTask&gt;&gt;</ID>
+    <ID>MaxLineLength:SessionScopedCronRepository.kt$SessionScopedCronRepository$override suspend fun resumeSchedule(target: CronResumeTarget): Result&lt;Unit&gt;</ID>
+    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun createServer(params: McpServerCreateParams): McpServer</ID>
+    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun refreshServerTools(serverId: McpServerId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedMcpServerRepository.kt$SessionScopedMcpServerRepository$override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer</ID>
+    <ID>MaxLineLength:SessionScopedPassageRepository.kt$SessionScopedPassageRepository$override suspend fun createPassage(agentId: AgentId, text: String): Passage</ID>
+    <ID>MaxLineLength:SessionScopedPassageRepository.kt$SessionScopedPassageRepository$override suspend fun refreshPassages(agentId: AgentId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun archiveProject(identifier: String): ProjectSummary</ID>
+    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun deleteProject(identifier: String): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun getProject(identifier: String): ProjectSummary</ID>
+    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean</ID>
+    <ID>MaxLineLength:SessionScopedProjectRepository.kt$SessionScopedProjectRepository$override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse</ID>
+    <ID>MaxLineLength:SessionScopedProjectWorkRepository.kt$SessionScopedProjectWorkRepository$)</ID>
+    <ID>MaxLineLength:SessionScopedProjectWorkRepository.kt$SessionScopedProjectWorkRepository$override suspend fun invalidateProjectCache(projectId: String): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun checkExistingProvider(providerId: ProviderId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun checkProvider(params: ProviderCheckParams): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun createProvider(params: ProviderCreateParams): Provider</ID>
+    <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun deleteProvider(providerId: ProviderId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedProviderRepository.kt$SessionScopedProviderRepository$override suspend fun getProvider(providerId: ProviderId): Provider</ID>
+    <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun getRunMessages(runId: RunId): List&lt;LettaMessage&gt;</ID>
+    <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun getRunMetrics(runId: RunId): RunMetrics</ID>
+    <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun getRunUsage(runId: RunId): UsageStatistics</ID>
+    <ID>MaxLineLength:SessionScopedRunRepository.kt$SessionScopedRunRepository$override suspend fun refreshRuns(params: RunListParams): Unit</ID>
+    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepMessages(stepId: String): List&lt;LettaMessage&gt;</ID>
+    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepMetrics(stepId: String): StepMetrics</ID>
+    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun getStepTrace(stepId: String): ProviderTrace?</ID>
+    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun listSteps(params: StepListParams): List&lt;Step&gt;</ID>
+    <ID>MaxLineLength:SessionScopedStepRepository.kt$SessionScopedStepRepository$override suspend fun refreshSteps(params: StepListParams): Unit</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun attachTool(agentId: AgentId, toolId: ToolId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun detachTool(agentId: AgentId, toolId: ToolId): Unit</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun fetchToolsPage(limit: Int, offset: Int): List&lt;Tool&gt;</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool</ID>
+    <ID>MaxLineLength:SessionScopedToolRepository.kt$SessionScopedToolRepository$override suspend fun upsertTool(params: ToolCreateParams): Tool</ID>
+    <ID>MaxLineLength:SseParserTest.kt$SseParserTest$val sse = "data: {\"id\":\"1\",\"message_type\":\"tool_call_message\",\"tool_call\":{\"name\":\"search\",\"arguments\":\"{}\",\"type\":\"function\"}}\n\n"</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$LedgerToolCall$data</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND callId &gt; :after ORDER BY callId LIMIT 1")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND callId &gt; :after AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND unresolved = 1 AND owner IS NOT NULL AND returned = 0 ORDER BY callId LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, generation, position, primaryIdentity, secondaryIdentity, pointer, bytes, checksum FROM ledger_migration_row WHERE scope = :scope AND generation = :generation AND position &gt; :after ORDER BY position LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND (:after IS NULL OR identity &gt; :after) ORDER BY identity LIMIT 128")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded AND identity &gt; :after ORDER BY identity LIMIT 1")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded ORDER BY identity LIMIT 1")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND identity = :identity")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position &lt; :position ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position = :position AND identity &lt; :identity ORDER BY identity DESC LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position = :position AND identity &gt; :identity ORDER BY identity ASC LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope AND position &gt; :position ORDER BY position ASC, identity ASC LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, identity, position, pointer, bytes, contentType, revision FROM ledger_row WHERE scope = :scope ORDER BY position DESC, identity DESC LIMIT min(128, max(0, :limit))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, pointer, ordinal, payload, checksum FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT scope, sourceToken, generation, afterOrder, copiedRows, complete, pendingPointer, pendingOffset, pendingDigest FROM ledger_migration WHERE scope = :scope")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDao$@Query("SELECT substr(payload, max(0, :start) + 1, min(32768, max(0, :limit))) FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDatabase$entities = [LedgerHead::class, LedgerRow::class, LedgerBlob::class, LedgerChunk::class, LedgerEvidence::class, LedgerMigrationState::class, LedgerMigrationRow::class, LedgerToolCall::class, LedgerToolSweep::class, LedgerValidationState::class]</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE INDEX IF NOT EXISTS index_ledger_tool_call_scope_unresolved_callId ON ledger_tool_call(scope, unresolved, callId)")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS ledger_tool_call (scope BLOB NOT NULL, callId BLOB NOT NULL, owner BLOB, returned INTEGER NOT NULL, unresolved INTEGER NOT NULL, PRIMARY KEY(scope, callId))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS ledger_tool_sweep (scope BLOB NOT NULL, generation INTEGER NOT NULL, PRIMARY KEY(scope))")</ID>
+    <ID>MaxLineLength:TimelineLedgerDatabase.kt$TimelineLedgerDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS ledger_validation (scope BLOB NOT NULL, payload BLOB NOT NULL, checksum TEXT NOT NULL, PRIMARY KEY(scope))")</ID>
+    <ID>MaxLineLength:TimelineOwnedStorageFactory.kt$DormantCanonicalTimelineStore$override suspend</ID>
+    <ID>MaxLineLength:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$FileChannel.open(temporary, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)</ID>
+    <ID>MaxLineLength:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$State</ID>
+    <ID>MaxLineLength:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$private fun statePath(scope: TimelineScope): Path</ID>
+    <ID>MaxLineLength:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority$state.receipt?.let { writeUTF(it.sourceToken); writeUTF(it.targetGeneration); writeLong(it.targetRevision); writeUTF(it.certificateId) }</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$assertEquals(listOf("old", if (messages.size == 2 &amp;&amp; messages[1].id == "new") "new" else "middle"), (http as TimelineRemotePageResult.Page).records.map { it.identity.value })</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$private fun http(messages: List&lt;AssistantMessage&gt;)</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$private fun iroh(result: String): IrohAdminRpcTimelineTransport</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val advancingRequest = request("advance", TimelineContinuation.Before(TimelineMessageId("previous")), TimelineRemoteOrder.NewestFirst, 1)</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val cancelRequest = request("cancel-owner", TimelineContinuation.Initial, TimelineRemoteOrder.OldestFirst, 2, conversationId = "conv-cancel")</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val repeatedRequest = request("repeat", TimelineContinuation.Before(TimelineMessageId("duplicate")), TimelineRemoteOrder.NewestFirst, 1)</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val success = async { transport.listConversationMessagePage(successRequest, TimelinePageProgress(successRequest.continuation, 1, 1)) }</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val successRequest = request("success-owner", TimelineContinuation.Initial, TimelineRemoteOrder.OldestFirst, 2, conversationId = "conv-success")</ID>
+    <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val timeoutRequest = request("timeout-owner", TimelineContinuation.Initial, TimelineRemoteOrder.OldestFirst, 2, conversationId = "conv-timeout")</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$assertFalse("agent-b scoped loop should not receive agent-a repair", agentBTimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$assertTrue("agent-a scoped loop should receive repaired message", agentATimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore(), repositoryScope = repositoryScope)</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore, repositoryScope = repositoryScope)</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2, repositoryScope = repositoryScope)</ID>
+    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)</ID>
+    <ID>MaxLineLength:TimelineStrategyDatabase.kt$StrategyMetadataDao$@Query("SELECT scope,eventId,orderKey,bodyKey FROM strategy_metadata WHERE scope=:scope AND (orderKey,eventId)&lt;(:orderKey,:eventId) ORDER BY orderKey DESC,eventId DESC LIMIT :limit")</ID>
+    <ID>MaxLineLength:TimelineStrategyDatabase.kt$StrategyMetadataDao$@Query("SELECT scope,eventId,orderKey,bodyKey FROM strategy_metadata WHERE scope=:scope ORDER BY orderKey DESC,eventId DESC LIMIT :limit OFFSET :offset")</ID>
+    <ID>MaxLineLength:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest$loop.ingestStreamEvent(AssistantMessage(id = "assistant-canonical", date = FIXTURE_DATE, contentRaw = JsonPrimitive("partial response with enough content"), runId = "run-delete", seqId = 1, otid = "canonical-otid"))</ID>
+    <ID>MaxLineLength:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest$loop.ingestStreamEvent(AssistantMessage(id = "assistant-orphan", date = FIXTURE_DATE, contentRaw = JsonPrimitive("p"), runId = "run-delete", seqId = 1, otid = "orphan-otid"))</ID>
+    <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), tools)</ID>
+    <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = kotlinx.serialization.json.JsonNull, error = null)</ID>
+    <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")</ID>
+    <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest$result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), testTools)</ID>
+    <ID>MaxLineLength:ToolRepositoryTest.kt$ToolRepositoryTest.&lt;no name provided&gt;$override suspend</ID>
+    <ID>NestedBlockDepth:FakeMcpServerApi.kt$FakeMcpServerApi$private fun parseArgsFast(configValue: Any?): List&lt;String&gt;</ID>
+    <ID>NestedBlockDepth:RoomValidationMeasuredTest.kt$RoomValidationMeasuredTest$private suspend fun audit(count: Int, chained: Boolean): Meter.Snapshot</ID>
+    <ID>NestedBlockDepth:TimelineKeysetStrategyTest.kt$TimelineKeysetStrategyTest$@Test fun `metadata projection excludes heavy bodies and body slices obey byte limit`()</ID>
+    <ID>NewLineAtEndOfFile:BlockPaginationTest.kt$com.letta.mobile.data.repository.BlockPaginationTest.kt</ID>
+    <ID>NewLineAtEndOfFile:PaginationHelpersTest.kt$com.letta.mobile.data.repository.PaginationHelpersTest.kt</ID>
+    <ID>NewLineAtEndOfFile:ProviderPaginationTest.kt$com.letta.mobile.data.repository.ProviderPaginationTest.kt</ID>
+    <ID>ReturnCount:ApprovalMessageMapper.kt$private fun canAbsorbApprovalResponse( response: ApprovalResponsePayload, folded: List&lt;FoldedToolApproval&gt;, renderedToolCallIds: Set&lt;String&gt;, ): Boolean</ID>
+    <ID>ReturnCount:DomainToUiMessageMapper.kt$private fun AppMessage.subagentTaskBinding( returnsByCallId: Map&lt;String, AppMessage&gt;, ): SubagentTaskBinding?</ID>
+    <ID>ReturnCount:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$private suspend fun selectNormalizedRead( scope: TimelineScope, normalizedHead: NormalizedTimelineSnapshotHeadEntity?, legacyHead: ConfirmedTimelineSnapshotHeadMetadata?, ): ConfirmedTimelineReadResult?</ID>
+    <ID>ReturnCount:RoomTimelineBoundedStore.kt$RoomTimelineBoundedStore.Session$override suspend fun resolveImage(reference: StoredImageBodyReference): String?</ID>
+    <ID>SpreadOperator:LettaDatabase.kt$LettaDatabase.Companion$(*LettaDatabaseMigrations.ALL)</ID>
+    <ID>SwallowedException:MessageApiTimelineTransport.kt$MessageApiTimelineTransport$e: NoActiveRunException</ID>
+    <ID>ThrowsCount:SessionScopedAllConversationsRepository.kt$SessionScopedAllConversationsRepository$private suspend fun &lt;T&gt; withCurrentSessionAndRetryOnSwitch(block: suspend (SessionGraph) -&gt; T): T</ID>
+    <ID>TooGenericExceptionCaught:CapabilityRepository.kt$CapabilityRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConversationPagingSource.kt$ConversationPagingSource$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ConversationRepository.kt$ConversationRepository$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:CoroutineExtensions.kt$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessagePagingSource.kt$MessagePagingSource$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore$failure: Throwable</ID>
+    <ID>TooGenericExceptionCaught:RoomLegacyCanonicalMigration.kt$RoomLegacyCanonicalMigration$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:SessionManager.kt$SessionManager$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ToolRepository.kt$ToolRepository$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:BackendSwitchInvalidatorTest.kt$BackendSwitchInvalidatorTest$throw RuntimeException("b")</ID>
+    <ID>TooGenericExceptionThrown:CoroutineExtensionsTest.kt$CoroutineExtensionsTest$throw RuntimeException("Test Error")</ID>
+    <ID>TooManyFunctions:ConfirmedTimelineSnapshotEntity.kt$ConfirmedTimelineSnapshotDao</ID>
+    <ID>TooManyFunctions:ConversationDao.kt$ConversationDao</ID>
+    <ID>TooManyFunctions:ConversationRepository.kt$ConversationRepository : IConversationRepositoryBackendScopedCache</ID>
+    <ID>TooManyFunctions:DomainIdConverters.kt$DomainIdConverters</ID>
+    <ID>TooManyFunctions:IrohAdminRpcTimelineTransport.kt$IrohAdminRpcTimelineTransport : TimelineTransport</ID>
+    <ID>TooManyFunctions:RoomConfirmedTimelineStore.kt$RoomConfirmedTimelineStore : ConfirmedTimelineStore</ID>
+    <ID>TooManyFunctions:RoomTimelineBoundedStore.kt$RoomTimelineBoundedStore$Session : TimelineStoreTransactionTimelineImageBodyWriter</ID>
+    <ID>TooManyFunctions:SessionScopedAgentRepository.kt$SessionScopedAgentRepository : IAgentRepositoryBackendScopedCache</ID>
+    <ID>TooManyFunctions:SessionScopedChannelTransport.kt$SessionScopedChannelTransport : IChannelTransportRedialAwareChannelTransportFrameCollectorOverflowRecoveryMonitorSubagentScopeAwareChannelTransport</ID>
+    <ID>TooManyFunctions:SessionScopedConversationRepository.kt$SessionScopedConversationRepository : IConversationRepositoryBackendScopedCache</ID>
+    <ID>TooManyFunctions:TimelineLedgerDatabase.kt$TimelineLedgerDao</ID>
+    <ID>TooManyFunctions:TimelineOwnershipAuthority.kt$TimelineOwnershipAuthority</ID>
+    <ID>TooManyFunctions:ToolRepository.kt$ToolRepository : IToolRepository</ID>
+    <ID>UnusedImports:AgentRepositoryTest.kt$import kotlinx.coroutines.flow.first</ID>
+    <ID>UnusedImports:BlockRepositoryTest.kt$import kotlinx.serialization.json.buildJsonObject</ID>
+    <ID>UnusedImports:BlockRepositoryTest.kt$import kotlinx.serialization.json.put</ID>
+    <ID>UnusedImports:ContractsTest.kt$import com.letta.mobile.data.model.Agent</ID>
+    <ID>UnusedImports:ContractsTest.kt$import com.letta.mobile.data.model.AgentId</ID>
+    <ID>UnusedImports:FakeAgentApi.kt$import com.letta.mobile.data.model.ProjectId</ID>
+    <ID>UnusedImports:FakeAgentRepository.kt$import com.letta.mobile.data.model.ProjectId</ID>
+    <ID>UnusedImports:RoomConfirmedTimelineStoreTest.kt$import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitFailure</ID>
+    <ID>UnusedImports:RoomConfirmedTimelineStoreTest.kt$import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineCommitPlan</ID>
+    <ID>UnusedImports:RoomConfirmedTimelineStoreTest.kt$import com.letta.mobile.data.timeline.snapshot.NormalizedTimelineWriteResult</ID>
+    <ID>UnusedImports:RoomNormalizedIncrementalCommitTest.kt$import androidx.sqlite.db.SupportSQLiteDatabase</ID>
+    <ID>UnusedImports:RoomNormalizedIncrementalCommitTest.kt$import androidx.sqlite.db.SupportSQLiteOpenHelper</ID>
+    <ID>UnusedImports:RoomNormalizedIncrementalCommitTest.kt$import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory</ID>
+    <ID>UnusedImports:RoomNormalizedIncrementalCommitTest.kt$import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec</ID>
+    <ID>UnusedImports:RunRepositoryTest.kt$import kotlinx.serialization.json.buildJsonObject</ID>
+    <ID>UnusedImports:SelfTodoTimelineExclusionTest.kt$import com.letta.mobile.data.transport.TransportFrameEvent</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionGraphTest.kt$import kotlinx.coroutines.flow.map</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionManagerTest.kt$import kotlinx.coroutines.flow.map</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedAgentRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedAllConversationsRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportRecoveryTest.kt$import kotlinx.serialization.json.JsonArray</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedChannelTransportTest.kt$import kotlinx.coroutines.flow.map</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedConversationRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedModelSchedulePassageRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedProjectRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeMcpServerApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import com.letta.mobile.testutil.FakeToolApi</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedProjectWorkRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.local.AgentEntity</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.local.ConversationDao</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.local.ConversationEntity</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.local.ConversationRefreshEntity</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.data.model.LettaConfig</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeAgentApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeConversationApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeModelApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakePassageApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeProjectWorkApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeProviderApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeRunApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeScheduleApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import com.letta.mobile.testutil.FakeStepApi</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import io.mockk.mockk</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import kotlinx.coroutines.flow.Flow</ID>
+    <ID>UnusedImports:SessionScopedToolMcpRepositoryTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import app.cash.turbine.test</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.collections.immutable.persistentListOf</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.async</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.StandardTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.advanceTimeBy</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.advanceUntilIdle</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.runCurrent</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.test.runTest</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import org.junit.Assert.assertFalse</ID>
+    <ID>UnusedImports:TimelineSyncLoopHydrateTest.kt$import org.junit.Assert.assertNotNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import app.cash.turbine.test</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.ReasoningMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.SystemMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.data.model.ToolCallMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.async</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.StandardTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.advanceTimeBy</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.advanceUntilIdle</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.runCurrent</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.test.runTest</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopImageRestoreTest.kt$import org.junit.Assert.assertFalse</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import app.cash.turbine.test</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.ReasoningMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.SystemMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.data.model.ToolCallMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.collections.immutable.persistentListOf</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.test.advanceTimeBy</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconcileTest.kt$import org.junit.Assert.assertFalse</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import app.cash.turbine.test</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.AssistantMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.ReasoningMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.SystemMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.ToolCallMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.data.model.UserMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.collections.immutable.persistentListOf</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.Dispatchers</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.async</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.runBlocking</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.serialization.json.JsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopReconnectTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.ReasoningMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.SystemMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.ToolCallMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.data.model.UserMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.collections.immutable.persistentListOf</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.Dispatchers</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.runBlocking</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.test.advanceTimeBy</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopSendTest.kt$import org.junit.Assert.assertFalse</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.LettaMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.SystemMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.ToolCallMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.data.model.UserMessage</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.collections.immutable.persistentListOf</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.Dispatchers</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.runBlocking</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopStreamingTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import app.cash.turbine.test</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.data.api.ApiException</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.data.api.NoActiveRunException</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.data.model.ConversationId</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.data.model.MessageContentPart</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.data.model.MessageCreateRequest</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import com.letta.mobile.testutil.TestMessageSource</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import io.ktor.utils.io.ByteChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import io.ktor.utils.io.ByteReadChannel</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import io.ktor.utils.io.writeStringUtf8</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlin.random.Random</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.CancellationException</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.CompletableDeferred</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.flow.MutableStateFlow</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.sync.Mutex</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.test.UnconfinedTestDispatcher</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.test.advanceTimeBy</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.test.runCurrent</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.withTimeout</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.coroutines.withTimeoutOrNull</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.serialization.json.JsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.serialization.json.jsonArray</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.serialization.json.jsonObject</ID>
+    <ID>UnusedImports:TimelineSyncLoopToolApprovalTest.kt$import kotlinx.serialization.json.jsonPrimitive</ID>
+    <ID>UnusedImports:WsChatBridgeTest.kt$import com.letta.mobile.data.transport.BridgeTurnStatus</ID>
+    <ID>UnusedParameter:ClientToolRegistry.kt$ClientToolRegistry$arguments: String</ID>
+    <ID>UnusedPrivateMember:SessionManagerTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedAgentRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedAllConversationsRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedChannelTransportTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedConversationRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedProjectRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:SessionScopedProjectWorkRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun assistantStreamMessage(plan: TimelineAssistantStreamPlan): LettaMessage</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun clearRequestFromRecord(record: TimelineCursorRecord): TimelineCursorClearRequest</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun cursorMapView(store: RecordingConversationCursorStore): TimelineCursorMapView</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun cursorPairView(store: RecordingConversationCursorStore): TimelineCursorPairView</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun expiredPlanConversation(plan: TimelineExpiredStreamPlan): ConversationId</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun failurePolicy(policy: TimelineListFailurePolicy): TimelineListFailurePolicy</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun heartbeatChannel(plan: TimelineHeartbeatStreamPlan): ByteChannel</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun idleConversation(plan: TimelineIdleStreamPlan): ConversationId</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun limitedOrderedView(view: TimelineOrderedMessageView): TimelineMessageBatch</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun listGateRelease(gate: TimelineListGate): CompletableDeferred&lt;List&lt;LettaMessage&gt;&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun listGateStarted(gate: TimelineListGate): CompletableDeferred&lt;Unit&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun mapViewEntries(view: TimelineCursorMapView): Map&lt;String, Long&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun mergeOrderedViews( left: TimelineOrderedMessageView, right: TimelineOrderedMessageView, ): TimelineMessageBatch</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun pairViewRecords(view: TimelineCursorPairView): List&lt;Pair&lt;String, Long&gt;&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun reversedOrderedView(view: TimelineOrderedMessageView): TimelineMessageBatch</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendCaptureMessages(capture: TimelineSendCapture): TimelineMessageBatch</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendCaptureRequest(capture: TimelineSendCapture): MessageCreateRequest</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendPipelineCapture(pipeline: TimelineSendPipeline): TimelineSendCapture</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendPipelineSink(pipeline: TimelineSendPipeline): TimelineStoredMessageSink</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun storedSinkMessages(sink: TimelineStoredMessageSink): List&lt;LettaMessage&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun streamChannelRequest( request: TimelineStreamChannelRequest, ): TimelineStreamChannelRequest</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun streamOpenSignal(signal: TimelineStreamOpenSignal): CompletableDeferred&lt;Unit&gt;</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchCursorRecord(record: TimelineCursorRecord): TimelineCursorRecord</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchMessageSpec(spec: TimelineTestMessageSpec): TimelineTestMessageSpec</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchQueryBatch( query: ConversationListQuery, batch: TimelineMessageBatch, ): TimelineOrderedMessageView</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun userPersistRequest(plan: TimelineUserPersistPlan): MessageCreateRequest</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun userPersistSink(plan: TimelineUserPersistPlan): TimelineStoredMessageSink</ID>
+    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun withCursorRecord( store: RecordingConversationCursorStore, record: TimelineCursorRecord, ): TimelineCursorRecord</ID>
+    <ID>UnusedPrivateProperty:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest$val commitsDuringStreaming = commitsAfterOneWindow</ID>
+    <ID>UnusedPrivateProperty:TimelineSyncLoopReconnectTest.kt$TimelineSyncLoopReconnectTest$val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-qv6d", scope)</ID>
+    <ID>UseCheckOrError:FakeConversationApi.kt$FakeConversationApi$throw IllegalStateException("admin_rpc is not supported by this transport")</ID>
+    <ID>UseCheckOrError:IrohAdminRpcSlashCommandSource.kt$IrohAdminRpcSlashCommandSource$throw IllegalStateException("Iroh admin_rpc $method returned no result")</ID>
+    <ID>UseCheckOrError:IrohAdminRpcSlashCommandSource.kt$IrohAdminRpcSlashCommandSource$throw IllegalStateException("Iroh admin_rpc goal.get returned no result")</ID>
+    <ID>UseCheckOrError:SessionScopedAllConversationsRepository.kt$SessionScopedAllConversationsRepository$throw IllegalStateException( "Session graph kept switching; refresh abandoned after $MAX_SESSION_SWITCH_RETRIES attempts", )</ID>
+    <ID>WildcardImport:BackendConversationCursorStoreTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:ResumableValidationDigestTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomLedgerCardinalityTest.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomLedgerCardinalityTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomLegacyCanonicalMigration.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomLegacyCanonicalMigrationTest.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomLegacyCanonicalMigrationTest.kt$import com.letta.mobile.data.timeline.snapshot.*</ID>
+    <ID>WildcardImport:RoomLegacyCanonicalMigrationTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomLegacyLedgerCopySourceTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomLegacyLedgerCopyTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomTimelineBoundedStore.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomTimelineBoundedStoreTest.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomTimelineBoundedStoreTest.kt$import com.letta.mobile.data.timeline.snapshot.*</ID>
+    <ID>WildcardImport:RoomTimelineBoundedStoreTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomTimelineOwnershipEnforcementTest.kt$import com.letta.mobile.data.timeline.snapshot.*</ID>
+    <ID>WildcardImport:RoomTimelineOwnershipEnforcementTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomTimelineToolIndexTest.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomTimelineToolIndexTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:RoomTimelineValidation.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:RoomValidationMeasuredTest.kt$import androidx.sqlite.db.*</ID>
+    <ID>WildcardImport:RoomValidationMeasuredTest.kt$import com.letta.mobile.data.timeline.snapshot.*</ID>
+    <ID>WildcardImport:RoomValidationMeasuredTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:SessionCapturedCursorTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TimelineOwnedStorageHandoffTest.kt$import com.letta.mobile.data.timeline.snapshot.*</ID>
+    <ID>WildcardImport:TimelineOwnedStorageHandoffTest.kt$import org.junit.Assert.*</ID>
+    <ID>WildcardImport:TimelineOwnershipAuthorityTest.kt$import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

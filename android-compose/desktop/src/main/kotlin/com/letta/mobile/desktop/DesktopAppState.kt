@@ -79,6 +79,10 @@ enum class DesktopDestination(
         label = "Projects",
         summary = "The projects an Iroh host relays from VibeSync: open one's chat, sync it, or provision its beads remote.",
     ),
+    Plugins(
+        label = "Plugins",
+        summary = "Install plugins from a file after reviewing what each may do; enable, disable or remove them.",
+    ),
 }
 
 fun defaultDesktopBootstrapState(

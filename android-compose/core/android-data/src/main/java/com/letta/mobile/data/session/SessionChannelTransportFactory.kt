@@ -56,6 +56,8 @@ class SessionChannelTransportFactory @Inject constructor(
                     secretKeyStore = com.letta.mobile.data.security.KeystoreIrohIdentityStore.forApp(appContext),
                     externalToolRegistry = externalToolRegistry,
                     notebookStore = notebookStore,
+                    // by4vm.50: cadence syncs only on unmetered + (charging or screen on).
+                    syncBudget = AndroidSyncBudgetPolicy(appContext),
                     notebookPeers = {
                         NotebookPeerProvisioning.read(appContext.filesDir.toPath().resolve("notebooks/peers.json"))
                     },

@@ -89,7 +89,6 @@ internal class AdminChatSendPipeline(
             uiState = uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
             activeConversationId = activeConversationId,
-            isFreshRoute = isFreshRoute,
             setActiveConversationId = setActiveConversationId,
             startTimelineObserver = startTimelineObserver,
             clientVersionProvider = clientVersionProvider,

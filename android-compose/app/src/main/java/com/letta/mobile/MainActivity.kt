@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ProfileCaptureKeyguardHelper.allowProfileCaptureLaunch(this)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = PairLinkLaunchTarget.consume(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent, this)
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
@@ -204,7 +204,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = PairLinkLaunchTarget.consume(intent)
+        launchTarget.value = PairLinkLaunchTarget.consume(intent, this)
     }
 
     private fun importAutomationPayloadFromLaunchIntent() {
@@ -212,6 +212,11 @@ class MainActivity : ComponentActivity() {
             ?.trim()
             .orEmpty()
         if (encodedPayload.isBlank()) {
+            return
+        }
+        // letta-mobile-by4vm.1: exported activity — release builds never stage the extra.
+        if (!AutomationAuthBootstrap.acceptsLaunchPayload) {
+            intent.removeExtra(AutomationAuthBootstrap.EXTRA_PAYLOAD_BASE64)
             return
         }
         getSharedPreferences(AutomationAuthBootstrap.PREFS_NAME, MODE_PRIVATE)

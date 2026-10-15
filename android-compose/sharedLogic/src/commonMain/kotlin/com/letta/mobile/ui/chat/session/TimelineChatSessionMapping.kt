@@ -1,11 +1,14 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
+import com.letta.mobile.data.chat.projection.withQueuedApprovals
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.timeline.TimelineSyncLoop
@@ -50,18 +53,26 @@ data class TimelineRunState(
     val loadError: String? = null,
     /** The last send or control failure; kept until the next send, so the glow reads "failed". */
     val error: String? = null,
-    /** The [error] the page already showed, so it is not shown twice. */
-    val acknowledgedError: String? = null,
     /** A stop was requested and the run has not ended yet. */
     val cancelling: Boolean = false,
+    /**
+     * letta-mobile-by4vm.81: Stop gave up on the run's terminal and dropped it locally; the page
+     * shows the run idle until the timeline's own run ends or the next send.
+     */
+    val clearedLocally: Boolean = false,
     /** Approval request ids whose answer is in flight. */
     val submittingApprovals: Set<String> = emptySet(),
 )
 
-/** Timeline view state the page toggles: collapsed runs and expanded reasoning. */
+/**
+ * Timeline view state a session port keeps for the page: collapsed runs, expanded reasoning, and the
+ * page error already shown. letta-mobile-by4vm.98: desktop's port keeps the same state.
+ */
 data class TimelineLocalState(
     val collapsedRunIds: Set<String> = emptySet(),
     val expandedReasoningMessageIds: Set<String> = emptySet(),
+    /** The page error the page already showed (its snackbar), so it is not shown twice. */
+    val acknowledgedError: String? = null,
 ) {
     fun toggleRun(runId: String) = copy(collapsedRunIds = collapsedRunIds.toggle(runId))
 
@@ -73,11 +84,10 @@ private fun Set<String>.toggle(value: String): Set<String> = if (value in this) 
 
 /**
  * The timeline port's presence comes from the projection alone (a prompt still sending, a run still
- * open); it has no client-mode stream, A2UI wait or transport turn flag of its own.
+ * open); it has no A2UI wait or transport turn flag of its own.
  */
 internal val IdlePresenceSignals = ChatPresenceSignals(
     replyStreaming = false,
-    clientModeStreamInFlight = false,
     a2uiThinkingActive = false,
     duplicateInitialMessageInFlight = false,
     turnInFlight = false,
@@ -98,7 +108,7 @@ fun timelineChatUiState(
     isAgentTyping = presentation.isAgentTyping,
     agentName = target.agentName,
     agentId = target.agentId,
-    error = run.error.takeUnless { it == run.acknowledgedError },
+    error = local.pageError(run.error),
     runFailed = run.error != null,
     collapsedRunIds = local.collapsedRunIds.toImmutableSet(),
     expandedReasoningMessageIds = local.expandedReasoningMessageIds.toImmutableSet(),
@@ -112,6 +122,25 @@ private fun TimelineRunState.conversationState(conversationId: String): Conversa
     else -> ConversationState.Ready(conversationId)
 }
 
+/** letta-mobile-by4vm.79: the approval state a host hands the port through [TimelineChatSessionOptions.approvals]. */
+data class TimelineHostApprovals(
+    val submitting: Set<String> = emptySet(),
+    val queued: Set<String> = emptySet(),
+    val details: Map<String, PendingApprovalDetails> = emptyMap(),
+)
+
+/**
+ * [this] with the host's approval state laid over it: parked details joined onto their rows, queued
+ * answers marked, and the row answered by either the port or the host disabled. Unchanged when the
+ * host reports nothing.
+ */
+fun ChatUiState.withHostApprovals(run: TimelineRunState, approvals: TimelineHostApprovals): ChatUiState {
+    if (approvals == TimelineHostApprovals()) return this
+    val joined = withPendingApprovalDetails(approvals.details).withQueuedApprovals(approvals.queued)
+    val answering = answeringApprovalOnScreen(run.submittingApprovals + approvals.submitting, joined.messages)
+    return if (answering == joined.activeApprovalRequestId) joined else joined.copy(activeApprovalRequestId = answering)
+}
+
 /** The newest on-screen approval whose answer is in flight; the page disables that row's buttons. */
 internal fun answeringApprovalOnScreen(submitting: Set<String>, messages: List<UiMessage>): String? {
     if (submitting.isEmpty()) return null
@@ -120,17 +149,22 @@ internal fun answeringApprovalOnScreen(submitting: Set<String>, messages: List<U
     }
 }
 
-/** The composer for [draft]; a send waits for the run to end (this port has no send queue). */
+/** Whether a send may go out now: none while a run is in flight, unless the host queues it. */
+data class TimelineSendGate(val runInFlight: Boolean, val canQueue: Boolean) {
+    val blocked: Boolean get() = runInFlight && !canQueue
+}
+
+/** The composer for [draft]; a send during a run waits for it to end unless [gate] queues it. */
 fun timelineComposerUiState(
     draft: TimelineComposerDraft,
-    runInFlight: Boolean,
+    gate: TimelineSendGate,
     options: TimelineChatSessionOptions,
 ): ChatComposerUiState = ChatComposerUiState(
     text = draft.state.text,
     attachments = draft.state.pendingImageAttachments.toImmutableList(),
     error = draft.hostError ?: draft.state.error?.message(options.attachmentLimits),
-    canSend = draft.state.hasPayload && !runInFlight,
-    canQueueWhileStreaming = false,
+    canSend = draft.state.hasPayload && !gate.blocked,
+    canQueueWhileStreaming = gate.canQueue,
     placeholder = options.placeholder,
     maxAttachments = options.attachmentLimits.maxAttachmentCount,
     attachmentLimits = options.attachmentLimits,
@@ -143,7 +177,7 @@ fun ChatComposerError.message(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.AttachmentLoadFailed -> "Could not attach image."
 }
 
-/** What a timeline port can do: images and the controls its transport offers; nothing else yet. */
+/** What a timeline port can do: images, the controls its transport offers, and the host's extensions. */
 fun timelineCapabilities(controls: TimelineChatRunControls) = ChatSurfaceCapabilities(
     attachImages = true,
     rerun = false,

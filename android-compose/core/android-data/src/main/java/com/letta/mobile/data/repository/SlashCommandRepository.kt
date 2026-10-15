@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import javax.inject.Inject
@@ -15,7 +16,7 @@ class SlashCommandRepository @Inject constructor(
     settingsRepository: ISettingsRepository,
     channelTransport: IChannelTransport,
 ) : CachedSlashCommandRepository(
-    remote = noAppServerRoute(),
+    remote = RemoteRoute.Absent(SessionRoute.SKILLS),
     irohSource = IrohAdminRpcSlashCommandSource(
         channelTransport = channelTransport,
         settingsRepository = settingsRepository,

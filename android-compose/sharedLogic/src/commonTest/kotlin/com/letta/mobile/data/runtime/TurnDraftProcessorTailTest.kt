@@ -135,7 +135,7 @@ private class TailHarness(private val scope: TestScope) {
         try {
             processor.process(lifecycle(RuntimeRunStatus.Completed, runId), frameSeq = null, authoritative = true)
         } catch (_: TurnEndedForTest) {
-            // The processor completes the turn by throwing out of complete(), as the engine's marker does.
+            // This harness stops the feed by throwing out of complete(); the engine signals a TurnOutcome.
         }
         scope.advanceUntilIdle()
     }

@@ -5,6 +5,7 @@ import com.letta.mobile.data.context.estimate.LocalContextInputs
 import com.letta.mobile.data.context.estimate.LocalMessageTokens
 import com.letta.mobile.data.context.estimate.LocalTranscriptContext
 import com.letta.mobile.data.context.estimate.toAgentContextJson
+import com.letta.mobile.data.model.AgentId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.io.File
@@ -36,6 +37,7 @@ internal class LocalBackendContextReader(
     private val support: LocalBackendStoreSupport,
     private val messageReader: LocalBackendMessageReader,
     private val maxTranscriptBytes: Long = LocalBackendMessageReader.MAX_TRANSCRIPT_BYTES,
+    private val maxInlineValueChars: Int = BoundedTranscriptReader.DEFAULT_MAX_INLINE_VALUE_CHARS,
 ) {
 
     /**
@@ -44,7 +46,9 @@ internal class LocalBackendContextReader(
      */
     fun agentContextProjected(query: AgentContextQuery): JsonObject? =
         runCatching {
-            val agent = readJson(File(File(support.baseDir, "agents"), "${query.agentId}.json")) ?: return@runCatching null
+            // letta-mobile-by4vm.21: letta.js names records agents/<base64url(id)>.json; bare <id>.json too.
+            val agentFile = LocalBackendLayout.findAgentRecordFile(support.baseDir, AgentId(query.agentId)) ?: return@runCatching null
+            val agent = readJson(agentFile) ?: return@runCatching null
             val dir = messageReader.contextConversationDir(query.conversationId, query.agentId) ?: return@runCatching null
             val inputs = LocalContextInputs(
                 systemPromptSidecar = readJson(File(dir, "system-prompt.json")),
@@ -68,11 +72,15 @@ internal class LocalBackendContextReader(
         summary.toLong() + LocalMessageTokens.ofAll(transcript.messages)
     }.getOrNull()
 
-    /** An absent transcript is an empty conversation; one past the byte cap is not estimated at all. */
+    /**
+     * An absent transcript is an empty conversation; one past the byte cap is not estimated at all.
+     * Below the cap, lines go through [BoundedTranscriptReader] (letta-mobile-by4vm.49) so a
+     * multi-MB base64 image part becomes a length marker instead of one giant String.
+     */
     private fun readTranscript(file: File): LocalTranscriptContext? {
         if (!file.isFile) return LocalTranscriptContext.read(emptySequence())
         if (file.length() > maxTranscriptBytes) return null
-        return file.bufferedReader().use { LocalTranscriptContext.read(it.lineSequence()) }
+        return BoundedTranscriptReader.readTranscriptContext(file, maxInlineValueChars)
     }
 
     private fun readJson(file: File): JsonObject? = runCatching {

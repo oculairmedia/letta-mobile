@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.api.ProjectIrohSource
 import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.repository.iroh.AdminRpcMethod
 import com.letta.mobile.data.repository.iroh.AdminRpcPath
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlin.jvm.JvmInline
 import kotlinx.coroutines.CancellationException
@@ -36,12 +37,7 @@ import kotlinx.serialization.json.put
 open class IrohAdminRpcProjectSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) : ProjectIrohSource {
     override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
 

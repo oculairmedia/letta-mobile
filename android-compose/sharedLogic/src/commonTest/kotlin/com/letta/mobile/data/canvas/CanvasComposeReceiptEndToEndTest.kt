@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactReceipts
 import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
 import com.letta.mobile.data.model.ToolCall
@@ -138,7 +139,7 @@ class CanvasComposeReceiptEndToEndTest {
         assertEquals(CanvasArtifactStatus.Published, receipt.status)
         assertEquals(TOOL_CALL_ID, receipt.toolCallId)
         assertEquals(CanvasComposeIds.derived(TOOL_CALL_ID), receipt.artifactId, "the artifact the host derived from the call id")
-        assertEquals(CanvasId.forConversation(CONVERSATION).value, receipt.canvasId)
+        assertEquals(CanvasId.forConversation(ConversationId(CONVERSATION)).value, receipt.canvasId)
         assertEquals(host.scene().revision, receipt.revision)
         assertEquals("Weekend", receipt.title)
     }
