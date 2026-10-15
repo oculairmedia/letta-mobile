@@ -17,6 +17,7 @@ import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.chat.session.ChatRunId
@@ -126,7 +127,7 @@ class DesktopChatSessionPortTest {
         assertFalse(capabilities.search)
         assertTrue(capabilities.modelSwitch)
         assertTrue(capabilities.fontScale)
-        assertEquals(controller.supportsWorkingDirectory, capabilities.workingDirectory)
+        assertEquals(controller.workingDirectory.current.value != null, capabilities.workingDirectory)
         assertFalse(capabilities.pagedHistory, "no canonical presentation in the fake")
 
         controller.close()
@@ -157,7 +158,7 @@ class DesktopChatSessionPortTest {
             presence = ChatStreamingPresence(isStreaming = true, isAgentTyping = true),
             cancellingConversationId = "conv-1",
             sendQueue = ConversationSendQueue(),
-            local = DesktopChatLocalTimelineState(),
+            local = TimelineLocalState(),
         )
 
         val selected = desktopChatUiState(inputs, previous = null)
@@ -178,7 +179,7 @@ class DesktopChatSessionPortTest {
             presence = ChatStreamingPresence(isStreaming = false, isAgentTyping = false),
             cancellingConversationId = null,
             sendQueue = ConversationSendQueue(),
-            local = DesktopChatLocalTimelineState(),
+            local = TimelineLocalState(),
         )
 
         val first = desktopChatUiState(inputs, previous = null)
@@ -303,7 +304,7 @@ class DesktopChatSessionPortTest {
             presence = ChatStreamingPresence(isStreaming = false, isAgentTyping = false),
             cancellingConversationId = null,
             sendQueue = ConversationSendQueue(),
-            local = DesktopChatLocalTimelineState(),
+            local = TimelineLocalState(),
         )
     }
 

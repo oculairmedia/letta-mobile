@@ -22,7 +22,9 @@ import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryUiState
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
+import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.session.TimelineRunState
+import com.letta.mobile.ui.chat.session.pageError
 import com.letta.mobile.ui.chat.session.withHostApprovals
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -34,21 +36,6 @@ import kotlinx.collections.immutable.toImmutableSet
  * flows and the controller so each rule is unit-testable on plain values.
  */
 
-/** Timeline UI state desktop keeps locally (the old page held it in composable state). */
-internal data class DesktopChatLocalTimelineState(
-    val collapsedRunIds: Set<String> = emptySet(),
-    val expandedReasoningMessageIds: Set<String> = emptySet(),
-    /** The page error the shared page has already shown, so it is not shown again. */
-    val acknowledgedError: String? = null,
-) {
-    fun toggleRun(runId: String) = copy(collapsedRunIds = collapsedRunIds.toggle(runId))
-
-    fun toggleReasoning(messageId: String) =
-        copy(expandedReasoningMessageIds = expandedReasoningMessageIds.toggle(messageId))
-}
-
-private fun Set<String>.toggle(value: String): Set<String> = if (value in this) this - value else this + value
-
 /** Everything the timeline state is derived from, at one instant. */
 internal data class DesktopChatTimelineInputs(
     val surface: DesktopChatSurfaceState,
@@ -56,7 +43,8 @@ internal data class DesktopChatTimelineInputs(
     val presence: ChatStreamingPresence,
     val cancellingConversationId: String?,
     val sendQueue: ConversationSendQueue,
-    val local: DesktopChatLocalTimelineState,
+    /** letta-mobile-by4vm.98: the shared port-local view state (toggles, the acknowledged error). */
+    val local: TimelineLocalState,
     /**
      * letta-mobile-by4vm.97: the controller's approval state as the shared overlay reads it: answers
      * in flight, queued offline (bzvro.14), and each parked control request's details (bzvro.11/.12).
@@ -87,7 +75,7 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         agentName = selected?.agentName.orEmpty(),
         agentId = selected?.agentId,
         // A composer error is the composer's to show (next to the draft), not the page's.
-        error = surface.pageError(inputs.local.acknowledgedError),
+        error = surface.pageError(inputs.local),
         // The controller keeps its error until the next send; the glow reads it, shown or not,
         // as the host's own page background does (rememberDesktopAmbientStatus).
         runFailed = surface.errorMessage != null,
@@ -103,12 +91,11 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
 private val HOST_OWNED_RUN = TimelineRunState()
 
 /**
- * The page (snackbar) error: the surface error unless it is the composer's own error, which the
- * composer shows, or the page already showed it ([acknowledged]). Acknowledging does not clear
- * the controller's error, so the ambient glow keeps reading "failed" until the next send.
+ * The page (snackbar) error: the shared rule over [local] (hidden once acknowledged, glow kept),
+ * minus the composer's own error, which the composer shows next to the draft.
  */
-internal fun DesktopChatSurfaceState.pageError(acknowledged: String?): String? =
-    errorMessage.takeUnless { it == composerErrorMessage || it == acknowledged }
+internal fun DesktopChatSurfaceState.pageError(local: TimelineLocalState): String? =
+    local.pageError(errorMessage).takeUnless { it == composerErrorMessage }
 
 /** Reuses the previous list instance when the content is unchanged, so the timeline skips work. */
 private fun nextMessages(previous: ImmutableList<UiMessage>?, next: List<UiMessage>): ImmutableList<UiMessage> =
@@ -122,13 +109,6 @@ internal data class DesktopChatComposerHostInputs(
     val placeholder: String? = null,
 )
 
-/** The controller's working-directory facts, for gateways that have one. */
-internal data class DesktopWorkingDirectoryInputs(
-    val supported: Boolean,
-    val path: String?,
-    val loading: Boolean,
-)
-
 /** Everything the composer state is derived from, at one instant. */
 internal data class DesktopChatComposerInputs(
     val surface: DesktopChatSurfaceState,
@@ -137,7 +117,8 @@ internal data class DesktopChatComposerInputs(
     val modelOptions: List<Pair<String, String>>,
     /** letta-mobile-by4vm.85: the selected conversation's effort and each option's efforts. */
     val modelEfforts: DesktopModelEfforts = DesktopModelEfforts(),
-    val workingDirectory: DesktopWorkingDirectoryInputs,
+    /** letta-mobile-by4vm.98: the shared working-directory chip; null where the gateway has none. */
+    val workingDirectory: ChatWorkingDirectoryUiState?,
     val canQueueWhileStreaming: Boolean,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val permissionMode: ChatPermissionModeUiState? = null,
@@ -158,7 +139,7 @@ internal fun desktopChatComposerUiState(inputs: DesktopChatComposerInputs): Chat
         mentionables = inputs.host.mentionables.toImmutableList(),
         model = desktopChatModelUiState(surface.composerModelLabel, inputs.modelOptions, inputs.modelEfforts),
         contextUsage = inputs.host.contextUsage,
-        workingDirectory = inputs.workingDirectory.toUiState(),
+        workingDirectory = inputs.workingDirectory,
         permissionMode = inputs.permissionMode,
     )
 }
@@ -223,6 +204,3 @@ internal fun desktopChatModelUiState(
         options = options.toImmutableList(),
     )
 }
-
-private fun DesktopWorkingDirectoryInputs.toUiState(): ChatWorkingDirectoryUiState? =
-    if (supported) ChatWorkingDirectoryUiState(path = path, isLoading = loading) else null

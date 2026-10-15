@@ -60,7 +60,7 @@ internal fun LettaDesktopApp(
     val frame = rememberDesktopShellFrame(context, chatState)
     DesktopShellEffects(context, frame, conversationTabs)
     DesktopShellRoutingEffects(context, frame, onActiveTitleChange)
-    val workingDirectory by context.core.chatController.selectedConversationWorkingDirectory.collectAsState()
+    val workingDirectory = context.core.chatController.workingDirectory.current.collectAsState().value?.path
     DesktopMaterialTheme {
         DesktopWorkspaceFileViewerHost(context.core.chatScope, workingDirectory) {
             DesktopShellWindowContent(context, frame)
