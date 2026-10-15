@@ -33,15 +33,15 @@
 
 # ---------------------------------------------------------------------------
 # letta-mobile-by4vm.88: session-scoped repositories are java.lang.reflect.Proxy
-# instances over these interfaces (SessionForwarding.kt). Keep each
-# interface a real type (no merging into its single implementation). Method names
-# must survive too: SessionScopedInvocationHandler checks SessionForwarding's names
-# ("clearForBackendSwitch", ...) against Class.getMethods() at construction, so an
-# obfuscated interface fails app start in minified builds (perf-gate on main
-# 81787e1cb: "Target package ... is not running").
+# instances over these interfaces (SessionForwarding.kt). R8 assumes it sees every
+# implementer of an interface, so without a full keep it (a) devirtualised calls on
+# IAgentRepository into a cast to its one visible implementer, CachedAgentRepository
+# ("$Proxy2 cannot be cast"), (b) renamed or removed methods that
+# SessionScopedInvocationHandler matches by name against Class.getMethods()
+# ("ie6 has no methods [checkpointAndRestoreConfig]"). Either one fails app start in
+# minified builds (perf-gate red on main 81787e1cb: "Target package ... is not running").
 # ---------------------------------------------------------------------------
--keep,allowobfuscation,allowshrinking interface com.letta.mobile.data.repository.api.I*Repository
--keepclassmembernames interface com.letta.mobile.data.repository.api.I*Repository {
+-keep interface com.letta.mobile.data.repository.api.I*Repository {
     <methods>;
 }
 
