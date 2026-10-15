@@ -9,6 +9,8 @@ on:
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
+      - "*.md"
+      - "scripts/bootstrap-branch-protection.sh"
   pull_request:
     # Required contexts (test / build-apk-pass / shared-multiplatform) must report
     # on stacked letta/**, feat/**, and cursor/** PRs as well as PRs into main.
@@ -32,6 +34,8 @@ on:
       # that would otherwise never report test/build-apk-pass/
       # shared-multiplatform. android-perf.yml needs no entry: its perf-gate
       # macrobenchmark is nightly + main only, not a required PR check.
+      # *.md and scripts/bootstrap-branch-protection.sh feed the docs-freshness
+      # check in `test`, so a README-only PR must run it rather than skip it.
       # docs/** is here for the same reason: a docs-only PR would otherwise
       # report none of the required contexts, so branch protection blocks it
       # with nothing to fix and no check to re-run. letta-mobile-je4k7 tracks replacing this allowlist,
@@ -39,6 +43,8 @@ on:
       # report and short-circuit when nothing they gate has changed.
       - ".github/workflows/**"
       - "docs/**"
+      - "*.md"
+      - "scripts/bootstrap-branch-protection.sh"
       - "android-compose/**"
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
@@ -118,6 +124,13 @@ jobs:
       - name: Enforce stateful mock isolation
         working-directory: ${{ github.workspace }}
         run: bash scripts/ci/stateful-mock-gate.sh
+
+      # README/CONTRIBUTING/CLAUDE/AGENTS must name every Gradle module, list the
+      # branch-protection gates, cite real modules in task paths, keep relative
+      # links resolving, and quote the wrapper's Gradle version.
+      - name: Check docs match the tree
+        working-directory: ${{ github.workspace }}
+        run: python3 scripts/ci/docs-freshness-check.py
 
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.
