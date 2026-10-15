@@ -34,7 +34,13 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatSendQueueSource
+import com.letta.mobile.ui.chat.session.ChatSendQueueTarget
+import com.letta.mobile.ui.chat.session.CoordinatorSendQueue
+import com.letta.mobile.ui.chat.session.DerivedStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryState
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
@@ -954,9 +960,12 @@ class DesktopChatController(
         return canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(activeGateway, conversation))
     }
 
-    /** letta-mobile-1n5py: the canonical route's send queue for the selected conversation, else null. */
-    fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
-        selectedCanonicalCoordinator()?.sendQueue
+    /** letta-mobile-1n5py: the canonical route's queue for the selected conversation, else null. */
+    private fun selectedQueueTarget(): ChatSendQueueTarget? {
+        val selectedId = _state.value.selectedConversationId ?: return null
+        val controls = selectedCanonicalCoordinator()?.sendQueue ?: return null
+        return ChatSendQueueTarget(controls, QueueConversationId(selectedId))
+    }
 
     private fun launchCanonicalSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit) {
         val conversationId = _state.value.selectedConversationId
@@ -1194,6 +1203,19 @@ class DesktopChatController(
     }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
+
+    /**
+     * letta-mobile-1n5py, by4vm.98.2: the selected conversation's send queue, the shared extension
+     * point the session port reads; re-resolved when the selection or the canonical route changes.
+     * Only the canonical route queues a send during a run.
+     */
+    val sendQueue: ChatSendQueueSource = CoordinatorSendQueue(
+        targets = combine(canonicalPresentation, state.map { it.selectedConversationId }.distinctUntilChanged()) { _, _ ->
+            selectedQueueTarget()
+        },
+        canQueueWhileStreaming = DerivedStateFlow(canonicalPresentation.map { it != null }) { canonicalPresentation.value != null },
+        current = ::selectedQueueTarget,
+    )
     private val _canonicalStatus = MutableStateFlow<String?>(null)
     val canonicalStatus = _canonicalStatus.asStateFlow()
 

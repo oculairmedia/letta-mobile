@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.send.ConversationSendQueue
-import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -12,7 +11,6 @@ import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
-import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.A2uiSnackbarId
 import com.letta.mobile.ui.chat.session.A2uiSurfaceId
@@ -33,15 +31,12 @@ import com.letta.mobile.ui.chat.session.currentHostApprovals
 import com.letta.mobile.ui.chat.session.forgetAcknowledgedOnceCleared
 import com.letta.mobile.ui.chat.session.hostApprovals
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.runningFold
@@ -177,7 +172,7 @@ internal class DesktopChatSessionPort(
         controller.state,
         controller.replyPresence,
         controller.cancellingConversationId,
-        selectedSendQueue(),
+        controller.sendQueue.queue,
         combine(localTimeline, controller.approvals.hostApprovals(), ::Pair),
     ) { surface, presence, cancelling, queue, (local, approvals) ->
         DesktopChatTimelineInputs(surface, presence, cancelling, queue, local, approvals)
@@ -186,31 +181,12 @@ internal class DesktopChatSessionPort(
         localTimeline.update { it.forgetAcknowledgedOnceCleared(inputs.surface.errorMessage) }
     }
 
-    /**
-     * The selected conversation's queue, re-resolved whenever the selection or the canonical route
-     * changes.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun selectedSendQueue(): Flow<ConversationSendQueue> = combine(
-        controller.canonicalPresentation,
-        controller.state.map { it.selectedConversationId }.distinctUntilChanged(),
-    ) { _, selectedId -> selectedId }
-        .flatMapLatest { selectedId ->
-            val queues = controller.canonicalSendQueue()?.state
-            if (selectedId == null || queues == null) {
-                flowOf(ConversationSendQueue())
-            } else {
-                queues.map { it[QueueConversationId(selectedId)] ?: ConversationSendQueue() }
-            }
-        }
-        .distinctUntilChanged()
-
     private fun currentComposerInputs() = DesktopChatComposerInputs(
         surface = controller.state.value,
         host = hostInputs.value,
         model = controller.models.model.value,
         workingDirectory = controller.workingDirectory.current.value,
-        canQueueWhileStreaming = controller.canonicalPresentation.value != null,
+        canQueueWhileStreaming = controller.sendQueue.canQueueWhileStreaming.value,
         attachmentLimits = controller.attachmentLimits,
     )
 
@@ -219,14 +195,14 @@ internal class DesktopChatSessionPort(
         hostInputs,
         controller.models.model,
         combine(controller.workingDirectory.current, permissionModes.permissionMode, ::Pair),
-        controller.canonicalPresentation,
-    ) { surface, host, model, (workingDirectory, permissionMode), canonical ->
+        controller.sendQueue.canQueueWhileStreaming,
+    ) { surface, host, model, (workingDirectory, permissionMode), canQueue ->
         DesktopChatComposerInputs(
             surface = surface,
             host = host,
             model = model,
             workingDirectory = workingDirectory,
-            canQueueWhileStreaming = canonical != null,
+            canQueueWhileStreaming = canQueue,
             attachmentLimits = controller.attachmentLimits,
             permissionMode = permissionMode,
         )
@@ -279,8 +255,6 @@ internal class DesktopChatActions(
     private val branchView: () -> DesktopBranchView = { DesktopBranchView(emptyList(), hasOlderMessages = true) },
     private val onSetPermissionMode: (AppServerPermissionMode) -> Unit = {},
 ) : ChatActions {
-    private val queue = desktopQueuedSendActions(controller)
-
     private val selectedConversationId: String?
         get() = controller.state.value.selectedConversationId
 
@@ -334,11 +308,11 @@ internal class DesktopChatActions(
 
     override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
-    override fun cancelQueuedSend(id: QueuedSendId) = queue.onCancel(id)
+    override fun cancelQueuedSend(id: QueuedSendId) = controller.sendQueue.cancel(id)
 
-    override fun sendQueuedNow(id: QueuedSendId) = queue.onSendNow(id)
+    override fun sendQueuedNow(id: QueuedSendId) = controller.sendQueue.sendNow(id)
 
-    override fun resumeSendQueue() = queue.onResume()
+    override fun resumeSendQueue() = controller.sendQueue.resume()
 
     override fun toggleRunCollapsed(runId: ChatRunId) = localTimeline.update { it.toggleRun(runId.value) }
 

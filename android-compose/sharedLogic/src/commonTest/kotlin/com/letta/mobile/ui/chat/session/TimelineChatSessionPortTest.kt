@@ -1,6 +1,10 @@
 package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
+import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.chat.send.QueueConversationId
+import com.letta.mobile.data.chat.send.QueuedChatSend
+import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.timeline.DeliveryState
@@ -77,6 +81,51 @@ class TimelineChatSessionPortTest {
         assertEquals(listOf("hello" to 1), session.sends.map { (text, images) -> text to images.size })
         assertEquals("", port.composer.value.text)
         assertTrue(port.composer.value.attachments.isEmpty())
+    }
+
+    @Test
+    fun aHostQueueTakesASendDuringARunAndShowsWhatWaits() = runTest {
+        val session = FakeTimelineChatSession()
+        val queue = FakeSendQueue()
+        val port = port(session, sendQueue = queue)
+        runCurrent()
+
+        session.timeline.value = timelineWith(pendingPrompt("first"))
+        port.actions.updateComposerText("second")
+        runCurrent()
+        assertTrue(port.uiState.value.isRunInFlight)
+        assertTrue(port.composer.value.canQueueWhileStreaming)
+        assertTrue(port.composer.value.canSend)
+
+        port.actions.send()
+        runCurrent()
+        assertEquals(listOf("second"), session.sends.map { it.first })
+        assertEquals("", port.composer.value.text)
+
+        val waiting = QueuedChatSend(QueuedSendId("q-1"), QueueConversationId("conv-1"), "second")
+        queue.queue.value = ConversationSendQueue(items = listOf(waiting))
+        runCurrent()
+        assertEquals(listOf(waiting), port.uiState.value.sendQueue.items)
+
+        port.actions.sendQueuedNow(waiting.id)
+        port.actions.cancelQueuedSend(waiting.id)
+        port.actions.resumeSendQueue()
+        assertEquals(listOf("now q-1", "cancel q-1", "resume"), queue.calls)
+    }
+
+    @Test
+    fun aHostQueueThatCannotQueueNowStillBlocksASendDuringARun() = runTest {
+        val session = FakeTimelineChatSession()
+        val port = port(session, sendQueue = FakeSendQueue(canQueue = false))
+        runCurrent()
+
+        session.timeline.value = timelineWith(pendingPrompt("first"))
+        port.actions.updateComposerText("second")
+        runCurrent()
+        assertFalse(port.composer.value.canSend)
+        port.actions.send()
+        runCurrent()
+        assertTrue(session.sends.isEmpty())
     }
 
     @Test
@@ -290,8 +339,10 @@ class TimelineChatSessionPortTest {
     private fun TestScope.port(
         session: FakeTimelineChatSession,
         controls: TimelineChatRunControls = TimelineChatRunControls(),
+        sendQueue: ChatSendQueueSource? = null,
     ): TimelineChatSessionPort {
-        val port = TimelineChatSessionPort(session, target, backgroundScope, TimelineChatSessionOptions(controls = controls))
+        val options = TimelineChatSessionOptions(controls = controls, sendQueue = sendQueue)
+        val port = TimelineChatSessionPort(session, target, backgroundScope, options)
         // The page's flows share while collected, as ChatSurface collects them.
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
@@ -343,6 +394,24 @@ internal class FakeTimelineChatSession(
     override suspend fun send(text: String, attachments: List<MessageContentPart.Image>) {
         sendFailure?.let { throw it }
         sends += text to attachments
+    }
+}
+
+private class FakeSendQueue(canQueue: Boolean = true) : ChatSendQueueSource {
+    val calls = mutableListOf<String>()
+    override val queue = MutableStateFlow(ConversationSendQueue())
+    override val canQueueWhileStreaming = MutableStateFlow(canQueue)
+
+    override fun cancel(id: QueuedSendId) {
+        calls += "cancel ${id.value}"
+    }
+
+    override fun sendNow(id: QueuedSendId) {
+        calls += "now ${id.value}"
+    }
+
+    override fun resume() {
+        calls += "resume"
     }
 }
 

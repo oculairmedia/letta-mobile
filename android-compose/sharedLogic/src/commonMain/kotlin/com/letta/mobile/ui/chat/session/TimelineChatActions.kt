@@ -43,11 +43,11 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
 
     override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
 
-    override fun cancelQueuedSend(id: QueuedSendId) = Unit
+    override fun cancelQueuedSend(id: QueuedSendId) = port.queuedSends?.cancel(id) ?: Unit
 
-    override fun sendQueuedNow(id: QueuedSendId) = Unit
+    override fun sendQueuedNow(id: QueuedSendId) = port.queuedSends?.sendNow(id) ?: Unit
 
-    override fun resumeSendQueue() = Unit
+    override fun resumeSendQueue() = port.queuedSends?.resume() ?: Unit
 
     override fun toggleRunCollapsed(runId: ChatRunId) = port.updateLocal { it.toggleRun(runId.value) }
 
