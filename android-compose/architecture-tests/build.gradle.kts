@@ -57,6 +57,9 @@ val architectureTest = tasks.register<Test>("architectureTest") {
     // TypedIdRepositoryArchitectureTest (letta-mobile-by4vm.23) reads the id ratchet baselines.
     inputs.files("id-literal-baseline.txt", "raw-id-params-baseline.txt")
         .withPropertyName("idRatchetBaselines").withPathSensitivity(PathSensitivity.RELATIVE)
+    // ChatControllerSurfaceRepositoryArchitectureTest (letta-mobile-by4vm.80) reads its baseline.
+    inputs.file("chat-controller-surface-baseline.txt")
+        .withPropertyName("chatControllerSurfaceBaseline").withPathSensitivity(PathSensitivity.RELATIVE)
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }

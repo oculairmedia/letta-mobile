@@ -57,6 +57,11 @@ data class TimelineRunState(
     val acknowledgedError: String? = null,
     /** A stop was requested and the run has not ended yet. */
     val cancelling: Boolean = false,
+    /**
+     * letta-mobile-by4vm.81: Stop gave up on the run's terminal and dropped it locally; the page
+     * shows the run idle until the timeline's own run ends or the next send.
+     */
+    val clearedLocally: Boolean = false,
     /** Approval request ids whose answer is in flight. */
     val submittingApprovals: Set<String> = emptySet(),
 )
