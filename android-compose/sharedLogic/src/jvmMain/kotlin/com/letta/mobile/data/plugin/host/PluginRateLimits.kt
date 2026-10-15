@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.serialization.Serializable
@@ -31,10 +32,10 @@ class PluginRateLimits(
     private val logs = SlidingWindowCounter(log, nowMs)
 
     /** Counts one emit of [pluginId]; false (and not counted) when it is over [emit]. */
-    fun tryEmit(pluginId: String): Boolean = emits.tryTake(pluginId, 1)
+    fun tryEmit(pluginId: PluginId): Boolean = emits.tryTake(pluginId.value, 1)
 
     /** Counts one log line of [pluginId]; false (and not counted) when it is over [log]. */
-    fun tryLog(pluginId: String): Boolean = logs.tryTake(pluginId, 1)
+    fun tryLog(pluginId: PluginId): Boolean = logs.tryTake(pluginId.value, 1)
 
     companion object {
         const val DEFAULT_EMITS_PER_SECOND: Long = 10

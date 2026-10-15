@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -81,6 +82,9 @@ data class InstalledPlugin(
 ) {
     val manifest: PluginManifest get() = current.manifest
     val id: String get() = manifest.id
+
+    /** [id] as a typed [PluginId], for the host's per-plugin services. */
+    val pluginId: PluginId get() = PluginId(manifest.id)
     val version: String get() = manifest.version
     val consent: PluginConsent get() = current.consent
     val packageSha256: String get() = current.packageSha256

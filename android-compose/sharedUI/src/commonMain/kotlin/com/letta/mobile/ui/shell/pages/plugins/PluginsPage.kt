@@ -15,9 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginCatalog
 import com.letta.mobile.data.plugin.catalog.PluginConsentItem
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginPackageFile
 import com.letta.mobile.data.plugin.catalog.PluginsPageActions
 import com.letta.mobile.data.plugin.catalog.PluginsPageController

@@ -10,7 +10,7 @@ PR at a time.
 
 | What | Where |
 |---|---|
-| Domain id value classes (`AgentId`, `ConversationId`, `MessageId`, `RunId`, `RequestId`, …) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt` |
+| Domain id value classes (`AgentId`, `ConversationId`, `MessageId`, `RunId`, `RequestId`, `PluginId`, …) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/DomainIds.kt` |
 | Id string formats (`IdFormats`) | `android-compose/core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt` |
 | Runtime-contract ids (`ToolCallId`, `ToolApprovalId`, `BackendId`, runtime `RunId`/`ConversationId`) | `android-compose/core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/` |
 | Ratchet test, scanner and baselines | `android-compose/architecture-tests/` (`TypedIdRepositoryArchitectureTest`, `IdRatchetScan`, `CountRatchetBaseline`, `id-literal-baseline.txt`, `raw-id-params-baseline.txt`) |

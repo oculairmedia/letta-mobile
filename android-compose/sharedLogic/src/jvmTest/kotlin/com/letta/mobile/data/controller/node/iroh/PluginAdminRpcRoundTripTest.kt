@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginState
@@ -7,7 +8,6 @@ import com.letta.mobile.data.plugin.ZipPluginPackageReader
 import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.plugin.catalog.PluginCatalogResult
 import com.letta.mobile.data.plugin.catalog.PluginGrants
-import com.letta.mobile.data.plugin.catalog.PluginId
 import com.letta.mobile.data.plugin.catalog.PluginInstallRequest
 import com.letta.mobile.data.plugin.catalog.PluginPageWire
 import com.letta.mobile.data.plugin.host.FakeLcpPlugin

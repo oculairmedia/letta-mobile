@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.wire.LcpCallException
 import com.letta.mobile.data.plugin.wire.LcpErrorCode
@@ -56,17 +57,17 @@ enum class PluginRefusal(val wire: String, val code: Int, val capability: Plugin
  */
 class PluginRefusals {
     private val lock = SynchronizedObject()
-    private val counts = mutableMapOf<Pair<String, PluginRefusal>, Int>()
+    private val counts = mutableMapOf<Pair<PluginId, PluginRefusal>, Int>()
 
-    fun record(pluginId: String, refusal: PluginRefusal) {
+    fun record(pluginId: PluginId, refusal: PluginRefusal) {
         synchronized(lock) { counts[pluginId to refusal] = (counts[pluginId to refusal] ?: 0) + 1 }
         PluginHostEvents.record(PluginHostEvent.REFUSED, pluginId, "reason" to refusal.wire)
     }
 
-    fun count(pluginId: String, refusal: PluginRefusal): Int = synchronized(lock) { counts[pluginId to refusal] ?: 0 }
+    fun count(pluginId: PluginId, refusal: PluginRefusal): Int = synchronized(lock) { counts[pluginId to refusal] ?: 0 }
 
     /** Records [refusal] and builds the error the plugin is answered: `data {reason, index?, capability?}`. */
-    fun refuse(pluginId: String, refusal: PluginRefusal, message: String, index: Int? = null): LcpCallException {
+    fun refuse(pluginId: PluginId, refusal: PluginRefusal, message: String, index: Int? = null): LcpCallException {
         record(pluginId, refusal)
         val data = buildJsonObject {
             put("reason", refusal.wire)

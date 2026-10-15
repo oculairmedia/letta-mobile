@@ -1,6 +1,7 @@
 package com.letta.mobile.data.plugin.host
 
 import com.letta.mobile.data.controller.node.iroh.AtomicJsonFile
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginPackage
 import com.letta.mobile.data.plugin.PluginRegistryState
@@ -30,7 +31,7 @@ class PluginPackageStore(val root: Path) {
             PluginRegistryState.decode(text)
         } catch (e: SerializationException) {
             Files.move(registryFile, registryFile.resolveSibling("$REGISTRY_FILE.unreadable-${System.currentTimeMillis()}"))
-            PluginHostEvents.record(PluginHostEvent.REGISTRY_UNREADABLE, "*", "error" to e.message.orEmpty())
+            PluginHostEvents.record(PluginHostEvent.REGISTRY_UNREADABLE, PluginHostEvents.ALL, "error" to e.message.orEmpty())
             PluginRegistryState()
         }
     }
@@ -57,8 +58,8 @@ class PluginPackageStore(val root: Path) {
     }
 
     /** Deletes every unpacked version of [pluginId]. */
-    fun delete(pluginId: String) {
-        root.resolve(pluginId).toFile().deleteRecursively()
+    fun delete(pluginId: PluginId) {
+        root.resolve(pluginId.value).toFile().deleteRecursively()
     }
 
     private fun writeInside(dir: Path, relative: String, bytes: ByteArray) {

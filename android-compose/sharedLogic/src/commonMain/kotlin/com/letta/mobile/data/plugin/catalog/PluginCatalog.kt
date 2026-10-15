@@ -1,13 +1,13 @@
 package com.letta.mobile.data.plugin.catalog
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.PluginId
 import com.letta.mobile.data.plugin.PluginCapability
 import com.letta.mobile.data.plugin.PluginHealth
 import com.letta.mobile.data.plugin.PluginManifest
 import com.letta.mobile.data.plugin.PluginState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.jvm.JvmInline
 
 /**
  * letta-mobile-cdgpr.9: what the Plugins page reads and asks of the host's plugin registry. The
@@ -43,12 +43,6 @@ interface PluginCatalog {
 
     /** Asks [id] for its health now; the answer also lands in [plugins]. */
     suspend fun health(id: PluginId): PluginCatalogResult<PluginHealth>
-}
-
-/** A plugin's manifest id (`letta.chart`). */
-@JvmInline
-value class PluginId(val value: String) {
-    override fun toString(): String = value
 }
 
 /** A package file the owner picked: its name and every byte. */

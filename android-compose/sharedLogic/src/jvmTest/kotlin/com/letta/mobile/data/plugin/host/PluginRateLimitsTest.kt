@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin.host
 
+import com.letta.mobile.data.model.PluginId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -16,24 +17,24 @@ class PluginRateLimitsTest {
     fun emitsAreLimitedPerPluginOverASlidingSecond() {
         val limits = PluginRateLimits(emit = PluginRateLimit(2), nowMs = { now })
 
-        assertTrue(limits.tryEmit("a"))
+        assertTrue(limits.tryEmit(PluginId("a")))
         now = 600
-        assertTrue(limits.tryEmit("a"))
-        assertFalse(limits.tryEmit("a"))
-        assertTrue(limits.tryEmit("b"), "each plugin has its own budget")
+        assertTrue(limits.tryEmit(PluginId("a")))
+        assertFalse(limits.tryEmit(PluginId("a")))
+        assertTrue(limits.tryEmit(PluginId("b")), "each plugin has its own budget")
         now = 999
-        assertFalse(limits.tryEmit("a"), "the first emit is still inside the window")
+        assertFalse(limits.tryEmit(PluginId("a")), "the first emit is still inside the window")
         now = 1000
-        assertTrue(limits.tryEmit("a"), "the first emit has left the window")
-        assertFalse(limits.tryEmit("a"))
+        assertTrue(limits.tryEmit(PluginId("a")), "the first emit has left the window")
+        assertFalse(limits.tryEmit(PluginId("a")))
     }
 
     @Test
     fun logsHaveTheirOwnBudget() {
         val limits = PluginRateLimits(emit = PluginRateLimit(1), log = PluginRateLimit(3), nowMs = { now })
 
-        assertTrue(limits.tryEmit("a"))
-        assertEquals(listOf(true, true, true, false), List(4) { limits.tryLog("a") })
+        assertTrue(limits.tryEmit(PluginId("a")))
+        assertEquals(listOf(true, true, true, false), List(4) { limits.tryLog(PluginId("a")) })
     }
 
     @Test
@@ -42,23 +43,23 @@ class PluginRateLimitsTest {
 
         assertEquals(64L * 1024 * 1024, quota.limit.amount)
         assertEquals(1.days, quota.limit.window)
-        assertTrue(quota.tryCharge("a", 60L * 1024 * 1024))
-        assertFalse(quota.tryCharge("a", 5L * 1024 * 1024))
-        assertTrue(quota.tryCharge("a", 4L * 1024 * 1024))
+        assertTrue(quota.tryCharge(PluginId("a"), 60L * 1024 * 1024))
+        assertFalse(quota.tryCharge(PluginId("a"), 5L * 1024 * 1024))
+        assertTrue(quota.tryCharge(PluginId("a"), 4L * 1024 * 1024))
         now = 1.days.inWholeMilliseconds
-        assertEquals(0L, quota.used("a"))
-        assertTrue(quota.tryCharge("a", 64L * 1024 * 1024))
+        assertEquals(0L, quota.used(PluginId("a")))
+        assertTrue(quota.tryCharge(PluginId("a"), 64L * 1024 * 1024))
     }
 
     @Test
     fun aRefundedChargeFreesItsBytes() {
         val quota = PluginAssetQuota(PluginRateLimit(100, 1.hours), nowMs = { now })
 
-        assertTrue(quota.tryCharge("a", 80))
-        quota.refund("a", 80)
+        assertTrue(quota.tryCharge(PluginId("a"), 80))
+        quota.refund(PluginId("a"), 80)
 
-        assertEquals(0L, quota.used("a"))
-        assertTrue(quota.tryCharge("a", 100))
+        assertEquals(0L, quota.used(PluginId("a")))
+        assertTrue(quota.tryCharge(PluginId("a"), 100))
     }
 
     @Test
