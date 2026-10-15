@@ -17,7 +17,7 @@ class ChatSendStrategySelectorTest {
             ChatSendContext(explicitConversationId = "conv-1"),
         )
 
-        assertSame(f.timeline, selected)
+        assertSame(f.timeline.strategy, selected)
     }
 
     // ---------------------------------------------------------------------
@@ -33,8 +33,8 @@ class ChatSendStrategySelectorTest {
     fun `iroh backend selects the iroh strategy`() {
         val f = Fixture()
         val selected = f.selectFor(BackendKind.IROH)
-        assertSame(f.iroh, selected)
-        assertNotSame(f.timeline, selected)
+        assertSame(f.iroh.strategy, selected)
+        assertNotSame(f.timeline.strategy, selected)
     }
 
     @Test
@@ -59,7 +59,7 @@ class ChatSendStrategySelectorTest {
                     isLocalRuntime = true,
                 ),
             )
-            assertSame("local runtime must win for kind=$kind", f.local, selected)
+            assertSame("local runtime must win for kind=$kind", f.local.strategy, selected)
         }
     }
 
@@ -67,18 +67,18 @@ class ChatSendStrategySelectorTest {
     fun `local runtime backend kind selects the local strategy`() {
         val f = Fixture()
 
-        assertSame(f.local, f.selectFor(BackendKind.LOCAL_RUNTIME))
+        assertSame(f.local.strategy, f.selectFor(BackendKind.LOCAL_RUNTIME))
     }
 
     @Test
-    fun `send delegates payload and context to selected strategy`() {
+    fun `send delegates payload to selected strategy`() {
         val f = Fixture()
         val image = MessageContentPart.Image(base64 = "abc", mediaType = "image/png")
         val context = ChatSendContext(explicitConversationId = "conv-1")
 
         f.selector.send("hello", listOf(image), context)
 
-        assertEquals(listOf(RecordedSend("hello", listOf(image), context)), f.timeline.sent)
+        assertEquals(listOf(RecordedSend("hello", listOf(image))), f.timeline.sent)
         assertEquals(0, f.local.sent.size)
         assertEquals(0, f.iroh.sent.size)
     }
@@ -101,13 +101,13 @@ class ChatSendStrategySelectorTest {
     }
 
     private class Fixture {
-        val timeline = RecordingStrategy()
-        val local = RecordingStrategy()
-        val iroh = RecordingStrategy()
+        val timeline = Recorder("timeline")
+        val local = Recorder("local")
+        val iroh = Recorder("iroh")
         val selector = ChatSendStrategySelector(
-            timelineStrategy = timeline,
-            localStrategy = local,
-            irohStrategy = iroh,
+            timelineStrategy = timeline.strategy,
+            localStrategy = local.strategy,
+            irohStrategy = iroh.strategy,
         )
 
         fun selectFor(kind: BackendKind): ChatSendStrategy = selector.select(
@@ -115,28 +115,19 @@ class ChatSendStrategySelectorTest {
         )
     }
 
-    private class RecordingStrategy : ChatSendStrategy {
+    private class Recorder(routeName: String) {
         val sent = mutableListOf<RecordedSend>()
         var cancels = 0
             private set
-
-        override fun send(
-            text: String,
-            attachments: List<MessageContentPart.Image>,
-            context: ChatSendContext,
-        ): Job {
-            sent += RecordedSend(text, attachments, context)
-            return Job()
-        }
-
-        override fun cancel() {
-            cancels++
-        }
+        val strategy = ChatSendStrategy(
+            routeName = routeName,
+            sendVia = { text, attachments -> sent += RecordedSend(text, attachments); Job() },
+            cancelVia = { cancels++ },
+        )
     }
 
     private data class RecordedSend(
         val text: String,
         val attachments: List<MessageContentPart.Image>,
-        val context: ChatSendContext,
     )
 }

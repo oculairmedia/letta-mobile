@@ -34,7 +34,6 @@ import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.session.DEFAULT_REMOTE_BACKEND_LABEL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
-import com.letta.mobile.data.session.SessionBackendBinding
 import com.letta.mobile.data.session.SessionRepositoryGraphFactory
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
@@ -43,10 +42,9 @@ import com.letta.mobile.data.session.graph.adminRepositories
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.SubagentListing
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
-import com.letta.mobile.data.session.sessionBackendBinding
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.chat.defaultDesktopAppServerGatewayFactory
@@ -156,10 +154,8 @@ class DesktopRepositoryAdapters(
 ) {
     // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
     // even if serverUrl still carries a leftover iroh:// ticket.
-    private val binding = config.sessionBackendBinding(
-        forceIroh = IrohChannelTransport.shouldUseIroh(config?.serverUrl),
-    )
-    private val irohMode = binding == SessionBackendBinding.Iroh
+    private val backendKind = config.routedBackendKind()
+    private val irohMode = backendKind == BackendKind.IROH
 
     /**
      * letta-mobile-by4vm.13: what this session serves — the desktop row of the
@@ -168,7 +164,7 @@ class DesktopRepositoryAdapters(
      */
     val capabilities: SessionCapabilities = SessionCapabilities.forSession(
         platform = SessionPlatform.DESKTOP,
-        kind = desktopBackendKind(binding, config),
+        kind = desktopServedKind(backendKind, config),
         hostCapabilities = { channelTransport.hostCapabilities },
     )
 
@@ -178,7 +174,7 @@ class DesktopRepositoryAdapters(
     // letta-mobile-ckmub.4: every non-Iroh backend is an App Server this window dials directly (the
     // bundled runtime or a remote ws:// host); its agents and memory are read over that session.
     private val appServerRepositories = when {
-        binding == SessionBackendBinding.LocalRuntime ->
+        backendKind == BackendKind.LOCAL_RUNTIME ->
             buildDesktopAppServerRepositories(DesktopLocalAppServerClientRegistry.shared)
         !irohMode && !config?.serverUrl.isNullOrBlank() ->
             buildDesktopAppServerRepositories(DesktopLocalAppServerClientRegistry.direct)
@@ -271,12 +267,9 @@ class DesktopRepositoryAdapters(
     )
 }
 
-/** The backend kind a desktop session binds; a remote host with no address is no backend at all. */
-private fun desktopBackendKind(binding: SessionBackendBinding, config: LettaConfig?): BackendKind? = when (binding) {
-    SessionBackendBinding.LocalRuntime -> BackendKind.LOCAL_RUNTIME
-    SessionBackendBinding.Iroh -> BackendKind.IROH
-    SessionBackendBinding.RemoteHttp -> BackendKind.DIRECT_WS.takeUnless { config?.serverUrl.isNullOrBlank() }
-}
+/** The backend kind a desktop session serves; a remote host with no address is no backend at all. */
+private fun desktopServedKind(kind: BackendKind, config: LettaConfig?): BackendKind? =
+    kind.takeUnless { it == BackendKind.DIRECT_WS && config?.serverUrl.isNullOrBlank() }
 
 fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =
     remoteLettaBackendDescriptor(
