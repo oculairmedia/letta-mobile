@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -15,18 +17,9 @@ kotlin {
     // client renders :sharedUI, which draws canvases with this module; letta-mobile-o4ygk.4).
     android {
         namespace = "io.ak1.drawbox"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {

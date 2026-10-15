@@ -119,6 +119,11 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-unresolved-pct", type=float, default=100.0)
     parser.add_argument("--list", action="store_true", help="print every unresolved class")
     args = parser.parse_args(argv)
+    for path in (args.profile, args.source_root):
+        if not path.resolve().is_relative_to(REPO_ROOT):
+            print(f"baseline-profile-staleness: {path} is outside the checkout {REPO_ROOT}", file=sys.stderr)
+            return 2
+    args.profile, args.source_root = args.profile.resolve(), args.source_root.resolve()
     wanted = profile_classes(args.profile) if args.profile.is_file() else set()
     if not wanted:
         print(f"baseline-profile-staleness: no first-party classes in {args.profile}", file=sys.stderr)

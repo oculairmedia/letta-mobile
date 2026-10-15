@@ -6,7 +6,8 @@
 // Runs from the npm work dir so `@babel/core` resolves from its node_modules.
 import { transformAsync } from '@babel/core';
 import { readFileSync, writeFileSync } from 'fs';
-const file = process.argv[2];
+import { patchTarget } from './patch-target.mjs';
+const file = patchTarget();
 const src = readFileSync(file, 'utf8');
 const result = await transformAsync(src, {
   plugins: ['@babel/plugin-transform-unicode-property-regex'],

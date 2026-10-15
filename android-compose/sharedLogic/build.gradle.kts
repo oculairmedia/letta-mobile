@@ -1,7 +1,10 @@
+import com.letta.mobile.kmp.hostNative
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     // Phase 3c: no Compose Gradle plugins here. Projection models still use
@@ -48,29 +51,13 @@ tasks.withType<Test>().configureEach {
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedlogic"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
 
         withHostTestBuilder {}
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
-    val hostOs = System.getProperty("os.name")
-    val hostArch = System.getProperty("os.arch")
-    when {
-        hostOs == "Mac OS X" && hostArch == "aarch64" -> macosArm64("hostNative")
-        hostOs == "Mac OS X" -> macosX64("hostNative")
-        hostOs.startsWith("Windows") -> mingwX64("hostNative")
-        hostOs == "Linux" -> linuxX64("hostNative")
-    }
+    hostNative()
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
