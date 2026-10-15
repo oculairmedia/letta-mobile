@@ -1,7 +1,10 @@
+import com.letta.mobile.kmp.hostNative
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -9,19 +12,9 @@ plugins {
 kotlin {
     android {
         namespace = "com.letta.mobile.avatar.core"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
-
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
     // The web client renders :sharedUI, which shows the mascot (letta-mobile-o4ygk.4).
     @OptIn(ExperimentalWasmDsl::class)
@@ -29,14 +22,7 @@ kotlin {
         browser()
     }
 
-    val hostOs = System.getProperty("os.name")
-    val hostArch = System.getProperty("os.arch")
-    when {
-        hostOs == "Mac OS X" && hostArch == "aarch64" -> macosArm64("hostNative")
-        hostOs == "Mac OS X" -> macosX64("hostNative")
-        hostOs.startsWith("Windows") -> mingwX64("hostNative")
-        hostOs == "Linux" -> linuxX64("hostNative")
-    }
+    hostNative()
 
     sourceSets {
         commonMain {

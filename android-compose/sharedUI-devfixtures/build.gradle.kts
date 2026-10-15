@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /*
  * Phone fixtures for the shared chat page (letta-mobile-bglj6.1): the conversations, composers,
@@ -12,6 +11,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  */
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.compose")
 }
@@ -19,8 +20,6 @@ plugins {
 kotlin {
     jvm {
         compilerOptions {
-            // sharedUI's jvm target (and its tests) are JVM 17.
-            jvmTarget.set(JvmTarget.JVM_17)
             freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api")
         }
     }

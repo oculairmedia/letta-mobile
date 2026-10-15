@@ -7,7 +7,8 @@
 // matches "MiniMax-M3"), mirroring the shim's LETTA_VISION_MODELS pattern so both surfaces stay
 // consistent. Adding a vision model = one list entry, no code edit.
 import { readFileSync, writeFileSync } from 'fs';
-const file = process.argv[2];
+import { patchTarget } from './patch-target.mjs';
+const file = patchTarget();
 let src = readFileSync(file, 'utf8');
 const token = 'input: input.modelId.includes("llava") || input.modelId.includes("vision") || input.modelId.includes("vl") ? ["text", "image"] : ["text"],';
 if (!src.includes(token)) {

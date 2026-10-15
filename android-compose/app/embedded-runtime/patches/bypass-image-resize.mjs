@@ -3,7 +3,8 @@
 // send would die with "999 (1000)" in failureMode:strict. The composer already downsamples
 // client-side, so the resize is redundant — rewrite it to a passthrough.
 import { readFileSync, writeFileSync } from 'fs';
-const file = process.argv[2];
+import { patchTarget } from './patch-target.mjs';
+const file = patchTarget();
 let src = readFileSync(file, 'utf8');
 const marker = 'async function resizeImageIfNeeded(buffer, inputMediaType) {';
 const idx = src.indexOf(marker);

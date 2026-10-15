@@ -5,7 +5,8 @@
 // emit sites to the standard shape so images actually reach the provider. PROVEN against the live
 // :8082 proxy: standard shape -> 200 + description; camelCase -> bad_request "image_url is empty".
 import { readFileSync, writeFileSync } from 'fs';
-const file = process.argv[2];
+import { patchTarget } from './patch-target.mjs';
+const file = patchTarget();
 let src = readFileSync(file, 'utf8');
 // Whitespace-agnostic: convert every chat/completions camelCase
 // image_url part into the OpenAI-standard
