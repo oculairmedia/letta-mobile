@@ -2,7 +2,7 @@ package com.letta.mobile.ui.screens.tools
 
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.Tool
-import com.letta.mobile.data.repository.McpServerRepository
+import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.testutil.FakeToolApi
 import io.mockk.coEvery
@@ -28,7 +28,7 @@ class AllToolsViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeRepository: FakeToolRepository
-    private lateinit var mockMcpServerRepository: McpServerRepository
+    private lateinit var mockMcpServerRepository: IMcpServerRepository
     private lateinit var viewModel: AllToolsViewModel
 
     @Before

@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.data
 
-import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.backend.SessionCapabilities
 import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.backend.SessionRoute
@@ -12,8 +11,6 @@ import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
-import com.letta.mobile.data.repository.CachedProjectRepository
-import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -33,7 +30,6 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAgentRepository
-import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
 import com.letta.mobile.data.session.DEFAULT_REMOTE_BACKEND_LABEL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
@@ -42,6 +38,7 @@ import com.letta.mobile.data.session.SessionRepositoryGraphFactory
 import com.letta.mobile.data.session.graph.HostSessionRepositories
 import com.letta.mobile.data.session.graph.SessionGraphIdentity
 import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.adminRepositories
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.session.graph.SubagentListing
 import com.letta.mobile.data.session.remoteLettaBackendDescriptor
@@ -199,21 +196,14 @@ class DesktopRepositoryAdapters(
         null
     }
     private val irohSettings = ActiveConfigSettingsRepository(config)
-    private val irohAdminReads = if (irohMode) {
-        buildIrohAdminReadRepositories(channelTransport = channelTransport, settingsRepository = irohSettings)
+    // letta-mobile-by4vm.87: the admin repositories (projects included) Android builds too; only an
+    // Iroh host serves them here.
+    private val irohAdmin = if (irohMode) {
+        SharedSessionGraph.adminRepositories(transport = channelTransport, settings = irohSettings)
     } else {
         null
     }
 
-    // letta-mobile-ckmub.2.6: projects ride the Iroh host's `project.*` relay; no other backend has them.
-    private val irohProjectRepository = if (irohMode) {
-        CachedProjectRepository(
-            remote = RemoteRoute.Absent(SessionRoute.PROJECTS),
-            irohProjectSource = IrohAdminRpcProjectSource(channelTransport, irohSettings),
-        )
-    } else {
-        null
-    }
     // letta-mobile-by4vm.24: built by the shared graph builder, as Android's are. The desktop
     // Background tasks panel has a "Finished" section, so it lists every subagent.
     internal val transportBound = SharedSessionGraph.transportBound(
@@ -243,17 +233,17 @@ class DesktopRepositoryAdapters(
     val conversationRepository: IConversationRepository = unavailable(SessionRoute.CONVERSATIONS)
     val cronRepository: ICronRepository = transportBound.cronRepository
     val mcpServerRepository: IMcpServerRepository =
-        irohAdminReads?.mcpServerRepository ?: unavailable(SessionRoute.MCP_SERVERS)
+        irohAdmin?.mcpServerRepository ?: unavailable(SessionRoute.MCP_SERVERS)
     val modelRepository: IModelRepository =
-        irohAdminReads?.modelRepository ?: unavailable(SessionRoute.MODELS)
+        irohAdmin?.modelRepository ?: unavailable(SessionRoute.MODELS)
     val passageRepository: IPassageRepository =
-        irohAdminReads?.passageRepository ?: unavailable(SessionRoute.PASSAGES)
-    val projectRepository: IProjectRepository = irohProjectRepository ?: unavailable(SessionRoute.PROJECTS)
+        irohAdmin?.passageRepository ?: unavailable(SessionRoute.PASSAGES)
+    val projectRepository: IProjectRepository = irohAdmin?.projectRepository ?: unavailable(SessionRoute.PROJECTS)
     val projectWorkRepository: IProjectWorkRepository = unavailable(SessionRoute.PROJECT_WORK)
     val providerRepository: IProviderRepository =
-        irohAdminReads?.providerRepository ?: unavailable(SessionRoute.PROVIDERS)
+        irohAdmin?.providerRepository ?: unavailable(SessionRoute.PROVIDERS)
     val runRepository: IRunRepository =
-        irohAdminReads?.runRepository ?: unavailable(SessionRoute.RUNS)
+        irohAdmin?.runRepository ?: unavailable(SessionRoute.RUNS)
     val scheduleRepository: IScheduleRepository = irohRepositories?.scheduleRepository ?: unavailable(SessionRoute.SCHEDULES)
     val selfTodoRepository: ISelfTodoRepository = transportBound.selfTodoRepository
     val stepRepository: IStepRepository = unavailable(SessionRoute.STEPS)
