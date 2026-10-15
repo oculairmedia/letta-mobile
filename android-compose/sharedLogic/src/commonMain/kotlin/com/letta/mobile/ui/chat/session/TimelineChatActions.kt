@@ -5,6 +5,7 @@ import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 
 /*
  * letta-mobile-o4ygk.4.5: the page's intents, forwarded to a TimelineChatSessionPort.
@@ -71,6 +72,8 @@ internal class TimelineChatActions(private val port: TimelineChatSessionPort) : 
     override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = Unit
 
     override fun changeWorkingDirectory(directory: ChatWorkingDirectory) = port.changeWorkingDirectory(directory)
+
+    override fun setPermissionMode(mode: AppServerPermissionMode) = port.setPermissionMode(mode)
 
     override fun updateSearchQuery(query: String) = Unit
 

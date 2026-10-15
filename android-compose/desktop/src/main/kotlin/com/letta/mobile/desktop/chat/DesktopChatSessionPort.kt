@@ -13,7 +13,6 @@ import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.desktopQueuedSendActions
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -25,14 +24,13 @@ import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
 import com.letta.mobile.ui.chat.session.ChatMessageId
 import com.letta.mobile.ui.chat.session.ChatModelHandle
-import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.ChatRunId
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
+import com.letta.mobile.ui.chat.session.GatewayPermissionModes
 import com.letta.mobile.ui.chat.session.currentHostApprovals
 import com.letta.mobile.ui.chat.session.hostApprovals
-import com.letta.mobile.ui.chat.session.toUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,7 +44,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -80,6 +77,13 @@ internal class DesktopChatSessionPort(
 ) : ChatSessionPort {
     private val hostInputs = MutableStateFlow(DesktopChatComposerHostInputs())
     private val localTimeline = MutableStateFlow(DesktopChatLocalTimelineState())
+
+    /** letta-mobile-bzvro.13, by4vm.98: the selected conversation's mode chip, the shared gateway binding. */
+    private val permissionModes = GatewayPermissionModes(
+        scope = scope,
+        targets = controller.state.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
+        current = { controller.activeGateway.permissionModeTarget(controller.state.value.selectedConversation) },
+    )
 
     init {
         followModelCatalog()
@@ -119,7 +123,7 @@ internal class DesktopChatSessionPort(
         commandsById = { hostInputs.value.commands.associateBy(ComposerCommand::label) },
         localTimeline = localTimeline,
         branchView = { uiState.value.let { DesktopBranchView(it.messages, it.hasMoreOlderMessages) } },
-        onSetPermissionMode = ::requestPermissionMode,
+        onSetPermissionMode = permissionModes::setPermissionMode,
     )
 
     /**
@@ -218,7 +222,7 @@ internal class DesktopChatSessionPort(
         controller.state,
         hostInputs,
         combine(controller.availableModels, modelEfforts(), ::Pair),
-        combine(controller.workingDirectory.current, permissionModeUi(), ::Pair),
+        combine(controller.workingDirectory.current, permissionModes.permissionMode, ::Pair),
         controller.canonicalPresentation,
     ) { surface, host, (models, efforts), (workingDirectory, permissionMode), canonical ->
         DesktopChatComposerInputs(
@@ -267,39 +271,6 @@ internal class DesktopChatSessionPort(
                 if (models.isNotEmpty() && controller.supportsReasoningEffort) refreshCatalogQuietly(catalog)
             }
         }
-    }
-
-    /**
-     * letta-mobile-bzvro.13: the selected conversation's permission mode, for a gateway that runs the
-     * turn engine; null (no chip) for one that cannot read or change it.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private fun permissionModeUi(): Flow<ChatPermissionModeUiState?> =
-        controller.state
-            .map { state -> state.selectedConversation?.let { it.agentId?.takeIf(String::isNotBlank) to it.id } to controller.activeGateway }
-            .distinctUntilChanged()
-            .flatMapLatest { (target, gateway) ->
-                val agentId = target?.first
-                val controller = gateway as? DesktopPermissionModeController
-                val modes = controller?.permissionModes
-                if (agentId == null || modes == null) {
-                    flowOf(null)
-                } else {
-                    val runtime = AppServerRuntimeScope(agentId, target.second)
-                    // letta-mobile-bzvro.40: a relaying host's mode is read (or this client's choice re-sent) on open.
-                    // letta-mobile-a4tm7: the chip names the runtime it governs (an Iroh host, or this desktop's own).
-                    modes.observe(runtime).map { it.toUiState(runtime = controller?.permissionModeRuntime) }
-                        .onStart { scope.launch { controller?.syncPermissionMode(runtime) } }
-                }
-            }
-
-    /** Asks the selected conversation's runtime for [mode]; the chip shows it pending until the server echoes it. */
-    private fun requestPermissionMode(mode: AppServerPermissionMode) {
-        val conversation = controller.state.value.selectedConversation ?: return
-        val agentId = conversation.agentId?.takeIf(String::isNotBlank) ?: return
-        val modes = controller.activeGateway as? DesktopPermissionModeController ?: return
-        if (modes.permissionModes == null) return
-        scope.launch { modes.setPermissionMode(AppServerRuntimeScope(agentId, conversation.id), mode) }
     }
 }
 

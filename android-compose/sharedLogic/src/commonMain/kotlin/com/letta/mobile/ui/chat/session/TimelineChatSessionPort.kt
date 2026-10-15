@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CancellationException
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
@@ -72,6 +74,8 @@ data class TimelineChatSessionOptions(
     val approvals: ChatApprovalStateSource? = null,
     /** letta-mobile-by4vm.98: the conversation's working directory; null: no chip, capability off. */
     val workingDirectory: ChatWorkingDirectorySource? = null,
+    /** letta-mobile-by4vm.98: the conversation's permission-mode chip; null shows none. */
+    val permissionModes: ChatPermissionModeSource? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val placeholder: String? = null,
 )
@@ -121,8 +125,13 @@ class TimelineChatSessionPort(
     private val workingDirectory: StateFlow<ChatWorkingDirectoryUiState?> =
         options.workingDirectory?.current ?: MutableStateFlow(null)
 
-    override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState, workingDirectory) { current, ui, directory ->
-        timelineComposerUiState(current, ui.isRunInFlight, options).copy(workingDirectory = directory)
+    override val composer: StateFlow<ChatComposerUiState> = combine(
+        draft,
+        uiState,
+        workingDirectory,
+        options.permissionModes?.permissionMode ?: flowOf(null),
+    ) { current, ui, directory, permissionMode ->
+        timelineComposerUiState(current, ui.isRunInFlight, options).copy(workingDirectory = directory, permissionMode = permissionMode)
     }.stateIn(
         scope,
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -262,6 +271,10 @@ class TimelineChatSessionPort(
 
     internal fun changeWorkingDirectory(directory: ChatWorkingDirectory) {
         options.workingDirectory?.changeWorkingDirectory(directory)
+    }
+
+    internal fun setPermissionMode(mode: AppServerPermissionMode) {
+        options.permissionModes?.setPermissionMode(mode)
     }
 
     internal fun retryLoad() {

@@ -1,6 +1,14 @@
 package com.letta.mobile.ui.chat.session
 
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
+import com.letta.mobile.data.runtime.ModeChangeResult
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.RuntimePermissionDefaults
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -95,12 +103,61 @@ class TimelineChatSessionExtensionsTest {
         assertFalse(port.capabilities.value.workingDirectory)
     }
 
+    @Test
+    fun theTimelinePortShowsAndChangesTheGatewaysPermissionMode() = runTest {
+        val gateway = FakeModeGateway()
+        val runtime = AppServerRuntimeScope("agent-1", "conv-1")
+        val modeTarget = ChatPermissionModeTarget(gateway, runtime)
+        val modes = GatewayPermissionModes(backgroundScope, flowOf(modeTarget)) { modeTarget }
+        val port = port(TimelineChatSessionOptions(permissionModes = modes))
+        runCurrent()
+
+        assertEquals(AppServerPermissionMode.Unrestricted, port.composer.value.permissionMode?.selected)
+        assertEquals(listOf(runtime), gateway.synced, "opening the conversation syncs a relaying host's mode")
+
+        port.actions.setPermissionMode(AppServerPermissionMode.Standard)
+        runCurrent()
+        assertEquals(listOf(runtime to AppServerPermissionMode.Standard), gateway.requested)
+        assertEquals(AppServerPermissionMode.Standard, port.composer.value.permissionMode?.selected)
+    }
+
+    @Test
+    fun aGatewayWithoutARegistryShowsNoChipAndIgnoresRequests() = runTest {
+        val gateway = FakeModeGateway(permissionModes = null)
+        val modeTarget = ChatPermissionModeTarget(gateway, AppServerRuntimeScope("agent-1", "conv-1"))
+        val modes = GatewayPermissionModes(backgroundScope, flowOf(modeTarget)) { modeTarget }
+        val port = port(TimelineChatSessionOptions(permissionModes = modes))
+        runCurrent()
+
+        assertNull(port.composer.value.permissionMode)
+        port.actions.setPermissionMode(AppServerPermissionMode.Strict)
+        runCurrent()
+        assertEquals(emptyList(), gateway.requested)
+    }
+
     private fun TestScope.port(options: TimelineChatSessionOptions): TimelineChatSessionPort {
         val port = TimelineChatSessionPort(FakeTimelineChatSession(), target, backgroundScope, options)
         backgroundScope.launch { port.uiState.collect {} }
         backgroundScope.launch { port.composer.collect {} }
         backgroundScope.launch { port.capabilities.collect {} }
         return port
+    }
+}
+
+private class FakeModeGateway(
+    override val permissionModes: PermissionModeRegistry? =
+        PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)),
+) : PermissionModeGateway {
+    val requested = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
+    val synced = mutableListOf<AppServerRuntimeScope>()
+
+    override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean {
+        requested += runtime to mode
+        return permissionModes?.change(runtime, mode) { ModeChangeResult.Confirmed } ?: false
+    }
+
+    override suspend fun syncPermissionMode(runtime: AppServerRuntimeScope) {
+        synced += runtime
     }
 }
 
