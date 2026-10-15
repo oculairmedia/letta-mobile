@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -22,8 +23,8 @@ import kotlin.test.assertTrue
  */
 class HostCanvasSceneSchemaTest {
     private val json = Json { ignoreUnknownKeys = true }
-    private val conversationCanvas = CanvasId.forConversation(CONVERSATION).value
-    private val conversationTopic = CanvasRelayProtocol.conversationTopic(CONVERSATION)
+    private val conversationCanvas = CanvasId.forConversation(ConversationId(CONVERSATION)).value
+    private val conversationTopic = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
 
     private class Host {
         val store = InMemoryCanvasRelayStore()
@@ -103,7 +104,7 @@ class HostCanvasSceneSchemaTest {
         assertEquals(true, json.decodeFromString<CanvasReplaceSceneResult>(replaced).ok)
         val onPhone = CanvasOpProjector.stripMetadataForDrawBox(phone.scene())
         assertEquals(2, elementsOf(onPhone).size, "the phone projects both elements: $onPhone")
-        assertEquals(onPhone, CanvasSceneRenderGuard.renderable(onPhone, conversationCanvas), "and draws every one")
+        assertEquals(onPhone, CanvasSceneRenderGuard.renderable(onPhone, CanvasId(conversationCanvas)), "and draws every one")
     }
 
     @Test

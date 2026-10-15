@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.storage.InMemoryAssetStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -76,7 +77,7 @@ class CanvasRelayAssetsE2ETest {
         // The phone starts sending an asset but never finishes; the desktop asks for it and waits.
         val bytes = ByteArray(3000) { 5 }
         val asset = InMemoryAssetStore().put("image/png", bytes)
-        phoneLink.send(CanvasRelayMessage.AssetPut(CanvasRelayProtocol.conversationTopic("conv-1"), asset, 0, 2, kotlin.io.encoding.Base64.encode(bytes, 0, 1500)))
+        phoneLink.send(CanvasRelayMessage.AssetPut(CanvasRelayProtocol.conversationTopic(ConversationId("conv-1")), asset, 0, 2, kotlin.io.encoding.Base64.encode(bytes, 0, 1500)))
         val fetched = async { desktop.client.fetchAsset(desktop.canvasId, asset.ref) }
         runCurrent()
         desktopLink.drop()

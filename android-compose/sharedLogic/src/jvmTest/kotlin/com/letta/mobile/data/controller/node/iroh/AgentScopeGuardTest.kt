@@ -22,11 +22,48 @@ class AgentScopeGuardTest {
 
     private fun obj(vararg pairs: Pair<String, String>): JsonObject = buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } }
 
+    private fun frame(topLevel: String?, runtime: String?): JsonObject = buildJsonObject {
+        topLevel?.let { put("agent_id", it) }
+        runtime?.let { put("runtime", obj("agent_id" to it, "conversation_id" to "c")) }
+    }
+
     @Test
-    fun agentIdIsFoundAtTopLevelOrUnderRuntime() {
-        assertEquals("a1", AgentScopeGuard.agentIdOf(obj("agent_id" to "a1")))
-        assertEquals("a2", AgentScopeGuard.agentIdOf(buildJsonObject { put("runtime", obj("agent_id" to "a2")) }))
-        assertEquals(null, AgentScopeGuard.agentIdOf(obj("conversation_id" to "c")))
+    fun agentIdsAreCollectedFromTopLevelAndRuntime() {
+        assertEquals(setOf("a1"), AgentScopeGuard.agentIdsOf(obj("agent_id" to "a1")))
+        assertEquals(setOf("a2"), AgentScopeGuard.agentIdsOf(frame(topLevel = null, runtime = "a2")))
+        assertEquals(setOf("a1", "a2"), AgentScopeGuard.agentIdsOf(frame(topLevel = "a1", runtime = "a2")))
+        assertEquals(setOf("a1", "a3"), AgentScopeGuard.agentIdsOf(obj("agent_id" to "a1", "agentId" to "a3")))
+        assertEquals(emptySet(), AgentScopeGuard.agentIdsOf(obj("conversation_id" to "c")))
+    }
+
+    @Test
+    fun inScopeTopLevelCannotSmuggleOutOfScopeRuntimeAgent() {
+        assertFalse(AgentScopeGuard.allowsParams(scope, frame(topLevel = "agent-mine", runtime = "agent-other")))
+        assertFalse(AgentScopeGuard.allowsParams(scope, frame(topLevel = "agent-other", runtime = "agent-mine")))
+    }
+
+    @Test
+    fun matchingInScopeTopLevelAndRuntimeAgentsAreAllowed() {
+        assertTrue(AgentScopeGuard.allowsParams(scope, frame(topLevel = "agent-mine", runtime = "agent-mine")))
+    }
+
+    @Test
+    fun disagreeingAgentIdsAreDeniedEvenWhenBothAreInScope() {
+        val wide = setOf("agent-mine", "agent-also-mine")
+        assertFalse(AgentScopeGuard.allowsParams(wide, frame(topLevel = "agent-mine", runtime = "agent-also-mine")))
+        assertTrue(AgentScopeGuard.allowsParams(null, frame(topLevel = "agent-mine", runtime = "agent-other")))
+    }
+
+    @Test
+    fun runtimeOnlyAgentIsChecked() {
+        assertFalse(AgentScopeGuard.allowsParams(scope, frame(topLevel = null, runtime = "agent-other")))
+        assertTrue(AgentScopeGuard.allowsParams(scope, frame(topLevel = null, runtime = "agent-mine")))
+    }
+
+    @Test
+    fun frameNamingNoAgentPasses() {
+        assertTrue(AgentScopeGuard.allowsParams(scope, frame(topLevel = null, runtime = null)))
+        assertTrue(AgentScopeGuard.allowsParams(scope, obj("conversation_id" to "c")))
     }
 
     @Test

@@ -1,7 +1,11 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.bound
+
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.backend.noAppServerRoute
 import app.cash.turbine.test
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.repository.api.PassageRemoteSource
@@ -24,12 +28,12 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class PassageRepositoryTest {
     private lateinit var fakeApi: FakePassageApi
-    private lateinit var repository: PassageRepository
+    private lateinit var repository: CachedPassageRepository
 
     @Before
     fun setup() {
         fakeApi = FakePassageApi()
-        repository = PassageRepository(fakeApi)
+        repository = CachedPassageRepository(fakeApi.bound())
     }
 
     @Test
@@ -72,8 +76,8 @@ class PassageRepositoryTest {
                 AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
             }
         }
-        val irohRepository = PassageRepository(
-            remote = fakeApi,
+        val irohRepository = CachedPassageRepository(
+            remote = fakeApi.bound(),
             irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
         )
 
@@ -116,17 +120,17 @@ class PassageRepositoryTest {
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
     @Test
-    fun `refreshPassages in iroh mode without source throws NoAppServerRouteException`() = runTest {
+    fun `refreshPassages in iroh mode without source throws AppServerRouteUnavailable`() = runTest {
         val failure = runCatching {
             val apiThatThrows = object : FakePassageApi() {
                 override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                    throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                    throw AppServerRouteUnavailable(SessionRoute.PASSAGES, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
-            val repo = PassageRepository(apiThatThrows)
+            val repo = CachedPassageRepository(apiThatThrows.bound())
             repo.refreshPassages(AgentId("a1"))
         }.exceptionOrNull()
-        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
+        org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
     }
 
     @Test
@@ -155,10 +159,10 @@ class PassageRepositoryTest {
         val irohSource = IrohAdminRpcPassageSource(transport, settings)
         val apiThatThrows = object : FakePassageApi() {
             override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.PASSAGES, "Raw HTTP forbidden")
             }
         }
-        val repo = PassageRepository(apiThatThrows, irohSource)
+        val repo = CachedPassageRepository(apiThatThrows.bound(), irohSource)
         repo.refreshPassages(AgentId("a1"))
         repo.getPassages(AgentId("a1")).test {
             assertEquals(1, awaitItem().size)
@@ -167,7 +171,7 @@ class PassageRepositoryTest {
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    private open class FakePassageApi : PassageRemoteSource by noAppServerRoute<PassageRemoteSource>() {
+    private open class FakePassageApi : PassageRemoteSource by unavailable<PassageRemoteSource>(SessionRoute.PASSAGES) {
         private val passagesByAgent = mutableMapOf<String, MutableList<Passage>>()
         var shouldFail = false
         val calls = mutableListOf<String>()

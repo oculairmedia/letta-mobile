@@ -12,17 +12,19 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
+import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 
@@ -128,17 +130,22 @@ class ControllerDisconnectInvalidationTest {
             connectionGenerationProvider = { generation },
         )
 
-        assertFailsWith<IllegalStateException> {
-            engine.runTurn(
-                TurnCommand(
-                    backendId = BackendId("test"),
-                    runtimeId = RuntimeId("rt"),
-                    agentId = AgentId("agent-1"),
-                    conversationId = ConversationId("conv-1"),
-                    input = TurnInput.UserMessage(localMessageId = "local-1", text = "hi"),
-                ),
-            ).first()
-        }
+        // letta-mobile-by4vm.7: a failed start is a Failed terminal for the caller, not an escaped exception.
+        val drafts = engine.runTurn(
+            TurnCommand(
+                backendId = BackendId("test"),
+                runtimeId = RuntimeId("rt"),
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                input = TurnInput.UserMessage(localMessageId = "local-1", text = "hi"),
+            ),
+        ).toList()
+        val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts.single().payload)
+        assertEquals(RuntimeRunStatus.Failed, failed.status)
+        assertEquals(
+            "App Server turn could not start: Connection generation superseded during runtime_start",
+            failed.reason,
+        )
         assertEquals(1, client.runtimeStarts.size)
     }
 

@@ -1,0 +1,131 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:StreamingMarkdownParser.kt$atLineStart &amp;&amp; i + 2 &lt; n &amp;&amp; prefix[i] == '`' &amp;&amp; prefix[i + 1] == '`' &amp;&amp; prefix[i + 2] == '`'</ID>
+    <ID>ComplexCondition:StreamingMarkdownText.kt$StreamingAppendedDeltaFadeState$!isStreaming || isReducedMotion || !isEligibleBlockKind || activeBlockId == null || activeSource.isEmpty()</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownParser.kt$internal fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownText.kt$@Composable private fun StreamingMarkdownDocumentBlocks( blocks: List&lt;StreamingMarkdownDocumentBlock&gt;, textColor: Color, stabilizeTables: Boolean, isStreaming: Boolean, tailTransform: (String) -&gt; String, cursorText: String?, cursorAlpha: Float, repairIncompleteMarkdown: Boolean, fadeAppendedText: Boolean = false, )</ID>
+    <ID>ForbiddenComment:StreamingMarkdownStructuralInvariantTest.kt$StreamingMarkdownInvariantHelpers$* Reusable pure helper for asserting streaming markdown structural invariants. * KMP-portable (Android-free). * * TODO: move to commonMain testFixtures once StreamingMarkdownText is extracted * to shared code.</ID>
+    <ID>InvalidPackageDeclaration:HoldToDictateButtonTest.kt$package com.letta.mobile.ui.components.audio</ID>
+    <ID>LongMethod:ActionSheet.kt$@Composable fun ActionSheetItem( text: String, icon: ImageVector, onClick: () -&gt; Unit, destructive: Boolean = false, enabled: Boolean = true, supportingText: String? = null, )</ID>
+    <ID>LongMethod:AmbientShaderAgentBackground.kt$@Composable fun AmbientShaderAgentBackground( agentStatus: String, modifier: Modifier = Modifier, /** Monotonic pulse incremented when visible assistant content grows. */ streamActivityPulse: Long = 0L, /** * Optional per-agent identity color: when set, NON-TERMINAL states * (idle/running/active) harmonize toward it, so the ambient background * says who you're talking to, not just what state it's in. Failed and * Completed always harmonize toward the theme seed — error semantics must * survive every agent palette. */ identitySeed: Color? = null, /** * The composer's measured height, read at draw time: the glow stays above a composer taller * than the tenth of the screen it assumes (see AmbientMotion.bandAboveComposer). */ composerHeight: () -&gt; androidx.compose.ui.unit.Dp = { androidx.compose.ui.unit.Dp.Unspecified }, content: @Composable BoxScope.() -&gt; Unit, )</ID>
+    <ID>LongMethod:ChatTextGeometry.kt$ChatTextGeometryMeasurer$fun clipToVisualLines( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, maxLines: Int, maxChars: Int, ): ChatTextVisualClip</ID>
+    <ID>LongMethod:ExpandableTitleSearch.kt$@Composable fun ExpandableTitleSearch( query: String, onQueryChange: (String) -&gt; Unit, onClear: () -&gt; Unit, expanded: Boolean, onExpandedChange: (Boolean) -&gt; Unit, titleContent: @Composable RowScope.() -&gt; Unit, modifier: Modifier = Modifier, placeholder: String = "Search…", collapsedHint: String = placeholder.removeSuffix("…"), @Suppress("UNUSED_PARAMETER") compactMaxWidth: Dp = 160.dp, enabled: Boolean = true, clearQueryOnCollapse: Boolean = false, openSearchContentDescription: String = "Open search", closeSearchContentDescription: String = "Close search", @Suppress("UNUSED_PARAMETER") clearSearchContentDescription: String = "Clear search", @Suppress("UNUSED_PARAMETER") autoFocus: Boolean = true, showCollapseButton: Boolean = true, isAppBarCollapsed: Boolean = false, )</ID>
+    <ID>LongMethod:HapticEffects.kt$HapticEffects$@SuppressLint("NewApi") internal fun platformSpecFor(cue: LettaHapticCue): PlatformHapticSpec?</ID>
+    <ID>LongMethod:HoldToDictateButton.kt$@Composable fun HoldToDictateButton( isRecognizing: Boolean, onStart: () -&gt; Unit, onStop: () -&gt; Unit, onCancel: () -&gt; Unit, enabled: Boolean = true, modifier: Modifier = Modifier, cancelThresholdDp: Int = 100, )</ID>
+    <ID>LongMethod:LettaInputBar.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable fun LettaInputBar( text: String, onTextChange: (String) -&gt; Unit, onSend: (String) -&gt; Unit, placeholder: String, sendContentDescription: String, modifier: Modifier = Modifier, enabled: Boolean = true, maxLines: Int = 4, canSendOverride: Boolean? = null, actionIcon: ImageVector = LettaIcons.Send, actionContentDescription: String = sendContentDescription, actionContainerColor: Color? = null, actionContentColor: Color? = null, actionSizeFraction: Float = 1f, actionPulse: Boolean = false, actionVisible: Boolean = true, hasStagedContent: Boolean = false, contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm), itemSpacing: Dp = LettaDimens.Space.sm, leadingContent: (@Composable () -&gt; Unit)? = null, customTrailingContent: (@Composable () -&gt; Unit)? = null, )</ID>
+    <ID>LongMethod:MarkdownText.kt$@Composable private fun MarkdownTextRaw( text: String, modifier: Modifier = Modifier, textColor: Color = MaterialTheme.colorScheme.onSurface, )</ID>
+    <ID>LongMethod:MermaidDiagram.kt$@Composable fun MermaidDiagram( source: String, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:MermaidDiagram.kt$@Composable private fun MermaidFullscreenDialog( request: ImageRequest, onDismiss: () -&gt; Unit, onCopy: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ModelDropdown.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ModelDropdown( selectedModel: String, models: List&lt;LlmModel&gt;, onModelSelected: (String) -&gt; Unit, onLoadModels: () -&gt; Unit, modifier: Modifier = Modifier, label: String = "Model", selectionValue: (LlmModel) -&gt; String = ModelCatalog::valueOf, )</ID>
+    <ID>LongMethod:StatusTimeline.kt$@Composable fun CollapsibleStatusRow( title: @Composable () -&gt; Unit, expanded: Boolean, onExpandedChange: (Boolean) -&gt; Unit, modifier: Modifier = Modifier, subtitle: String? = null, statusLabel: String? = null, statusColor: Color? = MaterialTheme.colorScheme.onSurfaceVariant, node: (@Composable () -&gt; Unit)? = null, badge: (@Composable () -&gt; Unit)? = null, motionPolicy: ChatMotionPolicy = rememberChatMotionPolicy(), content: (@Composable () -&gt; Unit)? = null, )</ID>
+    <ID>LongMethod:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>LongMethod:StreamingMarkdownParser.kt$internal fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>LongMethod:StreamingMarkdownText.kt$@Composable fun StreamingMarkdownText( text: String, modifier: Modifier = Modifier, textColor: Color = MaterialTheme.colorScheme.onSurface, tailTransform: (String) -&gt; String = { it }, cursorText: String? = null, cursorAlpha: Float = 1f, deferUnstableMarkdown: Boolean = true, stabilizeTables: Boolean = false, isStreaming: Boolean = true, animateSettledSize: Boolean = true, fadeAppendedText: Boolean = false, onStableFloorHeightPxChanged: (Int) -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:StreamingMarkdownText.kt$@Composable private fun StreamingMarkdownDocumentBlocks( blocks: List&lt;StreamingMarkdownDocumentBlock&gt;, textColor: Color, stabilizeTables: Boolean, isStreaming: Boolean, tailTransform: (String) -&gt; String, cursorText: String?, cursorAlpha: Float, repairIncompleteMarkdown: Boolean, fadeAppendedText: Boolean = false, )</ID>
+    <ID>LongMethod:TelemetryGrid.kt$@Composable fun TelemetryGrid( promptTokens: Int, completionTokens: Int, durationMs: Long, costUsd: Double?, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:Theme.kt$@VisibleForTesting internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors</ID>
+    <ID>LongMethod:ThinkingShader.kt$@Composable fun ThinkingShader( tint: Color, bgColor: Color, modifier: Modifier = Modifier, heightDp: Int = 216, animate: Boolean = true, // p2auf: secondary/tertiary themed accents the glow slowly drifts // toward. Default to [tint] so existing single-color callers are // unchanged; pass distinct theme colors for the multi-color drift. tint2: Color = tint, tint3: Color = tint, )</ID>
+    <ID>LongMethod:ThinkingShader.kt$@Composable private fun ThinkingShaderFallback( tint: Color, bgColor: Color, modifier: Modifier = Modifier, heightDp: Int = 216, animate: Boolean = true, tint2: Color = tint, tint3: Color = tint, )</ID>
+    <ID>LongMethod:ThinkingTextToken.kt$@Composable fun ThinkingTextToken( visible: Boolean, delayMessage: String? = null, textOverride: String? = null, reducedMotion: Boolean = false, reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(), modifier: Modifier = Modifier, /** Around the text; the default is the standalone strip's inset. Beside a mascot the caller drops the start. */ contentPadding: PaddingValues = PaddingValues(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.xs), )</ID>
+    <ID>LongParameterList:CardGroup.kt$CardGroupScope$( onClick: (() -&gt; Unit)? = null, modifier: Modifier = Modifier, overlineContent: (@Composable () -&gt; Unit)? = null, supportingContent: (@Composable () -&gt; Unit)? = null, leadingContent: (@Composable () -&gt; Unit)? = null, trailingContent: (@Composable () -&gt; Unit)? = null, colors: ListItemColors? = null, headlineContent: @Composable () -&gt; Unit, )</ID>
+    <ID>LongParameterList:ChatTextGeometry.kt$ChatTextGeometryMeasurer$( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, maxLines: Int, maxChars: Int, )</ID>
+    <ID>LongParameterList:ChatTextGeometry.kt$ChatTextGeometryMeasurer$( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, softWrap: Boolean = true, maxLines: Int = Int.MAX_VALUE, )</ID>
+    <ID>LongParameterList:MermaidNativeRenderer.kt$MermaidNativeRenderer$( source: String, darkTheme: Boolean, textArgb: Int, borderArgb: Int, surfaceArgb: Int, primaryArgb: Int, secondaryArgb: Int, tertiaryArgb: Int, )</ID>
+    <ID>LongParameterList:Theme.kt$( primary: Color, primaryContainer: Color, secondary: Color, tertiary: Color, background: Color, surface: Color, surfaceVariant: Color, outline: Color, )</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownParser.kt$for</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownParser.kt$while</ID>
+    <ID>MatchingDeclarationName:AmbientShaderAgentBackground.kt$AmbientAgentStatus</ID>
+    <ID>MatchingDeclarationName:Color.kt$HslColor</ID>
+    <ID>MatchingDeclarationName:IconSizing.kt$LettaIconSizing</ID>
+    <ID>MatchingDeclarationName:Motion.kt$LettaMotion</ID>
+    <ID>MatchingDeclarationName:SearchHighlight.kt$SearchHighlightColors</ID>
+    <ID>MatchingDeclarationName:Sizing.kt$LettaSizing</ID>
+    <ID>MatchingDeclarationName:Spacing.kt$LettaSpacing</ID>
+    <ID>MatchingDeclarationName:StarterPrompts.kt$StarterPrompt</ID>
+    <ID>MatchingDeclarationName:Theme.kt$PresetThemeColors</ID>
+    <ID>MatchingDeclarationName:ToolAffordanceRow.kt$ToolAffordanceRowTestTags</ID>
+    <ID>MatchingDeclarationName:TopBarTheme.kt$LettaTopBarDefaults</ID>
+    <ID>MaxLineLength:CardGroup.kt$Box</ID>
+    <ID>MaxLineLength:DesignSystemDisclosureChevronContractTest.kt$DesignSystemDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
+    <ID>MaxLineLength:HapticEffectsContractTest.kt$HapticEffectsContractTest$assertEquals(HapticFeedbackConstants.CONTEXT_CLICK, HapticEffects.platformSpecFor(LettaHapticCue.ApprovalNeeded)?.fallbackPlatformType)</ID>
+    <ID>MaxLineLength:Previews.kt$thinkingText = "Let me analyze this step by step:\n1. First consideration\n2. Second point\n3. **Conclusion**: this approach works best."</ID>
+    <ID>MaxLineLength:SplitMarkdownBlocksTest.kt$SplitMarkdownBlocksTest$val text = "Before\n\n| Language | Runtime | UI |\n| --- | --- | --- |\n| Kotlin | JVM | Compose |\n| Swift | Native | SwiftUI |\nAfter"</ID>
+    <ID>MaxLineLength:StatusChip.kt$"created", "running", "pending", "processing", "working", "busy" -&gt; MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer</ID>
+    <ID>MaxLineLength:StreamingFlickerTest.kt$StreamingFlickerTest$val text = "Here is **bold** and *italic* and `code` mixed together in one paragraph that goes on for a while and then continues with **another bold span** before ending.\n\nNext paragraph here."</ID>
+    <ID>MaxLineLength:UrlAutolinkTest.kt$UrlAutolinkTest$val expected = "Check [https://example.com](https://example.com). Also see [https://test.org](https://test.org), and ([https://another.com](https://another.com))."</ID>
+    <ID>MaxLineLength:VoiceRecognizerOverlay.kt$Row</ID>
+    <ID>NestedBlockDepth:ChatTextGeometry.kt$private fun estimateCodeVisualClip( text: String, style: TextStyle, widthPx: Int, density: Density, maxLines: Int, ): EstimatedCodeClip?</ID>
+    <ID>NestedBlockDepth:RichInlineText.kt$internal fun prepareRichInlineItems(items: List&lt;RichInlineItem&gt;): List&lt;PreparedRichInlineItem&gt;</ID>
+    <ID>NestedBlockDepth:StreamingFlickerTest.kt$StreamingFlickerTest$@Test fun `active tail is byte-append-only across consecutive ticks`()</ID>
+    <ID>NestedBlockDepth:StreamingFlickerTest.kt$StreamingFlickerTest$private fun unmatchedInlineMarker(line: String): String?</ID>
+    <ID>NestedBlockDepth:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>NestedBlockDepth:StreamingMarkdownParser.kt$internal fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>NewLineAtEndOfFile:SearchHighlightTest.kt$com.letta.mobile.ui.components.SearchHighlightTest.kt</ID>
+    <ID>ReturnCount:ChatTextGeometry.kt$ChatTextGeometryMeasurer$fun clipToVisualLines( text: String, style: TextStyle, widthPx: Int, density: Density, layoutDirection: LayoutDirection, mode: ChatTextLayoutMode, maxLines: Int, maxChars: Int, ): ChatTextVisualClip</ID>
+    <ID>ReturnCount:StreamingFlickerTest.kt$StreamingFlickerTest$private fun unmatchedInlineMarker(line: String): String?</ID>
+    <ID>ReturnCount:StreamingMarkdownParser.kt$internal fun parseMarkdownTable(text: String): ParsedMarkdownTable?</ID>
+    <ID>ReturnCount:TableCellInlineMarkdown.kt$private fun String.parseDelimitedTableCellSpan( start: Int, marker: String, kind: TableCellInlineSpanKind, allowWordBoundary: Boolean, ): TableCellInlineSpan?</ID>
+    <ID>ReturnCount:TableCellInlineMarkdown.kt$private fun String.parseTableCellLinkSpan(start: Int): TableCellInlineSpan?</ID>
+    <ID>TooManyFunctions:HapticEffects.kt$HapticEffects</ID>
+    <ID>TooManyFunctions:MarkdownText.kt$com.letta.mobile.ui.components.MarkdownText.kt</ID>
+    <ID>TooManyFunctions:Previews.kt$com.letta.mobile.ui.components.Previews.kt</ID>
+    <ID>TooManyFunctions:StreamingMarkdownParser.kt$com.letta.mobile.ui.components.StreamingMarkdownParser.kt</ID>
+    <ID>UnusedImports:Accordions.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ColorTest.kt$import kotlin.math.abs</ID>
+    <ID>UnusedImports:DateSeparator.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:DeliveryTimeText.kt$import com.letta.mobile.ui.theme.LocalChatFontScale</ID>
+    <ID>UnusedImports:DeliveryTimeText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
+    <ID>UnusedImports:FormItem.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:IconSizing.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:LatencyText.kt$import com.letta.mobile.ui.theme.LocalChatFontScale</ID>
+    <ID>UnusedImports:LatencyText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
+    <ID>UnusedImports:LettaSearchBar.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:MarkdownText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
+    <ID>UnusedImports:RotationalLoader.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ScrollToBottomFab.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ScrollToBottomFabRenderingTest.kt$import androidx.compose.ui.test.onNodeWithTag</ID>
+    <ID>UnusedImports:StarterPrompts.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:StatefulFadingEdges.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:StatusChip.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocument</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentState</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.allowsInlineCursor</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.renderMarkdownSource</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentParserTest.kt$import com.letta.mobile.ui.markdown.supportsPlainTextHeightPrediction</ID>
+    <ID>UnusedImports:StreamingMarkdownDocumentTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownBlockKind</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import com.letta.mobile.ui.markdown.allowsInlineCursor</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import com.letta.mobile.ui.markdown.renderMarkdownSource</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import com.letta.mobile.ui.markdown.supportsPlainTextHeightPrediction</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import org.junit.Assert.assertEquals</ID>
+    <ID>UnusedImports:StreamingMarkdownStructuralInvariantTest.kt$import org.junit.Assert.assertTrue</ID>
+    <ID>UnusedImports:StreamingMarkdownText.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
+    <ID>UnusedImports:ThinkingSection.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ThinkingSection.kt$import com.letta.mobile.ui.theme.scaledBy</ID>
+    <ID>UnusedImports:ThinkingTextToken.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ToolAffordanceRow.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedParameter:ExpandableTitleSearch.kt$onQueryChange: (String) -&gt; Unit</ID>
+    <ID>UnusedParameter:ThinkingShader.kt$tint2: Color = tint</ID>
+    <ID>UnusedParameter:ThinkingShader.kt$tint3: Color = tint</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun AccordionsPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun DateSeparatorPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun EmptyStatePreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun ErrorDialogPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun LatencyTextPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun LiveStatusTextPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageActionButtonsPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageBubblePreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun MessageSenderPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun RotationalLoaderPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun StatusTimelinePreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun TelemetryGridPreview()</ID>
+    <ID>UnusedPrivateMember:Previews.kt$@PreviewLightDark @Composable private fun ThinkingSectionPreview()</ID>
+    <ID>UnusedPrivateMember:StatusTimeline.kt$@PreviewLightDark @Composable private fun StatusTimelinePreview()</ID>
+    <ID>UnusedPrivateProperty:ThinkingSection.kt$val fontScale = LocalChatFontScale.current</ID>
+  </CurrentIssues>
+</SmellBaseline>

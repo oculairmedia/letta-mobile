@@ -35,7 +35,6 @@ class MessageRepositoryBoundaryTest {
                 // from page size. No new state and no new responsibility — this repository stays
                 // a stateless HTTP helper.
                 "fetchOlderMessagesPage",
-                "getMessagesPaged",
                 "resetMessages",
                 "searchMessages",
                 "submitApproval",

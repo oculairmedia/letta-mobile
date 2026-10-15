@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -24,10 +25,10 @@ class FileHostCanvasDirectory(private val file: Path) : HostCanvasDirectory {
     private val serializer = ListSerializer(HostCanvasEntry.serializer())
     private var loaded: MutableList<HostCanvasEntry>? = null
 
-    override suspend fun get(canvasId: String): HostCanvasEntry? = io { entries().firstOrNull { it.canvasId == canvasId } }
+    override suspend fun get(canvasId: CanvasId): HostCanvasEntry? = io { entries().firstOrNull { it.canvasId == canvasId.value } }
 
-    override suspend fun forConversation(conversationId: String): HostCanvasEntry? =
-        io { entries().firstOrNull { it.conversationId == conversationId } }
+    override suspend fun forConversation(conversationId: ConversationId): HostCanvasEntry? =
+        io { entries().firstOrNull { it.conversationId == conversationId.value } }
 
     override suspend fun putIfAbsent(entry: HostCanvasEntry): HostCanvasEntry = io {
         val entries = entries()

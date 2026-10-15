@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 
 /**
  * The two non-shim read sources available to admin handlers.
@@ -27,6 +28,11 @@ data class NativeReadTiers(
     val turnIdentity: com.letta.mobile.data.runtime.TurnIdentityLedger? = null,
 )
 
+/** Admin RPC handlers a platform adds to the router: the JVM host's plugin runtime (letta-mobile-cdgpr.7). */
+fun interface AdminRpcRoutes {
+    fun register(router: AdminRpcRouter)
+}
+
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
         "conversation.list",
@@ -39,6 +45,8 @@ object AdminRpcRegistry {
         "conversation.compact",
         // letta-mobile-joigh: context-limit relay (ConversationContextLimitHandlers).
         "conversation.context_limit",
+        // letta-mobile-by4vm.51: system-prompt recompile relay (ConversationRecompileHandlers).
+        "conversation.recompile",
         // letta-mobile-iczm7: dreaming (ReflectionAdminHandlers).
         "reflection.get",
         "reflection.set",
@@ -76,7 +84,7 @@ object AdminRpcRegistry {
         "project.update",
         "project.archive",
         "project.delete",
-    )
+    ) + PluginAdminRpc.METHODS
 
     fun buildRouter(
         /**
@@ -118,6 +126,12 @@ object AdminRpcRegistry {
          * When null, skill.list returns an empty skills array until a catalog is wired.
          */
         skillsListing: SkillsListingSource? = null,
+        /**
+         * letta-mobile-by4vm.84: the App Server's slash commands, observed from
+         * `update_device_status`. Null falls back to a catalog that answers the built-in list
+         * when a [nativeClient] is wired, and `capability_unavailable` when none is.
+         */
+        slashCommands: NativeSlashCommandCatalog? = null,
         /** See [NativeReadTiers.agentChanges]. */
         agentChanges: AgentChangeNotifier? = null,
         /** See [NativeReadTiers.conversationChanges]. */
@@ -137,6 +151,12 @@ object AdminRpcRegistry {
         pairingQr: PairingQrConfig? = null,
         /** letta-mobile-a4tm7: pushes confirmed permission-mode changes to viewers; null pushes nothing. */
         permissionModes: PermissionModePublisher? = null,
+        /**
+         * letta-mobile-cdgpr.7: the host's `plugins.*` handlers (`PluginAdminHandlers` on a JVM host
+         * running plugins). Null (`--plugins=off`, Android) answers them `capability_unavailable`
+         * and advertises no `plugins_v1`.
+         */
+        pluginRoutes: AdminRpcRoutes? = null,
     ): AdminRpcRouter {
         val router = AdminRpcRouter()
 
@@ -163,9 +183,9 @@ object AdminRpcRegistry {
         ScheduleAdminHandlers.register(router, nativeClient)
         ToolAdminHandlers.register(router, localBackendStore, nativeClient)
         McpAdminHandlers.register(router)
-        // Phase 3: shim-era goal/slash surfaces are product-removed.
-        GoalAdminHandlers.register(router, adminBaseUrl = null)
-        SlashCommandAdminHandlers.register(router, adminBaseUrl = null)
+        // letta-mobile-by4vm.84: goals have no App Server owner; slash commands come from device status.
+        GoalAdminHandlers.register(router)
+        SlashCommandAdminHandlers.register(router, slashCommands ?: nativeClient?.let { NativeSlashCommandCatalog() })
         SkillAdminHandlers.register(
             router,
             nativeClient = nativeClient,
@@ -184,6 +204,10 @@ object AdminRpcRegistry {
         ConversationCompactHandlers.register(router, nativeClient, localBackendStore)
         // letta-mobile-joigh: the context limit for Iroh clients (execute_command context-limit).
         ConversationContextLimitHandlers.register(router, nativeClient)
+        // letta-mobile-by4vm.51: /recompile for Iroh clients (conversation_recompile).
+        ConversationRecompileHandlers.register(router, nativeClient)
+        pluginRoutes?.register(router)
+            ?: CapabilityUnavailable.register(router, PluginAdminRpc.METHODS, "plugin host")
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

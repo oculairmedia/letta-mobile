@@ -212,6 +212,26 @@ class AdminChatSessionPortTest {
         )
     }
 
+    // letta-mobile-by4vm.82: the chip read Default whenever the conversation had its own model, so
+    // an effort picked for it never showed and seemed not to stick.
+    @Test
+    fun `model state reports the conversation's effort under an override`() {
+        val agent = TestData.agent("agent-model", "Model", model = "anthropic/agent-model")
+        val inputs = AdminChatComposerMapping.ModelInputs(
+            agent = agent,
+            models = listOf(LlmModel(id = "m1", handle = "anthropic/claude-opus-5-5", displayNameOverride = "Claude Opus 5.5")),
+            conversationOverride = "anthropic/claude-opus-5-5",
+            effortsFor = { listOf("low", "medium", "high") },
+            conversationEffort = "high",
+        )
+
+        val model = checkNotNull(AdminChatComposerMapping.modelUiState(inputs))
+
+        assertEquals("Claude Opus 5.5", model.currentLabel)
+        assertEquals("high", model.currentEffort)
+        assertEquals(null, AdminChatComposerMapping.modelUiState(inputs.copy(conversationEffort = null))?.currentEffort)
+    }
+
     @Test
     fun `the context chip shows the streamed total without any drawer refresh`() = runTest {
         // letta-mobile-0ofhc: nothing but the streamed reading feeds the chip. No refresh call,

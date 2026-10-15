@@ -11,6 +11,7 @@ import com.letta.mobile.data.canvas.compose.ComposeStatus
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
@@ -33,7 +34,7 @@ class CanvasComposeToolTest {
     private lateinit var sessions: CanvasSessionRegistry
     private lateinit var registry: ExternalToolRegistry
 
-    private val canvasId = CanvasId.forConversation(CONVERSATION)
+    private val canvasId = CanvasId.forConversation(ConversationId(CONVERSATION))
 
     @BeforeTest
     fun setUp() {

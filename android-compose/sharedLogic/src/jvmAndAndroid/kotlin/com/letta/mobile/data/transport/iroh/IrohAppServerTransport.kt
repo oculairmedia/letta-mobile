@@ -49,6 +49,14 @@ import kotlin.time.Duration.Companion.milliseconds
  * request_id correlation. The stream channel is receive-only and carries streaming
  * events (stream_delta, update_loop_status, etc.).
  *
+ * letta-mobile-by4vm.48: this transport keeps the default, unordered-between-lanes
+ * [AppServerTransport.inboundFrames]. That is safe because the Iroh node writes every frame that
+ * carries `event_seq` (`stream_delta`, `update_loop_status`, `update_queue`, `turn_finished`) on
+ * the stream QUIC stream, in `event_seq` order, and only request answers and `input_accepted`
+ * on the control stream. Each stream has one reader and one SharedFlow here, so a turn's
+ * `turn_finished` always follows its deltas. Moving a turn frame to the control stream would
+ * break that; `IrohRelayedTurnLaneOrderTest` pins it.
+ *
  * App Server v2 frames are sent/received UNCHANGED — this is pure transport,
  * not protocol transformation.
  *
@@ -111,6 +119,14 @@ class IrohAppServerTransport(
      * servers can never emit framing the peer cannot decode.
      */
     private val serverSupportsFrameParts = AtomicBoolean(false)
+
+    @Volatile private var authCapabilities: Set<String> = emptySet()
+
+    /**
+     * letta-mobile-by4vm.50: every capability the server advertised in its last successful
+     * auth_response (recorded before that response reaches the caller of `auth`); empty before.
+     */
+    val serverCapabilities: Set<String> get() = authCapabilities
 
     /**
      * Awaits the initial QUIC connection completion (success or failure).
@@ -469,6 +485,7 @@ class IrohAppServerTransport(
     private fun recordServerCapabilities(frame: AppServerReceivedFrame) {
         val auth = frame.frame as? AppServerInboundFrame.AuthResponse ?: return
         if (!auth.success) return
+        authCapabilities = auth.capabilities.orEmpty().toSet()
         val supported = IrohFrameCodec.FRAME_PART_CAPABILITY in auth.capabilities.orEmpty()
         val changed = serverSupportsFrameParts.getAndSet(supported) != supported
         if (changed) {

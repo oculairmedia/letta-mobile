@@ -87,7 +87,7 @@ Audit in this order:
 | 4 | `AppServerProtocol.kt` | Kotlin's typed wire representation |
 | 5 | `iroh-admin-ownership-matrix.json` | Declared owner for every registered Iroh `admin_rpc` method |
 | 6 | `AdminRpcRegistry.kt` and `*AdminHandlers.kt` | Actual Iroh admin routing and fallback order |
-| 7 | `AppServerTurnEngine.kt` and `AppServerContextWindowPreflight.kt` | Runtime, turn, approval, and context-recovery policy |
+| 7 | `AppServerTurnEngine.kt` (`AppServerContextWindowPreflight.kt` has been removed; context-window state now lives in `data/context/`) | Runtime, turn, approval, and context-recovery policy |
 | 8 | Mobile repositories and ViewModels | Client projection and UI defaults, never backend authority |
 
 Relative repository paths:
@@ -98,7 +98,7 @@ Relative repository paths:
 - `android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json`
 - `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry.kt`
 - `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt`
-- `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerContextWindowPreflight.kt`
+- ~~`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerContextWindowPreflight.kt`~~ (removed; see `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/context/`)
 
 The TypeScript declaration is authoritative for field-level upstream schema.
 Do not maintain a second hand-written copy of every field here. The verifier

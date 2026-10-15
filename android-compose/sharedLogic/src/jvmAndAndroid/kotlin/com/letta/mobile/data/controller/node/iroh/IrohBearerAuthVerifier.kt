@@ -43,7 +43,18 @@ class IrohBearerAuthVerifier(
             } else {
                 deny(remoteEndpointId, "pairing_required")
             }
+        // letta-mobile-by4vm.35: a configured allowlist binds the static token
+        // to the listed NodeIds even when pairing admits unlisted peers, so a
+        // leaked token is useless from any other key. Paired peers and invite
+        // redemption authenticate before reaching this path.
+        if (isOutsideAllowlist(remoteEndpointId)) return deny(remoteEndpointId, "peer_not_allowlisted")
+        return verifyToken(remoteEndpointId, expected, providedToken)
+    }
 
+    private fun isOutsideAllowlist(remoteEndpointId: String): Boolean =
+        policy.allowedPeerIds.isNotEmpty() && remoteEndpointId !in policy.allowedPeerIds
+
+    private fun verifyToken(remoteEndpointId: String, expected: String, providedToken: String?): Outcome {
         val matches = providedToken != null &&
             MessageDigest.isEqual(
                 expected.encodeToByteArray(),

@@ -25,15 +25,15 @@ The CLI now has two useful modes:
 
 ## Build and run
 
-The module is still an Android library because the production timeline code
-lives in `:core`, which is also Android-backed. The entrypoint is no longer a
-JUnit test: `:cli:run` is a `JavaExec` task that uses the Android unit-test
-runtime classpath only to provide Android stubs for the JVM process.
+The module is a plain Kotlin/JVM application (letta-mobile-by4vm.57): it
+consumes the `jvm` target of `:sharedLogic` and uses no Android APIs. `:cli:run`
+is the `application` plugin's run task; `-PcliArgs` is still accepted for the
+existing scripts (`--args` works too). JDK 21+ is required because the Iroh
+binding (`computer.iroh:iroh`) is JVM 21 only.
 
 ```powershell
 cd android-compose
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
-$env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 .\gradlew.bat :cli:run -PcliArgs="<command> [options]"
 ```
 

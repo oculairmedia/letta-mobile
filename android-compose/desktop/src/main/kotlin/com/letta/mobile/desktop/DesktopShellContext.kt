@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.a2ui.mayForwardAsUserAction
 import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
@@ -55,7 +56,9 @@ internal fun rememberDesktopShellContext(
     }
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
         val resolved = resolveA2uiAction(action, chatState.value.selectedConversationId)
-        core.sessionGraph.value.channelTransport.sendA2uiAction(resolved)
+        // letta-mobile-by4vm.2: desktop has no registry-backed A2UI approval path, so a
+        // tool_approval_response is dropped (and logged) rather than matched by the server unchecked.
+        if (resolved.mayForwardAsUserAction()) core.sessionGraph.value.channelTransport.sendA2uiAction(resolved)
     }
     return DesktopShellContext(
         shell = shell,
@@ -66,7 +69,7 @@ internal fun rememberDesktopShellContext(
         overlays = overlays,
         chatState = chatState,
         onA2uiAction = onA2uiAction,
-        sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction),
+        sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),
         imageIntake = rememberDesktopImageIntake(core, navigator),
     )
 }
@@ -81,8 +84,9 @@ private fun resolveA2uiAction(action: A2uiAction, selectedConversationId: String
 private fun rememberDesktopSharedChatWiring(
     chatController: DesktopChatController,
     onA2uiAction: (A2uiAction) -> Unit,
+    modelCatalog: com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository?,
 ): DesktopSharedChatWiring {
-    val port = rememberDesktopChatSessionPort(chatController, onA2uiAction)
+    val port = rememberDesktopChatSessionPort(chatController, onA2uiAction, modelCatalog)
     val dockedCanvasRouter = remember { DesktopDockedCanvasRouter() }
     return DesktopSharedChatWiring(port = port, dockedCanvas = dockedCanvasRouter)
 }

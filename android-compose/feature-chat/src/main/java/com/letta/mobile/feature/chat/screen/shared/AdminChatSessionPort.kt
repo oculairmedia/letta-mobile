@@ -106,6 +106,7 @@ internal class AdminChatSessionPort(
             models = models,
             conversationOverride = viewModel.conversationId?.value?.let(selections.models::get),
             effortsFor = viewModel::reasoningEffortsFor,
+            conversationEffort = viewModel.conversationId?.value?.let(selections.efforts::get),
         ),
     )
 

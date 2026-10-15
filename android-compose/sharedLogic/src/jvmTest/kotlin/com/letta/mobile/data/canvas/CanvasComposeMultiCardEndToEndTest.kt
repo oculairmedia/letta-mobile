@@ -17,6 +17,7 @@ import com.letta.mobile.data.chat.projection.CanvasArtifactStatus
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaMessageSerializer
 import com.letta.mobile.data.model.ToolCall
@@ -443,7 +444,7 @@ class CanvasComposeMultiCardEndToEndTest {
         const val CALL_1 = "toolu_01LisbonTripCompose"
         const val CALL_2 = "toolu_01RestaurantsCompose"
         const val CALL_3 = "toolu_01LisbonTripAgain"
-        val CANVAS_ID = CanvasId.forConversation(CONVERSATION)
+        val CANVAS_ID = CanvasId.forConversation(ConversationId(CONVERSATION))
         val DOCUMENT_KINDS = setOf(ComposeKind.NOTE, ComposeKind.CHECKLIST, ComposeKind.CARD)
         val ELEMENT_CONTENT = setOf("type", "shapeType", "points", "text", "textTopLeft", "wrapWidth", "fontSize", "_compose")
         val json = Json { ignoreUnknownKeys = true }

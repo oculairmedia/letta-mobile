@@ -68,7 +68,7 @@ kotlin {
                 implementation(libs.ktor.client.websockets)
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.serialization.kotlinx.json)
-                implementation(libs.filekit.core.chat)
+                implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs)
             }
         }

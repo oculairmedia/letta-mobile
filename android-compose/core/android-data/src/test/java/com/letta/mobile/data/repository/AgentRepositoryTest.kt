@@ -1,5 +1,7 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.model.AgentCreateParams
@@ -549,17 +551,17 @@ class AgentRepositoryTest {
     // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
     @Test
-    fun `createAgent in iroh mode without source throws NoAppServerRouteException`() = runTest {
+    fun `createAgent in iroh mode without source throws AppServerRouteUnavailable`() = runTest {
         val failure = runCatching {
             val apiThatThrows = object : FakeAgentApi() {
                 override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
-                    throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden in iroh:// mode")
+                    throw AppServerRouteUnavailable(SessionRoute.AGENTS, "Raw HTTP forbidden in iroh:// mode")
                 }
             }
             val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
             repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
         }.exceptionOrNull()
-        org.junit.Assert.assertTrue("expected NoAppServerRouteException, got $failure", failure is com.letta.mobile.data.backend.NoAppServerRouteException)
+        org.junit.Assert.assertTrue("expected AppServerRouteUnavailable, got $failure", failure is AppServerRouteUnavailable)
     }
 
     @Test
@@ -593,7 +595,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun countAgents(): Int {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.AGENTS, "Raw HTTP forbidden")
             }
         }
         val repo = AgentRepository(
@@ -632,7 +634,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.AGENTS, "Raw HTTP forbidden")
             }
             override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> = emptyList()
         }
@@ -656,7 +658,7 @@ class AgentRepositoryTest {
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
             override suspend fun deleteAgent(id: AgentId) {
-                throw com.letta.mobile.data.backend.NoAppServerRouteException("Raw HTTP forbidden")
+                throw AppServerRouteUnavailable(SessionRoute.AGENTS, "Raw HTTP forbidden")
             }
         }
         val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)

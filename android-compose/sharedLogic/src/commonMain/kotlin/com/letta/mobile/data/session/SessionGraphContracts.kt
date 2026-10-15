@@ -1,5 +1,9 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -20,6 +24,7 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LettaBackend
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -57,8 +62,27 @@ interface SessionRepositoryGraph {
     val toolRepository: IToolRepository
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository
 
+    /**
+     * letta-mobile-by4vm.13: which optional routes this graph serves. A repository for a route it
+     * does not serve throws [com.letta.mobile.data.backend.AppServerRouteUnavailable] on every call,
+     * so ask here (or use [ifSupported]) before touching one.
+     */
+    val capabilities: SessionCapabilities
+
     fun close()
 }
+
+/** [read] when this graph serves [route]; null (render "not available") when it does not. */
+inline fun <T> SessionRepositoryGraph.ifSupported(route: SessionRoute, read: SessionRepositoryGraph.() -> T): T? =
+    if (capabilities.supports(route)) read() else null
+
+/** The agent roster, or an empty one (a new flow; remember it per graph) where no agents are served. */
+fun SessionRepositoryGraph.agentRosterOrEmpty(): StateFlow<List<Agent>> =
+    ifSupported(SessionRoute.AGENTS) { agentRepository.agents } ?: MutableStateFlow(emptyList())
+
+/** The LLM catalog, or an empty one (a new flow; remember it per graph) where no models are served. */
+fun SessionRepositoryGraph.llmModelsOrEmpty(): StateFlow<List<LlmModel>> =
+    ifSupported(SessionRoute.MODELS) { modelRepository.llmModels } ?: MutableStateFlow(emptyList())
 
 interface SessionRepositoryGraphFactory<out Graph : SessionRepositoryGraph> {
     fun create(): Graph

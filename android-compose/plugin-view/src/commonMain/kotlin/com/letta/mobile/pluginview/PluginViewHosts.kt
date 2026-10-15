@@ -2,7 +2,13 @@ package com.letta.mobile.pluginview
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.letta.mobile.data.plugin.view.PluginViewTransport
+import com.letta.mobile.data.plugin.view.PluginViewsModel
+import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.ui.canvas.plugin.LocalPluginElementRenderers
 import com.letta.mobile.ui.canvas.plugin.LocalPluginViewHost
 import com.letta.mobile.ui.canvas.plugin.PluginElementRenderers
@@ -51,4 +57,29 @@ fun ProvidePluginViews(
         LocalPluginElementRenderers provides renderers,
         content = content,
     )
+}
+
+/**
+ * letta-mobile-cdgpr.8: [content] with live views from [model], the one call a shell makes around
+ * its canvas. The model supplies the host's enabled plugins and its view transport. When this
+ * device's "Live plugin views" switch is off, no [host] is provided, so every element draws its
+ * fallback card or snapshot. Without a model, [content] is drawn as it is, every element its card.
+ */
+@Composable
+fun ProvidePluginViews(
+    model: PluginViewsModel?,
+    host: PluginViewHost,
+    canvasId: String,
+    platform: ViewPlatform,
+    content: @Composable () -> Unit,
+) {
+    if (model == null) return content()
+    LaunchedEffect(model) { model.refresh() }
+    val enabled by model.liveViewsEnabled.collectAsState()
+    val supported by model.supported.collectAsState()
+    val plugins by model.plugins.collectAsState()
+    val environment = remember(model, canvasId, platform, supported) {
+        PluginViewEnvironment(canvasId, platform, transport = model.transport ?: PluginViewTransport.Unavailable)
+    }
+    ProvidePluginViews(PluginViewsModel.viewHost(host, enabled), environment, plugins, content)
 }

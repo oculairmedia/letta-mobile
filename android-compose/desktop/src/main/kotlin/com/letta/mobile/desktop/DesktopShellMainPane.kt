@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.session.llmModelsOrEmpty
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.Composable
@@ -130,8 +131,8 @@ private fun rememberDesktopShellChatHost(context: DesktopShellContext, frame: De
 private fun rememberShellContextUsage(context: DesktopShellContext, frame: DesktopShellFrame): ContextWindowUsageState {
     val core = context.core
     val sessionGraph = core.sessionGraph.value
-    val models by sessionGraph.modelRepository.llmModels.collectAsState()
-    val modelSelections by core.chatController.conversationModelSelections.collectAsState()
+    val models by remember(sessionGraph) { sessionGraph.llmModelsOrEmpty() }.collectAsState()
+    val modelSelections by core.chatController.models.selections.collectAsState()
     return rememberFocusedContextUsage(
         focus = DesktopContextFocus(
             agentId = frame.focus.selectedAgentId,
@@ -237,6 +238,8 @@ private fun desktopDestinationActions(context: DesktopShellContext, frame: Deskt
     return DestinationContentActions(
         onRailRecencyDaysChange = core.railPrefs::updateRecencyDays,
         onOpenProviders = { context.navigator.navigate(ShellDestination.Providers) },
+        onOpenPlugins = { context.navigator.navigate(ShellDestination.Plugins) },
+        pluginViews = core.bootstrap.dataBindings.pluginViews,
         onRetryConnection = core.chatController::retryConnection,
         home = desktopHomeCallbacks(context, frame),
         memory = controllers.memory,

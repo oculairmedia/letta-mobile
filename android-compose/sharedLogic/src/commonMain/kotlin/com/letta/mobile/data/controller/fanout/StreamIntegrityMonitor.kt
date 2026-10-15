@@ -2,14 +2,11 @@ package com.letta.mobile.data.controller.fanout
 
 import com.letta.mobile.data.controller.RuntimeSyncScheduler
 import com.letta.mobile.data.controller.RuntimeSyncScheduler.SyncReason
-import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlin.time.Clock
 
 /**
  * letta-mobile-bzvro.6 (F06): keeps a client's view of its runtimes from going stale.
@@ -18,6 +15,10 @@ import kotlin.time.Clock
  * `event_seq` gap, see [EventSeqGapDetector]) asks the [RuntimeSyncScheduler] for a recovery
  * `sync`; loop status frames set each runtime's cadence (busy vs idle). [requestResync] is the
  * hook for "the app came back to the foreground / the window regained focus".
+ *
+ * Gap detection needs frames in socket order. The router reads `AppServerClient.events`, which on a
+ * direct socket is `AppServerTransport.inboundFrames` in arrival order (letta-mobile-by4vm.5); fed
+ * from the old two-lane merge, a `turn_finished` overtaking a delta read as a gap.
  */
 class StreamIntegrityMonitor(
     private val scheduler: RuntimeSyncScheduler,
@@ -55,30 +56,11 @@ class StreamIntegrityMonitor(
 
     companion object {
         /**
-         * The monitor for [router]'s watched runtimes, syncing through [client]. The caller binds it
-         * with [AppServerRuntimeEventRouter.bindStreamIntegrity] and runs it with [start].
+         * letta-mobile-by4vm.50: advertised in an Iroh host's `auth_response` when it draws every
+         * frame's `event_seq` inside its stream write lock, so the per-connection sequence a client
+         * sees is contiguous and a jump is a lost frame. Clients enable gap detection on Iroh only
+         * when the host says so (see [StreamIntegrityBinding.bindIfHostOrdersEventSeq]).
          */
-        fun forRouter(
-            router: AppServerRuntimeEventRouter,
-            client: AppServerClient,
-            detectGaps: Boolean,
-            requestIdFactory: () -> String,
-        ): StreamIntegrityMonitor {
-            val scheduler = RuntimeSyncScheduler(
-                runtimes = router::watchedRuntimes,
-                sync = { runtime, reason ->
-                    client.sync(
-                        AppServerCommand.Sync(
-                            runtime = runtime,
-                            requestId = requestIdFactory(),
-                            recoverApprovals = reason.recoverApprovals,
-                            forceDeviceStatus = reason.recoverApprovals,
-                        ),
-                    )
-                },
-                clock = { Clock.System.now().toEpochMilliseconds() },
-            )
-            return StreamIntegrityMonitor(scheduler, detectGaps, router.connectionGenerationProvider)
-        }
+        const val EVENT_SEQ_ORDERED_CAPABILITY: String = "event_seq_ordered_v1"
     }
 }

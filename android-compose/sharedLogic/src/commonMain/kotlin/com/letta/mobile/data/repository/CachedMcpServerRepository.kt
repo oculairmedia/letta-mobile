@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerId
@@ -22,7 +23,7 @@ import kotlinx.coroutines.flow.update
 
 /** Phase 5l: platform-neutral cached MCP server repository. */
 open class CachedMcpServerRepository(
-    private val remote: McpServerRemoteSource,
+    private val remote: RemoteRoute<McpServerRemoteSource>,
     private val irohMcpSource: McpServerIrohSource? = null,
 ) : IMcpServerRepository {
     private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
@@ -42,18 +43,18 @@ open class CachedMcpServerRepository(
             _servers.update { irohSource.listMcpServers() }
             return
         }
-        _servers.update { remote.listMcpServers() }
+        _servers.update { remote.source().listMcpServers() }
     }
 
     override suspend fun refreshServerTools(serverId: McpServerId) {
         if (inIrohMode()) irohUnsupported("mcp.refreshServerTools(${serverId.value})")
-        val tools = remote.listMcpServerTools(serverId.value)
+        val tools = remote.source().listMcpServerTools(serverId.value)
         replaceServerTools(serverId, tools)
     }
 
     override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult {
         if (inIrohMode()) irohUnsupported("mcp.resyncServerTools(${serverId.value})")
-        val result = remote.refreshMcpServerTools(serverId.value)
+        val result = remote.source().refreshMcpServerTools(serverId.value)
         runCatchingCancellable { refreshServerTools(serverId) }
         return result
     }
@@ -64,7 +65,7 @@ open class CachedMcpServerRepository(
         params: McpToolExecuteParams,
     ): McpToolExecutionResult {
         if (inIrohMode()) irohUnsupported("mcp.runServerTool(${serverId.value}, ${toolId.value})")
-        return remote.runMcpServerTool(serverId.value, toolId.value, params)
+        return remote.source().runMcpServerTool(serverId.value, toolId.value, params)
     }
 
     override suspend fun fetchAllMcpTools(): List<Tool> {
@@ -75,28 +76,28 @@ open class CachedMcpServerRepository(
         refreshServers()
         return _servers.value.flatMap { server ->
             runCatchingCancellable {
-                remote.listMcpServerTools(server.id.value)
+                remote.source().listMcpServerTools(server.id.value)
             }.getOrElse { emptyList() }
         }
     }
 
     override suspend fun createServer(params: McpServerCreateParams): McpServer {
         if (inIrohMode()) irohUnsupported("mcp.createServer")
-        val server = remote.createMcpServer(params)
+        val server = remote.source().createMcpServer(params)
         upsertServer(server)
         return server
     }
 
     override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer {
         if (inIrohMode()) irohUnsupported("mcp.updateServer(${id.value})")
-        val server = remote.updateMcpServer(id.value, params)
+        val server = remote.source().updateMcpServer(id.value, params)
         upsertServer(server)
         return server
     }
 
     override suspend fun deleteServer(id: McpServerId) {
         if (inIrohMode()) irohUnsupported("mcp.deleteServer(${id.value})")
-        remote.deleteMcpServer(id.value)
+        remote.source().deleteMcpServer(id.value)
         _servers.update { current -> current.filterNot { it.id == id } }
         _toolsByServer.update { current ->
             current.toMutableMap().apply { remove(id) }

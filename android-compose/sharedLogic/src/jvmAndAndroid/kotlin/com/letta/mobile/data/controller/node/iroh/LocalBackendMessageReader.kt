@@ -303,12 +303,7 @@ internal class LocalBackendMessageReader(
 
     /** Port of store.ts unwrapSessionEnvelope + normalizeMessage (content->parts). */
     private fun normalizeMessage(value: JsonObject): JsonObject? {
-        val unwrapped =
-            if (value["type"]?.stringOrNull() == "message" && value["message"] is JsonObject) {
-                value["message"] as JsonObject
-            } else {
-                value
-            }
+        val unwrapped = LocalBackendLayout.messageBody(value)
         val parts = unwrapped["parts"]
         val content = unwrapped["content"]
         return if (parts !is JsonArray && content is JsonArray) {

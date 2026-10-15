@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.skills
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.repository.activeBackendIsIroh
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
@@ -33,6 +34,6 @@ class SessionSkillsApi @Inject constructor(
 
     private suspend fun delegate(operation: String): SkillsApi {
         if (settingsRepository.activeBackendIsIroh()) return iroh
-        throw NoAppServerRouteException("Skills.$operation")
+        throw AppServerRouteUnavailable(SessionRoute.SKILLS, "Skills.$operation")
     }
 }

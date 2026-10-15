@@ -65,7 +65,6 @@ composeCompiler {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
@@ -80,12 +79,11 @@ dependencies {
 
     implementation(project(":sharedLogic"))
     api(project(":sharedUI"))
-    implementation(project(":core:android-data"))
 
     implementation(libs.coil3.compose)
     implementation(libs.coil3.svg)
-    implementation(libs.androidx.compose.material3.chat)
-    implementation(libs.androidx.compose.material3.windowsize.chat)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.windowsize)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)

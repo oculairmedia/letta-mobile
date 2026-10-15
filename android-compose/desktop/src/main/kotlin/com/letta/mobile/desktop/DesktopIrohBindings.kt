@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.session.ifSupported
+import com.letta.mobile.data.backend.SessionRoute
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
@@ -43,7 +45,8 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
  * iroh:// backend: one QUIC channel transport shared by the chat gateway,
  * admin_rpc reads, and (once implemented server-side) registries. Selected
  * purely by URL scheme, same as Android's DefaultSessionRepositoryGraphFactory; null for HTTP
- * backends. Connects on entering composition and disconnects on dispose.
+ * backends. Connects on entering composition and closes (disconnect + cancel its
+ * owned coroutine job) on dispose.
  */
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
     IrohChannelTransport(
@@ -169,7 +172,9 @@ internal fun rememberIrohTransport(
             chatScope = chatScope,
             hooks = DesktopTransportLifecycleHooks(
                 onConnect = ::connectIrohTransport,
-                onDisposeTransport = { t -> t.disconnect() },
+                // by4vm.10: close, not disconnect: this instance dies with its config key, so its
+                // owned coroutine job must be cancelled or every config change leaks it.
+                onDisposeTransport = { t -> t.close() },
             ),
         ),
     )
@@ -262,8 +267,9 @@ private fun buildDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
+    // letta-mobile-by4vm.13: no agents served (no backend configured) resolves no names.
     val agentRepository = {
-        runtime.dataBindings.sessionGraphProvider.current.agentRepository
+        runtime.dataBindings.sessionGraphProvider.current.ifSupported(SessionRoute.AGENTS) { agentRepository }
     }
     return DesktopChatController(
         bootstrapState = runtime.bootstrapState,
@@ -289,10 +295,10 @@ private fun buildDesktopChatController(
                 )
         },
         agentNamesByIdProvider = { agentIds ->
-            resolveDesktopAgentNames(agentIds, agentRepository())
+            agentRepository()?.let { resolveDesktopAgentNames(agentIds, it) }.orEmpty()
         },
         agentByIdProvider = { agentIds ->
-            resolveDesktopAgents(agentIds, agentRepository())
+            agentRepository()?.let { resolveDesktopAgents(agentIds, it) }.orEmpty()
         },
         loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
         persistArchivedConversationIds = { ids ->

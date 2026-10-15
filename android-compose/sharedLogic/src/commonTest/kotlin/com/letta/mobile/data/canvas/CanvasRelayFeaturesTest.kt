@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -17,7 +18,7 @@ import kotlin.test.assertTrue
  * them, and an app never sends one to a host that did not, which would refuse the whole connection.
  */
 class CanvasRelayFeaturesTest {
-    private val topic = CanvasRelayProtocol.conversationTopic("conv-1")
+    private val topic = CanvasRelayProtocol.conversationTopic(ConversationId("conv-1"))
     private fun note(opId: String, lamport: Long) =
         CanvasOp.AddElementOp(opId, CanvasSession.LOCAL_USER_ACTOR_ID, lamport, "el-$opId", """{"id":"el-$opId","type":"Text","text":"$opId"}""")
 

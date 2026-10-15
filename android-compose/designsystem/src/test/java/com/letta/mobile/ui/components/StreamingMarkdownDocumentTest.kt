@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.components
 
+import com.letta.mobile.ui.markdown.ParsedTableRow
+import com.letta.mobile.ui.markdown.parseMarkdownTable
 import com.letta.mobile.ui.markdown.StreamingMarkdownBlockKind
 import com.letta.mobile.ui.markdown.StreamingMarkdownDocument
 import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentBlock

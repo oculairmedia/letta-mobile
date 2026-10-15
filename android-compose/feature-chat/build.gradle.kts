@@ -39,11 +39,6 @@ android {
         disable += "NullSafeMutableLiveData"
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -75,7 +70,6 @@ composeCompiler {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
@@ -94,58 +88,56 @@ dependencies {
     implementation(project(":sharedUI"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
-    implementation(libs.filekit.core.chat)
-    implementation(libs.filekit.dialogs.compose.chat)
+    implementation(libs.filekit.core)
+    implementation(libs.filekit.dialogs.compose)
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    implementation(libs.androidx.compose.material3.chat)
-    implementation(libs.androidx.compose.material3.windowsize.chat)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.windowsize)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.core.ktx.chat)
-    implementation(libs.androidx.hilt.navigation.compose.chat)
-    implementation(libs.androidx.lifecycle.viewmodel.compose.chat)
-    implementation(libs.androidx.lifecycle.runtime.compose.chat)
-    implementation(libs.androidx.navigation.compose.chat)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.exifinterface)
     implementation(libs.molecule.runtime)
-    implementation(libs.coil3.compose.chat)
-    implementation(libs.kotlinx.collections.immutable.chat)
+    implementation(libs.coil3.compose)
+    implementation(libs.kotlinx.collections.immutable)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.paging.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Deliberate override of catalog hilt=2.59.2; do not silently flatten.
-    implementation(libs.hilt.android.chat)
-    ksp(libs.hilt.compiler.chat)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit4)
-    testImplementation(libs.junit.jupiter.api.chat)
+    testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.kotlinx.coroutines.test)
-    // Deliberate override of catalog ktor=3.5.0; do not silently flatten.
-    testImplementation(libs.ktor.client.core.chat)
-    testImplementation(libs.mockk.chat)
-    testImplementation(libs.kotest.runner.junit5.chat)
-    testImplementation(libs.kotest.assertions.core.chat)
-    testImplementation(libs.kotest.property.chat)
+    testImplementation(libs.ktor.client.core)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(libs.kotest.property)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.compose.ui.test.junit4)
-    testImplementation(libs.androidx.datastore.preferences.chat)
-    testImplementation(libs.roborazzi.chat)
-    testImplementation(libs.roborazzi.compose.chat)
+    testImplementation(libs.androidx.datastore.preferences)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
     testImplementation(libs.androidx.test.core.ktx)
     testImplementation(libs.androidx.test.ext.junit.ktx)
-    testImplementation(libs.hilt.android.testing.chat)
-    kspTest(libs.hilt.compiler.chat)
-    testRuntimeOnly(libs.junit.jupiter.engine.chat)
-    testRuntimeOnly(libs.junit.platform.launcher.chat)
-    testRuntimeOnly(libs.junit.vintage.engine.chat)
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

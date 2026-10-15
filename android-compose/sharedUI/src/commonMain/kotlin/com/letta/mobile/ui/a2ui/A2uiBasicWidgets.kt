@@ -56,7 +56,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
@@ -807,7 +806,7 @@ internal fun A2uiColumn(
         if (children.isEmpty()) {
             A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         }
-        children.forEach { childId ->
+        A2uiCappedForEach(children) { childId ->
             val child = surface.components[childId]
             if (child == null) {
                 A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -848,7 +847,7 @@ internal fun A2uiRow(
         if (children.isEmpty()) {
             A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         }
-        children.forEach { childId ->
+        A2uiCappedForEach(children) { childId ->
             val child = surface.components[childId]
             if (child == null) {
                 A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -894,7 +893,7 @@ internal fun A2uiListView(
                 .testTag(A2uiTestTags.LIST_VIEW),
             verticalArrangement = Arrangement.spacedBy(component.spacing()),
         ) {
-            children.forEach { childId ->
+            A2uiCappedForEach(children) { childId ->
                 val child = surface.components[childId]
                 if (child == null) {
                     A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -930,7 +929,7 @@ internal fun A2uiListView(
             .testTag(A2uiTestTags.LIST_VIEW),
         verticalArrangement = Arrangement.spacedBy(component.spacing()),
     ) {
-        items.forEachIndexed { index, item ->
+        A2uiCappedForEachIndexed(items) { index, item ->
             val itemScope = A2uiRenderScope(basePath = itemsPath.appendJsonPointerSegment(index.toString()))
             val itemKey = item.resolveItemKey(template.itemKeyPath) ?: index.toString()
             key(component.id, itemKey, index) {
@@ -1156,7 +1155,7 @@ internal fun A2uiButton(
     val label = component.resolveButtonLabel(surface, renderScope)
     val action = component.action(surface, renderScope)
     val localOpenUrl = component.localOpenUrl(surface, renderScope)
-    val uriHandler = LocalUriHandler.current
+    val openLink = rememberA2uiLinkOpener()
     val haptic = LocalHapticFeedback.current
     var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
 
@@ -1183,14 +1182,7 @@ internal fun A2uiButton(
                         "componentId=${component.id} action=open_url",
                 )
                 A2uiHaptics.confirm(haptic)
-                runCatching {
-                    uriHandler.openUri(localOpenUrl)
-                }.onFailure {
-                    a2uiLog.warn(
-                        "Button onClick: URL open failed surfaceId=${surface.surfaceId} " +
-                            "componentId=${component.id} action=open_url",
-                    )
-                }
+                openLink(localOpenUrl) // letta-mobile-by4vm.3: host link policy, confirm by default
                 return@Button
             }
             // letta-mobile-ykkl diagnostic: log the dispatch hop so the

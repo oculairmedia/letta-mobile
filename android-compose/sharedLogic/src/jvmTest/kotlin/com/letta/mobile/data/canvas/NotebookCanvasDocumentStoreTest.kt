@@ -1,5 +1,7 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
@@ -82,7 +84,7 @@ class NotebookCanvasDocumentStoreTest {
     @Test
     fun creationRaceAndRestartKeepOneConversationAndCanvasIdentity() = runBlocking {
         val path = Files.createTempDirectory("canvas-notebook-race-")
-        val first = CanvasDocument(CanvasId.forConversation("chat"), "agent", "chat", "One", sceneJson = "")
+        val first = CanvasDocument(CanvasId.forConversation(ConversationId("chat")), "agent", "chat", "One", sceneJson = "")
         val second = first.copy(id = CanvasId("other"), title = "Two")
         val winner = NotebookLocalStore(path, "canvas-peer").use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
@@ -97,7 +99,7 @@ class NotebookCanvasDocumentStoreTest {
         }
         NotebookLocalStore(path, "canvas-peer").use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
-            assertEquals(winner.id, store.getForConversation("chat")?.id)
+            assertEquals(winner.id, store.getForConversation(ConversationId("chat"))?.id)
             assertEquals(winner, store.createForConversationIfAbsent(second))
             assertEquals(1, notebooks.listDocuments().size)
         }
@@ -123,8 +125,8 @@ class NotebookCanvasDocumentStoreTest {
                 it.jsonObject.getValue("id").toString().trim('"')
             }.toSet())
             assertEquals(listOf(b.id, a.id), store.listAll().map { it.id })
-            assertEquals(listOf(a.id), store.listForAgent("agent").map { it.id })
-            assertEquals(a.id, store.getForConversation("chat")?.id)
+            assertEquals(listOf(a.id), store.listForAgent(AgentId("agent")).map { it.id })
+            assertEquals(a.id, store.getForConversation(ConversationId("chat"))?.id)
         }
     }
 }

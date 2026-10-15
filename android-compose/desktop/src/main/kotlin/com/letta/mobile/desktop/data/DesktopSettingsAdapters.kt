@@ -326,7 +326,12 @@ data class DesktopDataBindings(
     /** letta-mobile-bzvro.13: the persisted default permission mode, shared by the gateway and the settings card. */
     val permissionModeSettings: com.letta.mobile.data.runtime.PermissionModeSettings =
         com.letta.mobile.data.runtime.PermissionModeSettings(secureSettingsStore),
-)
+    /** letta-mobile-cdgpr.8: builds [pluginViews] on first use; null where the window has no plugins. */
+    private val pluginViewsFactory: (() -> com.letta.mobile.data.plugin.view.PluginViewsModel)? = null,
+) {
+    /** The host's plugins, their view transport and this device's live-views switch; one per window bootstrap. */
+    val pluginViews: com.letta.mobile.data.plugin.view.PluginViewsModel? by lazy { pluginViewsFactory?.invoke() }
+}
 
 fun createDefaultDesktopDataBindings(
     secureSettingsStore: SecureSettingsStore = DesktopFileSecureSettingsStore(),
@@ -356,5 +361,6 @@ fun createDefaultDesktopDataBindings(
             permissionModeSettings = permissionModeSettings,
         ),
         modelControlRpc = com.letta.mobile.data.repository.modelcontrol.AdminRpcInvoker.overTransport(channelTransportProvider),
+        pluginViewsFactory = { com.letta.mobile.desktop.plugin.desktopPluginViewsModel(channelTransportProvider) },
     )
 }

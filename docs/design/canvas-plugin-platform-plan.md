@@ -112,7 +112,7 @@ Alternative runtimes:
 "runtime": { "kind": "service", "url": "ws://127.0.0.1:7788/lcp", "headers": { "Authorization": "Bearer ${secrets.apiToken}" } }
 ```
 
-Rules: `id` is `<publisher>.<name>` lowercase (`[a-z0-9]+(\.[a-z0-9]+)+`); element types are `ext:<id>/<kind>`; agent tool names are `<idShort>_<action>` where `idShort` is the last id segment (the host refuses collisions at install); `${settings.*}` and `${secrets.*}` are the only substitutions and are resolved by the host only; `props` schemas are closed objects of scalars/short strings (≤ 4 KiB serialised); `capabilities` is a closed enum (3.3); `migrations` are declarative only (`rename`, `default`, `drop`) keyed by the *from* version; `contract.version` must be one the host supports; every page's `html` is inside the package.
+Rules: `id` is `<publisher>.<name>` lowercase (`[a-z0-9]+(\.[a-z0-9]+)+`); element types are `ext:<id>/<kind>`; agent tool names are `<idShort>_<action>` where `idShort` is the last id segment (the host refuses collisions at install); `${settings.*}` and `${secrets.*}` are the only substitutions and are resolved by the host only; `props` schemas are closed objects of scalars/short strings and bounded arrays of those (`maxItems` ≤ 256, letta-mobile-cdgpr.12; ≤ 4 KiB serialised); `capabilities` is a closed enum (3.3); `migrations` are declarative only (`rename`, `default`, `drop`) keyed by the *from* version; `contract.version` must be one the host supports; every page's `html` is inside the package.
 
 ### 3.2 Kotlin SPI (`:plugin-api`, KMP module with a jvm target, no project dependencies, published as an artifact)
 

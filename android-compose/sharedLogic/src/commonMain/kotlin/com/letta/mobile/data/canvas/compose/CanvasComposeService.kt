@@ -4,6 +4,7 @@ import com.letta.mobile.data.canvas.CanvasBatchCheck
 import com.letta.mobile.data.canvas.CanvasBatchValidator
 import com.letta.mobile.data.canvas.CanvasBatchViolation
 import com.letta.mobile.data.canvas.CanvasOp
+import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
@@ -28,7 +29,7 @@ sealed interface ComposeOutcome {
  * names the artifact when the request does not).
  */
 data class ComposeTarget(
-    val canvasId: String,
+    val canvasId: CanvasId,
     val sceneJson: String,
     val sceneRevision: Long? = null,
     val toolCallId: String? = null,
@@ -140,7 +141,7 @@ internal class ComposeRun(
         // Loud: the batch passed every rule and the board still did not take it.
         Telemetry.event(
             CanvasComposeService.TAG, "publish.failed",
-            "canvasId" to target.canvasId, "artifactId" to ready.artifactId, "ops" to ready.ops.size, "code" to code.name, "reason" to message,
+            "canvasId" to target.canvasId.value, "artifactId" to ready.artifactId, "ops" to ready.ops.size, "code" to code.name, "reason" to message,
             level = Telemetry.Level.WARN,
         )
         val problemCode = if (code == ComposeErrorCode.BOARD_REFUSED) CanvasComposeService.PUBLISH_FAILED else code.name

@@ -51,6 +51,9 @@ internal sealed interface InputAcceptance {
     sealed interface Failure : InputAcceptance {
         val failureReason: String
         val kind: String
+
+        /** The lease's release reason when this failure ends the turn (letta-mobile-by4vm.7). */
+        val releaseReason: String get() = TurnReleaseReason.INPUT_REJECTED
     }
 
     /** `accepted=false`: the input will never run. */
@@ -67,6 +70,17 @@ internal sealed interface InputAcceptance {
     data class ConnectionLost(val error: String) : Failure {
         override val failureReason: String get() = INPUT_CONNECTION_LOST_REASON
         override val kind: String get() = "connection_lost"
+    }
+
+    /**
+     * letta-mobile-by4vm.7: sending the input threw before any acknowledgement could be read. The
+     * input may or may not have reached the server, so the turn fails and the orphan-abort rules
+     * for a cancelled lease apply (an abort only when this lease's own run was seen).
+     */
+    data class SendFailed(val error: String) : Failure {
+        override val failureReason: String get() = "App Server input could not be sent: $error"
+        override val kind: String get() = "send_failed"
+        override val releaseReason: String get() = TurnReleaseReason.INPUT_SEND_FAILED
     }
 
     /**
@@ -459,24 +473,26 @@ internal suspend fun <T : Any> untilCollectorEnds(collector: Job, send: suspend 
 }
 
 /**
- * Waits for [collector], or fails the turn at once on [inputFailure]. Returns the release reason
- * only when the input failed; after a join the collector has already recorded its own reason
- * (normal completion, watchdog timeout, ...), which must not be overwritten.
+ * Waits for [collector], or fails the turn at once on [inputFailure]. The input failure's release
+ * reason is recorded BEFORE the collector is cancelled, so the cancellation that tears the
+ * collector down is not mistaken for why the turn ended. After a plain join the collector has
+ * already recorded its own reason (normal completion, watchdog timeout, ...).
  */
 internal suspend fun joinCollectorOrHandleFailure(
     collector: Job,
     inputFailure: InputAcceptance.Failure?,
+    release: TurnReleaseRecord,
     onFailure: suspend (String) -> Unit,
-): String? {
+) {
     if (inputFailure != null) {
         // letta-mobile-qygvv.1: the server will never run this input — fail
         // now instead of waiting out the idle watchdog.
+        release.record(inputFailure.releaseReason)
         collector.cancelAndJoin()
         onFailure(inputFailure.failureReason)
-        return "input_rejected"
+        return
     }
     collector.join()
-    return null
 }
 
 /**

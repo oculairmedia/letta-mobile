@@ -1,5 +1,6 @@
 package com.letta.mobile.data.plugin
 
+import com.letta.mobile.data.model.PluginId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -81,6 +82,9 @@ data class InstalledPlugin(
 ) {
     val manifest: PluginManifest get() = current.manifest
     val id: String get() = manifest.id
+
+    /** [id] as a typed [PluginId], for the host's per-plugin services. */
+    val pluginId: PluginId get() = PluginId(manifest.id)
     val version: String get() = manifest.version
     val consent: PluginConsent get() = current.consent
     val packageSha256: String get() = current.packageSha256
@@ -90,6 +94,12 @@ data class InstalledPlugin(
 
     /** Whether the staged update returns the plugin to a state that advertises its tools. */
     private val resumesAdvertised: Boolean get() = pendingUpdate?.resumeState?.advertises == true
+
+    /** Whether the owner consented to this very version and everything it asks for (an empty consent never counts). */
+    val consented: Boolean get() = consent.forVersion == version && consent.covers(manifest)
+
+    /** Whether it may run: consented to and [ready]. */
+    val runnable: Boolean get() = ready && consented
 
     /** Whether everything the plugin needs to run is set: required settings and required secrets. */
     val ready: Boolean

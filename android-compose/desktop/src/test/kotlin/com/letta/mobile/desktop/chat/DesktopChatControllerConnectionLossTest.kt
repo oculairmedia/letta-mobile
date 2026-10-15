@@ -35,6 +35,65 @@ class DesktopChatControllerConnectionLossTest {
         override val connectionState: StateFlow<ChannelTransportState> = states
     }
 
+    /** letta-mobile-by4vm.9: a ws:// gateway whose shared reconnect owner redials on its own. */
+    private class SelfReconnectingFakeGateway :
+        FakeDesktopChatGateway(),
+        ConnectionStatusGateway,
+        DesktopReconnectOwningGateway {
+        val states = MutableStateFlow<ChannelTransportState>(connected())
+        override val connectionState: StateFlow<ChannelTransportState> = states
+        override val ownsReconnect = true
+        var resumes = 0
+
+        override fun resumeSession(): Boolean {
+            resumes += 1
+            return true
+        }
+    }
+
+    @Test
+    fun aSelfReconnectingGatewayIsNotRebuiltWhileItsOwnerRedials() = runTest {
+        val gateway = SelfReconnectingFakeGateway()
+        var gatewayBuilds = 0
+        val controller = testController { gatewayBuilds += 1; gateway }
+        controller.start()
+        runCurrent()
+
+        gateway.states.value = degraded()
+        runCurrent()
+        advanceTimeBy(200_000)
+        runCurrent()
+
+        assertEquals(1, gatewayBuilds, "a rebuild would tear down the turns the owner keeps alive")
+        assertEquals(ChatConnectionState.StreamDisconnected, controller.state.value.connectionState)
+
+        // Once the owner gives up, the controller's rebuild is the escalation of last resort.
+        gateway.states.value = ChannelTransportState.Disconnected(code = 1006, reason = "attempts exhausted")
+        runCurrent()
+        advanceTimeBy(200_000)
+        runCurrent()
+        assertEquals(2, gatewayBuilds)
+        controller.close()
+    }
+
+    @Test
+    fun wakeFromSleepGoesToTheGatewaysOwnReconnectOwner() = runTest {
+        val gateway = SelfReconnectingFakeGateway()
+        var gatewayBuilds = 0
+        val controller = testController { gatewayBuilds += 1; gateway }
+        controller.start()
+        runCurrent()
+        gateway.states.value = degraded()
+        runCurrent()
+
+        controller.onSystemResumed()
+        runCurrent()
+
+        assertEquals(1, gateway.resumes, "the owner cuts its backoff short")
+        assertEquals(1, gatewayBuilds, "no rebuild")
+        controller.close()
+    }
+
     @Test
     fun transportDropSurfacesAsStreamDisconnected() = runTest {
         val gateway = ConnectionAwareFakeGateway()

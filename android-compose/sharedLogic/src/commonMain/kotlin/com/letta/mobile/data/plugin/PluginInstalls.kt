@@ -14,13 +14,18 @@ internal object PluginInstalls {
         val manifest = command.manifest
         if (state[manifest.id] != null) return refuse(PluginRefusal.ALREADY_INSTALLED, "${manifest.id} is installed; update it instead")
         packageProblem(state, manifest, command.packageSha256)?.let { return it }
-        val diff = PluginConsentDiff.between(command.consent, manifest)
-        if (!diff.isEmpty || command.consent.forVersion != manifest.version) {
-            return refuse(PluginRefusal.CONSENT_REQUIRED, "consent to what ${manifest.id} ${manifest.version} asks for before installing it", diff)
-        }
-        val record = PluginVersionRecord(manifest, command.packageSha256, command.consent, command.nowEpochMs)
+        if (!command.awaitingConsent) consentProblem(manifest, command.consent)?.let { return it }
+        val consent = if (command.awaitingConsent) PluginConsent.none() else command.consent
+        val record = PluginVersionRecord(manifest, command.packageSha256, consent, command.nowEpochMs)
         val settings = command.settingsSummary ?: PluginSettingsSummary.of(manifest, JsonObject(emptyMap()))
         return applied(state, InstalledPlugin(record, settingsSummary = settings, secretsStatus = secretsFor(manifest, emptyMap())))
+    }
+
+    /** A refusal when [consent] does not cover exactly [manifest]'s version and everything it asks for. */
+    private fun consentProblem(manifest: PluginManifest, consent: PluginConsent): PluginTransition? {
+        val diff = PluginConsentDiff.between(consent, manifest)
+        val covered = diff.isEmpty && consent.forVersion == manifest.version
+        return refuse(PluginRefusal.CONSENT_REQUIRED, "consent to what ${manifest.id} ${manifest.version} asks for before installing it", diff).takeIf { !covered }
     }
 
     fun stageUpdate(state: PluginRegistryState, command: PluginCommand.StageUpdate): PluginTransition {
@@ -29,7 +34,9 @@ internal object PluginInstalls {
         PluginRegistryReducer.updating(plugin)?.let { return it }
         packageProblem(state, manifest, command.packageSha256)?.let { return it }
         versionProblem(plugin, manifest)?.let { return it }
-        val consent = consentForUpdate(plugin, manifest, command.consent) ?: return refuse(
+        val consent = consentForUpdate(plugin, manifest, command.consent)
+            ?: plugin.consent.takeIf { command.awaitingConsent }
+            ?: return refuse(
             PluginRefusal.CONSENT_REQUIRED, "${manifest.id} ${manifest.version} asks for more than was consented to; consent again",
             PluginConsentDiff.forUpdate(plugin.manifest, plugin.consent, manifest),
         )
@@ -100,7 +107,7 @@ internal object PluginInstalls {
     /** [plugin] back in [before]'s state after a version change: enabled again when it was and still can be. */
     private fun resume(plugin: InstalledPlugin, before: PluginState): InstalledPlugin {
         val wasOn = before.advertises || before is PluginState.Faulted
-        return plugin.copy(state = if (wasOn && plugin.ready) PluginState.Enabled else PluginState.Installed)
+        return plugin.copy(state = if (wasOn && plugin.runnable) PluginState.Enabled else PluginState.Installed)
     }
 
     private fun secretsFor(manifest: PluginManifest, known: Map<String, SecretState>): Map<String, SecretState> =

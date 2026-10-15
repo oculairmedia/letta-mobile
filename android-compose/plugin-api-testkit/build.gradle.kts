@@ -3,6 +3,8 @@
 // so the API jar carries only the contract. jvm only: plugins are jars.
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     `maven-publish`
 }
@@ -13,11 +15,7 @@ version = "1.0.0"
 kotlin {
     explicitApi()
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
     sourceSets {
         getByName("jvmMain") {

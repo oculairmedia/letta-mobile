@@ -12,9 +12,13 @@ import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasOp
 import com.letta.mobile.data.canvas.CanvasOpProjector
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.canvas.CanvasDocument
+import com.letta.mobile.data.canvas.CanvasDocumentStore
+import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.runBlocking
@@ -163,23 +167,24 @@ class RoomCanvasOpLogTest {
             opId = "progress-a", actorId = agent, lamport = 0L, elementId = "pe-a",
             props = JsonObject(mapOf("status" to JsonPrimitive("done"))),
         )
+        val documents = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(
-            RoomCanvasDocumentStore(database.canvasDocumentDao()),
+            documents,
             CanvasCreateOptions(
                 canvasId = canvasId,
                 acl = CanvasAcl(CanvasSession.LOCAL_USER_ACTOR_ID, writerAgentIds = setOf(agent)),
                 opLog = opLog,
             ),
         )
-        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), agent)
+        session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), CanvasActorId(agent))
         assertTrue(session.movePluginElement("pe-a", moved) != null)
-        session.applyAgentBatch(listOf(update), agent)
+        session.applyAgentBatch(listOf(update), CanvasActorId(agent))
         assertTrue(session.removePluginElement("pe-b") != null)
         val before = session.pluginElements()
 
         val restartedLog = RoomCanvasOpLog(database.canvasOpDao())
         val reopened = CanvasSession.open(
-            RoomCanvasDocumentStore(database.canvasDocumentDao()),
+            documents,
             canvasId,
             CanvasConversationOptions(opLog = restartedLog),
         )!!
@@ -193,7 +198,7 @@ class RoomCanvasOpLogTest {
         assertEquals(before, CanvasOpProjector.pluginElementsOf(CanvasOpProjector.project(CanvasOpProjector.emptySceneJson(), logged)))
 
         assertTrue(reopened.movePluginElement("pe-a", frame) != null)
-        val stored = RoomCanvasDocumentStore(database.canvasDocumentDao()).get(canvasId)!!
+        val stored = documents.get(canvasId)!!
         assertEquals(frame, CanvasOpProjector.pluginElementsOf(stored.sceneJson).single().frame)
     }
 
@@ -215,5 +220,62 @@ class RoomCanvasOpLogTest {
         assertEquals("pe-1", loaded.elementId)
         assertEquals("sha256:ab", loaded.snapshot?.assetRef)
         assertEquals(JsonPrimitive("done"), loaded.props?.get("status"))
+    }
+
+    /** A notebook store whose writes can fail: the crash between the op log and the document. */
+    private class FailingDocuments(private val inner: InMemoryCanvasDocumentStore = InMemoryCanvasDocumentStore()) :
+        CanvasDocumentStore by inner {
+        var failWrites = false
+
+        override suspend fun upsert(doc: CanvasDocument) {
+            check(!failWrites) { "process died before the document was written" }
+            inner.upsert(doc)
+        }
+    }
+
+    @Test
+    fun appendedRowsStayUnsettledUntilSettled() = runBlocking {
+        val canvasId = CanvasId("canvas-ops-journal")
+        val first = CanvasOp.SetBackgroundOp("journal-1", "user-1", 1L, "#000000")
+        val second = CanvasOp.SetBackgroundOp("journal-2", "user-1", 2L, "#ffffff")
+        opLog.append(canvasId, second)
+        opLog.append(canvasId, first)
+        assertEquals("in append order", listOf("journal-2", "journal-1"), opLog.unsettled(canvasId).map { it.opId })
+
+        opLog.settle(canvasId, listOf("journal-2"))
+        opLog.append(canvasId, second) // a redelivered op keeps its settled state
+        assertEquals(listOf("journal-1"), RoomCanvasOpLog(database.canvasOpDao()).unsettled(canvasId).map { it.opId })
+        opLog.settle(canvasId, (1..1200).map { "absent-$it" } + "journal-1")
+        assertEquals(emptyList<String>(), opLog.unsettled(canvasId).map { it.opId })
+    }
+
+    @Test
+    fun anOpLoggedBeforeACrashedDocumentWriteIsRecoveredAfterARestart() = runBlocking {
+        val documents = FailingDocuments()
+        val session = CanvasSession.create(documents, CanvasCreateOptions(opLog = opLog))
+        val op = CanvasOp.AddElementOp(
+            opId = "crash-1", actorId = CanvasSession.LOCAL_USER_ACTOR_ID, lamport = 7L, elementId = "rect-1",
+            elementJson = """{"id":"rect-1","type":"Shape","zIndex":1,"points":["0.0,0.0","10.0,10.0"],"shapeType":"RECTANGLE"}""",
+        )
+
+        documents.failWrites = true
+        val crashed = try {
+            session.applyLocal(op)
+            false
+        } catch (_: IllegalStateException) {
+            true
+        }
+        documents.failWrites = false
+        assertTrue("the write was expected to fail", crashed)
+        assertFalse(documents.get(session.canvasId)!!.sceneJson.contains("rect-1"))
+
+        // A restart: a new log over the same table, a new session over the stored document.
+        val restartedLog = RoomCanvasOpLog(database.canvasOpDao())
+        val reopened = CanvasSession.open(documents, session.canvasId, CanvasConversationOptions(opLog = restartedLog))!!
+
+        assertTrue("the reopened board lost the logged op", reopened.sceneJsonOrEmpty().contains("rect-1"))
+        assertTrue("the recovered op was not stored", documents.get(session.canvasId)!!.sceneJson.contains("rect-1"))
+        assertEquals(emptyList<String>(), restartedLog.unsettled(session.canvasId).map { it.opId })
+        assertEquals(1, database.canvasOpDao().countForCanvas(session.canvasId.value))
     }
 }

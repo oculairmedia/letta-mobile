@@ -12,8 +12,8 @@ import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.BackendKind
+import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -91,7 +91,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
 import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
-import com.letta.mobile.feature.chat.coordination.ClientModeBootstrapConfig
+import com.letta.mobile.feature.chat.coordination.LocalRuntimeBootstrapConfig
 import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
 import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
@@ -161,7 +161,6 @@ internal class AdminChatViewModel @Inject constructor(
     private val sessionManager: SessionManager,
     private val runtimeEventOutbox: RuntimeEventOutbox,
     private val currentConversationTracker: CurrentConversationTracker,
-    private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
     private val slashCommandRepository: ISlashCommandRepository,
@@ -280,13 +279,15 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.explicitNewChat
     /**
      * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" — not "is this the shim?". Since g70jb.4 only Iroh
-     * is; a leftover shim-era config classifies as REST.
+     * by a frame channel?" — not "is this the shim?". Only Iroh is. Both flags
+     * are classified from the active config alone (see [routedBackendKind]).
      */
-    private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
-        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveUsesChannelTransport())
-    private val backendKind: StateFlow<BackendKind> = shimBackendDetector.activeBackendKind
-        .stateIn(viewModelScope, SharingStarted.Lazily, shimBackendDetector.cachedActiveBackendKind())
+    private val backendKind: StateFlow<BackendKind> = settingsRepository.activeConfig
+        .map { it.routedBackendKind() }
+        .stateIn(viewModelScope, SharingStarted.Lazily, settingsRepository.activeConfig.value.routedBackendKind())
+    private val usesChannelTransport: StateFlow<Boolean> = backendKind
+        .map { it.usesChannelTransport }
+        .stateIn(viewModelScope, SharingStarted.Lazily, backendKind.value.usesChannelTransport)
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
         get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
@@ -430,7 +431,7 @@ internal class AdminChatViewModel @Inject constructor(
             composerController = composerController,
             chatBannerController = chatBannerController,
             submitApproval = chatApprovalController::submitApproval,
-            // lgns8.10.4.1: config truth, resolved once in ShimBackendDetector.
+            // lgns8.10.4.1: config truth, classified once by routedBackendKind().
             // The inline iroh:// URL sniff that used to live here is gone.
             backendKind = { backendKind.value },
             activeConversationId = { chatConversationCoordinator.activeConversationId },
@@ -453,7 +454,10 @@ internal class AdminChatViewModel @Inject constructor(
             activeAgent = activeAgent,
             bannerController = chatBannerController,
             modelControl = modelControl,
-            conversationId = { conversationId?.value },
+            conversation = com.letta.mobile.feature.chat.coordination.OpenConversation(
+                id = { conversationId?.value },
+                refresh = { conversationRepository.refreshConversations(agentId) },
+            ),
         )
     }
 
@@ -739,7 +743,6 @@ internal class AdminChatViewModel @Inject constructor(
         currentConversationTracker = currentConversationTracker,
         activeReplyStreams = MutableStateFlow(emptySet()),
         uiState = _uiState,
-        isClientModeStreamInFlight = { false },
         // letta-mobile-c4igq.7: hold presence across inter-round gaps of a
         // multi-tool turn. wsChatBridge.hasActiveChatTurn(conversationId) is true
         // from turn start until the real terminal (spans all tool rounds), so the
@@ -781,7 +784,7 @@ internal class AdminChatViewModel @Inject constructor(
             currentConversationTracker = currentConversationTracker,
             uiState = _uiState,
             updateSessionState = ::updateSessionState,
-            bootstrap = ClientModeBootstrapConfig(
+            bootstrap = LocalRuntimeBootstrapConfig(
                 pendingMessages = { persistentListOf() },
                 setPendingUserMessage = { },
                 currentConversationId = { null },
@@ -800,7 +803,7 @@ internal class AdminChatViewModel @Inject constructor(
                 },
             ),
             send = ConversationSendConfig(
-                viaClientMode = ::sendCoordinatorMessage,
+                viaLocalRuntime = ::sendCoordinatorMessage,
                 viaTimeline = ::sendCoordinatorMessage,
                 markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
             ),
@@ -860,12 +863,10 @@ internal class AdminChatViewModel @Inject constructor(
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
             bannerController = chatBannerController,
-            setClientModeConversationId = { },
             refreshAvailableAgents = ::refreshAvailableAgents,
             observeLastChatSelection = agentSelectionCoordinator::observeLastChatSelection,
             seedAgentNameFromMemoryCache = agentSelectionCoordinator::seedAgentNameFromMemoryCache,
             observeAgentNameCache = agentSelectionCoordinator::observeAgentNameCache,
-            refreshClientModeLocation = { },
             loadProjectAgents = { projectChatCoordinator.loadProjectAgents() },
             loadProjectBrief = { projectChatCoordinator.loadProjectBrief() },
             loadRecentBugReports = { projectChatCoordinator.loadRecentBugReports() },
@@ -873,11 +874,8 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private fun resolveConversationAndLoad(
-        useClientModeForResolve: Boolean = false,
-    ) = chatConversationCoordinator.resolveConversationAndLoad(
-        if (useClientModeForResolve) ConversationAccessMode.Client else ConversationAccessMode.Timeline,
-    )
+    private fun resolveConversationAndLoad() =
+        chatConversationCoordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
 
     fun loadMessages() = chatConversationCoordinator.loadMessages(ConversationAccessMode.Timeline)
 
@@ -893,7 +891,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun loadOlderMessages() {
         if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
-        chatHistoryPager.loadOlderMessages(false)
+        chatHistoryPager.loadOlderMessages()
     }
 
     /** See [ChatHistoryPager.releaseOlderMessages]. */
@@ -975,13 +973,13 @@ internal class AdminChatViewModel @Inject constructor(
             }
             stopTimelineObserverLocked()
             if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-                startLegacyTimelineObserverLocked(conversationId)
+                startLegacyTimelineObserverLocked(ConversationId(conversationId))
                 return
             }
             val capturedRuntime = selectedRuntime
             val hostOpen = pagingHost.openCanonical
             if (capturedRuntime == null && hostOpen == null) {
-                startLegacyTimelineObserverLocked(conversationId)
+                startLegacyTimelineObserverLocked(ConversationId(conversationId))
                 return
             }
             val route = Triple(conversationId, generation, scrollToMessageId)
@@ -1055,8 +1053,8 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob?.start()
     }
 
-    private fun startLegacyTimelineObserverLocked(conversationId: String) {
-        chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
+    private fun startLegacyTimelineObserverLocked(conversationId: ConversationId) {
+        chatTimelineObserver.start(agentId.value, conversationId.value, timelineObserverProvenance())
     }
 
     private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }

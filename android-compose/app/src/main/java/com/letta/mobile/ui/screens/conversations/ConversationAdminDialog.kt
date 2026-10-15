@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.conversations
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -30,6 +32,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.ui.components.CardGroup
+import com.letta.mobile.ui.components.CardGroupScope
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
@@ -49,6 +52,9 @@ internal data class ConversationAdminDialogState(
     val inspectorMessages: List<ConversationInspectorMessage>,
     val isInspectorLoading: Boolean,
     val inspectorError: String?,
+    /** letta-mobile-by4vm.12: actions this backend routes; the others show why they're off. */
+    val routes: ConversationAdminRoutes = ConversationAdminRoutes(cancelRuns = false, recompile = false),
+    val adminActionError: String? = null,
 )
 
 internal data class ConversationAdminDialogCallbacks(
@@ -87,8 +93,10 @@ internal fun ConversationAdminDialog(
             )
             ConversationAdminActionsSection(
                 display = state.display,
+                routes = state.routes,
                 callbacks = callbacks,
             )
+            ConversationAdminActionError(state.adminActionError)
             ConversationAdminInspectorSection(
                 isInspectorLoading = state.isInspectorLoading,
                 inspectorError = state.inspectorError,
@@ -172,6 +180,7 @@ private fun ConversationAdminRenameSection(
 @Composable
 private fun ConversationAdminActionsSection(
     display: ConversationDisplay,
+    routes: ConversationAdminRoutes,
     callbacks: ConversationAdminDialogCallbacks,
 ) {
     val conversation = display.conversation
@@ -192,15 +201,17 @@ private fun ConversationAdminActionsSection(
             headlineContent = { Text(stringResource(R.string.action_fork)) },
             leadingContent = { Icon(imageVector = LettaIcons.ForkRight, contentDescription = null) },
         )
-        item(
+        routedItem(
+            unavailableReason = routes.unavailableReason(ConversationAdminAction.CancelRuns),
             onClick = callbacks.onCancelRuns,
-            headlineContent = { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) },
-            leadingContent = { Icon(imageVector = LettaIcons.Close, contentDescription = null) },
+            label = R.string.screen_conversations_cancel_runs_action,
+            icon = LettaIcons.Close,
         )
-        item(
+        routedItem(
+            unavailableReason = routes.unavailableReason(ConversationAdminAction.Recompile),
             onClick = callbacks.onRecompile,
-            headlineContent = { Text(stringResource(R.string.screen_conversations_recompile_action)) },
-            leadingContent = { Icon(imageVector = LettaIcons.Refresh, contentDescription = null) },
+            label = R.string.screen_conversations_recompile_action,
+            icon = LettaIcons.Refresh,
         )
         item(
             onClick = callbacks.onDelete,
@@ -216,6 +227,35 @@ private fun ConversationAdminActionsSection(
             },
         )
     }
+}
+
+/**
+ * letta-mobile-by4vm.12: an action row that runs only where the backend routes it; with an
+ * [unavailableReason] it is inert and says why instead of throwing into a no-route stub.
+ */
+private fun CardGroupScope.routedItem(
+    unavailableReason: String?,
+    onClick: () -> Unit,
+    @StringRes label: Int,
+    icon: ImageVector,
+) {
+    item(
+        onClick = onClick.takeIf { unavailableReason == null },
+        headlineContent = { Text(stringResource(label)) },
+        supportingContent = unavailableReason?.let { reason ->
+            {
+                Text(reason, style = MaterialTheme.typography.listItemSupporting, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        leadingContent = { Icon(imageVector = icon, contentDescription = null) },
+    )
+}
+
+/** letta-mobile-by4vm.12: why the last cancel / recompile failed or had no route. */
+@Composable
+private fun ConversationAdminActionError(message: String?) {
+    if (message.isNullOrBlank()) return
+    Text(message, style = MaterialTheme.typography.listItemSupporting, color = MaterialTheme.colorScheme.error)
 }
 
 @Composable
@@ -384,6 +424,8 @@ private fun ConversationAdminSectionsPreview() {
             ConversationAdminDetailsSection(display = previewAdminDialogState().display)
             ConversationAdminActionsSection(
                 display = previewAdminDialogState().display,
+                // One routed, one not, so the preview shows both row states.
+                routes = ConversationAdminRoutes(cancelRuns = true, recompile = false),
                 callbacks = previewAdminDialogCallbacks(),
             )
         }

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
+import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,45 @@ class CanvasSession(
 
     private var lamportClock: Long = 0L
 
+    /** Ties [opLog] to [store]: ops are settled once the document write carrying them succeeds. */
+    private val settlement = CanvasOpSettlement(canvasId, opLog)
+
+    /**
+     * Every change runs under this lock, after folding in any ops the log holds that the stored
+     * document missed (letta-mobile-by4vm.22): a crash or failed write between the two stores.
+     */
+    private suspend inline fun <T> locked(block: () -> T): T = mutex.withLock {
+        if (settlement.begin()) recoverUnsettled()
+        block()
+    }
+
+    /**
+     * Folds the log's unsettled ops into the document, in the order they were appended, and settles
+     * them. Projection is last-writer-wins, so an op the document already holds changes nothing.
+     */
+    private suspend fun recoverUnsettled() {
+        val pending = settlement.takeUnsettled()
+        if (pending.isNullOrEmpty()) return
+        pending.forEach(::updateLamport)
+        settlement.recovering {
+            // letta-mobile-by4vm.68: a crash after logging an op but before queueing it for delivery
+            // leaves it unsettled; queue it now. Remote ops among them are host duplicates (acked).
+            syncTransport?.reserveDelivery(canvasId, pending.map { it.opId })
+            val current = currentDoc()
+            val scene = CanvasOpProjector.project(current.sceneJson, pending)
+            if (scene == current.sceneJson) {
+                settlement.settleCarried()
+            } else {
+                commitScene(scene, CanvasCommitMetadata(actorId = "system", description = "Recovered ${pending.size} unsaved edits"))
+            }
+        }
+    }
+
+    /** Opens the session on the stored document with the log's unsettled ops folded in. */
+    private suspend fun recoverOnOpen() {
+        locked { }
+    }
+
     private suspend fun currentDoc(): CanvasDocument =
         _document.value ?: store.get(canvasId) ?: CanvasDocument(
             id = canvasId,
@@ -71,7 +112,7 @@ class CanvasSession(
         updated: CanvasDocument,
         metadata: CanvasCommitMetadata = CanvasCommitMetadata(),
     ): CanvasDocument {
-        store.upsert(updated)
+        settlement.writing { store.upsert(updated) }
         _document.value = updated
         recordCheckpoint(updated, metadata = metadata)
         return updated
@@ -95,7 +136,7 @@ class CanvasSession(
     /**
      * Loads the document from [store] into memory and updates [document] state.
      */
-    suspend fun load(): CanvasDocument? = mutex.withLock {
+    suspend fun load(): CanvasDocument? = locked {
         val loaded = store.get(canvasId)
         _document.value = loaded
         if (loaded != null) {
@@ -152,18 +193,18 @@ class CanvasSession(
      *
      * An empty [sceneJson] is explicitly allowed (e.g. canvas cleared).
      */
-    suspend fun saveScene(sceneJson: String): CanvasDocument = mutex.withLock {
+    suspend fun saveScene(sceneJson: String): CanvasDocument = locked {
         commitScene(sceneJson)
     }
 
     /**
      * Applies an agent-driven scene replacement, incrementing revision and updating timestamp.
      */
-    suspend fun applyAgentReplace(sceneJson: String, actorId: String? = null): CanvasDocument = mutex.withLock {
+    suspend fun applyAgentReplace(sceneJson: String, actorId: CanvasActorId? = null): CanvasDocument = locked {
         val current = currentDoc()
-        val effectiveActor = actorId ?: current.agentId ?: "agent"
+        val effectiveActor = actorId?.value ?: current.agentId ?: "agent"
         if (current.acl != null && !current.acl.canWrite(effectiveActor)) {
-            throw UnauthorizedCanvasMutationException(effectiveActor, canvasId)
+            throw UnauthorizedCanvasMutationException(CanvasActorId(effectiveActor), canvasId)
         }
         commitScene(sceneJson)
     }
@@ -172,15 +213,15 @@ class CanvasSession(
      * Applies a single locally-generated [CanvasOp], appends to [opLog], projects state,
      * updates persistence, and publishes to [syncTransport].
      */
-    suspend fun applyLocal(op: CanvasOp): CanvasDocument = mutex.withLock { applyLocalLocked(op) }
+    suspend fun applyLocal(op: CanvasOp): CanvasDocument = locked { applyLocalLocked(op) }
 
     /** [applyLocal]'s body, for callers that must test the scene and act on it under one lock. */
     private suspend fun applyLocalLocked(op: CanvasOp): CanvasDocument {
         val current = currentDoc()
         if (current.acl != null && !current.acl.canWrite(op.actorId)) {
-            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+            throw UnauthorizedCanvasMutationException(CanvasActorId(op.actorId), canvasId)
         }
-        opLog.append(canvasId, op)
+        appendLocal(listOf(op))
         if (op.lamport > lamportClock) lamportClock = op.lamport
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         val updated = commitScene(newScene)
@@ -192,7 +233,7 @@ class CanvasSession(
      * Applies a remote [CanvasOp], ignoring if already present in [opLog] (deduplication),
      * appends to [opLog], projects state, and updates persistence.
      */
-    suspend fun applyRemote(op: CanvasOp, vouchedActor: String? = null): CanvasDocument? = mutex.withLock {
+    suspend fun applyRemote(op: CanvasOp, vouchedActor: String? = null): CanvasDocument? = locked {
         val current = currentDoc()
         if (!mayApplyRemote(current.acl, op, vouchedActor)) {
             com.letta.mobile.util.Telemetry.event(
@@ -206,7 +247,7 @@ class CanvasSession(
             adoptNewerStored()
             return null
         }
-        opLog.append(canvasId, op)
+        settlement.append(op)
         if (op.lamport > lamportClock) lamportClock = op.lamport
         val newScene = CanvasOpProjector.project(current.sceneJson, listOf(op))
         commitScene(newScene)
@@ -241,8 +282,23 @@ class CanvasSession(
         }
     }
 
+    /**
+     * Logs this app's own [ops], then queues them for delivery before the document write that
+     * carries them (letta-mobile-by4vm.68): a crash after that write but before the publish still
+     * leaves them queued; one before the queueing leaves them unsettled, and [recoverUnsettled]
+     * queues them.
+     */
+    private suspend fun appendLocal(ops: List<CanvasOp>) {
+        ops.forEach { settlement.append(it) }
+        reserveDelivery(ops)
+    }
+
+    private suspend fun reserveDelivery(ops: List<CanvasOp>) {
+        if (ops.isNotEmpty()) syncTransport?.reserveDelivery(canvasId, ops.map { it.opId })
+    }
+
     private suspend fun recordSingleOp(op: CanvasOp) {
-        opLog.append(canvasId, op)
+        settlement.append(op)
         updateLamport(op)
     }
 
@@ -263,7 +319,7 @@ class CanvasSession(
     private suspend fun shouldSkipOrReject(op: CanvasOp, isRemote: Boolean, acl: CanvasAcl?): Boolean {
         if (acl != null && !acl.canWrite(op.actorId)) {
             if (isRemote) return true
-            throw UnauthorizedCanvasMutationException(op.actorId, canvasId)
+            throw UnauthorizedCanvasMutationException(CanvasActorId(op.actorId), canvasId)
         }
         return isRemote && opLog.has(canvasId, op.opId)
     }
@@ -278,7 +334,7 @@ class CanvasSession(
     /**
      * Applies a sequence of operations as a single revision bump.
      */
-    suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = mutex.withLock {
+    suspend fun applyOps(ops: List<CanvasOp>, isRemote: Boolean = false): CanvasDocument = locked {
         applyOpsLocked(ops, isRemote)
     }
 
@@ -286,6 +342,7 @@ class CanvasSession(
         val current = currentDoc()
         val opsToApply = filterAndRecordOps(ops, isRemote, current.acl)
         if (opsToApply.isEmpty()) return current
+        if (!isRemote) reserveDelivery(opsToApply)
 
         val newScene = CanvasOpProjector.project(current.sceneJson, opsToApply)
         val updated = commitScene(newScene)
@@ -301,7 +358,7 @@ class CanvasSession(
      * after its log's ([CanvasStampedBatch.separately]), then committed as one revision and published
      * op by op. An update the agent sends is newer than the board it read, whatever clock it wrote.
      */
-    suspend fun applyAgentOps(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+    suspend fun applyAgentOps(ops: List<CanvasOp>, actorId: CanvasActorId): CanvasDocument = locked {
         applyOpsLocked(CanvasStampedBatch.separately(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") }, isRemote = false)
     }
 
@@ -318,7 +375,7 @@ class CanvasSession(
     suspend fun setDocument(
         documentId: String,
         documentJson: String,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
         style: CanvasTextStyle? = null,
@@ -332,7 +389,7 @@ class CanvasSession(
     suspend fun writeDocument(write: CanvasDocumentWrite): CanvasDocument? {
         val op = CanvasOp.SetDocumentOp(
             opId = CanvasOpDiffer.generateOpId("doc"),
-            actorId = write.actorId,
+            actorId = write.actorId.value,
             lamport = lamportClock + 1,
             documentId = write.documentId,
             documentJson = write.documentJson,
@@ -359,7 +416,7 @@ class CanvasSession(
     suspend fun retitleDocument(
         documentId: String,
         title: String,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, title = title)
@@ -369,7 +426,7 @@ class CanvasSession(
     suspend fun restyleDocument(
         documentId: String,
         style: CanvasTextStyle,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, style = style)
@@ -379,7 +436,7 @@ class CanvasSession(
     suspend fun recolorDocument(
         documentId: String,
         colorHex: String,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
         val existing = documents().firstOrNull { it.id == documentId } ?: return null
         return setDocument(documentId, existing.json, actorId, color = colorHex)
@@ -392,15 +449,15 @@ class CanvasSession(
     suspend fun moveDocument(
         documentId: String,
         frame: CanvasDocumentFrame,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
         style: CanvasTextStyle? = null,
-    ): CanvasDocument? = mutex.withLock {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return@withLock null
-        if (isMoveRedundant(existing, frame, style)) return@withLock null
+    ): CanvasDocument? = locked {
+        val existing = documents().firstOrNull { it.id == documentId } ?: return@locked null
+        if (isMoveRedundant(existing, frame, style)) return@locked null
         applyLocalLocked(
             CanvasOp.SetDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
+                actorId = actorId.value,
                 lamport = lamportClock + 1,
                 documentId = documentId,
                 documentJson = existing.json,
@@ -429,7 +486,7 @@ class CanvasSession(
      * was born with, last-writer-wins simply discards it - the board does not move, and undo
      * looks broken rather than refused.
      */
-    suspend fun applyLocalStamped(ops: List<CanvasOp>): CanvasDocument? = mutex.withLock {
+    suspend fun applyLocalStamped(ops: List<CanvasOp>): CanvasDocument? = locked {
         var last: CanvasDocument? = null
         ops.forEach { op ->
             val stamped = op.withStamp(CanvasOpDiffer.generateOpId("undo"), ++lamportClock)
@@ -444,7 +501,7 @@ class CanvasSession(
      * committed as a single revision and published to peers as one message, so a peer never holds
      * half of it.
      */
-    suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: String): CanvasDocument = mutex.withLock {
+    suspend fun applyAgentBatch(ops: List<CanvasOp>, actorId: CanvasActorId): CanvasDocument = locked {
         applyLocalLocked(CanvasStampedBatch.of(ops, actorId, lamportClock) { CanvasOpDiffer.generateOpId("agent") })
     }
 
@@ -455,13 +512,13 @@ class CanvasSession(
     /** Restore just one deleted drawing item, using a fresh LWW stamp and a normal synced op. */
     suspend fun restoreDeletedElement(
         target: CanvasDeletedElement,
-    ): CanvasDocument? = mutex.withLock {
+    ): CanvasDocument? = locked {
         val snapshot = (store as? CanvasDeletedElementStore)?.deletedElements(canvasId)
-            ?.firstOrNull { it.elementId == target.elementId } ?: return@withLock null
-        val stored = store.get(canvasId) ?: return@withLock null
+            ?.firstOrNull { it.elementId == target.elementId } ?: return@locked null
+        val stored = store.get(canvasId) ?: return@locked null
         // A snapshot can outlive a peer's re-add; never replace an already live same-ID item.
         val live = Json.parseToJsonElement(stored.sceneJson).jsonObject["elements"]?.jsonArray.orEmpty()
-        if (live.any { it.jsonObject["id"]?.jsonPrimitive?.content == target.elementId }) return@withLock null
+        if (live.any { it.jsonObject["id"]?.jsonPrimitive?.content == target.elementId }) return@locked null
         _document.value = stored
         adoptLamportOf(stored)
         applyLocalLocked(
@@ -487,11 +544,11 @@ class CanvasSession(
     suspend fun setLabelOwner(
         documentId: String,
         shapeId: String?,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument = applyLocal(
         CanvasOp.SetLabelOwnerOp(
             opId = CanvasOpDiffer.generateOpId("label"),
-            actorId = actorId,
+            actorId = actorId.value,
             lamport = lamportClock + 1,
             documentId = documentId,
             shapeId = shapeId,
@@ -501,14 +558,14 @@ class CanvasSession(
     suspend fun bindArrow(
         elementId: String,
         binding: CanvasArrowBinding,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
         val current = arrowBindings()[elementId] ?: CanvasArrowBinding()
         if (current == binding) return null
         return applyLocal(
             CanvasOp.SetArrowBindingOp(
                 opId = CanvasOpDiffer.generateOpId("bind"),
-                actorId = actorId,
+                actorId = actorId.value,
                 lamport = lamportClock + 1,
                 elementId = elementId,
                 binding = binding,
@@ -525,13 +582,13 @@ class CanvasSession(
     /** Sets the board's background pattern as a local op; a no-op when it is already that. */
     suspend fun setBackgroundPattern(
         pattern: CanvasBackgroundPattern,
-        actorId: String = LOCAL_USER_ACTOR_ID,
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
         if (backgroundPattern() == pattern) return null
         return applyLocal(
             CanvasOp.SetBackgroundPatternOp(
                 opId = CanvasOpDiffer.generateOpId("bg"),
-                actorId = actorId,
+                actorId = actorId.value,
                 lamport = lamportClock + 1,
                 pattern = pattern,
             ),
@@ -546,15 +603,15 @@ class CanvasSession(
      */
     suspend fun moveDocuments(
         frames: Map<String, CanvasDocumentFrame>,
-        actorId: String = LOCAL_USER_ACTOR_ID,
-    ): CanvasDocument? = mutex.withLock {
+        actorId: CanvasActorId = LOCAL_USER_ACTOR,
+    ): CanvasDocument? = locked {
         val existing = documents().associateBy { it.id }
         val ops = frames.mapNotNull { (id, frame) ->
             val doc = existing[id] ?: return@mapNotNull null
             if (doc.frame == frame) return@mapNotNull null
             CanvasOp.SetDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
-                actorId = actorId,
+                actorId = actorId.value,
                 lamport = lamportClock + 1,
                 documentId = id,
                 documentJson = doc.json,
@@ -562,11 +619,11 @@ class CanvasSession(
                 owner = CanvasGeometryOwner.USER,
             )
         }
-        if (ops.isEmpty()) return@withLock null
+        if (ops.isEmpty()) return@locked null
         applyLocalLocked(
             CanvasOp.BatchOp(
                 opId = CanvasOpDiffer.generateOpId("batch"),
-                actorId = actorId,
+                actorId = actorId.value,
                 lamport = lamportClock + 1,
                 ops = ops,
             ),
@@ -581,13 +638,13 @@ class CanvasSession(
      * projected scene. Without the guard each one appends an op, commits a revision and publishes
      * to peers, for a note that is deleted once.
      */
-    suspend fun removeDocument(documentId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument? =
-        mutex.withLock {
-            if (documents().none { it.id == documentId }) return@withLock null
+    suspend fun removeDocument(documentId: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument? =
+        locked {
+            if (documents().none { it.id == documentId }) return@locked null
             applyLocalLocked(
                 CanvasOp.RemoveDocumentOp(
                     opId = CanvasOpDiffer.generateOpId("doc"),
-                    actorId = actorId,
+                    actorId = actorId.value,
                     lamport = lamportClock + 1,
                     documentId = documentId,
                 ),
@@ -602,14 +659,14 @@ class CanvasSession(
      * scene and writing under one lock; nothing when [build] makes nothing.
      */
     internal suspend fun applyLocalBuilt(build: (sceneJson: String, lamport: Long) -> CanvasOp?): CanvasDocument? =
-        mutex.withLock {
-            val op = build(sceneJsonOrEmpty(), lamportClock + 1) ?: return@withLock null
+        locked {
+            val op = build(sceneJsonOrEmpty(), lamportClock + 1) ?: return@locked null
             applyLocalLocked(op)
         }
 
-    suspend fun applyLocalScene(newJson: String, actorId: String = LOCAL_USER_ACTOR_ID): List<CanvasOp> {
+    suspend fun applyLocalScene(newJson: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): List<CanvasOp> {
         val doc = currentDoc()
-        if (doc.acl != null && !doc.acl.canWrite(actorId)) {
+        if (doc.acl != null && !doc.acl.canWrite(actorId.value)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
         val current = sceneJsonOrEmpty()
@@ -643,7 +700,7 @@ class CanvasSession(
     /**
      * Updates document title.
      */
-    suspend fun updateTitle(newTitle: String): CanvasDocument = mutex.withLock {
+    suspend fun updateTitle(newTitle: String): CanvasDocument = locked {
         val current = currentDoc()
         commitUpdate(
             current.copy(
@@ -657,29 +714,29 @@ class CanvasSession(
      * Restores canvas to a prior [CanvasCheckpoint], generating and applying a [CanvasOp.ReplaceSceneOp]
      * locally and broadcasting to peers.
      */
-    suspend fun restoreCheckpoint(checkpointId: String, actorId: String = LOCAL_USER_ACTOR_ID): CanvasDocument = mutex.withLock {
+    suspend fun restoreCheckpoint(checkpointId: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument = locked {
         val checkpoint = _checkpoints.value.firstOrNull { it.checkpointId == checkpointId }
             ?: throw IllegalArgumentException("Checkpoint not found: $checkpointId")
 
         val current = currentDoc()
-        if (current.acl != null && !current.acl.canWrite(actorId)) {
+        if (current.acl != null && !current.acl.canWrite(actorId.value)) {
             throw UnauthorizedCanvasMutationException(actorId, canvasId)
         }
 
         val op = CanvasOp.ReplaceSceneOp(
             opId = "restore-${++lamportClock}-${clock()}",
-            actorId = actorId,
+            actorId = actorId.value,
             lamport = ++lamportClock,
             sceneJson = checkpoint.sceneJson,
         )
-        opLog.append(canvasId, op)
+        appendLocal(listOf(op))
         val updated = commitUpdate(
             current.copy(
                 revision = current.revision + 1L,
                 sceneJson = checkpoint.sceneJson,
                 updatedAtEpochMs = clock(),
             ),
-            metadata = CanvasCommitMetadata(actorId = actorId, description = "Restored to rev ${checkpoint.revision}"),
+            metadata = CanvasCommitMetadata(actorId = actorId.value, description = "Restored to rev ${checkpoint.revision}"),
         )
         syncTransport?.publish(canvasId, op)
         updated
@@ -690,6 +747,10 @@ class CanvasSession(
 
         /** The actor id the local human edits as; also the default owner of every new canvas. */
         const val LOCAL_USER_ACTOR_ID: String = "local_user"
+
+        /** [LOCAL_USER_ACTOR_ID] typed, the default actor of every local write. */
+        val LOCAL_USER_ACTOR: CanvasActorId = CanvasActorId(LOCAL_USER_ACTOR_ID)
+
         /**
          * Creates a new [CanvasDocument] in [store] and returns an initialized [CanvasSession].
          */
@@ -744,6 +805,7 @@ class CanvasSession(
                 clock = options.clock,
             )
             session.initialize(existing)
+            session.recoverOnOpen()
             return session
         }
 
@@ -756,7 +818,7 @@ class CanvasSession(
             options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val createOptions = CanvasCreateOptions(
-                canvasId = CanvasId.forConversation(conversationId),
+                canvasId = CanvasId.forConversation(ConversationId(conversationId)),
                 title = options.title,
                 conversationId = conversationId,
                 agentId = options.agentId,
@@ -775,6 +837,7 @@ class CanvasSession(
                 clock = options.clock,
             )
             session.initialize(doc)
+            session.recoverOnOpen()
             return session
         }
     }
@@ -827,5 +890,5 @@ data class CanvasDocumentWrite(
     val title: String? = null,
     val owner: CanvasGeometryOwner? = null,
     val compose: CanvasComposeProvenance? = null,
-    val actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
+    val actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR,
 )

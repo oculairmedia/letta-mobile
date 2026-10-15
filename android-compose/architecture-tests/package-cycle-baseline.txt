@@ -1,0 +1,46 @@
+# Mutually importing package pairs in the shared modules (letta-mobile-by4vm.27).
+#
+# SharedLayeringTest scans sharedLogic commonMain + jvmAndAndroid and sharedUI commonMain,
+# builds each module's package import graph and fails on a pair not listed here (new cycle)
+# or a line here whose pair is gone (stale). Delete the line in the change that breaks the
+# cycle. Never add a line: fix the import instead.
+# See docs/architecture/shared-layering-ratchet.md.
+#
+# Format: <module> <package-a> <-> <package-b>   (a < b; lines sorted)
+
+sharedLogic com.letta.mobile.data.canvas <-> com.letta.mobile.data.canvas.compose
+sharedLogic com.letta.mobile.data.canvas <-> com.letta.mobile.data.canvas.plugin
+sharedLogic com.letta.mobile.data.chat.projection <-> com.letta.mobile.data.timeline
+sharedLogic com.letta.mobile.data.chat.projection <-> com.letta.mobile.ui.chat.render
+sharedLogic com.letta.mobile.data.commands <-> com.letta.mobile.ui.chat.session
+sharedLogic com.letta.mobile.data.compaction <-> com.letta.mobile.data.context
+sharedLogic com.letta.mobile.data.context <-> com.letta.mobile.data.context.limit
+sharedLogic com.letta.mobile.data.controller <-> com.letta.mobile.data.controller.fanout
+sharedLogic com.letta.mobile.data.controller <-> com.letta.mobile.data.controller.registry
+sharedLogic com.letta.mobile.data.controller <-> com.letta.mobile.data.runtime
+sharedLogic com.letta.mobile.data.controller <-> com.letta.mobile.data.transport.appserver
+sharedLogic com.letta.mobile.data.controller.node.iroh <-> com.letta.mobile.data.transport.iroh
+sharedLogic com.letta.mobile.data.meridian <-> com.letta.mobile.data.meridian.endpoint
+sharedLogic com.letta.mobile.data.messaging <-> com.letta.mobile.data.model
+sharedLogic com.letta.mobile.data.model <-> com.letta.mobile.data.runtime
+sharedLogic com.letta.mobile.data.model <-> com.letta.mobile.data.search
+sharedLogic com.letta.mobile.data.model <-> com.letta.mobile.data.transport.appserver
+sharedLogic com.letta.mobile.data.pairing <-> com.letta.mobile.data.transport.iroh
+sharedLogic com.letta.mobile.data.repository <-> com.letta.mobile.data.repository.api
+sharedLogic com.letta.mobile.data.repository <-> com.letta.mobile.data.repository.iroh
+sharedLogic com.letta.mobile.data.runtime <-> com.letta.mobile.data.transport.appserver
+sharedLogic com.letta.mobile.data.runtime <-> com.letta.mobile.data.transport.iroh
+sharedLogic com.letta.mobile.data.timeline <-> com.letta.mobile.data.timeline.api
+sharedLogic com.letta.mobile.data.timeline <-> com.letta.mobile.data.timeline.snapshot
+sharedLogic com.letta.mobile.data.transport <-> com.letta.mobile.data.transport.api
+sharedLogic com.letta.mobile.data.transport.appserver <-> com.letta.mobile.data.transport.iroh
+sharedUI com.letta.mobile.ui.canvas <-> com.letta.mobile.ui.canvas.plugin
+sharedUI com.letta.mobile.ui.chat <-> com.letta.mobile.ui.theme
+sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.composer
+sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.timeline
+sharedUI com.letta.mobile.ui.chat.surface <-> com.letta.mobile.ui.chat.surface.timeline.rows
+sharedUI com.letta.mobile.ui.components <-> com.letta.mobile.ui.host
+sharedUI com.letta.mobile.ui.context <-> com.letta.mobile.ui.modelcontrol
+sharedUI com.letta.mobile.ui.host <-> com.letta.mobile.ui.shell
+sharedUI com.letta.mobile.ui.shell <-> com.letta.mobile.ui.shell.rail
+sharedUI com.letta.mobile.ui.shell <-> com.letta.mobile.ui.shell.sidebar

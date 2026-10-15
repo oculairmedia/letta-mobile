@@ -19,8 +19,10 @@ import kotlinx.atomicfu.locks.synchronized
  * kept the generation) is never a gap; a `1` restarts tracking.
  *
  * Only meaningful on a transport that delivers every frame of the connection. A relay that filters
- * frames per viewer (the Iroh host fanning out to phones) shows legitimate holes, so callers enable
- * detection for direct sockets only.
+ * frames per viewer shows legitimate holes unless it re-stamps the sequence per viewer. The Iroh host
+ * does (one counter per viewer connection, drawn under its stream write lock, letta-mobile-by4vm.50)
+ * and says so with [StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]; clients enable detection on
+ * direct sockets and on Iroh hosts that advertise it.
  */
 class EventSeqGapDetector {
     private val lock = SynchronizedObject()

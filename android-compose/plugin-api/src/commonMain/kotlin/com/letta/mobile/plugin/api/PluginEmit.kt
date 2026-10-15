@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
  * `canvas_apply_ops`; whatever it refuses comes back in the [EmitReceipt], never as a failure.
  *
  * Only the plugin's own kinds can be placed or updated (`ext:<pluginId>/<kind>`), and removals name
- * the plugin's own elements. [placeImages] places core images that outlive the plugin.
+ * the plugin's own elements. An emit made for a call carries that call's [callId]. [placeImages] places core images that outlive the plugin.
  */
 @Serializable
 public data class PluginEmit(
@@ -18,6 +18,11 @@ public data class PluginEmit(
     public val update: List<UpdateElement> = emptyList(),
     public val remove: List<String> = emptyList(),
     public val placeImages: List<PlaceImage> = emptyList(),
+    /**
+     * The [ActionContext.callId] of the call this emit belongs to: the host places on that call's
+     * board. Ignored in [ActionResult.Ok.emit], which always belongs to its own call.
+     */
+    public val callId: String? = null,
 ) {
     /** Whether the emit asks for nothing. */
     public val isEmpty: Boolean

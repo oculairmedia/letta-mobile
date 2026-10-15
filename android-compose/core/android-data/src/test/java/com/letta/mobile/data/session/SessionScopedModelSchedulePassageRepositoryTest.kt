@@ -1,5 +1,8 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.repository.api.IScheduleRepository
+import com.letta.mobile.data.repository.api.IPassageRepository
+import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
@@ -60,10 +63,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val modelProxy = SessionScopedModelRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val modelProxy = sessionManager.sessionScoped(IModelRepository::class) { it.modelRepository }
 
         modelProxy.refreshLlmModels()
         modelProxy.refreshEmbeddingModels()
@@ -101,10 +101,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val passageProxy = SessionScopedPassageRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val passageProxy = sessionManager.sessionScoped(IPassageRepository::class) { it.passageRepository }
         val passages = passageProxy.getPassages(AgentId("agent-1"))
 
         passageProxy.refreshPassages(AgentId("agent-1"))
@@ -141,10 +138,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val scheduleProxy = SessionScopedScheduleRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val scheduleProxy = sessionManager.sessionScoped(IScheduleRepository::class) { it.scheduleRepository }
 
         scheduleProxy.refreshSchedules("agent-1")
         advanceUntilIdle()

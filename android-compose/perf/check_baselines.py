@@ -10,8 +10,10 @@ Exit codes:
     0 — all measured metrics within tolerance
     1 — at least one metric regressed
     2 — malformed, missing, undersampled, or unseeded gating input
-    configured by --retryable-single-startup-exit-code — exactly one configured
-        startup gate regressed, so CI may rerun once before failing hard
+
+There is no retry path: one measurement decides (letta-mobile-by4vm.32). On a
+breach CI prints the last main runs as a control (perf/perf_control.py); a human
+reruns only if that control says the runner, not the change, moved.
 """
 from __future__ import annotations
 
@@ -25,25 +27,6 @@ from typing import Iterable
 
 HERE = pathlib.Path(__file__).resolve().parent
 BASELINES_PATH = HERE / "baselines.json"
-RETRYABLE_STARTUP_METRIC_KEYS = frozenset({
-    "startup.cold.p95_ms",
-    "startup.warm.p95_ms",
-})
-ORDINARY_EXIT_CODES = frozenset({0, 1, 2})
-
-
-def _retryable_exit_code(value: str) -> int:
-    try:
-        exit_code = int(value)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError("must be an integer exit status") from exc
-    if not 1 <= exit_code <= 255 or exit_code in ORDINARY_EXIT_CODES:
-        raise argparse.ArgumentTypeError(
-            "must be a distinct nonzero process exit status (3-255)"
-        )
-    return exit_code
-
-
 def _load_baselines(baselines_path: pathlib.Path) -> dict:
     return json.loads(baselines_path.read_text(encoding="utf-8"))
 
@@ -285,20 +268,6 @@ def _evaluate_metric(key: str, spec: dict, measurements: list[dict], rebaseline:
     return row, outcome
 
 
-def _is_single_retry_eligible_startup_regression(failures: list[dict]) -> bool:
-    if len(failures) != 1:
-        return False
-    return failures[0]["key"] in RETRYABLE_STARTUP_METRIC_KEYS
-
-
-def _regression_exit_code(failures: list[dict], retryable_exit_code: int | None) -> int:
-    if retryable_exit_code is None:
-        return 1
-    if _is_single_retry_eligible_startup_regression(failures):
-        return retryable_exit_code
-    return 1
-
-
 def _report_problems(label: str, rows: list[dict]) -> None:
     print(f"\n{label}:", file=sys.stderr)
     for row in rows:
@@ -314,7 +283,6 @@ def check(
     outputs_dir: pathlib.Path,
     rebaseline: bool,
     baselines_path: pathlib.Path = BASELINES_PATH,
-    retryable_single_startup_exit_code: int | None = None,
     summary_json_path: pathlib.Path | None = None,
     summary_md_path: pathlib.Path | None = None,
 ) -> int:
@@ -340,7 +308,7 @@ def check(
         exit_code = 2
     elif failures:
         _report_problems("Perf regressions detected", failures)
-        exit_code = _regression_exit_code(failures, retryable_single_startup_exit_code)
+        exit_code = 1
     else:
         exit_code = 0
 
@@ -354,11 +322,6 @@ def main(argv: list[str]) -> int:
     parser.add_argument("outputs_dir", type=pathlib.Path)
     parser.add_argument("--baselines", type=pathlib.Path, default=BASELINES_PATH)
     parser.add_argument("--rebaseline", action="store_true")
-    parser.add_argument(
-        "--retryable-single-startup-exit-code",
-        type=_retryable_exit_code,
-        default=None,
-    )
     parser.add_argument("--summary-json", type=pathlib.Path, default=None)
     parser.add_argument("--summary-md", type=pathlib.Path, default=None)
     args = parser.parse_args(argv)
@@ -371,7 +334,6 @@ def main(argv: list[str]) -> int:
             args.outputs_dir,
             args.rebaseline,
             baselines_path=args.baselines.resolve(),
-            retryable_single_startup_exit_code=args.retryable_single_startup_exit_code,
             summary_json_path=args.summary_json,
             summary_md_path=args.summary_md,
         )

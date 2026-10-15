@@ -13,7 +13,6 @@ class CheckBaselinesModule(Protocol):
         outputs_dir: pathlib.Path,
         rebaseline: bool,
         baselines_path: pathlib.Path = ...,
-        retryable_single_startup_exit_code: int | None = ...,
         summary_json_path: pathlib.Path | None = ...,
         summary_md_path: pathlib.Path | None = ...,
     ) -> int: ...
@@ -77,20 +76,16 @@ class CheckBaselinesTest(unittest.TestCase):
             "startup.warm.p95_ms": ("StartupBenchmark.warmStartup", "warmStartup"),
         }[key]
 
-    def write_startup_retry_case(
+    def write_startup_case(
         self,
         cold_observed: float | None,
         warm_observed: float | None,
         *,
-        cold_gate: bool = True,
         warm_gate: bool = True,
-        cold_baseline: float = 100.0,
         warm_baseline: float = 100.0,
     ) -> None:
         startup_specs = {
-            "startup.cold.p95_ms": self.startup_spec(
-                "startup.cold.p95_ms", cold_baseline, gate=cold_gate
-            ),
+            "startup.cold.p95_ms": self.startup_spec("startup.cold.p95_ms"),
             "startup.warm.p95_ms": self.startup_spec(
                 "startup.warm.p95_ms", warm_baseline, gate=warm_gate
             ),
@@ -433,22 +428,9 @@ class CheckBaselinesTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
 
-    def test_retryable_exit_code_must_be_distinct_process_failure_status(self) -> None:
-        for value in ("0", "-1", "256"):
-            with self.subTest(value=value):
-                with mock.patch("sys.stderr"):
-                    with self.assertRaises(SystemExit) as raised:
-                        check_baselines.main([
-                            str(self.outputs_dir),
-                            "--retryable-single-startup-exit-code",
-                            value,
-                        ])
-                self.assertEqual(raised.exception.code, 2)
-
-    def test_retryable_exit_code_accepts_valid_status(self) -> None:
-        self.assertEqual(check_baselines._retryable_exit_code("3"), 3)
-
-    def test_startup_regression_retry_exit_code_scenarios(self) -> None:
+    def test_any_startup_regression_fails_on_the_single_measurement(self) -> None:
+        # letta-mobile-by4vm.32: no retry path. One breached startup metric fails
+        # exactly like two do; the control in the job summary decides about noise.
         scenarios = (
             (
                 "isolated-cold",
@@ -458,34 +440,41 @@ class CheckBaselinesTest(unittest.TestCase):
                     "warm_baseline": 50.0,
                     "warm_gate": False,
                 },
-                3,
             ),
-            ("isolated-warm", {"cold_observed": 90.0, "warm_observed": 120.0}, 3),
-            ("both-regress", {"cold_observed": 120.0, "warm_observed": 120.0}, 1),
+            ("isolated-warm", {"cold_observed": 90.0, "warm_observed": 120.0}),
+            ("both-regress", {"cold_observed": 120.0, "warm_observed": 120.0}),
         )
 
-        for name, case, expected_exit_code in scenarios:
+        for name, case in scenarios:
             with self.subTest(scenario=name):
-                self.write_startup_retry_case(**case)
+                self.write_startup_case(**case)
                 result = check_baselines.check(
                     self.outputs_dir,
                     rebaseline=False,
                     baselines_path=self.baselines_path,
-                    retryable_single_startup_exit_code=3,
                 )
-                self.assertEqual(result, expected_exit_code)
+                self.assertEqual(result, 1)
 
-    def test_retryable_exit_does_not_override_missing_measurements(self) -> None:
-        self.write_startup_retry_case(cold_observed=120.0, warm_observed=None)
+    def test_regression_with_missing_measurement_fails_closed(self) -> None:
+        self.write_startup_case(cold_observed=120.0, warm_observed=None)
 
         result = check_baselines.check(
             self.outputs_dir,
             rebaseline=False,
             baselines_path=self.baselines_path,
-            retryable_single_startup_exit_code=3,
         )
 
         self.assertEqual(result, 2)
+
+    def test_retry_flag_is_gone(self) -> None:
+        with mock.patch("sys.stderr"):
+            with self.assertRaises(SystemExit) as raised:
+                check_baselines.main([
+                    str(self.outputs_dir),
+                    "--retryable-single-startup-exit-code",
+                    "3",
+                ])
+        self.assertEqual(raised.exception.code, 2)
 
     def test_summary_files_include_diagnostics(self) -> None:
         self.write_baselines(

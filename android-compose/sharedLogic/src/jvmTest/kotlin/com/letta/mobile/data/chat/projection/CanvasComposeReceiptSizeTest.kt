@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.canvas.CanvasId
 import com.letta.mobile.data.canvas.CanvasToolContract
 import com.letta.mobile.data.canvas.compose.CanvasComposeCompiler
 import com.letta.mobile.data.canvas.compose.CanvasComposeContract
@@ -182,7 +183,7 @@ class CanvasComposeReceiptSizeTest {
         }
         val ready = assertIs<ComposeCompilation.Ready>(CanvasComposeCompiler.compile(request as JsonObject, "") { error("named") })
         return ready.receipt(
-            canvasId = "canvas-conversation-conv-" + "c".repeat(100),
+            canvasId = CanvasId("canvas-conversation-conv-" + "c".repeat(100)),
             status = ComposeStatus.PUBLISHED,
             revision = Long.MAX_VALUE,
             warnings = listOf(CanvasComposeService.ALREADY_PUBLISHED_WARNING),

@@ -1,6 +1,8 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.bound
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.RoomAgentLocalCache
 import com.letta.mobile.data.repository.api.AgentRemoteSource
@@ -24,7 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 // The default scope serves repositories built outside a session graph (tests); graphs pass their own.
 @Suppress("NoDetachedCoroutineLifecycle")
 open class AgentRepository(
-    remote: AgentRemoteSource = noAppServerRoute(),
+    remote: RemoteRoute<AgentRemoteSource> = RemoteRoute.Absent(SessionRoute.AGENTS),
     agentDao: Lazy<AgentDao>,
     repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     localAgentSource: LocalRuntimeAgentSource? = null,
@@ -46,4 +48,20 @@ open class AgentRepository(
     settingsRepository = settingsRepository,
     transport = transport,
     irohAgentSource = irohAgentSource,
-)
+) {
+    /** A repository over a bound [remote] (tests bind a fake). */
+    constructor(
+        remote: AgentRemoteSource,
+        agentDao: Lazy<AgentDao>,
+        repositoryScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        localAgentSource: LocalRuntimeAgentSource? = null,
+        settingsRepository: ISettingsRepository? = null,
+        transport: IChannelTransport? = null,
+        irohAgentSource: IrohAdminRpcAgentSource? =
+            if (transport != null && settingsRepository != null) {
+                IrohAdminRpcAgentSource(transport, settingsRepository)
+            } else {
+                null
+            },
+    ) : this(remote.bound(), agentDao, repositoryScope, localAgentSource, settingsRepository, transport, irohAgentSource)
+}

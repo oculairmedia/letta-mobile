@@ -3,7 +3,6 @@ package com.letta.mobile.data.controller.node.iroh
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -81,12 +80,12 @@ class AgentMetadataSidecar(private val dir: File) {
 
     /** One stored agent's metadata, or null for a file that is not a readable entry (skipped). */
     private fun readEntry(file: File): Pair<String, JsonObject>? {
-        val agentId = runCatching { String(DECODER.decode(file.name.removeSuffix(SUFFIX))) }.getOrNull() ?: return null
+        val agentId = runCatching { LocalBackendLayout.b64UrlDecode(file.name.removeSuffix(SUFFIX)) }.getOrNull() ?: return null
         val metadata = runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() ?: return null
         return agentId to metadata
     }
 
-    private fun fileFor(agentId: String) = File(dir, ENCODER.encodeToString(agentId.toByteArray()) + SUFFIX)
+    private fun fileFor(agentId: String) = File(dir, LocalBackendLayout.b64UrlEncode(agentId) + SUFFIX)
 
     companion object {
         const val METADATA_KEY = "metadata"
@@ -95,7 +94,5 @@ class AgentMetadataSidecar(private val dir: File) {
         fun inLocalBackend(localBackendDir: File) = AgentMetadataSidecar(File(localBackendDir, "meridian/agent-metadata"))
 
         private const val SUFFIX = ".json"
-        private val ENCODER = Base64.getUrlEncoder().withoutPadding()
-        private val DECODER = Base64.getUrlDecoder()
     }
 }

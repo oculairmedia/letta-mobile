@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import com.letta.mobile.data.model.CanvasActorId
 import io.github.linreal.cascade.editor.action.FocusBlock
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.serialization.loadFromJson
@@ -62,7 +63,7 @@ fun CanvasBlockEditor(
     documentId: String,
     storedJson: String,
     modifier: Modifier = Modifier,
-    actorId: String = "local_user",
+    actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR,
     active: Boolean = true,
     /** True when the editor sits on a pale tint (a coloured note), so its text stays dark. */
     onLightSurface: Boolean = false,

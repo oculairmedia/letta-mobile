@@ -49,12 +49,9 @@ The parser reads AndroidX benchmark JSON output from:
 
 `android-compose/macrobenchmark/build/outputs/connected_android_test_additional_output/`
 
-Each CI run also writes compact summaries under `android-compose/build/perf-summary/`:
-
-- `attempt-1/perf-summary.json` and `.md` for the first benchmark sample
-- `attempt-2/perf-summary.json` and `.md` only when the bounded startup retry path runs
-- `attempt-1/results/` and `attempt-1/reports/` when a retry runs, preserving the
-  first attempt rather than replacing its evidence with the terminal attempt
+Each CI run also writes a compact summary, `android-compose/build/perf-summary/perf-summary.{json,md}`,
+publishes it in the job summary, and uploads it on its own as the small
+`android-perf-summary-<run>` artifact (the control step below reads those).
 
 The summaries include observed value, baseline, ceiling, percent delta, benchmark source, AndroidX metric name, source JSON path, and whether the metric is gating or informational.
 
@@ -84,33 +81,57 @@ includes rendering it. Cold startup retains its
 Warm startup uses a `+20%` envelope, cold startup a `+50%` envelope, and both gate by default. Their minimum
 sample counts prevent absent or undersampled output from silently passing.
 
-## Retry behavior
+## One measurement, then the control (no automatic retry)
 
-The workflow automatically performs **one bounded retry** when, and only when,
-the first baseline check finds one regression limited to either
-`startup.cold.p95_ms` or `startup.warm.p95_ms`. The first check exits through a
-dedicated retryable status, the job copies the first attempt's AndroidX results
-and reports into the attempt-specific artifact directory, reruns the complete
-macrobenchmark suite on a fresh emulator action invocation, and then runs the
-baseline check again without the retryable exit code.
+Until letta-mobile-by4vm.32 the workflow reran the whole suite when exactly one
+startup metric breached, and passed if the second attempt did. That is retrying
+until green, which the project's deflake rule forbids: it hid real regressions
+behind a coin flip and doubled the emulator time on every noisy run.
 
-Outcomes:
+Now:
 
-- attempt 1 passes: job passes, no retry
-- attempt 1 has exactly one startup metric above ceiling and attempt 2 passes:
-  job passes; artifacts retain both complete attempts and their summaries
-- attempt 2 has any regression, missing measurement, malformed input, or
-  unseeded gating baseline: job fails and remains red
-- attempt 1 has multiple failures or a non-startup failure: job fails immediately
+1. The suite runs **once**. `perf/check_baselines.py` exits 1 on any breach
+   (2 on missing, malformed, undersampled or unseeded input). There is no
+   retryable exit code any more.
+2. On a breach, the **control** step lists the last 5 completed main pushes of
+   this workflow (success or failure; cancelled runs are skipped), downloads
+   their `android-perf-summary-*` artifacts (older runs: `android-perf-results-*`),
+   and renders `perf/perf_control.py`'s table into the job summary: this run's
+   cold/warm p95 next to main's, each flagged when over today's ceiling, plus
+   a one-line reading per breached metric.
+3. The job fails. A **human** decides:
+   - the control shows main at or over the same ceiling: the runner moved.
+     Rerun the job once and say so on the PR, quoting the control line;
+   - main sits comfortably under it: the change is the suspect. Profile it
+     (see the playbook) before any rerun. If the slowdown is real and
+     accepted, rebaseline deliberately (below), never by widening a ceiling
+     to make one PR pass.
 
-The retry is prospective: it applies to every qualifying PR and does not bypass
-or rebaseline a particular change. It does **not** raise the `+20%` ceiling.
-It is supported by noisy healthy warm-start p95 observations on the unlocked
-shared emulator (428.617, 432.252, 503.493, 521.637, and 538.351 ms), while a
-second fully evaluated attempt continues to detect repeatable regressions.
-Preserving the first attempt prevents the former semantic false-pass mode where
-a cold-only retry's terminal success could hide an earlier warm breach in an
-artifact.
+Noise is still real on the shared emulator (2026-10-14: #1935, which touched
+no startup code, breached cold 2362/2269 and warm 745/651 while neighbouring
+PRs and main passed), so a rerun with control evidence is legitimate. What is
+gone is the silent, automatic one.
+
+## Baseline Profile freshness
+
+The gate measures `playBenchmark`, which ships
+`app/src/playRelease/generated/baselineProfiles/baseline-prof.txt`. ART
+silently ignores profile entries whose classes no longer exist, so a stale
+profile shows up only as startup drift. Each perf-gate run executes
+`scripts/ci/baseline-profile-staleness.py --max-unresolved-pct 25`, which
+resolves the profile's first-party (`com/letta/...`) classes against the
+Kotlin/Java sources (Hilt/Dagger/Room generated classes resolve through the
+class they are generated from). Over 25% unresolved it emits a workflow
+warning and a job-summary section; it never fails this required job.
+
+On 2026-10-14 the profile (captured 2026-06-25) had 145 of 283 first-party
+classes unresolved (51%): the bot/, client-mode, REST `data/api` and old
+navigation routes it was recorded against are gone. Regenerating needs a
+device or emulator run of the `:baselineprofile` generators
+(`baselineprofile/src/main/java/.../BaselineProfileGenerator.kt`, output saved
+under `app/src/playRelease/generated/`); that is tracked separately, not done
+in CI. Run the check locally with
+`python3 scripts/ci/baseline-profile-staleness.py --list`.
 
 ## Re-baselining
 
@@ -193,21 +214,22 @@ here rather than hard-coded in the repo.
 If the job fails unexpectedly:
 
 1. download the `android-perf-results-*` artifact
-2. inspect `build/perf-summary/attempt-*/perf-summary.md` first for the compact
+2. inspect `build/perf-summary/perf-summary.md` first for the compact
    observed/baseline/ceiling/delta/source/path view
 3. inspect the underlying `*-benchmarkData.json` files and HTML reports for the
-   failing attempt
+   failing run
 4. verify the failing metric is from the expected benchmark method
-5. if the workflow already used attempt 2 and any metric failed or was missing,
-   treat it as terminal rather than manually rerunning to hide the failure
+5. read the control table in the job summary before deciding on a rerun (see
+   "One measurement, then the control"); never rerun more than once to get green
 6. if the change is legitimate and repeatable, rebaseline deliberately
 
 ## Regression simulation
 
 `android-compose/perf/test_check_baselines.py` includes a regression test
 that verifies the parser exits non-zero when a benchmark value exceeds the
-allowed ceiling. Keep that test passing so the CI gate itself does not
-silently rot.
+allowed ceiling; `test_perf_control.py` covers the control table. The
+perf-gate job runs both (`python3 -m unittest discover -s perf -p 'test_*.py'`)
+on every run, so the gate itself cannot silently rot.
 
 ### `reactivecircus/android-emulator-runner` `script:` line continuations
 

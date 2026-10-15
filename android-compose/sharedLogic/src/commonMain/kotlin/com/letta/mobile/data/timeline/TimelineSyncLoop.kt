@@ -177,6 +177,15 @@ class TimelineSyncLoop(
         )
     }
 
+    // letta-mobile-by4vm.17: every pending-local row this loop writes or reads is owned by
+    // (backend, agent, conversation), so `conv-default-*` ids reused across agents/backends
+    // cannot surface each other's unsent messages.
+    private val pendingScope = PendingLocalScope(
+        backendId = timelineScope?.backendId,
+        conversationId = conversationId,
+        agentId = timelineScope?.agentId ?: agentId,
+    )
+
     private val hydrator by lazy {
         TimelineHydrator(
             conversationId = conversationId,
@@ -185,6 +194,7 @@ class TimelineSyncLoop(
             events = _events,
             timelineProcessor = timelineProcessor,
             onHydrationCommitted = { scheduleSnapshotPersist(SnapshotPersistReason.HYDRATION) },
+            pendingScope = pendingScope,
         )
     }
 
@@ -776,6 +786,8 @@ class TimelineSyncLoop(
                         content = effect.pending.content,
                         attachments = effect.pending.attachments,
                         sentAt = effect.sentAt,
+                        backendId = pendingScope.backendId,
+                        agentId = pendingScope.agentId,
                     ),
                 )
                 is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
@@ -805,6 +817,7 @@ class TimelineSyncLoop(
         state = state,
         events = _events,
         pendingLocalStore = pendingLocalStore,
+        pendingScope = pendingScope,
         logTag = logTag,
         scope = loopScope,
         ingestStreamEvent = ::ingestStreamEvent,

@@ -2,20 +2,29 @@ package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
+import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
+import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
+import com.letta.mobile.data.chat.runtime.ChatStopRequest
+import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.flow.stateIn
@@ -51,7 +60,7 @@ interface TimelineChatSession {
  * reports that through [ChatSurfaceCapabilities] so the page hides the control.
  */
 data class TimelineChatRunControls(
-    /** Asks the server to stop the conversation's active run; true when it confirmed. */
+    /** Asks the server to stop the conversation's active run; true once it went out (false clears the run locally). */
     val stopRun: (suspend () -> Boolean)? = null,
     val answerApproval: (suspend (ChatApprovalAnswer) -> Unit)? = null,
 )
@@ -59,6 +68,20 @@ data class TimelineChatRunControls(
 /** What the port is built from besides the session itself. */
 data class TimelineChatSessionOptions(
     val controls: TimelineChatRunControls = TimelineChatRunControls(),
+    /**
+     * letta-mobile-by4vm.79: the host's own approval state (answers in flight, queued offline,
+     * parked details), e.g. the shared [com.letta.mobile.data.chat.approval.ChatApprovalAnswerer]'s.
+     * Null keeps the port's own in-flight tracking only, as the web client does.
+     */
+    val approvals: ChatApprovalStateSource? = null,
+    /** letta-mobile-by4vm.98: the conversation's working directory; null: no chip, capability off. */
+    val workingDirectory: ChatWorkingDirectorySource? = null,
+    /** letta-mobile-by4vm.98: the conversation's permission-mode chip; null shows none. */
+    val permissionModes: ChatPermissionModeSource? = null,
+    /** letta-mobile-by4vm.98.1: the conversation's model chip and switch; null: no chip, capability off. */
+    val models: ChatModelSource? = null,
+    /** letta-mobile-by4vm.98.2: the conversation's send queue; null: a send waits for the run to end. */
+    val sendQueue: ChatSendQueueSource? = null,
     val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     val placeholder: String? = null,
 )
@@ -73,8 +96,7 @@ data class TimelineChatSessionOptions(
  * [TimelineChatSession] and the run controls its transport has; the web client is the first host
  * that has no conversation owner of its own.
  *
- * Capabilities it does not have yet (model switch, working directory, search, paged history, goals,
- * re-run, the send queue) are reported off, so the page hides them.
+ * Capabilities it does not have yet (search, paged history, goals, re-run) are reported off, so the page hides them; a host adds the rest through [TimelineChatSessionOptions].
  */
 class TimelineChatSessionPort(
     private val session: TimelineChatSession,
@@ -87,17 +109,55 @@ class TimelineChatSessionPort(
     private val run = MutableStateFlow(TimelineRunState())
     private val local = MutableStateFlow(TimelineLocalState())
 
-    override val uiState: StateFlow<ChatUiState> = timelineInputs()
+    /** The page state as the timeline presents it, before a local stop clear is laid over it. */
+    private val presented: StateFlow<ChatUiState> = timelineInputs()
         .runningFold(null as ChatUiState?) { previous, inputs -> present(inputs, previous) }
         .map { it ?: initialUiState() }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
-    override val composer: StateFlow<ChatComposerUiState> = combine(draft, uiState) { current, ui ->
-        timelineComposerUiState(current, ui.isRunInFlight, options)
-    }.stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), timelineComposerUiState(draft.value, false, options))
+    override val uiState: StateFlow<ChatUiState> = combine(
+        presented,
+        run.map { it.clearedLocally }.distinctUntilChanged(),
+        options.sendQueue?.queue ?: flowOf(ConversationSendQueue()),
+    ) { ui, cleared, queue -> ui.withRunClearedLocally(cleared).copy(sendQueue = queue) }
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
-    override val capabilities: StateFlow<ChatSurfaceCapabilities> =
-        MutableStateFlow(timelineCapabilities(options.controls)).asStateFlow()
+    /** letta-mobile-by4vm.81: Stop's lifecycle, the same shared state machine Android and desktop run. */
+    private val interrupter = ChatRunInterrupter(
+        scope = scope,
+        host = TimelineRunStopHost(updateRun = ::updateRun, onClearedLocally = ::watchClearedRunEnd),
+        telemetry = ChatRunInterruptTelemetry(TIMELINE_STOP_TELEMETRY_TAG),
+    )
+    private var clearedRunWatch: Job? = null
+
+    private val workingDirectory: StateFlow<ChatWorkingDirectoryUiState?> =
+        options.workingDirectory?.current ?: MutableStateFlow(null)
+
+    private val model: StateFlow<ChatModelUiState?> = options.models?.model ?: MutableStateFlow(null)
+
+    private val canQueue: StateFlow<Boolean> = options.sendQueue?.canQueueWhileStreaming ?: MutableStateFlow(false)
+
+    override val composer: StateFlow<ChatComposerUiState> = combine(
+        combine(draft, canQueue, ::Pair),
+        uiState,
+        combine(workingDirectory, model, ::Pair),
+        options.permissionModes?.permissionMode ?: flowOf(null),
+    ) { (current, queues), ui, (directory, chip), permissionMode ->
+        timelineComposerUiState(current, TimelineSendGate(ui.isRunInFlight, queues), options)
+            .copy(workingDirectory = directory, model = chip, permissionMode = permissionMode)
+    }.stateIn(
+        scope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        timelineComposerUiState(draft.value, TimelineSendGate(false, canQueue.value), options)
+            .copy(workingDirectory = workingDirectory.value, model = model.value),
+    )
+
+    override val capabilities: StateFlow<ChatSurfaceCapabilities> = workingDirectory
+        .map(::currentCapabilities)
+        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities(workingDirectory.value))
+
+    private fun currentCapabilities(directory: ChatWorkingDirectoryUiState?) =
+        timelineCapabilities(options.controls).copy(workingDirectory = directory != null, modelSwitch = options.models != null)
 
     override val actions: ChatActions = TimelineChatActions(this)
 
@@ -127,8 +187,8 @@ class TimelineChatSessionPort(
     }
 
     private fun timelineInputs(): Flow<TimelineInputs> =
-        combine(session.timeline, run, local) { timeline, runState, localState ->
-            TimelineInputs(timeline, runState, localState)
+        combine(session.timeline, run, local, options.approvals.hostApprovals()) { timeline, runState, localState, approvals ->
+            TimelineInputs(timeline, runState, localState, approvals)
         }
 
     private fun present(inputs: TimelineInputs, previous: ChatUiState?): ChatUiState {
@@ -140,8 +200,8 @@ class TimelineChatSessionPort(
             isActiveRunStreaming = false,
             ownAgentId = target.agentId,
         )
-        val presentation = presenter.present(projection, IdlePresenceSignals, prior.isStreaming, prior.isAgentTyping)
-        return timelineChatUiState(target, presentation, inputs.run, inputs.local)
+        val presentation = presenter.present(projection, IdlePresenceSignals)
+        return timelineChatUiState(target, presentation, inputs.run, inputs.local).withHostApprovals(inputs.run, inputs.approvals)
     }
 
     private fun initialUiState(): ChatUiState = ChatUiState(agentName = target.agentName, agentId = target.agentId)
@@ -153,21 +213,25 @@ class TimelineChatSessionPort(
     internal fun updateRun(transform: (TimelineRunState) -> TimelineRunState) = run.update(transform)
 
     internal fun sendDraft() {
-        if (uiState.value.isRunInFlight) return
+        val gate = sendGate()
+        if (gate.blocked) return
         val sendDraft = ChatComposerPolicy.beginSend(draft.value.state) ?: return
         draft.value = TimelineComposerDraft(sendDraft.nextState)
-        launchSend(TimelineSend(sendDraft.text, sendDraft.attachments))
+        launchSend(TimelineSend(sendDraft.text, sendDraft.attachments), queued = gate.runInFlight)
     }
 
     /** Sends [send] without touching the draft (starter prompts, "send again"). */
     internal fun sendDirect(send: TimelineSend) {
-        if (send.text.isBlank() || uiState.value.isRunInFlight) return
-        launchSend(send)
+        val gate = sendGate()
+        if (send.text.isBlank() || gate.blocked) return
+        launchSend(send, queued = gate.runInFlight)
     }
 
-    private fun launchSend(send: TimelineSend) {
-        // A new run starts clean: no earlier error, and no stop request left over from the last run.
-        run.update { it.copy(error = null, acknowledgedError = null, cancelling = false) }
+    private fun sendGate() = TimelineSendGate(uiState.value.isRunInFlight, canQueue.value)
+
+    /** A [queued] send goes to the host's queue behind the run in flight, which it leaves alone. */
+    private fun launchSend(send: TimelineSend, queued: Boolean) {
+        if (!queued) startCleanRun()
         scope.launch {
             try {
                 session.send(send.text, send.attachments)
@@ -179,16 +243,45 @@ class TimelineChatSessionPort(
         }
     }
 
+    /** A new run starts clean: no earlier error, and no stop request left over from the last run. */
+    private fun startCleanRun() {
+        interrupter.retire()
+        clearedRunWatch?.cancel()
+        run.update { it.copy(error = null, cancelling = false, clearedLocally = false) }
+        local.update { it.forgetAcknowledgedOnceCleared(error = null) }
+    }
+
+    /**
+     * Stop enters "stopping…" and asks the server to abort; the run settles when the timeline's own
+     * run ends. A second press, an abort that did not go out, or no terminal within the shared
+     * timeout drops the run locally ([TimelineRunState.clearedLocally]).
+     */
     internal fun stopRun() {
         val stop = options.controls.stopRun ?: return
         if (!uiState.value.isRunInFlight) return
-        run.update { it.copy(cancelling = true) }
-        scope.launch { runControl { if (!stop()) run.update { state -> state.copy(cancelling = false) } } }
+        interrupter.request(
+            ChatStopRequest(
+                key = target.conversationId,
+                transport = STOP_TRANSPORT,
+                abort = stop,
+                awaitTerminal = { presented.first { !it.isRunInFlight } },
+            ),
+        )
+    }
+
+    /** After a local clear, the timeline's own run ending lifts the overlay. */
+    private fun watchClearedRunEnd() {
+        clearedRunWatch?.cancel()
+        clearedRunWatch = scope.launch {
+            presented.first { !it.isRunInFlight }
+            run.update { it.copy(clearedLocally = false) }
+        }
     }
 
     internal fun answerApproval(answer: ChatApprovalAnswer) {
         val submit = options.controls.answerApproval ?: return
         if (answer.requestId in run.value.submittingApprovals) return
+        if (options.approvals?.submittingApprovals?.value?.contains(answer.requestId) == true) return
         run.update { it.copy(submittingApprovals = it.submittingApprovals + answer.requestId) }
         scope.launch {
             try {
@@ -198,6 +291,20 @@ class TimelineChatSessionPort(
             }
         }
     }
+
+    internal fun changeWorkingDirectory(directory: ChatWorkingDirectory) {
+        options.workingDirectory?.changeWorkingDirectory(directory)
+    }
+
+    internal fun setPermissionMode(mode: AppServerPermissionMode) {
+        options.permissionModes?.setPermissionMode(mode)
+    }
+
+    internal fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) {
+        options.models?.selectModel(handle, effort)
+    }
+
+    internal val queuedSends: ChatSendQueueSource? get() = options.sendQueue
 
     internal fun retryLoad() {
         scope.launch { load() }
@@ -221,12 +328,14 @@ class TimelineChatSessionPort(
         val timeline: Timeline,
         val run: TimelineRunState,
         val local: TimelineLocalState,
+        val approvals: TimelineHostApprovals,
     )
 
     private companion object {
         const val LOAD_FAILED = "Could not load the conversation"
         const val SEND_FAILED = "Could not send the message"
-        const val CONTROL_FAILED = "The server did not accept that"
+        const val CONTROL_FAILED = TIMELINE_STOP_FAILED
+        const val STOP_TRANSPORT = "timeline"
 
         /** The page's flows run only while it collects them, as desktop's port does. */
         const val STOP_TIMEOUT_MS = 5_000L

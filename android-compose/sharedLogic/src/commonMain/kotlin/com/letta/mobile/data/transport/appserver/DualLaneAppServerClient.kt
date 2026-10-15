@@ -78,6 +78,16 @@ class DualLaneAppServerClient(
     override suspend fun cronUpdate(command: AppServerCommand.CronUpdate) = runtime.cronUpdate(command)
     override suspend fun cronDelete(command: AppServerCommand.CronDelete) = runtime.cronDelete(command)
     override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = runtime.cronDeleteAll(command)
+    override suspend fun cronPause(command: AppServerCommand.CronPause) = runtime.cronPause(command)
+    override suspend fun cronResume(command: AppServerCommand.CronResume) = runtime.cronResume(command)
+
+    // letta-mobile-by4vm.82: slash commands (`/context-limit`, `/compact`, dreaming) run on the runtime
+    // lane, whose events carry the `slash_command_end` that answers them. Left to the interface's
+    // default, they threw UnsupportedOperationException and the host called /context-limit
+    // unsupported, so the drawer's limit slider gave way to "can't change the context limit".
+    override suspend fun executeCommand(command: AppServerCommand.ExecuteCommand) = runtime.executeCommand(command)
+    override suspend fun monitorStop(command: AppServerCommand.MonitorStop) = runtime.monitorStop(command)
+    override suspend fun updateToolset(command: AppServerCommand.UpdateToolset) = runtime.updateToolset(command)
     override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) =
         admin.getReflectionSettings(command)
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) =

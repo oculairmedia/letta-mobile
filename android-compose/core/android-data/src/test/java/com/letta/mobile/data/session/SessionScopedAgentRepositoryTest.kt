@@ -58,10 +58,7 @@ class SessionScopedAgentRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val proxy = SessionScopedAgentRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val proxy = sessionManager.scopedAgentRepository()
 
         proxy.refreshAgents()
         advanceUntilIdle()
@@ -100,10 +97,7 @@ class SessionScopedAgentRepositoryTest {
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val proxy = SessionScopedAgentRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val proxy = sessionManager.scopedAgentRepository()
 
         val summaries = proxy.listAgentSummaries()
         advanceUntilIdle()

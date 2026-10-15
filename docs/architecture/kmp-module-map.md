@@ -19,8 +19,7 @@ app                      Android application
 desktop                  JVM Compose Desktop application
 web                      wasmJs application (local theme duplicates until wasm sharedUI)
 designsystem             Android Jetpack Compose (api → sharedUI)
-feature-chat             Android presentation
-feature-editagent        Android presentation
+feature-chat             Android host of the shared chat page (sharedUI chat surface)
 ```
 
 **Rule:** `:sharedLogic` must not Gradle-depend on `:app`, `:core:android-data`, `:designsystem`, `:feature-*`, `:desktop`, `:web`, or `:sharedUI`. Enforced by `:architecture-tests:test` (`SharedLogicIsolationTest`).

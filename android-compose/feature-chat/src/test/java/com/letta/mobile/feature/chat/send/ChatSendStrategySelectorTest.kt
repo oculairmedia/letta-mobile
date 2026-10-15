@@ -10,22 +10,11 @@ import org.junit.Test
 
 class ChatSendStrategySelectorTest {
     @Test
-    fun `selects timeline strategy for a plain REST backend`() {
+    fun `selects timeline strategy for a direct ws backend`() {
         val f = Fixture()
 
         val selected = f.selector.select(
-            ChatSendContext(isClientModeEnabled = true, explicitConversationId = "conv-1"),
-        )
-
-        assertSame(f.timeline, selected)
-    }
-
-    @Test
-    fun `selects timeline strategy when client mode is disabled`() {
-        val f = Fixture()
-
-        val selected = f.selector.select(
-            ChatSendContext(isClientModeEnabled = false, explicitConversationId = null),
+            ChatSendContext(explicitConversationId = "conv-1"),
         )
 
         assertSame(f.timeline, selected)
@@ -41,20 +30,17 @@ class ChatSendStrategySelectorTest {
     // ---------------------------------------------------------------------
 
     @Test
-    fun `iroh backend selects the iroh strategy whatever the client mode flag`() {
-        for (clientMode in listOf(false, true)) {
-            val f = Fixture()
-            val selected = f.selectFor(BackendKind.IROH, clientMode = clientMode)
-            assertSame("clientMode=$clientMode", f.iroh, selected)
-            assertNotSame(f.timeline, selected)
-        }
+    fun `iroh backend selects the iroh strategy`() {
+        val f = Fixture()
+        val selected = f.selectFor(BackendKind.IROH)
+        assertSame(f.iroh, selected)
+        assertNotSame(f.timeline, selected)
     }
 
     @Test
     fun `only an iroh context uses the channel transport`() {
         for (kind in BackendKind.entries) {
             val context = ChatSendContext(
-                isClientModeEnabled = false,
                 explicitConversationId = null,
                 backendKind = kind,
             )
@@ -68,7 +54,6 @@ class ChatSendStrategySelectorTest {
             val f = Fixture()
             val selected = f.selector.select(
                 ChatSendContext(
-                    isClientModeEnabled = false,
                     explicitConversationId = null,
                     backendKind = kind,
                     isLocalRuntime = true,
@@ -89,7 +74,7 @@ class ChatSendStrategySelectorTest {
     fun `send delegates payload and context to selected strategy`() {
         val f = Fixture()
         val image = MessageContentPart.Image(base64 = "abc", mediaType = "image/png")
-        val context = ChatSendContext(isClientModeEnabled = true, explicitConversationId = "conv-1")
+        val context = ChatSendContext(explicitConversationId = "conv-1")
 
         f.selector.send("hello", listOf(image), context)
 
@@ -102,7 +87,6 @@ class ChatSendStrategySelectorTest {
     fun `send and cancel over an iroh backend never reach the timeline strategy`() {
         val f = Fixture()
         val context = ChatSendContext(
-            isClientModeEnabled = false,
             explicitConversationId = "conv-1",
             backendKind = BackendKind.IROH,
         )
@@ -126,8 +110,8 @@ class ChatSendStrategySelectorTest {
             irohStrategy = iroh,
         )
 
-        fun selectFor(kind: BackendKind, clientMode: Boolean = false): ChatSendStrategy = selector.select(
-            ChatSendContext(isClientModeEnabled = clientMode, explicitConversationId = null, backendKind = kind),
+        fun selectFor(kind: BackendKind): ChatSendStrategy = selector.select(
+            ChatSendContext(explicitConversationId = null, backendKind = kind),
         )
     }
 

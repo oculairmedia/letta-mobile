@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
@@ -27,12 +28,7 @@ class IrohAdminRpcTimelineTransport(
     // failing to decode with "Expected JsonObject, but had JsonNull" — matching
     // the leniency the agent.get fix (IrohAdminRpcAgentSource) already uses.
     private val gatedTelemetryPaths: MutableSet<String> = mutableSetOf(),
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    private val json: Json = LettaJson.adminRpc,
 ) : TimelineTransport {
     /**
      * letta-mobile-71orq: true when the active backend is an `iroh://`

@@ -32,11 +32,12 @@
 }
 
 # ---------------------------------------------------------------------------
-# Backend seam (letta-mobile-ckmub.4). Production binds the remote-source interfaces to
-# java.lang.reflect.Proxy instances (noAppServerRoute / SessionRemoteSources.None) and has no other
-# implementation, so R8 full mode would treat them as uninstantiated: keep them and their members.
+# letta-mobile-by4vm.88: session-scoped repositories are java.lang.reflect.Proxy
+# instances over these interfaces (SessionForwarding.kt). Keep each
+# interface a real type (no merging into its single implementation); renaming
+# is fine because the proxy invokes the same Method on the graph's repository.
 # ---------------------------------------------------------------------------
--keep interface com.letta.mobile.data.repository.api.*RemoteSource { *; }
+-keep,allowobfuscation,allowshrinking interface com.letta.mobile.data.repository.api.I*Repository
 
 # ---------------------------------------------------------------------------
 # OkHttp — keep public API + TLS internals; let R8 shrink implementation.

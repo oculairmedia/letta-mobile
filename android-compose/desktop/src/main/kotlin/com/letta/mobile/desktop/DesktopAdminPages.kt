@@ -6,6 +6,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ProjectSummary
@@ -16,9 +18,9 @@ import com.letta.mobile.data.projects.ProjectsPageSources
 import com.letta.mobile.data.projects.RepositoryProjectsBackend
 import com.letta.mobile.data.projects.SettingsStoreProjectPinStore
 import com.letta.mobile.data.runs.RunMonitorController
+import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.templates.AgentTemplatesController
-import com.letta.mobile.desktop.data.DesktopRepositoryUnavailableException
 import com.letta.mobile.desktop.data.DesktopSessionGraph
 import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
@@ -40,13 +42,15 @@ internal data class DesktopAdminNavigation(
 
 /**
  * What the desktop's admin pages are bound to: the session's repositories, whether the backend has
- * projects (only a live Iroh host relays them), and where project pins are kept.
+ * projects (only an Iroh host relays them; letta-mobile-by4vm.13: read from the session's
+ * capabilities), and where project pins are kept.
  */
 internal data class DesktopAdminBinding(
     val graph: DesktopSessionGraph,
     val projectsAvailable: Boolean,
     val projectPins: ProjectPinStore,
     val navigation: DesktopAdminNavigation,
+    val pluginViews: com.letta.mobile.data.plugin.view.PluginViewsModel? = null,
 )
 
 /** letta-mobile-ckmub.2.6: the admin pages over the current session; projects only through a live Iroh host. */
@@ -56,35 +60,40 @@ internal fun rememberDesktopAdminBinding(context: DesktopShellContext): DesktopA
     val settingsStore = core.bootstrap.secureSettingsStore
     val pins = remember(settingsStore) { SettingsStoreProjectPinStore(settingsStore, PROJECT_PINS_KEY) }
     val router = context.router
+    val graph = core.sessionGraph.value
     return DesktopAdminBinding(
-        graph = core.sessionGraph.value,
-        projectsAvailable = core.iroh.transport != null,
+        graph = graph,
+        projectsAvailable = graph.capabilities.supports(SessionRoute.PROJECTS),
         projectPins = pins,
         navigation = DesktopAdminNavigation(
             openConversation = { _, conversationId -> router.openConversation(ConversationId(conversationId)) },
             openAgent = { router.openAgent(AgentId(it)) },
             openSettings = { context.navigator.navigate(DesktopDestination.Settings) },
         ),
+        pluginViews = core.bootstrap.dataBindings.pluginViews,
     )
 }
 
 private const val PROJECT_PINS_KEY = "desktop.projects.pinned"
 
 /**
- * letta-mobile-ckmub.2.6: the shared Runs, Templates and Projects pages on the desktop, each over its
- * sharedLogic controller. A controller lives as long as its page is on screen, and is rebuilt when the
- * session graph is (a backend switch).
+ * letta-mobile-ckmub.2.6 / cdgpr.9: the shared Runs, Templates, Projects and Plugins pages, each over its sharedLogic
+ * controller, which lives while its page is on screen and is rebuilt with the session graph (a backend switch).
  */
 internal fun desktopAdminPages(binding: DesktopAdminBinding): ShellAdminPages = ShellAdminPages(
     runs = desktopRunsPage(binding),
     templates = desktopTemplatesPage(binding),
     projects = if (binding.projectsAvailable) desktopProjectsPage(binding) else shellProjectsUnavailablePage(binding.navigation.openSettings),
+    plugins = desktopPluginsPage(binding.pluginViews),
 )
 
 private fun desktopRunsPage(binding: DesktopAdminBinding) = ShellPageContent<ShellDestination.Runs> { destination, modifier ->
     val graph = binding.graph
     val scope = rememberCoroutineScope()
-    val controller = remember(graph) { RunMonitorController(graph.runRepository, scope, ::desktopAdminErrorMessage) }
+    // letta-mobile-by4vm.13: a session that serves no runs gets no repository; the page says why.
+    val controller = remember(graph) {
+        RunMonitorController(graph.ifSupported(SessionRoute.RUNS) { runRepository }, scope, ::desktopAdminErrorMessage)
+    }
     LaunchedEffect(controller) { controller.start() }
     val monitor by controller.state.collectAsState()
     val agentNames = rememberAgentNames(graph)
@@ -95,7 +104,8 @@ private fun desktopRunsPage(binding: DesktopAdminBinding) = ShellPageContent<She
 
 @Composable
 private fun rememberAgentNames(graph: DesktopSessionGraph): Map<String, String> {
-    val agents by graph.agentRepository.agents.collectAsState()
+    val roster = graph.ifSupported(SessionRoute.AGENTS) { agentRepository.agents } ?: return emptyMap()
+    val agents by roster.collectAsState()
     return remember(agents) { agents.associate { it.id.value to it.name.ifBlank { it.id.value } } }
 }
 
@@ -103,7 +113,11 @@ private fun desktopTemplatesPage(binding: DesktopAdminBinding) = ShellPageConten
     val graph = binding.graph
     val scope = rememberCoroutineScope()
     val controller = remember(graph) {
-        AgentTemplatesController(agentRepository = graph.agentRepository, scope = scope, errorMessageMapper = ::desktopAdminErrorMessage)
+        AgentTemplatesController(
+            agentRepository = graph.ifSupported(SessionRoute.AGENTS) { agentRepository },
+            scope = scope,
+            errorMessageMapper = ::desktopAdminErrorMessage,
+        )
     }
     val state by controller.state.collectAsState()
     val openAgent = binding.navigation.openAgent
@@ -131,7 +145,7 @@ private fun desktopProjectsPage(binding: DesktopAdminBinding) = ShellPageContent
 
 private fun ProjectSummary.agentIdOrNull(): String? = lettaAgentId?.value?.takeIf { it.isNotBlank() }
 
-private fun desktopAdminErrorMessage(throwable: Throwable, fallback: String): String = when (throwable) {
-    is DesktopRepositoryUnavailableException -> "This backend does not serve this page yet."
+internal fun desktopAdminErrorMessage(throwable: Throwable, fallback: String): String = when (throwable) {
+    is AppServerRouteUnavailable -> "This backend does not serve this page yet."
     else -> throwable.message ?: fallback
 }

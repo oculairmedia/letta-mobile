@@ -43,12 +43,12 @@ object CanvasDryRun {
         return value.booleanOrNull ?: value.content.equals("true", ignoreCase = true)
     }
 
-    fun result(check: CanvasBatchCheck, revision: Long, canvasId: String?): CanvasDryRunResult = when (check) {
-        is CanvasBatchCheck.Valid -> CanvasDryRunResult(valid = true, revision = revision, canvasId = canvasId)
+    fun result(check: CanvasBatchCheck, revision: Long, canvasId: CanvasId?): CanvasDryRunResult = when (check) {
+        is CanvasBatchCheck.Valid -> CanvasDryRunResult(valid = true, revision = revision, canvasId = canvasId?.value)
         is CanvasBatchCheck.Invalid -> CanvasDryRunResult(
             valid = false,
             revision = revision,
-            canvasId = canvasId,
+            canvasId = canvasId?.value,
             problems = check.violations.map(::problem),
             message = check.message,
         )

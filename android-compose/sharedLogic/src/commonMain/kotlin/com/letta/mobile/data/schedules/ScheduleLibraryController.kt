@@ -118,6 +118,12 @@ class ScheduleLibraryController(
      * the Memory surface, which carries the agent id through MemoryRoute.
      */
     private val initialAgentId: String? = null,
+    /**
+     * letta-mobile-by4vm.13: false when the session's capabilities say it serves no native schedule
+     * route, so the controller never makes the doomed call and opens on the cron fallback or the
+     * "admin unavailable" state straight away.
+     */
+    nativeScheduleRoute: Boolean = true,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -139,7 +145,7 @@ class ScheduleLibraryController(
      * Backends that DO serve the native route never latch this — the native
      * path is used on every load, so their behaviour is completely unchanged.
      */
-    private var nativeScheduleRouteUnavailable = false
+    private var nativeScheduleRouteUnavailable = !nativeScheduleRoute
 
     fun start() {
         if (stateFlow.value.agents.isEmpty() && stateFlow.value.schedules.isEmpty()) {

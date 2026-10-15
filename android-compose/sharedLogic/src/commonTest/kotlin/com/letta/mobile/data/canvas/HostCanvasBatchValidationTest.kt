@@ -8,6 +8,7 @@ import com.letta.mobile.data.canvas.CanvasBatchFixtures.label1
 import com.letta.mobile.data.canvas.CanvasBatchFixtures.labelledBox
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -26,7 +27,7 @@ import kotlin.test.assertTrue
  */
 class HostCanvasBatchValidationTest {
     private val json = Json { ignoreUnknownKeys = true }
-    private val topic = CanvasRelayProtocol.conversationTopic(CONVERSATION)
+    private val topic = CanvasRelayProtocol.conversationTopic(ConversationId(CONVERSATION))
 
     private class Host {
         val store = InMemoryCanvasRelayStore()

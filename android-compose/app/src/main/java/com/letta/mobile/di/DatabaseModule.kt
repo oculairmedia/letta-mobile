@@ -17,9 +17,9 @@ import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
-import com.letta.mobile.data.local.CanvasDocumentDao
 import com.letta.mobile.data.local.CanvasOpDao
 import com.letta.mobile.data.local.RoomCanvasOpLog
+import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
@@ -49,18 +49,6 @@ abstract class PendingLocalStoreModule {
 
 @Module
 @InstallIn(SingletonComponent::class)
-object CanonicalTimelineModule {
-    @Provides
-    @Singleton
-    fun provideCoordinator(
-        store: com.letta.mobile.data.timeline.TimelineBoundedStore,
-        transport: com.letta.mobile.data.timeline.TimelineTransport,
-    ): com.letta.mobile.data.timeline.CanonicalTimelineCoordinator =
-        com.letta.mobile.data.timeline.CanonicalTimelineCoordinator(store, transport)
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
 object DatabaseModule {
     @Provides
     @Singleton
@@ -85,11 +73,6 @@ object DatabaseModule {
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2,
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_2_3,
         ).build()
-
-    @Provides
-    @Singleton
-    fun provideTimelineBoundedStore(): com.letta.mobile.data.timeline.TimelineBoundedStore =
-        com.letta.mobile.data.local.DormantCanonicalTimelineStore
 
     @Provides
     @Singleton
@@ -127,6 +110,21 @@ object DatabaseModule {
         return database.pendingLocalDao()
     }
 
+    /**
+     * letta-mobile-by4vm.17: pending (unsent) rows are backend-scoped; the store reads the
+     * active backend id lazily so a backend switch clears the outgoing backend's rows.
+     */
+    @Provides
+    @Singleton
+    fun provideRoomPendingLocalStore(
+        dao: PendingLocalDao,
+        settingsRepository: com.letta.mobile.data.repository.api.ISettingsRepository,
+    ): RoomPendingLocalStore =
+        RoomPendingLocalStore(
+            dao,
+            activeBackendId = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
+        )
+
     @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {
         return database.conversationDao()
@@ -153,11 +151,6 @@ object DatabaseModule {
     }
 
     @Provides
-    fun provideCanvasDocumentDao(database: LettaDatabase): CanvasDocumentDao {
-        return database.canvasDocumentDao()
-    }
-
-    @Provides
     @Singleton
     fun provideNotebookLocalStore(@ApplicationContext context: Context): NotebookLocalStore {
         val prefs = context.getSharedPreferences("notebook-identity", Context.MODE_PRIVATE)
@@ -179,6 +172,10 @@ object DatabaseModule {
         return database.canvasOpDao()
     }
 
+    /**
+     * The canvas op log is the notebook document's write-ahead journal (letta-mobile-by4vm.22):
+     * the notebook store owns the document, CanvasSession settles each op once it is stored.
+     */
     @Provides
     @Singleton
     fun provideCanvasOpLog(dao: CanvasOpDao): CanvasOpLog {

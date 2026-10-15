@@ -73,8 +73,8 @@ class TimelineSyncLoopImageRestoreTest {
         override suspend fun markFailed(otid: String) {
             rows[otid]?.let { rows[otid] = it.copy(deliveryState = DeliveryState.FAILED) }
         }
-        override suspend fun load(conversationId: String): List<PendingLocalRecord> =
-            rows.values.filter { it.conversationId == conversationId }.sortedBy { it.sentAt }
+        override suspend fun load(scope: PendingLocalScope): List<PendingLocalRecord> =
+            rows.values.filter { it.conversationId == scope.conversationId }.sortedBy { it.sentAt }
     }
 
     @Test

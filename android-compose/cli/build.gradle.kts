@@ -1,51 +1,45 @@
 plugins {
-    id("com.letta.mobile.android.library")
+    // letta-mobile-by4vm.57: plain Kotlin/JVM. The module uses no Android APIs, and being an
+    // Android library forced `:cli:run` to borrow the debug unit-test classpath (Android stubs)
+    // and to drag kotlinx-coroutines-android. It now consumes :sharedLogic's `jvm` target.
+    // Sources stay under src/*/java (the Kotlin JVM plugin compiles .kt there by default) so
+    // the history and the changed-file guardrails are not churned by a pure directory move.
+    id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.serialization")
-}
-
-android {
-    namespace = "com.letta.mobile.cli"
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-            isReturnDefaultValues = true
-            all {
-                it.useJUnitPlatform()
-                it.maxHeapSize = "1536m"
-                it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
-            }
-        }
-    }
-
-    sourceSets {
-        getByName("main") {
-            kotlin.directories += "src/main/java"
-        }
-        getByName("test") {
-            kotlin.directories += "src/test/java"
-        }
-    }
+    application
 }
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // JVM 21: computer.iroh:iroh:1.0.0 (via :sharedLogic's jvm target) is JVM 21+ only.
+        // Matches :iroh-wrapper-cli, :appserver-cli and :desktop.
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+    applicationName = "meridian"
+    mainClass.set("com.letta.mobile.cli.Main")
+    // The forked JVM is what loads libiroh_ffi (JNI); keep it green if a future JDK flips
+    // restricted-native-access warnings into errors.
+    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
+}
+
 dependencies {
-    implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
     // letta-mobile-zsgad: `app-server-serve-iroh` now lives in the pure-JVM
     // :iroh-wrapper-cli module so it can ship as an installable distribution
-    // (this Android library module cannot). The developer `meridian` CLI keeps
+    // (at the time this was an Android library module). The developer `meridian` CLI keeps
     // exposing the same subcommand by consuming it from there.
     implementation(project(":iroh-wrapper-cli"))
 
     implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
@@ -58,6 +52,12 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+tasks.test {
+    useJUnitPlatform()
+    maxHeapSize = "1536m"
+    jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
 }
 
 fun splitCliArgs(input: String): List<String> {
@@ -92,26 +92,10 @@ fun splitCliArgs(input: String): List<String> {
     return out
 }
 
-// Custom task: `./gradlew :cli:run -PcliArgs="stream --message hello"`
-tasks.register<JavaExec>("run") {
-    description = "Run the letta-mobile CLI."
-    group = "application"
-
-    dependsOn("compileDebugUnitTestKotlin", "processDebugUnitTestJavaRes")
-    mainClass.set("com.letta.mobile.cli.Main")
-    val unitTestRuntime = tasks.named<Test>("testDebugUnitTest").get().classpath
-    classpath(unitTestRuntime)
-    classpath(
-        layout.buildDirectory.dir("tmp/kotlin-classes/debug"),
-        layout.buildDirectory.dir("intermediates/javac/debug/classes"),
-    )
-
-    args(splitCliArgs(providers.gradleProperty("cliArgs").orElse("").get()))
+// `./gradlew :cli:run -PcliArgs="stream --message hello"` (the scripts under scripts/ use
+// -PcliArgs; Gradle's own `--args` also works and takes precedence when given).
+tasks.named<JavaExec>("run") {
+    providers.gradleProperty("cliArgs").orNull?.let { args(splitCliArgs(it)) }
     standardInput = System.`in`
-    // This forked JVM (not the daemon/client, which GRADLE_OPTS /
-    // gradle.properties cover) is what actually loads libiroh_ffi; keep it
-    // green if a future JDK flips native-access warnings to errors.
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-
     outputs.upToDateWhen { false }
 }

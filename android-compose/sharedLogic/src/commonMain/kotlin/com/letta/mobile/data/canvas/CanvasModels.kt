@@ -3,29 +3,13 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.document.DocumentSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
-@Serializable
-data class CanvasId(val value: String) {
-    override fun toString(): String = value
-
-    companion object {
-        /**
-         * A fresh id for a canvas that is about to be upserted. Every store's upsert replaces
-         * an existing row (and its ACL) silently, so the id must not be able to collide: a
-         * timestamp plus a small suffix could repeat within one millisecond, a UUID cannot.
-         */
-        @OptIn(ExperimentalUuidApi::class)
-        fun generate(): CanvasId = CanvasId("canvas-${Uuid.random()}")
-
-        /**
-         * The canvas of conversation [conversationId], the same on every app: apps share a canvas
-         * through their host by id, so a random id per app would give each its own board.
-         */
-        fun forConversation(conversationId: String): CanvasId = CanvasId("canvas-conversation-$conversationId")
-    }
-}
+/**
+ * The canvas id now lives in `core/ids` beside the other domain ids (letta-mobile-by4vm.99). This
+ * alias keeps the `com.letta.mobile.data.canvas.CanvasId` name the canvas code already imports;
+ * new code may import [com.letta.mobile.data.model.CanvasId] directly.
+ */
+typealias CanvasId = com.letta.mobile.data.model.CanvasId
 
 /** A board at a revision: the shared-document [DocumentSnapshot] for canvases. */
 @Serializable

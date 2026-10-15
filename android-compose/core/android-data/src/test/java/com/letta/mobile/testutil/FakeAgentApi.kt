@@ -1,6 +1,7 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.backend.noAppServerRoute
+import com.letta.mobile.data.backend.SessionRoute
+import com.letta.mobile.data.backend.unavailable
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
@@ -14,7 +15,7 @@ import com.letta.mobile.data.model.ProjectId
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
-open class FakeAgentApi : AgentRemoteSource by noAppServerRoute<AgentRemoteSource>() {
+open class FakeAgentApi : AgentRemoteSource by unavailable<AgentRemoteSource>(SessionRoute.AGENTS) {
     var agents = mutableListOf<Agent>()
     var shouldFail = false
     var listDelayMillis: Long = 0L

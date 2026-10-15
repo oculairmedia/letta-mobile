@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.ConversationId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -15,7 +16,7 @@ class StoreCanvasClosedBoardApplierNotebookTest {
     @Test
     fun remoteOpWhileBoardClosedSurvivesNotebookRestartAndKeepsIndependentElement() = runBlocking {
         val path = Files.createTempDirectory("canvas-closed-notebook-")
-        val canvasId = CanvasId.forConversation("closed-conversation")
+        val canvasId = CanvasId.forConversation(ConversationId("closed-conversation"))
         val opLog = InMemoryCanvasOpLog()
         val op = CanvasOp.AddElementOp(
             "remote-add", "agent-1", 1L, "remote-text",

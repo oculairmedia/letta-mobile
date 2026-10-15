@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.appserver.AppServerChannelAccount
 import com.letta.mobile.data.transport.appserver.AppServerChannelAccountPatch
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerRequestIdFactory
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -106,7 +107,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class ChannelRestoreCoordinator(
     private val client: AppServerClient,
-    private val requestIdFactory: () -> String = ::defaultChannelRequestId,
+    private val requestIdFactory: () -> String = defaultChannelRequestId,
     /** Total `channel_start` attempts per account, per restore pass. */
     private val maxAttemptsPerAccount: Int = DEFAULT_MAX_ATTEMPTS,
     private val baseBackoffMs: Long = DEFAULT_BASE_BACKOFF_MS,
@@ -435,12 +436,7 @@ class ChannelRestoreCoordinator(
         const val DEFAULT_MAX_BACKOFF_MS: Long = 8_000
         private const val MAX_BACKOFF_SHIFT: Int = 20
 
-        private var nextRequestId = 0
-
-        private fun defaultChannelRequestId(): String {
-            nextRequestId += 1
-            return "channel-restore-$nextRequestId"
-        }
+        private val defaultChannelRequestId = AppServerRequestIdFactory("channel-restore")
     }
 }
 

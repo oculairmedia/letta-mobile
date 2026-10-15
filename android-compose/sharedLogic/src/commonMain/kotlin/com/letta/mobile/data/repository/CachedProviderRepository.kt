@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCheckParams
 import com.letta.mobile.data.model.ProviderCreateParams
@@ -18,7 +19,7 @@ import kotlinx.coroutines.flow.update
  * [ProviderRemoteSource] and optional [ProviderIrohSource] for list refreshes.
  */
 open class CachedProviderRepository(
-    private val remote: ProviderRemoteSource,
+    private val remote: RemoteRoute<ProviderRemoteSource>,
     private val irohProviderSource: ProviderIrohSource? = null,
 ) : IProviderRepository {
     private val _providers = MutableStateFlow<List<Provider>>(emptyList())
@@ -34,7 +35,7 @@ open class CachedProviderRepository(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
-                remote.listProviders(
+                remote.source().listProviders(
                     limit = limit,
                     before = null,
                     after = after,
@@ -49,31 +50,31 @@ open class CachedProviderRepository(
     }
 
     override suspend fun getProvider(providerId: ProviderId): Provider {
-        return remote.retrieveProvider(providerId.value)
+        return remote.source().retrieveProvider(providerId.value)
     }
 
     override suspend fun createProvider(params: ProviderCreateParams): Provider {
-        val provider = remote.createProvider(params)
+        val provider = remote.source().createProvider(params)
         upsertProvider(provider)
         return provider
     }
 
     override suspend fun updateProvider(providerId: ProviderId, params: ProviderUpdateParams): Provider {
-        val provider = remote.updateProvider(providerId.value, params)
+        val provider = remote.source().updateProvider(providerId.value, params)
         upsertProvider(provider)
         return provider
     }
 
     override suspend fun checkProvider(params: ProviderCheckParams) {
-        remote.checkProvider(params)
+        remote.source().checkProvider(params)
     }
 
     override suspend fun checkExistingProvider(providerId: ProviderId) {
-        remote.checkExistingProvider(providerId.value)
+        remote.source().checkExistingProvider(providerId.value)
     }
 
     override suspend fun deleteProvider(providerId: ProviderId) {
-        remote.deleteProvider(providerId.value)
+        remote.source().deleteProvider(providerId.value)
         _providers.update { current -> current.filterNot { it.id == providerId } }
     }
 

@@ -67,4 +67,25 @@ class CanvasModelsTest {
         assertNull(deserialized.agentId)
         assertNull(deserialized.conversationId)
     }
+
+    /**
+     * The canvas metadata the notebook and desktop stores persist (`Json.encodeToString` with the
+     * default config): the id is an object, `{"value":…}`, since before CanvasId moved to core/ids
+     * (letta-mobile-by4vm.99). Stored canvases must keep decoding, so the bytes may not change.
+     */
+    @Test
+    fun canvasDocumentKeepsItsStoredBytes() {
+        val doc = CanvasDocument(
+            id = CanvasId("canvas-1"),
+            agentId = "agent-a",
+            conversationId = "conv-b",
+            title = "T",
+            revision = 3L,
+            updatedAtEpochMs = 5L,
+        )
+        val stored = """{"id":{"value":"canvas-1"},"agentId":"agent-a","conversationId":"conv-b","title":"T","revision":3,"updatedAtEpochMs":5}"""
+
+        assertEquals(stored, Json.encodeToString(CanvasDocument.serializer(), doc))
+        assertEquals(doc, Json.decodeFromString(CanvasDocument.serializer(), stored))
+    }
 }

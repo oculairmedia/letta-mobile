@@ -77,7 +77,7 @@ straight file move.
 | `IAllConversationsRepository` / `IMessageRepository` | Expose Android Paging and legacy Android UI message models; keep them platform-side until desktop needs a common paging/streaming list contract. |
 | `IFolderRepository` / `IGroupRepository` | Expose Ktor `ContentType` / `ByteReadChannel`; extract a common non-streaming/non-upload subset separately if another platform needs it. |
 | `SseParser.kt` / `Utf8LineReader.kt` | Ktor channel parser plus Android logging. `SseFrame` is shared; parser adapters should be platform-specific or rebuilt around a common byte/line abstraction. |
-| `ChannelTransport.kt`, `WsChatBridge.kt`, `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared transport/frame/cursor contracts are extracted. |
+| ~~`ChannelTransport.kt`~~ (removed), `WsChatBridge.kt` (now in `sharedLogic/.../data/transport/`), `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared transport/frame/cursor contracts are extracted. |
 | Compose A2UI renderers | Android `designsystem` still owns concrete widget rendering, haptics, URL opening, and Android action handling. Shared A2UI protocol/action/data model contracts are extracted. |
 
 ## Extraction Pivot

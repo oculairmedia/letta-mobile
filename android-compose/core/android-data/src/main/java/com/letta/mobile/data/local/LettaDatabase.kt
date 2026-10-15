@@ -31,10 +31,9 @@ import com.letta.mobile.data.model.DomainIdConverters
         ConfirmedTimelineSnapshotChunkEntity::class,
         NormalizedTimelineSnapshotHeadEntity::class,
         NormalizedTimelineSnapshotRowEntity::class,
-        CanvasDocumentEntity::class,
         CanvasOpEntity::class,
     ],
-    version = 19,
+    version = 22,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
@@ -48,7 +47,6 @@ abstract class LettaDatabase : RoomDatabase() {
     abstract fun runtimeEventDao(): RuntimeEventDao
     abstract fun memFsDao(): MemFsDao
     abstract fun confirmedTimelineSnapshotDao(): ConfirmedTimelineSnapshotDao
-    abstract fun canvasDocumentDao(): CanvasDocumentDao
     abstract fun canvasOpDao(): CanvasOpDao
 
     companion object {

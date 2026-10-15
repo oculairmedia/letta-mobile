@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import com.letta.mobile.data.chat.recompile.ConversationRecompileController
 import com.letta.mobile.data.chat.recompile.ConversationRecompileGateway
 import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.commands.ClientSlashCommand
@@ -19,21 +20,24 @@ import kotlinx.coroutines.launch
 
 /**
  * letta-mobile-zxk2n.5 (G92): the client-local `/` commands the Android chat can route, and where
- * each goes. [recompileGateway] is null where `/recompile` has no route (Iroh: the host needs a
- * relay), and the chat then says so instead of sending it.
+ * each goes. [recompileGateway] refuses (UnsupportedOperationException) where `/recompile` has no
+ * route, read when it runs since an Iroh host advertises its relay only once connected; the chat
+ * then shows [recompileUnavailableReason] instead of sending it.
  */
 internal data class AndroidClientCommands(
     val offered: Set<ClientSlashCommand>,
     val route: (ClientSlashCommand) -> Unit,
     val recompileGateway: ConversationRecompileGateway?,
+    val recompileUnavailableReason: String = ConversationRecompileController.UNAVAILABLE_DEFAULT,
 )
 
 /** The scaffold's client commands for the shared chat page; null outside a scaffold (tests, previews). */
 internal val LocalAndroidClientCommands = compositionLocalOf<AndroidClientCommands?> { null }
 
-/** `/recompile` through the conversation repository (REST `POST /v1/conversations/{id}/recompile`). */
+/** `/recompile` through the conversation repository, refused where it reports no recompile route. */
 internal class RepositoryRecompileGateway(private val repository: IConversationRepository) : ConversationRecompileGateway {
     override suspend fun recompileConversation(request: ConversationRecompileRequest) {
+        if (!repository.canRecompileConversations()) throw UnsupportedOperationException("no recompile route")
         repository.recompileConversation(
             ConversationId(request.conversationId),
             dryRun = false,
@@ -54,11 +58,19 @@ internal fun rememberAndroidClientCommands(state: AgentScaffoldRuntimeState, onR
     val navigation = state.params.navigation
     val offered = remember(navigation) { offeredClientCommands(navigation) }
     val iroh = drawer?.backendIsIroh == true
-    return remember(offered, iroh, state.drawerConversationRepo) {
+    val repository = state.drawerConversationRepo
+    return remember(offered, iroh, repository) {
         AndroidClientCommands(
             offered = offered,
             route = { command -> routeClientCommand(current, command, onRename) },
-            recompileGateway = if (iroh) null else RepositoryRecompileGateway(state.drawerConversationRepo),
+            // letta-mobile-by4vm.12/.51: the gateway asks the repository for a route when it runs (an
+            // Iroh host with the relay has one); without one the chat says recompile is unavailable.
+            recompileGateway = RepositoryRecompileGateway(repository),
+            recompileUnavailableReason = if (iroh) {
+                ConversationRecompileController.UNAVAILABLE_HOST_OUTDATED
+            } else {
+                ConversationRecompileController.UNAVAILABLE_DEFAULT
+            },
         )
     }
 }

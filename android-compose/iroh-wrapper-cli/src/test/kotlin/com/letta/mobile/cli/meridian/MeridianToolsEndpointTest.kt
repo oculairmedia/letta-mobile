@@ -20,7 +20,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -78,15 +77,32 @@ class MeridianToolsEndpointTest {
     private fun endpoint(config: MeridianToolsConfig) =
         MeridianToolsEndpoint(config, ExternalToolRegistry.hostTools(listOf(tool)), frames, { synchronized(logs) { logs += it } })
 
-    private fun request(vararg argv: String, token: String? = null) =
-        MeridianToolsWireRequest(argv.toList(), agentId = "agent-a", conversationId = "conv-a", token = token)
+    /** The TCP bearer token and the per-call tool token a request carries. */
+    private data class Auth(val bearer: String? = null, val tool: String? = null)
+
+    private fun request(vararg argv: String, auth: Auth = Auth()) = MeridianToolsWireRequest(
+        argv.toList(),
+        agentId = "agent-a",
+        conversationId = "conv-a",
+        token = auth.bearer,
+        toolToken = auth.tool,
+    )
+
+    /** letta-code's PreToolUse hook: the token of [callId], which the host waits to see start. */
+    private fun issueToolToken(channel: SocketChannel, callId: String, auth: Auth = Auth()): String {
+        val reply = exchange(channel, MeridianToolsWireRequest(issueToolToken = callId, token = auth.bearer))
+        assertEquals(MeridianExit.OK, reply.exitCode, reply.stdout)
+        return Json.parseToJsonElement(reply.stdout).jsonObject.getValue("tool_token").jsonPrimitive.content
+    }
 
     @Test
-    fun `serves the router on the Unix socket and binds to the live shell call`() = runBlocking {
+    fun `serves the router on the Unix socket and binds by the live shell call's token`() = runBlocking {
         frames.emit(toolStart("call-7", "meridian canvas list"))
         assertNotNull(endpoint(config()).start(scope))
+        val socket = dir.resolve("t.sock")
 
-        val response = awaitLiveBinding { exchange(unix(dir.resolve("t.sock")), request("canvas", "list")) }
+        val toolToken = issueToolToken(unix(socket), "call-7")
+        val response = exchange(unix(socket), request("canvas", "list", auth = Auth(tool = toolToken)))
 
         assertEquals(MeridianExit.OK, response.exitCode, response.stdout)
         assertEquals("call-7", tool.callers.single().toolCallId)
@@ -114,10 +130,12 @@ class MeridianToolsEndpointTest {
         val port = descriptor["port"]!!.jsonPrimitive.int
         val token = descriptor["token"]!!.jsonPrimitive.content
         val withoutToken = exchange(tcp(port), request("canvas", "list"))
-        val withToken = awaitLiveBinding { exchange(tcp(port), request("canvas", "list", token = token)) }
+        val toolToken = issueToolToken(tcp(port), "call-1", Auth(bearer = token))
+        val withToken = exchange(tcp(port), request("canvas", "list", auth = Auth(bearer = token, tool = toolToken)))
 
         assertEquals("tcp", descriptor["transport"]!!.jsonPrimitive.content)
         assertEquals(64, token.length)
+        assertEquals(64, toolToken.length)
         assertEquals(MeridianExit.DENIED, withoutToken.exitCode)
         assertEquals(MeridianExit.OK, withToken.exitCode, withToken.stdout)
         assertEquals("regular file", Files.readString(blocked))
@@ -148,17 +166,6 @@ class MeridianToolsEndpointTest {
         assertFalse(policy("native").servesCli())
         assertFalse(policy("meta", "agent-a=native").servesCli())
     }
-
-    /** The frame collector runs concurrently with the first request; retry until it has caught up. */
-    private suspend fun awaitLiveBinding(call: () -> MeridianToolsWireResponse): MeridianToolsWireResponse =
-        withTimeout(10_000) {
-            var response = call()
-            while (response.exitCode == MeridianExit.DENIED && response.stdout.contains("no running meridian")) {
-                kotlinx.coroutines.delay(20)
-                response = call()
-            }
-            response
-        }
 
     private fun unix(path: Path): SocketChannel = SocketChannel.open(StandardProtocolFamily.UNIX).apply {
         connect(UnixDomainSocketAddress.of(path))

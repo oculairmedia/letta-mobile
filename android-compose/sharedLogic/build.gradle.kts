@@ -1,7 +1,10 @@
+import com.letta.mobile.kmp.hostNative
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
+    // jvmTarget 17 + catalog compileSdk/minSdk for the KMP targets (build-logic).
+    id("com.letta.mobile.kmp.library")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     // Phase 3c: no Compose Gradle plugins here. Projection models still use
@@ -40,34 +43,21 @@ detekt {
 // in CI runners; they are skipped (via JUnit Assume) unless this is "true".
 tasks.withType<Test>().configureEach {
     System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
+    // A planted host secret (letta-mobile-cdgpr.10): PluginTrustTest asserts a plugin process
+    // never inherits it. Fake value; nothing reads it but that test.
+    environment("LETTA_TOKEN", "letta-trust-test-planted-host-token")
 }
 
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedlogic"
-        compileSdk = libs.versions.compileSdk.get().toInt()
-        minSdk = libs.versions.minSdk.get().toInt()
 
         withHostTestBuilder {}
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
     }
 
-    jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    jvm()
 
-    val hostOs = System.getProperty("os.name")
-    val hostArch = System.getProperty("os.arch")
-    when {
-        hostOs == "Mac OS X" && hostArch == "aarch64" -> macosArm64("hostNative")
-        hostOs == "Mac OS X" -> macosX64("hostNative")
-        hostOs.startsWith("Windows") -> mingwX64("hostNative")
-        hostOs == "Linux" -> linuxX64("hostNative")
-    }
+    hostNative()
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -86,8 +76,6 @@ kotlin {
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))
-                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26): KMP -> KMP.
-                api(project(":plugin-api"))
                 api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api(libs.kotlinx.serialization.json)
@@ -160,6 +148,10 @@ kotlin {
         getByName("jvmMain") {
             dependsOn(jvmAndAndroid)
             dependencies {
+                // The canvas plugin SPI and its LCP wire DTOs (letta-mobile-s416w.26). Host-only: the
+                // plugin host (data/plugin/wire) runs on jvm, so Android/wasm/native don't ship it
+                // (letta-mobile-cdgpr.1).
+                api(project(":plugin-api"))
                 implementation(libs.iroh)
                 // PNG rendering (QrRenderer.kt) needs ZXing javase — jvmMain only.
                 implementation(libs.zxing.javase)

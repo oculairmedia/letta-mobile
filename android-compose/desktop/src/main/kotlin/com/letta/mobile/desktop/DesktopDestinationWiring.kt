@@ -14,21 +14,19 @@ internal data class ScheduleWiringDeps(
 )
 
 /**
- * The shared Schedules page's actions on desktop: deletes route to whichever backend owns the
- * schedule id, and creates prefer the HTTP cron API when it exists (Iroh uses the native
- * schedule.create path via the library controller).
+ * The shared Schedules page's actions on desktop: the page says which list a deleted row came
+ * from (cron panel or native schedule library), and creates prefer the HTTP cron API when it
+ * exists (Iroh uses the native schedule.create path via the library controller).
  */
 internal fun destinationScheduleActions(deps: ScheduleWiringDeps): SchedulesPageActions =
     SchedulesPageActions(
         onRefresh = deps.schedules::loadData,
         onSelectAgent = deps.schedules::selectAgent,
-        onDelete = { id ->
-            if (deps.scheduleLibraryState.schedules.any { it.id == id }) {
-                deps.schedules.deleteSchedule(id)
-            } else {
-                deps.cronPanel.delete(DesktopCronTaskId(id))
-            }
+        // The controller deletes under its selected agent: drop a delete for any other agent's row.
+        onDeleteSchedule = { ref ->
+            if (ref.agentId == deps.scheduleLibraryState.selectedAgentId) deps.schedules.deleteSchedule(ref.scheduleId)
         },
+        onDeleteCron = { id -> deps.cronPanel.delete(DesktopCronTaskId(id.value)) },
         onCreate = { request ->
             val targetAgent = request.agentId ?: deps.selectedAgentId
             when {

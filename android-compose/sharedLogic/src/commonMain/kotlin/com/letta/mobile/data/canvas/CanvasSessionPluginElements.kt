@@ -2,6 +2,7 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementUndo
+import com.letta.mobile.data.model.CanvasActorId
 
 /*
  * A person's writes to plugin elements (canvas plugin platform plan 4.5, letta-mobile-s416w.3):
@@ -20,7 +21,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementUndo
 suspend fun CanvasSession.movePluginElement(
     elementId: String,
     frame: CanvasDocumentFrame,
-    actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
+    actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR,
 ): CanvasHistory.Step.Documents? = movePluginElements(mapOf(elementId to frame), actorId)
 
 /**
@@ -30,7 +31,7 @@ suspend fun CanvasSession.movePluginElement(
  */
 suspend fun CanvasSession.movePluginElements(
     frames: Map<String, CanvasDocumentFrame>,
-    actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
+    actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR,
 ): CanvasHistory.Step.Documents? = writePluginElements(label = "plugin element moved") { elements, lamport ->
     val onBoard = elements.associateBy { it.id }
     val moves = frames.filter { (id, frame) -> onBoard[id]?.let { it.frame != frame } == true }
@@ -38,22 +39,22 @@ suspend fun CanvasSession.movePluginElements(
     when (moves.size) {
         0 -> null
         1 -> moves.single()
-        else -> CanvasOp.BatchOp(CanvasOpDiffer.generateOpId("batch"), actorId, lamport, moves)
+        else -> CanvasOp.BatchOp(CanvasOpDiffer.generateOpId("batch"), actorId.value, lamport, moves)
     }
 }
 
 /** Removes plugin element [elementId] from the board; null when it is not there. */
 suspend fun CanvasSession.removePluginElement(
     elementId: String,
-    actorId: String = CanvasSession.LOCAL_USER_ACTOR_ID,
+    actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR,
 ): CanvasHistory.Step.Documents? = writePluginElements(label = "plugin element removed") { elements, lamport ->
     if (elements.none { it.id == elementId }) null
-    else CanvasOp.RemovePluginElementOp(CanvasOpDiffer.generateOpId("plugin"), actorId, lamport, elementId)
+    else CanvasOp.RemovePluginElementOp(CanvasOpDiffer.generateOpId("plugin"), actorId.value, lamport, elementId)
 }
 
-private fun pluginMove(id: String, frame: CanvasDocumentFrame, actorId: String, lamport: Long) = CanvasOp.SetPluginElementOp(
+private fun pluginMove(id: String, frame: CanvasDocumentFrame, actorId: CanvasActorId, lamport: Long) = CanvasOp.SetPluginElementOp(
     opId = CanvasOpDiffer.generateOpId("plugin"),
-    actorId = actorId,
+    actorId = actorId.value,
     lamport = lamport,
     elementId = id,
     frame = frame,

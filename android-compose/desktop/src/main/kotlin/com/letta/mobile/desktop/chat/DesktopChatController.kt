@@ -4,6 +4,10 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ChatRunInterruptHost
+import com.letta.mobile.data.chat.runtime.ChatRunInterruptTelemetry
+import com.letta.mobile.data.chat.runtime.ChatRunInterrupter
+import com.letta.mobile.data.chat.runtime.ChatStopRequest
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
@@ -19,14 +23,10 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
-import com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections
 import com.letta.mobile.data.repository.observeConversationUpdates
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.desktop.DesktopBootstrapState
@@ -34,7 +34,14 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.data.chat.send.QueueConversationId
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatSendQueueSource
+import com.letta.mobile.ui.chat.session.ChatSendQueueTarget
+import com.letta.mobile.ui.chat.session.CoordinatorSendQueue
+import com.letta.mobile.ui.chat.session.DerivedStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryState
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
@@ -95,9 +102,6 @@ class DesktopChatController(
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DesktopChatSurfaceState> = _state.asStateFlow()
 
-    private val _availableModels = MutableStateFlow<List<LlmModel>>(emptyList())
-    val availableModels: StateFlow<List<LlmModel>> = _availableModels.asStateFlow()
-
     /** Active / Archived / All filter for the conversation list (re-fetches). */
     private val _archiveFilter = MutableStateFlow(ConversationArchiveFilter.Active)
     val archiveFilter: StateFlow<ConversationArchiveFilter> = _archiveFilter.asStateFlow()
@@ -115,52 +119,26 @@ class DesktopChatController(
 
     private val approvalCoordinator = DesktopChatApprovalCoordinator(
         scope = scope,
-        onError = ::showApprovalError,
+        onError = ::showPageError,
     )
 
-    /** A closed controller no longer owns the surface, so it must not write to it. */
-    private fun showApprovalError(message: String) {
-        if (closed) return
-        _state.update { it.copy(errorMessage = message) }
+    /**
+     * letta-mobile-by4vm.97: the approval state the session port overlays on the timeline (answers
+     * in flight, queued offline, parked details) and whether the active gateway can answer at all.
+     */
+    val approvals: DesktopChatApprovalState = approvalCoordinator
+
+    /**
+     * letta-mobile folder-settings #2, by4vm.98: the SELECTED conversation's working directory, as
+     * the shared extension point the session port reads (null where the active gateway cannot
+     * report one: remote/HTTP backends). The shell re-reads it on a selection change.
+     */
+    val workingDirectory = ChatWorkingDirectoryState(scope) {
+        gateway.takeUnless { closed }.workingDirectoryTarget(_state.value.selectedConversation)
     }
-
-    /**
-     * Approval request ids whose decision (answer / dismiss) is in flight, so the
-     * structured AskUserQuestion card can disable its buttons while submitting.
-     */
-    val submittingApprovals: StateFlow<Set<String>> = approvalCoordinator.submittingApprovals
-
-    /** letta-mobile-bzvro.14: requests answered offline, waiting in the gateway's outbox. */
-    val queuedApprovals: StateFlow<Set<String>> = approvalCoordinator.queuedApprovals
-    val pendingApprovalDetails: StateFlow<Map<String, com.letta.mobile.data.runtime.PendingApprovalDetails>> =
-        approvalCoordinator.pendingApprovalDetails
-
-    /**
-     * Whether the active gateway can actually submit approvals (i.e. is a
-     * [DesktopApprovalSubmitter]). Demo / HTTP-only gateways can't, so the UI must
-     * disable/hide the approval-answer buttons instead of offering a silent no-op.
-     */
-    val canSubmitApprovals: StateFlow<Boolean> = approvalCoordinator.canSubmitApprovals
-
-    /**
-     * letta-mobile folder-settings #2: the SELECTED conversation's working
-     * directory, as last read from the runtime via
-     * [DesktopWorkingDirectoryController.currentWorkingDirectory]. Null while
-     * unknown/loading, or when the active gateway doesn't support this
-     * (remote/HTTP backends) — see [supportsWorkingDirectory].
-     */
-    private val _selectedConversationWorkingDirectory = MutableStateFlow<String?>(null)
-    val selectedConversationWorkingDirectory: StateFlow<String?> =
-        _selectedConversationWorkingDirectory.asStateFlow()
-
-    private val _workingDirectoryLoading = MutableStateFlow(false)
-    val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
 
     /** The active gateway, for capabilities a port reads off it (the permission mode). */
     internal val activeGateway: DesktopChatGateway? get() = gateway
-
-    /** Whether the active gateway can report/change a conversation's working directory. */
-    val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
 
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
@@ -213,9 +191,11 @@ class DesktopChatController(
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
 
-    private val interruptCoordinator = DesktopChatInterruptCoordinator(
+    /** letta-mobile-by4vm.14: Stop's lifecycle, the same shared state machine Android's composer runs. */
+    private val interrupter = ChatRunInterrupter(
         scope = scope,
-        onForcedLocalStop = ::forceLocalStopClear,
+        host = ChatRunInterruptHost(::forceLocalStopClear),
+        telemetry = ChatRunInterruptTelemetry(TELEMETRY_TAG),
     )
 
     /**
@@ -225,7 +205,7 @@ class DesktopChatController(
      * frame) — never optimistically. While set, the composer refuses new sends,
      * so a message can't be interleaved into a turn that is still running.
      */
-    val cancellingConversationId: StateFlow<String?> = interruptCoordinator.cancellingConversationId
+    val cancellingConversationId: StateFlow<String?> = interrupter.cancelling
 
     /**
      * The shared chat timeline presenter - the same one Android's ChatTimelineObserver uses
@@ -259,21 +239,16 @@ class DesktopChatController(
     val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
 
     private val presenceJob: Job = scope.launch {
-        var presenceConversationId: String? = null
         combine(
             _boundProjection,
             _streamingConversationId,
             state.map { it.selectedConversationId },
         ) { bound, streamingConversationId, selectedConversationId ->
-            // Presence carries over only within one conversation; a selection change starts fresh.
-            val previous = _replyPresence.value.takeIf { presenceConversationId == selectedConversationId }
-            presenceConversationId = selectedConversationId
             derivePresence(
                 projection = bound.projection?.takeIf { bound.conversationId != null && bound.conversationId == selectedConversationId },
                 // The send job spans send -> terminal across every tool round: it is desktop's
                 // in-flight turn, the same fact Android reads from the transport.
                 turnInFlight = streamingConversationId != null && streamingConversationId == selectedConversationId,
-                previous = previous,
             )
         }
             // Tokens arriving for the selected conversation are the one phase this controller
@@ -305,58 +280,49 @@ class DesktopChatController(
     private fun derivePresence(
         projection: TimelineProjection?,
         turnInFlight: Boolean,
-        previous: ChatStreamingPresence?,
     ): ChatStreamingPresence {
-        val previousIsStreaming = previous?.isStreaming ?: false
-        val previousIsAgentTyping = previous?.isAgentTyping ?: false
         if (projection == null) {
             // Nothing projected for this conversation yet: only the in-flight turn can say it works.
             return ChatStreamingPresencePolicy.derive(
                 inputs = ChatStreamInputs(
-                    previousIsStreaming = previousIsStreaming,
-                    previousIsAgentTyping = previousIsAgentTyping,
                     anyServerLocalPending = false,
                     tailIsAssistant = false,
                     replyStreaming = turnInFlight,
-                    clientModeStreamInFlight = false,
                     a2uiThinkingActive = false,
                     duplicateInitialMessageInFlight = false,
                     turnInFlight = turnInFlight,
                 ),
             )
         }
-        // Desktop is server-mode only, so the client-mode / A2UI-thinking / duplicate-initial
-        // signals are inert here.
+        // Desktop has no A2UI-thinking or duplicate-initial signals, so those are inert here.
         val presentation = timelinePresenter.present(
             projection = projection,
             signals = ChatPresenceSignals(
                 replyStreaming = turnInFlight,
-                clientModeStreamInFlight = false,
                 a2uiThinkingActive = false,
                 duplicateInitialMessageInFlight = false,
                 turnInFlight = turnInFlight,
             ),
-            previousIsStreaming = previousIsStreaming,
-            previousIsAgentTyping = previousIsAgentTyping,
         )
         return ChatStreamingPresence(isStreaming = presentation.isStreaming, isAgentTyping = presentation.isAgentTyping)
     }
 
     private var gateway: DesktopChatGateway? = null
 
-    private val modelCatalogHelper = DesktopChatModelCatalogHelper(
-        scope = scope,
-        agentByIdProvider = agentByIdProvider,
-        onModelsLoaded = ::publishAvailableModels,
-        getSelectedConversationAgentId = ::selectedConversationAgentId,
-    )
+    /**
+     * letta-mobile-by4vm.98.1: the chat's models (list, per-conversation picks and efforts, the
+     * switch) and the composer's model chip, the shared extension point the session port reads.
+     */
+    val models = DesktopConversationModels(scope, ModelHost(), agentByIdProvider)
 
-    private fun publishAvailableModels(models: List<LlmModel>) {
-        if (closed) return
-        _availableModels.value = models
+    private inner class ModelHost : DesktopModelHost {
+        override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
+        override val isClosed: Boolean get() = closed
+        override val surface: StateFlow<DesktopChatSurfaceState> get() = state
+        override val management: DesktopConversationManagement get() = conversationManagement
+
+        override fun updateSurface(transform: (DesktopChatSurfaceState) -> DesktopChatSurfaceState) = _state.update(transform)
     }
-
-    private fun selectedConversationAgentId(): String? = _state.value.selectedConversation?.agentId
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
         scope = scope,
@@ -416,7 +382,7 @@ class DesktopChatController(
     /** The draft comes back with the failure, so a failed send never costs the user what they typed. */
     private fun onRemoteSendFailed(attempt: RemoteSendAttempt, errorMessage: String) {
         if (closed) return
-        clearThinkingFor(attempt.conversationId)
+        _thinkingConversationId.compareAndSet(attempt.conversationId, null)
         runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, errorMessage))
         _state.update {
             val failed = ChatSessionReducer.sendFailed(it.runtimeState, attempt.text, attempt.attachments, errorMessage)
@@ -436,38 +402,26 @@ class DesktopChatController(
         if (outcome == RemoteSendOutcome.Completed) {
             runPhases.publish(attempt.conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed))
         }
-        if (cancellingConversationId.value != attempt.conversationId) return
-        interruptCoordinator.clearCancelling()
-        clearThinkingFor(attempt.conversationId)
-        attempt.conversationId?.let(interruptCoordinator::recordTerminalAfterCancel)
+        val conversationId = attempt.conversationId ?: return
+        if (interrupter.settle(conversationId)) _thinkingConversationId.compareAndSet(conversationId, null)
     }
 
     private fun RemoteSendAttempt.isTheLiveStream(): Boolean =
         streamGen == streamingGeneration && _streamingConversationId.value == conversationId
 
-    private fun clearThinkingFor(conversationId: String?) {
-        if (_thinkingConversationId.value == conversationId) _thinkingConversationId.value = null
-    }
 
     private fun bindGateway(next: DesktopChatGateway?) {
         if (gateway !== next) {
-            modelCatalogHelper.reset()
+            models.catalogLoader.reset()
             deletionUndo.backendChanged()
         }
         gateway = next
         _deleteBehavior.value = next?.deleteBehavior ?: ConversationDeleteBehavior.Permanent
         runPhases.bind(next)
         approvalCoordinator.bindGateway(next)
+        workingDirectory.bindSupport(next is DesktopWorkingDirectoryController)
         connectionWatcher.start(next)
     }
-
-    // Per-conversation model overrides: the host's (seeded from each conversation list, dxz5s) and
-    // this session's picks. The effective composer model otherwise comes from the conversation's agent.
-    private val conversationModels = ConversationModelSelections()
-
-    /** Each conversation's own model and window; the context chip and card size their window from it. */
-    val conversationModelSelections: StateFlow<ConversationModelChoices>
-        get() = conversationModels.choices
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
@@ -728,7 +682,7 @@ class DesktopChatController(
     suspend fun createAgentAndOpen(params: AgentCreateParams): com.letta.mobile.data.agenteditor.AgentCreated {
         val gw = gatewayExtras.takeUnless { closed } ?: error("Not connected to a backend")
         val agentName = params.name?.ifBlank { null } ?: "New agent"
-        val catalogModel = params.model?.let { modelCatalogHelper.requireCatalogModel(gw, _availableModels.value, it) }
+        val catalogModel = params.model?.let { models.catalogLoader.requireCatalogModel(gw, models.available.value, it) }
         val agent = gw.createAgent(
             params.copy(
                 name = agentName,
@@ -743,48 +697,6 @@ class DesktopChatController(
         val conversation = gw.createConversation(agent.id.value)
         reloadConversationsAndSelect(preferConversationId = conversation.id.value)
         return com.letta.mobile.data.agenteditor.AgentCreated(agent.id.value, conversation.id.value)
-    }
-
-    /** Re-reads the chat's model list after the host catalog changed (letta-mobile-w4q4p.6.1). */
-    suspend fun reloadModelCatalog() {
-        if (closed) return
-        val extras = gatewayExtras ?: return
-        modelCatalogHelper.startModelCatalogLoad(extras, replaceCurrent = true).await().getOrThrow()
-    }
-
-    /** Apply a model override to the active conversation. */
-    fun setConversationModel(model: String) {
-        if (closed) return
-        val conversationId = _state.value.selectedConversationId ?: return
-        val previousOverride = conversationModels[conversationId]
-        val previousLabel = _state.value.composerModelLabel
-        conversationModels.record(conversationId, model)
-        _state.update { it.copy(composerModelLabel = model) }
-        scope.launch {
-            applyConversationModel(conversationId, model, previousOverride, previousLabel)
-        }
-    }
-
-    private suspend fun applyConversationModel(
-        conversationId: String,
-        model: String,
-        previousOverride: String?,
-        previousLabel: String,
-    ) {
-        try {
-            val extras = gatewayExtras ?: error("This backend cannot change a conversation's model")
-            val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
-            extras.setConversationModel(conversationId, transportModel)
-            conversationManagement.recordModel(model)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            val restored = conversationModels.rollback(conversationId, model, previousOverride)
-            if (restored && _state.value.selectedConversationId == conversationId) {
-                _state.update { it.copy(composerModelLabel = previousLabel) }
-            }
-            _state.update { it.copy(errorMessage = t.message ?: "Could not change model") }
-        }
     }
 
     /** Switch the conversation list between Active / Archived / All (display-only). */
@@ -858,11 +770,11 @@ class DesktopChatController(
 
     private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
         scope.launch {
-            val agentLookup = conversationModels[conversationId] == null && !agentId.isNullOrBlank()
+            val agentLookup = models.picks[conversationId] == null && !agentId.isNullOrBlank()
             val agentModel = agentId.takeIf { agentLookup }?.let { id -> runCatching { agentByIdProvider(setOf(id)) }.getOrNull()?.get(id)?.model }
             // letta-mobile-okvyf: read the override AFTER the agent lookup, so a pick
             // made while the lookup was in flight is not overwritten by the agent model.
-            val label = conversationModels.effectiveModel(conversationId, agentModel) ?: "Auto"
+            val label = models.picks.effectiveModel(conversationId, agentModel) ?: "Auto"
             if (!closed && _state.value.selectedConversationId == conversationId) {
                 _state.update { it.copy(composerModelLabel = label) }
             }
@@ -876,16 +788,7 @@ class DesktopChatController(
     fun submitApproval(answer: ChatApprovalAnswer) {
         if (closed) return
         approvalCoordinator.submitApproval(
-            ApprovalSubmissionRequest(
-                gateway = gateway,
-                conversation = _state.value.selectedConversation,
-                requestId = answer.requestId,
-                toolCallIds = answer.toolCallIds,
-                approve = answer.approve,
-                reason = answer.reason,
-                selectedSuggestionIds = answer.selectedSuggestionIds,
-                suggestionBinding = answer.suggestionBinding,
-            ),
+            ApprovalSubmissionRequest(gateway = gateway, conversation = _state.value.selectedConversation, answer = answer),
         )
     }
 
@@ -923,7 +826,10 @@ class DesktopChatController(
         _state.update { it.withoutComposerError() }
     }
 
-    /** An error about the page (not the draft), such as a starter prompt that could not send. */
+    /**
+     * An error about the page (not the draft), such as a starter prompt that could not send. A
+     * closed controller no longer owns the surface, so it must not write to it.
+     */
     private fun showPageError(message: String) {
         if (closed) return
         _state.update { it.copy(errorMessage = message) }
@@ -951,61 +857,19 @@ class DesktopChatController(
         }
     }
 
-    /**
-     * Refreshes [selectedConversationWorkingDirectory] from the runtime for
-     * the currently selected conversation.
-     */
-    fun refreshSelectedConversationWorkingDirectory() {
-        if (closed) return
-        val controller = gateway as? DesktopWorkingDirectoryController
-        val conversation = state.value.selectedConversation
-        val agentId = conversation?.agentId
-        if (controller == null || agentId == null) {
-            _selectedConversationWorkingDirectory.value = null
-            return
-        }
-        val conversationId = conversation.id
-        scope.launch {
-            _workingDirectoryLoading.value = true
-            _selectedConversationWorkingDirectory.value =
-                runCatching { controller.currentWorkingDirectory(agentId, conversationId) }.getOrNull()
-            _workingDirectoryLoading.value = false
-        }
-    }
-
-    /**
-     * Changes the SELECTED conversation's working directory to [path].
-     */
-    fun changeSelectedConversationWorkingDirectory(path: String) {
-        if (closed) return
-        val controller = gateway as? DesktopWorkingDirectoryController ?: return
-        val conversation = state.value.selectedConversation ?: return
-        val agentId = conversation.agentId ?: return
-        val conversationId = conversation.id
-        scope.launch {
-            _workingDirectoryLoading.value = true
-            val succeeded = runCatching {
-                controller.setWorkingDirectory(agentId, conversationId, path)
-            }.getOrDefault(false)
-            if (succeeded) {
-                _selectedConversationWorkingDirectory.value = path
-            }
-            _workingDirectoryLoading.value = false
-        }
-    }
-
     fun stopActiveRun(conversationId: String) {
         if (closed) return
-        interruptCoordinator.stopActiveRun(
-            conversationId = conversationId,
-            gateway = gateway,
-            streamingConversationId = _streamingConversationId.value,
-            thinkingConversationId = _thinkingConversationId.value,
-        )
+        // Only the conversation whose run is live can be stopped from here.
+        val active = _streamingConversationId.value ?: _thinkingConversationId.value
+        if (active != null && active != conversationId) return
+        val aborter = gateway as? DesktopTurnAborter
+        val abort: (suspend () -> Boolean)? = aborter?.let { target -> suspend { target.abortConversationTurn(conversationId) } }
+        interrupter.request(ChatStopRequest(key = conversationId, transport = "appServer", abort = abort))
     }
 
     /**
-     * Local escape hatch: drop the streaming UI without a terminal frame.
+     * Local escape hatch: drop the streaming UI without a terminal frame. The interrupter has
+     * already left CANCELLING and telemeters the clear.
      */
     private fun forceLocalStopClear(conversationId: String, reason: String) {
         sendJob?.cancel()
@@ -1016,7 +880,6 @@ class DesktopChatController(
                 it
             }
         }
-        interruptCoordinator.clearCancelling()
         if (_thinkingConversationId.value == conversationId) {
             _thinkingConversationId.value = null
         }
@@ -1024,13 +887,6 @@ class DesktopChatController(
             _streamingConversationId.value = null
         }
         runPhases.publish(conversationId, RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason))
-        Telemetry.event(
-            TELEMETRY_TAG,
-            "interrupt.forcedLocalClear",
-            "conversationId" to conversationId,
-            "reason" to reason,
-            level = Telemetry.Level.WARN,
-        )
     }
 
     fun send() {
@@ -1104,9 +960,12 @@ class DesktopChatController(
         return canonicalSendFor?.invoke(agentId, desktopTimelineTransportFor(activeGateway, conversation))
     }
 
-    /** letta-mobile-1n5py: the canonical route's send queue for the selected conversation, else null. */
-    fun canonicalSendQueue(): com.letta.mobile.data.chat.send.ChatSendQueueControls? =
-        selectedCanonicalCoordinator()?.sendQueue
+    /** letta-mobile-1n5py: the canonical route's queue for the selected conversation, else null. */
+    private fun selectedQueueTarget(): ChatSendQueueTarget? {
+        val selectedId = _state.value.selectedConversationId ?: return null
+        val controls = selectedCanonicalCoordinator()?.sendQueue ?: return null
+        return ChatSendQueueTarget(controls, QueueConversationId(selectedId))
+    }
 
     private fun launchCanonicalSend(draft: ChatComposerSendDraft, onRefused: (String) -> Unit) {
         val conversationId = _state.value.selectedConversationId
@@ -1198,7 +1057,7 @@ class DesktopChatController(
             val nextGateway = gatewayFactory()
             bindGateway(nextGateway)
 
-            gatewayExtras?.let(modelCatalogHelper::startModelCatalogLoad)
+            gatewayExtras?.let(models.catalogLoader::startModelCatalogLoad)
 
             reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
@@ -1233,7 +1092,7 @@ class DesktopChatController(
 
     private suspend fun loadConversationSummaries(nextGateway: DesktopChatGateway): List<ChatConversationSummary> {
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
-        conversationModels.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
+        models.picks.seedFromHost(conversations) // dxz5s: host overrides, before any selection reads them
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         // An empty map here silently degrades every conversation label to its
         // raw `agent-<uuid>`, so the failure must not be invisible.
@@ -1344,6 +1203,19 @@ class DesktopChatController(
     }
     private val _canonicalPresentation = MutableStateFlow<com.letta.mobile.data.timeline.CanonicalTimelinePresentation?>(null)
     val canonicalPresentation = _canonicalPresentation.asStateFlow()
+
+    /**
+     * letta-mobile-1n5py, by4vm.98.2: the selected conversation's send queue, the shared extension
+     * point the session port reads; re-resolved when the selection or the canonical route changes.
+     * Only the canonical route queues a send during a run.
+     */
+    val sendQueue: ChatSendQueueSource = CoordinatorSendQueue(
+        targets = combine(canonicalPresentation, state.map { it.selectedConversationId }.distinctUntilChanged()) { _, _ ->
+            selectedQueueTarget()
+        },
+        canQueueWhileStreaming = DerivedStateFlow(canonicalPresentation.map { it != null }) { canonicalPresentation.value != null },
+        current = ::selectedQueueTarget,
+    )
     private val _canonicalStatus = MutableStateFlow<String?>(null)
     val canonicalStatus = _canonicalStatus.asStateFlow()
 
@@ -1470,7 +1342,7 @@ class DesktopChatController(
         _boundProjection.value = BoundProjection(conversationId = conversationId, projection = projection)
         if (projection.noChange) return
         val messages = projection.ui
-        approvalCoordinator.reconcileSubmittedApprovals(conversationId, messages)
+        approvalCoordinator.reconcileSubmittedApprovals(ConversationId(conversationId), messages)
         val agentReplyLanded = projection.tailIsAssistant ||
             messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
         if (_thinkingConversationId.value == conversationId && agentReplyLanded) {

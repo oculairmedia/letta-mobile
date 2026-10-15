@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.plugin.catalog.PluginAdminRpc
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayAccess
 import com.letta.mobile.data.transport.appserver.WorkspaceRelayMethod
 
@@ -153,6 +154,11 @@ object IrohPeerCapabilities {
         // canonical agent.create + conversation.create verbs) and report on the
         // workactivity stream. Both arms sit above the deny-by-default else so
         // Vibesync peers get SUBAGENT_SPAWN/WORKACTIVITY_REPORT without admin.full.
+        // letta-mobile-cdgpr.7: a live plugin view reads its page like chat and acts like a chat send (the canvas
+        // relay admits any signed-in peer); installing, consenting and switching plugins is host administration.
+        method == PluginAdminRpc.PAGE_READ -> CHAT_READ
+        method == PluginAdminRpc.VIEW_ACTION -> CHAT_SEND
+        method in PluginAdminRpc.MANAGEMENT -> ADMIN_FULL
         method in SUBAGENT_SPAWN_METHODS -> SUBAGENT_SPAWN
         method in WORKACTIVITY_METHODS -> WORKACTIVITY_REPORT
         else -> ADMIN_FULL
@@ -233,6 +239,8 @@ object IrohPeerCapabilities {
         "conversation.restore", "conversation.delete", "conversation.fork",
         // letta-mobile-57cta: rewrites the conversation's transcript, like fork/update.
         "conversation.compact",
+        // letta-mobile-by4vm.51: re-renders (and saves) the conversation's system prompt.
+        "conversation.recompile",
     )
 
     // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasActorId
 import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -83,7 +84,7 @@ object CanvasOpDiffer {
     fun diff(
         oldSceneJson: String,
         newSceneJson: String,
-        actorId: String,
+        actorId: CanvasActorId,
         lamportSupplier: () -> Long,
     ): List<CanvasOp> {
         if (oldSceneJson == newSceneJson) return emptyList()
@@ -93,7 +94,7 @@ object CanvasOpDiffer {
         if (oldParsed == newParsed) return emptyList()
 
         val ops = mutableListOf<CanvasOp>()
-        val target = DiffTarget(actorId, lamportSupplier)
+        val target = DiffTarget(actorId.value, lamportSupplier)
         diffBackground(oldParsed, newParsed, target)?.let { ops.add(it) }
         diffElements(oldParsed, newParsed, target, ops)
         return ops

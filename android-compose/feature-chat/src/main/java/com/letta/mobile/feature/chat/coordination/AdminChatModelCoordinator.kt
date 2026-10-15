@@ -36,7 +36,7 @@ internal class AdminChatModelCoordinator(
     private val bannerController: ChatBannerController,
     /** letta-mobile-w4q4p: per-conversation switch over model.update; null keeps the agent-update path. */
     private val modelControl: ChatModelControl? = null,
-    private val conversationId: () -> String? = { null },
+    private val conversation: OpenConversation = OpenConversation(),
 ) {
     val conversationSelections: StateFlow<ConversationModelChoices> =
         modelControl?.conversationSelections ?: MutableStateFlow(ConversationModelChoices())
@@ -94,8 +94,8 @@ internal class AdminChatModelCoordinator(
 
     private fun conversationModelTarget(): ConversationModelTarget? {
         if (modelControl == null || !settingsRepository.activeBackendIsIroh()) return null
-        val conversation = conversationId()?.takeIf { it.isNotBlank() } ?: return null
-        return ConversationModelTarget(agentId.value, conversation)
+        val openId = conversation.id()?.takeIf { it.isNotBlank() } ?: return null
+        return ConversationModelTarget(agentId.value, openId)
     }
 
     private fun switchConversationModel(control: ChatModelControl, target: ConversationModelTarget, pick: ModelPick) {
@@ -103,6 +103,7 @@ internal class AdminChatModelCoordinator(
             try {
                 control.switchConversationModel(target, pick)
                 runCatching { agentRepository.refreshAgents() }
+                runCatching { conversation.refresh() }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -145,6 +146,16 @@ internal class AdminChatModelCoordinator(
         )
     }
 }
+
+/**
+ * The conversation the chat has open: its id, read at each pick, and a re-read of the agent's
+ * conversations after a per-conversation switch (letta-mobile-by4vm.82), so the host's record of
+ * the new model / effort / window — and the cache a reopen reads — follows it.
+ */
+internal class OpenConversation(
+    val id: () -> String? = { null },
+    val refresh: suspend () -> Unit = {},
+)
 
 private data class LocalModelSelection(
     val isSelected: Boolean,

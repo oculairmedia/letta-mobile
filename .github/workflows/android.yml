@@ -32,8 +32,6 @@ on:
       # that would otherwise never report test/build-apk-pass/
       # shared-multiplatform. perf-gate needs no entry — android-perf.yml has no
       # pull_request paths filter and always runs.
-      # qodana.yaml lives at the repo root, not under android-compose/. A
-      # Qodana-exclude-only PR would otherwise skip these required jobs forever.
       # docs/** is here for the same reason: a docs-only PR reports perf-gate
       # (android-perf.yml has no paths filter) but none of the other required
       # contexts, so branch protection blocks it with nothing to fix and no
@@ -50,7 +48,6 @@ on:
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "tools/**"
-      - "qodana.yaml"
   workflow_dispatch:
 
 concurrency:
@@ -90,7 +87,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # Let same-repo PRs refresh Gradle User Home caches for later workflow
           # runs. Fork PRs stay read-only to avoid untrusted Gradle User Home
@@ -210,14 +207,18 @@ jobs:
           retention-days: 7
 
   detekt:
-    # Advisory static analysis. Wired with continue-on-error so existing debt
-    # does not block merges; findings still show on the PR checks list.
-    name: detekt (advisory)
-    # Keep advisory work out of the initial runner queue so required checks
+    # letta-mobile-by4vm.32: honest, non-required static analysis. Every module's
+    # existing findings are in its detekt-baseline.xml, so main is green and only
+    # a NEW finding fails this job. Not a required check (branch protection is
+    # untouched), but it is no longer masked: a new finding shows red.
+    # Covers the Android modules (app, core:android-data, designsystem,
+    # feature-chat) and quality:detekt-rules; KMP modules report NO-SOURCE.
+    # The changed-file guardrailDetekt rules run inside the required `test` job.
+    name: detekt
+    # Keep non-required work out of the initial runner queue so required checks
     # acquire capacity first.
     needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: android-compose
@@ -233,26 +234,87 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer. Advisory jobs
           # restore shared entries without uploading competing snapshots.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Run detekt
-        run: ./gradlew detekt --continue
+      - name: Run detekt against the per-module baselines
+        run: ./gradlew detekt --continue -Parchitecture.strict=true
 
       - name: Publish detekt summary
         if: always()
         working-directory: ${{ github.workspace }}
         run: |
           {
-            echo "## detekt (advisory)"
+            echo "## detekt"
             echo
-            echo "Ran \`./gradlew detekt --continue\`. This check is non-blocking."
+            echo "Ran \`./gradlew detekt --continue -Parchitecture.strict=true\` (non-required)."
+            echo "Findings already in a module's \`detekt-baseline.xml\` are ignored; anything new fails."
+            echo "Fix it, or (deliberately) refresh the baseline with \`./gradlew detektBaseline\` on JDK 21."
             echo
             echo "Config: \`android-compose/detekt.yml\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload detekt reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-reports-${{ github.run_id }}
+          path: android-compose/**/build/reports/detekt/**
+          if-no-files-found: warn
+          retention-days: 7
+
+  main-module-tests:
+    # letta-mobile-by4vm.32: on PRs, :sharedUI:jvmTest and :desktop:test run in
+    # the required `test` job only when their own trees change
+    # (scripts/ci/changed-gradle-modules.sh), so a sharedLogic change that breaks
+    # them lands silently, and push runs never resolve additive tasks at all.
+    # Every push to main (and workflow_dispatch) runs both unconditionally here,
+    # so main is never silently broken. Not a PR check and not required.
+    name: main module tests (sharedUI jvm + desktop)
+    if: github.event_name != 'pull_request'
+    needs: [test]
+    runs-on: ubuntu-latest
+    # :desktop:test once hung for 25 min in shared-multiplatform. Healthy runs are
+    # well under this; the bound turns a hang into an honest red, not a 6 h wait.
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
+        with:
+          # The required test job owns cache writes.
+          cache-read-only: true
+
+      - name: Run sharedUI JVM and desktop tests
+        run: ./gradlew :sharedUI:jvmTest :desktop:test --continue
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-module-test-reports-${{ github.run_id }}
+          path: |
+            android-compose/sharedUI/build/test-results/jvmTest/**
+            android-compose/sharedUI/build/reports/tests/jvmTest/**
+            android-compose/desktop/build/test-results/test/**
+            android-compose/desktop/build/reports/tests/test/**
+          if-no-files-found: warn
+          retention-days: 7
 
   row-parity:
     # Hard cut S9 (letta-mobile-ckmub.2.2): the shared sharedUI chat rows against
@@ -281,7 +343,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
@@ -337,7 +399,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # The required test job is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
@@ -388,8 +450,10 @@ jobs:
         # that ship no wasm artifact, without making web-wasm required
         # (letta-mobile-o4ygk.2). :sharedUI compiles for wasm too, so JVM-only
         # calls in the shared Compose UI fail here (letta-mobile-o4ygk.4).
+        # :core:runtime owns its contract tests (letta-mobile-by4vm.58): JVM run
+        # plus native/wasm test compiles, in the same invocation.
         run: |
-          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
+          ./gradlew :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist :core:runtime:jvmTest :core:runtime:compileTestKotlinHostNative :core:runtime:compileTestKotlinWasmJs
           ./gradlew :sharedLogic:compileKotlinHostNative :sharedLogic:compileTestKotlinHostNative :sharedLogic:compileKotlinWasmJs :sharedLogic:compileTestKotlinWasmJs :sharedUI:compileKotlinWasmJs :sharedUI:compileTestKotlinWasmJs
           node sharedLogic/karma.config.test.cjs
 
@@ -415,12 +479,12 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Setup Rust with WASM target
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249  # stable
         with:
           targets: wasm32-unknown-unknown
 
@@ -522,7 +586,7 @@ jobs:
           java-version: 26
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           # Restore Gradle User Home state from prior trusted workflow runs;
           # keep all PR matrix consumers read-only and leave project-local state to the
@@ -614,7 +678,7 @@ jobs:
           java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 

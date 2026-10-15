@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
+import com.letta.mobile.data.model.CanvasActorId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,7 +14,7 @@ class CanvasOpDifferTest {
         val ops = CanvasOpDiffer.diff(
             oldSceneJson = "",
             newSceneJson = "",
-            actorId = "test_user",
+            actorId = CanvasActorId("test_user"),
             lamportSupplier = { 1L },
         )
         assertTrue(ops.isEmpty())
@@ -27,7 +28,7 @@ class CanvasOpDifferTest {
         val ops = CanvasOpDiffer.diff(
             oldSceneJson = oldScene,
             newSceneJson = newScene,
-            actorId = "test_user",
+            actorId = CanvasActorId("test_user"),
             lamportSupplier = { 1L },
         )
 
@@ -45,14 +46,14 @@ class CanvasOpDifferTest {
         val scene1 = """{"bgColor": "#ffffffff", "elements": [{"id": "el-1", "type": "Text", "text": "Hello"}]}"""
 
         // 1. Add element
-        val ops1 = CanvasOpDiffer.diff(scene0, scene1, "user-1", lamportSupplier)
+        val ops1 = CanvasOpDiffer.diff(scene0, scene1, CanvasActorId("user-1"), lamportSupplier)
         assertEquals(1, ops1.size)
         val addOp = assertIs<CanvasOp.AddElementOp>(ops1[0])
         assertEquals("el-1", addOp.elementId)
 
         // 2. Update element and add a second element
         val scene2 = """{"bgColor": "#ffffffff", "elements": [{"id": "el-1", "type": "Text", "text": "Updated"}, {"id": "el-2", "type": "Shape"}]}"""
-        val ops2 = CanvasOpDiffer.diff(scene1, scene2, "user-1", lamportSupplier)
+        val ops2 = CanvasOpDiffer.diff(scene1, scene2, CanvasActorId("user-1"), lamportSupplier)
         assertEquals(2, ops2.size)
         val updateOp = ops2.filterIsInstance<CanvasOp.UpdateElementOp>().first()
         val addOp2 = ops2.filterIsInstance<CanvasOp.AddElementOp>().first()
@@ -61,7 +62,7 @@ class CanvasOpDifferTest {
 
         // 3. Remove element el-1
         val scene3 = """{"bgColor": "#ffffffff", "elements": [{"id": "el-2", "type": "Shape"}]}"""
-        val ops3 = CanvasOpDiffer.diff(scene2, scene3, "user-1", lamportSupplier)
+        val ops3 = CanvasOpDiffer.diff(scene2, scene3, CanvasActorId("user-1"), lamportSupplier)
         assertEquals(1, ops3.size)
         val removeOp = assertIs<CanvasOp.RemoveElementOp>(ops3[0])
         assertEquals("el-1", removeOp.elementId)
@@ -75,11 +76,11 @@ class CanvasOpDifferTest {
         val baseScene = """{"bgColor": "#ffffffff", "elements": []}"""
         // Edit 1: add a box
         val edit1 = """{"bgColor": "#ffffffff", "elements": [{"id": "box-1", "type": "RECTANGLE"}]}"""
-        val ops1 = CanvasOpDiffer.diff(baseScene, edit1, "user-1", lamportSupplier)
+        val ops1 = CanvasOpDiffer.diff(baseScene, edit1, CanvasActorId("user-1"), lamportSupplier)
 
         // Edit 2: add a circle
         val edit2 = """{"bgColor": "#ffffffff", "elements": [{"id": "box-1", "type": "RECTANGLE"}, {"id": "circle-1", "type": "CIRCLE"}]}"""
-        val ops2 = CanvasOpDiffer.diff(edit1, edit2, "user-1", lamportSupplier)
+        val ops2 = CanvasOpDiffer.diff(edit1, edit2, CanvasActorId("user-1"), lamportSupplier)
 
         // Combined sequential local edits produce >= 2 ops
         val totalOps = ops1 + ops2
@@ -108,7 +109,7 @@ class CanvasOpDifferTest {
         val ops = CanvasOpDiffer.diff(
             oldSceneJson = prettyScene,
             newSceneJson = compactScene,
-            actorId = "test_user",
+            actorId = CanvasActorId("test_user"),
             lamportSupplier = { 1L },
         )
 
@@ -160,7 +161,7 @@ class CanvasOpDifferTest {
         val ops = CanvasOpDiffer.diff(
             oldSceneJson = sessionSceneWithLww,
             newSceneJson = cleanDrawBoxExport,
-            actorId = "local_user",
+            actorId = CanvasActorId("local_user"),
             lamportSupplier = { 100L },
         )
 
@@ -186,7 +187,7 @@ class CanvasOpDifferTest {
         val session = CanvasOpProjector.project(drawing, listOf(place))
         assertEquals(1, CanvasOpProjector.pluginElementsOf(session).size)
 
-        val noOps = { old: String, new: String -> CanvasOpDiffer.diff(old, new, "local_user", lamportSupplier = { 4L }) }
+        val noOps = { old: String, new: String -> CanvasOpDiffer.diff(old, new, CanvasActorId("local_user"), lamportSupplier = { 4L }) }
         assertTrue(noOps(session, drawing).isEmpty(), "DrawBox's export without _pluginElements is not a change")
         val moved = CanvasOpProjector.project(session, listOf(place.copy(opId = "move-1", lamport = 4L, frame = CanvasDocumentFrame(9f, 9f, 100f, 80f))))
         assertTrue(noOps(session, moved).isEmpty(), "a plugin element write is not a drawing change")

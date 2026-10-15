@@ -95,6 +95,44 @@ class ConversationModelSelectionsTest {
         assertEquals(64_000, selections.choices.value.windows["conv-1"])
     }
 
+    // letta-mobile-by4vm.82: an effort picked here shows at once and survives a stale host list; the
+    // host's record takes over once it reports that effort.
+    @Test
+    fun aPickedEffortShowsUntilTheHostReportsIt() {
+        val selections = ConversationModelSelections()
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000, effort = "low")))
+
+        selections.record("conv-1", OPUS, ReasoningEffortChoice.Named("high"))
+        assertEquals("high", selections.choices.value.efforts["conv-1"])
+
+        // A list fetched before the switch landed: same model, old effort. The pick stands.
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000, effort = "low")))
+        assertEquals("high", selections.choices.value.efforts["conv-1"])
+        assertEquals(1_000_000, selections.choices.value.windows["conv-1"])
+
+        // The host confirms; a later change elsewhere then shows.
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000, effort = "high")))
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, window = 1_000_000, effort = "max")))
+        assertEquals("max", selections.choices.value.efforts["conv-1"])
+    }
+
+    @Test
+    fun aModelSwitchCarriesItsEffortAndADefaultPickShowsNone() {
+        val selections = ConversationModelSelections()
+        selections.seedFromHost(listOf(hostConversation("conv-1", model = OPUS, effort = "low")))
+
+        selections.record("conv-1", SONNET, ReasoningEffortChoice.Named("xhigh"))
+        assertEquals(SONNET, selections["conv-1"])
+        assertEquals("xhigh", selections.choices.value.efforts["conv-1"])
+
+        // Re-picking the same model without an effort keeps the pending one.
+        selections.record("conv-1", SONNET)
+        assertEquals("xhigh", selections.choices.value.efforts["conv-1"])
+
+        selections.record("conv-1", OPUS, ReasoningEffortChoice.ProviderDefault)
+        assertNull(selections.choices.value.efforts["conv-1"])
+    }
+
     private fun hostConversation(id: String, model: String?, window: Int? = null, effort: String? = null) = Conversation(
         id = ConversationId(id),
         agentId = AgentId("agent-1"),
@@ -105,6 +143,7 @@ class ConversationModelSelectionsTest {
     private companion object {
         const val OPUS = "anthropic/claude-opus-5-5"
         const val GPT = "openai/gpt-5.6-sol"
+        const val SONNET = "anthropic/claude-sonnet-5-5"
         const val AGENT_MODEL = "lmstudio/gpt-6-sol"
     }
 }

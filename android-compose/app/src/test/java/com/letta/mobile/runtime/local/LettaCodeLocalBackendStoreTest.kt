@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -12,6 +13,7 @@ import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -92,7 +94,7 @@ class LettaCodeLocalBackendStoreTest {
             """{"id":"ui-msg-9","role":"toolResult","toolCallId":"call_2","content":[{"type":"text","text":"boom"}],"isError":true}""",
         )
 
-        val results = store().readToolResults("agent-3")
+        val results = store().readToolResults(AgentId("agent-3"))
 
         assertEquals(2, results.size)
         assertEquals("hi\n", results.getValue("call_1").body)
@@ -256,5 +258,25 @@ class LettaCodeLocalBackendStoreTest {
         val content = transcript.readText()
         assertFalse("must NOT persist a type:image_ref part", content.contains("\"type\":\"image_ref\""))
         assertTrue("transcript should carry an image_ref pointer field", content.contains("\"image_ref\":\"sha256:"))
+    }
+
+    @Test
+    fun `contextWindowOverview reads an image-bloated transcript through the bounded reader`() = runTest {
+        val agentId = "agent-context-oversized"
+        val agentKey = Base64.getUrlEncoder().withoutPadding().encodeToString(agentId.toByteArray(Charsets.UTF_8))
+        File(temp.root, "embedded-lettacode/local-backend/agents").apply { mkdirs() }
+            .resolve("$agentKey.json").writeText("""{"id":"$agentId","name":"ctx"}""")
+        writeTranscript(agentId, userRow, assistantTextRow)
+        val key = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("default:$agentId".toByteArray(Charsets.UTF_8))
+        File(temp.root, "embedded-lettacode/local-backend/conversations/$key/messages.jsonl")
+            .appendText("""{"id":"u9","role":"user","content":[{"type":"image","mimeType":"image/png","data":"""" +
+                "A".repeat(9 * 1024 * 1024) + "\"}]}\n")
+
+        val overview = store().contextWindowOverview(AgentId(agentId))
+
+        assertNotNull(overview)
+        assertEquals(3, overview!!.numMessages)
+        assertTrue(overview.contextWindowSizeMax > 0)
     }
 }

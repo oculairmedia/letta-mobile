@@ -9,7 +9,7 @@ import org.cef.network.CefRequest
 import org.cef.network.CefResponse
 
 /**
- * Answers one `letta-plugin` request from the [PluginPageServer]: the page is read off the
+ * Answers the page request from the [PluginPageServer]: the page is read off the
  * browser's IO thread (it may come over the network), then its status, headers and bytes are
  * handed to CEF.
  */

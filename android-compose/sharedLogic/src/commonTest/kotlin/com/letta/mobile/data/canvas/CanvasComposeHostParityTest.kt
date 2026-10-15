@@ -6,6 +6,7 @@ import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.WEEKEND
 import com.letta.mobile.data.canvas.HostCanvasComposeToolsTest.Companion.receipt
 import com.letta.mobile.data.controller.extras.ExternalToolCaller
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -24,7 +25,7 @@ import kotlin.test.assertIs
  * are compared with the revision each host reports, which is also what its get_scene answers.
  */
 class CanvasComposeHostParityTest {
-    private val canvasId = CanvasId.forConversation(CONVERSATION)
+    private val canvasId = CanvasId.forConversation(ConversationId(CONVERSATION))
 
     private suspend fun ExternalToolRegistry.compose(request: String = WEEKEND_PLAN, toolCallId: String = TOOL_CALL) =
         invoke(CanvasToolContract.COMPOSE, Json.parseToJsonElement(request).jsonObject, ExternalToolCaller(AGENT, CONVERSATION, toolCallId))

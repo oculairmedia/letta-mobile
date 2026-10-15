@@ -1,0 +1,4 @@
+# letta-mobile-by4vm.80: public functions + properties on the per-platform chat state owners.
+# Only shrinks: lower a line in the change that moves a member behind TimelineChatSessionPort.
+desktop/src/main/kotlin/com/letta/mobile/desktop/chat/DesktopChatController.kt 43
+feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AdminChatViewModel.kt 78

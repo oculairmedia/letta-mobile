@@ -17,12 +17,9 @@ data class ChatStreamingPresence(
  * Defaults are set so each individual use can override just the flags it cares
  * about — but in practice the production sites build a full record.
  *
- * @property previousIsStreaming held while a client-mode stream owns the flags.
- * @property previousIsAgentTyping held while a client-mode stream owns the flags.
  * @property anyServerLocalPending true while a still-sending local message is pending.
  * @property tailIsAssistant true if the timeline tail is a settled assistant message.
  * @property replyStreaming true while a streaming reply is producing tokens.
- * @property clientModeStreamInFlight true while a client-mode (embedded/local) turn is in flight.
  * @property a2uiThinkingActive true while an A2UI thinking surface is open.
  * @property duplicateInitialMessageInFlight true while a duplicate-initial follow is showing.
  * @property turnInFlight letta-mobile-c4igq.7: true while a chat turn is in flight
@@ -40,12 +37,9 @@ data class ChatStreamingPresence(
  *   mask is a no-op until the caller threads the new flag through).
  */
 data class ChatStreamInputs(
-    val previousIsStreaming: Boolean = false,
-    val previousIsAgentTyping: Boolean = false,
     val anyServerLocalPending: Boolean = false,
     val tailIsAssistant: Boolean = false,
     val replyStreaming: Boolean = false,
-    val clientModeStreamInFlight: Boolean = false,
     val a2uiThinkingActive: Boolean = false,
     val duplicateInitialMessageInFlight: Boolean = false,
     val turnInFlight: Boolean = false,
@@ -61,9 +55,7 @@ data class ChatStreamInputs(
  * is working" identically, and makes the precedence rules headless-testable.
  *
  * The precedence is deliberate:
- *  - while a client-mode (embedded/local-runtime) turn is in flight the runtime
- *    owns the flags, so the previous values are held;
- *  - otherwise an actively-streaming reply, an open A2UI "thinking" surface, or
+ *  - an actively-streaming reply, an open A2UI "thinking" surface, or
  *    a duplicate-initial follow are each enough to show working;
  *  - failing those, a still-sending local message means working — and typing is
  *    suppressed once the tail is a confirmed assistant message (the reply has
@@ -85,7 +77,6 @@ object ChatStreamingPresencePolicy {
         // entry hasn't been retired yet.
         val effectiveTurnInFlight = inputs.turnInFlight && inputs.projectionRunActive
         val isStreaming = when {
-            inputs.clientModeStreamInFlight -> inputs.previousIsStreaming
             inputs.replyStreaming -> true
             inputs.a2uiThinkingActive -> true
             inputs.duplicateInitialMessageInFlight -> true
@@ -93,7 +84,6 @@ object ChatStreamingPresencePolicy {
             else -> inputs.anyServerLocalPending
         }
         val isAgentTyping = when {
-            inputs.clientModeStreamInFlight -> inputs.previousIsAgentTyping
             inputs.replyStreaming -> true
             inputs.a2uiThinkingActive -> true
             inputs.duplicateInitialMessageInFlight -> true

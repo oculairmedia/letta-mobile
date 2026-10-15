@@ -5,11 +5,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-internal enum class ConversationAccessMode { Client, Timeline }
+/**
+ * How a conversation is resolved: through the local runtime (an embedded LettaCode backend bound
+ * to a local agent) or through the remote timeline. Formerly `Client` (client mode, removed in
+ * letta-mobile-by4vm.26); renamed in by4vm.53.
+ */
+internal enum class ConversationAccessMode { LocalRuntime, Timeline }
 
 internal enum class ResolutionAttempt { Initial, Subsequent }
 
-internal enum class DuplicateInitialMessagePolicy { StageFreshClientDuplicate, SuppressDuplicate }
+internal enum class DuplicateInitialMessagePolicy { StageFreshLocalRuntimeDuplicate, SuppressDuplicate }
 
 internal enum class HydrationAvailability { Hydrated, NeedsLoading }
 

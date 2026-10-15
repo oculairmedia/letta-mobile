@@ -105,5 +105,36 @@ class ReasoningEffortSliderUiTest {
         waitForIdle()
         onNodeWithTag(ReasoningEffortSliderTags.SLIDER).assertDoesNotExist()
     }
-}
 
+    // letta-mobile-by4vm.82: the catalog row for a handle carries only its first variant's tier (low);
+    // the conversation runs at high. The slider and the model row show the conversation's effort.
+    @Test
+    fun theSheetShowsTheConversationsEffortNotTheCatalogRows() = runComposeUiTest {
+        val opus = ModelPickerEntry(
+            value = "anthropic/claude-opus-5-5",
+            handle = ModelHandle("anthropic/claude-opus-5-5"),
+            displayName = "Claude Opus 5.5",
+            tier = ReasoningTier.LOW,
+            efforts = listOf("low", "medium", "high"),
+            selected = true,
+        )
+        setContent {
+            MaterialTheme {
+                Column {
+                    AgentContextSheetContent(
+                        model = AgentContextCardModel.present(
+                            AgentContextCardInputs("Claude Opus 5.5", "high", null, false, null, compacting = false, turnRunning = false),
+                        ),
+                        picker = AgentContextPicker(
+                            state = ModelPickerState(groups = listOf(ModelPickerGroup("anthropic", "Anthropic", listOf(opus)))),
+                            actions = ModelPickerActions(onSelect = {}, onQueryChange = {}, onToggleGroup = {}, onRefresh = {}, onEditModels = null),
+                            onEffortApplied = { _, _ -> },
+                        ),
+                        onCompact = {},
+                    )
+                }
+            }
+        }
+        onNodeWithTag(ReasoningEffortSliderTags.VALUE).assertTextEquals("High")
+    }
+}

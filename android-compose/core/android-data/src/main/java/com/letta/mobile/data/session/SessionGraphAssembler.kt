@@ -1,36 +1,29 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.backend.SessionCapabilities
+import com.letta.mobile.data.backend.SessionPlatform
 import com.letta.mobile.data.context.ContextReadingSnapshots
-import com.letta.mobile.data.context.contextTokenReadingsOf
+import com.letta.mobile.data.session.graph.AdminRemoteRoutes
+import com.letta.mobile.data.session.graph.HostSessionRepositories
+import com.letta.mobile.data.session.graph.SessionGraphIdentity
+import com.letta.mobile.data.session.graph.SharedSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
+import com.letta.mobile.data.session.graph.adminRepositories
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.CronRepository
-import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
-import com.letta.mobile.data.repository.IrohAdminRpcModelSource
-import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
-import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
-import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
-import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
-import com.letta.mobile.data.repository.McpServerRepository
-import com.letta.mobile.data.repository.ModelRepository
-import com.letta.mobile.data.repository.PassageRepository
-import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
-import com.letta.mobile.data.repository.ProviderRepository
-import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
-import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
-import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -76,50 +69,47 @@ class SessionGraphAssembler @Inject constructor(
         val agentRepository = createAgentRepository(request)
         val conversationRepos = createConversationRepos(request, agentRepository)
         val adminRepositories = createAdminRepositories(request)
-        val binding = request.activeConfig.sessionBackendBinding(
-            forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl),
+        // letta-mobile-by4vm.24: the transport-bound repositories every host builds alike.
+        val transportBound = SharedSessionGraph.transportBound(
+            transport = request.channelTransport,
+            scope = request.scope,
+            snapshots = settingsStore?.let(::ContextReadingSnapshots),
         )
-        val useIroh = binding.bindsIroh()
+        val forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
+        val useIroh = request.activeConfig.sessionBackendBinding(forceIroh = forceIroh).bindsIroh()
+        val repositories = SharedSessionRepositoryGraph(
+            identity = SessionGraphIdentity(
+                id = request.graphId,
+                backendDescriptor = request.backendDescriptor,
+                localRuntimeBackend = request.localRuntimeBackend,
+                channelTransport = request.channelTransport,
+                capabilities = sessionCapabilities(request, forceIroh),
+            ),
+            host = HostSessionRepositories(
+                agentRepository = agentRepository,
+                blockRepository = blockRepository,
+                conversationRepository = conversationRepos.conversation,
+                mcpServerRepository = adminRepositories.mcpServerRepository,
+                modelRepository = adminRepositories.modelRepository,
+                passageRepository = adminRepositories.passageRepository,
+                projectRepository = adminRepositories.projectRepository,
+                projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
+                runRepository = adminRepositories.runRepository,
+                providerRepository = adminRepositories.providerRepository,
+                scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
+                stepRepository = StepRepository(remoteSources.steps.orNull()),
+                toolRepository = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
+                vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
+            ),
+            transportBound = transportBound,
+        )
         return SessionGraph(
-            id = request.graphId,
-            capturedConfig = request.activeConfig,
-            backendDescriptor = request.backendDescriptor,
-            conversationCursorStore = request.capturedCursorStore,
+            repositories = repositories,
             localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
-            agentRepository = agentRepository,
-            blockRepository = blockRepository,
             allConversationsRepository = conversationRepos.allConversations,
-            channelTransport = request.channelTransport,
-            conversationRepository = conversationRepos.conversation,
-            cronRepository = CronRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
-            mcpServerRepository = adminRepositories.mcpServer,
-            modelRepository = adminRepositories.model,
-            passageRepository = adminRepositories.passage,
-            projectRepository = adminRepositories.project,
-            projectWorkRepository = ProjectWorkRepository(remoteSources.projectWork),
-            runRepository = adminRepositories.run,
-            providerRepository = adminRepositories.provider,
-            scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
-            selfTodoRepository = SelfTodoRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
-            stepRepository = StepRepository(remoteSources.steps),
-            subagentRepository = SubagentRepository(
-                transport = request.channelTransport,
-                scope = request.scope,
-            ),
-            toolRepository = adminRepositories.tool,
-            vibesyncEventStreamRepository = VibesyncEventStreamRepository(request.scope),
-            contextTokenReadings = contextTokenReadingsOf(
-                transport = request.channelTransport,
-                scope = request.scope,
-                snapshots = settingsStore?.let(::ContextReadingSnapshots),
-            ),
+            conversationCursorStore = request.capturedCursorStore,
+            capturedConfig = request.activeConfig,
         )
     }
 
@@ -163,20 +153,33 @@ class SessionGraphAssembler @Inject constructor(
         )
     }
 
-    private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories =
-        AdminRepositories(
-            mcpServer = McpServerRepository(remoteSources.mcpServers, request.irohSource(::IrohAdminRpcMcpSource)),
-            model = ModelRepository(
-                remote = remoteSources.models,
-                localModelSource = localModelSource,
-                settingsRepository = request.settingsRepository,
-                irohModelSource = request.irohSource(::IrohAdminRpcModelSource),
+    // letta-mobile-by4vm.87: the admin repositories desktop builds too, over the same builder.
+    private fun createAdminRepositories(request: SessionGraphAssembleRequest) =
+        SharedSessionGraph.adminRepositories(
+            transport = request.channelTransport,
+            settings = request.settingsRepository,
+            remotes = AdminRemoteRoutes(
+                mcpServers = remoteSources.mcpServers,
+                models = remoteSources.models,
+                passages = remoteSources.passages,
+                projects = remoteSources.projects,
+                providers = remoteSources.providers,
+                runs = remoteSources.runs,
             ),
-            passage = PassageRepository(remoteSources.passages, request.irohSource(::IrohAdminRpcPassageSource)),
-            project = ProjectRepository(remoteSources.projects, request.irohSource(::IrohAdminRpcProjectSource)),
-            run = RunRepository(remoteSources.runs, request.irohSource(::IrohAdminRpcRunSource)),
-            provider = ProviderRepository(remoteSources.providers, request.irohSource(::IrohAdminRpcProviderSource)),
-            tool = ToolRepository(remoteSources.tools, request.irohSource(::IrohAdminRpcToolSource)),
+            localModelSource = localModelSource,
+        )
+
+    /**
+     * letta-mobile-by4vm.13: what this graph serves — the Android row of the
+     * [com.letta.mobile.data.backend.SessionRouteMatrix] for the config's backend kind, plus any route
+     * a bound remote source adds. The Iroh host's advertised features are read live.
+     */
+    private fun sessionCapabilities(request: SessionGraphAssembleRequest, forceIroh: Boolean): SessionCapabilities =
+        SessionCapabilities.forSession(
+            platform = SessionPlatform.ANDROID,
+            kind = request.activeConfig?.backendKind(forceIroh = forceIroh),
+            hostCapabilities = { request.channelTransport.hostCapabilities },
+            extraBound = remoteSources.boundRoutes(),
         )
 
     /** An Iroh admin_rpc source over this graph's transport, when the graph has settings to scope it. */
@@ -199,15 +202,5 @@ class SessionGraphAssembler @Inject constructor(
     private data class ConversationRepos(
         val allConversations: AllConversationsRepository,
         val conversation: ConversationRepository,
-    )
-
-    private data class AdminRepositories(
-        val mcpServer: McpServerRepository,
-        val model: ModelRepository,
-        val passage: PassageRepository,
-        val project: ProjectRepository,
-        val run: RunRepository,
-        val provider: ProviderRepository,
-        val tool: ToolRepository,
     )
 }

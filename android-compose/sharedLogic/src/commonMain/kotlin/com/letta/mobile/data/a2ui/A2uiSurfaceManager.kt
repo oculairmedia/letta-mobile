@@ -31,6 +31,8 @@ data class A2uiSurfaceState(
     val components: Map<String, A2uiComponent> = emptyMap(),
     val dataModel: A2uiDataModel = A2uiDataModel(),
     val dataModelRevision: Long = 0L,
+    /** Set when an update broke [A2uiSurfaceLimits]; the surface then renders a "too large" placeholder until deleted. */
+    val limitViolation: A2uiSurfaceLimitViolation? = null,
 )
 
 class A2uiSurfaceManager(
@@ -390,6 +392,11 @@ private fun Map<String, A2uiSurfaceState>.updateComponents(
     val payload = message.updateComponents
     val existing = this[payload.surfaceId] ?: A2uiSurfaceState(surfaceId = payload.surfaceId)
     val incoming = payload.components.associateBy(A2uiComponent::id)
+    if (existing.limitViolation != null) return this
+    checkComponentBudget(existing.components, incoming)?.let { violation ->
+        logSurfaceRejected(payload.surfaceId, violation)
+        return plus(payload.surfaceId to existing.copy(components = emptyMap(), limitViolation = violation))
+    }
     val nextComponents = existing.components + incoming
     val root = payload.root
         ?: existing.rootComponentId

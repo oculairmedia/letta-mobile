@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerIdentity
 import com.letta.mobile.data.transport.appserver.AppServerProbeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -74,5 +75,24 @@ class ServerHealthTrackerTest {
         tracker.refreshAll()
         assertEquals(4, probed.size)
         assertEquals(listOf("a", "b", "b", "b"), reported.sorted())
+    }
+
+    @Test
+    fun removingEveryConfigWhileAProbeIsInFlightLeavesNoDot() = runTest {
+        val gate = CompletableDeferred<AppServerProbeResult>()
+        val slowProbe = ServerHealthProbe { _, _ -> gate.await() }
+        val configs = MutableStateFlow(listOf(remote("a", "ws://a:1")))
+        val reported = mutableListOf<String>()
+        val tracker = ServerHealthTracker(configs, slowProbe, backgroundScope, listener = { config, _ -> reported += config.id })
+        runCurrent()
+        assertEquals(mapOf("a" to ServerHealthState.PROBING), tracker.states.value)
+
+        configs.value = emptyList()
+        runCurrent()
+        gate.complete(AppServerProbeResult.Ok(AppServerIdentity("local", "0.33.6", 1)))
+        runCurrent()
+
+        assertEquals(emptyMap<String, ServerHealthState>(), tracker.states.value, "the deleted server's late answer must not bring its dot back")
+        assertEquals(emptyList<String>(), reported)
     }
 }

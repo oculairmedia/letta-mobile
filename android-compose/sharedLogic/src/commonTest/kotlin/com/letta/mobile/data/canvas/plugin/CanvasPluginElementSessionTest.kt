@@ -14,6 +14,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.moved
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.place
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.progress
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.props
+import com.letta.mobile.data.model.CanvasActorId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,9 +39,9 @@ class CanvasPluginElementSessionTest {
     @Test
     fun undoingAMovePutsTheFrameBackAndKeepsTheLaterPluginState() = runTest {
         val session = session()
-        session.applyAgentBatch(listOf(place(0)), AGENT)
+        session.applyAgentBatch(listOf(place(0)), CanvasActorId(AGENT))
         session.applyLocalStamped(listOf(moveTo(moved, CanvasGeometryOwner.USER)))
-        session.applyAgentBatch(listOf(progress(0, 0.8)), AGENT)
+        session.applyAgentBatch(listOf(progress(0, 0.8)), CanvasActorId(AGENT))
         assertEquals(moved, session.element()?.frame)
 
         // The inverse was built before the plugin's update and carries a stale clock.
@@ -58,7 +59,7 @@ class CanvasPluginElementSessionTest {
     @Test
     fun undoingARemovalBringsTheWholeElementBack() = runTest {
         val session = session()
-        session.applyAgentBatch(listOf(place(0)), AGENT)
+        session.applyAgentBatch(listOf(place(0)), CanvasActorId(AGENT))
         val before = session.element()!!
         session.applyLocalStamped(listOf(CanvasOp.RemovePluginElementOp("r", CanvasSession.LOCAL_USER_ACTOR_ID, 0, ID)))
         assertNull(session.element())

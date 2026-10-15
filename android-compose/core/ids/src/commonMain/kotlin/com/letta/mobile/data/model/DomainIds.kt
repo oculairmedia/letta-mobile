@@ -43,6 +43,47 @@ value class MessageId(val value: String) {
     override fun toString(): String = value
 }
 
+/**
+ * A Letta run (one agent turn on the server). Distinct from `com.letta.mobile.runtime.RunId`,
+ * which is the runtime-contract twin; new data-layer code should take this one. Blank ids are
+ * rejected so an unset run never masquerades as a real one.
+ */
+@JvmInline
+@Serializable
+value class RunId(val value: String) {
+    init {
+        require(value.isNotBlank()) { "RunId cannot be blank." }
+    }
+
+    override fun toString(): String = value
+}
+
+/**
+ * A request/response correlation id on a wire protocol (App Server `request_id`, approval
+ * request ids, control requests). Blank ids are rejected: a blank id cannot correlate anything.
+ */
+@JvmInline
+@Serializable
+value class RequestId(val value: String) {
+    init {
+        require(value.isNotBlank()) { "RequestId cannot be blank." }
+    }
+
+    override fun toString(): String = value
+}
+
+/**
+ * A plugin's manifest id (`letta.chart`): the key of the host's plugin registry, of its drivers,
+ * rate limits and asset quota, and the `plugin_id` of the `plugins.*` admin RPCs. Serializes as
+ * its bare string. No blank check: registry lookups take ids straight from the wire and answer
+ * "not installed" for an unknown one, which a blank id is.
+ */
+@JvmInline
+@Serializable
+value class PluginId(val value: String) {
+    override fun toString(): String = value
+}
+
 @JvmInline
 @Serializable
 value class ToolId(val value: String) {

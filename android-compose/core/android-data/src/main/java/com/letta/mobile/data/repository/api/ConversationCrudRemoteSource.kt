@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.api
 
-import com.letta.mobile.data.backend.NoAppServerRouteException
+import com.letta.mobile.data.backend.AppServerRouteUnavailable
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.chat.branch.ConversationForkRequest
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -45,4 +46,4 @@ interface ConversationCrudRemoteSource : ConversationRemoteSource {
 }
 
 private fun noRoute(operation: String): Nothing =
-    throw NoAppServerRouteException("ConversationCrudRemoteSource.$operation")
+    throw AppServerRouteUnavailable(SessionRoute.CONVERSATIONS, "ConversationCrudRemoteSource.$operation")

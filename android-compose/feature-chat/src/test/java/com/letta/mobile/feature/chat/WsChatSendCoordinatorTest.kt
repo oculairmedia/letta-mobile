@@ -127,7 +127,6 @@ class WsChatSendCoordinatorTest {
             uiState = uiState,
             clearComposerAfterSend = { cleared = true },
             activeConversationId = { activeConversation },
-            isFreshRoute = true,
             setActiveConversationId = { activeConversation = it },
             startTimelineObserver = { observedConversation = it },
             clientVersionProvider = clientVersionProvider,

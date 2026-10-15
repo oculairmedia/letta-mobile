@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
+import com.letta.mobile.data.model.CanvasActorId
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
@@ -97,9 +98,9 @@ class FileCanvasOpLogTest {
                 opLog = FileCanvasOpLog(rootDirectory = tempDir),
             ),
         )
-        session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-b")), fixtures.AGENT)
+        session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-b")), CanvasActorId(fixtures.AGENT))
         session.movePluginElement(fixtures.ID, fixtures.moved)
-        session.applyAgentBatch(listOf(fixtures.progress(0, 0.25)), fixtures.AGENT)
+        session.applyAgentBatch(listOf(fixtures.progress(0, 0.25)), CanvasActorId(fixtures.AGENT))
         session.removePluginElement("pe-b")
         val written = session.opLog.getOps(canvasId, 0L)
 
@@ -124,5 +125,37 @@ class FileCanvasOpLogTest {
         assertEquals("pe-1", op.elementId)
         assertEquals("sha256:ab", op.snapshot?.assetRef)
         assertEquals(kotlinx.serialization.json.JsonPrimitive("done"), op.props?.get("status"))
+    }
+
+    private fun background(id: String, lamport: Long) =
+        CanvasOp.SetBackgroundOp(opId = id, actorId = "user-desk", lamport = lamport, colorHex = "#123456")
+
+    @Test
+    fun journalKeepsAppendedOpsUnsettledUntilSettledAcrossRestarts() = runTest {
+        val canvasId = CanvasId("canvas-desktop-journal")
+        val log = FileCanvasOpLog(rootDirectory = tempDir)
+        log.append(canvasId, background("j-1", 1L))
+        log.append(canvasId, background("j-2", 2L))
+        log.settle(canvasId, listOf("j-1"))
+
+        val restarted = FileCanvasOpLog(rootDirectory = tempDir)
+        assertEquals(listOf("j-2"), restarted.unsettled(canvasId).map { it.opId }, "a settled op came back, or a pending one was lost")
+
+        restarted.settle(canvasId, listOf("j-2", "j-2"))
+        assertEquals(emptyList(), FileCanvasOpLog(rootDirectory = tempDir).unsettled(canvasId).map { it.opId })
+    }
+
+    @Test
+    fun journalTakesALogWrittenBeforeItExistedAsSettled() = runTest {
+        val canvasId = CanvasId("canvas-desktop-legacy")
+        val legacy = FileCanvasOpLog(rootDirectory = tempDir)
+        legacy.append(canvasId, background("legacy-1", 1L))
+        // A log from before the journal: no sidecar beside it.
+        Files.list(tempDir).use { files -> files.filter { it.toString().endsWith(".settled") }.forEach(Files::delete) }
+
+        val upgraded = FileCanvasOpLog(rootDirectory = tempDir)
+        assertEquals(emptyList(), upgraded.unsettled(canvasId).map { it.opId }, "a pre-journal op would be replayed")
+        upgraded.append(canvasId, background("new-1", 2L))
+        assertEquals(listOf("new-1"), FileCanvasOpLog(rootDirectory = tempDir).unsettled(canvasId).map { it.opId })
     }
 }

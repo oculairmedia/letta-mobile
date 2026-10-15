@@ -38,7 +38,14 @@ class AdminRpcContractTest {
                 projectMethods() +
                 toolMethods() +
                 miscMethods() +
-                workspaceMethods()
+                workspaceMethods() +
+                pluginMethods()
+
+        /** letta-mobile-cdgpr.7: the plugin host's routes, capability_unavailable without one. */
+        fun pluginMethods() = setOf(
+            "plugins.list", "plugins.inspect", "plugins.install", "plugins.consent", "plugins.enable",
+            "plugins.disable", "plugins.remove", "plugins.disableAll", "plugins.page.read", "plugins.view.action",
+        )
 
         /** letta-mobile-bzvro.37: the workspace relay's allowlist, spelled out. */
         fun workspaceMethods() = setOf(
@@ -60,7 +67,7 @@ class AdminRpcContractTest {
         fun conversationMethods() = setOf(
             "conversation.archive", "conversation.compact", "conversation.context_limit", "conversation.create", "conversation.delete",
             "conversation.fork", "conversation.get", "conversation.list", "conversation.list_agent",
-            "conversation.restore",
+            "conversation.recompile", "conversation.restore",
         )
 
         fun projectMethods() = setOf(

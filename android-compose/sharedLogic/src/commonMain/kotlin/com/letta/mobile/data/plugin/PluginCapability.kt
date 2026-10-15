@@ -53,6 +53,9 @@ data class PluginConsent(
     fun covers(manifest: PluginManifest): Boolean = PluginConsentDiff.between(this, manifest).isEmpty
 
     companion object {
+        /** No consent yet: installed, waiting for the owner (covers no version, so nothing runs). */
+        fun none(): PluginConsent = PluginConsent(emptySet(), emptySet(), grantedAtEpochMs = 0L, forVersion = "")
+
         /** Consent to exactly what [manifest] asks for, granted at [nowEpochMs]. */
         fun forManifest(manifest: PluginManifest, nowEpochMs: Long): PluginConsent = PluginConsent(
             capabilities = manifest.capabilities.toSet(),

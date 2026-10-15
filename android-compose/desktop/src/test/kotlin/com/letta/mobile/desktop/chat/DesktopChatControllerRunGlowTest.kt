@@ -7,6 +7,7 @@ import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.parseTimelineInstant
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import com.letta.mobile.ui.chat.session.TimelineLocalState
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -76,7 +77,7 @@ class DesktopChatControllerRunGlowTest {
             presence = controller.replyPresence.value,
             cancellingConversationId = null,
             sendQueue = ConversationSendQueue(),
-            local = DesktopChatLocalTimelineState(),
+            local = TimelineLocalState(),
         ),
         previous = null,
     )
