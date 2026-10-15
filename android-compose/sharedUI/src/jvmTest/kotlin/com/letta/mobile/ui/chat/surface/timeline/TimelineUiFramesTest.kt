@@ -54,6 +54,30 @@ class TimelineUiFramesTest {
         assertTrue(jumps.isEmpty(), jumps.joinToString("\n") + "\n\n" + frames.joinToString("\n"))
     }
 
+    /**
+     * letta-mobile-by4vm.105: the reply keeps the one LazyColumn key it streamed under through the
+     * hand-over to its settled row and the overlay draining, so the list never disposes it.
+     */
+    @Test
+    fun replyKeepsItsStreamedKeyThroughSettle() = replyTurn { frames ->
+        val streamed = frames.last { it.step == "stream-done" }.newestKey
+        val settle = frames.filter { it.step == "settle" }
+        val rekeyed = settle.filter { it.newestKey != streamed }
+        assertTrue(rekeyed.isEmpty(), "reply streamed as $streamed, then:\n" + rekeyed.joinToString("\n"))
+    }
+
+    /**
+     * letta-mobile-by4vm.105: the settled row replaces the live one inside the same item, so the
+     * reply's content is not torn down and rebuilt at settle: a rebuilt markdown body draws empty
+     * for a frame before its parse lands, and the newest row collapses and springs back.
+     */
+    @Test
+    fun replyDrawsInPlaceThroughSettle() = replyTurn { frames ->
+        val handOver = frames.dropWhile { it.step != "stream-done" }.filter { it.step == "stream-done" || it.step == "settle" }
+        val jumps = heightJumps(handOver, MAX_HEIGHT_JUMP_DP)
+        assertTrue(jumps.isEmpty(), jumps.joinToString("\n") + "\n\n" + handOver.joinToString("\n"))
+    }
+
     @Test
     fun settleDoesNotFlashTheSpinner() = replyTurn { frames ->
         // Opening the history is allowed its loading state; everything after is not.
