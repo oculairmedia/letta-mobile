@@ -26,6 +26,15 @@ internal data class ApprovalSubmissionRequest(
 )
 
 /**
+ * letta-mobile-by4vm.97: the approval state desktop's session port reads: the shared
+ * [ChatApprovalStateSource] the port lays over the timeline, plus whether the active gateway can
+ * answer at all (demo / HTTP-only gateways cannot, so the page hides the buttons).
+ */
+interface DesktopChatApprovalState : ChatApprovalStateSource {
+    val canSubmitApprovals: StateFlow<Boolean>
+}
+
+/**
  * Binds the active gateway's approval surface (can it answer, what it parked, what waits in its
  * outbox) and delivers answers over it. The answer lifecycle itself - in flight, released, reconciled
  * against the timeline - is the shared [ChatApprovalAnswerer] Android's chat screen uses too
@@ -34,7 +43,7 @@ internal data class ApprovalSubmissionRequest(
 internal class DesktopChatApprovalCoordinator(
     private val scope: CoroutineScope,
     private val onError: (String) -> Unit,
-) : ChatApprovalStateSource {
+) : DesktopChatApprovalState {
     private val answerer = ChatApprovalAnswerer(
         scope,
         object : ChatApprovalAnswerHost {
@@ -44,7 +53,7 @@ internal class DesktopChatApprovalCoordinator(
     override val submittingApprovals: StateFlow<Set<String>> = answerer.submitting
 
     private val _canSubmitApprovals = MutableStateFlow(false)
-    val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
+    override val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
 
     private val _queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
 
