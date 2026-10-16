@@ -236,21 +236,6 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     @Test
-    fun aSavedLettaCloudBackendLoadsAsARemoteHostWithANotice() {
-        val settingsStore = DesktopInMemorySecureSettingsStore()
-        settingsStore.putString("letta.config.id", "desktop-cloud")
-        settingsStore.putString("letta.config.mode", "CLOUD")
-        settingsStore.putString("letta.config.serverUrl", "https://api.letta.com")
-        settingsStore.putString("letta.config.accessToken", "cloud-key")
-
-        val loaded = DesktopLettaConfigStore(settingsStore).load()
-
-        assertEquals(LettaConfig.Mode.SELF_HOSTED, loaded.mode)
-        assertNull(loaded.accessToken)
-        assertEquals(com.letta.mobile.data.model.LettaConfigMigration.CLOUD_NOTICE, loaded.migrationNotice)
-    }
-
-    @Test
     fun configStoreImplementsSharedBackendConfigAndTokenContracts() = runTest {
         val configStore = DesktopLettaConfigStore(DesktopInMemorySecureSettingsStore())
         val backendStore: BackendConfigStore = configStore

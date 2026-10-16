@@ -133,10 +133,6 @@ open class CachedSettingsRepository(
     }
 
     override fun getThemePreset(): Flow<ThemePreset> = preferencesStore.snapshots.map { prefs ->
-        val legacyAmoledDarkMode = prefs.getBoolean(SettingsPreferenceKeys.AMOLED_DARK_MODE) ?: false
-        if (legacyAmoledDarkMode) {
-            return@map ThemePreset.AMOLED_BLACK
-        }
         val presetName = prefs.getString(SettingsPreferenceKeys.THEME_PRESET) ?: ThemePreset.DEFAULT.name
         try {
             ThemePreset.valueOf(presetName)
@@ -183,24 +179,7 @@ open class CachedSettingsRepository(
     }
 
     private fun loadLastChatSelection(): LastChatSelection? {
-        val stored = secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_SELECTION)
-        if (stored != null) {
-            return LastChatSelectionStorage.deserialize(stored)
-        }
-        val migrated = LastChatSelectionStorage.migrateLegacy(
-            legacyAgentId = secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_AGENT_ID),
-            legacyAgentName = secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_AGENT_NAME),
-            legacyConversationId = secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_CONVERSATION_ID),
-        )
-        secureSettingsStore.remove(SettingsSecureKeys.LAST_CHAT_AGENT_ID)
-        secureSettingsStore.remove(SettingsSecureKeys.LAST_CHAT_AGENT_NAME)
-        secureSettingsStore.remove(SettingsSecureKeys.LAST_CHAT_CONVERSATION_ID)
-        if (migrated != null) {
-            LastChatSelectionStorage.serialize(migrated)?.let {
-                secureSettingsStore.putString(SettingsSecureKeys.LAST_CHAT_SELECTION, it)
-            }
-        }
-        return migrated
+        return LastChatSelectionStorage.deserialize(secureSettingsStore.getString(SettingsSecureKeys.LAST_CHAT_SELECTION))
     }
 
     override suspend fun clearAllData() = withContext(Dispatchers.Default) {
@@ -235,7 +214,6 @@ open class CachedSettingsRepository(
     override suspend fun setThemePreset(themePreset: ThemePreset) {
         preferencesStore.edit { prefs ->
             prefs.putString(SettingsPreferenceKeys.THEME_PRESET, themePreset.name)
-            prefs.putBoolean(SettingsPreferenceKeys.AMOLED_DARK_MODE, false)
             prefs.putString(SettingsPreferenceKeys.CHAT_BACKGROUND, DEFAULT_CHAT_BACKGROUND_KEY)
         }
     }
@@ -243,12 +221,6 @@ open class CachedSettingsRepository(
     override suspend fun setDynamicColor(enabled: Boolean) {
         preferencesStore.edit { prefs ->
             prefs.putBoolean(SettingsPreferenceKeys.DYNAMIC_COLOR, enabled)
-        }
-    }
-
-    suspend fun setAmoledDarkMode(enabled: Boolean) {
-        preferencesStore.edit { prefs ->
-            prefs.putBoolean(SettingsPreferenceKeys.AMOLED_DARK_MODE, enabled)
         }
     }
 
@@ -483,41 +455,12 @@ open class CachedSettingsRepository(
                 emptyList()
             }
         }
-        val shortcuts = readLegacyPinnedShortcutOrder(prefs).map(::shortcutKeyPart)
-        val agents = readLegacyPinnedAgentOrder(prefs).map(::agentKeyPart)
-        return shortcuts + agents
+        return DEFAULT_PINNED_SHORTCUTS.map(::shortcutKeyPart)
     }
 
     private fun writeUnifiedPinnedItems(prefs: MutableSettingsPreferencesEditor, items: List<String>) {
         val deduped = items.distinct()
         prefs.putString(SettingsPreferenceKeys.PINNED_ITEMS_ORDER, json.encodeToString(deduped))
-        val agentIds = deduped.mapNotNull(::parseAgentKeyPart)
-        val shortcutNames = deduped.mapNotNull(::parseShortcutKeyPart)
-        prefs.putString(SettingsPreferenceKeys.PINNED_AGENT_ORDER, json.encodeToString(agentIds))
-        prefs.putStringSet(SettingsPreferenceKeys.PINNED_AGENT_IDS, agentIds.toSet())
-        prefs.putString(SettingsPreferenceKeys.PINNED_SHORTCUT_ORDER, json.encodeToString(shortcutNames))
-    }
-
-    private fun readLegacyPinnedAgentOrder(prefs: SettingsPreferencesSnapshot): List<String> {
-        prefs.getString(SettingsPreferenceKeys.PINNED_AGENT_ORDER)?.let { raw ->
-            return try {
-                json.decodeFromString<List<String>>(raw)
-            } catch (_: Exception) {
-                emptyList()
-            }
-        }
-        return (prefs.getStringSet(SettingsPreferenceKeys.PINNED_AGENT_IDS) ?: emptySet()).toList()
-    }
-
-    private fun readLegacyPinnedShortcutOrder(prefs: SettingsPreferencesSnapshot): List<String> {
-        prefs.getString(SettingsPreferenceKeys.PINNED_SHORTCUT_ORDER)?.let { raw ->
-            return try {
-                json.decodeFromString<List<String>>(raw)
-            } catch (_: Exception) {
-                DEFAULT_PINNED_SHORTCUTS
-            }
-        }
-        return DEFAULT_PINNED_SHORTCUTS
     }
 
     private fun replaceTypeSegment(
@@ -533,15 +476,6 @@ open class CachedSettingsRepository(
         val others = current.filterNot(typePredicate)
         return replacement + others
     }
-
-    private fun shortcutKeyPart(name: String) = "shortcut:$name"
-    private fun agentKeyPart(id: String) = "agent:$id"
-    private fun isShortcutKeyPart(key: String) = key.startsWith("shortcut:")
-    private fun isAgentKeyPart(key: String) = key.startsWith("agent:")
-    private fun parseShortcutKeyPart(key: String): String? =
-        if (isShortcutKeyPart(key)) key.removePrefix("shortcut:") else null
-    private fun parseAgentKeyPart(key: String): String? =
-        if (isAgentKeyPart(key)) key.removePrefix("agent:") else null
 
     companion object {
         val DEFAULT_PINNED_SHORTCUTS = listOf(

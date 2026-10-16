@@ -33,9 +33,6 @@ class IrohAgentIdentityCanonicalTest {
         File(dir, fileName).writeText("""{"agentId":"$agentId","secretKeyB64":"$keyB64"}""")
     }
 
-    private fun keyB64Of(fileName: String): String =
-        Regex("\"secretKeyB64\":\"([^\"]+)\"").find(File(dir, fileName).readText())!!.groupValues[1]
-
     private fun fixedKeyB64(seed: Byte): String =
         Base64.getEncoder().encodeToString(ByteArray(32) { seed })
 
@@ -109,91 +106,4 @@ class IrohAgentIdentityCanonicalTest {
         assertIs<IllegalArgumentException>(ex)
     }
 
-    // ---- migration ----
-
-    /**
-     * Bare counterpart exists: the orphan is deleted and the LIVE key is untouched.
-     * Asserting the surviving key bytes is the point — a migration that "succeeds" by
-     * overwriting the live keypair with the orphan's would change the agent's node id
-     * and break every peer that cached it.
-     */
-    @Test
-    fun `migration deletes the orphan and preserves the live canonical key`() {
-        val liveKey = fixedKeyB64(1)
-        writeIdentity("agent-X.json", "agent-X", liveKey)
-        writeIdentity("letta_agent-X.json", "letta_agent-X", fixedKeyB64(2))
-
-        val actions = IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-
-        assertEquals(listOf("agent-X.json"), identityFiles())
-        assertEquals(liveKey, keyB64Of("agent-X.json"), "the live canonical key must survive unchanged")
-        val deleted = assertIs<IdentityMigrationAction.DeletedOrphan>(actions.single())
-        assertEquals("letta_agent-X", deleted.legacyAgentId)
-        assertEquals("agent-X", deleted.canonicalAgentId)
-    }
-
-    /**
-     * No bare counterpart: the keypair is carried over verbatim. Regenerating instead
-     * would silently rotate the agent's node id.
-     */
-    @Test
-    fun `migration renames a lone legacy file preserving key bytes`() {
-        val legacyKey = fixedKeyB64(3)
-        writeIdentity("letta_agent-Y.json", "letta_agent-Y", legacyKey)
-
-        val actions = IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-
-        assertEquals(listOf("agent-Y.json"), identityFiles())
-        assertEquals(legacyKey, keyB64Of("agent-Y.json"), "key material must be preserved byte-for-byte")
-        assertIs<IdentityMigrationAction.RenamedToCanonical>(actions.single())
-    }
-
-    /** The migrated key must still load, and yield the same node id it had before. */
-    @Test
-    fun `renamed identity keeps its node id`() {
-        writeIdentity("letta_agent-Y.json", "letta_agent-Y", fixedKeyB64(4))
-        val before = IrohAgentIdentity.loadOrCreate("letta_agent-Y", dir)
-
-        // loadOrCreate canonicalizes, so `before` created agent-Y.json; reset to the
-        // pre-migration shape to exercise the migration proper.
-        dir.deleteRecursively()
-        writeIdentity("letta_agent-Y.json", "letta_agent-Y", Base64.getEncoder().encodeToString(before.secretKeyBytes))
-
-        IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-        val after = IrohAgentIdentity.loadOrCreate("agent-Y", dir)
-
-        assertEquals(before.nodeIdHex, after.nodeIdHex, "migration must not rotate the node id")
-    }
-
-    @Test
-    fun `migration is idempotent`() {
-        writeIdentity("agent-X.json", "agent-X", fixedKeyB64(1))
-        writeIdentity("letta_agent-X.json", "letta_agent-X", fixedKeyB64(2))
-        writeIdentity("letta_agent-Y.json", "letta_agent-Y", fixedKeyB64(3))
-
-        val first = IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-        val filesAfterFirst = identityFiles()
-        val second = IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-
-        assertEquals(2, first.size)
-        assertTrue(second.isEmpty(), "a second run must report no actions: $second")
-        assertEquals(filesAfterFirst, identityFiles(), "a second run must not change the directory")
-    }
-
-    @Test
-    fun `migration leaves canonical and unrelated files untouched`() {
-        writeIdentity("agent-X.json", "agent-X", fixedKeyB64(1))
-        dir.mkdirs()
-        File(dir, "README.md").writeText("not an identity")
-
-        val actions = IrohAgentIdentity.migrateLegacyNamespacedFiles(dir)
-
-        assertTrue(actions.isEmpty())
-        assertEquals(listOf("README.md", "agent-X.json"), identityFiles())
-    }
-
-    @Test
-    fun `migration on a missing directory is a no-op and never throws`() {
-        assertTrue(IrohAgentIdentity.migrateLegacyNamespacedFiles(File(dir, "nope")).isEmpty())
-    }
 }

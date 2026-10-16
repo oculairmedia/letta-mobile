@@ -5,7 +5,6 @@ import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,20 +26,6 @@ class KeystoreIrohIdentityStoreTest {
     }
 
     private val dir: File = Files.createTempDirectory("identity").toFile()
-
-    @Test
-    fun legacyPlaintextKeyIsSealedDeletedAndKeepsTheSameBytes() = runTest {
-        val legacy = ByteArray(32) { it.toByte() }
-        File(dir, KeystoreIrohIdentityStore.LEGACY_FILE).writeBytes(legacy)
-
-        val loaded = KeystoreIrohIdentityStore(dir, FakeSealer()).loadOrCreate()
-
-        assertArrayEquals("NodeId must survive the migration", legacy, loaded)
-        assertFalse(File(dir, KeystoreIrohIdentityStore.LEGACY_FILE).exists())
-        val sealed = File(dir, KeystoreIrohIdentityStore.SEALED_FILE).readBytes()
-        assertFalse("the sealed file must not contain the key in the clear", sealed.toList().windowed(32).any { it == legacy.toList() })
-        assertArrayEquals(legacy, KeystoreIrohIdentityStore(dir, FakeSealer()).loadOrCreate())
-    }
 
     @Test
     fun freshDeviceGetsOneStableIdentity() = runTest {

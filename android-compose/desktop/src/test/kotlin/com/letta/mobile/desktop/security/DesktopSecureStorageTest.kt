@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DesktopSecureStorageTest {
@@ -67,17 +68,22 @@ class DesktopSecureStorageTest {
     }
 
     @Test
-    fun legacyPlaintextTokenMigratesToEncryptedOnFirstRead() {
+    fun plaintextValueUnderASensitiveKeyReadsAsAbsent() {
         val delegate = InMemoryStore()
-        delegate.values["letta.config.accessToken"] = "legacy-plaintext-token"
+        delegate.values["letta.config.accessToken"] = "plaintext-token"
         val store = EncryptingSecureSettingsStore(delegate, tempVault())
 
-        assertEquals("legacy-plaintext-token", store.getString("letta.config.accessToken", null))
+        assertNull(store.getString("letta.config.accessToken", null))
+    }
 
-        val migrated = delegate.values.getValue("letta.config.accessToken")
-        assertTrue(migrated.startsWith(EncryptingSecureSettingsStore.PREFIX))
-        assertFalse(migrated.contains("legacy-plaintext-token"))
-        assertEquals("legacy-plaintext-token", store.getString("letta.config.accessToken", null))
+    @Test
+    fun parkedAccessTokenIsEncryptedAtRest() {
+        val delegate = InMemoryStore()
+        val store = EncryptingSecureSettingsStore(delegate, tempVault())
+        store.putString("letta.config.parkedAccessToken", "parked-token")
+
+        assertFalse(delegate.values.getValue("letta.config.parkedAccessToken").contains("parked-token"))
+        assertEquals("parked-token", store.getString("letta.config.parkedAccessToken", null))
     }
 
     @Test

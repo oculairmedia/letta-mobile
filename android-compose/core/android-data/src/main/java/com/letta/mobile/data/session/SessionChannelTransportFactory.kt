@@ -52,8 +52,7 @@ class SessionChannelTransportFactory @Inject constructor(
                     scope = scope,
                     onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
                     // d6e8g.9 / dpv7m.2: a stable device NodeId so reconnects reuse
-                    // the identity a host paired; sealed with a Keystore key (the
-                    // old plaintext key file is migrated in place, same NodeId).
+                    // the identity a host paired; sealed with a Keystore key.
                     secretKeyStore = com.letta.mobile.data.security.KeystoreIrohIdentityStore.forApp(appContext),
                     externalToolRegistry = externalToolRegistry,
                     notebookStore = notebookStore,
