@@ -46,7 +46,7 @@ data class RecentAgentsInput(
 /** The strip: the agents it shows, in order, and how many of the directory it leaves out. */
 data class RecentAgentsCut(
     val agents: List<Pair<String, String>>,
-    /** Directory agents not on the strip; the host offers an "all agents" path while this is non-zero. */
+    /** Directory agents not on the strip; the host's agent picker (the rail's New) still lists them. */
     val hiddenCount: Int,
 )
 

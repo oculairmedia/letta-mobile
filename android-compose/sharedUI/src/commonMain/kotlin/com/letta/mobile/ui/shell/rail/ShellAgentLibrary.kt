@@ -57,7 +57,6 @@ data class ShellLibraryRailState(
     val focus: ShellRailFocus,
     val expanded: Boolean = false,
     val homeSelected: Boolean = false,
-    val hiddenAgentCount: Int = 0,
 )
 
 /**
@@ -73,7 +72,6 @@ fun ShellLibraryRail(state: ShellLibraryRailState, actions: ShellAgentRailAction
             entries = entries,
             homeSelected = state.homeSelected,
             expanded = state.expanded,
-            hiddenAgentCount = state.hiddenAgentCount,
         ),
         actions = actions,
         modifier = modifier.background(MaterialTheme.colorScheme.background),

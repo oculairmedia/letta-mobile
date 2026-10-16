@@ -50,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.letta.mobile.ui.chat.AgentOrb
 import com.letta.mobile.ui.components.lettaFadingEdges
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.host.LocalLettaHost
 import com.letta.mobile.ui.host.LettaHoverCard
 import com.letta.mobile.ui.shell.ShellRowMenus
@@ -59,7 +58,6 @@ import com.letta.mobile.ui.theme.LettaDimens
 /** Test tags for the rail's parts. */
 object ShellAgentRailTags {
     const val RAIL = "shell-agent-rail"
-    const val ALL_AGENTS = "shell-agent-rail-all-agents"
     fun orb(key: String) = "shell-agent-rail-orb-$key"
 }
 
@@ -98,7 +96,7 @@ fun ShellAgentRail(
             if (state.expanded && library != null) {
                 library()
             } else {
-                ShellRailOrbList(entries = state.entries, hiddenAgentCount = state.hiddenAgentCount, actions = actions)
+                ShellRailOrbList(entries = state.entries, actions = actions)
             }
         }
         RailHeaderRow(onClick = actions.onNewSession, label = "New".takeIf { state.expanded }) {
@@ -134,11 +132,10 @@ private fun RailHeaderRow(onClick: () -> Unit, label: String?, icon: @Composable
 
 /**
  * The orbs, lazy and scrolling so a long roster never pushes New off-screen; the edges fade while it
- * scrolls. When the recents cut left agents out, an "All agents" button after the orbs opens the full list.
+ * scrolls. Agents the recents cut left out are reached through New, whose picker lists every agent.
  */
 @Composable
-private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, hiddenAgentCount: Int, actions: ShellAgentRailActions) {
-    val onShowAllAgents = actions.onShowAllAgents.takeIf { hiddenAgentCount > 0 }
+private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, actions: ShellAgentRailActions) {
     val listState = rememberLazyListState()
     LazyColumn(
         state = listState,
@@ -154,39 +151,8 @@ private fun ColumnScope.ShellRailOrbList(entries: List<ShellRailEntry>, hiddenAg
         items(entries, key = { "orb-${it.key}" }) { entry ->
             ShellRailOrb(entry = entry, actions = actions)
         }
-        if (onShowAllAgents != null) {
-            item(key = "all-agents") { AllAgentsButton(hiddenAgentCount = hiddenAgentCount, onClick = onShowAllAgents) }
-        }
     }
 }
-
-/**
- * The rail's way to every agent the recents cut left out: an "All agents" grid button, opening the
- * host's full agent list. How many are left out is in its description and tooltip, not on its face.
- */
-@Composable
-private fun AllAgentsButton(hiddenAgentCount: Int, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(width = LettaDimens.Orb.railSlotWidth, height = LettaDimens.Orb.railSlotHeight)
-            .testTag(ShellAgentRailTags.ALL_AGENTS),
-        contentAlignment = Alignment.Center,
-    ) {
-        RailCircleButton(
-            RailCircleButtonStyle(
-                icon = LettaIcons.Apps,
-                description = allAgentsDescription(hiddenAgentCount),
-                diameter = LettaDimens.Control.iconButton,
-                container = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-            onClick = onClick,
-        )
-    }
-}
-
-/** "All agents (N more)": the control's description and tooltip. */
-internal fun allAgentsDescription(hiddenAgentCount: Int): String = "$ALL_AGENTS ($hiddenAgentCount more)"
 
 /** Fades whichever edge of the rail list has more to scroll to (about one orb's worth). */
 @Composable
@@ -330,7 +296,6 @@ private fun RailCircleButton(style: RailCircleButtonStyle, onClick: () -> Unit) 
     }
 }
 
-private const val ALL_AGENTS = "All agents"
 private const val FADE_MS = 250
 private const val ORBIT_MS = 1200
 private const val FULL_TURN = 360f
