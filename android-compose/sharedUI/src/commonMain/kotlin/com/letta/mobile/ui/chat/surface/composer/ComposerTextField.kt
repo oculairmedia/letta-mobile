@@ -44,6 +44,7 @@ import com.letta.mobile.sharedui.resources.chat_surface_placeholder
 import com.letta.mobile.ui.chat.surface.sendflight.rememberSendFlightSource
 import com.letta.mobile.ui.haptics.LettaHapticCue
 import com.letta.mobile.ui.haptics.LocalHaptics
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotGazeSurface
 import com.letta.mobile.ui.mascot.mascotGazeTarget
 import com.letta.mobile.ui.theme.LettaDimens
@@ -131,11 +132,16 @@ internal fun ComposerTextField(
         }
         true
     }
+    // The mascot being typed to listens to the cadence (letta-mobile-te3n1.1); only the primary field counts.
+    val mascots = LocalMascotRegistry.current
     BasicTextField(
         value = fieldValue,
         onValueChange = { next ->
             fieldValue = next
-            if (next.text != text) model.actions.updateComposerText(next.text)
+            if (next.text != text) {
+                model.actions.updateComposerText(next.text)
+                if (primary) mascots.noteComposerKeystroke()
+            }
         },
         enabled = enabled,
         modifier = modifier

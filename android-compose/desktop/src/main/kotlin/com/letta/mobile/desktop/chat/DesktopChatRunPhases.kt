@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.presence.ConversationRunPhasePublisher
 import com.letta.mobile.data.presence.ConversationRunRegistry
 import com.letta.mobile.data.presence.RunScope
@@ -20,7 +21,7 @@ import kotlinx.coroutines.launch
 internal class DesktopChatRunPhases(
     private val scope: CoroutineScope,
     private val state: StateFlow<DesktopChatSurfaceState>,
-    registry: ConversationRunRegistry,
+    private val registry: ConversationRunRegistry,
     private val closed: () -> Boolean,
 ) {
     private val publisher = ConversationRunPhasePublisher(registry)
@@ -53,6 +54,21 @@ internal class DesktopChatRunPhases(
             conversationId,
             RuntimeEventPayload.RemoteStreamFrame(frameId = "desktop-tokens", messageType = "assistant_message", body = ""),
         )
+    }
+
+    /** The user asked to stop [conversationId]'s run; it reads INTERRUPTING until the terminal lands. */
+    fun markInterrupting(conversationId: String) {
+        if (closed()) return
+        // The run being stopped is in the registry under its own agent, even when the surface
+        // state does not list the conversation (a run the gateway reported for another window).
+        val agent = registry.runs.value[conversationId]?.agentId ?: agentIdFor(conversationId) ?: return
+        publisher.markInterrupting(RunScope(conversationId, agent))
+    }
+
+    /** The window's subagent registry list, through the shared path Android uses (DELEGATING, dreaming). */
+    fun publishSubagents(entries: List<SubagentEntry>) {
+        if (closed()) return
+        publisher.setSubagents(entries)
     }
 
     /** Subscribe to [gateway]'s runtime events when it can report them; a gateway that cannot reports nothing. */

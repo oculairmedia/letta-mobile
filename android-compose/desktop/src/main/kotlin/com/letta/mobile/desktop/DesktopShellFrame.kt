@@ -20,9 +20,7 @@ import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
-import com.letta.mobile.data.presence.dreamingAgentIds
 import com.letta.mobile.data.presence.presenceByAgent
-import com.letta.mobile.data.presence.withDreaming
 import com.letta.mobile.ui.shell.header.UnifiedSearchSources
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
@@ -191,8 +189,10 @@ private fun rememberDesktopShellActivity(context: DesktopShellContext, chatState
     // ProvideMascotShell reads the app-wide one: the phase the turn is actually in, attributed to
     // the conversation it happened in (letta-mobile-8a3bz, -s4krx).
     val runs by chatController.runs.collectAsState()
-    // letta-mobile-iczm7: an agent whose dream runs in the background dozes while otherwise idle.
-    val mascotPresence = remember(runs, activeSubagents) { runs.presenceByAgent().withDreaming(dreamingAgentIds(activeSubagents)) }
+    // letta-mobile-iczm7 / te3n1.1: subagents reach the run registry through the shared publisher
+    // (DELEGATING, dreaming), the same path Android's chat takes.
+    LaunchedEffect(chatController, activeSubagents) { chatController.publishSubagents(activeSubagents) }
+    val mascotPresence = remember(runs) { runs.presenceByAgent() }
     val mascotRegistry = LocalMascotRegistry.current
     SideEffect { mascotRegistry.updatePresence(mascotPresence) }
     val thinkingAgentId = thinkingConversationId?.let { tid ->

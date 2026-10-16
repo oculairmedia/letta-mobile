@@ -222,7 +222,7 @@ internal fun androidAboutSection(versionName: String, status: EmbeddedLettaCodeR
 )
 
 /** Where the developer section's debug entries lead; null leaves them out (release builds). */
-internal class DeveloperDestinations(val onCanvasDebug: () -> Unit)
+internal class DeveloperDestinations(val onCanvasDebug: () -> Unit, val onCopyRuntimeLog: () -> Unit = {})
 
 /** Preview features, and the debug tools of a debug build (Developer group). */
 internal fun developerSection(state: ConfigUiState, vm: ConfigViewModel, debug: DeveloperDestinations?) = SettingsSectionModel(
@@ -242,7 +242,11 @@ internal fun developerSection(state: ConfigUiState, vm: ConfigViewModel, debug: 
             add(
                 SettingsRow.Actions(
                     "dev-debug",
-                    listOf(SettingsAction("dev-canvas", "Canvas debug") { destinations.onCanvasDebug() }),
+                    listOf(
+                        SettingsAction("dev-canvas", "Canvas debug") { destinations.onCanvasDebug() },
+                        // letta-mobile-by4vm.121.11: the on-device runtime's lifecycle file, past logcat.
+                        SettingsAction("dev-runtime-log", "Copy runtime log") { destinations.onCopyRuntimeLog() },
+                    ),
                 ),
             )
         }

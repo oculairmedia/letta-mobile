@@ -7,6 +7,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.sharedui.resources.Res
 import com.letta.mobile.sharedui.resources.composer_model_no_match
+import com.letta.mobile.sharedui.resources.composer_model_none
+import com.letta.mobile.sharedui.resources.composer_model_none_hint
 import com.letta.mobile.sharedui.resources.composer_model_other_provider
 import com.letta.mobile.sharedui.resources.composer_model_search
 import com.letta.mobile.ui.chat.session.ChatModelOption
@@ -50,7 +52,7 @@ internal fun ComposerModelPickerSheet(
             selected = selected.orEmpty(),
             filterLocally = false,
             search = PickerSearch(stringResource(Res.string.composer_model_search)),
-            empty = PickerEmpty(stringResource(Res.string.composer_model_no_match, query)),
+            empty = modelPickerEmpty(model, query),
         ),
         callbacks = PickerCallbacks(onQuery = { query = it }, onPick = { onSelect(it.value) }, onDismiss = onDismiss),
         pane = PickerPane(
@@ -58,6 +60,20 @@ internal fun ComposerModelPickerSheet(
             testTag = testTag,
         ),
     )
+}
+
+/**
+ * letta-mobile-by4vm.121.11: a search that matched nothing, a catalog that could not be read (its
+ * reason, e.g. the on-device runtime stopped), and a catalog with no models yet read differently.
+ */
+@Composable
+private fun modelPickerEmpty(model: ChatModelUiState, query: String): PickerEmpty {
+    val unavailable = model.unavailableReason
+    return when {
+        query.isNotBlank() -> PickerEmpty(stringResource(Res.string.composer_model_no_match, query))
+        unavailable != null -> PickerEmpty(unavailable)
+        else -> PickerEmpty(stringResource(Res.string.composer_model_none), stringResource(Res.string.composer_model_none_hint))
+    }
 }
 
 private fun ChatModelOption.toPickerItem(provider: String): PickerItem<ChatModelOption> = PickerItem(

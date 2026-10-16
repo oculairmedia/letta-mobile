@@ -142,13 +142,28 @@ fun MascotLive(
     val presence = registry.presence[agentId] ?: AgentPresence.IDLE
     LaunchedEffect(entry, presence) { entry.ensureLoaded(); entry.apply(presence) }
     val cursor = registry.cursor.value
+    val pointerPresent = cursor != null
+    // Reduced motion holds one look per state (the content at work, the input at rest): no
+    // wandering, and every reaction shrinks to a blink.
+    val reducedMotion = LocalReducedMotion.current
+    LaunchedEffect(entry, reducedMotion, pointerPresent) {
+        entry.setPlatformFacts(MascotPlatformFacts(reduceMotion = reducedMotion, pointerPresent = pointerPresent))
+    }
     // At rest (idle, no pointer, its last beat played out) the scene holds its pose and no frame
     // is asked for: a seat that stays composed must not redraw the window every vsync (MascotRest).
-    val moving = rememberMascotMoving(mascotEngaged(presence, pointerPresent = cursor != null), identity)
+    val moving = rememberMascotMoving(mascotEngaged(presence, pointerPresent = pointerPresent), identity)
     // The director's timers (listening release, success hold, blink schedule) need a clock;
-    // tickTo is idempotent per frame so several surfaces of one agent tick it once.
+    // tickTo is idempotent per frame so several surfaces of one agent tick it once. The keystroke
+    // count is read here, not in composition, so typing never recomposes the tile.
     LaunchedEffect(entry, moving) {
-        if (moving) while (true) withFrameNanos { entry.tickTo(it) }
+        if (moving) {
+            while (true) {
+                withFrameNanos {
+                    entry.setKeystrokes(registry.composerKeystrokes)
+                    entry.tickTo(it)
+                }
+            }
+        }
     }
     // Gaze: this tile vs the pointer plus optional composer / timeline rects
     // from the registry. Null input/timeline skip those plan rows; OWN/USER
@@ -163,8 +178,6 @@ fun MascotLive(
         .filter { it.agentId != agentId && !it.bounds.isEmpty }
         .map { GazePoint(it.bounds.centerX, it.bounds.centerY) }
     val minReachPx = with(LocalDensity.current) { GAZE_MIN_REACH.toPx() }
-    // Reduced motion holds one look per state (the content at work, the input at rest): no wandering.
-    val reducedMotion = LocalReducedMotion.current
     LaunchedEffect(entry, cursor, bounds, minReachPx, inputBounds, timelineBounds, peersPx, reducedMotion) {
         entry.setGazeWorld(
             GazeWorld.fromWindow(

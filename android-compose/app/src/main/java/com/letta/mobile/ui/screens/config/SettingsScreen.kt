@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.config
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +23,8 @@ import ca.oculair.meridian.R
 import com.letta.mobile.data.settings.NotificationSettings
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.platform.BatteryOptimizationHelper
+import com.letta.mobile.runtime.local.RotatingLineFile
+import com.letta.mobile.runtime.local.runtimeLifecycleLogFile
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.settings.BackendSettingsActions
@@ -54,6 +58,7 @@ fun SettingsScreen(
         battery = rememberBatteryOptimizationState(context),
         onImportModel = { importModel.launch(arrayOf("application/octet-stream", "*/*")) },
         onSaveModel = { viewModel.saveConfig(onSuccess = { snackbar.dispatch(CONFIG_SAVED) }, onError = snackbar::dispatch) },
+        onCopyRuntimeLog = { snackbar.dispatch(copyRuntimeLifecycleLog(context)) },
     )
     val services = SettingsPageServices(
         backend = BackendSettingsActions(
@@ -77,6 +82,15 @@ fun SettingsScreen(
         destination = ShellDestination.Settings(),
         deps = ShellPageDeps(settings = shellSettingsPage(SettingsPageState(config), services, onBack = onNavigateBack)),
     )
+}
+
+/** Debug builds: puts the on-device runtime's lifecycle log on the clipboard; returns what to tell the user. */
+private fun copyRuntimeLifecycleLog(context: Context): String {
+    val text = RotatingLineFile(runtimeLifecycleLogFile(context)).read()
+    if (text.isBlank()) return "The runtime log is empty"
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return "No clipboard"
+    clipboard.setPrimaryClip(ClipData.newPlainText("letta runtime log", text))
+    return "Runtime log copied"
 }
 
 @Composable

@@ -239,7 +239,7 @@ class GazeDirector(
     private fun cursorDemandsLook(state: AvatarState, world: GazeWorld): Boolean {
         if (world.mode == GazeDriveMode.CURSOR) return world.pointer != null
         val pointer = world.pointer ?: return false
-        if (state == AvatarState.SLEEPING) return false
+        if (state.eyesClosed) return false
         if (interestOf(GazeTarget.CURSOR) <= config.cursorInterestFloor) return false
         val movedRecently = world.pointerMovedRecently ?: (pointerFresh > 0f)
         if (!movedRecently) return false

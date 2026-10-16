@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.presence.AgentPresence
+import com.letta.mobile.data.presence.RunEdges
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
@@ -28,9 +29,11 @@ import kotlinx.coroutines.delay
 /**
  * Whether a live mascot has something to show right now: any presence but plain idle (working,
  * the user typing to it, an approval, an error), or a pointer in the window its eyes can follow.
+ * The run edge counts are history, not presence: an agent that has finished runs and does nothing
+ * now is at rest.
  */
 internal fun mascotEngaged(presence: AgentPresence, pointerPresent: Boolean): Boolean =
-    presence != AgentPresence.IDLE || pointerPresent
+    presence.copy(edges = RunEdges.NONE) != AgentPresence.IDLE || pointerPresent
 
 /**
  * How long a mascot keeps moving after it stops being engaged (or first appears, or changes

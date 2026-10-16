@@ -71,6 +71,40 @@ interface AvatarRuntime {
      */
     fun setCameraFraming(framing: AvatarCameraFraming) {}
 
+    /**
+     * Play a one-shot [reaction] (letta-mobile-te3n1); [arg] carries its magnitude or variant
+     * (LAND's impact, TRICK's id). A renderer whose asset has no animation for it plays its
+     * fallback or nothing. Default no-op so renderers opt in.
+     */
+    fun react(reaction: AvatarReaction, arg: ReactionArg = ReactionArg.NONE) {}
+
+    /** How intently the mascot listens (the user's typing cadence while LISTENING). Default no-op. */
+    fun setListenLevel(level: ListenLevel) {}
+
+    /** Whether the pointer is over the mascot. Default no-op. */
+    fun setHovered(hover: Hover) {}
+
+    /** Whether the user is petting the mascot. Default no-op. */
+    fun setPetting(petting: Petting) {}
+
+    /** The mascot's own travel / drag velocity through the window. Default no-op. */
+    fun setMotion(motion: MascotMotion) {}
+
+    /**
+     * True when the asset squashes, stretches and leans itself from [setMotion] and LAND, so the
+     * host must not deform the drawn layer as well (te3n1.3's `rigCarriesBody`).
+     */
+    val carriesBody: Boolean get() = false
+
+    /** The platform asked for reduced motion; the asset holds still poses. Default no-op. */
+    fun setReducedMotion(preference: MotionPreference) {}
+
+    /**
+     * True when the asset calms its own reactions under [setReducedMotion]. When false the
+     * director plays every reaction as a single blink instead, so reduced motion holds on any asset.
+     */
+    val honorsReducedMotion: Boolean get() = false
+
     /** Advance renderer-side time (spring bones, blends, procedural idle). */
     fun update(deltaSeconds: Float)
 
