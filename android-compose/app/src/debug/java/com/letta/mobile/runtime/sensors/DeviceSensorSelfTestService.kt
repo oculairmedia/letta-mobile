@@ -6,7 +6,6 @@ import android.os.IBinder
 import android.util.Log
 import ca.oculair.meridian.BuildConfig
 import java.io.File
-import kotlinx.coroutines.runBlocking
 
 /**
  * Dev-only service entrypoint for ADB validation of Stage 1→2 without user
@@ -31,18 +30,9 @@ class DeviceSensorSelfTestService : Service() {
             val payload = buildSelfTestPayload(snapshot)
             val out = File(filesDir, DeviceSensorSelfTestReceiver.OUTPUT_FILE)
             out.writeText(payload)
-            val grounding = File(filesDir, DeviceSensorGroundingWriter.FILE_NAME)
-            runBlocking {
-                DeviceSensorGroundingWriter(
-                    provider = object : DeviceSensorSnapshotProvider {
-                        override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
-                    },
-                    outputFile = grounding,
-                ).writeSnapshot(snapshot.capturedAtMillis)
-            }
             Log.w(
                 TAG,
-                "[device-sensor-self-test] wrote ${out.absolutePath} and ${grounding.absolutePath} " +
+                "[device-sensor-self-test] wrote ${out.absolutePath} " +
                     "sensors=${snapshot.sensorCount} summary=${DeviceSensorSnapshotFormatter.toCompactString(snapshot)}",
             )
         }.onFailure { error ->

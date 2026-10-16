@@ -79,13 +79,13 @@ private fun runtimeStatusRows(status: EmbeddedLettaCodeRuntimeStatus): List<Sett
 )
 
 /**
- * letta-mobile-ckmub.5: the embedded runtime is for development. It is letta-code
- * [LettaCodeContract.ANDROID_EMBEDDED_VERSION] (nodejs-mobile, Node 18), below the
- * [LettaCodeContract.VERSION] contract, so features verified against the contract are remote-only.
+ * letta-mobile-ckmub.5: the embedded runtime is for development. It runs letta-code
+ * [LettaCodeContract.VERSION] (nodejs-mobile, Node 18) through the headless protocol until it moves
+ * to the App Server path (letta-mobile-by4vm.110.6), so App Server features are remote-only.
  */
 internal val EMBEDDED_RUNTIME_DEV_ONLY_NOTE: String =
-    "For development only. The on-phone runtime is letta-code ${LettaCodeContract.ANDROID_EMBEDDED_VERSION}, " +
-        "older than the ${LettaCodeContract.VERSION} the app is built for, so newer features are missing. " +
+    "For development only. The on-phone runtime runs letta-code ${LettaCodeContract.VERSION} in a reduced mode: " +
+        "one conversation per app run, and no forking, dreaming or approvals. " +
         "For everyday use, connect to a desktop or remote host."
 
 private fun catalogRows(state: ConfigUiState, vm: ConfigViewModel): List<SettingsRow> {

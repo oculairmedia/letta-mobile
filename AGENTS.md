@@ -580,21 +580,24 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 - Build logic: versions only in `android-compose/gradle/libs.versions.toml` (one per library,
   no per-module forks); convention plugins in `android-compose/build-logic/`. The embedded
   (dev-only) letta-code runtime prep is the `com.letta.mobile.embedded-runtime` plugin, with pins
-  in `app/embedded-runtime/embedded-runtime.properties` and letta.js patches as real files in
-  `app/embedded-runtime/patches/` — edit those, not `app/build.gradle.kts`.
+  in `letta-code-runtime/letta-code-runtime.properties` (the one letta-code pin, also read by the
+  desktop build) and letta.js patches as real files in `letta-code-runtime/patches/` — edit
+  those, not `app/build.gradle.kts`.
 
 ### App Server contract / probe toolchain (epic letta-mobile-lgns8)
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
-  `~/.nvm/versions/node/v24.18.0/bin/node`). There is ONE wire contract:
-  **`@letta-ai/letta-code@0.34.8`** (`app-server-v2-contract-matrix.json` `baseline.version`),
-  which is also the desktop's bundled runtime and what the `appserver-contract-baseline` CI job
+  `~/.nvm/versions/node/v24.18.0/bin/node`). There is ONE letta-code pin:
+  **`@letta-ai/letta-code@0.34.14`** (`letta-code-runtime/letta-code-runtime.properties`), which
+  is the wire contract (`app-server-v2-contract-matrix.json` `baseline.version`), the desktop's
+  bundled runtime, the Android embedded runtime and what the `appserver-contract-baseline` CI job
   installs; `LettaCodeVersionPinsTest` fails if they disagree. Not the contract: the Linux host
   still runs **`0.33.6`** until redeployed (the client must keep working against it: never
   require a 0.34-only field, gate 0.34-only commands on an advertised capability); the
   restart-replay evidence is still the older **`0.29.12`** capture (it needs a live server +
-  model provider to re-capture); and the Android embedded runtime **`0.26.1`** is **dev-only**
-  (nodejs-mobile Node 18, letta-code 0.26.2+ needs Node >= 22.19; on-device execution is a
+  model provider to re-capture). The Android embedded runtime is still **dev-only**
+  (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a only, driven through
+  the headless stream-json protocol until letta-mobile-by4vm.110.6; on-device execution is a
   Google Play policy risk), so production Android is remote-only and anything "verified against
   a 0.33/0.34 server" is desktop/remote-only. One table lists every pin:
   `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`

@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     // Dev-only on-device letta-code runtime: npm/libnode/NDK prep tasks, letta.js patches
-    // (app/embedded-runtime/), EMBEDDED_LETTACODE_* BuildConfig. See build-logic/.../embedded/.
+    // (../letta-code-runtime/), EMBEDDED_LETTACODE_* BuildConfig. See build-logic/.../embedded/.
     id("com.letta.mobile.embedded-runtime")
     // 16 KB realignment + ELF sanity check of the vendored Iroh/Nimbus JNI .so files, run before
     // every merge*JniLibFolders/merge*NativeLibs (realign16KbJniLibs, verifyJniLibSanity).
@@ -340,7 +340,19 @@ android {
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE.md",
                 "META-INF/NOTICE.md",
+                // Desktop-only JNI payloads that JVM jars carry as Java resources and that would
+                // otherwise land at the APK root (~25 MB compressed). Android never loads them:
+                // org.automerge's LoadLibrary takes the System.loadLibrary path on Android (the .so
+                // comes from org.automerge:androidnative), and Iroh's JNA loader uses
+                // lib/<abi>/libiroh_ffi.so from computer.iroh:iroh-android.
+                "native/**", // org.automerge:automerge — windows/macOS automerge_jni
+                "win32-x86-64/**", // computer.iroh:iroh — iroh_ffi.dll
+                "darwin-aarch64/**", // computer.iroh:iroh — libiroh_ffi.dylib
             )
+        }
+        jniLibs {
+            // JNA's AAR still ships ABIs Android dropped (NDK r17 / API 21+); no device can load them.
+            excludes += setOf("lib/mips/**", "lib/mips64/**", "lib/armeabi/**")
         }
     }
 

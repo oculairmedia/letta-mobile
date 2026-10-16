@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.LettaCodeContract
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -117,11 +118,11 @@ class EmbeddedRuntimeDeviceLoopTest {
 
         assertTrue("embedded assets must be enabled for runnable status", status.assetsEnabled)
         assertTrue("embedded runtime should be runnable", status.runnable)
-        // The version carries the asset revision suffix (e.g. 0.26.1-r6);
-        // pin only the letta-code release.
+        // The version carries the asset revision suffix (e.g. 0.34.14-r32);
+        // pin only the letta-code release, which is THE pin.
         assertTrue(
             "unexpected embedded version: ${status.version}",
-            status.version.startsWith("0.26.1"),
+            status.version.startsWith("${LettaCodeContract.VERSION}-r"),
         )
     }
 

@@ -7,7 +7,6 @@ import com.letta.mobile.data.dreaming.DreamStartStatus
 import com.letta.mobile.data.dreaming.DreamTrigger
 import com.letta.mobile.data.dreaming.DreamUnsupportedReason
 import com.letta.mobile.data.model.SubagentKind
-import com.letta.mobile.data.transport.appserver.LettaCodeContract
 
 /** letta-mobile-iczm7: the Dreaming surface's text. Our own words over letta-code's behaviour. */
 object DreamingStrings {
@@ -86,8 +85,8 @@ object DreamingStrings {
         DreamUnsupportedReason.HostNeedsUpdate -> "This Iroh host is too old for dreaming controls. Update the host (meridian-iroh-wrapper)."
         DreamUnsupportedReason.NoNativeAppServer -> "This host has no App Server connection to letta-code, so it can't manage dreaming."
         DreamUnsupportedReason.RuntimeTooOld ->
-            "This letta-code runtime can't dream on request. The on-phone runtime is letta-code " +
-                "${LettaCodeContract.ANDROID_EMBEDDED_VERSION}, for development only; use a desktop or server runtime."
+            "This letta-code runtime can't dream on request. The on-phone runtime is for development only; " +
+                "use a desktop or server runtime."
     }
 
     fun failure(message: String): String = "Couldn't update dreaming: $message"

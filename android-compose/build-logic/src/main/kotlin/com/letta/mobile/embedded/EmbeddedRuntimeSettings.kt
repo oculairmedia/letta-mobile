@@ -4,7 +4,7 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import java.util.Properties
 
-/** Pins from `app/embedded-runtime/embedded-runtime.properties`. */
+/** Pins from `letta-code-runtime/letta-code-runtime.properties` (relative to the Gradle root). */
 internal data class EmbeddedRuntimePins(
     val lettaCodeVersion: String,
     val lettaCodeIntegrity: String,
@@ -20,7 +20,7 @@ internal data class EmbeddedRuntimePins(
 
     companion object {
         fun load(project: Project, path: String): EmbeddedRuntimePins {
-            val file = project.layout.projectDirectory.file(path)
+            val file = project.rootProject.layout.projectDirectory.file(path)
             val text = project.providers.fileContents(file).asText.get()
             val props = Properties().apply { load(text.reader()) }
             fun pin(key: String): String =

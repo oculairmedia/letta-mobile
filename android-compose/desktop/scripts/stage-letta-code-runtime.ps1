@@ -28,8 +28,9 @@ if (-not (Test-Path -LiteralPath $modulesSource)) {
 }
 Copy-Item -LiteralPath $modulesSource -Destination $modulesDest -Recurse -Force
 
-# letta-code 0.34's shrinkwrap nests @letta-ai/letta-agent-sdk with its own older letta-code copies
-# (0.33.7, and 0.33.3 below that) plus their dependencies. Those paths exceed the 260-character
+# letta-code 0.34.8's shrinkwrap nested @letta-ai/letta-agent-sdk with its own older letta-code
+# copies (0.33.7, and 0.33.3 below that) plus their dependencies; 0.34.14's SDK nests none, but the
+# removal stays for a release that brings them back. Those paths exceed the 260-character
 # limit WiX enforces in the MSI. The SDK resolves @letta-ai/letta-code with require.resolve, so
 # without the nested copies it uses the bundled runtime itself; its own dependencies (letta-client,
 # ajv) live one level up. The shrinkwrap also leaves an orphan letta-code/node_modules tree with

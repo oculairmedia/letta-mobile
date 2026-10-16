@@ -2,7 +2,6 @@ package com.letta.mobile.runtime.local
 
 import android.content.Context
 import android.util.Log
-import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -64,7 +63,6 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
     onDeviceProviderApiKey: String? = null,
     androidNetworkBridgeBaseUrl: String,
     androidNetworkBridgeToken: String,
-    deviceSensorGroundingWriter: DeviceSensorGroundingWriter? = null,
     toolInstaller: AndroidEmbeddedToolInstaller,
 ): AndroidEmbeddedLettaCodeLaunchSpec {
     workingDirectory.mkdirs()
@@ -78,7 +76,7 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
         writeEmbeddedLettaCodeProviderAuth(
             baseUrl = onDeviceProviderBaseUrl,
             apiKey = onDeviceProviderApiKey ?: EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_API_KEY,
-            modelId = modelSelection.openAiModelId,
+            modelSelection = modelSelection,
         )
     }
     return AndroidEmbeddedLettaCodeLaunchSpec(
@@ -112,9 +110,6 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
             put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
             put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
             put("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN", androidNetworkBridgeToken)
-            deviceSensorGroundingWriter?.let {
-                put("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH", it.outputFile.absolutePath)
-            }
             put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
         },
     )
@@ -190,8 +185,11 @@ private fun PreparedLettaCodeProject.memfsEnvironment(toolInstaller: AndroidEmbe
     val pathEnvironment = mapOf(
         "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
     ) + npmEnvironment
+    // letta-code 0.34 has no process-wide memfs opt-out (LETTA_LOCAL_BACKEND_NO_MEMFS is gone; only
+    // stateless sessions, `--no-memfs` and the `memfs:disabled` agent tag skip it). The embedded build
+    // is arm64-v8a only, where libgit.so is always packaged; without it memfs startup fails loudly.
     if (!toolInstaller.linkPackagedTool(binDirectory, "git", "libgit.so", "git-backed local memfs")) {
-        return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+        return pathEnvironment
     }
     val disabledHooksDirectory = File(storageDirectory.parentFile, "git-hooks-disabled").apply { mkdirs() }
     File(homeDirectory, ".gitconfig").writeText(
@@ -217,7 +215,7 @@ private fun PreparedLettaCodeProject.memfsEnvironment(toolInstaller: AndroidEmbe
 private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(
     baseUrl: String,
     apiKey: String,
-    modelId: String,
+    modelSelection: EmbeddedLettaCodeModelSelection,
 ) {
     val authFile = File(storageDirectory, "providers/auth.json")
     val root = buildJsonObject {
@@ -245,7 +243,7 @@ private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(
                             buildJsonArray {
                                 add(
                                     buildJsonObject {
-                                        put("id", modelId)
+                                        put("id", modelSelection.openAiModelId)
                                         put("contextWindow", DEFAULT_LOCAL_CONTEXT_WINDOW)
                                         put("maxTokens", EmbeddedLettaCodeModelSelection.DEFAULT_MAX_TOKENS)
                                         put("input", buildJsonArray {

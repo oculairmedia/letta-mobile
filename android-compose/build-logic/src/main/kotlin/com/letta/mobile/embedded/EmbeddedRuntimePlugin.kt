@@ -12,9 +12,9 @@ import org.gradle.api.tasks.TaskProvider
 /**
  * `com.letta.mobile.embedded-runtime`: the dev-only on-device letta-code runtime for :app
  * (nodejs-mobile libnode + NDK helpers + the patched letta.js asset tree), formerly ~1,100 lines
- * of app/build.gradle.kts. Pins live in `app/embedded-runtime/embedded-runtime.properties`, the
- * letta.js patches in `app/embedded-runtime/patches/`, shipped polyfills in
- * `app/embedded-runtime/runtime/`. Task names, inputs and outputs match the old inline tasks.
+ * of app/build.gradle.kts. Pins live in `letta-code-runtime/letta-code-runtime.properties` (the one
+ * letta-code pin, shared with the desktop bundle and the wire contract), the letta.js patches in
+ * `letta-code-runtime/patches/`, shipped preloads in `letta-code-runtime/runtime/`.
  *
  * Everything is gated by `embedLettaCodeNative` / `embedLettaCodeAssets` ([EmbeddedRuntimeFlags]);
  * with both off (CI, the default) the tasks are registered but skipped and only the
@@ -85,9 +85,8 @@ class EmbeddedRuntimePlugin : Plugin<Project> {
         val assets = project.tasks.register("prepareEmbeddedLettaCodeAssets", PrepareEmbeddedLettaCodeAssetsTask::class.java) {
             onlyIf { flags.assetsEnabled.get() }
             notCompatibleWithConfigurationCache("Runs npm install and copies embedded LettaCode assets.")
-            shimSources.set(project.layout.projectDirectory.dir("src/main/embedded-lettacode"))
-            patchesDirectory.set(project.layout.projectDirectory.dir("$RUNTIME_DIR/patches"))
-            runtimeDirectory.set(project.layout.projectDirectory.dir("$RUNTIME_DIR/runtime"))
+            patchesDirectory.set(project.rootProject.layout.projectDirectory.dir("$RUNTIME_DIR/patches"))
+            runtimeDirectory.set(project.rootProject.layout.projectDirectory.dir("$RUNTIME_DIR/runtime"))
             lettaCodeVersion.set(pins.lettaCodeVersion)
             deviceNpmVersion.set(pins.deviceNpmVersion)
             toolGroupPatchScript.set(repoScripts.resolve("patch-embedded-letta-code-tool-groups.cjs"))
@@ -95,13 +94,6 @@ class EmbeddedRuntimePlugin : Plugin<Project> {
             npmStageDirectory.set(project.layout.buildDirectory.dir("embedded-lettacode/npm-stage"))
             npmInvocationDirectory.set(project.layout.projectDirectory)
             outputDirectory.set(dirs.assets)
-        }
-        project.tasks.register(
-            "verifyEmbeddedLettaCodeSwitchSessionControl",
-            VerifyEmbeddedLettaCodeSwitchSessionControlTask::class.java,
-        ) {
-            dependsOn(assets)
-            assetsDirectory.set(dirs.assets)
         }
         val toolGroupTest = project.tasks.register("testEmbeddedLettaCodeToolGroupPatch", Exec::class.java) {
             description = "Runs regression tests for embedded LettaCode tool-call group trimming."
@@ -155,8 +147,9 @@ class EmbeddedRuntimePlugin : Plugin<Project> {
     )
 
     private companion object {
-        const val RUNTIME_DIR = "embedded-runtime"
-        const val PINS_FILE = "$RUNTIME_DIR/embedded-runtime.properties"
+        /** Relative to the Gradle root (android-compose/). */
+        const val RUNTIME_DIR = "letta-code-runtime"
+        const val PINS_FILE = "$RUNTIME_DIR/letta-code-runtime.properties"
 
         val CURL_HELPER = NdkHelper(
             "prepareEmbeddedCurlHelper",

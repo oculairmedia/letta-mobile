@@ -1,12 +1,12 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.34.8",
+    "version": "0.34.14",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "87e0cf05f1f4e726f880dcd42c3f165c56f64d846c8375a8cb386dc3f763110e",
-    "protocol_corpus_sha256": "f1be347e560f37d9899c5ae2c9d2de7b347f7eae71c9495e8ace5191bdbec344",
+    "protocol_sha256": "1a37d456a5e48ed003e4f5f0b1f6fcf29b0ec4e3f44d5b3b07b6ade3ac418498",
+    "protocol_corpus_sha256": "aad6304f10e25203679d0dfdca1ae45e176665ca26c0b1421199acc0e5f6e8ac",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -19,6 +19,7 @@
       "dist/types/types/conversation-fork-protocol.d.ts",
       "dist/types/types/cwd-protocol.d.ts",
       "dist/types/types/external-tool-protocol.d.ts",
+      "dist/types/types/file-write-protocol.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
       "dist/types/types/provider-oauth-config.d.ts",
@@ -131,6 +132,8 @@
     "channel_target_bind",
     "channel_route_remove",
     "channel_route_update",
+    "browser_device_mcp_oauth",
+    "browser_device_mcp_oauth_cancel",
     "execute_command",
     "remove_queue_item",
     "launch_subagent",
@@ -141,6 +144,7 @@
     "secret_apply"
   ],
   "messages": [
+    "browser_device_mcp_oauth_response",
     "control_request",
     "input_accepted",
     "teleport_probe_response",
@@ -350,7 +354,9 @@
         "list_connect_providers",
         "connect_provider",
         "disconnect_provider",
-        "chatgpt_usage_read"
+        "chatgpt_usage_read",
+        "browser_device_mcp_oauth",
+        "browser_device_mcp_oauth_cancel"
       ],
       "messages": [
         "list_models_response",
@@ -359,7 +365,8 @@
         "list_connect_providers_response",
         "connect_provider_response",
         "disconnect_provider_response",
-        "chatgpt_usage_read_response"
+        "chatgpt_usage_read_response",
+        "browser_device_mcp_oauth_response"
       ]
     },
     {

@@ -32,7 +32,10 @@ private fun ApplicationExtension.addBuildConfigFields(pins: EmbeddedRuntimePins,
 }
 
 private fun ApplicationExtension.addNativeRuntime(project: Project, dirs: EmbeddedRuntimeDirs) {
-    defaultConfig.ndk.abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+    // letta-mobile-by4vm.110 D2: the full-fat (embedded) build is arm64-v8a only. The NDK helpers
+    // (git/bash/curl/node CLI) exist only for arm64, so another ABI would ship libnode without the
+    // git that letta-code's memfs needs.
+    defaultConfig.ndk.abiFilters += "arm64-v8a"
     defaultConfig.externalNativeBuild.cmake.arguments +=
         "-DLETTACODE_LIBNODE_DIR=${dirs.libnode.get().asFile.absolutePath.replace("\\", "/")}"
     defaultConfig.externalNativeBuild.cmake.arguments += "-DANDROID_STL=c++_shared"
