@@ -33,7 +33,8 @@ data class MascotSignals(
  * double-click, measuring velocity and seat travel - and reports the result here; the director
  * writes the contract inputs and triggers (the host, not the file's listeners, becomes the writer
  * of hovered / dragged), and the `.riv` owns every animation. The interaction slice
- * (letta-mobile-te3n1.4) produces these on every platform; M3 reports seat travel as [Motion].
+ * (letta-mobile-te3n1.4) produces these on every platform; the seat transport (te3n1.3) reports
+ * landings as [Landed] and its travel through [MascotDirector.setMotion].
  */
 sealed interface MascotEvent {
     /** The user sent a message. */
@@ -66,11 +67,8 @@ sealed interface MascotEvent {
     /** The user put the mascot down; [impact] 0..1 is how hard it landed. */
     data class DragEnded(val impact: Float) : MascotEvent
 
-    /**
-     * The mascot's own velocity through the window, in mascot widths per second, as the host
-     * measured it - while dragged, or while a seat hand-off carries it. Zero when it comes to rest.
-     */
-    data class Motion(val vx: Float, val vy: Float) : MascotEvent
+    /** The mascot arrived at a seat (the end of a hop or its entrance); [impact] 0..1 is how fast it came in. */
+    data class Landed(val impact: Float) : MascotEvent
 
     /** A double-click / double-tap; [trick] picks the easter egg. */
     data class DoubleTap(val trick: Int) : MascotEvent
@@ -105,7 +103,7 @@ class MascotFrame internal constructor() {
     var reduceMotion: Boolean = false
         internal set
 
-    /** The host-measured velocity ([MascotEvent.Motion]), mascot widths per second. */
+    /** The host-measured travel / drag velocity ([MascotDirector.setMotion]), -1..1. */
     var motionX: Float = 0f
         internal set
 

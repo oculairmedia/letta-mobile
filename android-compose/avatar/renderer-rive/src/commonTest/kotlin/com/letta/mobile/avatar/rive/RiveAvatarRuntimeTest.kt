@@ -106,7 +106,7 @@ class RiveAvatarRuntimeTest {
         runtime.setListenLevel(2f)
         runtime.setHovered(true)
         runtime.setPetting(true)
-        runtime.setMotion(8f, -2f)
+        runtime.setMotion(8f, -0.5f)
         runtime.setReducedMotion(true)
         assertEquals(
             listOf<Pair<String, Any>>(
@@ -120,6 +120,7 @@ class RiveAvatarRuntimeTest {
             sink.writes,
         )
         assertTrue(runtime.honorsReducedMotion)
+        assertTrue(runtime.carriesBody, "the rig squashes and leans itself, so the layer must not")
     }
 
     @Test
@@ -136,6 +137,7 @@ class RiveAvatarRuntimeTest {
         runtime.setReducedMotion(true)
         assertEquals(emptyList(), sink.writes)
         assertEquals(false, runtime.honorsReducedMotion, "the director will blink instead")
+        assertEquals(false, runtime.carriesBody, "the layer keeps deforming the drawing")
     }
 
     @Test

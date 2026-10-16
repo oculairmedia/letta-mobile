@@ -46,6 +46,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.MascotEvent
 import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.avatar.core.MascotVector
 import com.letta.mobile.data.model.AgentId
@@ -316,10 +317,24 @@ private fun TransportedMascot(
     // The slot outlives the agent it shows: the driver reads whichever agent stands here now.
     val currentAgent by rememberUpdatedState(agentId)
     val density = LocalDensity.current
+    // The slot's scene (the one MascotLive below draws): its director hears the body's travel and
+    // landings (te3n1.1 over te3n1.3), and a rig that animates them itself takes the deform over.
+    val host = LocalMascotHost.current
+    val director = remember(host, sceneKey, identity) { host.entry(sceneKey, identity) }?.director
+    LaunchedEffect(director) { if (director?.carriesBody == true) transport.rigCarriesBody = true }
+    LaunchedEffect(director, flight) {
+        val d = director ?: return@LaunchedEffect
+        // Keyed on the flight's frame counter, so a body at rest asks for no frames.
+        snapshotFlow { flight.observeFrame() }.collect { d.setMotion(flight.body.motionX, flight.body.motionY) }
+    }
+    val landed = { impact: Float ->
+        transport.landed(flight, impact)
+        director?.onEvent(MascotEvent.Landed(impact))
+    }
     LaunchedEffect(sceneKey, reducedMotion) {
         if (reducedMotion) flight.body.snap()
-        launch { flight.enter(reducedMotion) { impact -> transport.landed(flight, impact) } }
-        launch { flight.drive(reducedMotion) { impact -> transport.landed(flight, impact) } }
+        launch { flight.enter(reducedMotion, landed) }
+        launch { flight.drive(reducedMotion, landed) }
         val motion = HopMotion(reducedMotion, density.density)
         snapshotFlow { currentAgent.let { agent -> transport.activeStage(agent)?.let { MascotTransport.SeatKey(agent, it) } } }
             .distinctUntilChanged()

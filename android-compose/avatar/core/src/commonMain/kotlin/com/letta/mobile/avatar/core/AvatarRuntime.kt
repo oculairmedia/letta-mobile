@@ -87,8 +87,14 @@ interface AvatarRuntime {
     /** The user is petting the mascot. Default no-op. */
     fun setPetting(petting: Boolean) {}
 
-    /** The mascot's own motion through the window, in mascot widths per second. Default no-op. */
+    /** The mascot's own travel / drag velocity through the window, -1..1 on each axis. Default no-op. */
     fun setMotion(vx: Float, vy: Float) {}
+
+    /**
+     * True when the asset squashes, stretches and leans itself from [setMotion] and LAND, so the
+     * host must not deform the drawn layer as well (te3n1.3's `rigCarriesBody`).
+     */
+    val carriesBody: Boolean get() = false
 
     /** The platform asked for reduced motion; the asset holds still poses. Default no-op. */
     fun setReducedMotion(reduced: Boolean) {}

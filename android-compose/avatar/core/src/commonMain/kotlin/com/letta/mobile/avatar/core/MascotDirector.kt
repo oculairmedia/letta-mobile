@@ -83,6 +83,9 @@ class MascotDirector(
     /** The arbitrated sustained state. */
     val state: AvatarState get() = avatar.state
 
+    /** The asset animates travel and landings itself ([AvatarRuntime.carriesBody]); the host must not deform it too. */
+    val carriesBody: Boolean get() = runtime.carriesBody
+
     private var signals = MascotSignals()
     private var world = GazeWorld()
     private val pending = ReactionBuffer()
@@ -167,7 +170,7 @@ class MascotDirector(
                 setMotion(0f, 0f)
                 fire(AvatarReaction.LAND, event.impact.coerceIn(0f, 1f))
             }
-            is MascotEvent.Motion -> setMotion(event.vx, event.vy)
+            is MascotEvent.Landed -> fire(AvatarReaction.LAND, event.impact.coerceIn(0f, 1f))
             is MascotEvent.DoubleTap -> {
                 wakeIfAsleep()
                 fire(AvatarReaction.TRICK, event.trick.toFloat())
@@ -180,10 +183,14 @@ class MascotDirector(
         }
     }
 
-    /** Host-measured velocity; reduced motion holds the body still, so it writes zero. */
-    private fun setMotion(vx: Float, vy: Float) {
-        val x = if (signals.reduceMotion || vx.isNaN()) 0f else vx
-        val y = if (signals.reduceMotion || vy.isNaN()) 0f else vy
+    /**
+     * The host-measured travel / drag velocity, -1..1 on each axis (te3n1.3's MascotBody motion).
+     * Allocation-free, so a host can write it every frame the body moves; reduced motion holds the
+     * body still, so it writes zero.
+     */
+    fun setMotion(vx: Float, vy: Float) {
+        val x = if (signals.reduceMotion || vx.isNaN()) 0f else vx.coerceIn(-1f, 1f)
+        val y = if (signals.reduceMotion || vy.isNaN()) 0f else vy.coerceIn(-1f, 1f)
         if (x == frame.motionX && y == frame.motionY) return
         frame.motionX = x
         frame.motionY = y

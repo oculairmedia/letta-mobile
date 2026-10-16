@@ -258,13 +258,16 @@ class MascotDirectorTest {
         val rig = rig()
         rig.director.onEvent(MascotEvent.DragStarted)
         assertEquals(AvatarState.DRAGGED, rig.director.state)
-        rig.director.onEvent(MascotEvent.Motion(vx = 1.5f, vy = -0.5f))
-        assertEquals(1.5f, rig.director.frame.motionX)
+        rig.director.setMotion(vx = 1.5f, vy = -0.5f)
+        assertEquals(1f, rig.director.frame.motionX, "clamped to the contract's -1..1")
         assertEquals(-0.5f, rig.director.frame.motionY)
         rig.director.onEvent(MascotEvent.DragEnded(impact = 2f))
         assertEquals(0f, rig.director.frame.motionX, "put down: at rest")
         assertEquals(AvatarState.IDLE, rig.director.state)
         assertEquals(listOf(AvatarReaction.LAND), rig.runtime.reactions)
+        rig.tick(0.5f)
+        rig.director.onEvent(MascotEvent.Landed(impact = 0.4f)) // a seat hop arriving (te3n1.3)
+        assertEquals(listOf(AvatarReaction.LAND, AvatarReaction.LAND), rig.runtime.reactions)
     }
 
     @Test

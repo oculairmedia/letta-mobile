@@ -191,6 +191,12 @@ data class RiveMascotCapabilities(
     /** The file calms itself under reduced motion, so reactions need not shrink on the host side. */
     val honorsReducedMotion: Boolean get() = RiveAvatarContract.INPUT_REDUCE_MOTION in inputs
 
+    /** The file squashes, stretches and leans itself from the travel inputs and its landing trigger. */
+    val carriesBody: Boolean
+        get() = RiveAvatarContract.INPUT_MOVE_X in inputs &&
+            RiveAvatarContract.INPUT_MOVE_Y in inputs &&
+            AvatarReaction.LAND in reactionTriggers
+
     companion object {
         /**
          * The mascot.riv shipped with the te3n1.5 rig: every reaction has its own trigger except an
