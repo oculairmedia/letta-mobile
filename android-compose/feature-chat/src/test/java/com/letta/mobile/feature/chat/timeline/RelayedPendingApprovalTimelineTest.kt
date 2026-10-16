@@ -12,7 +12,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
@@ -21,6 +20,8 @@ import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.feature.chat.NoOpChatActions
 import com.letta.mobile.feature.chat.parity.RowParityFixture
 import com.letta.mobile.feature.chat.screen.shared.SharedChatPageLocals
+import com.letta.mobile.ui.chat.session.TimelineHostApprovals
+import com.letta.mobile.ui.chat.session.withHostApprovals
 import com.letta.mobile.ui.chat.surface.ChatPlatformStyle
 import com.letta.mobile.ui.chat.surface.ChatSurfaceAppearance
 import com.letta.mobile.ui.chat.surface.ChatToolDetails
@@ -36,7 +37,7 @@ import org.robolectric.annotation.Config
 /**
  * letta-mobile-sieej (P0): the phone's chat over Iroh, Strict mode. The phone's own engine sees the
  * parked Bash call only as a plain tool row; the host's relayed `pending_approvals` snapshot is
- * joined onto it exactly as AdminChatViewModel.present() does ([withPendingApprovalDetails]). The
+ * joined onto it exactly as AdminChatViewModel.present() does ([withHostApprovals]). The
  * Android timeline (the shared page's rows, Touch idiom, tool details in a sheet) must show the
  * approval card with its controls without a tap, and the composer token must say it waits.
  */
@@ -59,7 +60,7 @@ class RelayedPendingApprovalTimelineTest {
         )
         val parked = PendingApprovalDetails(approvalId = "perm-$CALL_ID", toolCallId = CALL_ID, toolName = "Bash")
         val state = RowParityFixture.state(listOf(RowParityFixture.userPrompt, narration, bash), thinking = true)
-            .withPendingApprovalDetails(mapOf(CALL_ID to parked))
+            .withHostApprovals(TimelineHostApprovals(details = mapOf(CALL_ID to parked)))
 
         // The thinking sweep never stops animating: step the clock by hand.
         composeRule.mainClock.autoAdvance = false

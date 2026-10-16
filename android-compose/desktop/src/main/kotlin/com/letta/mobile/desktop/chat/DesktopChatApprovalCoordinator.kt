@@ -10,15 +10,12 @@ import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.PendingApprovalSource
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
 import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 internal data class ApprovalSubmissionRequest(
     val gateway: DesktopChatGateway?,
@@ -37,56 +34,29 @@ interface DesktopChatApprovalState : ChatApprovalStateSource {
 
 /**
  * Binds the active gateway's approval surface (can it answer, what it parked, what waits in its
- * outbox) and delivers answers over it. The answer lifecycle itself - in flight, released, reconciled
- * against the timeline - is the shared [ChatApprovalAnswerer] Android's chat screen uses too
- * (letta-mobile-by4vm.78).
+ * outbox) and delivers answers over it. The answer lifecycle and the queued / parked state are the
+ * shared [ChatApprovalAnswerer] Android's chat screen uses too (letta-mobile-by4vm.78, .93).
  */
-internal class DesktopChatApprovalCoordinator(
-    private val scope: CoroutineScope,
-    private val onError: (String) -> Unit,
-) : DesktopChatApprovalState {
+internal class DesktopChatApprovalCoordinator(scope: CoroutineScope, onError: (String) -> Unit) : DesktopChatApprovalState {
     private val answerer = ChatApprovalAnswerer(
         scope,
         object : ChatApprovalAnswerHost {
             override fun onRejected(answer: ChatApprovalAnswer, message: String) = onError(message)
         },
     )
-    override val submittingApprovals: StateFlow<Set<String>> = answerer.submitting
+    override val submittingApprovals get() = answerer.submittingApprovals
+    override val queuedApprovals get() = answerer.queuedApprovals
+    override val pendingApprovalDetails get() = answerer.pendingApprovalDetails
 
     private val _canSubmitApprovals = MutableStateFlow(false)
     override val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
 
-    private val _queuedApprovals = MutableStateFlow<Set<String>>(emptySet())
-
-    /** letta-mobile-bzvro.14: requests answered offline and waiting in the bound gateway's outbox. */
-    override val queuedApprovals: StateFlow<Set<String>> = _queuedApprovals.asStateFlow()
-    private var queueJob: Job? = null
-
-    private val _pendingApprovalDetails = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
-
-    /** What each parked control request of the bound gateway offered, by tool call id (empty when it reports none). */
-    override val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = _pendingApprovalDetails.asStateFlow()
-    private var detailsJob: Job? = null
-
     fun bindGateway(gateway: DesktopChatGateway?) {
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
-        bindQueue(gateway)
-        detailsJob?.cancel()
-        _pendingApprovalDetails.value = emptyMap()
-        val source = gateway as? PendingApprovalSource ?: return
-        detailsJob = scope.launch {
-            source.pendingApprovalDetails.collect {
-                _pendingApprovalDetails.value = it
-                answerer.releaseAnsweredCalls(it)
-            }
-        }
-    }
-
-    private fun bindQueue(gateway: DesktopChatGateway?) {
-        queueJob?.cancel()
-        _queuedApprovals.value = emptySet()
-        val source = gateway as? ApprovalQueueSource ?: return
-        queueJob = scope.launch { source.queuedApprovalRequestIds.collect { _queuedApprovals.value = it } }
+        answerer.bind(
+            (gateway as? ApprovalQueueSource)?.queuedApprovalRequestIds,
+            (gateway as? PendingApprovalSource)?.pendingApprovalDetails,
+        )
     }
 
     private data class SubmissionTarget(
