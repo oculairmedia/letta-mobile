@@ -1,0 +1,107 @@
+name: Embedded runtime on Node 18
+
+# Not a required check (letta-mobile-by4vm.110.3). Proves the letta-code tree the APK ships boots on
+# the Node the device ships (nodejs-mobile 18.20.4, the libnodeVersion pin), so a bad letta-code
+# bump fails here instead of on a phone:
+#   1. the REAL staging task (:app:prepareEmbeddedLettaCodeAssets, as release.yml runs it) builds
+#      the tree, and :appserver-cli:installDist builds the shared Kotlin host + client;
+#   2. scripts/embedded-runtime/node18-smoke.sh enforces the gzip size budget, then runs the tree on
+#      Node 18.20.4 with the shipped preloads (node18-compat.cjs first) behind an android-platform
+#      emulation preload, against a fake OpenAI-compatible LLM: a headless stream-json Bash turn,
+#      then `letta server` through LocalAppServerHost driven by app-server-smoke (runtime_start ->
+#      Bash tool -> end_turn). The first missing-API error lands in the job summary.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/embedded-runtime-node18.yml"
+      - "scripts/embedded-runtime/**"
+      - "scripts/patch-embedded-letta-code-tool-groups.cjs"
+      - "android-compose/letta-code-runtime/**"
+      - "android-compose/build-logic/src/main/kotlin/com/letta/mobile/embedded/**"
+      - "android-compose/appserver-cli/**"
+      - "android-compose/sharedLogic/src/*/kotlin/com/letta/mobile/data/runtime/host/**"
+      - "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/appserver/**"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: embedded-runtime-node18-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Same launcher flag and cache prefix as android.yml (see the comments there).
+  GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+  GRADLE_BUILD_ACTION_CACHE_KEY_PREFIX: gh-v2
+
+jobs:
+  embedded-runtime-node18:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pins
+        id: pin
+        run: |
+          pins=android-compose/letta-code-runtime/letta-code-runtime.properties
+          echo "node=$(sed -n 's/^libnodeVersion=v//p' "$pins")" >> "$GITHUB_OUTPUT"
+          echo "letta=$(sed -n 's/^lettaCodeVersion=//p' "$pins")" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Node 22 (asset staging, as release.yml)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a  # v4.4.3
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-embedded-npm-${{ hashFiles('android-compose/letta-code-runtime/letta-code-runtime.properties') }}
+          restore-keys: ${{ runner.os }}-embedded-npm-
+
+      - name: Stage the embedded tree and build appserver-cli
+        working-directory: android-compose
+        run: |
+          cp -f local.properties.example local.properties
+          ./gradlew :app:prepareEmbeddedLettaCodeAssets :appserver-cli:installDist \
+            -PembedLettaCodeAssets=true --build-cache
+
+      - name: Setup Node ${{ steps.pin.outputs.node }} (the nodejs-mobile version the device ships)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.pin.outputs.node }}
+
+      - name: Boot letta-code ${{ steps.pin.outputs.letta }} on Node ${{ steps.pin.outputs.node }}
+        env:
+          WORK: ${{ runner.temp }}/node18-smoke
+        run: |
+          scripts/embedded-runtime/node18-smoke.sh \
+            android-compose/app/build/generated/embedded-lettacode-assets/letta-code/nodejs-project \
+            android-compose/appserver-cli/build/install/meridian-app-server
+
+      - name: Upload runtime logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded-runtime-node18-logs
+          path: |
+            ${{ runner.temp }}/node18-smoke/*.err
+            ${{ runner.temp }}/node18-smoke/*.out
+            ${{ runner.temp }}/node18-smoke/*.jsonl
+            ${{ runner.temp }}/node18-smoke/llm.log
+          if-no-files-found: ignore

@@ -68,8 +68,9 @@ The Android implementation follows these constraints:
   a vendored `libnode.so` or a network npm install.
 - Build with `-PembedLettaCodeNative=true -PembedLettaCodeAssets=true` after
   adding nodejs-mobile `libnode` under `android-compose/app/libnode`.
-- `prepareEmbeddedLettaCodeAssets` installs `@letta-ai/letta-code@0.26.1` into
-  generated APK assets when asset packaging is enabled.
+- `prepareEmbeddedLettaCodeAssets` installs the pinned `@letta-ai/letta-code`
+  (`lettaCodeVersion` in `android-compose/letta-code-runtime/letta-code-runtime.properties`)
+  into generated APK assets when asset packaging is enabled.
 - The JNI bridge starts Node once, writes user/control frames to stdin, and
   emits stdout JSON lines into the Kotlin stream-json mapper.
 
@@ -81,12 +82,38 @@ The embedded App Server wedge is currently version-blocked:
 | --- | --- | --- | --- |
 | `@letta-ai/letta-code@0.26.1` | `>=18` | `letta app-server --help` falls back to the normal CLI help; package tarball has no `app-server` or protocol-v2 assets. | Compatible with nodejs-mobile 18.20.4, but no App Server entrypoint. |
 | `@letta-ai/letta-code@0.27.15` | `>=22.19.0` | Host CLI exposes `app-server` and protocol-v2 assets; local loopback smoke reached `runtime_start -> input -> stream_delta -> sync -> abort_message` on Node v24.13.1. | App Server available for host adapters, but incompatible with the current Android nodejs-mobile 18.20.4 runtime. |
-| nodejs-mobile Android | 18.20.4 | Current pinned embedded libnode in `android-compose/letta-code-runtime/letta-code-runtime.properties`. | Blocks direct 0.27.x embedding. |
+| `@letta-ai/letta-code@0.34.14` (the pin) | `>=22` declared | Boots on 18.20.4 with `runtime/node18-compat.cjs` as the first preload (the App Server path needs only the `crypto` global; `toWellFormed` and `getBuiltinModule` are the other shims hit). `embedded-runtime-node18` CI proves headless and `server --listen` on every relevant PR. | Headless stream-json today; App Server loopback lands with letta-mobile-by4vm.110.5/.6. |
+| nodejs-mobile Android | 18.20.4 | Current pinned embedded libnode in `android-compose/letta-code-runtime/letta-code-runtime.properties`. | The engine every bump must boot on. |
 
-Until this gate changes, Android must keep the stream-json path as the default
-embedded runtime transport. The shared App Server client can still be used for
-host and future loopback adapters, but on-device launch needs a feature flag
-and a version/runtime check before it can replace JNI stdin/stdout.
+### CI: `embedded-runtime-node18`
+
+`.github/workflows/embedded-runtime-node18.yml` (not a required check) runs on PRs that touch
+`letta-code-runtime/`, the staging task in `build-logic/.../embedded/`, `scripts/embedded-runtime/`,
+`appserver-cli/`, the shared `LocalAppServerHost` package or the workflow, plus every main push:
+
+1. `:app:prepareEmbeddedLettaCodeAssets -PembedLettaCodeAssets=true` stages the exact tree the APK
+   ships (Node 22, as `release.yml`); `:appserver-cli:installDist` builds the shared Kotlin host and
+   client.
+2. `scripts/embedded-runtime/node18-smoke.sh` on Node `libnodeVersion` (18.20.4): fails when the
+   gzip'd staged tree exceeds **28 MiB** (0.34.14 stages 26.4 MiB gzip, ~123 MiB raw; raw size is not
+   budgeted), then runs the tree with the shipped preloads in device order behind
+   `android-platform-emulation.cjs` (`process.platform = "android"`, no `Intl`) against
+   `fake-llm.cjs`: a headless stream-json Bash turn, then `letta server` through
+   `LocalAppServerHost` (`app-server-serve`) driven by the shared `AppServerClient`
+   (`app-server-smoke`: `runtime_start` -> Bash tool -> `end_turn`).
+3. A failure prints the first missing-API line from the runtime's stderr (for example
+   `crypto is not defined` with the compat preload removed) as an annotation and, with the stderr
+   tail, in the job summary; logs are uploaded as `embedded-runtime-node18-logs`.
+
+Run it locally without touching the host runtime: stage with the Gradle task above, then
+`docker run --rm --network none -v "$PWD:/repo:ro" -v <jdk>:/jdk:ro -e JAVA=/jdk/bin/java
+node:18.20.4-bookworm bash /repo/scripts/embedded-runtime/node18-smoke.sh
+/repo/android-compose/app/build/generated/embedded-lettacode-assets/letta-code/nodejs-project
+/repo/android-compose/appserver-cli/build/install/meridian-app-server`.
+
+What it cannot see: V8's ICU-backed `\p{...}` regex support (the desktop Node has it, the device
+does not), the JNI bridge, Android's network bridge and device tools. Those stay on the Pixel
+sign-off (letta-mobile-by4vm.110.7).
 
 ## Native Dependency Risks
 
