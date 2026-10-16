@@ -376,7 +376,7 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
-    fun `switching session sends live stdin switch without restarting node`() = runTest {
+    fun `switching conversation fails loudly instead of re-entering node or misrouting the turn`() = runTest {
         mockkStatic(ContextCompat::class)
         every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
         every { ContextCompat.startForegroundService(any(), any()) } returns Unit
@@ -394,18 +394,20 @@ class AndroidLettaCodeRuntimeControllerTest {
 
         val modelPath = tempModelPath()
         controller.submit(command(), config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma")).first()
-        controller.submit(
-            command(agentId = "agent-2", conversationId = "conv-2"),
-            config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma"),
-        ).first()
+        val failure = runCatching {
+            controller.submit(
+                command(agentId = "agent-2", conversationId = "conv-2"),
+                config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma"),
+            ).first()
+        }.exceptionOrNull()
 
+        assertTrue(failure is IllegalStateException)
+        assertTrue(failure?.message.orEmpty().contains("Restart the app"))
         assertTrue(nodeBridge.started)
         assertEquals(1, nodeBridge.startCalls)
         assertEquals(0, nodeBridge.stopCalls)
-        assertTrue(nodeBridge.writtenLines.any { it.contains("\"subtype\":\"interrupt\"") })
-        val switchLine = nodeBridge.writtenLines.first { it.contains("\"subtype\":\"switch_session\"") }
-        assertTrue(switchLine.contains("\"agent_id\":\"agent-2\""))
-        assertTrue(switchLine.contains("\"conversation_id\":\"conv-2\""))
+        assertEquals(1, nodeBridge.writtenLines.count { it.contains("\"type\":\"user\"") })
+        assertFalse(nodeBridge.writtenLines.any { it.contains("switch_session") })
     }
 
     @Test

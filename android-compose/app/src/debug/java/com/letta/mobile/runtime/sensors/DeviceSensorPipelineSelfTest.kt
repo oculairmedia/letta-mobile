@@ -8,7 +8,6 @@ import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.hardware.HardwareControlStatus
 import java.io.File
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -43,23 +42,6 @@ object DeviceSensorPipelineSelfTest {
 
         val snapshotOut = File(filesDir, DeviceSensorSelfTestReceiver.OUTPUT_FILE)
         snapshotOut.writeText(DeviceSensorSelfTestService.buildSelfTestPayload(snapshot))
-
-        val groundingOut = File(filesDir, DeviceSensorGroundingWriter.FILE_NAME)
-        val groundingReport = runBlocking {
-            DeviceSensorGroundingWriter(
-                provider = object : DeviceSensorSnapshotProvider {
-                    override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
-                },
-                outputFile = groundingOut,
-            ).writeSnapshot(snapshot.capturedAtMillis)
-        }
-        val groundingPayload = runCatching { json.parseToJsonElement(groundingOut.readText()).jsonObject }.getOrNull()
-        stages += stage(
-            id = "stage3.passive_grounding_file",
-            passed = groundingOut.isFile && groundingPayload?.get("summary")?.jsonPrimitive?.content == groundingReport.summary,
-            details = "Wrote passive grounding summary (${groundingReport.bytes}B): ${groundingReport.summary}",
-            artifact = groundingOut.name,
-        )
 
         val readToolOut = File(filesDir, DeviceSensorSelfTestActivity.READ_SENSORS_OUTPUT_FILE)
         val readToolText = DeviceSensorReadTool(
@@ -125,21 +107,15 @@ object DeviceSensorPipelineSelfTest {
             artifact = hardwareToolOut.name,
         )
 
-        val preloadArtifact = "letta-code/nodejs-project/embedded-runtime-introspection-preload.cjs"
+        val preloadArtifact = "letta-code/nodejs-project/device-tools-preload.cjs"
         val preloadText = runCatching {
             context.assets.open(preloadArtifact).bufferedReader().use { it.readText() }
         }.getOrElse {
-            File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
+            File(filesDir, "embedded-lettacode/nodejs-project/device-tools-preload.cjs")
                 .takeIf { file -> file.isFile }
                 ?.readText()
                 .orEmpty()
         }
-        stages += stage(
-            id = "stage6.passive_transport_preload",
-            passed = preloadText.contains("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH") && preloadText.contains("Device context:"),
-            details = "Embedded packaged preload includes device grounding file transport and Device context injection.",
-            artifact = preloadArtifact,
-        )
         stages += stage(
             id = "stage7.active_tool_transport_preload",
             passed = preloadText.contains("read_sensors") && preloadText.contains("/device/sensors/read") && preloadText.contains("@letta/externalTools"),
@@ -160,7 +136,6 @@ object DeviceSensorPipelineSelfTest {
             stages = stages,
             artifacts = listOf(
                 snapshotOut.name,
-                groundingOut.name,
                 readToolOut.name,
                 actionMatrixOut.name,
                 hardwareToolOut.name,

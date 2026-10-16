@@ -33,7 +33,6 @@ android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/Android
 android-compose/app/src/main/java/com/letta/mobile/runtime/mobileactions/MobileIntentActionTool.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/notifications/NotificationPollTool.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/screen/ScreenCaptureTool.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorGroundingWriter.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorReadTool.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/sensors/DeviceSensorSnapshotFormatter.kt
 android-compose/app/src/release/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt

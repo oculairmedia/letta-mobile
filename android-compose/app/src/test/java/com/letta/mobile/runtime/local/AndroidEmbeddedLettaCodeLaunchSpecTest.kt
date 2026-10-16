@@ -1,8 +1,5 @@
 package com.letta.mobile.runtime.local
 
-import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
-import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
-import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,13 +12,6 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
     fun `shared launch spec preserves Android env bridge preload and stream-json fallback parity`() {
         val baseDir = tempDir("letta-launch-parity")
         val project = preparedProject(baseDir, withNpm = true)
-        val sensorGrounding = DeviceSensorGroundingWriter(
-            provider = object : DeviceSensorSnapshotProvider {
-                override fun snapshot(nowMillis: Long): DeviceSensorSnapshot =
-                    DeviceSensorSnapshot(capturedAtMillis = nowMillis)
-            },
-            outputFile = File(baseDir, "device-sensor-grounding.json"),
-        )
         val selection = EmbeddedLettaCodeModelSelection(
             modelHandle = "google/gemma-3n-E2B-it-litert-lm",
             modelPath = File(baseDir, "gemma.litertlm").apply { writeText("model") }.absolutePath,
@@ -36,7 +26,6 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
             onDeviceProviderApiKey = "openai-loopback-token",
             androidNetworkBridgeBaseUrl = "http://127.0.0.1:4567",
             androidNetworkBridgeToken = "android-bridge-token",
-            deviceSensorGroundingWriter = sensorGrounding,
             toolInstaller = FakeToolInstaller(availableCommands = setOf("curl", "node", "npm", "git")),
         )
         val request = spec.toStreamJsonNodeStartRequest(
@@ -68,7 +57,6 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals("openai-loopback-token", env["LMSTUDIO_API_KEY"])
         assertEquals("http://127.0.0.1:4567", env["LETTA_ANDROID_NETWORK_BRIDGE_URL"])
         assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
-        assertEquals(sensorGrounding.outputFile.absolutePath, env["LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH"])
         assertEquals(tmpDir.absolutePath, env["TMPDIR"])
         assertEquals(tmpDir.absolutePath, env["TMP"])
         assertEquals(tmpDir.absolutePath, env["TEMP"])
@@ -85,15 +73,15 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals(binDir.absolutePath, env["GIT_EXEC_PATH"])
         assertEquals("", env["GIT_TEMPLATE_DIR"])
         assertEquals("1", env["GIT_CONFIG_NOSYSTEM"])
-        assertNull(env["LETTA_LOCAL_BACKEND_NO_MEMFS"])
         val disabledHooksPath = File(baseDir, "git-hooks-disabled").absolutePath
         assertTrue(File(project.homeDirectory, ".gitconfig").readText().contains("hooksPath = $disabledHooksPath"))
 
         assertEquals(
             listOf(
+                "node18-compat.cjs",
                 "regexp-polyfill.cjs",
                 "android-network-polyfill.cjs",
-                "embedded-runtime-introspection-preload.cjs",
+                "device-tools-preload.cjs",
             ),
             spec.preloadRequireFiles.map { it.name },
         )
@@ -101,7 +89,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
     }
 
     @Test
-    fun `shared launch spec disables memfs when packaged git is unavailable but keeps Android path setup`() {
+    fun `shared launch spec skips git setup when packaged git is unavailable but keeps Android path setup`() {
         val baseDir = tempDir("letta-launch-no-git")
         val project = preparedProject(baseDir, withNpm = false)
         val selection = EmbeddedLettaCodeModelSelection(
@@ -121,7 +109,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         val env = spec.environment
 
         assertEquals("lmstudio/minimax-m3", spec.modelHandle)
-        assertEquals("1", env["LETTA_LOCAL_BACKEND_NO_MEMFS"])
+        assertNull(env["GIT_EXEC_PATH"])
         assertFalse(File(project.homeDirectory, ".gitconfig").exists())
         assertNull(env["LETTA_NPM_CLI_JS"])
         assertNull(env["LETTA_NODE_BIN"])

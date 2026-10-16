@@ -17,16 +17,17 @@ class EncodeUserTurnWireLineTest {
     private val json = Json
 
     @Test
-    fun `embedded node preloads include runtime introspection bridge after platform polyfills`() {
+    fun `embedded node preloads start with node18 compat and end with the device tools`() {
         val projectDir = File("/tmp/embedded-lettacode")
 
         val files = embeddedLettaCodePreloadRequireFiles(projectDir).map { it.name }
 
         assertEquals(
             listOf(
+                "node18-compat.cjs",
                 "regexp-polyfill.cjs",
                 "android-network-polyfill.cjs",
-                "embedded-runtime-introspection-preload.cjs",
+                "device-tools-preload.cjs",
             ),
             files,
         )

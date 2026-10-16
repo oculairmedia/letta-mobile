@@ -6,6 +6,7 @@ import org.gradle.jvm.toolchain.JavaInstallationMetadata
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaLauncher
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 // WiX 4 still resolves installer sources through Win32 paths. Keep CI's
 // packaging workspace short so deeply nested production dependencies remain
@@ -28,7 +29,13 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
 // against Jewel AND Nucleus together (both are compiled against different
 // Compose baselines) â€” do it as its own change, not as a drive-by bump.
 val desktopNodeVersion = "24.13.1"
-val desktopLettaCodeVersion = "0.34.14"
+// THE letta-code pin (letta-mobile-by4vm.110 D1), shared with the embedded runtime and the wire
+// contract. desktop/runtime/{package.json,package-lock.json,runtime-manifest.json} mirror it
+// (LettaCodeVersionPinsTest).
+val desktopLettaCodeVersion: String = Properties().apply {
+    val pinFile = rootProject.layout.projectDirectory.file("letta-code-runtime/letta-code-runtime.properties")
+    load(providers.fileContents(pinFile).asText.get().reader())
+}.getProperty("lettaCodeVersion")
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
 val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
 // Desktop packages bundle JetBrains Runtime 25.0.4 (JBR) rather than Temurin.

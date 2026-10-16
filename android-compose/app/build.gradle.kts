@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     // Dev-only on-device letta-code runtime: npm/libnode/NDK prep tasks, letta.js patches
-    // (app/embedded-runtime/), EMBEDDED_LETTACODE_* BuildConfig. See build-logic/.../embedded/.
+    // (../letta-code-runtime/), EMBEDDED_LETTACODE_* BuildConfig. See build-logic/.../embedded/.
     id("com.letta.mobile.embedded-runtime")
     // 16 KB realignment + ELF sanity check of the vendored Iroh/Nimbus JNI .so files, run before
     // every merge*JniLibFolders/merge*NativeLibs (realign16KbJniLibs, verifyJniLibSanity).

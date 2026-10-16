@@ -8,10 +8,11 @@ name: Release
 #   - the signed play-release APK WITH the embedded Letta Code runtime
 #     (nodejs-mobile libnode + npm assets baked in, so the app can run the
 #     agent on-device with no remote shim). That runtime is the dev-only
-#     embedded pin in android-compose/app/embedded-runtime/embedded-runtime.properties
-#     (letta-code 0.26.1 on Node 18, below the 0.34.14 wire contract); whether the
+#     embedded runtime from android-compose/letta-code-runtime/letta-code-runtime.properties
+#     (letta-code 0.34.14 on Node 18, arm64-v8a only: the embedded build filters every
+#     other ABI, letta-mobile-by4vm.110 D2); whether the
 #     Play release keeps shipping it is an open product call (letta-mobile-by4vm.92),
-#     so the embed flags and libnode checks below are deliberately unchanged,
+#     so the embed flags below are deliberately unchanged,
 #   - the Windows desktop EXE + MSI installers, and
 #   - the Linux Iroh wrapper CLI distribution (the Kotlin app-server gateway
 #     that meridian-iroh-wrapper.service runs), so server binaries ship with
@@ -122,7 +123,7 @@ jobs:
           import sys
           import zipfile
 
-          abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
+          abis = ("arm64-v8a",)  # the embedded (full-fat) build is arm64-v8a only (by4vm.110 D2)
           jni = "libautomerge_jni_0_2_0.so"  # org.automerge:androidnative:0.0.9
           apks = glob.glob("*.apk")
           if len(apks) != 1:

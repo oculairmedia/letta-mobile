@@ -5,7 +5,6 @@ import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
-import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -55,7 +54,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val onDeviceOpenAiBridge: OnDeviceOpenAiBridge,
     private val localBackendStore: LettaCodeLocalBackendStore,
     private val androidNetworkBridge: AndroidNetworkBridge,
-    private val deviceSensorGroundingWriter: DeviceSensorGroundingWriter? = null,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -99,7 +97,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             // wire line, not yet on disk, so it is never stripped in-flight.
             // No-ops cheaply once everything is stripped.
             stripPersistedImages(command.agentId.value)
-            writeDeviceSensorGrounding()
             var endedCleanly = false
             try {
                 collectTurnOutputWithLivenessWatchdog(
@@ -202,17 +199,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             }
     }
 
-    private suspend fun writeDeviceSensorGrounding() {
-        val writer = deviceSensorGroundingWriter ?: return
-        runCatching { writer.writeSnapshot() }
-            .onSuccess { report ->
-                Log.d(TAG, "Device sensor grounding wrote ${report.bytes}B sensors=${report.sensorCount}")
-            }
-            .onFailure { error ->
-                Log.w(TAG, "Device sensor grounding failed", error)
-            }
-    }
-
     private suspend fun healDanglingToolCalls(agentId: String, phase: String) {
         runCatching { localBackendStore.healDanglingToolCalls(agentId) }
             .onSuccess { report ->
@@ -233,9 +219,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         startMutex.withLock {
             if (activeSession == null) return
         }
-        nodeBridge.writeLine(
-            buildInterruptControlRequest("interrupt-${System.currentTimeMillis()}"),
-        ).onFailure { error ->
+        nodeBridge.writeLine(buildInterruptControlRequest()).onFailure { error ->
             Log.w(TAG, "Failed to send interrupt to embedded LettaCode", error)
         }
     }
@@ -271,13 +255,18 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 if (active == requestedSession) {
                     return@withLock false
                 }
-                interruptActiveSessionForSwitch()
-                if (active.modelKey == requestedSession.modelKey) {
-                    sendSwitchSessionControl(requestedSession)
-                    activeSession = requestedSession
-                    transcriptDirty = true
-                    return@withLock false
+                // letta-mobile-by4vm.110.2: letta-code 0.34 has no in-process agent/conversation
+                // switch on the headless stream-json protocol (the switch_session patch is gone),
+                // and node::Start runs once per process. Fail loudly instead of letting the turn
+                // land in the previous conversation; the App Server path (by4vm.110.6) scopes
+                // every runtime by agent + conversation natively.
+                val sameConversation = active.agentId == requestedSession.agentId &&
+                    active.conversationId == requestedSession.conversationId
+                check(sameConversation) {
+                    "The on-device runtime serves one conversation per app run. " +
+                        "Restart the app to switch conversations."
                 }
+                interruptActiveSessionForSwitch()
                 stopActiveRuntimeForModelSwitch()
             }
 
@@ -354,7 +343,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     }
 
     private suspend fun interruptActiveSessionForSwitch() {
-        nodeBridge.writeLine(buildInterruptControlRequest("switch-interrupt-${System.currentTimeMillis()}")).onFailure { error ->
+        nodeBridge.writeLine(buildInterruptControlRequest()).onFailure { error ->
             Log.w(TAG, "Failed to interrupt embedded LettaCode before switching sessions", error)
         }
     }
@@ -368,25 +357,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         activeAndroidNetworkBridgeSession = null
         activeSession = null
         transcriptDirty = true
-    }
-
-    private suspend fun sendSwitchSessionControl(session: EmbeddedLettaCodeSessionKey) {
-        nodeBridge.writeLine(
-            buildJsonObject {
-                put("type", "control_request")
-                put("request_id", "switch-session-${System.currentTimeMillis()}")
-                put(
-                    "request",
-                    buildJsonObject {
-                        put("subtype", "switch_session")
-                        put("agent_id", session.agentId)
-                        put("conversation_id", session.conversationId)
-                    },
-                )
-                put("agent_id", session.agentId)
-                put("conversation_id", session.conversationId)
-            }.toString(),
-        ).getOrThrow()
     }
 
     private suspend fun PreparedLettaCodeProject.toLettaCodeNodeStartRequest(
@@ -418,7 +388,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             onDeviceProviderApiKey = onDeviceProviderApiKey,
             androidNetworkBridgeBaseUrl = androidNetworkBridgeBaseUrl,
             androidNetworkBridgeToken = androidNetworkBridgeToken,
-            deviceSensorGroundingWriter = deviceSensorGroundingWriter,
             toolInstaller = AndroidContextEmbeddedToolInstaller(context),
         ).toStreamJsonNodeStartRequest(session)
     }
@@ -453,10 +422,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
 }
 
 
-private fun buildInterruptControlRequest(requestId: String): String =
+private fun buildInterruptControlRequest(): String =
     buildJsonObject {
         put("type", "control_request")
-        put("request_id", requestId)
+        put("request_id", "interrupt-${System.currentTimeMillis()}")
         put("request", buildJsonObject { put("subtype", "interrupt") })
     }.toString()
 
@@ -466,10 +435,12 @@ data class EmbeddedLettaCodeSessionKey(
     val modelKey: String,
 )
 
+/** node18-compat.cjs must come first: the other preloads may already use the globals it backfills. */
 fun embeddedLettaCodePreloadRequireFiles(projectDir: File): List<File> = listOf(
+    File(projectDir, "node18-compat.cjs"),
     File(projectDir, "regexp-polyfill.cjs"),
     File(projectDir, "android-network-polyfill.cjs"),
-    File(projectDir, "embedded-runtime-introspection-preload.cjs"),
+    File(projectDir, "device-tools-preload.cjs"),
 )
 
 /**

@@ -47,7 +47,6 @@ import com.letta.mobile.runtime.screen.ScreenCaptureProvider
 import com.letta.mobile.runtime.screen.ScreenCaptureTool
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSampler
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
-import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.letta.mobile.runtime.sensors.DeviceSensorSampler
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
@@ -60,7 +59,6 @@ import dagger.hilt.components.SingletonComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoSet
-import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -123,16 +121,6 @@ object RuntimeModule {
     @Singleton
     fun provideDeviceHardwareControlTool(provider: DeviceHardwareControlProvider): DeviceHardwareControlTool =
         DeviceHardwareControlTool(provider)
-
-    @Provides
-    @Singleton
-    fun provideDeviceSensorGroundingWriter(
-        @ApplicationContext context: Context,
-        provider: DeviceSensorSnapshotProvider,
-    ): DeviceSensorGroundingWriter = DeviceSensorGroundingWriter(
-        provider = provider,
-        outputFile = File(context.filesDir, DeviceSensorGroundingWriter.FILE_NAME),
-    )
 
     @Provides
     @Singleton

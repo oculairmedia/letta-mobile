@@ -7,13 +7,13 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * letta-mobile-ckmub.5: there is ONE letta-code wire contract (0.34.14). The contract matrix's
- * `baseline.version` is its source of truth; the desktop bundled runtime, the
- * `appserver-contract-baseline` CI job, the README pin table, [LettaCodeContract] and the pins
- * quoted in CLAUDE.md / AGENTS.md / the CLI READMEs must all name it, and this test fails the
- * moment one of them disagrees. The restart-replay evidence (needs a live re-capture) and the
- * dev-only Android embedded runtime (0.26.1, Node 18) are the documented exceptions, each checked
- * against its own source of truth (letta-mobile-bzvro.10 / letta-mobile-340tc before it). See the
+ * letta-mobile-by4vm.110 D1: there is ONE letta-code pin. `letta-code-runtime/letta-code-runtime.properties`
+ * (`lettaCodeVersion`) is its source of truth: the Android embedded runtime and the desktop bundled
+ * runtime are built from it, and the wire contract (the matrix's `baseline.version`), the desktop
+ * runtime package files, the `appserver-contract-baseline` CI job, the README pin table,
+ * [LettaCodeContract] and the pins quoted in CLAUDE.md / AGENTS.md / the CLI READMEs must all name
+ * it; this test fails the moment one of them disagrees. The restart-replay evidence (needs a live
+ * re-capture) is the one documented exception, checked against its own evidence file. See the
  * "letta-code version pins" table in sharedLogic's `data/transport/appserver/README.md`.
  */
 class LettaCodeVersionPinsTest {
@@ -24,8 +24,8 @@ class LettaCodeVersionPinsTest {
 
     private fun first(regex: Regex, text: String): String? = regex.find(text)?.groupValues?.get(1)
 
-    private val bundled: String
-        get() = first(Regex("""val desktopLettaCodeVersion = "([^"]+)""""), read("desktop/build.gradle.kts"))!!
+    private val pin: String
+        get() = first(Regex("""(?m)^lettaCodeVersion=(\S+)$"""), read(PIN_FILE))!!
 
     private val contract: String
         get() = first(
@@ -33,14 +33,11 @@ class LettaCodeVersionPinsTest {
             read(CONTRACT_MATRIX),
         )!!
 
-    private val embedded: String
-        get() = first(Regex("""(?m)^lettaCodeVersion=(\S+)$"""), read("app/embedded-runtime/embedded-runtime.properties"))!!
-
     private val table: String
         get() = read("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md")
 
     @Test
-    fun theBundledRuntimePinAgreesEverywhere() {
+    fun theDesktopRuntimeFilesMirrorThePin() {
         val manifest = first(Regex(""""lettaCode"\s*:\s*"([^"]+)""""), read("desktop/runtime/runtime-manifest.json"))
         val pkg = first(Regex(""""@letta-ai/letta-code"\s*:\s*"([^"]+)""""), read("desktop/runtime/package.json"))
         val lock = first(
@@ -48,14 +45,18 @@ class LettaCodeVersionPinsTest {
             read("desktop/runtime/package-lock.json"),
         )
 
-        assertEquals(bundled, manifest, "desktop/runtime/runtime-manifest.json")
-        assertEquals(bundled, pkg, "desktop/runtime/package.json")
-        assertEquals(bundled, lock, "desktop/runtime/package-lock.json")
+        assertEquals(pin, manifest, "desktop/runtime/runtime-manifest.json")
+        assertEquals(pin, pkg, "desktop/runtime/package.json")
+        assertEquals(pin, lock, "desktop/runtime/package-lock.json")
+        assertTrue(
+            PIN_FILE in read("desktop/build.gradle.kts"),
+            "desktop/build.gradle.kts must read the pin file, not a literal",
+        )
     }
 
     @Test
-    fun theDesktopRuntimeIsTheContract() {
-        assertEquals(contract, bundled, "desktop bundled runtime must equal the wire contract")
+    fun theWireContractIsThePin() {
+        assertEquals(pin, contract, "the contract matrix baseline.version must equal the pin")
     }
 
     @Test
@@ -75,13 +76,15 @@ class LettaCodeVersionPinsTest {
     fun theReadmeNamesOneContract() {
         assertTrue("Wire types are pinned to `@letta-ai/letta-code@$contract`" in table, "README intro pin")
         assertTrue("There is **one** wire contract: **$contract**" in table, "README one-contract sentence")
-        assertTrue("| Wire contract | $contract |" in table, "README contract row")
+        assertTrue(
+            "| THE pin: wire contract, desktop bundled runtime, Android embedded runtime | $contract |" in table,
+            "README pin row",
+        )
     }
 
     @Test
-    fun theKotlinConstantsCiteTheSourcesOfTruth() {
-        assertEquals(contract, LettaCodeContract.VERSION, "LettaCodeContract.VERSION")
-        assertEquals(embedded, LettaCodeContract.ANDROID_EMBEDDED_VERSION, "LettaCodeContract.ANDROID_EMBEDDED_VERSION")
+    fun theKotlinConstantIsThePin() {
+        assertEquals(pin, LettaCodeContract.VERSION, "LettaCodeContract.VERSION")
     }
 
     @Test
@@ -110,12 +113,12 @@ class LettaCodeVersionPinsTest {
     }
 
     @Test
-    fun theEmbeddedRuntimeIsDocumentedAsDevOnly() {
-        assertTrue("| Android embedded runtime (dev-only) | $embedded |" in table, "README embedded pin")
-        assertTrue("**Development only, not a production path.**" in table, "README must say the embedded runtime is dev-only")
+    fun theReadmeNamesThePinFile() {
+        assertTrue("`$PIN_FILE`" in table, "README must name the pin file")
     }
 
     private companion object {
+        const val PIN_FILE = "letta-code-runtime/letta-code-runtime.properties"
         const val CONTRACT_MATRIX = "sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json"
         val QUOTED_PIN = Regex("""@letta-ai/letta-code@(\d+\.\d+\.\d+)""")
     }
