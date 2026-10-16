@@ -10,9 +10,9 @@ import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerTransport
+import com.letta.mobile.data.transport.appserver.AppServerWebSocketDial
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
-import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.openAppServerWebSocket
 import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +20,9 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
@@ -35,7 +37,9 @@ internal class WasmAppServerSession(
     val client: DefaultAppServerClient,
     val engine: AppServerTurnEngine,
     val router: AppServerRuntimeEventRouter,
-    val transport: AppServerTransport,
+    val isConnected: Flow<Boolean>,
+    /** Why the connection ended, when the transport knows (the Iroh binding does). */
+    val failureReason: () -> String?,
     val label: String,
     private val scope: CoroutineScope,
     private val closeTransport: suspend () -> Unit,
@@ -123,8 +127,10 @@ internal suspend fun connectWasmAppServerSession(
     httpClient: HttpClient,
     nextRequestId: (String) -> String,
 ): WasmAppServerSession {
-    val transport: AppServerTransport
     val label: String
+    val client: DefaultAppServerClient
+    val isConnected: Flow<Boolean>
+    val failureReason: () -> String?
     val closeTransport: suspend () -> Unit
     if (isIrohBackendUrl(config.serverUrl)) {
         // letta-mobile-ckmub.8: read the address here (a ticket, a short URL or a bare id) so a bad one
@@ -132,30 +138,40 @@ internal suspend fun connectWasmAppServerSession(
         // the endpoint id it can dial (through the relay; direct UDP is not available in a browser).
         val address = IrohServerAddress.parse(config.serverUrl)
         val iroh = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
-        transport = iroh
+        try {
+            bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { iroh.isConnected.first { it } }
+        } catch (error: Throwable) {
+            withContext(NonCancellable) { iroh.close() }
+            throw error
+        }
         label = "Iroh"
+        client = DefaultAppServerClient(iroh, parentScope = scope)
+        isConnected = iroh.isConnected
+        failureReason = { iroh.failureReason.value }
         closeTransport = iroh::close
     } else {
-        val websocket = KtorAppServerWebSocketTransport(
-            httpClient = httpClient,
-            baseUrl = resolveWebSocketUrl(config.serverUrl),
-            scope = scope,
-            bearerToken = config.accessToken,
+        // letta-mobile-by4vm.110.6: the ws:// open desktop and Android share; it fails at once with
+        // the socket's reason instead of waiting out the timeout.
+        val connection = openAppServerWebSocket(
+            AppServerWebSocketDial(resolveWebSocketUrl(config.serverUrl), config.accessToken),
+            httpClient,
+            scope,
         )
-        transport = websocket
         label = "WebSocket"
-        closeTransport = websocket::close
+        client = connection.client
+        isConnected = connection.connectionState.map { it.isReady }
+        failureReason = { null }
+        closeTransport = { connection.close("closed") }
     }
     var router: AppServerRuntimeEventRouter? = null
     try {
-        bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
-        val client = DefaultAppServerClient(transport, parentScope = scope)
         val eventRouter = AppServerRuntimeEventRouter().also { router = it }
         return WasmAppServerSession(
             client = client,
             engine = eventRouter.attachTurnStack(client, scope, AppServerTurnStackSpec(requestIdFactory = { nextRequestId("turn") })),
             router = eventRouter,
-            transport = transport,
+            isConnected = isConnected,
+            failureReason = failureReason,
             label = label,
             scope = scope,
             closeTransport = closeTransport,

@@ -108,8 +108,11 @@ class KtorAppServerWebSocketTransport(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
-            terminal = error.isTerminalHandshakeFailure()
-            reason = error.message ?: "App Server session error"
+            // letta-mobile-by4vm.117: an engine that cannot run this socket (OkHttp refusing the
+            // frame limit) is as final as a rejected token: say so, with the cause, instead of
+            // leaving callers to wait out a retry that can never succeed.
+            terminal = error.isTerminalHandshakeFailure() || error.isUnsupportedClientConfiguration()
+            reason = error.describeChain() ?: "App Server session error"
         } finally {
             coordinator.onSessionClosedOrFailed(terminal = terminal, reason = reason)
         }
@@ -220,6 +223,30 @@ internal fun Throwable.isTerminalHandshakeFailure(): Boolean {
         text.contains("Forbidden", ignoreCase = true) ||
         text.contains("Upgrade Required", ignoreCase = true)
 }
+
+/**
+ * letta-mobile-by4vm.117: the HTTP client cannot run this socket at all, e.g. Ktor's OkHttp engine
+ * rejecting the App Server frame ceiling ("Max frame size switch is not supported in OkHttp
+ * engine") or an engine without WebSocket support. Retrying the same client never helps.
+ */
+internal fun Throwable.isUnsupportedClientConfiguration(): Boolean =
+    generateSequence(this) { it.cause }.take(MAX_CAUSE_DEPTH).any { failure ->
+        val text = failure.message.orEmpty()
+        text.contains("is not supported in", ignoreCase = true) ||
+            text.contains("doesn't support WebSocket", ignoreCase = true) ||
+            text.contains("WebSocketCapability", ignoreCase = true)
+    }
+
+/** The failure and its causes as one line, so a wrapped engine error keeps its real reason. */
+internal fun Throwable.describeChain(): String? =
+    generateSequence(this) { it.cause }
+        .take(MAX_CAUSE_DEPTH)
+        .mapNotNull { it.message?.takeIf(String::isNotBlank) }
+        .distinct()
+        .joinToString(": ")
+        .takeIf(String::isNotBlank)
+
+private const val MAX_CAUSE_DEPTH = 8
 
 private val TERMINAL_HTTP_STATUS = Regex(
     pattern = "(?i)(?:\\bbut\\s+was\\s+|" +

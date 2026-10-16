@@ -114,6 +114,8 @@ class IrohChannelTransport(
     // letta-mobile-by4vm.50: when this device may run cadence syncs (phones: unmetered and charging
     // or screen on). Only used against hosts that advertise ordered event_seq.
     private val syncBudget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
+    // letta-mobile-by4vm.110.6: dial a plain ws:// App Server instead of an Iroh host.
+    private val directDialer: DirectAppServerDialer? = null,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport,
     CronControlTransport {
@@ -230,6 +232,7 @@ class IrohChannelTransport(
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
+        readyTimeout = directDialer?.readyTimeout ?: DEFAULT_READY_TIMEOUT,
     )
 
     init {
@@ -273,6 +276,7 @@ class IrohChannelTransport(
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
+        directDialer?.let { return irohDialer.attachDirect(it.dial(config), config) }
         val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
         return irohDialer.dial(
             config = config,
@@ -289,7 +293,8 @@ class IrohChannelTransport(
         if (state is IrohConnectionState.Ready) {
             notifyRedialIfTurnActive()
             connectionSession.onReady(state.handle)
-            livenessProbe.start(state.handle)
+            // A direct socket reports its own close; its admin_rpc is in process, so a probe proves nothing.
+            if (directDialer == null) livenessProbe.start(state.handle)
         } else {
             connectionSession.onNotReady()
             updateInterruptedTurns(state)

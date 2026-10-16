@@ -526,35 +526,6 @@ class IrohAppServerTransport(
         else -> false
     }
 
-    private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
-        parseAdminRpcPath(path).forEach { (key, value) -> put(key, value) }
-        if (body != null) {
-            runCatching { AppServerProtocol.json.parseToJsonElement(body).jsonObject }
-                .getOrNull()
-                ?.forEach { (key, value) -> put(key, value) }
-        }
-    }
-
-    private fun parseAdminRpcPath(path: String): Map<String, String> {
-        val withoutPrefix = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
-        val values = mutableMapOf<String, String>()
-        if (withoutPrefix.size >= 3 && withoutPrefix[0] == "v1" && withoutPrefix[1] == "conversations") {
-            values["conversation_id"] = withoutPrefix[2]
-            if (withoutPrefix.size >= 5 && withoutPrefix[3] == "messages") {
-                values["message_id"] = withoutPrefix[4]
-            }
-        }
-        path.substringAfter('?', missingDelimiterValue = "")
-            .split('&')
-            .filter { it.isNotBlank() }
-            .forEach { part ->
-                val key = part.substringBefore('=')
-                val value = part.substringAfter('=', missingDelimiterValue = "")
-                if (key.isNotBlank()) values[key] = value
-            }
-        return values
-    }
-
     // protocol.decodeFrame is total: malformed frames surface as
     // AppServerInboundFrame.DecodeFailure (raw preserved, diagnostic bounded +
     // credential-redacted) instead of throwing, so a bad frame never tears down
@@ -580,4 +551,34 @@ class IrohAppServerTransport(
         const val ADMIN_RPC_TIMEOUT_MS = 30_000L
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
+}
+
+/** An `admin_rpc` call's params: the REST-shaped [path]'s ids and query, merged with the JSON [body]. */
+internal fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
+    parseAdminRpcPath(path).forEach { (key, value) -> put(key, value) }
+    if (body != null) {
+        runCatching { AppServerProtocol.json.parseToJsonElement(body).jsonObject }
+            .getOrNull()
+            ?.forEach { (key, value) -> put(key, value) }
+    }
+}
+
+private fun parseAdminRpcPath(path: String): Map<String, String> {
+    val withoutPrefix = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
+    val values = mutableMapOf<String, String>()
+    if (withoutPrefix.size >= 3 && withoutPrefix[0] == "v1" && withoutPrefix[1] == "conversations") {
+        values["conversation_id"] = withoutPrefix[2]
+        if (withoutPrefix.size >= 5 && withoutPrefix[3] == "messages") {
+            values["message_id"] = withoutPrefix[4]
+        }
+    }
+    path.substringAfter('?', missingDelimiterValue = "")
+        .split('&')
+        .filter { it.isNotBlank() }
+        .forEach { part ->
+            val key = part.substringBefore('=')
+            val value = part.substringAfter('=', missingDelimiterValue = "")
+            if (key.isNotBlank()) values[key] = value
+        }
+    return values
 }
