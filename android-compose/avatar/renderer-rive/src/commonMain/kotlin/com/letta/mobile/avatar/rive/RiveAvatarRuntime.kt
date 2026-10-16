@@ -146,7 +146,7 @@ class RiveAvatarRuntime(
                     dragged = false
                     sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, false)
                 }
-                sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state, rig)))
+                sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state)))
             }
         }
     }

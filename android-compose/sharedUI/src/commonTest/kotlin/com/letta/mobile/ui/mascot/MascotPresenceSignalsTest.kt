@@ -95,7 +95,14 @@ class MascotPresenceSignalsTest {
             rig.runtime.reactions,
         )
         assertEquals(
-            listOf(AvatarState.THINKING, AvatarState.WORKING, AvatarState.THINKING, AvatarState.SPEAKING, AvatarState.IDLE, AvatarState.SUCCESS),
+            listOf(
+                AvatarState.THINKING,
+                AvatarState.WORKING,
+                AvatarState.THINKING,
+                AvatarState.SPEAKING,
+                AvatarState.IDLE,
+                AvatarState.SUCCESS,
+            ),
             rig.entered,
         )
     }
@@ -112,7 +119,8 @@ class MascotPresenceSignalsTest {
         rig.publisher.onEvent(RunScope("c1", AGENT), lifecycle(RuntimeRunStatus.Completed))
         rig.publisher.onEvent(RunScope("c1", AGENT), send("l3"))
         rig.sample()
-        assertEquals(2, rig.runtime.reactions.count { it == AvatarReaction.RUN_DONE }, "back-to-back finishes both play: ${rig.runtime.reactions}")
+        val finishes = rig.runtime.reactions.count { it == AvatarReaction.RUN_DONE }
+        assertEquals(2, finishes, "back-to-back finishes both play: ${rig.runtime.reactions}")
         rig.director.tick(2.1f) // the second success plays out
         assertEquals(AvatarState.THINKING, rig.director.state, "the third send is under way")
     }
@@ -120,7 +128,8 @@ class MascotPresenceSignalsTest {
     @Test
     fun anApprovalIsAskedOnceAndWaits() = runTest {
         val rig = rig()
-        val ask = RuntimeEventPayload.ApprovalRequested(ToolApprovalRequest(ToolApprovalId("ap-1"), ToolCallId("t1"), ToolName("Bash"), "ls"))
+        val request = ToolApprovalRequest(ToolApprovalId("ap-1"), ToolCallId("t1"), ToolName("Bash"), "ls")
+        val ask = RuntimeEventPayload.ApprovalRequested(request)
         rig.publish(send("l1"))
         rig.publish(ask)
         rig.publish(ask)
@@ -196,7 +205,7 @@ class MascotPresenceSignalsTest {
     fun entryFeedsPresenceDeltasAndTicksOncePerFrame() {
         var loads = 0
         var transitions = 0
-        val entry = object : MascotEntry(HeadlessAvatarRuntime(), MascotIdentity(MascotShape.entries.first(), 0xFF00AA88.toInt()), applyState = {}) {
+        val entry = object : MascotEntry(HeadlessAvatarRuntime(), IDENTITY, applyState = {}) {
             override suspend fun load() { loads++ }
             override fun writeIdentity(identity: MascotIdentity) = Unit
             override fun dispose() = Unit
@@ -224,7 +233,7 @@ class MascotPresenceSignalsTest {
 
     @Test
     fun entryTicksGazeWhenThePointerIsAbsent() {
-        val entry = object : MascotEntry(HeadlessAvatarRuntime(), MascotIdentity(MascotShape.entries.first(), 0xFF00AA88.toInt()), applyState = {}) {
+        val entry = object : MascotEntry(HeadlessAvatarRuntime(), IDENTITY, applyState = {}) {
             override suspend fun load() = Unit
             override fun writeIdentity(identity: MascotIdentity) = Unit
             override fun dispose() = Unit
@@ -243,5 +252,6 @@ class MascotPresenceSignalsTest {
 
     private companion object {
         const val AGENT = "a1"
+        val IDENTITY = MascotIdentity(MascotShape.entries.first(), 0xFF00AA88.toInt())
     }
 }

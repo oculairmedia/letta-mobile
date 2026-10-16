@@ -42,7 +42,8 @@ class SubagentPresenceTest {
     @Test
     fun aBackgroundRunIsADreamAndNeverChangesTheTurn() {
         publisher.onEvent(RunScope("c1", "a1"), RuntimeEventPayload.LocalUserAppend("l1", "hi"))
-        publisher.setSubagents(listOf(entry("s1", "Reflection"), entry("s2", "Reflection", status = "completed", agent = "a2", conversation = "c2")))
+        val finished = entry("s2", "Reflection", status = "completed", agent = "a2", conversation = "c2")
+        publisher.setSubagents(listOf(entry("s1", "Reflection"), finished))
         val presence = registry.runs.value.presenceByAgent()
         assertTrue(presence.getValue("a1").dreaming)
         assertEquals(AgentActivityKind.THINKING, presence.getValue("a1").activity)

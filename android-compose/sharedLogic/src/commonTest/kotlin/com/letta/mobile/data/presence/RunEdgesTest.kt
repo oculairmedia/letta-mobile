@@ -55,7 +55,9 @@ class RunEdgesTest {
 
     @Test
     fun eachDistinctApprovalCountsOnce() {
-        val ask = { id: String -> RuntimeEventPayload.ApprovalRequested(ToolApprovalRequest(ToolApprovalId(id), ToolCallId("t-$id"), ToolName("Bash"), "ls")) }
+        val ask = { id: String ->
+            RuntimeEventPayload.ApprovalRequested(ToolApprovalRequest(ToolApprovalId(id), ToolCallId("t-$id"), ToolName("Bash"), "ls"))
+        }
         feed(send("l1"), ask("ap-1"), ask("ap-1"), ask("ap-2"))
         assertEquals(2, state.edges.approvals)
     }

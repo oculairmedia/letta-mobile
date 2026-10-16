@@ -37,16 +37,26 @@ class AdminChatViewModelSubagentPresenceTest {
         var viewModel: AdminChatViewModel? = null
         try {
             val agent = TestData.agent("agent-dream", "Dreamer")
-            val entries = listOf(
-                SubagentEntry(toolCallId = "s1", subagentType = "Reflection", status = "running", parentAgentId = agent.id.value, parentConversationId = CONVERSATION),
-                SubagentEntry(toolCallId = "s2", subagentType = "General-purpose", status = "running", parentAgentId = agent.id.value, parentConversationId = CONVERSATION),
-            )
+            val running = { id: String, type: String ->
+                SubagentEntry(
+                    toolCallId = id,
+                    subagentType = type,
+                    status = "running",
+                    parentAgentId = agent.id.value,
+                    parentConversationId = CONVERSATION,
+                )
+            }
+            val entries = listOf(running("s1", "Reflection"), running("s2", "General-purpose"))
             val subagents = mockk<ISubagentRepository>(relaxed = true) {
                 every { activeSubagentsFlow(any()) } returns flowOf(entries)
                 every { currentActiveSubagents(any()) } returns entries
             }
             val registry = ConversationRunRegistry()
-            val presentation = ChatPagingPresentation(settled = flowOf(PagingData.empty()), live = MutableStateFlow(emptyList()), close = { })
+            val presentation = ChatPagingPresentation(
+                settled = flowOf(PagingData.empty()),
+                live = MutableStateFlow(emptyList()),
+                close = { },
+            )
             val host = ChatPagingHost().apply { openCanonical = { _, _, _, _ -> presentation } }
             viewModel = openedChatViewModel(
                 host,

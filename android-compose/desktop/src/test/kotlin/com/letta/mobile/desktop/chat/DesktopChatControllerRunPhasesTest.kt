@@ -91,12 +91,16 @@ class DesktopChatControllerRunPhasesTest {
 
         gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("Task")))
         runCurrent()
-        controller.publishSubagents(
-            listOf(
-                SubagentEntry(toolCallId = "s1", subagentType = "General-purpose", status = "running", parentAgentId = "agent-0", parentConversationId = "conv-1"),
-                SubagentEntry(toolCallId = "s2", subagentType = "Reflection", status = "running", parentAgentId = "agent-0", parentConversationId = "conv-1"),
-            ),
-        )
+        val running = { id: String, type: String ->
+            SubagentEntry(
+                toolCallId = id,
+                subagentType = type,
+                status = "running",
+                parentAgentId = "agent-0",
+                parentConversationId = "conv-1",
+            )
+        }
+        controller.publishSubagents(listOf(running("s1", "General-purpose"), running("s2", "Reflection")))
 
         assertEquals(RunPhase.DELEGATING, controller.runs.value.getValue("conv-1").phase)
         val presence = controller.runs.value.presenceByAgent().getValue("agent-0")
