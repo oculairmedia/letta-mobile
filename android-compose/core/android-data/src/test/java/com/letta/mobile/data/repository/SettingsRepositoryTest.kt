@@ -312,14 +312,6 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `legacy amoled dark mode maps to amoled preset`() = runTest {
-        repository.setAmoledDarkMode(true)
-
-        val preset = repository.getThemePreset().first()
-        assertEquals(ThemePreset.AMOLED_BLACK, preset)
-    }
-
-    @Test
     fun `dynamic color defaults off on plain JVM runtime`() = runTest {
         val dynamicColor = repository.getDynamicColor().first()
         assertEquals(false, dynamicColor)

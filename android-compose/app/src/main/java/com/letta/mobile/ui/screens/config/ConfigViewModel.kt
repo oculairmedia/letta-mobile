@@ -104,7 +104,6 @@ class ConfigViewModel @Inject constructor(
         const val DEFAULT_LOCAL_MODEL_RUNTIME = "litert-lm"
         const val DEFAULT_LOCAL_MODEL_ACCELERATOR = "cpu"
         const val DEFAULT_LOCAL_MODEL_MAX_TOKENS = "4096"
-        private const val LEGACY_LOCAL_RUNTIME_URL = "local://device"
     }
 
     // letta-mobile-cdlk: when the route arg signals create-new mode, the
@@ -298,7 +297,7 @@ class ConfigViewModel @Inject constructor(
         val updatedUrl = when (mode) {
             ServerMode.LOCAL -> LOCAL_RUNTIME_URL
             ServerMode.SELF_HOSTED ->
-                if (currentState.serverUrl in setOf(LOCAL_RUNTIME_URL, LEGACY_LOCAL_RUNTIME_URL)) "" else currentState.serverUrl
+                if (currentState.serverUrl == LOCAL_RUNTIME_URL) "" else currentState.serverUrl
         }
         _uiState.value = UiState.Success(
             currentState.copy(

@@ -27,21 +27,15 @@ interface IdentitySealer {
  * non-exportable Android Keystore key (letta-mobile-dpv7m.2). The NodeId it
  * derives is what a host binds when this device pairs, so it must survive
  * restarts and must never be stored in plaintext.
- *
- * Migration: the identity used to be a plaintext 32-byte file
- * (`iroh-client-identity.key`, d6e8g.9). It is sealed into
- * `iroh-client-identity.enc` on first use and the plaintext copy is deleted —
- * the same bytes, so the NodeId (and every pairing bound to it) is unchanged.
  */
 class KeystoreIrohIdentityStore(
     private val dir: File,
     private val sealer: IdentitySealer,
 ) : IrohSecretKeyStore {
     private val sealedFile = File(dir, SEALED_FILE)
-    private val legacyFile = File(dir, LEGACY_FILE)
 
     override suspend fun loadOrCreate(): ByteArray = withContext(Dispatchers.IO) {
-        synchronized(IdentityFileLock) { loadSealed() ?: migrateLegacy() ?: create() }
+        synchronized(IdentityFileLock) { loadSealed() ?: create() }
     }
 
     private fun loadSealed(): ByteArray? {
@@ -53,15 +47,6 @@ class KeystoreIrohIdentityStore(
                 Telemetry.event("IrohIdentity", "sealed.unreadable", "class" to it::class.simpleName, level = Telemetry.Level.WARN)
             }
             .getOrNull()
-    }
-
-    private fun migrateLegacy(): ByteArray? {
-        if (!legacyFile.exists()) return null
-        val bytes = runCatching { legacyFile.readBytes().also(IrohSecretKeyStores::requireValidKey) }.getOrNull() ?: return null
-        writeSealed(bytes)
-        if (!legacyFile.delete()) legacyFile.writeBytes(ByteArray(bytes.size))
-        Telemetry.event("IrohIdentity", "legacy.migrated")
-        return bytes
     }
 
     private fun create(): ByteArray = IrohSecretKeyStores.generateKeyBytes().also {
@@ -82,7 +67,6 @@ class KeystoreIrohIdentityStore(
 
     companion object {
         const val SEALED_FILE = "iroh-client-identity.enc"
-        const val LEGACY_FILE = "iroh-client-identity.key"
 
         /**
          * The one identity store every Iroh dial on this device uses (session + pairing).

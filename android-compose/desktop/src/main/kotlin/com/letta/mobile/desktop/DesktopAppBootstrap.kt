@@ -62,8 +62,7 @@ internal data class DesktopConfigBootstrap(
 @Composable
 internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
     // d6e8g.4: sensitive settings (access token) are vault-encrypted at rest —
-    // DPAPI on Windows, keyfile-AES-GCM elsewhere. Legacy plaintext tokens
-    // migrate transparently on first read.
+    // DPAPI on Windows, keyfile-AES-GCM elsewhere.
     val secureSettingsStore = remember {
         EncryptingSecureSettingsStore(
             delegate = DesktopFileSecureSettingsStore(),

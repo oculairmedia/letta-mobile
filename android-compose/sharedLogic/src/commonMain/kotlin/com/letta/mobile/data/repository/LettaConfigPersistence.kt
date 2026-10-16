@@ -1,7 +1,6 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LettaConfigMigration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -35,11 +34,10 @@ internal object LettaConfigPersistence {
         val localProviderApiKey: String? = null,
         val localProviderModel: String? = null,
     ) {
-        // letta-mobile-ckmub.9: a retired Cloud mode migrates to Remote host; an unknown mode fails
-        // the decode as before.
-        fun toLettaConfig() = LettaConfigMigration.migrate(mode, LettaConfig(
+        // An unknown stored mode fails the decode.
+        fun toLettaConfig() = LettaConfig(
             id = id,
-            mode = LettaConfigMigration.modeOf(mode) ?: LettaConfig.Mode.valueOf(mode),
+            mode = LettaConfig.Mode.valueOf(mode),
             serverUrl = serverUrl,
             accessToken = accessToken,
             localModelPath = localModelPath,
@@ -50,7 +48,7 @@ internal object LettaConfigPersistence {
             localProviderBaseUrl = localProviderBaseUrl,
             localProviderApiKey = localProviderApiKey,
             localProviderModel = localProviderModel,
-        ))
+        )
 
         companion object {
             fun fromLettaConfig(config: LettaConfig) = LettaConfigData(

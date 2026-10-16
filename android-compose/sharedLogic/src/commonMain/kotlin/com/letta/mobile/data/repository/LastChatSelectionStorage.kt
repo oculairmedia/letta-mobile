@@ -19,8 +19,8 @@ import kotlinx.serialization.json.Json
  * The fix is to make the torn state unrepresentable in storage: the whole
  * triple is serialized into ONE string under ONE key, so a write either lands
  * whole or not at all. `core:data` keeps only the binding (read/write that
- * string); the record shape, the serialization, the identity fence, and the
- * legacy migration are pure functions here.
+ * string); the record shape, the serialization and the identity fence are
+ * pure functions here.
  *
  * Lives in `commonMain` per AGENTS.md: platform-neutral state transforms are
  * must-be-shared, so production and every test substitute run one
@@ -30,11 +30,6 @@ object LastChatSelectionStorage {
 
     /** Single key holding the serialized triple. Atomic unit of persistence. */
     const val KEY: String = "last_chat_selection_v1"
-
-    /** Legacy per-field keys, read once for migration and then never again. */
-    const val LEGACY_AGENT_ID_KEY: String = "last_chat_agent_id"
-    const val LEGACY_AGENT_NAME_KEY: String = "last_chat_agent_name"
-    const val LEGACY_CONVERSATION_ID_KEY: String = "last_chat_conversation_id"
 
     /** Telemetry tag; grep logcat for `Telemetry/LastChatSelectionStorage`. */
     const val TELEMETRY_TAG: String = "LastChatSelectionStorage"
@@ -135,67 +130,4 @@ object LastChatSelectionStorage {
         )
     }
 
-    /**
-     * One-time migration off the three legacy keys.
-     *
-     * The legacy layout gives us no way to prove the three values were written
-     * by the same [setLastChatSelection][com.letta.mobile.data.repository.api.ISettingsRepository.setLastChatSelection]
-     * call — there is no version, no checksum, no write timestamp. So we do NOT
-     * reconstruct a triple we cannot vouch for.
-     *
-     * The only case we can prove consistent is the degenerate one: a non-blank
-     * agentId. A name and/or conversationId present alongside it *might* belong
-     * to a previous agent, so they are only carried when the caller supplies
-     * proof via [legacyConsistent]; otherwise the whole legacy triple is
-     * discarded and the user starts from a clean, honest absent state. Losing a
-     * resume target is cheap; resuming the *wrong* agent's conversation is not.
-     *
-     * @param legacyConsistent supply `true` only if the store can prove the
-     *   three values were written together. Defaults to `false` — the safe,
-     *   unprovable case.
-     */
-    fun migrateLegacy(
-        legacyAgentId: String?,
-        legacyAgentName: String?,
-        legacyConversationId: String?,
-        legacyConsistent: Boolean = false,
-    ): LastChatSelection? {
-        val agentId = legacyAgentId?.takeIf { it.isNotBlank() }
-        val name = legacyAgentName?.takeIf { it.isNotBlank() }
-        val conversationId = legacyConversationId?.takeIf { it.isNotBlank() }
-
-        if (agentId == null) {
-            // Nothing at all is not a tear; only orphaned satellites are.
-            if (name != null || conversationId != null) {
-                Telemetry.event(
-                    TELEMETRY_TAG,
-                    "lastChatSelectionLegacyTripleDiscarded",
-                    "reason" to "orphanedFieldsWithoutAgentId",
-                    "hadAgentName" to (name != null),
-                    "hadConversationId" to (conversationId != null),
-                    level = Telemetry.Level.WARN,
-                )
-            }
-            return null
-        }
-
-        val hasSatellites = name != null || conversationId != null
-        if (hasSatellites && !legacyConsistent) {
-            Telemetry.event(
-                TELEMETRY_TAG,
-                "lastChatSelectionLegacyTripleDiscarded",
-                "reason" to "unprovableConsistency",
-                "hadAgentName" to (name != null),
-                "hadConversationId" to (conversationId != null),
-                level = Telemetry.Level.WARN,
-            )
-            return null
-        }
-
-        return LastChatSelection(
-            agentId = agentId,
-            agentName = name,
-            conversationId = conversationId,
-        )
-    }
 }
