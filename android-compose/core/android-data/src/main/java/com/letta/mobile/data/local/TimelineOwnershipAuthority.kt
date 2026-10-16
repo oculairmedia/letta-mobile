@@ -17,19 +17,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-/**
- * Dormant storage primitive, not an activation service. All participants must use the same directory.
- * A backend OS lock spans the callback, including database commit, so processes cannot race a phase
- * change against a guarded write. Backend-wide maintenance shares that lock. Contention fails fast:
- * callers retry outside database/coordinator locks. No waiting while holding a Room transaction.
- *
- * Lock order: authority -> legacy Room -> ledger Room. Never reenter this authority from a callback.
- * In particular the legacy checkpoint must use an already-guarded private write implementation.
- * Old binaries/direct DAOs do not honor this protocol; rollout must exclude them before activation.
- * State is checksummed, bounded and atomically replaced then directory-fsynced. Corruption and IO
- * errors fail closed. A phase change is not a cross-database transaction: Prepared records are only
- * published after the target commit, Canonical only after validation while the authority is held.
- */
 class TimelineOwnershipBusyException : IllegalStateException("Timeline ownership busy; retry outside locks")
 
 /** Retry only lock acquisition failures, after the failed attempt has released its locks. */
@@ -45,45 +32,38 @@ suspend fun <T> retryTimelineOwnership(block: suspend () -> T): T {
     error("Unreachable ownership retry")
 }
 
+/**
+ * Per-conversation owner record for the canonical timeline ledger (letta-mobile-by4vm.15: the only
+ * Android timeline). A record pins the agent that first claimed a conversation and the epoch every
+ * lease is checked against; a backend OS lock spans each guarded callback, including its database
+ * commit. Contention fails fast: callers retry outside database/coordinator locks.
+ *
+ * Records written by older builds may still carry the retired migration phases (Legacy, Migrating,
+ * Prepared) and a source mapping; they decode, and [claimCanonical] moves them to Canonical without
+ * copying anything. State is checksummed, bounded and atomically replaced then directory-fsynced.
+ * Corruption and IO errors fail closed.
+ */
 class TimelineOwnershipAuthority internal constructor(
     private val directory: Path,
     private val syncDirectory: (Path) -> Unit,
 ) {
     constructor(directory: Path) : this(directory, ::forceDirectory)
 
+    /** Legacy, Migrating and Prepared survive only as decodable phases of records older builds wrote. */
     enum class Phase { Legacy, Migrating, Prepared, Canonical }
-    enum class Route { Legacy, Migration, Canonical }
+    enum class Route { Canonical }
     data class Receipt(val sourceToken: String, val targetGeneration: String, val targetRevision: Long, val certificateId: String = "")
     data class Mapping(val source: TimelineScope, val sourceEpoch: Long, val target: TimelineScope, val targetEpoch: Long)
     data class State(val scope: TimelineScope, val epoch: Long, val phase: Phase, val receipt: Receipt? = null, val mapping: Mapping? = null)
     data class Lease(val scope: TimelineScope, val epoch: Long, val route: Route)
-
-    /** Explicit admission of an untouched source/target pair, never a missing migrated record. */
-    suspend fun registerLegacyPair(source: TimelineScope, target: TimelineScope, verifyUnusedTarget: suspend () -> Unit) =
-        pairLocked(source.backendId, target.backendId) {
-            val sourceExists = Files.exists(statePath(source))
-            val targetExists = Files.exists(statePath(target))
-            if (sourceExists && targetExists) return@pairLocked
-            for (scope in listOf(source, target).distinct()) {
-                if (Files.exists(statePath(scope))) {
-                    val state = read(scope)
-                    check(state.phase == Phase.Legacy && state.mapping == null) {
-                        "Missing mapped ownership record; explicit recovery required"
-                    }
-                }
-            }
-            verifyUnusedTarget()
-            if (!sourceExists) publish(State(source, 0, Phase.Legacy))
-            if (!targetExists && target != source) publish(State(target, 0, Phase.Legacy))
-        }
 
     suspend fun state(scope: TimelineScope): State = locked(scope.backendId) { read(scope) }
 
     /**
      * Read-only owner lookup that tolerates an unclaimed conversation. A conversation opened for
      * the first time in a backend that already manages others has no record yet, which is ordinary
-     * traffic, not the lost record [read] demands recovery for: binding is not recovery, and the
-     * write paths still meet that fence. Returns null when nothing has claimed the conversation.
+     * traffic, not the lost record [read] demands recovery for. Returns null when nothing has
+     * claimed the conversation.
      */
     suspend fun ownerAgent(scope: TimelineScope): String? = locked(scope.backendId) {
         if (Files.exists(statePath(scope))) read(scope).scope.agentId else null
@@ -105,130 +85,10 @@ class TimelineOwnershipAuthority internal constructor(
         return Lease(scope, next.epoch, Route.Canonical)
     }
 
-    /** Capture before admitting work; a lease is checked again while holding the storage lock. */
-    suspend fun acquire(scope: TimelineScope, route: Route): Lease = locked(scope.backendId) {
-        val state = read(scope)
-        requireRoute(state, scope, route)
-        Lease(scope, state.epoch, route)
-    }
-
-    suspend fun <T> withLease(lease: Lease, block: suspend () -> T): T = leaseLocked(lease) {
+    suspend fun <T> withLease(lease: Lease, block: suspend () -> T): T = locked(lease.scope.backendId) {
         val state = read(lease.scope)
         check(state.epoch == lease.epoch) { "Stale timeline ownership epoch" }
         requireRoute(state, lease.scope, lease.route)
-        block()
-    }
-
-    /** Runtime must close admission and drain accepted legacy writes BEFORE calling this. */
-    suspend fun beginMigration(legacy: Lease): Lease = locked(legacy.scope.backendId) {
-        check(legacy.route == Route.Legacy)
-        val previous = read(legacy.scope)
-        check(previous.scope == legacy.scope && previous.phase == Phase.Legacy && previous.epoch == legacy.epoch)
-        val next = State(legacy.scope, Math.addExact(previous.epoch, 1), Phase.Migrating)
-        publish(next)
-        Lease(next.scope, next.epoch, Route.Migration)
-    }
-
-    /** Captured source lease must be drained. No namespace inference or missing-source fallback.
-     * Source intent is published first: a crash can only leave writers fenced, never unguarded.
-     * Retry this same captured pair after cancellation/IO failure; do not reacquire a legacy lease.
-     */
-    suspend fun beginMappedMigration(legacy: Lease, target: TimelineScope, verifySource: suspend () -> Unit): Lease =
-        pairLocked(legacy.scope.backendId, target.backendId) {
-            require(legacy.route == Route.Legacy && legacy.scope.backendId != target.backendId)
-            require(legacy.scope.conversationId == target.conversationId && legacy.scope.agentId == target.agentId)
-            val source = read(legacy.scope)
-            val mapping = source.mapping ?: run {
-                check(source.scope == legacy.scope && source.phase == Phase.Legacy && source.epoch == legacy.epoch)
-                val destination = read(target)
-                check(destination.scope == target && destination.phase == Phase.Legacy && destination.mapping == null)
-                verifySource()
-                Mapping(legacy.scope, Math.addExact(source.epoch, 1), target, Math.addExact(destination.epoch, 1)).also {
-                    publish(State(it.source, it.sourceEpoch, Phase.Migrating, mapping = it))
-                }
-            }
-            check(mapping.source == legacy.scope && mapping.sourceEpoch == Math.addExact(legacy.epoch, 1) && mapping.target == target)
-            check(source.phase == Phase.Legacy || source.phase == Phase.Migrating)
-            if (!Files.exists(statePath(target))) {
-                publish(State(target, mapping.targetEpoch, Phase.Migrating, mapping = mapping))
-            } else {
-                val destination = read(target)
-                if (destination.mapping == null) {
-                    check(destination.phase == Phase.Legacy && destination.epoch + 1 == mapping.targetEpoch)
-                    publish(State(target, mapping.targetEpoch, Phase.Migrating, mapping = mapping))
-                } else {
-                    check(destination.mapping == mapping && destination.scope == target && destination.epoch == mapping.targetEpoch)
-                    check(destination.phase == Phase.Migrating || destination.phase == Phase.Prepared)
-                }
-            }
-            Lease(target, mapping.targetEpoch, Route.Migration)
-        }
-
-    suspend fun capturedMapping(lease: Lease): Mapping? = leaseLocked(lease) {
-        val state = read(lease.scope)
-        check(state.scope == lease.scope && state.epoch == lease.epoch)
-        state.mapping
-    }
-
-    private suspend fun <T> pairLocked(first: String, second: String, block: suspend () -> T): T {
-        val ordered = listOf(first, second).distinct().sorted()
-        return locked(ordered[0]) { if (ordered.size == 1) block() else locked(ordered[1], block) }
-    }
-
-    private suspend fun <T> leaseLocked(lease: Lease, block: suspend () -> T): T {
-        val captured = state(lease.scope).mapping
-        return pairLocked(lease.scope.backendId, captured?.source?.backendId ?: lease.scope.backendId) {
-            val current = read(lease.scope)
-            check(current.mapping == captured) { "Mapping changed; retry outside locks" }
-            captured?.let {
-                check(it.target == lease.scope && it.targetEpoch == lease.epoch)
-                val source = read(it.source)
-                check(source.mapping == it && source.epoch == it.sourceEpoch &&
-                    (source.phase == Phase.Migrating || (source.phase == Phase.Prepared &&
-                        current.phase in listOf(Phase.Prepared, Phase.Canonical)))) {
-                    "Captured source fence changed"
-                }
-            }
-            block()
-        }
-    }
-
-    /** Validation callback runs under the same authority as the publication, not before acquisition. */
-    suspend fun prepare(migration: Lease, validate: suspend () -> Receipt): State = leaseLocked(migration) {
-        checkMigration(migration, Phase.Migrating)
-        val receipt = validate()
-        require(receipt.targetRevision >= 0 && receipt.sourceToken.isNotEmpty() && receipt.targetGeneration.isNotEmpty())
-        State(migration.scope, migration.epoch, Phase.Prepared, receipt, read(migration.scope).mapping).also { publish(it) }
-    }
-
-    /** Does not select any runtime route. Caller must still keep activation_dormant until integrated. */
-    suspend fun commitSwitch(migration: Lease, validate: suspend (Receipt) -> Unit): Lease = leaseLocked(migration) {
-        val previous = checkMigration(migration, Phase.Prepared)
-        validate(checkNotNull(previous.receipt))
-        previous.mapping?.let {
-            // Seal source intent first. If the target is subsequently lost, never recreate it as
-            // an unswitched migration. Interrupted switch resumes from the prepared target.
-            publish(State(it.source, it.sourceEpoch, Phase.Prepared, previous.receipt, it))
-        }
-        publish(previous.copy(phase = Phase.Canonical))
-        Lease(previous.scope, previous.epoch, Route.Canonical)
-    }
-
-    /** No Canonical -> Legacy transition: a frozen legacy snapshot cannot preserve later writes. */
-    suspend fun abortBeforeSwitch(migration: Lease): Lease = locked(migration.scope.backendId) {
-        check(migration.route == Route.Migration)
-        val previous = read(migration.scope)
-        check(previous.scope == migration.scope && previous.epoch == migration.epoch)
-        check(previous.phase == Phase.Migrating || previous.phase == Phase.Prepared)
-        check(previous.mapping == null) { "Mapped migrations are forward-recovery only; source must remain fenced" }
-        val next = State(previous.scope, Math.addExact(previous.epoch, 1), Phase.Legacy)
-        publish(next)
-        Lease(next.scope, next.epoch, Route.Legacy)
-    }
-
-    /** Conservative backend maintenance: reject once any ownership record exists. No history scan. */
-    suspend fun <T> legacyMaintenance(backendId: String, block: suspend () -> T): T = locked(backendId) {
-        check(!Files.exists(backendDirectory(backendId).resolve("managed"))) { "Managed backend requires coordinated maintenance" }
         block()
     }
 
@@ -238,18 +98,7 @@ class TimelineOwnershipAuthority internal constructor(
         check(state.scope == scope) {
             "Timeline ownership scope mismatch: stored=${state.scope} requested=$scope"
         }
-        check(when (route) {
-            Route.Legacy -> state.phase == Phase.Legacy
-            Route.Migration -> state.phase == Phase.Migrating
-            Route.Canonical -> state.phase == Phase.Canonical
-        }) { "Timeline ownership route fenced: ${state.phase}" }
-    }
-
-    private fun checkMigration(lease: Lease, phase: Phase): State {
-        check(lease.route == Route.Migration)
-        return read(lease.scope).also {
-            check(it.scope == lease.scope && it.epoch == lease.epoch && it.phase == phase) { "Stale migration lease" }
-        }
+        check(route == Route.Canonical && state.phase == Phase.Canonical) { "Timeline ownership route fenced: ${state.phase}" }
     }
 
     private suspend fun <T> locked(backendId: String, block: suspend () -> T): T = withContext(Dispatchers.IO) {

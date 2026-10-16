@@ -23,5 +23,4 @@ data class SessionGraphAssembleRequest(
     val cacheGate: SessionCacheGate,
     val backendDescriptor: com.letta.mobile.runtime.BackendDescriptor =
         localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX),
-    val capturedCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,
 )

@@ -7,44 +7,37 @@ import androidx.room.RoomDatabase
 import com.letta.mobile.data.model.DomainIdConverters
 
 /**
- * App-local Room database.
+ * App-local Room database: caches (agents, conversations), the runtime-event outbox, memfs, bug
+ * reports and the canvas op journal. Chat history is not here; it lives in the canonical
+ * timeline ledger (`timeline-ledger.db`, [TimelineLedgerDatabase]).
  *
- * Migration policy: production builders must register explicit migrations and must not use
- * destructive fallback. Pending local messages can contain user image bubbles that are not
- * recoverable from the server, so schema changes must preserve existing rows. Schema JSON is
- * exported under core/schemas and migration coverage lives in LettaDatabaseMigrationTest.
+ * Migration policy (letta-mobile-by4vm.15, while the app has no users): schema changes bump the
+ * version and reset this database destructively; nothing in it is unrecoverable from the backend.
+ * v24 squashed v1..v23 and dropped the legacy chat-history tables (confirmed/normalized snapshots,
+ * pending_local_messages, backend_conversation_cursors). Revisit before the first release with
+ * users: from then on every schema change needs an explicit migration again.
  */
 @Database(
     entities = [
         AgentEntity::class,
         BugReportEntity::class,
-        PendingLocalEntity::class,
         ConversationEntity::class,
         ConversationRefreshEntity::class,
-        BackendConversationCursorEntity::class,
         RuntimeEventEntity::class,
         MemFsFileEntity::class,
         MemFsCommitEntity::class,
-        ConfirmedTimelineSnapshotHeadEntity::class,
-        ConfirmedTimelineSnapshotManifestEntity::class,
-        ConfirmedTimelineSnapshotChunkEntity::class,
-        NormalizedTimelineSnapshotHeadEntity::class,
-        NormalizedTimelineSnapshotRowEntity::class,
         CanvasOpEntity::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
 abstract class LettaDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun bugReportDao(): BugReportDao
-    abstract fun pendingLocalDao(): PendingLocalDao
     abstract fun conversationDao(): ConversationDao
-    abstract fun backendConversationCursorDao(): BackendConversationCursorDao
     abstract fun runtimeEventDao(): RuntimeEventDao
     abstract fun memFsDao(): MemFsDao
-    abstract fun confirmedTimelineSnapshotDao(): ConfirmedTimelineSnapshotDao
     abstract fun canvasOpDao(): CanvasOpDao
 
     companion object {
@@ -53,16 +46,15 @@ abstract class LettaDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): LettaDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    LettaDatabase::class.java,
-                    "letta_database"
-                )
-                    .addMigrations(*LettaDatabaseMigrations.ALL)
-                    .build()
+                val instance = builder(context, "letta_database").build()
                 INSTANCE = instance
                 instance
             }
         }
+
+        /** The production builder: any version without a path to [LettaDatabase]'s resets. */
+        internal fun builder(context: Context, name: String): RoomDatabase.Builder<LettaDatabase> =
+            Room.databaseBuilder(context.applicationContext, LettaDatabase::class.java, name)
+                .fallbackToDestructiveMigration(dropAllTables = true)
     }
 }
