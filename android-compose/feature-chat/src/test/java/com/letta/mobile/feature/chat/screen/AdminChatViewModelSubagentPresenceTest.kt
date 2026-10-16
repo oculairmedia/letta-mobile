@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * letta-mobile-te3n1.1: Android's chat publishes its conversation's subagents into the app-wide
@@ -30,7 +31,8 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminChatViewModelSubagentPresenceTest {
     @Test
-    fun `the conversation's subagents reach the run registry`() = runTest {
+    fun `the conversation's subagents reach the run registry`() = runTest(timeout = 3.minutes) {
+        // The fixture's ViewModel brings up a great many mocks; a loaded machine needs more than runTest's 1 min.
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         var viewModel: AdminChatViewModel? = null
         try {

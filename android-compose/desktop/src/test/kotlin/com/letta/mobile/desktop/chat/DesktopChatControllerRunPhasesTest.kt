@@ -11,11 +11,14 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Desktop's half of the run-phase pipeline: the gateway's runtime events reach the window's
@@ -112,9 +115,16 @@ class DesktopChatControllerRunPhasesTest {
 
         gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
         runCurrent()
+        // Every phase the conversation passes through, unconflated: a stop with nothing to abort
+        // lands its terminal at once, so INTERRUPTING is a step on the way, not the end state.
+        val phases = mutableListOf<RunPhase?>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            controller.runs.collect { phases += it["conv-1"]?.phase }
+        }
         controller.stopActiveRun("conv-1")
+        runCurrent()
 
-        assertEquals(RunPhase.INTERRUPTING, controller.runs.value.getValue("conv-1").phase)
+        assertTrue(RunPhase.INTERRUPTING in phases, "the stop was published as INTERRUPTING: $phases")
         controller.close()
     }
 
