@@ -60,7 +60,6 @@ class SharedSessionRepositoryGraphTest {
         identity = SessionGraphIdentity(
             id = 7L,
             backendDescriptor = remoteLettaBackendDescriptor(config = null, idPrefix = "test"),
-            localRuntimeBackend = null,
             channelTransport = transport,
             capabilities = SessionCapabilities.None,
         ),

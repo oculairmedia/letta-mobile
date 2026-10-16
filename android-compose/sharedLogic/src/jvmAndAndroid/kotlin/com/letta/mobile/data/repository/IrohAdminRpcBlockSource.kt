@@ -51,7 +51,7 @@ class IrohAdminRpcBlockSource private constructor(
     private fun channelTransport(): IChannelTransport = channelTransportProvider()
 
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     override suspend fun retrieveBlock(blockId: String): Block {
         val params = buildJsonObject { put("block_id", blockId) }

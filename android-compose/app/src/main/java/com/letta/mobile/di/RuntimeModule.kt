@@ -1,25 +1,11 @@
 package com.letta.mobile.di
 
 import com.letta.mobile.data.local.LettaDatabase
-import com.letta.mobile.data.local.RoomMemFsStore
 import com.letta.mobile.data.local.RoomRuntimeEventOutbox
-import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
-import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
-import com.letta.mobile.data.session.LocalRuntimeProvider
-import com.letta.mobile.runtime.local.EmbeddedCatalogModelSource
-import com.letta.mobile.runtime.local.LettaCodeLocalBackendStore
-import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
-import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
 import com.letta.mobile.runtime.local.AndroidNetworkBridge
 import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
-import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
-import com.letta.mobile.runtime.local.LettaCodeNodeBridge
-import com.letta.mobile.runtime.local.LettaCodeRuntimeController
 import com.letta.mobile.runtime.local.LiteRtLmOnDeviceChatCompletionEngine
-import com.letta.mobile.runtime.local.LocalKoogRuntimeProvider
-import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
 import com.letta.mobile.runtime.local.LocalAndroidNetworkBridge
 import com.letta.mobile.runtime.local.LocalOpenAiOnDeviceBridge
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
@@ -32,7 +18,9 @@ import com.letta.mobile.data.runtime.host.LocalAppServerLauncher
 import com.letta.mobile.data.transport.appserver.AppServerDiscovery
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import com.letta.mobile.data.session.LocalRuntimeDialer
 import com.letta.mobile.data.session.ProcessScope
+import com.letta.mobile.runtime.local.AndroidLocalRuntimeDialer
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
@@ -46,7 +34,6 @@ import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
-import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.runtime.actions.AndroidMobileActionCapabilityProvider
 import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
@@ -79,20 +66,6 @@ object RuntimeModule {
     @Singleton
     fun provideRuntimeEventOutbox(database: LettaDatabase): RuntimeEventOutbox =
         RoomRuntimeEventOutbox(database)
-
-    @Provides
-    @Singleton
-    fun provideMemFsStore(database: LettaDatabase): MemFsStore =
-        RoomMemFsStore(database)
-
-    @Provides
-    @Singleton
-    fun provideLettaCodeHeadlessClient(client: AndroidLettaCodeHeadlessClient): LettaCodeHeadlessClient = client
-
-    @Provides
-    @Singleton
-    fun provideLettaCodeRuntimeController(controller: AndroidLettaCodeRuntimeController): LettaCodeRuntimeController =
-        controller
 
     @Provides
     @Singleton
@@ -135,10 +108,6 @@ object RuntimeModule {
 
     @Provides
     @Singleton
-    fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
-
-    @Provides
-    @Singleton
     fun provideEmbeddedNode(bridge: NativeLettaCodeNodeBridge): EmbeddedNode = bridge
 
     @Provides
@@ -147,8 +116,7 @@ object RuntimeModule {
 
     /**
      * letta-mobile-by4vm.110.5: the on-device App Server host. Lazy: building it starts nothing;
-     * the first `acquire()` launches node. Not consumed yet: the LOCAL_RUNTIME chat moves onto it
-     * in by4vm.110.6.
+     * the first `acquire()` (the first LOCAL_RUNTIME dial, by4vm.110.6) launches node.
      */
     @Provides
     @Singleton
@@ -162,6 +130,11 @@ object RuntimeModule {
         discovery = AppServerDiscovery(HttpClient(OkHttp)),
         scope = scope,
     )
+
+    /** letta-mobile-by4vm.110.6: how a LOCAL_RUNTIME session's channel dials the host above. */
+    @Provides
+    @Singleton
+    fun provideLocalRuntimeDialer(dialer: AndroidLocalRuntimeDialer): LocalRuntimeDialer = dialer
 
     @Provides
     @Singleton
@@ -219,24 +192,6 @@ object RuntimeModule {
 
     @Provides
     @Singleton
-    fun provideLocalRuntimeConversationSource(
-        store: LettaCodeLocalBackendStore,
-    ): LocalRuntimeConversationSource = store
-
-    @Provides
-    @Singleton
-    fun provideLocalRuntimeAgentSource(
-        store: LettaCodeLocalBackendStore,
-    ): LocalRuntimeAgentSource = store
-
-    @Provides
-    @Singleton
-    fun provideLocalRuntimeModelSource(
-        source: EmbeddedCatalogModelSource,
-    ): LocalRuntimeModelSource = source
-
-    @Provides
-    @Singleton
     fun provideOnDeviceChatCompletionEngine(
         engine: LiteRtLmOnDeviceChatCompletionEngine,
     ): OnDeviceChatCompletionEngine = engine
@@ -254,14 +209,4 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideEmbeddedModelRepository(repository: AssetEmbeddedModelRepository): EmbeddedModelRepository = repository
-
-    @Provides
-    @IntoSet
-    @Singleton
-    fun provideLocalLettaCodeRuntimeProvider(provider: LocalLettaCodeRuntimeProvider): LocalRuntimeProvider = provider
-
-    @Provides
-    @IntoSet
-    @Singleton
-    fun provideLocalKoogRuntimeProvider(provider: LocalKoogRuntimeProvider): LocalRuntimeProvider = provider
 }

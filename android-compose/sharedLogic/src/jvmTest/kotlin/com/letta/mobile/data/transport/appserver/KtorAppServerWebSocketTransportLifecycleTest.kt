@@ -332,6 +332,42 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         transport.close()
     }
 
+    /**
+     * letta-mobile-by4vm.117: Ktor's OkHttp engine refuses the App Server frame ceiling after the
+     * upgrade. The generation must end terminal, with that reason, at once: on the #2057 device smoke
+     * the failure read as a retryable drop and the connect sat silent for minutes.
+     */
+    @Test
+    fun anEngineThatCannotHonourTheFrameCeilingFailsTerminalWithItsReason() = runBlocking {
+        val port = startServer { for (frame in incoming) Unit }
+        val okHttp = HttpClient(io.ktor.client.engine.okhttp.OkHttp) { install(ClientWebSockets) { applyAppServerFrameLimits() } }
+        val transport = KtorAppServerWebSocketTransport(httpClient = okHttp, baseUrl = "ws://127.0.0.1:$port", scope = scope)
+
+        val failed = withTimeout(TIMEOUT) {
+            transport.connectionState.first { it is AppServerConnectionState.Failed }
+        } as AppServerConnectionState.Failed
+
+        assertTrue(failed.terminal, "an engine that cannot run the socket is not worth retrying: $failed")
+        assertTrue(failed.reason.orEmpty().contains("Max frame size"), "the engine's own reason is kept: $failed")
+        transport.close()
+        okHttp.close()
+    }
+
+    @Test
+    fun theSharedOpenFailsFastWithTheEngineReasonInsteadOfWaitingOutReadiness() = runBlocking {
+        val port = startServer { for (frame in incoming) Unit }
+        val okHttp = HttpClient(io.ktor.client.engine.okhttp.OkHttp) { install(ClientWebSockets) { applyAppServerFrameLimits() } }
+        val started = kotlin.time.TimeSource.Monotonic.markNow()
+
+        val failure = runCatching {
+            openAppServerWebSocket(AppServerWebSocketDial("ws://127.0.0.1:$port", bearerToken = null), okHttp, scope)
+        }.exceptionOrNull()
+
+        assertTrue(failure?.message.orEmpty().contains("Max frame size"), "open must report the cause: $failure")
+        assertTrue(started.elapsedNow() < TIMEOUT, "open must not wait out the readiness timeout")
+        okHttp.close()
+    }
+
     @Test
     fun productionUrlsNeverIncludeChannelQuery() {
         assertTrue(!appServerUrl("ws://127.0.0.1:4500").contains("channel="))

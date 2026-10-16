@@ -25,7 +25,7 @@ class IrohAdminRpcRunSource(
     private val json: Json = LettaJson.adminRpc,
 ) : com.letta.mobile.data.repository.api.RunIrohSource {
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     /**
      * Encodes every [RunListParams] field the server's `run.list` admin_rpc

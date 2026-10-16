@@ -18,6 +18,8 @@ import com.letta.mobile.data.settings.ChatSettings
 import com.letta.mobile.data.settings.SettingValue
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.toSettingsStatus
+import com.letta.mobile.data.runtime.host.LocalAppServerHost
+import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
@@ -77,6 +79,8 @@ data class ConfigUiState(
         version = "disabled",
         integrity = "",
     ),
+    /** letta-mobile-by4vm.110.6: the on-device App Server's health, for the Local runtime section. */
+    val localRuntimeHealth: RuntimeHealth = RuntimeHealth(),
     val isRefreshing: Boolean = false,
     val refreshError: String? = null,
     val hasUnsavedChanges: Boolean = false,
@@ -92,6 +96,7 @@ class ConfigViewModel @Inject constructor(
     private val embeddedModelRepository: EmbeddedModelRepository,
     private val endpointOpenAiModelCatalog: EndpointOpenAiModelCatalog,
     private val appServerConnectionTester: AppServerConnectionTester,
+    private val localAppServerHost: LocalAppServerHost,
     /** The default permission mode new conversations start in, for the Chat section. */
     val permissionModeSettings: PermissionModeSettings,
 ) : ViewModel() {
@@ -120,6 +125,7 @@ class ConfigViewModel @Inject constructor(
     init {
         loadConfig()
         observeEmbeddedModelCatalog()
+        observeLocalRuntimeHealth()
     }
 
     /**
@@ -235,6 +241,7 @@ class ConfigViewModel @Inject constructor(
                 savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 embeddedModelCatalog = embeddedModelRepository.catalog.value,
                 embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
+                localRuntimeHealth = localAppServerHost.health.value,
             )
         } else {
             // createNew = true: empty form, fresh UUID at save time.
@@ -251,6 +258,7 @@ class ConfigViewModel @Inject constructor(
                 savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                 embeddedModelCatalog = embeddedModelRepository.catalog.value,
                 embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
+                localRuntimeHealth = localAppServerHost.health.value,
             )
         }
     }
@@ -572,6 +580,16 @@ class ConfigViewModel @Inject constructor(
             embeddedModelRepository.catalog.collect { catalog ->
                 val currentState = (_uiState.value as? UiState.Success)?.data ?: return@collect
                 _uiState.value = UiState.Success(currentState.copy(embeddedModelCatalog = catalog))
+            }
+        }
+    }
+
+    /** Node runs once per app process (decision D3): the section shows its health, never a Stop. */
+    private fun observeLocalRuntimeHealth() {
+        viewModelScope.launch {
+            localAppServerHost.health.collect { health ->
+                val currentState = (_uiState.value as? UiState.Success)?.data ?: return@collect
+                _uiState.value = UiState.Success(currentState.copy(localRuntimeHealth = health))
             }
         }
     }

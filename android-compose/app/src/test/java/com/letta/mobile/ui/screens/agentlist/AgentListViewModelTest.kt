@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import kotlinx.collections.immutable.persistentListOf
@@ -28,7 +27,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -201,28 +199,6 @@ class AgentListViewModelTest {
         viewModel = viewModelWith(Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha")), Agent(id = AgentId("a2"), name = "Agent2"))
 
         assertEquals(2, viewModel.getFilteredAgents().size)
-    }
-
-    @Test
-    fun `local runtime mode displays only local-bound agents`() = runTest {
-        clearMocks(agentRepository, answers = false, recordedCalls = true)
-        activeConfigFlow.value = localConfig()
-        every { agentRepository.agents } returns MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("remote-agent"), name = "Remote"),
-                Agent(id = AgentId("local-agent-generated"), name = "Local id"),
-                Agent(
-                    id = AgentId("metadata-local"),
-                    name = "Local metadata",
-                    metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
-                ),
-            )
-        )
-
-        viewModel = watched()
-
-        assertEquals(listOf("local-agent-generated", "metadata-local"), viewModel.uiState.value.agents.map { it.id.value })
-        assertEquals(listOf("local-agent-generated", "metadata-local"), viewModel.getFilteredAgents().map { it.id.value })
     }
 
     @Test

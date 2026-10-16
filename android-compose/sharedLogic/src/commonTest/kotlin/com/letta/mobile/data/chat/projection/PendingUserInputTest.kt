@@ -18,6 +18,13 @@ class PendingUserInputTest {
         assertEquals("req-1", pendingUserInputApproval(messages)?.requestId)
     }
 
+    /** letta-mobile-8fq4j: a parked plan waits on the person like a question does. */
+    @Test
+    fun anUnansweredPlanIsPending() {
+        val messages = listOf(prompt(), request("req-1", "ExitPlanMode"))
+        assertEquals("req-1", pendingUserInputApproval(messages)?.requestId)
+    }
+
     @Test
     fun aRuntimeResolvedApprovalNeverWaitsOnThePerson() {
         assertNull(pendingUserInputApproval(listOf(prompt(), request("req-1", "Bash"))))

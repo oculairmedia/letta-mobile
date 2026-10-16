@@ -27,7 +27,7 @@ enum class DreamUnsupportedReason {
     /** The host has no native App Server client (a shim-era or degraded host). */
     NoNativeAppServer,
 
-    /** The letta-code runtime has no `/dream` (the embedded Android 0.26.1 runtime, letta-code before 0.33). */
+    /** The letta-code runtime has no `/dream` (letta-code before 0.33). */
     RuntimeTooOld,
 }
 

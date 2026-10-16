@@ -14,7 +14,7 @@ class IrohAdminRpcClient(
     @PublishedApi internal val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository
 ) {
-    fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
+    fun shouldUseIroh(): Boolean = settingsRepository.activeBackendUsesChannel()
 
     @PublishedApi internal val json: Json = LettaJson.adminRpc
 

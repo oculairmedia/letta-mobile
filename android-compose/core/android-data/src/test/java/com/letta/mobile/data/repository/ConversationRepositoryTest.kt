@@ -12,7 +12,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
@@ -199,33 +198,6 @@ class ConversationRepositoryTest {
 
 
     @Test
-    fun `createConversation uses local source in local runtime mode`() = runTest {
-        val localSource = FakeLocalRuntimeConversationSource()
-        val settingsRepository = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "local",
-                mode = LettaConfig.Mode.LOCAL,
-                serverUrl = "local-lettacode://runtime",
-            ),
-        )
-        repository = ConversationRepository(
-            fakeApi,
-            FakeAgentRepository(),
-            lazyOf(database.conversationDao()),
-            repositoryScope = repositoryScope,
-            localConversationSource = localSource,
-            settingsRepository = settingsRepository,
-        )
-
-        val conversation = repository.createConversation("local-agent", "Local summary")
-
-        assertEquals("local-conv-local-agent", conversation.id.value)
-        assertEquals(listOf(AgentId("local-agent")), localSource.createdAgentIds)
-        assertTrue(fakeApi.calls.none { it.startsWith("createConversation") })
-        assertTrue(repository.getConversations("local-agent").first().any { it.id == conversation.id })
-    }
-
-    @Test
     fun `deleteConversation removes optimistically`() = runTest {
         fakeApi.conversations.addAll(listOf(
             TestData.conversation(id = "1", agentId = "a1"),
@@ -314,7 +286,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = repositoryScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
         database.conversationDao().upsert(
@@ -341,7 +312,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = repositoryScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
         database.conversationDao().upsert(
@@ -372,33 +342,6 @@ class ConversationRepositoryTest {
         assertTrue(forked.id.value.startsWith("fork-"))
         assertTrue(fakeApi.calls.any { it.startsWith("forkConversation") })
         assertTrue(repository.getConversations("a1").first().any { it.id == forked.id })
-    }
-
-    @Test
-    fun `the embedded runtime cannot fork and never falls through to the REST fork`() = runTest {
-        repository = ConversationRepository(
-            fakeApi,
-            FakeAgentRepository(),
-            lazyOf(database.conversationDao()),
-            repositoryScope = repositoryScope,
-            localConversationSource = FakeLocalRuntimeConversationSource(),
-            settingsRepository = FakeSettingsRepository(
-                initialActiveConfig = LettaConfig(id = "local", mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://runtime"),
-            ),
-        )
-
-        assertFalse(repository.canForkConversations())
-        val failure = runCatching {
-            repository.forkConversation(ConversationId("local-conv-1"), AgentId("a1"), "message-1")
-        }.exceptionOrNull()
-
-        assertTrue(failure is com.letta.mobile.data.chat.branch.BranchUnavailableException)
-        assertTrue(fakeApi.calls.none { it.startsWith("forkConversation") })
-    }
-
-    @Test
-    fun `a remote backend can fork`() {
-        assertTrue(repository.canForkConversations())
     }
 
     @Test
@@ -455,7 +398,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = backgroundScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
@@ -486,7 +428,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = backgroundScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
@@ -510,7 +451,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = backgroundScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
@@ -575,7 +515,6 @@ class ConversationRepositoryTest {
             FakeAgentRepository(),
             lazyOf(database.conversationDao()),
             repositoryScope = repositoryScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
@@ -770,20 +709,5 @@ class ConversationRepositoryTest {
 
     /** A scope torn down with [repositoryScope] whose init job a test can join. */
     private fun childScope() = CoroutineScope(repositoryScope.coroutineContext + Job(repositoryScope.coroutineContext.job))
-
-    private class FakeLocalRuntimeConversationSource : LocalRuntimeConversationSource {
-        val createdAgentIds = mutableListOf<AgentId>()
-
-        override suspend fun listConversations(): List<Conversation> = emptyList()
-
-        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
-            createdAgentIds.add(agentId)
-            return TestData.conversation(
-                id = "local-conv-${agentId.value}",
-                agentId = agentId.value,
-                summary = summary,
-            )
-        }
-    }
 
 }
