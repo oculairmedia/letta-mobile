@@ -23,6 +23,17 @@ import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
 import com.letta.mobile.runtime.local.LocalAndroidNetworkBridge
 import com.letta.mobile.runtime.local.LocalOpenAiOnDeviceBridge
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
+import com.letta.mobile.runtime.local.AndroidLocalAppServerLaunchSource
+import com.letta.mobile.runtime.local.EmbeddedNode
+import com.letta.mobile.runtime.local.LibnodeAppServerLauncher
+import com.letta.mobile.runtime.local.androidLocalAppServerHost
+import com.letta.mobile.data.runtime.host.LocalAppServerHost
+import com.letta.mobile.data.runtime.host.LocalAppServerLauncher
+import com.letta.mobile.data.transport.appserver.AppServerDiscovery
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import com.letta.mobile.data.session.ProcessScope
+import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
@@ -125,6 +136,32 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideEmbeddedNode(bridge: NativeLettaCodeNodeBridge): EmbeddedNode = bridge
+
+    @Provides
+    @Singleton
+    fun provideLocalAppServerLauncher(launcher: LibnodeAppServerLauncher): LocalAppServerLauncher = launcher
+
+    /**
+     * letta-mobile-by4vm.110.5: the on-device App Server host. Lazy: building it starts nothing;
+     * the first `acquire()` launches node. Not consumed yet: the LOCAL_RUNTIME chat moves onto it
+     * in by4vm.110.6.
+     */
+    @Provides
+    @Singleton
+    fun provideLocalAppServerHost(
+        launcher: LocalAppServerLauncher,
+        launchSource: AndroidLocalAppServerLaunchSource,
+        @ProcessScope scope: CoroutineScope,
+    ): LocalAppServerHost = androidLocalAppServerHost(
+        launcher = launcher,
+        launchSource = launchSource,
+        discovery = AppServerDiscovery(HttpClient(OkHttp)),
+        scope = scope,
+    )
 
     @Provides
     @Singleton

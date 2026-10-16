@@ -213,7 +213,8 @@ class TimelineChatSessionPort(
             ownAgentId = target.agentId,
         )
         val presentation = presenter.present(projection, IdlePresenceSignals)
-        return timelineChatUiState(target, presentation, inputs.run, inputs.local).withHostApprovals(inputs.run, inputs.approvals)
+        return timelineChatUiState(target, presentation, inputs.run, inputs.local)
+            .withHostApprovals(inputs.approvals, inputs.run.submittingApprovals)
     }
 
     private fun initialUiState(): ChatUiState = ChatUiState(agentName = target.agentName, agentId = target.agentId)

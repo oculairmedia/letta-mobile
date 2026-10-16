@@ -9,11 +9,11 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,13 +29,17 @@ internal class ChatApprovalController(
     private val relay: ChatApprovalRelay? = null,
 ) {
     /**
-     * letta-mobile-by4vm.78: the shared answer lifecycle, the same one desktop uses. An answer stays
-     * in flight until this conversation's timeline stops showing the request as pending, so a card
-     * cannot turn actionable again between a successful submit and the server's decision.
+     * letta-mobile-by4vm.78/.93: the answer lifecycle and host approval state desktop uses too; the
+     * screen lays [approvals] over the timeline with withHostApprovals, which derives the answering row.
      */
     private val answerer = ChatApprovalAnswerer(scope, AnswerHost())
+    val approvals: ChatApprovalStateSource get() = answerer
+
+    /** The newest answer submitted; only its delivery ends the typing presence it started. */
+    private var presenceOwner: String? = null
 
     init {
+        answerer.bind(relay?.outbox?.queuedRequestIds, relay?.pendingDetails)
         // letta-mobile-bzvro.14: an answer made offline that the host no longer needed is said so.
         relay?.let { owner ->
             scope.launch {
@@ -47,15 +51,14 @@ internal class ChatApprovalController(
         scope.launch {
             combine(
                 uiState.map { state -> state.messages.mapNotNull { it.approvalRequest?.requestId }.toSet() },
-                relay?.pendingDetails?.map { parked -> parked.values.map { it.approvalId }.toSet() } ?: flowOf(emptySet()),
+                answerer.pendingApprovalDetails.map { parked -> parked.values.map { it.approvalId }.toSet() },
             ) { timeline, parked -> timeline + parked }
                 .distinctUntilChanged()
                 .collect { pending ->
                     // Nothing in flight: do not touch activeConversationId, which the owning
                     // view model may still be initialising when this first emission lands.
-                    if (answerer.submitting.value.isEmpty()) return@collect
-                    val conversation = ConversationId(activeConversationId() ?: NO_CONVERSATION)
-                    if (answerer.reconcile(conversation, pending).isNotEmpty()) publishInFlight()
+                    if (answerer.submittingApprovals.value.isEmpty()) return@collect
+                    answerer.reconcile(ConversationId(activeConversationId() ?: NO_CONVERSATION), pending)
                 }
         }
     }
@@ -78,51 +81,33 @@ internal class ChatApprovalController(
         )
     }
 
-    /** How each step of an answer lands on [uiState] and the banner. */
+    /** How each step of an answer lands on the typing presence and the banner. */
     private inner class AnswerHost : ChatApprovalAnswerHost {
         override fun onInFlight(answer: ChatApprovalAnswer) {
-            uiState.update {
-                it.copy(isStreaming = true, isAgentTyping = true, activeApprovalRequestId = answer.requestId)
-            }
+            presenceOwner = answer.requestId
+            uiState.update { it.copy(isStreaming = true, isAgentTyping = true) }
         }
 
-        /**
-         * Presence flags reset as they always have; only an answer that went out (or waits in the
-         * offline outbox) keeps its card in flight, until the timeline reconciles it.
-         */
+        /** Presence resets; only an answer that went out (or waits in the offline outbox) stays in flight. */
         override fun onAccepted(answer: ChatApprovalAnswer, result: ChatApprovalResult) {
             // letta-mobile-bzvro.40: a relayed card goes now, not at the host's next snapshot; a queued
             // one (letta-mobile-bzvro.14) stays, marked as waiting for the connection.
             if (result == ChatApprovalResult.Submitted) answer.toolCallIds.forEach { relay?.resolve(it) }
-            val requestId = answer.requestId
-            uiState.update {
-                if (it.activeApprovalRequestId != requestId) it else it.copy(isStreaming = false, isAgentTyping = false)
-            }
+            endPresence(answer)
         }
 
         override fun onRejected(answer: ChatApprovalAnswer, message: String) {
             bannerController.showError(message)
-            release(answer)
+            endPresence(answer)
         }
 
-        override fun onCancelled(answer: ChatApprovalAnswer) = release(answer)
+        override fun onCancelled(answer: ChatApprovalAnswer) = endPresence(answer)
 
-        /** The answer is no longer in flight: the UI points at whatever still is. */
-        private fun release(answer: ChatApprovalAnswer) {
-            val requestId = answer.requestId
-            uiState.update {
-                if (it.activeApprovalRequestId != requestId) {
-                    it
-                } else {
-                    it.copy(isStreaming = false, isAgentTyping = false, activeApprovalRequestId = answerer.latest)
-                }
-            }
+        private fun endPresence(answer: ChatApprovalAnswer) {
+            if (presenceOwner != answer.requestId) return
+            presenceOwner = null
+            uiState.update { it.copy(isStreaming = false, isAgentTyping = false) }
         }
-    }
-
-    /** The timeline decided some answers: point the UI at whatever is still in flight. */
-    private fun publishInFlight() {
-        uiState.update { it.copy(activeApprovalRequestId = answerer.latest) }
     }
 
     private companion object {
