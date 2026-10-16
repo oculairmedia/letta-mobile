@@ -119,9 +119,10 @@ approval.submit shim-fallback removal at cutover.
   `accessToken`/`syncAccessToken` — in **cleartext**, so these frames stay
   controller-internal, are never fanned out to viewers, and are never logged. Any
   VIEWER-facing channel surface still needs the lgns8.12 sensitive-capability
-  policy. Ships OFF (`--channels-host` / `LETTA_CHANNELS_HOST`); lettashim remains
-  the host until the maintenance-window cutover documented in the retirement
-  runbook — running both double-starts accounts.
+  policy. Always on since the 2026-08-01 cutover (the `--channels-host` flag was
+  removed by4vm.111): every wrapper is the channels host for the App Server it
+  wraps, so never point two wrappers at one App Server — the second re-wires
+  channel ingress to its own socket.
 
 ## Scope revisions for .7/.8/.9
 
