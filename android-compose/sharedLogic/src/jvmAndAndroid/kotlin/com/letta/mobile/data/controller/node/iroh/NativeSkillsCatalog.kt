@@ -183,6 +183,8 @@ class NativeSkillsCatalog {
                 put("name", name)
                 frame.skillPath?.let { put("skill_path", it) }
                 frame.linkPath?.let { put("link_path", it) }
+                // skill_enable creates a symlink, which skill_disable can remove.
+                put("removable", true)
             }
             skills = JsonArray(skills.filterNot { nameOf(it) == name } + entry)
             stale = false

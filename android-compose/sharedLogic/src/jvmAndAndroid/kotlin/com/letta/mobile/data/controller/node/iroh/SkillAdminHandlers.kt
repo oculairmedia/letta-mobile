@@ -65,13 +65,10 @@ object SkillAdminHandlers {
                         skillPath = skillPath,
                     ),
                 )
-                if (response.success) {
-                    buildJsonObject {
-                        put("enabled", true)
-                        response.skillName?.let { put("skill_name", it) }
-                    }
-                } else {
-                    null
+                if (!response.success) NativeAdmin.refused(NativeAdminOp.SkillInstall, response.error)
+                buildJsonObject {
+                    put("enabled", true)
+                    response.skillName?.let { put("skill_name", it) }
                 }
             }
             invalidateRuntimesAfterSkillMutation(controller)
@@ -86,7 +83,8 @@ object SkillAdminHandlers {
                         name = skillName,
                     ),
                 )
-                if (response.success) buildJsonObject { put("disabled", true) } else null
+                if (!response.success) NativeAdmin.refused(NativeAdminOp.SkillUninstall, response.error)
+                buildJsonObject { put("disabled", true) }
             }
             invalidateRuntimesAfterSkillMutation(controller)
             result
