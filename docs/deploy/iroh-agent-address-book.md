@@ -11,6 +11,14 @@ resolve `agentId` → dialable Iroh `EndpointAddr` (per the Meridian ruling
 2026-08-06), the offline seed script that populates them, and the operator
 recipe for re-seeding + adding new agents.
 
+## Where the receiver listens
+
+The wrapper serves the `/letta/a2a/0` ALPN on its one Iroh endpoint
+(`--iroh-port`, the App Server's node id), not on an endpoint of its own
+(letta-mobile-by4vm.112). The host record it writes at boot carries that
+endpoint's node id and direct addresses. `LETTA_A2A_PORT` / `--a2a-port`
+binds nothing: `-1` disables the receiver, any other value enables it.
+
 ---
 
 ## The three artifacts

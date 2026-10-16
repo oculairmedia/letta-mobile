@@ -1,5 +1,8 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.node.FakeAppServerController
+import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.data.model.AgentId
@@ -15,7 +18,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -37,6 +39,10 @@ import kotlin.time.Duration.Companion.seconds
  * record, with backend membership letting the sender resolve any agent it
  * asks about. The membership gate is wired to a fake [LocalBackendAdminStore]
  * that always answers true for the test agent.
+ *
+ * letta-mobile-by4vm.112: the receiver is served the way the wrapper serves it,
+ * as a protocol handler on the host [IrohNodeEndpoint] that also serves the App
+ * Server ALPN (one endpoint, one relay registration, demultiplexed by ALPN).
  */
 class IrohAgentMessageReceiveE2ETest {
 
@@ -45,14 +51,46 @@ class IrohAgentMessageReceiveE2ETest {
     }
 
     private lateinit var senderEp: Endpoint
-    private lateinit var receiverEp: Endpoint
+    private var host: IrohNodeEndpoint? = null
+    private val hostScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @After fun tearDown() {
         runBlocking {
             if (::senderEp.isInitialized) runCatching { senderEp.shutdown() }
-            if (::receiverEp.isInitialized) runCatching { receiverEp.shutdown() }
+            host?.let { runCatching { it.shutdown() } }
         }
+        hostScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
+
+    /**
+     * The host endpoint the wrapper runs: the App Server ALPN for one paired peer only, plus
+     * the a2a receiver, which any host may reach.
+     */
+    private suspend fun startHost(receiver: IrohAgentMessageReceiver): IrohNodeEndpoint =
+        IrohNodeEndpoint(
+            scope = hostScope,
+            authPolicy = IrohAuthPolicy.PeerAllowlist(setOf("some-other-paired-peer")),
+            protocolHandlers = listOf(receiver),
+        ).also {
+            host = it
+            it.create()
+            it.start(FakeAppServerController())
+        }
+
+    private suspend fun publish(endpoint: IrohNodeEndpoint, prefix: String): HostEndpointAddressStore {
+        val store = HostEndpointAddressStore(
+            File.createTempFile(prefix, ".kv").apply { deleteOnExit() },
+            AlwaysPresentFakeBackend(),
+        )
+        val addr = endpoint.addr()
+        val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
+        store.register(IrohAgentAddress("host", endpoint.nodeIdHex(), direct))
+        return store
+    }
+
+    private fun bindSender(): Endpoint =
+        runBlocking { Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode())).also { it.online() } }
+            .also { senderEp = it }
 
     private fun interactive(id: String, at: String) = IrohAgentMessageRouter.ConversationState(
         Conversation(ConversationId(id), AgentId("agent-recv"), conversationClass = ConversationClass.INTERACTIVE, lastMessageAt = at), busy = false,
@@ -72,15 +110,12 @@ class IrohAgentMessageReceiveE2ETest {
 
     @Test
     fun inboundLandsInInteractiveTriggersOneTurnAndSkipsHeartbeat() = runBlocking {
-        senderEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
-        receiverEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), alpns = listOf(IrohAgentMessage.ALPN)))
-        receiverEp.online(); senderEp.online()
+        bindSender()
 
         val turns = AtomicInteger(0)
         val landed = CompletableDeferred<String>()
         val router = IrohAgentMessageRouter(ownAgentId = "agent-recv")
         val receiver = IrohAgentMessageReceiver(
-            endpoint = receiverEp,
             router = router,
             conversationsFor = {
                 // The heartbeat conversation is MORE recent, but must be skipped.
@@ -97,18 +132,10 @@ class IrohAgentMessageReceiveE2ETest {
                 DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
         )
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val job = receiver.start(scope)
+        val endpoint = startHost(receiver)
 
         // Publish the host record (ONE kv line per letta-mobile-xmpqm) + send.
-        val store = HostEndpointAddressStore(
-            File.createTempFile("bn008-3", ".kv").apply { deleteOnExit() },
-            AlwaysPresentFakeBackend(),
-        )
-        val addr = receiverEp.addr()
-        val nodeHex = addr.id().toBytes().joinToString("") { "%02x".format(it) }
-        val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
-        store.register(IrohAgentAddress("host", nodeHex, direct))
+        val store = publish(endpoint, "bn008-3")
         val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
 
         val initialEventCount = com.letta.mobile.util.Telemetry.events.value.size
@@ -132,8 +159,6 @@ class IrohAgentMessageReceiveE2ETest {
         assertEquals("agent-sender", recvEvents[0].attrs["fromAgentId"])
         assertEquals("agent-recv", recvEvents[0].attrs["toAgentId"])
         assertEquals("m-1", recvEvents[0].attrs["msgId"])
-        job.cancel()
-        scope.coroutineContext[Job]?.cancel()
         Unit
     }
 
@@ -144,15 +169,12 @@ class IrohAgentMessageReceiveE2ETest {
      */
     @Test
     fun inboundWithExplicitConversationIdLandsOnThatExactConversation() = runBlocking {
-        senderEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
-        receiverEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), alpns = listOf(IrohAgentMessage.ALPN)))
-        receiverEp.online(); senderEp.online()
+        bindSender()
 
         val turns = AtomicInteger(0)
         val landed = CompletableDeferred<String>()
         val router = IrohAgentMessageRouter(ownAgentId = "agent-recv")
         val receiver = IrohAgentMessageReceiver(
-            endpoint = receiverEp,
             router = router,
             conversationsFor = {
                 listOf(
@@ -170,18 +192,10 @@ class IrohAgentMessageReceiveE2ETest {
                 DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
         )
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val job = receiver.start(scope)
+        val endpoint = startHost(receiver)
 
         // Publish the host record (ONE kv line per letta-mobile-xmpqm) + send.
-        val store = HostEndpointAddressStore(
-            File.createTempFile("5m1qy", ".kv").apply { deleteOnExit() },
-            AlwaysPresentFakeBackend(),
-        )
-        val addr = receiverEp.addr()
-        val nodeHex = addr.id().toBytes().joinToString("") { "%02x".format(it) }
-        val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
-        store.register(IrohAgentAddress("host", nodeHex, direct))
+        val store = publish(endpoint, "5m1qy")
         val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
 
         val result = sender.send(
@@ -192,8 +206,32 @@ class IrohAgentMessageReceiveE2ETest {
         val landedConv = withTimeout(15.seconds) { landed.await() }
         assertEquals("working-conv", landedConv, "must land on the explicit target conversation, not the most-recent one")
         assertEquals(1, turns.get(), "exactly one turn triggered")
-        job.cancel()
-        scope.coroutineContext[Job]?.cancel()
+        Unit
+    }
+
+    /**
+     * letta-mobile-by4vm.112: one host endpoint negotiates BOTH the App Server and the a2a ALPN
+     * for the same node id, so no dial (relay-routed or direct) can reach an endpoint that lacks
+     * the App Server protocol. An ALPN the host does not serve still fails the handshake.
+     */
+    @Test
+    fun hostEndpointNegotiatesAppServerAndA2aAlpns() = runBlocking {
+        val sender = bindSender()
+        val receiver = IrohAgentMessageReceiver(
+            router = IrohAgentMessageRouter(ownAgentId = "agent-recv"),
+            conversationsFor = { emptyList() },
+            onDeliver = { _, _ -> DeliveryOutcome(delivered = false) },
+        )
+        val endpoint = startHost(receiver)
+        for (alpn in listOf(IrohNodeEndpoint.DEFAULT_ALPN, IrohAgentMessage.ALPN)) {
+            val connection = withTimeout(15.seconds) { sender.connect(endpoint.addr(), alpn) }
+            assertEquals(alpn.decodeToString(), connection.alpn().decodeToString())
+            connection.close(0L, ByteArray(0))
+        }
+        val refused = runCatching {
+            withTimeout(15.seconds) { sender.connect(endpoint.addr(), "/letta/unknown/0".encodeToByteArray()) }
+        }
+        kotlin.test.assertTrue(refused.isFailure, "an unserved ALPN must not complete the handshake")
         Unit
     }
 }
