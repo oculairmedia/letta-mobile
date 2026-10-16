@@ -166,6 +166,8 @@ class AppServerTurnEngine(
      */
     private val approvalDecisionCache: ApprovalDecisionCache =
         eventRouter?.approvalDecisionCache() ?: ApprovalDecisionCache(),
+    /** letta-mobile-jvctq: false never answers an approval for the person; every one waits for them. */
+    private val autoAllowApprovals: Boolean = true,
 ) : TurnEngine {
     internal val approvalSender = ApprovalResponseSender(client, approvalDecisionCache, requestIdFactory)
 
@@ -241,7 +243,8 @@ class AppServerTurnEngine(
         inboundControlRegistry = inboundControlRegistry,
         connectionGenerationProvider = connectionGenerationProvider,
         leaseHeld = { key -> leases.peek(key)?.lease != null },
-        runtimeOwned = { key -> leases.peek(key) != null },
+        // letta-mobile-jvctq: without auto-allow no runtime's policy is ours to apply, so nothing is answered.
+        runtimeOwned = { key -> autoAllowApprovals && leases.peek(key) != null },
         permissionModeFor = { key -> permissionModeProvider(unleasedCommandFor(key)) },
         runtimeScopeFor = { key -> leases.peek(key)?.runtimeScope },
         parkLeftPending = { key, parked ->
@@ -1419,7 +1422,7 @@ class AppServerTurnEngine(
         // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion, ExitPlanMode) are NEVER
         // auto-approved (that closes them with no answer and the agent stalls); jna0o.7: an
         // allow-listed `meridian` CLI call is approved in every mode, like the tool it replaces.
-        if (!approval.autoAllowPermitted(permissionModeProvider(command))) return false
+        if (!autoAllowApprovals || !approval.autoAllowPermitted(permissionModeProvider(command))) return false
         Telemetry.event(
             "IrohTurn", "approval.auto_allow",
             "approvalId" to approval.requestId,
