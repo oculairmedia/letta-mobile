@@ -6,8 +6,6 @@ import com.letta.mobile.data.runtime.host.LocalAppServerLaunch
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -194,12 +192,12 @@ data class ProviderEndpoint(val baseUrl: String, val apiKey: String)
 
 /**
  * letta-mobile-by4vm.110.6: the runtime's own provider file, `<backendDir>/providers/auth.json`,
- * with one `lc-lmstudio` provider at [endpoint] listing [selection]'s model, so agents created on
- * [EmbeddedLettaCodeModelSelection.lettaCodeModelHandle] resolve (the CI node18 smoke and the
- * device smoke use this shape). Vision stays with `LETTA_CODE_VISION_MODEL_IDS`: 0.34.14 ignores
- * `models[].input` for lmstudio (by4vm.110.2).
+ * with one `lc-lmstudio` provider at [endpoint]. It carries only the connection: letta-code
+ * 0.34.14 discovers lmstudio models from the endpoint itself (`/api/v0/models`, then `/models`)
+ * and ignores a `models[]` array here, so the endpoint must advertise [lettaCodeLookupId] of the
+ * agents' handle (by4vm.121.1). Vision stays with `LETTA_CODE_VISION_MODEL_IDS` (by4vm.110.2).
  */
-fun File.writeLocalProviderAuth(endpoint: ProviderEndpoint, selection: EmbeddedLettaCodeModelSelection) {
+fun File.writeLocalProviderAuth(endpoint: ProviderEndpoint) {
     val root = buildJsonObject {
         put("version", 1)
         put(
@@ -214,20 +212,6 @@ fun File.writeLocalProviderAuth(endpoint: ProviderEndpoint, selection: EmbeddedL
                         put("provider_category", "byok")
                         put("auth", buildJsonObject { put("type", "api"); put("key", endpoint.apiKey) })
                         put("base_url", endpoint.baseUrl)
-                        put(
-                            "models",
-                            buildJsonArray {
-                                add(
-                                    buildJsonObject {
-                                        put("id", selection.openAiModelId)
-                                        put("contextWindow", DEFAULT_LOCAL_CONTEXT_WINDOW)
-                                        put("maxTokens", selection.maxTokens)
-                                        put("input", buildJsonArray { add(JsonPrimitive("text")) })
-                                        put("cost", buildJsonObject { put("input", 0); put("output", 0) })
-                                    },
-                                )
-                            },
-                        )
                     },
                 )
             },
@@ -239,7 +223,6 @@ fun File.writeLocalProviderAuth(endpoint: ProviderEndpoint, selection: EmbeddedL
 }
 
 private const val LOCAL_PROVIDER_NAME = "lc-lmstudio"
-private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
 
 private val VISION_MODEL_PATTERNS = listOf(
     "llava", "vision", "opus", "sonnet", "haiku", "claude", "fable",

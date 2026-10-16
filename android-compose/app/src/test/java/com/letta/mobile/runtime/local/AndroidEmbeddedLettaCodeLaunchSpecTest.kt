@@ -6,7 +6,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -51,26 +50,17 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
     }
 
     @Test
-    fun `local provider file points lc-lmstudio at the endpoint and lists the selected model`() {
+    fun `local provider file points lc-lmstudio at the endpoint without a models list`() {
         val backendDir = tempDir("letta-provider-auth")
-        val selection = EmbeddedLettaCodeModelSelection(
-            modelHandle = "google/gemma-3n-E2B-it-litert-lm",
-            modelPath = "/models/gemma.litertlm",
-            runtime = "litert-lm",
-            accelerator = "gpu",
-            maxTokens = 2048,
-        )
 
-        backendDir.writeLocalProviderAuth(ProviderEndpoint("http://127.0.0.1:3456/v1", "loopback-token"), selection)
+        backendDir.writeLocalProviderAuth(ProviderEndpoint("http://127.0.0.1:3456/v1", "loopback-token"))
 
         val provider = kotlinx.serialization.json.Json.parseToJsonElement(File(backendDir, "providers/auth.json").readText())
             .jsonObject.getValue("providers").jsonObject.getValue("lc-lmstudio").jsonObject
         assertEquals("lmstudio", provider.getValue("provider_type").jsonPrimitive.content)
         assertEquals("http://127.0.0.1:3456/v1", provider.getValue("base_url").jsonPrimitive.content)
         assertEquals("loopback-token", provider.getValue("auth").jsonObject.getValue("key").jsonPrimitive.content)
-        val model = provider.getValue("models").jsonArray.single().jsonObject
-        assertEquals("google/gemma-3n-E2B-it-litert-lm", model.getValue("id").jsonPrimitive.content)
-        assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", selection.lettaCodeModelHandle)
+        assertFalse(provider.containsKey("models"))
     }
 
     @Test
