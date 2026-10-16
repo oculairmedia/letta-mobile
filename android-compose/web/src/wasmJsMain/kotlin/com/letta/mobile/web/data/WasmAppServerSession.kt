@@ -1,12 +1,13 @@
 package com.letta.mobile.web.data
 
-import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.AppServerTurnStackSpec
+import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerTransport
@@ -149,16 +150,10 @@ internal suspend fun connectWasmAppServerSession(
     try {
         bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
         val client = DefaultAppServerClient(transport, parentScope = scope)
-        val eventRouter = AppServerRuntimeEventRouter()
-        router = eventRouter
-        eventRouter.attach(scope, client.events)
+        val eventRouter = AppServerRuntimeEventRouter().also { router = it }
         return WasmAppServerSession(
             client = client,
-            engine = AppServerTurnEngine(
-                client = client,
-                requestIdFactory = { nextRequestId("turn") },
-                eventRouter = eventRouter,
-            ).also { engine -> engine.answerApprovalReplaysFrom(eventRouter, scope) },
+            engine = eventRouter.attachTurnStack(client, scope, AppServerTurnStackSpec(requestIdFactory = { nextRequestId("turn") })),
             router = eventRouter,
             transport = transport,
             label = label,

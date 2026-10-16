@@ -218,7 +218,7 @@ suspend fun AppServerTurnEngine.reanswerReplayedApproval(
  * Iroh dialer) call this so a replayed `control_request` for a request this engine
  * already answered is re-answered on [scope] instead of being dropped by the fanout.
  */
-fun AppServerTurnEngine.answerApprovalReplaysFrom(router: AppServerRuntimeEventRouter, scope: CoroutineScope) {
+internal fun AppServerTurnEngine.answerApprovalReplaysFrom(router: AppServerRuntimeEventRouter, scope: CoroutineScope) {
     router.bindApprovalReplayResponder { frame ->
         val cached = cachedApprovalDecisionFor(frame)
         if (cached != null) scope.launch { reanswerReplayedApproval(cached) }

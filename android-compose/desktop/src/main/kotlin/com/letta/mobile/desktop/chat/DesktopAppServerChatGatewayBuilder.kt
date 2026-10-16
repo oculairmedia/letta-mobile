@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
 import com.letta.mobile.data.canvas.CanvasExternalTools
 import com.letta.mobile.data.canvas.CanvasSessionRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -14,6 +13,8 @@ import com.letta.mobile.data.controller.fanout.StreamIntegrityBinding
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.canvas.DesktopNotebookCanvasStore
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.AppServerTurnStackSpec
+import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -191,11 +192,11 @@ class DesktopAppServerChatGatewayBuilder(
             if (spec.local) leases += DesktopLocalAppServerClientRegistry.shared.install(opened.client)
             if (!spec.isIroh) leases += DesktopLocalAppServerClientRegistry.direct.install(opened.client)
             startStreamIntegrity(router, opened.client, clientScope, irohHostCapabilities = spec.irohHostCapabilities())
-            val turnEngine = buildDesktopAppServerTurnEngine(
-                client = opened.client,
-                scope = controllerScope,
-                externalToolRegistry = toolRegistry,
-                config = DesktopAppServerEngineConfig(eventRouter = router, permissionModes = spec.permissionModes),
+            // lgns8.22.3: one inbound collector per desktop gateway.
+            val turnEngine = router.attachTurnStack(
+                opened.client,
+                controllerScope,
+                desktopTurnStackSpec(toolRegistry, spec.permissionModes),
             )
             engine = turnEngine
             return DesktopAppServerChatGateway(
@@ -257,9 +258,18 @@ class DesktopAppServerChatGatewayBuilder(
  * window or compacts before a turn. letta-code compacts from the agent's own compaction settings
  * against the model's real window.
  */
-internal data class DesktopAppServerEngineConfig(
-    val eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
-    val permissionModes: PermissionModeRegistry? = null,
+internal fun desktopTurnStackSpec(
+    externalToolRegistry: ExternalToolRegistry? = null,
+    permissionModes: PermissionModeRegistry? = null,
+) = AppServerTurnStackSpec(
+    clientInfo = DESKTOP_CLIENT_INFO,
+    permissionMode = AppServerPermissionMode.Unrestricted,
+    permissionModeProvider = { command ->
+        permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
+            ?: AppServerPermissionMode.Unrestricted
+    },
+    onPermissionModeInForce = { runtime, mode -> permissionModes?.observed(runtime, mode) },
+    externalToolRegistry = externalToolRegistry,
 )
 
 /**
@@ -321,29 +331,6 @@ internal fun desktopReattachCommand(
     forceDeviceStatus = true,
     externalTools = externalToolRegistry.advertisedToolsCommandGroups(audience = ToolAudience(runtime.agentId)),
 )
-
-internal fun buildDesktopAppServerTurnEngine(
-    client: AppServerClient,
-    scope: CoroutineScope,
-    externalToolRegistry: ExternalToolRegistry? = null,
-    config: DesktopAppServerEngineConfig = DesktopAppServerEngineConfig(),
-): AppServerTurnEngine {
-    // lgns8.22.3: one inbound collector per desktop gateway generation.
-    val router = config.eventRouter
-    router.attach(scope, client.events)
-    return AppServerTurnEngine(
-        client = client,
-        clientInfo = DESKTOP_CLIENT_INFO,
-        permissionMode = AppServerPermissionMode.Unrestricted,
-        permissionModeProvider = { command ->
-            config.permissionModes?.modeFor(AppServerRuntimeScope(command.agentId.value, command.conversationId.value))
-                ?: AppServerPermissionMode.Unrestricted
-        },
-        onPermissionModeInForce = { runtime, mode -> config.permissionModes?.observed(runtime, mode) },
-        eventRouter = router,
-        externalToolRegistry = externalToolRegistry,
-    ).also { engine -> engine.answerApprovalReplaysFrom(router, scope) }
-}
 
 /**
  * The iroh auth exchange doubles as the transport handshake: it advertises the
