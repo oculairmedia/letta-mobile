@@ -1,6 +1,7 @@
 package com.letta.mobile.data.a2ui
 
 import androidx.compose.runtime.Stable
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -66,12 +67,12 @@ class A2uiSurfaceManager(
         _surfaces.value = emptyMap()
     }
 
-    fun dismissSurface(surfaceId: String) {
-        if (surfaceId.isBlank()) return
-        _surfaces.update { current -> current - surfaceId }
+    fun dismissSurface(surfaceId: A2uiSurfaceId) {
+        if (surfaceId.value.isBlank()) return
+        _surfaces.update { current -> current - surfaceId.value }
     }
 
-    fun surface(surfaceId: String): A2uiSurfaceState? = surfaces.value[surfaceId]
+    fun surface(surfaceId: A2uiSurfaceId): A2uiSurfaceState? = surfaces.value[surfaceId.value]
 }
 
 object A2uiBindingResolver {
@@ -394,7 +395,7 @@ private fun Map<String, A2uiSurfaceState>.updateComponents(
     val incoming = payload.components.associateBy(A2uiComponent::id)
     if (existing.limitViolation != null) return this
     checkComponentBudget(existing.components, incoming)?.let { violation ->
-        logSurfaceRejected(payload.surfaceId, violation)
+        logSurfaceRejected(A2uiSurfaceId(payload.surfaceId), violation)
         return plus(payload.surfaceId to existing.copy(components = emptyMap(), limitViolation = violation))
     }
     val nextComponents = existing.components + incoming

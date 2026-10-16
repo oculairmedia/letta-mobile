@@ -21,6 +21,7 @@ import com.letta.mobile.data.canvas.CanvasPresenceTransport
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.plugin.view.PluginViewsModel
 import com.letta.mobile.data.plugin.view.ViewPlatform
 import com.letta.mobile.pluginview.ProvidePluginViews
@@ -56,7 +57,7 @@ class CanvasViewModel @Inject constructor(
             val canvasSession = if (!conversationId.isNullOrBlank() && canvasId.isBlank()) {
                 CanvasSession.getOrCreateForConversation(
                     store = store,
-                    conversationId = conversationId,
+                    conversationId = ConversationId(conversationId),
                     options = com.letta.mobile.data.canvas.CanvasConversationOptions(
                         agentId = agentId,
                         title = "Conversation Canvas",

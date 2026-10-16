@@ -32,6 +32,7 @@ import com.letta.mobile.data.canvas.CanvasGeometryOwner
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.canvas.CanvasNoteAutoFitFixtures.B
 import io.ak1.drawbox.domain.model.Viewport
 import java.io.File
@@ -207,7 +208,7 @@ class CanvasNoteAutoFitUiTest {
         val store = InMemoryCanvasDocumentStore()
         val first = session(store)
         first.put(FitNote("n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 900f), CanvasGeometryOwner.AUTO))
-        runBlocking { first.moveDocument("n", CanvasDocumentFrame(80f, 80f, 320f, 160f)) }
+        runBlocking { first.moveDocument(CanvasNoteId("n"), CanvasDocumentFrame(80f, 80f, 320f, 160f)) }
         assertEquals(CanvasGeometryOwner.USER, first.documents().single().owner)
 
         val reloaded = assertNotNull(runBlocking { CanvasSession.open(store, first.canvasId, CanvasConversationOptions()) })

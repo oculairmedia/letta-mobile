@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat.screen.shared
 
 import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.SlashCommand
@@ -11,6 +10,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.EffortSelection
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
+import com.letta.mobile.ui.chat.session.ChatHostCommand
 import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import kotlinx.collections.immutable.toImmutableList
@@ -22,20 +22,6 @@ import kotlinx.collections.immutable.toImmutableList
  */
 internal object AdminChatComposerMapping {
 
-    /** What the ViewModel knows about the composer at one instant. */
-    data class ComposerInputs(
-        val composer: ChatComposerState,
-        val canSend: Boolean,
-        val canQueueWhileStreaming: Boolean,
-        val maxAttachments: Int,
-        val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
-        val model: ChatModelUiState?,
-        /** The streamed context reading; the placeholder state while there is none yet. */
-        val contextUsage: ContextWindowUsageState,
-        /** letta-mobile-7mys7: the page can fork, so the palette offers /fork. */
-        val canFork: Boolean = false,
-    )
-
     /** What the ViewModel knows about the conversation's model at one instant. */
     data class ModelInputs(
         val agent: Agent?,
@@ -46,26 +32,28 @@ internal object AdminChatComposerMapping {
         val conversationEffort: String? = null,
     )
 
-    fun composerUiState(inputs: ComposerInputs): ChatComposerUiState = ChatComposerUiState(
-        text = inputs.composer.inputText,
-        attachments = inputs.composer.pendingAttachments,
-        error = inputs.composer.error,
-        canSend = inputs.canSend,
+    /** The draft; the extension points' chrome ([com.letta.mobile.ui.chat.session.withChrome]) goes over it. */
+    fun composerUiState(composer: ChatComposerState, canSend: Boolean, limits: AttachmentLimits) = ChatComposerUiState(
+        text = composer.inputText,
+        attachments = composer.pendingAttachments,
+        error = composer.error,
+        canSend = canSend,
         // The ViewModel's canSendMessages is connection-level, not payload-level: it gates input too.
-        acceptsInput = inputs.canSend,
-        canQueueWhileStreaming = inputs.canQueueWhileStreaming,
-        maxAttachments = inputs.maxAttachments,
-        attachmentLimits = inputs.attachmentLimits,
-        commands = composerCommands(inputs),
-        model = inputs.model,
-        contextUsage = inputs.contextUsage,
-        workingDirectory = null,
+        acceptsInput = canSend,
+        maxAttachments = limits.maxAttachmentCount,
+        attachmentLimits = limits,
     )
 
-    /** The server's slash commands, plus the client-run /fork where the page can fork. */
-    private fun composerCommands(inputs: ComposerInputs) =
-        (listOfNotNull(ChatComposerCommand.Fork.takeIf { inputs.canFork }) +
-            inputs.composer.slashCommands.map(ChatComposerCommand::fromSlashCommand)).toImmutableList()
+    /**
+     * The server's slash commands (installed ones removable), plus the client-run /fork where the
+     * page can fork, which fills the composer and is run by send.
+     */
+    fun hostCommands(slash: List<SlashCommand>, canFork: Boolean, select: (SlashCommand) -> Unit, uninstall: (SlashCommand) -> Unit) =
+        listOfNotNull(ChatComposerCommand.Fork.takeIf { canFork }?.let { ChatHostCommand(it.label, it.description, true) {} }) +
+            slash.map { command ->
+                val remove = if (command.installed) ({ uninstall(command) }) else null
+                ChatHostCommand(command.command, command.description, fillsComposer = true, uninstall = remove) { select(command) }
+            }
 
     fun modelUiState(inputs: ModelInputs): ChatModelUiState? {
         val handle = ConversationModelSelections.resolve(
@@ -112,6 +100,4 @@ internal object AdminChatComposerMapping {
         is ReasoningEffortChoice.Named -> EffortSelection.Set(choice.effort)
     }
 
-    fun findSlashCommand(commands: List<SlashCommand>, command: ChatComposerCommand): SlashCommand? =
-        commands.firstOrNull { it.command == command.id }
 }

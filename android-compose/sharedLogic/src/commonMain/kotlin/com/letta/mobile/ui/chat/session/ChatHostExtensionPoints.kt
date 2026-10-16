@@ -27,10 +27,12 @@ data class ChatHostCommand(
      * then edits and sends) rather than running an app action, so the palette does not take Enter.
      */
     val fillsComposer: Boolean = false,
+    /** Removes the command (an installed skill); null where it cannot be removed. */
+    val uninstall: (() -> Unit)? = null,
     val run: () -> Unit,
 ) {
     val command: ChatComposerCommand
-        get() = ChatComposerCommand(id = label, label = label, description = description, fillsComposer = fillsComposer)
+        get() = ChatComposerCommand(label, label, description, fillsComposer = fillsComposer, removable = uninstall != null)
 }
 
 /** Composer chrome the host computes outside the conversation owner. */

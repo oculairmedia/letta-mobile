@@ -32,6 +32,7 @@ import com.letta.mobile.data.a2ui.A2uiProtocolJson
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiUpdateDataModelPayload
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
+import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.ui.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiRenderer
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
@@ -65,7 +66,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = { clicked = it },
             )
@@ -98,7 +99,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.MISSING_COMPONENT).assertIsDisplayed()
@@ -122,7 +123,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.MISSING_TEXT).assertIsDisplayed()
@@ -158,7 +159,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Hello Emmanuel: 5/10").assertIsDisplayed()
@@ -180,7 +181,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("not-email")
@@ -201,13 +202,13 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Accept terms").assertIsDisplayed()
         composeRule.onNodeWithTag(A2uiTestTags.CHECKBOX).assertIsOff().performClick()
         composeRule.runOnIdle {
-            assertEquals("true", manager.surface(SurfaceId)!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content)
+            assertEquals("true", manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content)
         }
     }
 
@@ -229,7 +230,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.LIST_VIEW).assertIsDisplayed()
@@ -251,7 +252,7 @@ class A2uiRendererTest {
             """.trimIndent(),
         )
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = hidden)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = hidden)
         }
         composeRule.onNodeWithText("Modal body").assertDoesNotExist()
         composeRule.runOnIdle {
@@ -291,7 +292,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.VIDEO).assertIsDisplayed()
@@ -314,7 +315,7 @@ class A2uiRendererTest {
         val actions = mutableListOf<A2uiAction>()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager, onAction = actions::add)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager, onAction = actions::add)
         }
 
         composeRule.onNodeWithText("Open docs").assertIsEnabled().performClick()
@@ -389,7 +390,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("It works").assertIsDisplayed()
@@ -413,7 +414,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Waiting").assertIsNotEnabled()
@@ -424,7 +425,7 @@ class A2uiRendererTest {
         val manager = toolApprovalSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_CARD).assertIsDisplayed()
@@ -448,7 +449,7 @@ class A2uiRendererTest {
         val manager = toolApprovalSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_SENSITIVE_VALUE).performClick()
@@ -460,7 +461,7 @@ class A2uiRendererTest {
         val manager = toolApprovalSurfaceManager(argumentsExpanded = false)
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Show").assertIsDisplayed()
@@ -473,7 +474,7 @@ class A2uiRendererTest {
         val manager = toolApprovalSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Hide").performClick()
@@ -500,7 +501,7 @@ class A2uiRendererTest {
         val manager = toolApprovalSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Hide").performClick()
@@ -573,7 +574,7 @@ class A2uiRendererTest {
             affordances = listOf("once"),
             callId = "call-rest",
             riskLevel = "medium",
-        ).surface(SurfaceId)!!
+        ).surface(A2uiSurfaceId(SurfaceId))!!
         val manager = A2uiSurfaceManager(
             mapOf(SurfaceId to baseSurface.copy(approvalRequestId = "approval-rest-1"))
         )
@@ -581,7 +582,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -608,7 +609,7 @@ class A2uiRendererTest {
         try {
             composeRule.setLettaTestContent(useChatTheme = false) {
                 A2uiRenderer(
-                    surfaceId = SurfaceId,
+                    surfaceId = A2uiSurfaceId(SurfaceId),
                     surfaceManager = manager,
                     onAction = actions::add,
                 )
@@ -633,7 +634,7 @@ class A2uiRendererTest {
         val manager = phase4WidgetsSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Booking details").assertIsDisplayed()
@@ -652,7 +653,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -678,7 +679,7 @@ class A2uiRendererTest {
         val manager = listViewSurfaceManager(includeItems = false)
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.MISSING_COMPONENT).assertIsDisplayed()
@@ -710,7 +711,7 @@ class A2uiRendererTest {
         val manager = imageSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithContentDescription("Hotel room").assertIsDisplayed()
@@ -721,14 +722,14 @@ class A2uiRendererTest {
         val manager = textFieldSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.TEXT_FIELD).performTextInput("4")
         composeRule.runOnIdle {
             assertEquals(
                 "4",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
             )
         }
     }
@@ -738,14 +739,14 @@ class A2uiRendererTest {
         val manager = formWidgetSurfaceManager(root = "acceptTerms")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.CHECKBOX).assertIsOff().performClick()
         composeRule.runOnIdle {
             assertEquals(
                 "true",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content,
             )
         }
     }
@@ -755,7 +756,7 @@ class A2uiRendererTest {
         val manager = formWidgetSurfaceManager(root = "notifications")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.SWITCH).assertIsOn().performClick()
@@ -763,7 +764,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "false",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/notifications")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/notifications")!!.jsonPrimitive.content,
             )
         }
     }
@@ -773,7 +774,7 @@ class A2uiRendererTest {
         val manager = formWidgetSurfaceManager(root = "seatChoice")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.RADIO).assertIsDisplayed()
@@ -781,7 +782,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "aisle",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
             )
         }
     }
@@ -791,7 +792,7 @@ class A2uiRendererTest {
         val manager = formWidgetSurfaceManager(root = "mealChoice")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Pasta").assertIsDisplayed().performClick()
@@ -799,7 +800,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "pasta",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/mealChoice")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/mealChoice")!!.jsonPrimitive.content,
             )
         }
     }
@@ -809,7 +810,7 @@ class A2uiRendererTest {
         val manager = choicePickerSurfaceManager(root = "bound-picker")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.CHOICE_PICKER).assertIsDisplayed()
@@ -819,7 +820,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "glitchy",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/feel")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/feel")!!.jsonPrimitive.content,
             )
         }
     }
@@ -858,7 +859,7 @@ class A2uiRendererTest {
         )
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onAllNodesWithTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION).assertCountEquals(4)
@@ -869,12 +870,12 @@ class A2uiRendererTest {
         composeRule.onNodeWithText("Tools").performClick()
 
         composeRule.runOnIdle {
-            assertEquals("openai", manager.surface(SurfaceId)!!.dataModel.resolve("/provider")!!.jsonPrimitive.content)
-            val capabilities = manager.surface(SurfaceId)!!.dataModel.resolve("/capabilities").toString()
+            assertEquals("openai", manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/provider")!!.jsonPrimitive.content)
+            val capabilities = manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/capabilities").toString()
             assertTrue(capabilities.contains("vision"))
             assertTrue(capabilities.contains("code"))
-            assertEquals("direct", manager.surface(SurfaceId)!!.dataModel.resolve("/tone")!!.jsonPrimitive.content)
-            val features = manager.surface(SurfaceId)!!.dataModel.resolve("/features").toString()
+            assertEquals("direct", manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/tone")!!.jsonPrimitive.content)
+            val features = manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/features").toString()
             assertTrue(features.contains("stream"))
             assertTrue(features.contains("tools"))
         }
@@ -887,7 +888,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -899,7 +900,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "clean",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/feel-picker")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/feel-picker")!!.jsonPrimitive.content,
             )
             val action = actions.single()
             assertEquals("submit_feel", action.name)
@@ -913,7 +914,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = {},
             )
@@ -924,7 +925,7 @@ class A2uiRendererTest {
         composeRule.onNodeWithTag(A2uiTestTags.CHOICE_PICKER).assertIsNotEnabled()
 
         composeRule.runOnIdle {
-            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/feel-picker"))
+            assertEquals(null, manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/feel-picker"))
         }
     }
 
@@ -934,7 +935,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = {},
             )
@@ -949,7 +950,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "window",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
             )
         }
     }
@@ -959,7 +960,7 @@ class A2uiRendererTest {
         val manager = numericWidgetSurfaceManager(root = "volumeSlider")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.SLIDER).assertIsDisplayed()
@@ -969,7 +970,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "8",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/volume")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/volume")!!.jsonPrimitive.content,
             )
         }
     }
@@ -979,7 +980,7 @@ class A2uiRendererTest {
         val manager = numericWidgetSurfaceManager(root = "temperatureSlider")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.SLIDER).assertIsDisplayed()
@@ -989,7 +990,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "1.5",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/temperature")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/temperature")!!.jsonPrimitive.content,
             )
         }
     }
@@ -999,7 +1000,7 @@ class A2uiRendererTest {
         val manager = numericWidgetSurfaceManager(root = "numericForm")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onAllNodesWithTag(A2uiTestTags.STEPPER_INCREMENT)[0].performClick()
@@ -1008,11 +1009,11 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "3",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/quantity")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/quantity")!!.jsonPrimitive.content,
             )
             assertEquals(
                 "1.5",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/rating")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/rating")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1022,7 +1023,7 @@ class A2uiRendererTest {
         val manager = numericWidgetSurfaceManager(root = "localStepper")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("1").assertIsDisplayed()
@@ -1031,7 +1032,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "2",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/localStepper")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/localStepper")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1041,7 +1042,7 @@ class A2uiRendererTest {
         val manager = progressWidgetSurfaceManager(root = "downloadProgress", downloadProgress = 0.25)
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Downloading model").assertIsDisplayed()
@@ -1070,7 +1071,7 @@ class A2uiRendererTest {
         val manager = progressWidgetSurfaceManager(root = "scanProgress", scanProgress = 0.4)
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Scanning files").assertIsDisplayed()
@@ -1099,7 +1100,7 @@ class A2uiRendererTest {
         val manager = progressWidgetSurfaceManager(root = "indeterminateProgress", scanProgress = "waiting")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithContentDescription("Linear progress indeterminate").assertIsDisplayed()
@@ -1113,7 +1114,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = {},
             )
@@ -1130,7 +1131,7 @@ class A2uiRendererTest {
         val manager = dropdownSurfaceManager(root = "seatDropdown")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).assertIsDisplayed().performClick()
@@ -1138,7 +1139,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "aisle",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1148,7 +1149,7 @@ class A2uiRendererTest {
         val manager = dropdownSurfaceManager(root = "mealSelect")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.DROPDOWN).assertIsDisplayed().performClick()
@@ -1156,7 +1157,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "pasta",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/meal")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/meal")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1166,7 +1167,7 @@ class A2uiRendererTest {
         val manager = dropdownSurfaceManager(root = "localDropdown")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithText("Low").assertIsDisplayed()
@@ -1176,7 +1177,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "high",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/localDropdown")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/_inputs/localDropdown")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1187,7 +1188,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = {},
             )
@@ -1205,7 +1206,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1224,14 +1225,14 @@ class A2uiRendererTest {
         val manager = chipSurfaceManager(root = "doneFilter")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.FILTER_CHIP).assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(
                 "true",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/filters/done")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/filters/done")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1241,7 +1242,7 @@ class A2uiRendererTest {
         val manager = chipSurfaceManager(root = "countBadge")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.BADGE).assertIsDisplayed()
@@ -1266,7 +1267,7 @@ class A2uiRendererTest {
         val manager = tabsAccordionSurfaceManager(root = "projectTabs")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.TABS).assertIsDisplayed()
@@ -1288,7 +1289,7 @@ class A2uiRendererTest {
 
         composeRule.onNodeWithText("Activity body").assertIsDisplayed()
         composeRule.runOnIdle {
-            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/selectedTab"))
+            assertEquals(null, manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/selectedTab"))
         }
     }
 
@@ -1297,7 +1298,7 @@ class A2uiRendererTest {
         val manager = tabsAccordionSurfaceManager(root = "faqAccordion")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.ACCORDION).assertIsDisplayed()
@@ -1329,7 +1330,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1355,7 +1356,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = pauseManager,
                 onAction = pauseActions::add,
             )
@@ -1378,7 +1379,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = resumeManager,
                 onAction = resumeActions::add,
             )
@@ -1399,7 +1400,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1411,7 +1412,7 @@ class A2uiRendererTest {
         composeRule.onNodeWithText("Every").performClick()
         composeRule.onNodeWithText("Runs every 15 minutes").assertIsDisplayed()
         composeRule.runOnIdle {
-            val draft = manager.surface(SurfaceId)!!.dataModel.resolve("/draftSchedule")!!.jsonObject
+            val draft = manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/draftSchedule")!!.jsonObject
             assertEquals("every", draft["mode"]!!.jsonPrimitive.content)
             assertEquals("15", draft["value"]!!.jsonPrimitive.content)
         }
@@ -1440,7 +1441,7 @@ class A2uiRendererTest {
         val manager = iconSurfaceManager(name = "Cloud", contentDescription = "Cloud status")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.ICON).assertIsDisplayed()
@@ -1452,7 +1453,7 @@ class A2uiRendererTest {
         val manager = iconSurfaceManager(name = "NotARealIcon")
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.MISSING_ICON).assertIsDisplayed()
@@ -1465,7 +1466,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1516,7 +1517,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1561,7 +1562,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1606,7 +1607,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1650,7 +1651,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1697,7 +1698,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1728,7 +1729,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1767,7 +1768,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1788,7 +1789,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -1810,7 +1811,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = {},
             )
@@ -1826,7 +1827,7 @@ class A2uiRendererTest {
         composeRule.runOnIdle {
             assertEquals(
                 "4",
-                manager.surface(SurfaceId)!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
+                manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
             )
         }
     }
@@ -1838,7 +1839,7 @@ class A2uiRendererTest {
         try {
             composeRule.setLettaTestContent(useChatTheme = false) {
                 A2uiRenderer(
-                    surfaceId = SurfaceId,
+                    surfaceId = A2uiSurfaceId(SurfaceId),
                     surfaceManager = manager,
                     onAction = {},
                 )
@@ -1867,7 +1868,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiSurfaceRenderer(
-                surface = manager.surface(SurfaceId),
+                surface = manager.surface(A2uiSurfaceId(SurfaceId)),
                 actionResolutionToken = resolutionToken.intValue,
                 onAction = {},
             )
@@ -1892,7 +1893,7 @@ class A2uiRendererTest {
         val manager = dateTimeSurfaceManager()
 
         composeRule.setLettaTestContent(useChatTheme = false) {
-            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+            A2uiRenderer(surfaceId = A2uiSurfaceId(SurfaceId), surfaceManager = manager)
         }
 
         composeRule.onNodeWithTag(A2uiTestTags.DATE_TIME_INPUT).performClick()
@@ -1900,7 +1901,7 @@ class A2uiRendererTest {
         composeRule.onAllNodesWithText("OK")[0].performClick()
 
         composeRule.runOnIdle {
-            val value = manager.surface(SurfaceId)!!.dataModel.resolve("/reservationTime")!!.jsonPrimitive.content
+            val value = manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel.resolve("/reservationTime")!!.jsonPrimitive.content
             assertTrue(Regex("""\d{4}-\d{2}-\d{2}""").matches(value))
         }
     }
@@ -1921,7 +1922,7 @@ class A2uiRendererTest {
 
         composeRule.setLettaTestContent(useChatTheme = false) {
             A2uiRenderer(
-                surfaceId = SurfaceId,
+                surfaceId = A2uiSurfaceId(SurfaceId),
                 surfaceManager = manager,
                 onAction = actions::add,
             )
@@ -2001,7 +2002,7 @@ internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
     )
     check(
         A2uiBindingResolver.resolvePath(
-            manager.surface(SurfaceId)!!.dataModel,
+            manager.surface(A2uiSurfaceId(SurfaceId))!!.dataModel,
             "/title",
         )!!.jsonPrimitive.content == "Review tool call"
     )

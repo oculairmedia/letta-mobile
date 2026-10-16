@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
 import io.ak1.drawbox.domain.model.Mode
@@ -122,7 +123,7 @@ internal fun CanvasBoard.addJoinedNote(
     val id = newNoteId()
     scope.launch {
         recordingDocuments("adding a note") {
-            runCatching { s.setDocument(id, "", frame = frame, color = color) }.onSuccess {
+            runCatching { s.setDocument(CanvasNoteId(id), "", frame = frame, color = color) }.onSuccess {
                 val (start, end) = CanvasQuickCreate.connector(from, frame.toRect(), direction)
                 // The session's documents, which already hold the note just added.
                 if (CanvasQuickCreate.addArrow(controller, start, end) != null) snapConnectorToNotes()

@@ -68,7 +68,6 @@ class ConfirmedTimelineScenarioTest {
     ) = TimelineRepository(
         timelineTransport = transport,
         pendingLocalStore = NoOpPendingLocalStore,
-        conversationCursorStore = NoOpConversationCursorStore,
         confirmedTimelineStore = store,
         backendIdProvider = { "test-backend" },
         repositoryScope = repositoryScope,

@@ -13,6 +13,7 @@ import com.letta.mobile.data.agents.RecentAgentsCut
 import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
@@ -398,7 +399,7 @@ internal fun openDesktopCanvasSession(params: OpenDesktopCanvasParams) {
     params.scope.launch {
         val session = com.letta.mobile.data.canvas.CanvasSession.getOrCreateForConversation(
             store = params.store,
-            conversationId = convId,
+            conversationId = ConversationId(convId),
             options = com.letta.mobile.data.canvas.CanvasConversationOptions(
                 agentId = params.agentId,
                 title = "Canvas ($displayName)",

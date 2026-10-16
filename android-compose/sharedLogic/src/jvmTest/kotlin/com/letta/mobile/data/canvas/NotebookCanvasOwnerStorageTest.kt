@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasNoteId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -31,8 +32,8 @@ class NotebookCanvasOwnerStorageTest {
             session.writeDocument(
                 CanvasDocumentWrite("cmp-weekend-plan-meals", """{"version":2,"blocks":[]}""", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance),
             )
-            session.setDocument("mine", """{"version":2,"blocks":[]}""", frame = frame.copy(x = 900f))
-            session.moveDocument("mine", frame.copy(x = 950f))
+            session.setDocument(CanvasNoteId("mine"), """{"version":2,"blocks":[]}""", frame = frame.copy(x = 900f))
+            session.moveDocument(CanvasNoteId("mine"), frame.copy(x = 950f))
             session.applyLocal(CanvasOp.AddElementOp("add-h", "local_user", 10, "cmp-weekend-plan-heading", heading))
         }
         NotebookLocalStore(path, "owner-peer").use { notebooks ->

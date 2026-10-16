@@ -15,6 +15,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasElementId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.json.JsonObject
@@ -202,9 +203,9 @@ class DesktopCanvasDocumentStoreTest {
             ),
         )
         session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), CanvasActorId(agent))
-        assertNotNull(session.movePluginElement("pe-a", moved))
+        assertNotNull(session.movePluginElement(CanvasElementId("pe-a"), moved))
         session.applyAgentBatch(listOf(stateUpdate), CanvasActorId(agent))
-        assertNotNull(session.removePluginElement("pe-b"))
+        assertNotNull(session.removePluginElement(CanvasElementId("pe-b")))
         val before = session.pluginElements()
 
         val reopened = assertNotNull(
@@ -222,7 +223,7 @@ class DesktopCanvasDocumentStoreTest {
         val replayed = CanvasOpProjector.project(CanvasOpProjector.emptySceneJson(), reopened.opLog.getOps(canvasId, 0L))
         assertEquals(before, CanvasOpProjector.pluginElementsOf(replayed))
 
-        assertNotNull(reopened.movePluginElement("pe-a", frame))
+        assertNotNull(reopened.movePluginElement(CanvasElementId("pe-a"), frame))
         assertEquals(frame, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(canvasId)?.let { CanvasOpProjector.pluginElementsOf(it.sceneJson).single().frame })
     }
 }

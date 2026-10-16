@@ -9,6 +9,7 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.PendingToolApprovalRegistry
 import com.letta.mobile.data.a2ui.ToolApprovalAdmission
 import com.letta.mobile.data.a2ui.ToolApprovalRef
+import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
@@ -263,7 +264,7 @@ internal class AdminChatA2uiCoordinator(
     }
 
     fun dismissA2uiSurface(surfaceId: String) {
-        a2uiSurfaceManager.dismissSurface(surfaceId)
+        a2uiSurfaceManager.dismissSurface(A2uiSurfaceId(surfaceId))
         publishA2uiSurfaces(a2uiSurfaceManager.surfaces.value)
     }
 

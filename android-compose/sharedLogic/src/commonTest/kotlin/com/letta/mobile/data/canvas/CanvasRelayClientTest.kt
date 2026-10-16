@@ -86,7 +86,7 @@ internal class TestApp(
     suspend fun open(conversationId: String, agentId: String? = null): TestApp = apply {
         session = CanvasSession.getOrCreateForConversation(
             documents,
-            conversationId,
+            ConversationId(conversationId),
             CanvasConversationOptions(agentId = agentId, opLog = opLog, syncTransport = client),
         )
         syncing = session.startSync(scope)

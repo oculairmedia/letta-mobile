@@ -54,7 +54,6 @@ class TimelineSyncLoop(
     ingestedListener: IngestedMessageListener? = null,
     ingestedListenerProvider: (() -> IngestedMessageListener?)? = null,
     pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
-    private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
     startStreamSubscriber: Boolean = true,
     // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
@@ -791,18 +790,14 @@ class TimelineSyncLoop(
                     ),
                 )
                 is TimelineReductionEffect.DeletePendingLocal -> pendingLocalStore.delete(effect.otid)
-                is TimelineReductionEffect.RecordStreamSequence -> {
-                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
-                }
                 is TimelineReductionEffect.RepairHydrationCursor -> {
-                    conversationCursorStore.recordFrame(conversationId, effect.sequence)
                     Telemetry.event(
                         "TimelineSync", "hydrate.cursorRepaired",
                         "conversationId" to conversationId,
                         "cursorSeq" to effect.sequence,
                     )
                 }
-                is TimelineReductionEffect.AdvanceCursor -> Unit
+                is TimelineReductionEffect.RecordStreamSequence, is TimelineReductionEffect.AdvanceCursor -> Unit
             }
         },
         onStateCommitted = pendingPersistenceDelta::merge,

@@ -245,7 +245,6 @@
     <ID>MaxLineLength:TimelineRemotePageTransportParityTest.kt$TimelineRemotePageTransportParityTest$val timeoutRequest = request("timeout-owner", TimelineContinuation.Initial, TimelineRemoteOrder.OldestFirst, 2, conversationId = "conv-timeout")</ID>
     <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$assertFalse("agent-b scoped loop should not receive agent-a repair", agentBTimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })</ID>
     <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$assertTrue("agent-a scoped loop should receive repaired message", agentATimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })</ID>
-    <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore(), repositoryScope = repositoryScope)</ID>
     <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore, repositoryScope = repositoryScope)</ID>
     <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2, repositoryScope = repositoryScope)</ID>
     <ID>MaxLineLength:TimelineRepositoryTest.kt$TimelineRepositoryTest$val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4, repositoryScope = repositoryScope)</ID>
@@ -730,9 +729,6 @@
     <ID>UnusedPrivateMember:SessionScopedProjectRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
     <ID>UnusedPrivateMember:SessionScopedProjectWorkRepositoryTest.kt$@OptIn(ExperimentalCoroutinesApi::class) // letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because // production constructor now takes Lazy&lt;AgentDao&gt; / Lazy&lt;ConversationDao&gt;. private fun &lt;T&gt; lazyOf(value: T): dagger.Lazy&lt;T&gt;</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun assistantStreamMessage(plan: TimelineAssistantStreamPlan): LettaMessage</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun clearRequestFromRecord(record: TimelineCursorRecord): TimelineCursorClearRequest</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun cursorMapView(store: RecordingConversationCursorStore): TimelineCursorMapView</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun cursorPairView(store: RecordingConversationCursorStore): TimelineCursorPairView</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun expiredPlanConversation(plan: TimelineExpiredStreamPlan): ConversationId</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun failurePolicy(policy: TimelineListFailurePolicy): TimelineListFailurePolicy</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun heartbeatChannel(plan: TimelineHeartbeatStreamPlan): ByteChannel</ID>
@@ -740,9 +736,7 @@
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun limitedOrderedView(view: TimelineOrderedMessageView): TimelineMessageBatch</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun listGateRelease(gate: TimelineListGate): CompletableDeferred&lt;List&lt;LettaMessage&gt;&gt;</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun listGateStarted(gate: TimelineListGate): CompletableDeferred&lt;Unit&gt;</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun mapViewEntries(view: TimelineCursorMapView): Map&lt;String, Long&gt;</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun mergeOrderedViews( left: TimelineOrderedMessageView, right: TimelineOrderedMessageView, ): TimelineMessageBatch</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun pairViewRecords(view: TimelineCursorPairView): List&lt;Pair&lt;String, Long&gt;&gt;</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun reversedOrderedView(view: TimelineOrderedMessageView): TimelineMessageBatch</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendCaptureMessages(capture: TimelineSendCapture): TimelineMessageBatch</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun sendCaptureRequest(capture: TimelineSendCapture): MessageCreateRequest</ID>
@@ -751,12 +745,10 @@
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun storedSinkMessages(sink: TimelineStoredMessageSink): List&lt;LettaMessage&gt;</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun streamChannelRequest( request: TimelineStreamChannelRequest, ): TimelineStreamChannelRequest</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun streamOpenSignal(signal: TimelineStreamOpenSignal): CompletableDeferred&lt;Unit&gt;</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchCursorRecord(record: TimelineCursorRecord): TimelineCursorRecord</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchMessageSpec(spec: TimelineTestMessageSpec): TimelineTestMessageSpec</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun touchQueryBatch( query: ConversationListQuery, batch: TimelineMessageBatch, ): TimelineOrderedMessageView</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun userPersistRequest(plan: TimelineUserPersistPlan): MessageCreateRequest</ID>
     <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun userPersistSink(plan: TimelineUserPersistPlan): TimelineStoredMessageSink</ID>
-    <ID>UnusedPrivateMember:TimelineTestMessageApi.kt$private fun withCursorRecord( store: RecordingConversationCursorStore, record: TimelineCursorRecord, ): TimelineCursorRecord</ID>
     <ID>UnusedPrivateProperty:TimelineSyncLoopIncrementalPersistenceTest.kt$TimelineSyncLoopIncrementalPersistenceTest$val commitsDuringStreaming = commitsAfterOneWindow</ID>
     <ID>UnusedPrivateProperty:TimelineSyncLoopReconnectTest.kt$TimelineSyncLoopReconnectTest$val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-qv6d", scope)</ID>
     <ID>UseCheckOrError:FakeConversationApi.kt$FakeConversationApi$throw IllegalStateException("admin_rpc is not supported by this transport")</ID>

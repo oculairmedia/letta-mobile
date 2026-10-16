@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.ChartPie
 import com.composables.icons.lucide.Lucide
@@ -53,6 +54,7 @@ internal fun ComposerContextChip(state: ContextWindowUsageState) {
                 leadingIcon = Lucide.ChartPie,
             ),
             onClick = { open = !open },
+            modifier = Modifier.testTag(ComposerTestTags.CONTEXT_CHIP),
         )
         if (open) {
             ComposerPopover(

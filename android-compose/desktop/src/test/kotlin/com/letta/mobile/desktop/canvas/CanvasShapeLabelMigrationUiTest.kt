@@ -9,6 +9,8 @@ import com.letta.mobile.data.canvas.CanvasDocumentFrame
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.model.CanvasElementId
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.TextAlignment
@@ -40,13 +42,13 @@ class CanvasShapeLabelMigrationUiTest {
         val session = runBlocking {
             CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = scene)).also { s ->
                 s.setDocument(
-                    "label-rect-1", label("fdafd"),
+                    CanvasNoteId("label-rect-1"), label("fdafd"),
                     frame = CanvasDocumentFrame(50f, 50f, 180f, 100f), color = "#00000000",
                     style = CanvasTextStyle(textColor = "#e5484d", align = "start"),
                 )
-                s.setLabelOwner("label-rect-1", "rect-1")
+                s.setLabelOwner(CanvasNoteId("label-rect-1"), CanvasElementId("rect-1"))
                 // A note that happens to be called label-something, owned by nothing, stays a note.
-                s.setDocument("label-report", label("keep me"), color = "#fef3c7")
+                s.setDocument(CanvasNoteId("label-report"), label("keep me"), color = "#fef3c7")
             }
         }
         val controller = DrawBoxController(Reducer(UseCase()))

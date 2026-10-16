@@ -3,6 +3,7 @@ package com.letta.mobile.data.canvas
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElements
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasElementId
 import com.letta.mobile.data.model.CanvasId
 import java.nio.file.Files
 import java.util.concurrent.CompletableFuture
@@ -54,7 +55,7 @@ class NotebookCanvasPluginElementStorageTest {
         NotebookLocalStore(path, "plugin-peer").use { notebooks ->
             val session = session(notebooks, canvasId)
             session.applyAgentBatch(listOf(fixtures.place(0), fixtures.place(0, id = "pe-gone")), CanvasActorId(fixtures.AGENT))
-            assertNotNull(session.movePluginElement(fixtures.ID, fixtures.moved))
+            assertNotNull(session.movePluginElement(CanvasElementId(fixtures.ID), fixtures.moved))
             session.applyAgentBatch(listOf(fixtures.progress(0, 0.6), fixtures.remove(0, id = "pe-gone")), CanvasActorId(fixtures.AGENT))
             written = session.sceneJsonOrEmpty()
         }
@@ -72,7 +73,7 @@ class NotebookCanvasPluginElementStorageTest {
 
             // A session opened after the restart writes after everything stored, so its move lands.
             val reopened = CanvasSession.open(NotebookCanvasDocumentStore(notebooks), canvasId)!!
-            assertNotNull(reopened.movePluginElement(fixtures.ID, fixtures.frame))
+            assertNotNull(reopened.movePluginElement(CanvasElementId(fixtures.ID), fixtures.frame))
             assertEquals(fixtures.frame, reopened.pluginElements().single().frame)
 
             notebooks.readDocument { read ->
@@ -159,7 +160,7 @@ class NotebookCanvasPluginElementStorageTest {
             val session = CanvasSession.open(store, canvasId)!!
             assertEquals(fixtures.ID, session.pluginElements().single().id, "it still loads")
             session.applyAgentBatch(listOf(fixtures.progress(0, 0.4)), CanvasActorId(fixtures.AGENT))
-            assertNotNull(session.movePluginElement(fixtures.ID, fixtures.moved))
+            assertNotNull(session.movePluginElement(CanvasElementId(fixtures.ID), fixtures.moved))
         }
         NotebookLocalStore(path, "newer-peer").use { notebooks ->
             val stored = assertNotNull(NotebookCanvasDocumentStore(notebooks).get(canvasId)).sceneJson
@@ -200,7 +201,7 @@ class NotebookCanvasPluginElementStorageTest {
             }
             // Not fatal: the session still has the write and takes the next one.
             failPuts = false
-            assertNotNull(session.movePluginElement(fixtures.ID, fixtures.moved))
+            assertNotNull(session.movePluginElement(CanvasElementId(fixtures.ID), fixtures.moved))
             val element = session.pluginElements().single()
             assertEquals(fixtures.props("status" to "running", "progress" to 0.7), element.props)
             assertEquals(fixtures.moved, element.frame)

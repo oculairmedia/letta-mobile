@@ -470,7 +470,6 @@ class TimelineSnapshotPersistenceTest {
         val repository = TimelineRepository(
             timelineTransport = transport,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             confirmedTimelineStore = store,
             backendIdProvider = { "backend" },
             repositoryScope = backgroundScope,
@@ -508,7 +507,6 @@ class TimelineSnapshotPersistenceTest {
         val repository = TimelineRepository(
             timelineTransport = transport,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             confirmedTimelineStore = store,
             backendIdProvider = { "backend" },
             repositoryScope = backgroundScope,

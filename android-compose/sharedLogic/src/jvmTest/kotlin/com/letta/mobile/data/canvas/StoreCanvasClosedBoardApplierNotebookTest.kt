@@ -27,7 +27,7 @@ class StoreCanvasClosedBoardApplierNotebookTest {
         NotebookLocalStore(path, "canvas-peer").use { notebooks ->
             val store = NotebookCanvasDocumentStore(notebooks)
             CanvasSession.getOrCreateForConversation(
-                store, "closed-conversation", CanvasConversationOptions(agentId = "agent-1", opLog = opLog),
+                store, ConversationId("closed-conversation"), CanvasConversationOptions(agentId = "agent-1", opLog = opLog),
             ) // No open board session receives the remote op.
             val notebookId = notebooks.listDocuments().single()
             notebooks.putBoardElement(

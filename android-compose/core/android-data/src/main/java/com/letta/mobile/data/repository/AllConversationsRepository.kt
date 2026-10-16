@@ -7,6 +7,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.letta.mobile.data.local.ConversationDao
+import com.letta.mobile.data.local.GatedDao
+import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.local.RoomAllConversationsLocalCache
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -43,9 +45,11 @@ open class AllConversationsRepository(
     settingsRepository: ISettingsRepository? = null,
     irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     transport: IChannelTransport? = null,
+    /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
+    cacheGate: SessionCacheGate = SessionCacheGate.Open,
 ) : CachedAllConversationsRepository(
     remote = remote,
-    localCache = conversationDao?.let { dao -> { RoomAllConversationsLocalCache(dao.get()) } },
+    localCache = conversationDao?.let { GatedDao(it, cacheGate) }?.let { dao -> { RoomAllConversationsLocalCache(dao) } },
     repositoryScope = repositoryScope,
     localConversationSource = localConversationSource,
     settingsRepository = settingsRepository,

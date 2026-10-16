@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.performClick
+import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.bounds
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -261,7 +262,7 @@ class CanvasWorkspaceUiTest {
         )
         // A note at world (400,100) 200x120: its left anchor is (400,160).
         val frame = com.letta.mobile.data.canvas.CanvasDocumentFrame(x = 400f, y = 100f, width = 200f, height = 120f)
-        kotlinx.coroutines.runBlocking { session.setDocument("note-a", "", frame = frame, color = "#fde68a") }
+        kotlinx.coroutines.runBlocking { session.setDocument(CanvasNoteId("note-a"), "", frame = frame, color = "#fde68a") }
         setContent {
             CanvasWorkspace(controller = controller, session = session)
         }
@@ -287,7 +288,7 @@ class CanvasWorkspaceUiTest {
         kotlin.test.assertEquals("left", session.arrowBindings()[arrowId]?.end?.side)
 
         // Moving the note (as a drag commit or a peer would) re-points the bound end.
-        kotlinx.coroutines.runBlocking { session.moveDocument("note-a", frame.copy(x = 500f, y = 300f)) }
+        kotlinx.coroutines.runBlocking { session.moveDocument(CanvasNoteId("note-a"), frame.copy(x = 500f, y = 300f)) }
         waitUntil(timeoutMillis = 5000) {
             val arrow = controller.state.value.elements.filterIsInstance<io.ak1.drawbox.domain.model.Element.Shape>().single()
             arrow.points.last() == androidx.compose.ui.geometry.Offset(500f, 360f)
@@ -395,9 +396,9 @@ class CanvasWorkspaceUiTest {
         val b = com.letta.mobile.data.canvas.CanvasDocumentFrame(400f, 100f, 200f, 100f)
         val far = com.letta.mobile.data.canvas.CanvasDocumentFrame(2000f, 2000f, 200f, 100f)
         kotlinx.coroutines.runBlocking {
-            session.setDocument("note-a", "", frame = a, color = "#fde68a")
-            session.setDocument("note-b", "", frame = b, color = "#fde68a")
-            session.setDocument("note-far", "", frame = far, color = "#fde68a")
+            session.setDocument(CanvasNoteId("note-a"), "", frame = a, color = "#fde68a")
+            session.setDocument(CanvasNoteId("note-b"), "", frame = b, color = "#fde68a")
+            session.setDocument(CanvasNoteId("note-far"), "", frame = far, color = "#fde68a")
         }
         setContent { CanvasWorkspace(controller = controller, session = session) }
         waitUntil(timeoutMillis = 5000) { onAllNodesWithContentDescription("Note note-b").fetchSemanticsNodes().isNotEmpty() }

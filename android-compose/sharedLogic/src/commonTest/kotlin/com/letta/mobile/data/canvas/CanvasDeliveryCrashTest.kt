@@ -52,7 +52,7 @@ class CanvasDeliveryCrashTest {
     private suspend fun crashingSession(app: TestApp, crashAt: CrashPoint): CanvasSession =
         CanvasSession.getOrCreateForConversation(
             app.documents,
-            "conv-1",
+            ConversationId("conv-1"),
             CanvasConversationOptions(opLog = app.opLog, syncTransport = CrashingTransport(app.client, crashAt)),
         )
 
