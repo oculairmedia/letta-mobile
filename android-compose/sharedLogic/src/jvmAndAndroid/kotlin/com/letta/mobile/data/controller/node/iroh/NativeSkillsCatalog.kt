@@ -32,63 +32,70 @@ enum class SkillCatalogOrigin(val wireName: String) {
 /**
  * Controller-side projection of skill availability.
  *
- * ## Wire reality (verified against `@letta-ai/letta-code` 0.29.12, `letta.js`)
+ * ## Wire reality
  *
- * - `skills_updated` is emitted by `emitSkillsUpdated`
- *   (`// src/websocket/listener/commands/skills-agents.ts`) as exactly
- *   `{ type: "skills_updated", timestamp }`. It carries **no** skill array.
- * - `device_status.current_available_skills` is the literal `[]` in *both*
- *   branches of `buildDeviceStatus` — the online branch and the no-listener
- *   fallback. It is a hard-coded empty array, not an observation.
- * - There is no `skill_list` command. The only skill verbs on the wire are
- *   `skill_enable` / `skill_disable` and their responses.
- * - `runtime_start.skill_sources` is request-only; `runtime_start_response`
- *   never echoes it.
+ * - `skills_updated` (`emitSkillsUpdated`) is exactly `{ type, timestamp }`.
+ * - There is no `skill_list` command; the only skill verbs are `skill_enable` /
+ *   `skill_disable` (filesystem symlinks under `<LETTA_HOME>/skills`).
+ * - `device_status.current_available_skills` was a hard-coded `[]` in 0.29.12; from
+ *   0.34 it is the conversation runtime's discovered skills
+ *   (`{id, name, description, path, source}` for the bundled, global, agent and
+ *   project sources), and still `[]` before a turn.
  *
- * ## Consequence
+ * ## Model (letta-mobile skills-honest-controls)
  *
- * The App Server advertises **no authoritative skill enumeration**. Treating a
- * hard-coded `[]` as a snapshot is what made `skill.list` settle at
- * `hydrated=true` with an empty catalog while enabled skills existed.
+ * Every entry carries `source` and an explicit `controllable` flag. Only the host
+ * enumeration of letta-code's global control root ([HostSkillsEnumerator], read on
+ * every listing through [hostEnumeration]) can mark a skill controllable, and only a
+ * symlink there, because that is the one thing `skill_disable` can undo.
  *
- * This catalog therefore hydrates only from a genuine enumeration:
- * - a *non-empty* `current_available_skills` array (forward-compatible with a
- *   server that actually populates it), or
- * - [hydrateFromHost], for an injected host adapter that enumerates skill roots.
+ * Skills the App Server advertises from its other sources (bundled, agent, project)
+ * are merged in READ-ONLY: letta-code has no command that enables or disables them.
+ * They never replace the host enumeration — before this, a populated device status
+ * overwrote it with entries that had no controllability at all, so the client
+ * defaulted every skill to removable and offered toggles that could only fail.
+ * Global-source advertised entries are dropped while a host enumeration exists: the
+ * host reads that source directly.
  *
- * `skills_updated` is treated strictly as invalidation ([isStale]), and
- * `skill_enable_response` / `skill_disable_response` are applied as authoritative
- * *deltas* on top of an existing enumeration — a single observed mutation is not
- * itself an enumeration and never hydrates the catalog.
- *
- * ### Known limitation
- *
- * Against stock 0.29.12 this catalog stays unhydrated, and `skill.list` answers
- * `capability_unavailable` rather than a fabricated empty list. Restoring a real
- * listing requires a host-side skill-root enumerator wired into
- * [hydrateFromHost]; that adapter is out of scope here and is tracked separately.
+ * Without a host enumeration, a populated device status still hydrates the catalog
+ * (everything read-only); a hard-coded empty one never does.
  */
-class NativeSkillsCatalog {
+class NativeSkillsCatalog(
+    /** Re-reads the host's global skill root; null when the host cannot enumerate. */
+    private val hostEnumeration: (() -> JsonArray?)? = null,
+) {
     private val lock = Any()
 
     @Volatile
-    private var skills: JsonArray = JsonArray(emptyList())
+    private var hostSkills: JsonArray? = null
 
     @Volatile
-    private var origin: SkillCatalogOrigin = SkillCatalogOrigin.None
+    private var advertised: JsonArray? = null
 
     @Volatile
     private var stale: Boolean = false
 
     /** True only once an authoritative enumeration has been observed. */
-    fun isHydrated(): Boolean = origin != SkillCatalogOrigin.None
+    fun isHydrated(): Boolean = origin() != SkillCatalogOrigin.None
 
-    /** True when a `skills_updated` invalidation arrived after the last enumeration. */
+    /** True when a `skills_updated` invalidation arrived that could not be re-read yet. */
     fun isStale(): Boolean = stale
 
-    fun origin(): SkillCatalogOrigin = origin
+    fun origin(): SkillCatalogOrigin = when {
+        hostSkills != null -> SkillCatalogOrigin.HostEnumeration
+        !advertised.isNullOrEmpty() -> SkillCatalogOrigin.DeviceStatus
+        else -> SkillCatalogOrigin.None
+    }
 
-    fun snapshot(): JsonArray = skills
+    /** Host entries first, then each advertised read-only entry the host did not list. */
+    fun snapshot(): JsonArray {
+        val host = hostSkills.orEmpty()
+        val names = host.mapNotNullTo(HashSet(), ::nameOf)
+        val extras = advertised.orEmpty().filter { entry ->
+            nameOf(entry) !in names && (hostSkills == null || sourceOf(entry) != HostSkillsEnumerator.GLOBAL_SOURCE)
+        }
+        return JsonArray(host + extras)
+    }
 
     /** Wire shape expected by Iroh admin_rpc skill list clients. */
     fun listEnvelope(): JsonObject =
@@ -96,34 +103,26 @@ class NativeSkillsCatalog {
             put("skills", snapshot())
             put("hydrated", isHydrated())
             put("stale", isStale())
-            put("catalog_source", origin.wireName)
+            put("catalog_source", origin().wireName)
         }
 
     fun ingest(frame: AppServerInboundFrame) {
         when (frame) {
             is AppServerInboundFrame.UpdateDeviceStatus -> {
-                val advertised = extractSkills(frame.deviceStatus["current_available_skills"])
-                // A hard-coded empty array is not an enumeration. Only a populated
-                // array is evidence that the server knows about any skills at all.
-                if (!advertised.isNullOrEmpty()) {
-                    hydrate(advertised, SkillCatalogOrigin.DeviceStatus)
-                }
+                val next = extractSkills(frame.deviceStatus["current_available_skills"])
+                // A hard-coded empty array is not an enumeration.
+                if (!next.isNullOrEmpty()) advertised = next
             }
 
-            is AppServerInboundFrame.SkillsUpdated -> invalidate()
-
-            is AppServerInboundFrame.SkillEnableResponse -> {
-                if (frame.success) applyEnable(frame)
-            }
-
-            is AppServerInboundFrame.SkillDisableResponse -> {
-                if (frame.success) frame.skillName?.let(::applyDisable)
-            }
+            is AppServerInboundFrame.SkillsUpdated,
+            is AppServerInboundFrame.SkillEnableResponse,
+            is AppServerInboundFrame.SkillDisableResponse,
+            -> onSkillsChanged()
 
             is AppServerInboundFrame.Unknown -> {
                 // Defensive: an envelope variant we failed to type is still an
                 // invalidation signal, never a snapshot source.
-                if (frame.type == "skills_updated") invalidate()
+                if (frame.type == "skills_updated") onSkillsChanged()
             }
 
             else -> Unit
@@ -139,17 +138,30 @@ class NativeSkillsCatalog {
 
     /**
      * Install an authoritative enumeration produced by a host-side skill-root
-     * adapter. This is the only supported way to hydrate the catalog when the
-     * server itself advertises nothing.
+     * adapter. Tests and hosts without a live [hostEnumeration] use this directly.
      */
-    fun hydrateFromHost(next: JsonArray) = hydrate(
-        JsonArray(next.map(::normalizeSkillEntry)),
-        SkillCatalogOrigin.HostEnumeration,
-    )
+    fun hydrateFromHost(next: JsonArray) {
+        synchronized(lock) {
+            hostSkills = JsonArray(next.map(::normalizeSkillEntry))
+            stale = false
+        }
+    }
+
+    /** Re-reads the host root when one is wired; returns false when there is none or it is unreadable. */
+    fun refreshFromHost(): Boolean {
+        val next = hostEnumeration?.invoke() ?: return false
+        hydrateFromHost(next)
+        return true
+    }
 
     /** Adapt this catalog to the [SkillsListingSource] contract admin handlers consume. */
     fun asListingSource(): SkillsListingSource = object : SkillsListingSource {
-        override fun currentSkills(): JsonArray = snapshot()
+        // The filesystem is the truth (a symlink can be added or removed on disk at any
+        // time), so every listing re-reads it when the host can.
+        override fun currentSkills(): JsonArray {
+            refreshFromHost()
+            return snapshot()
+        }
 
         override fun isHydrated(): Boolean = this@NativeSkillsCatalog.isHydrated()
 
@@ -158,60 +170,43 @@ class NativeSkillsCatalog {
         override fun catalogSource(): String = origin().wireName
     }
 
-    private fun hydrate(next: JsonArray, source: SkillCatalogOrigin) {
+    /** `skills_updated` and enable / disable results say "something changed": re-read, else mark stale. */
+    private fun onSkillsChanged() {
+        if (refreshFromHost()) return
         synchronized(lock) {
-            skills = next
-            origin = source
-            stale = false
+            if (isHydrated()) stale = true
         }
     }
 
-    /** `skills_updated` says "something changed" and nothing more. */
-    private fun invalidate() {
-        synchronized(lock) {
-            if (origin != SkillCatalogOrigin.None) stale = true
-        }
-    }
+    private fun nameOf(element: JsonElement): String? = stringField(element, "name")
 
-    private fun applyEnable(frame: AppServerInboundFrame.SkillEnableResponse) {
-        val name = frame.skillName ?: return
-        synchronized(lock) {
-            // A delta is only meaningful on top of an enumeration; on its own it
-            // tells us nothing about the skills we have not observed.
-            if (origin == SkillCatalogOrigin.None) return
-            val entry = buildJsonObject {
-                put("name", name)
-                frame.skillPath?.let { put("skill_path", it) }
-                frame.linkPath?.let { put("link_path", it) }
-                // skill_enable creates a symlink, which skill_disable can remove.
-                put("removable", true)
-            }
-            skills = JsonArray(skills.filterNot { nameOf(it) == name } + entry)
-            stale = false
-        }
-    }
+    private fun sourceOf(element: JsonElement): String? = stringField(element, "source")
 
-    private fun applyDisable(name: String) {
-        synchronized(lock) {
-            if (origin == SkillCatalogOrigin.None) return
-            skills = JsonArray(skills.filterNot { nameOf(it) == name })
-            stale = false
-        }
-    }
-
-    private fun nameOf(element: JsonElement): String? =
-        (element as? JsonObject)?.get("name")?.let { (it as? JsonPrimitive)?.contentOrNull }
+    private fun stringField(element: JsonElement, key: String): String? =
+        (element as? JsonObject)?.get(key)?.let { (it as? JsonPrimitive)?.contentOrNull }
 
     private fun extractSkills(element: JsonElement?): JsonArray? {
-        if (element == null) return null
-        return when (element) {
-            is JsonArray -> JsonArray(element.map(::normalizeSkillEntry))
-            is JsonObject -> {
-                val nested = element["skills"]
-                if (nested is JsonArray) JsonArray(nested.map(::normalizeSkillEntry)) else null
-            }
-
+        val entries = when (element) {
+            is JsonArray -> element
+            is JsonObject -> element["skills"] as? JsonArray
             else -> null
+        } ?: return null
+        return JsonArray(entries.map(::advertisedEntry))
+    }
+
+    /**
+     * An App Server-advertised skill, read-only: letta-code addresses it by `id`
+     * (falling back to `name`), and nothing on the wire can enable or disable it.
+     */
+    private fun advertisedEntry(element: JsonElement): JsonElement {
+        val name = stringField(element, "id") ?: stringField(element, "name")
+            ?: (element as? JsonPrimitive)?.contentOrNull ?: element.toString()
+        return buildJsonObject {
+            put("name", name)
+            stringField(element, "description")?.let { put("description", it) }
+            stringField(element, "path")?.let { put("skill_path", it) }
+            put("source", sourceOf(element) ?: APP_SERVER_SOURCE)
+            put("controllable", false)
         }
     }
 
@@ -224,6 +219,11 @@ class NativeSkillsCatalog {
 
             else -> buildJsonObject { put("name", element.toString()) }
         }
+
+    private companion object {
+        /** Source label for an advertised skill that names none. */
+        const val APP_SERVER_SOURCE = "app_server"
+    }
 }
 
 /**

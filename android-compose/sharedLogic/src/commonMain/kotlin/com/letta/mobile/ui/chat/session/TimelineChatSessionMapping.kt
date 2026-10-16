@@ -131,13 +131,16 @@ data class TimelineHostApprovals(
 
 /**
  * [this] with the host's approval state laid over it: parked details joined onto their rows, queued
- * answers marked, and the row answered by either the port or the host disabled. Unchanged when the
- * host reports nothing.
+ * answers marked, and the row answered by either the host or the port ([portSubmitting]) disabled.
+ * Unchanged when the host reports nothing. letta-mobile-by4vm.93: on both clients this derives
+ * [ChatUiState.activeApprovalRequestId]: the bottom-most row (parked rows included) whose request has
+ * an answer in flight, null when none has a row; it clears once the request leaves the in-flight set
+ * (delivery failed or cancelled, the timeline decided it, or a sibling parallel call was parked).
  */
-fun ChatUiState.withHostApprovals(run: TimelineRunState, approvals: TimelineHostApprovals): ChatUiState {
+fun ChatUiState.withHostApprovals(approvals: TimelineHostApprovals, portSubmitting: Set<String> = emptySet()): ChatUiState {
     if (approvals == TimelineHostApprovals()) return this
     val joined = withPendingApprovalDetails(approvals.details).withQueuedApprovals(approvals.queued)
-    val answering = answeringApprovalOnScreen(run.submittingApprovals + approvals.submitting, joined.messages)
+    val answering = answeringApprovalOnScreen(portSubmitting + approvals.submitting, joined.messages)
     return if (answering == joined.activeApprovalRequestId) joined else joined.copy(activeApprovalRequestId = answering)
 }
 

@@ -114,13 +114,6 @@ class PendingToolApprovalRegistryTest {
         val button = A2uiAction(name = "show_details", surfaceId = "surface-1")
 
         assertNull(registry.admit(button, CONVERSATION))
-        assertTrue(button.mayForwardAsUserAction())
-    }
-
-    @Test
-    fun approvalAnswersAreNeverForwardedAsPlainUserActions() {
-        assertEquals(false, approvalAction(Answer(origin = A2uiActionOrigin.SurfaceAuthored)).mayForwardAsUserAction())
-        assertEquals(false, approvalAction().mayForwardAsUserAction())
     }
 
     private fun assertRejected(expected: ToolApprovalRejection, admission: ToolApprovalAdmission?) {

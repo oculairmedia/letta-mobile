@@ -81,7 +81,6 @@ private fun WsTimelineEvent.claimedAgent(): AgentId? = when (this) {
     is WsTimelineEvent.TurnStarted -> agentId
     is WsTimelineEvent.AgentUpdated -> agentId
     is WsTimelineEvent.MessageDelta -> agentId
-    is WsTimelineEvent.UserActionOutcome -> agentId
     else -> null
 }?.takeIf { it.isNotBlank() }?.let(::AgentId)
 
@@ -89,7 +88,6 @@ private fun WsTimelineEvent.claimedAgent(): AgentId? = when (this) {
 private fun WsTimelineEvent.ownershipKeys(): List<OwnershipKey> = when (this) {
     is WsTimelineEvent.TurnStarted -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
     is WsTimelineEvent.MessageDelta -> listOfNotNull(turn(turnId), run(message.runId), conversation(conversationId))
-    is WsTimelineEvent.UserActionOutcome -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
     is WsTimelineEvent.Error -> listOfNotNull(turn(turnId), run(runId), conversation(conversationId))
     is WsTimelineEvent.StopReason -> listOfNotNull(turn(turnId), run(runId))
     is WsTimelineEvent.UsageStatistics -> listOfNotNull(turn(turnId), run(runId))

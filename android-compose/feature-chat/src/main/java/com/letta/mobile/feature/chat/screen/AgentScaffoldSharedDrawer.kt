@@ -1,8 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
 import android.widget.Toast
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,10 +17,10 @@ import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
-import com.letta.mobile.ui.shell.ShellNavDrawer
 import com.letta.mobile.ui.shell.ShellNavDrawerActions
 import com.letta.mobile.ui.shell.ShellNavDrawerInput
 import com.letta.mobile.ui.shell.ShellNavDrawerMapping
+import com.letta.mobile.ui.shell.ShellNavDrawerSheet
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellChatOptionsActions
@@ -42,7 +40,7 @@ internal fun androidHiddenDrawerSections(navigation: AgentScaffoldNavigationCall
 
 /**
  * The hamburger's drawer when the shared navigation drawer is on (letta-mobile-c3np7.5.5): the
- * desktop's agent rail and agent panel ([ShellNavDrawer]) over Android's agents, the agent's
+ * desktop's agent rail and agent panel ([ShellNavDrawerSheet]) over Android's agents, the agent's
  * conversations and the canvas library, navigating through the chat's existing callbacks.
  */
 @Composable
@@ -94,15 +92,15 @@ internal fun AgentScaffoldSharedDrawerSheet(state: AgentScaffoldRuntimeState, dr
     // Relative times are taken when the drawer opens; they do not tick while it is open.
     val now = remember(open) { Clock.System.now() }
     val drawerState = remember(input, now) { ShellNavDrawerMapping.state(input, now) }
-    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest) {
-        ShellNavDrawer(
-            state = drawerState,
-            actions = rememberSharedDrawerActions(state, drawer, chatOptionsActions),
-            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
-            // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
-            agentCard = { AndroidAgentContextCard(state) },
-        )
-    }
+    // Edge to edge: the shared sheet lets the rail and panel surfaces run under the system bars and
+    // pads only their content for the insets.
+    ShellNavDrawerSheet(
+        state = drawerState,
+        actions = rememberSharedDrawerActions(state, drawer, chatOptionsActions),
+        modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
+        // letta-mobile-3io8k: model, context meter and Compact under the agent's name.
+        agentCard = { AndroidAgentContextCard(state) },
+    )
 }
 
 /** Android's agents as the drawer's rail sees them: the roster, its pins, its favourite and their activity. */

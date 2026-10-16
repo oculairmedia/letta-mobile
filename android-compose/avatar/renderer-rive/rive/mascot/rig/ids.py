@@ -43,13 +43,16 @@ _EXTERNAL = {
     "1:1", "1:2", "1:3", "1:4", "1:5", "1:6", "1:7", "1:8", "1:9", "1:10", "1:11", "1:50",  # rml.py
     "0:3", "0:233", "0:234",                                                    # gen_scene / body
     "3:1", "3:2", "3:3", "3:4", "3:6", "3:7", "3:8", "3:9", "3:10",             # machine.py layers
+    "3:11", "3:12", "3:13",                                     # machine.py: Pet, PetFace, React
+    "7:14", "7:15",                                             # plate.py: Squint, Rem layers
     "7:3", "7:10", "7:11", "7:12", "7:13",                                      # plate.py
     "3:900", "3:901", "3:902",                                  # gen_scene.py SOLO_SM / _LAYER / _STATE
 }
 
 # New ids start above everything already taken in the space: 0 runs to 0:327 (the vertex blocks),
-# 3 to 3:475 (the beats migrated below), 7 to 7:204 (the wave vertices).
-_FLOOR = {0: 400, 3: 460, 7: 300}
+# 1 to 1:208 (the shape enum values; the probes take 1:900+ and must stay clear), 2 to 2:10, 3 to
+# 3:475 (the beats migrated below), 7 to 7:204 (the wave vertices).
+_FLOOR = {0: 400, 1: 300, 2: 100, 3: 460, 7: 300}
 
 
 def _walk(value):
@@ -114,7 +117,7 @@ def alloc(space, name):
     while index in used:
         index += 1
     _RECORD[name] = f"{space}:{index}"
-    with open(_TABLE, "w", encoding="utf-8") as f:
+    with open(_TABLE, "w", encoding="utf-8", newline="\n") as f:   # LF on Windows too
         _json.dump(_RECORD, f, indent=2, sort_keys=True)
         f.write("\n")
     return _RECORD[name]
@@ -128,13 +131,30 @@ with open(_TABLE, encoding="utf-8") as _f:
 # The id tables below are computed ranges indexed by these orders, so the orders live with them:
 # reorder a list and every id shifts, which is exactly the move the freeze forbids.
 STATES = ["idle", "listening", "dragged", "thinking", "waitingInput", "speaking",
-          "success", "error", "sleeping", "loading", "failed", "degraded"]
+          "success", "error", "sleeping", "loading", "failed", "degraded",
+          # te3n1.5: two sustained states, then five plate-only expressions the reactions show.
+          "working", "dreaming", "content", "startled", "dizzy", "yawning", "trick"]
 
 
 MOMENTARY = ["success", "dragged"]
 
 
-SUSTAINED = [s for s in STATES if s not in MOMENTARY]
+# Expressions that exist only on the plate (an `expr` index and a glyph), never as an enum key:
+# the Pet and React layers key them for as long as a reaction or a pet lasts.
+PLATE_ONLY = ["content", "startled", "dizzy", "yawning", "trick"]
+
+
+SUSTAINED = [s for s in STATES if s not in MOMENTARY and s not in PLATE_ONLY]
+
+
+# The sustained states before te3n1.5. Their entry ids are the computed 3:250 / 3:350 ranges below
+# and are frozen; every pair that involves a newer state takes its ids from alloc().
+_LEGACY_SUSTAINED = ["idle", "listening", "thinking", "waitingInput", "speaking", "error",
+                     "sleeping", "loading", "failed", "degraded"]
+
+
+# Asleep, in either form: the idle beats, wander and the plate's eye life park for both.
+RESTING = ["sleeping", "dreaming"]
 
 
 SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "cloud", "drop"]
@@ -143,7 +163,19 @@ SHAPES = ["circle", "blob", "roundedSquare", "pill", "triangle", "hexagon", "clo
 GLYPH_ORDER = ["idle", "listening", "thinking", "waitingInput", "speaking", "success", "error", "sleeping", "loading", "failed", "degraded", "dragged"]  # 7:30..7:41
 
 
-ENTER_PAIRS = [(a, b) for a in SUSTAINED for b in SUSTAINED if a != b]  # every change gets an entry
+# Glyphs added by te3n1.5, drawn after the original twelve; their ids come from alloc(). `working`
+# is the existing art (z4b83); the rest are PLACEHOLDERS derived from existing glyphs until the
+# art pass (te3n1.7) replaces art/glyph-<name>.svg - see ARTIST.md.
+NEW_GLYPHS = ["working", "dreaming", "thinkingOpen", "content", "startled", "dizzy", "trick"]
+
+
+# Every change gets an entry. The legacy pairs keep their computed ids (3:250.., 3:350..); a pair
+# with a newer state in it is appended after them, ids from alloc().
+_LEGACY_PAIRS = [(a, b) for a in _LEGACY_SUSTAINED for b in _LEGACY_SUSTAINED if a != b]
+
+
+ENTER_PAIRS = _LEGACY_PAIRS + [(a, b) for a in SUSTAINED for b in SUSTAINED
+                               if a != b and (a, b) not in _LEGACY_PAIRS]
 
 
 # --- 0: the mascot artboard --------------------------------------------------------------------
@@ -286,10 +318,15 @@ WANDER_SLEEP_WAIT, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT_NODE, WANDER_SLEEP_SHIF
 WANDER_A_NODE, WANDER_B_NODE, WANDER_GLANCE_NODE, WANDER_PEEK_NODE, WANDER_SPIN_NODE = "3:240", "3:241", "3:242", "3:243", "3:244"
 
 
-enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:250..3:339
+enter_anim = {pair: f"3:{250 + i}" for i, pair in enumerate(_LEGACY_PAIRS)}   # 3:250..3:339
 
 
-enter_node = {pair: f"3:{350 + i}" for i, pair in enumerate(ENTER_PAIRS)}   # 3:350..3:439
+enter_node = {pair: f"3:{350 + i}" for i, pair in enumerate(_LEGACY_PAIRS)}   # 3:350..3:439
+
+
+for _pair in ENTER_PAIRS[len(_LEGACY_PAIRS):]:
+    enter_anim[_pair] = alloc(3, f"Enter_{_pair[0]}_{_pair[1]}")
+    enter_node[_pair] = alloc(3, f"Enter_{_pair[0]}_{_pair[1]}Node")
 
 
 # The extra waits that break the lockstep (see IDLE_WAITS / WANDER_WAITS in constants.py).
@@ -366,6 +403,106 @@ SACCADE_SLEEP_NODE = "7:189"
 
 
 wave_vertex_ids = [f"7:{200 + i}" for i in range(5)]
+
+
+GLYPH.update({name: alloc(7, "Glyph" + name[0].upper() + name[1:]) for name in NEW_GLYPHS})
+
+
+# Plate layers added by te3n1.5: the thinking squint beat and the dreaming REM flicker.
+PLATE_SQUINT_WAITS = [alloc(7, f"SquintWait{k}") for k in range(3)]
+
+
+PLATE_SQUINT_WAIT_NODES = [alloc(7, f"SquintWait{k}Node") for k in range(3)]
+
+
+PLATE_SQUINT_ANIM, PLATE_SQUINT_NODE = alloc(7, "Squint"), alloc(7, "SquintNode")
+
+
+PLATE_SQUINT_OFF_ANIM, PLATE_SQUINT_OFF_NODE = alloc(7, "SquintOff"), alloc(7, "SquintOffNode")
+
+
+PLATE_REM_WAITS = [alloc(7, f"RemWait{k}") for k in range(3)]
+
+
+PLATE_REM_WAIT_NODES = [alloc(7, f"RemWait{k}Node") for k in range(3)]
+
+
+PLATE_REM_ANIM, PLATE_REM_NODE = alloc(7, "RemFlicker"), alloc(7, "RemFlickerNode")
+
+
+PLATE_REM_OFF_NODE = alloc(7, "RemOffNode")
+
+
+# --- te3n1.5: the new contract surface ---------------------------------------------------------
+# Root nodes. Travel and Squash pivot at the body's base, above Lean; Listen and Peek sit in the
+# face chain. Each is keyed (or bound) by exactly one thing, so nothing fights over a property.
+TRAVEL_NODE = alloc(0, "TravelNode")       # bound to moveX / moveY: lean and stretch along travel
+SQUASH_NODE = alloc(0, "SquashNode")       # keyed by the Pet and React layers: squash about the feet
+LISTEN_NODE = alloc(0, "ListenNode")       # bound to listenLevel: the face lifts and leans in
+PEEK_NODE = alloc(0, "PeekNode")           # keyed by React only: the plate ducks (peekaboo, yawn)
+
+
+# View-model properties, in the order the file declares them (after the original nineteen).
+VM_NEW = {name: alloc(1, "VM_" + name) for name in (
+    "reduceMotion", "petting", "listenLevel", "moveX", "moveY", "impact", "trickId",
+    "poke", "dizzy", "sent", "toolStart", "toolDone", "land", "wake", "yawn", "trick")}
+
+
+CONV_LISTEN_Y, CONV_LISTEN_SCALE = alloc(2, "ListenToLift"), alloc(2, "ListenToScale")
+
+
+CONV_MOVE_LEAN, CONV_MOVE_SY, CONV_MOVE_SX = alloc(2, "MoveToLean"), alloc(2, "MoveToStretch"), alloc(2, "MoveToSpread")
+
+
+# Calm (reduceMotion) twins of every sustained loop: the same pose with the bob, the inflate, the
+# light and the gaze drift held at their first frame.
+calm_state_anim = {s: alloc(3, f"Calm_{s}") for s in SUSTAINED}
+
+
+calm_state_node = {s: alloc(3, f"Calm_{s}Node") for s in SUSTAINED}
+
+
+BREATH_CALM_ANIM, BREATH_CALM_NODE = alloc(3, "BreathCalm"), alloc(3, "BreathCalmNode")
+
+
+SUCCESS_CALM_ANIM, SUCCESS_CALM_NODE = alloc(3, "SuccessCalm"), alloc(3, "SuccessCalmNode")
+
+
+ERROR_CALM_ANIM, ERROR_CALM_NODE = alloc(3, "ErrorCalm"), alloc(3, "ErrorCalmNode")
+
+
+IDLE_HOLD_NODE = alloc(3, "IdleHoldNode")                  # parked by reduceMotion (plays a wait)
+
+
+WANDER_HOLD_NODE = alloc(3, "WanderHoldNode")              # parked by reduceMotion or working
+
+
+PET_REST_ANIM, PET_REST_NODE = alloc(3, "PetRest"), alloc(3, "PetRestNode")
+
+
+PET_ANIM, PET_NODE = alloc(3, "Petting"), alloc(3, "PettingNode")
+
+
+# PetFace: the content glyph on its own layer, cut in and out instantly - a blended nested `expr`
+# would sweep through every glyph index between the two (see rig/machine.py _pet_layers).
+PET_FACE_ANIM, PET_FACE_NODE, PET_FACE_REST_NODE = alloc(3, "PettingFace"), alloc(3, "PettingFaceNode"), alloc(3, "PettingFaceRestNode")
+
+
+REACT_REST_ANIM, REACT_REST_NODE = alloc(3, "ReactRest"), alloc(3, "ReactRestNode")
+
+
+REACT_CALM_ANIM, REACT_CALM_NODE = alloc(3, "ReactCalm"), alloc(3, "ReactCalmNode")
+
+
+# One one-shot per reaction; land has three impact tiers and trick four ids.
+REACTIONS = ["poke", "dizzy", "sent", "toolStart", "toolDone", "wake", "yawn",
+             "landSoft", "landMid", "landHard", "trick0", "trick1", "trick2", "trick3"]
+
+
+react_anim = {r: alloc(3, "React_" + r) for r in REACTIONS}
+
+
+react_node = {r: alloc(3, "React_" + r + "Node") for r in REACTIONS}
 
 
 _OWNER = _check_unique()

@@ -33,9 +33,8 @@ import kotlin.system.exitProcess
  * Usage: meridian agent-message send --from <agentId> --to <agentId> --body <text>
  * [--conversation-id <convId>]  (5m1qy: target an existing conversation on the recipient)
  *
- * letta-mobile-e12nf: also accepts `--body-file <path|->`, matching the
- * `resolveRequestBody`-style convention used by the REST commands
- * ([ResourceCommands], [RestCommands]) — `-` means "read from stdin". This
+ * letta-mobile-e12nf: also accepts `--body-file <path|->` — `-` means
+ * "read from stdin". This
  * is the LOAD-BEARING path for [com.letta.mobile.data.controller.extras.
  * CustomIrohMessagingTool] / [com.letta.mobile.data.controller.extras.
  * DefaultIrohCliRunner], which always invokes this command with
@@ -117,12 +116,8 @@ class AgentMessageCommand : CliktCommand(name = "agent-message") {
 
 /**
  * letta-mobile-e12nf: resolve the message body from exactly one of `--body`
- * (inline) or `--body-file` (path, or `-` for stdin). Mirrors
- * [resolveRequestBody]'s "exactly one of" contract in [CliRestRequest.kt] for
- * consistency across this CLI's commands, but is standalone here rather than
- * reused because that helper is REST-body-shaped (returns null when both are
- * absent, since a REST body is optional) — an a2a message body is always
- * required, so this throws on the empty case instead of returning null.
+ * (inline) or `--body-file` (path, or `-` for stdin). An a2a message body is
+ * always required, so this throws on the empty case.
  */
 internal fun resolveBody(inlineBody: String?, bodyFile: String?): String {
     if (inlineBody != null && bodyFile != null) {

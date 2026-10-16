@@ -175,17 +175,6 @@ private val A2uiToolApprovalSubmission.decision: ToolApprovalDecision
     get() = if (approve) ToolApprovalDecision.Approve else ToolApprovalDecision.Deny
 
 /**
- * The guard for an A2UI action headed to the wire as a plain user action: false (and logged) for a
- * `tool_approval_response`, which may only become an approval through [PendingToolApprovalRegistry.admit].
- * A client without that registry path drops approval answers rather than let the server match them.
- */
-fun A2uiAction.mayForwardAsUserAction(): Boolean {
-    if (!isToolApprovalResponse) return true
-    logRejection(this, ToolApprovalRejection.UnknownRequest, path = "forward")
-    return false
-}
-
-/**
  * The approval API answers one request ([com.letta.mobile.ui.chat.session.ChatApprovalAnswer] has
  * no scope); a lasting grant is an always-allow rule bound to the parked request's own
  * suggestions, which an A2UI card does not carry. A `session`/`forever` tap is therefore applied

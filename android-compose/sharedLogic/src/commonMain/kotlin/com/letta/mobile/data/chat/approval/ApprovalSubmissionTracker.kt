@@ -22,11 +22,6 @@ class ApprovalSubmissionTracker {
     /** Request ids with an answer in flight, in submission order. */
     val submitting: StateFlow<Set<String>> = _submitting.asStateFlow()
 
-    /** The most recently submitted request still in flight, or null. */
-    val latest: String? get() = _submitting.value.lastOrNull()
-
-    fun isSubmitting(requestId: String): Boolean = requestId in _submitting.value
-
     /** Marks [requestId], answered in [conversationId], as in flight. */
     fun begin(requestId: String, conversationId: String) {
         conversationByRequest.remove(requestId)

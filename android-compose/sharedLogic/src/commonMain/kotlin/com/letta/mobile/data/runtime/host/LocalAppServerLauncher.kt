@@ -29,6 +29,12 @@ data class LocalAppServerLaunch(
  */
 fun interface LocalAppServerLauncher {
     /**
+     * True when the server can start only once per OS process (Android's in-process libnode):
+     * the host then never stops it when idle and never restarts it (letta-mobile-by4vm.110.5).
+     */
+    val singleLaunch: Boolean get() = false
+
+    /**
      * Writes [token] to [tokenFile], readable by this user only and creating its directory, then
      * starts the [launch]'s command with its environment added, in its working directory. Throws
      * [IllegalStateException] when it cannot start.
