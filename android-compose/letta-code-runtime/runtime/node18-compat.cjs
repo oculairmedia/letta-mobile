@@ -33,6 +33,67 @@ if (globalThis.crypto === undefined) {
   Object.defineProperty(globalThis, 'crypto', { value: webcrypto, writable: true, configurable: true, enumerable: false });
 }
 
+// --- TextDecoder { fatal: true } without ICU. nodejs-mobile is built --with-intl=none, where
+// Node's own TextDecoder throws ERR_NO_ICU for `fatal` (lib/internal/encoding.js
+// makeTextDecoderJS). letta.js builds one at module init (src/utils/text-files), so this was the
+// first on-device crash of 0.34.14: `TypeError [ERR_NO_ICU]: "fatal" option is not supported`.
+// Decoding stays Node's; `fatal` is enforced here with buffer.isUtf8 (simdutf, Node >= 18.14, no
+// ICU). Only installed when the platform TextDecoder actually refuses `fatal`.
+(function installFatalTextDecoder() {
+  const Native = globalThis.TextDecoder;
+  if (typeof Native !== 'function') return;
+  try { new Native('utf-8', { fatal: true }); return; } catch (e) { if (!e || e.code !== 'ERR_NO_ICU') return; }
+  const { isUtf8 } = require('node:buffer');
+  installed.push('TextDecoder.fatal');
+  const note = (name) => { if (trace && !hit.has(name)) { hit.add(name); process.stderr.write(`[node18-compat] hit ${name}\n`); } };
+  const invalid = () => Object.assign(new TypeError('The encoded data was not valid for encoding utf-8'), { code: 'ERR_ENCODING_INVALID_ENCODED_DATA' });
+  const bytesOf = (input) => {
+    if (input === undefined) return new Uint8Array(0);
+    if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+    return new Uint8Array(input); // ArrayBuffer / SharedArrayBuffer; anything else: super.decode throws
+  };
+  // Bytes at the end that start a multi-byte sequence the chunk cuts off (kept for the next chunk).
+  const incompleteTail = (b) => {
+    for (let back = 1; back <= Math.min(3, b.length); back++) {
+      const c = b[b.length - back];
+      if ((c & 0xc0) === 0x80) continue; // continuation byte: keep looking for the lead
+      const need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 1;
+      return need > back ? back : 0;
+    }
+    return 0;
+  };
+  class TextDecoder extends Native {
+    #fatal;
+    #pending = new Uint8Array(0);
+    constructor(label = 'utf-8', options = undefined) {
+      const fatal = Boolean(options && options.fatal);
+      super(label, fatal ? { ...options, fatal: false } : options);
+      // Node without ICU decodes utf-8 and utf-16le only; utf-16le fatal degrades to replacement.
+      this.#fatal = fatal && this.encoding === 'utf-8';
+      if (fatal) note(this.#fatal ? 'TextDecoder.fatal' : `TextDecoder.fatal(${this.encoding}) degraded to replacement`);
+    }
+
+    get fatal() { return this.#fatal || super.fatal; }
+
+    decode(input = undefined, options = undefined) {
+      if (!this.#fatal) return super.decode(input, options);
+      const chunk = bytesOf(input);
+      const all = new Uint8Array(this.#pending.length + chunk.length);
+      all.set(this.#pending); all.set(chunk, this.#pending.length);
+      const keep = options && options.stream ? incompleteTail(all) : 0;
+      this.#pending = all.slice(all.length - keep);
+      if (!isUtf8(all.subarray(0, all.length - keep))) {
+        this.#pending = new Uint8Array(0);
+        super.decode(); // drop the inner decoder's partial state, as a fatal error does
+        throw invalid();
+      }
+      return super.decode(input, options);
+    }
+  }
+  Object.defineProperty(globalThis, 'TextDecoder', { value: TextDecoder, writable: true, configurable: true, enumerable: false });
+  try { require('node:util').TextDecoder = TextDecoder; } catch { /* util is the same object everywhere */ }
+})();
+
 // --- File global (Node 20). The SDKs' toFile()/multipart paths throw without it on 18.
 if (globalThis.File === undefined) {
   const { File } = require('node:buffer');
