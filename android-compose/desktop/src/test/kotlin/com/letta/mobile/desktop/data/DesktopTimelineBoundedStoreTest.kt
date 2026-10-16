@@ -22,8 +22,7 @@ class DesktopTimelineBoundedStoreTest {
             return TimelineDurableCheckpoint(parts[0].toLong(), null, parts[1].toBooleanStrict())
         }
     }
-    private var legacy = false
-    private fun store() = DesktopTimelineBoundedStore(root, codec, persistentIndexForNewScopes = !legacy)
+    private fun store() = DesktopTimelineBoundedStore(root, codec)
     private fun record(order: Long, id: String = "id-$order", bytes: ByteArray = byteArrayOf(1)) =
         TimelineStoredRecord(TimelinePageKey(order, TimelineMessageId(id)), "opaque", bytes)
 
@@ -108,10 +107,10 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun authoritativeIndexRestartNeverOpensDamagedLegacyManifest() = runTest {
+    @Test fun strayV1ManifestIsIgnored() = runTest {
         store().transaction(scope) { put(record(1)); nextRevision() }
         val directory = Files.list(root).use { it.findFirst().orElseThrow() }
-        // A stale v1 manifest is deliberately unreadable. v2 reads and writes must ignore it.
+        // Old-format files left in a scope directory are never read: v2 is the only format.
         Files.write(directory.resolve("active"), ByteArray(81))
         store().read(scope) {
             assertEquals(1L, checkpoint().revision)
@@ -121,33 +120,6 @@ class DesktopTimelineBoundedStoreTest {
         store().read(scope) {
             assertEquals(2L, checkpoint().revision)
             assertEquals(listOf(1L, 2L), metadata(TimelineReadPosition.Tail, 2).rows.map { it.key.order })
-        }
-    }
-
-    @Test fun migrationRowProgressResumesWithoutActivatingAndRejectsStaleSource() = runTest {
-        legacy = true
-        store().transaction(scope) {
-            nextRevision()
-            repeat(5) { put(record(it.toLong())) }
-        }
-        assertEquals(2L, store().migrateRows(scope, maxRows = 2).copiedRows)
-        assertEquals(4L, store().migrateRows(scope, maxRows = 2).copiedRows)
-        store().read(scope) { assertEquals(5, metadata(TimelineReadPosition.Tail, 10).rows.size) }
-        store().transaction(scope) { nextRevision(); put(record(6)) }
-        assertFailsWith<IllegalStateException> { store().migrateRows(scope, maxRows = 2) }
-        store().read(scope) { assertEquals(6, metadata(TimelineReadPosition.Tail, 10).rows.size) }
-    }
-
-    @Test fun migrationOversizedBodyDoesNotPublishProgress() = runTest {
-        legacy = true
-        store().transaction(scope) {
-            nextRevision()
-            put(record(1, bytes = ByteArray(20)))
-        }
-        assertFailsWith<IllegalArgumentException> { store().migrateRows(scope, maxBodyBytes = 10) }
-        assertEquals(1L, store().migrateRows(scope, maxBodyBytes = 20).copiedRows)
-        store().read(scope) {
-            assertContentEquals(ByteArray(20), body(metadata(TimelineReadPosition.Tail, 1).rows.single().body, 0, 20))
         }
     }
 
@@ -234,30 +206,6 @@ class DesktopTimelineBoundedStoreTest {
         }
     }
 
-    @Test fun exactUtf16KeysAndAuxiliaryCorruptionFailClosed() = runTest {
-        legacy = true // Explicit v1 compatibility/corruption regression.
-        val ids = listOf("\uD800", "\uD801", "?")
-        store().transaction(scope) {
-            nextRevision()
-            ids.forEachIndexed { index, id -> put(record(index.toLong(), id)); putEvidence(id, byteArrayOf(index.toByte())) }
-        }
-        store().read(scope) {
-            ids.forEachIndexed { index, id ->
-                assertEquals(index.toLong(), locate(TimelineMessageId(id))?.order)
-                assertContentEquals(byteArrayOf(index.toByte()), evidence(id, 1))
-            }
-        }
-        val evidencePath = Files.walk(root).use { paths ->
-            paths.filter { it.fileName.toString().startsWith("e-") }.findFirst().orElseThrow()
-        }
-        java.io.RandomAccessFile(evidencePath.toFile(), "rw").use { it.seek(it.length() - 1); it.write(123) }
-        store().read(scope) {
-            var failures = 0
-            for (id in ids) try { evidence(id, 1) } catch (_: IllegalArgumentException) { failures++ }
-            assertEquals(1, failures)
-        }
-    }
-
     @Test fun concurrentWriterIsFencedAndStagedReadsAreBounded() = runTest {
         store().transaction(scope) {
             nextRevision(); for (i in 0L..10) put(record(i))
@@ -326,45 +274,6 @@ class DesktopTimelineBoundedStoreTest {
             store().read(scope) {
                 assertContentEquals(byteArrayOf(1), body(issued, 0, 1))
             }
-        }
-    }
-
-    @Test fun cursorOnlyRevisionsReuseHistoryWithoutOverlayChains() = runTest(timeout = 60.minutes) {
-        legacy = true // Keep the published v1 corpus compatibility gate.
-        val backend = store()
-        backend.transaction(scope) {
-            nextRevision()
-            for (i in 0L until 28000) put(record(i))
-            putEvidence("keep", byteArrayOf(42))
-        }
-        val directory = Files.list(root).use { it.findFirst().orElseThrow() }
-        fun generation() = java.io.RandomAccessFile(directory.resolve("active").toFile(), "r").use { it.readUTF() }
-        val original = generation()
-        repeat(8) { iteration ->
-            backend.transaction(scope) { nextRevision(); cursor(null, iteration % 2 == 0) }
-            val current = generation()
-            assertTrue(Files.isSameFile(directory.resolve("$original.index"), directory.resolve("$current.index")))
-            assertTrue(Files.isSameFile(directory.resolve("$original.body"), directory.resolve("$current.body")))
-            val aux = directory.resolve("$current.aux")
-            assertEquals(2L, Files.list(aux).use { it.count() })
-            assertTrue(Files.size(aux.resolve("data-generation")) < 128)
-            store().read(scope) {
-                assertEquals(iteration + 2L, checkpoint().revision)
-                assertEquals(27999L, locate(TimelineMessageId("id-27999"))?.order)
-                assertEquals(40, metadata(TimelineReadPosition.Tail, 40).rows.size)
-                assertContentEquals(byteArrayOf(42), evidence("keep", 1))
-            }
-        }
-        assertFailsWith<CancellationException> {
-            backend.transaction(scope) { nextRevision(); cursor(null, false); throw CancellationException() }
-        }
-        store().read(scope) { assertEquals(9L, checkpoint().revision) }
-        // A later row mutation must resolve the data owner, not the cursor-only auxiliary directory.
-        backend.transaction(scope) { nextRevision(); put(record(28000)) }
-        store().read(scope) {
-            assertEquals(10L, checkpoint().revision)
-            assertContentEquals(byteArrayOf(42), evidence("keep", 1))
-            assertEquals(28000L, locate(TimelineMessageId("id-28000"))?.order)
         }
     }
 

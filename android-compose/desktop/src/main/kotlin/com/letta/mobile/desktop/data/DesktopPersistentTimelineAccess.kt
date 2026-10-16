@@ -126,7 +126,7 @@ internal class DesktopPersistentTimelineAccess(directory: Path, private val code
         }
 
     suspend fun commit(records: Map<TimelineMessageId, TimelineStoredRecord?>, evidence: Map<String, ByteArray?>,
-        checkpoint: TimelineDurableCheckpoint, originalRevisions: Map<TimelineMessageId, Long> = emptyMap(),
+        checkpoint: TimelineDurableCheckpoint,
         tools: Map<String, TimelineToolIndexEntry> = emptyMap(), toolGeneration: Long = roots.toolGeneration) {
         val budget = budget()
         var next = roots
@@ -143,7 +143,7 @@ internal class DesktopPersistentTimelineAccess(directory: Path, private val code
             } else {
                 val key = encodeKey(record.key)
                 val ref = writeBlob(record.body, budget)
-                val metadata = encode { writeLong(originalRevisions[identity] ?: checkpoint.revision); writeUTF(record.contentType)
+                val metadata = encode { writeLong(checkpoint.revision); writeUTF(record.contentType)
                     writeLong(record.body.size.toLong()); writeUTF(ref) }
                 next = next.copy(order = index.put(order, key, metadata, budget),
                     identity = index.put(next.identity, identityKey, key, budget))
