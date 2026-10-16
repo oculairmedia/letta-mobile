@@ -57,36 +57,25 @@ internal fun onDeviceModelSection(state: ConfigUiState, actions: OnDeviceModelAc
     )
 }
 
+/** Shown only in the `full` variant, i.e. when [EmbeddedLettaCodeRuntimeStatus.runnable]. */
 private fun runtimeStatusRows(status: EmbeddedLettaCodeRuntimeStatus): List<SettingsRow> = listOf(
-    SettingsRow.Info("runtime-version", "Embedded runtime", status.version.ifBlank { "disabled" }),
-    SettingsRow.Info(
-        "runtime-execution",
-        "Execution",
-        if (status.runnable) "Enabled" else "Disabled",
-        if (status.runnable) SettingsTone.Positive else SettingsTone.Warning,
-    ),
+    SettingsRow.Info("runtime-version", "Embedded runtime", status.version),
     SettingsRow.Note(
         "runtime-note",
-        SettingsStatus(
-            if (status.runnable) {
-                "Agents run on this device. Keep the app allowed in the background so replies and notifications arrive."
-            } else {
-                "This build cannot run the embedded runtime; connect to a remote host instead."
-            },
-        ),
+        SettingsStatus("Agents run on this device. Keep the app allowed in the background so replies and notifications arrive."),
     ),
-    SettingsRow.Note("runtime-dev-only", SettingsStatus(EMBEDDED_RUNTIME_DEV_ONLY_NOTE, SettingsTone.Warning)),
+    SettingsRow.Note("runtime-limits", SettingsStatus(EMBEDDED_RUNTIME_LIMITS_NOTE, SettingsTone.Warning)),
 )
 
 /**
- * letta-mobile-ckmub.5: the embedded runtime is for development. It runs letta-code
- * [LettaCodeContract.VERSION] (nodejs-mobile, Node 18) through the headless protocol until it moves
- * to the App Server path (letta-mobile-by4vm.110.6), so App Server features are remote-only.
+ * The embedded runtime runs letta-code [LettaCodeContract.VERSION] (nodejs-mobile, Node 18) through
+ * the headless protocol until it moves to the App Server path (letta-mobile-by4vm.110.6), so App
+ * Server features need a desktop or remote host until then.
  */
-internal val EMBEDDED_RUNTIME_DEV_ONLY_NOTE: String =
-    "For development only. The on-phone runtime runs letta-code ${LettaCodeContract.VERSION} in a reduced mode: " +
+internal val EMBEDDED_RUNTIME_LIMITS_NOTE: String =
+    "The on-phone runtime runs letta-code ${LettaCodeContract.VERSION} in a reduced mode for now: " +
         "one conversation per app run, and no forking, dreaming or approvals. " +
-        "For everyday use, connect to a desktop or remote host."
+        "Connect to a desktop or remote host for those."
 
 private fun catalogRows(state: ConfigUiState, vm: ConfigViewModel): List<SettingsRow> {
     if (state.embeddedModelCatalog.isEmpty()) {

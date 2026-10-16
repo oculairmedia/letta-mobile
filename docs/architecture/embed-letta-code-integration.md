@@ -76,7 +76,13 @@ The Android implementation follows these constraints:
 
 ## App Server Compatibility Gate
 
-The embedded App Server wedge is currently version-blocked:
+**Resolved (2026-10-16, letta-mobile-by4vm.109/.110.2):** the Node >= 22.19 requirement is only
+the `engines` field. Stock 0.34.14 runs on nodejs-mobile 18.20.4 with the `node18-compat.cjs`
+preload, and that is the embedded pin now (`letta-code-runtime/letta-code-runtime.properties`);
+the loopback App Server launch is letta-mobile-by4vm.110. The runtime ships in the `full` release
+APK (`docs/RELEASE.md`). The history below is kept for context.
+
+The embedded App Server wedge was version-blocked:
 
 | Target | Node requirement | App Server evidence | Android status |
 | --- | --- | --- | --- |

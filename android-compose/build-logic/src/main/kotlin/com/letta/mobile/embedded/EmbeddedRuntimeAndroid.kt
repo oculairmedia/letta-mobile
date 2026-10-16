@@ -20,8 +20,20 @@ internal fun configureEmbeddedRuntimeAndroid(
         if (flags.assetsEnabled.get()) {
             android.sourceSets.getByName("main").assets.directories.add(dirs.assets.get().asFile.absolutePath)
         }
-        if (nativeEnabled) android.addNativeRuntime(project, dirs)
+        if (nativeEnabled) android.addNativeRuntime(project, dirs) else android.configureLite()
     }
+}
+
+/**
+ * Release variant matrix (letta-mobile-by4vm.110.8): `full` = arm64-v8a + embedded runtime +
+ * LiteRT-LM, `lite` = neither, for every ABI a real device or emulator uses. LiteRT-LM only serves
+ * the embedded runtime's on-device model (OnDeviceOpenAiBridge) and the runtime refuses to start
+ * without libnode, so `lite` drops its JNI (~23 MB arm64, ~29 MB x86_64 uncompressed); the Kotlin
+ * classes stay, nothing reaches them. 32-bit x86 (~30 MB) has no devices; emulators are x86_64.
+ */
+private fun ApplicationExtension.configureLite() {
+    defaultConfig.ndk.abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+    packaging.jniLibs.excludes += listOf("**/liblitertlm_jni.so", "**/libLiteRt.so", "**/libLiteRtClGlAccelerator.so")
 }
 
 private fun ApplicationExtension.addBuildConfigFields(pins: EmbeddedRuntimePins, nativeEnabled: Boolean, assetsEnabled: Boolean) {
@@ -32,7 +44,7 @@ private fun ApplicationExtension.addBuildConfigFields(pins: EmbeddedRuntimePins,
 }
 
 private fun ApplicationExtension.addNativeRuntime(project: Project, dirs: EmbeddedRuntimeDirs) {
-    // letta-mobile-by4vm.110 D2: the full-fat (embedded) build is arm64-v8a only. The NDK helpers
+    // letta-mobile-by4vm.110 D2: the `full` (embedded) build is arm64-v8a only. The NDK helpers
     // (git/bash/curl/node CLI) exist only for arm64, so another ABI would ship libnode without the
     // git that letta-code's memfs needs.
     defaultConfig.ndk.abiFilters += "arm64-v8a"

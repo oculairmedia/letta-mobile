@@ -76,7 +76,8 @@ private fun ConfigListContent(
     onConnectEmbeddedRuntime: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val showEmbeddedRuntimeConnect = !state.hasEmbeddedLettaCodeConfig
+    // Only the `full` variant ships the runtime (letta-mobile-by4vm.110.8).
+    val showEmbeddedRuntimeConnect = !state.hasEmbeddedLettaCodeConfig && state.embeddedRuntimeStatus.runnable
     if (state.configs.isEmpty() && !showEmbeddedRuntimeConnect) {
         EmptyState(
             icon = LettaIcons.Settings,
@@ -137,13 +138,7 @@ private fun EmbeddedRuntimeConnectCard(
                         style = MaterialTheme.typography.listItemHeadline,
                     )
                     Text(
-                        text = stringResource(
-                            if (status.runnable) {
-                                R.string.screen_config_embedded_runtime_enabled_placeholder
-                            } else {
-                                R.string.screen_config_embedded_runtime_disabled_placeholder
-                            }
-                        ),
+                        text = stringResource(R.string.screen_config_embedded_runtime_enabled_placeholder),
                         style = MaterialTheme.typography.listItemSupporting,
                     )
                     Text(

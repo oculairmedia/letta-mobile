@@ -58,11 +58,16 @@ internal fun androidSettingsContributions(state: UiState<ConfigUiState>, inputs:
     val debug = if (BuildConfig.DEBUG) DeveloperDestinations(destinations.onCanvasDebug) else null
     return listOfNotNull(
         form.refreshError?.let { SettingsContribution(SettingsGroup.Backend, loadFailedSection(it, vm::loadConfig)) },
-        SettingsContribution(
-            SettingsGroup.Backend,
-            onDeviceModelSection(form, OnDeviceModelActions(vm, inputs.onImportModel, inputs.onSaveModel)),
-            showForMode = LettaConfig.Mode.LOCAL,
-        ),
+        // The `lite` variant ships no embedded runtime (letta-mobile-by4vm.110.8): nothing to configure.
+        if (form.embeddedRuntimeStatus.runnable) {
+            SettingsContribution(
+                SettingsGroup.Backend,
+                onDeviceModelSection(form, OnDeviceModelActions(vm, inputs.onImportModel, inputs.onSaveModel)),
+                showForMode = LettaConfig.Mode.LOCAL,
+            )
+        } else {
+            null
+        },
         SettingsContribution(SettingsGroup.Backend, savedBackendsSection(destinations.onConfigList)),
         SettingsContribution(SettingsGroup.Notifications, backgroundDeliverySection(inputs.battery.exempt, inputs.battery.requestExemption)),
         SettingsContribution(SettingsGroup.Providers, systemAccessSection(destinations.onSystemAccess)),
