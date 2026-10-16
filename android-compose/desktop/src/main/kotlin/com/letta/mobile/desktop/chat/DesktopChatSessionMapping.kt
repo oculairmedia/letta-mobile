@@ -18,7 +18,6 @@ import com.letta.mobile.ui.chat.session.ChatModelOption
 import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.TimelineLocalState
-import com.letta.mobile.ui.chat.session.TimelineRunState
 import com.letta.mobile.ui.chat.session.pageError
 import com.letta.mobile.ui.chat.session.withHostApprovals
 import kotlinx.collections.immutable.ImmutableList
@@ -79,11 +78,8 @@ internal fun desktopChatUiState(inputs: DesktopChatTimelineInputs, previous: Cha
         isCancelling = surface.selectedConversationId != null &&
             inputs.cancellingConversationId == surface.selectedConversationId,
         sendQueue = inputs.sendQueue,
-    ).withHostApprovals(HOST_OWNED_RUN, inputs.approvals)
+    ).withHostApprovals(inputs.approvals) // desktop's controller owns every answer; the port has none
 }
-
-/** Desktop's controller owns every approval answer, so the shared overlay sees none of the port's own. */
-private val HOST_OWNED_RUN = TimelineRunState()
 
 /**
  * The page (snackbar) error: the shared rule over [local] (hidden once acknowledged, glow kept),

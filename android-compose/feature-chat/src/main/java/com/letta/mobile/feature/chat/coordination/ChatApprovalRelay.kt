@@ -2,7 +2,6 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.approval.ApprovalOutboxCoordinator
 import com.letta.mobile.data.chat.approval.OutboxApproval
-import com.letta.mobile.data.chat.approval.OutboxNotice
 import com.letta.mobile.data.chat.approval.OutboxSubmitResult
 import com.letta.mobile.data.runtime.ApprovalRelayClient
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -18,11 +17,9 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -73,17 +70,10 @@ class ChatApprovalRelay @Inject constructor(
 
 /**
  * letta-mobile-bzvro.40: one chat screen's view of a [ChatApprovalRelay] for [agentId]'s
- * conversations; inert (no parked requests, no chip) when the screen has no relay.
+ * conversations (outbox delivery and the mode chip); inert when the screen has no relay. Parked and
+ * queued requests reach the screen through [ChatApprovalController.approvals] (letta-mobile-by4vm.93).
  */
 internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, private val agentId: String) {
-    val pendingDetails: StateFlow<Map<String, PendingApprovalDetails>> = relay?.pendingDetails ?: MutableStateFlow(emptyMap())
-
-    /** letta-mobile-bzvro.14: the requests answered offline and waiting. */
-    val queuedRequestIds: StateFlow<Set<String>> = relay?.outbox?.queuedRequestIds ?: MutableStateFlow(emptySet())
-
-    /** letta-mobile-bzvro.14: what the person is told once queued answers are sent or dropped. */
-    val outboxNotices: Flow<OutboxNotice> = relay?.outbox?.notices ?: emptyFlow()
-
     /**
      * letta-mobile-bzvro.14: [entry] through the outbox (sent now, or queued while the link is down);
      * null when this screen has none, or its backend is not a channel transport (HTTP sends directly).

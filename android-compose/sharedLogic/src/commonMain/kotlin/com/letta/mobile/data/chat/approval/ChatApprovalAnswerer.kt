@@ -3,9 +3,13 @@ package com.letta.mobile.data.chat.approval
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
+import com.letta.mobile.ui.chat.session.ChatApprovalStateSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** One answer to deliver: the card's [answer], the conversation it belongs to, and how it goes out. */
@@ -38,7 +42,8 @@ interface ChatApprovalAnswerHost {
 /**
  * letta-mobile-by4vm.78: the approval-answer lifecycle, one implementation for Android's chat screen
  * and desktop's controller (each used to carry its own submit / release / reconcile pipeline around
- * the shared [ApprovalSubmissionTracker]).
+ * the shared [ApprovalSubmissionTracker]); letta-mobile-by4vm.93: also both clients' one
+ * [ChatApprovalStateSource], with the host's outbox and parked requests mirrored by [bind].
  *
  * An answer is in flight from [submit] until the conversation's timeline stops showing its request
  * as pending ([reconcile]); a delivery that fails or is cancelled releases it at once. A request with
@@ -51,7 +56,7 @@ interface ChatApprovalAnswerHost {
 class ChatApprovalAnswerer(
     private val scope: CoroutineScope,
     private val host: ChatApprovalAnswerHost = object : ChatApprovalAnswerHost {},
-) {
+) : ChatApprovalStateSource {
     private val tracker = ApprovalSubmissionTracker()
 
     /**
@@ -61,12 +66,14 @@ class ChatApprovalAnswerer(
     private val answeredCalls = LinkedHashMap<String, AnsweredCall>()
 
     /** Request ids with an answer in flight, in submission order. */
-    val submitting: StateFlow<Set<String>> = tracker.submitting
+    override val submittingApprovals: StateFlow<Set<String>> = tracker.submitting
 
-    /** The most recently submitted request still in flight, or null. */
-    val latest: String? get() = tracker.latest
+    private val queued = MutableStateFlow<Set<String>>(emptySet())
+    override val queuedApprovals: StateFlow<Set<String>> = queued.asStateFlow()
 
-    fun isSubmitting(request: String): Boolean = tracker.isSubmitting(request)
+    private val parked = MutableStateFlow<Map<String, PendingApprovalDetails>>(emptyMap())
+    override val pendingApprovalDetails: StateFlow<Map<String, PendingApprovalDetails>> = parked.asStateFlow()
+    private var binding: Job? = null
 
     /** Marks the answer in flight and delivers it on the host's scope. */
     fun submit(submission: ChatApprovalSubmission) {
@@ -116,9 +123,24 @@ class ChatApprovalAnswerer(
         return decided
     }
 
-    /** The host's parked control requests are now [parked] (by tool call id). */
-    fun releaseAnsweredCalls(parked: Map<String, PendingApprovalDetails>) {
-        val released = answeredCalls.filterValues { it.call !in parked && it.siblings.any { sibling -> sibling in parked } }.keys
+    /** Mirrors the host's outbox and parked requests (null: it has none); parked snapshots also [releaseAnsweredCalls]. */
+    fun bind(queuedRequests: StateFlow<Set<String>>?, parkedRequests: StateFlow<Map<String, PendingApprovalDetails>>?) {
+        binding?.cancel()
+        queued.value = emptySet()
+        parked.value = emptyMap()
+        if (queuedRequests == null && parkedRequests == null) return
+        binding = scope.launch {
+            queuedRequests?.let { source -> launch { source.collect { queued.value = it } } }
+            parkedRequests?.collect {
+                parked.value = it
+                releaseAnsweredCalls(it)
+            }
+        }
+    }
+
+    /** The host's parked control requests are now [parkedCalls] (by tool call id). */
+    fun releaseAnsweredCalls(parkedCalls: Map<String, PendingApprovalDetails>) {
+        val released = answeredCalls.filterValues { it.call !in parkedCalls && it.siblings.any { sibling -> sibling in parkedCalls } }.keys
         released.toList().forEach(::clear)
     }
 
