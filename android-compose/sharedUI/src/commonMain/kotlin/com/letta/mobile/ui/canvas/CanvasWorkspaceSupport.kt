@@ -15,6 +15,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isAltPressed
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
+import com.letta.mobile.data.model.CanvasElementId
+import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.State as DrawBoxState
 import io.ak1.drawbox.domain.model.Element
 import io.ak1.drawbox.domain.model.Intent
@@ -202,7 +204,7 @@ internal object CanvasWorkspaceSupport {
             controller.onIntent(Intent.FinalizeArrowBindings(connector.id))
         }
         if (session != null && hasBoundEndpoint(snapped.binding)) {
-            scope.launch { runCatching { session.bindArrow(connector.id, snapped.binding) } }
+            scope.launch { runCatching { session.bindArrow(CanvasElementId(connector.id), snapped.binding) } }
         }
     }
 
@@ -800,8 +802,8 @@ internal object CanvasWorkspaceSupport {
                     controller.onIntent(io.ak1.drawbox.domain.model.Intent.UpdateElement(labelledShape(shape, words, label.style)))
                 }
             }
-            runCatching { session.removeDocument(label.id) }
-            runCatching { session.setLabelOwner(label.id, null) }
+            runCatching { session.removeDocument(CanvasNoteId(label.id)) }
+            runCatching { session.setLabelOwner(CanvasNoteId(label.id), null) }
         }
     }
 
@@ -904,8 +906,8 @@ internal object CanvasWorkspaceSupport {
         params.recordDeletion {
             work.orphaned.forEach { id ->
                 params.onClearActiveNoteIf(id)
-                runCatching { s.removeDocument(id) }
-                runCatching { s.setLabelOwner(id, null) }
+                runCatching { s.removeDocument(CanvasNoteId(id)) }
+                runCatching { s.setLabelOwner(CanvasNoteId(id), null) }
             }
         }
     }

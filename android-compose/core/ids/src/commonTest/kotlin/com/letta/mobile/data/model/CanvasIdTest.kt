@@ -42,4 +42,13 @@ class CanvasIdTest {
         assertEquals(CanvasActorId("agent-1"), Json.decodeFromString(CanvasActorId.serializer(), encoded))
         assertEquals("agent-1", CanvasActorId("agent-1").toString())
     }
+
+    @Test
+    fun canvasElementNoteAndCheckpointIdsSerializeAsTheirBareStrings() {
+        assertEquals("\"el-1\"", Json.encodeToString(CanvasElementId.serializer(), CanvasElementId("el-1")))
+        assertEquals("\"doc-1\"", Json.encodeToString(CanvasNoteId.serializer(), CanvasNoteId("doc-1")))
+        assertEquals("\"cp-1\"", Json.encodeToString(CanvasCheckpointId.serializer(), CanvasCheckpointId("cp-1")))
+        assertEquals(CanvasNoteId("doc-1"), Json.decodeFromString(CanvasNoteId.serializer(), "\"doc-1\""))
+        assertEquals("el-1", CanvasElementId("el-1").toString())
+    }
 }

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.canvas.CanvasCreateOptions
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import io.ak1.drawbox.presentation.reducer.Reducer
 import io.ak1.drawbox.presentation.viewmodel.DrawBoxController
@@ -63,7 +64,7 @@ class CanvasUnifiedUndoUiTest {
         waitUntil(timeoutMillis = 10_000) { session.documents().size == 1 }
         val note = session.documents().single()
 
-        runBlocking { session.removeDocument(note.id) }
+        runBlocking { session.removeDocument(CanvasNoteId(note.id)) }
         waitUntil(timeoutMillis = 10_000) { session.documents().isEmpty() }
 
         // The removal above went straight to the session rather than through the board, so undo

@@ -22,6 +22,7 @@ import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.progress
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElementFixtures.props
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasElementId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,7 +55,7 @@ class CanvasPluginElementMoveUndoTest {
     fun aMoveWritesTheFrameRegisterOnlyAsTheUser() = runTest {
         val session = placed()
         val before = assertNotNull(session.element())
-        assertNotNull(session.movePluginElement(ID, moved))
+        assertNotNull(session.movePluginElement(CanvasElementId(ID), moved))
 
         val op = assertIs<CanvasOp.SetPluginElementOp>(session.lastOp())
         val frameOnly = CanvasOp.SetPluginElementOp(op.opId, CanvasSession.LOCAL_USER_ACTOR_ID, op.lamport, ID, frame = moved, owner = CanvasGeometryOwner.USER)
@@ -65,7 +66,7 @@ class CanvasPluginElementMoveUndoTest {
     @Test
     fun aMoveAndAConcurrentPluginStateUpdateBothSurviveInEveryOrder() = runTest {
         val session = placed()
-        session.movePluginElement(ID, moved)
+        session.movePluginElement(CanvasElementId(ID), moved)
         val move = session.lastOp()
         // The plugin wrote at the same moment on another peer: the same lamport, not after the move.
         val update = progress(move.lamport, 0.5)
@@ -84,7 +85,7 @@ class CanvasPluginElementMoveUndoTest {
     @Test
     fun undoingAMovePutsTheFrameBackAndKeepsThePluginStateAndRedoMovesItAgain() = runTest {
         val session = placed()
-        val step = assertNotNull(session.movePluginElement(ID, moved))
+        val step = assertNotNull(session.movePluginElement(CanvasElementId(ID), moved))
         session.applyAgentBatch(listOf(progress(0, 0.9)), CanvasActorId(AGENT))
 
         session.undo(step)
@@ -102,9 +103,9 @@ class CanvasPluginElementMoveUndoTest {
     fun undoingARemovalBringsTheElementBackAndRedoRemovesItAgain() = runTest {
         val session = placed()
         val before = assertNotNull(session.element())
-        val step = assertNotNull(session.removePluginElement(ID))
+        val step = assertNotNull(session.removePluginElement(CanvasElementId(ID)))
         assertNull(session.element())
-        assertNull(session.removePluginElement(ID), "removing what is gone does nothing")
+        assertNull(session.removePluginElement(CanvasElementId(ID)), "removing what is gone does nothing")
 
         session.undo(step)
         assertEquals(before, session.element())
@@ -133,7 +134,12 @@ class CanvasPluginElementMoveUndoTest {
         val revision = session.document.value!!.revision
         val elsewhere = CanvasDocumentFrame(0f, 0f, 320f, 240f)
         val step = assertNotNull(
-            session.movePluginElements(mapOf(ID to moved, "pe-b" to elsewhere, "pe-c" to frame, "pe-missing" to moved)),
+            session.movePluginElements(
+                mapOf(
+                    CanvasElementId(ID) to moved, CanvasElementId("pe-b") to elsewhere,
+                    CanvasElementId("pe-c") to frame, CanvasElementId("pe-missing") to moved,
+                ),
+            ),
         )
         assertEquals(revision + 1, session.document.value!!.revision, "one revision")
         val batch = assertIs<CanvasOp.BatchOp>(session.lastOp())
@@ -142,7 +148,7 @@ class CanvasPluginElementMoveUndoTest {
 
         session.undo(step)
         assertTrue(session.pluginElements().all { it.frame == frame })
-        assertNull(session.movePluginElement("pe-c", frame), "a move to where it is does nothing")
+        assertNull(session.movePluginElement(CanvasElementId("pe-c"), frame), "a move to where it is does nothing")
     }
 
     @Test
@@ -150,7 +156,7 @@ class CanvasPluginElementMoveUndoTest {
         val session = placed()
         val placedCheckpoint = session.checkpoints.value.first()
         val placedElement = assertNotNull(session.element())
-        session.movePluginElement(ID, moved)
+        session.movePluginElement(CanvasElementId(ID), moved)
         session.applyAgentBatch(listOf(progress(0, 1.0)), CanvasActorId(AGENT))
 
         session.restoreCheckpoint(placedCheckpoint.checkpointId)

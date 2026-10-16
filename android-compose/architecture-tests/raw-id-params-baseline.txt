@@ -52,8 +52,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasExternalToo
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpLog.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpReferences.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneValidator.kt 2
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSession.kt 11
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSessionPluginElements.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSnap.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasTools.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindProps.kt 2

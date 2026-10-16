@@ -169,7 +169,7 @@ class IrohCanvasRelayEndToEndTest {
         IrohCanvasRelayClient(scope, client).attach(transport.readyHandle)
         val session = CanvasSession.getOrCreateForConversation(
             documents,
-            conversationId,
+            com.letta.mobile.data.model.ConversationId(conversationId),
             CanvasConversationOptions(opLog = opLog, syncTransport = client),
         )
         session.startSync(scope)

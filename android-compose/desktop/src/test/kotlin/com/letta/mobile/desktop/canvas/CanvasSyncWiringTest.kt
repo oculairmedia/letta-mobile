@@ -13,6 +13,7 @@ import com.letta.mobile.data.canvas.CanvasSyncTransport
 import com.letta.mobile.data.canvas.InMemoryCanvasDocumentStore
 import com.letta.mobile.data.canvas.LoopbackCanvasSyncTransport
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +41,7 @@ class CanvasSyncStatusBadgeTest {
         val session = runBlocking {
             CanvasSession.getOrCreateForConversation(
                 InMemoryCanvasDocumentStore(),
-                "conv-badge",
+                ConversationId("conv-badge"),
                 CanvasConversationOptions(syncTransport = ScriptedTransport(health)),
             )
         }
@@ -63,7 +64,7 @@ class CanvasSyncStatusBadgeTest {
         val session = runBlocking {
             CanvasSession.getOrCreateForConversation(
                 InMemoryCanvasDocumentStore(),
-                "conv-loopback",
+                ConversationId("conv-loopback"),
                 CanvasConversationOptions(syncTransport = LoopbackCanvasSyncTransport()),
             )
         }

@@ -71,6 +71,7 @@ import com.composables.icons.lucide.X
 import com.letta.mobile.data.canvas.CanvasSceneDocument
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.ui.theme.LettaDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -195,7 +196,7 @@ private fun NoteTitleField(session: CanvasSession, document: CanvasSceneDocument
         if (title == latest.title.orEmpty()) return@LaunchedEffect
         delay(TITLE_SAVE_DELAY_MS)
         recorder.recordingOrJust("renaming a note") {
-            runCatching { session.retitleDocument(latest.id, title) }
+            runCatching { session.retitleDocument(CanvasNoteId(latest.id), title) }
         }
     }
     val style = MaterialTheme.typography.headlineSmall.copy(color = onCard, fontWeight = FontWeight.Medium)
@@ -301,7 +302,7 @@ private fun NoteColourPanel(session: CanvasSession, document: CanvasSceneDocumen
         Text("Color", style = MaterialTheme.typography.titleSmall, color = onCard)
         SwatchRow(NoteColors, current = parseHexColor(document.color)) { picked ->
             scope.launch {
-                recorder.recordingOrJust("recolouring a note") { runCatching { session.recolorDocument(document.id, picked.toHex()) } }
+                recorder.recordingOrJust("recolouring a note") { runCatching { session.recolorDocument(CanvasNoteId(document.id), picked.toHex()) } }
             }
         }
         Text("Text", style = MaterialTheme.typography.titleSmall, color = onCard)
@@ -309,7 +310,7 @@ private fun NoteColourPanel(session: CanvasSession, document: CanvasSceneDocumen
             scope.launch {
                 recorder.recordingOrJust("recolouring the text") {
                     val style = document.style ?: CanvasTextStyle()
-                    runCatching { session.restyleDocument(document.id, style.copy(textColor = picked.toHex())) }
+                    runCatching { session.restyleDocument(CanvasNoteId(document.id), style.copy(textColor = picked.toHex())) }
                 }
             }
         }

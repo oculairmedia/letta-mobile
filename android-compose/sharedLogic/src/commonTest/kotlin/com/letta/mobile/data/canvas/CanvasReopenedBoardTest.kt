@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasNoteId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -62,14 +63,14 @@ class CanvasReopenedBoardTest {
             store = store,
             options = CanvasCreateOptions(title = "Board", opLog = opLog, initialSceneJson = ""),
         )
-        first.setDocument("note-1", """{"blocks":[]}""")
+        first.setDocument(CanvasNoteId("note-1"), """{"blocks":[]}""")
         assertTrue(first.documents().any { it.id == "note-1" })
 
         val reopened = requireNotNull(CanvasSession.open(store, first.canvasId, CanvasConversationOptions(opLog = opLog)))
         reopened.load()
         assertTrue(reopened.documents().any { it.id == "note-1" }, "the stored note did not come back")
 
-        reopened.removeDocument("note-1")
+        reopened.removeDocument(CanvasNoteId("note-1"))
         assertFalse(reopened.documents().any { it.id == "note-1" }, "the removed note came back")
     }
 }

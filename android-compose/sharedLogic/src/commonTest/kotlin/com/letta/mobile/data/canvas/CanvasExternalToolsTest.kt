@@ -528,7 +528,7 @@ class CanvasExternalToolsTest {
         assertEquals(ids.first(), store.getForConversation(ConversationId("conv-shared"))?.id?.value)
 
         // The same holds for a session-level open.
-        val session = CanvasSession.getOrCreateForConversation(store, "conv-shared")
+        val session = CanvasSession.getOrCreateForConversation(store, ConversationId("conv-shared"))
         assertEquals(ids.first(), session.canvasId.value)
     }
 

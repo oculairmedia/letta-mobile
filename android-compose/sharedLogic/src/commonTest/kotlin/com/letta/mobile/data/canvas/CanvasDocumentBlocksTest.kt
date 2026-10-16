@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasNoteId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -115,11 +116,11 @@ class CanvasDocumentBlocksTest {
         assertNull(CanvasOpProjector.documentsOf(s3).single().color)
 
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c3")))
-        session.setDocument("n", "")
-        assertNull(session.recolorDocument("missing", "#fff"))
-        session.recolorDocument("n", "#bfdbfe")
+        session.setDocument(CanvasNoteId("n"), "")
+        assertNull(session.recolorDocument(CanvasNoteId("missing"), "#fff"))
+        session.recolorDocument(CanvasNoteId("n"), "#bfdbfe")
         assertEquals("#bfdbfe", session.documents().single().color)
-        assertNull(session.setDocument("n", "", color = "#bfdbfe"), "an unchanged colour is not written again")
+        assertNull(session.setDocument(CanvasNoteId("n"), "", color = "#bfdbfe"), "an unchanged colour is not written again")
     }
 
     @Test
@@ -135,11 +136,11 @@ class CanvasDocumentBlocksTest {
         assertNull(CanvasOpProjector.documentsOf(s3).single().style)
 
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c4")))
-        session.setDocument("t", "")
-        assertNull(session.restyleDocument("missing", big))
-        session.restyleDocument("t", big)
+        session.setDocument(CanvasNoteId("t"), "")
+        assertNull(session.restyleDocument(CanvasNoteId("missing"), big))
+        session.restyleDocument(CanvasNoteId("t"), big)
         assertEquals(big, session.documents().single().style)
-        assertNull(session.setDocument("t", "", style = big), "an unchanged style is not written again")
+        assertNull(session.setDocument(CanvasNoteId("t"), "", style = big), "an unchanged style is not written again")
     }
 
     @Test
@@ -155,11 +156,11 @@ class CanvasDocumentBlocksTest {
         assertNull(CanvasOpProjector.documentsOf(s3).single().title, "an empty title clears it")
 
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("c5")))
-        session.setDocument("n", "")
-        assertNull(session.retitleDocument("missing", "x"))
-        session.retitleDocument("n", "Groceries")
+        session.setDocument(CanvasNoteId("n"), "")
+        assertNull(session.retitleDocument(CanvasNoteId("missing"), "x"))
+        session.retitleDocument(CanvasNoteId("n"), "Groceries")
         assertEquals("Groceries", session.documents().single().title)
-        assertNull(session.retitleDocument("n", "Groceries"), "an unchanged title is not written again")
+        assertNull(session.retitleDocument(CanvasNoteId("n"), "Groceries"), "an unchanged title is not written again")
     }
 
     @Test
@@ -167,11 +168,11 @@ class CanvasDocumentBlocksTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store, CanvasCreateOptions(title = "t", canvasId = CanvasId("c2")))
         val frame = CanvasDocumentFrame(x = 1f, y = 2f, width = 320f, height = 240f)
-        session.setDocument("n", "", frame = frame)
+        session.setDocument(CanvasNoteId("n"), "", frame = frame)
         assertEquals(frame, session.documents().single().frame)
-        assertNull(session.setDocument("n", "", frame = frame), "the same frame and text is not written again")
-        assertNull(session.moveDocument("missing", frame), "moving a note that is not there does nothing")
-        session.moveDocument("n", frame.copy(x = 99f))
+        assertNull(session.setDocument(CanvasNoteId("n"), "", frame = frame), "the same frame and text is not written again")
+        assertNull(session.moveDocument(CanvasNoteId("missing"), frame), "moving a note that is not there does nothing")
+        session.moveDocument(CanvasNoteId("n"), frame.copy(x = 99f))
         val moved = session.documents().single()
         assertEquals(99f, moved.frame?.x)
         assertEquals("", moved.json)
@@ -185,12 +186,12 @@ class CanvasDocumentBlocksTest {
         val initial = CanvasDocumentFrame(x = 1f, y = 2f, width = 320f, height = 240f)
         val moved = initial.copy(x = 99f)
         val updatedBody = """{"version":2,"blocks":[{"type":{"typeId":"paragraph"},"content":{"kind":"text","text":"fixed"}}]}"""
-        session.setDocument("n", """{"blocks":[{"type":{"typeId":"heading"}}]}""", frame = initial)
+        session.setDocument(CanvasNoteId("n"), """{"blocks":[{"type":{"typeId":"heading"}}]}""", frame = initial)
         val staleCard = session.documents().single()
-        session.setDocument("n", updatedBody)
+        session.setDocument(CanvasNoteId("n"), updatedBody)
         val beforeMove = session.documents()
 
-        session.moveDocument(staleCard.id, moved)
+        session.moveDocument(CanvasNoteId(staleCard.id), moved)
 
         val afterMove = session.documents()
         assertEquals(updatedBody, afterMove.single().json, "a stale card must not restore its old blocks")
@@ -198,7 +199,7 @@ class CanvasDocumentBlocksTest {
         val step = CanvasDocumentUndo.stepBetween(beforeMove, afterMove)
         assertEquals(updatedBody, (step?.undo?.single() as CanvasOp.SetDocumentOp).documentJson)
         assertEquals(updatedBody, (step.redo.single() as CanvasOp.SetDocumentOp).documentJson)
-        assertNull(session.moveDocument("n", moved), "an unchanged frame adds no history")
+        assertNull(session.moveDocument(CanvasNoteId("n"), moved), "an unchanged frame adds no history")
     }
 
     @Test
@@ -219,9 +220,9 @@ class CanvasDocumentBlocksTest {
     fun sessionRoundTripsTheDocumentThroughTheStore() = runTest {
         val store = InMemoryCanvasDocumentStore()
         val session = CanvasSession.create(store, CanvasCreateOptions(title = "t", canvasId = CanvasId("c1")))
-        session.setDocument("notes", "{\"blocks\":[]}")
+        session.setDocument(CanvasNoteId("notes"), "{\"blocks\":[]}")
         assertEquals("{\"blocks\":[]}", session.documents().single().json)
-        assertNull(session.setDocument("notes", "{\"blocks\":[]}"), "an unchanged document is not written again")
+        assertNull(session.setDocument(CanvasNoteId("notes"), "{\"blocks\":[]}"), "an unchanged document is not written again")
 
         val reopened = CanvasSession.open(store, CanvasId("c1"))!!
         assertEquals("{\"blocks\":[]}", reopened.documents().single().json)
