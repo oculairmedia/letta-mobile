@@ -80,7 +80,10 @@ object RunPhaseReducer {
         // letta-mobile-bzvro.7: the status line's detail, folded from the same event.
         val live = RuntimeLiveStatusReducer.reduce(state.live, event, nowMs)
         val tracked = phased.trackingApproval(event)
-        return if (live == tracked.live) tracked else tracked.copy(live = live)
+        // letta-mobile-te3n1.1: the moments this event was, as counts a sampling reader cannot miss.
+        val edges = RunEdges.after(previous = state, rested = base, next = tracked, event = event)
+        val counted = if (edges == tracked.edges) tracked else tracked.copy(edges = edges)
+        return if (live == counted.live) counted else counted.copy(live = live)
     }
 
     /**
@@ -98,14 +101,15 @@ object RunPhaseReducer {
     }
 
     /**
-     * Fold in how many subagents this conversation currently has running. Subagent activity lives
-     * in its own registry, not in the event stream, so it arrives as a separate signal: a tool
-     * call with subagents under it is [RunPhase.DELEGATING] rather than [RunPhase.WORKING].
+     * Fold in what this conversation's subagents are doing. Subagent activity lives in its own
+     * registry, not in the event stream, so it arrives as a separate signal: a tool call with
+     * foreground subagents under it is [RunPhase.DELEGATING] rather than [RunPhase.WORKING], and a
+     * background dream marks [ConversationRunState.dreaming] without touching the phase.
      */
-    fun withSubagents(state: ConversationRunState, count: Int, nowMs: Long): ConversationRunState {
-        val safe = count.coerceAtLeast(0)
-        if (safe == state.subagentCount) return state
-        val next = state.copy(subagentCount = safe)
+    fun withSubagents(state: ConversationRunState, subagents: SubagentActivity, nowMs: Long): ConversationRunState {
+        val safe = subagents.running.coerceAtLeast(0)
+        if (safe == state.subagentCount && subagents.dreaming == state.dreaming) return state
+        val next = state.copy(subagentCount = safe, dreaming = subagents.dreaming)
         return if (next.phase.isToolRunning) next.at(next.toolPhase(), nowMs) else next
     }
 

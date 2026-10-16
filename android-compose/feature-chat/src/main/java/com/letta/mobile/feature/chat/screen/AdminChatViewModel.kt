@@ -1047,7 +1047,10 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun interruptRun() {
-        if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+        if (replacingSendRuntime) return
+        // The cancel is asked for; the run reads INTERRUPTING until its terminal lands (te3n1.1).
+        runPhases.markInterrupting(RunScope(currentRunKey(), agentId.value))
+        composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
     /**
@@ -1186,6 +1189,11 @@ internal class AdminChatViewModel @Inject constructor(
             composerState.collect { composer ->
                 runPhases.setUserTyping(RunScope(currentRunKey(), agentId.value), composer.inputText.isNotBlank())
             }
+        }
+        // letta-mobile-te3n1.1: the conversation's subagents, through the same shared path desktop
+        // uses - a tool with subagents under it is DELEGATING, a background dream makes it dream.
+        viewModelScope.launch {
+            activeSubagentSource.rosterEntries.collect(runPhases::setSubagents)
         }
     }
 }

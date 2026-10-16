@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.RunPhase
 import com.letta.mobile.data.presence.presenceByAgent
@@ -74,6 +75,46 @@ class DesktopChatControllerRunPhasesTest {
         val presence = controller.runs.value.presenceByAgent()
         assertEquals(true, presence.getValue("agent-0").awaitingApproval)
 
+        controller.close()
+    }
+
+    @Test
+    fun theWindowsSubagentsMakeAToolDelegatingAndADreamDream() = runTest {
+        // letta-mobile-te3n1.1: DELEGATING and dreaming are produced on desktop, through the shared publisher.
+        val gateway = EventEmittingGateway()
+        val controller = testController(gateway)
+        controller.start()
+        runCurrent()
+
+        gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("Task")))
+        runCurrent()
+        controller.publishSubagents(
+            listOf(
+                SubagentEntry(toolCallId = "s1", subagentType = "General-purpose", status = "running", parentAgentId = "agent-0", parentConversationId = "conv-1"),
+                SubagentEntry(toolCallId = "s2", subagentType = "Reflection", status = "running", parentAgentId = "agent-0", parentConversationId = "conv-1"),
+            ),
+        )
+
+        assertEquals(RunPhase.DELEGATING, controller.runs.value.getValue("conv-1").phase)
+        val presence = controller.runs.value.presenceByAgent().getValue("agent-0")
+        assertEquals(AgentActivityKind.DELEGATING, presence.activity)
+        assertEquals(true, presence.dreaming)
+
+        controller.close()
+    }
+
+    @Test
+    fun stoppingARunMarksItInterrupting() = runTest {
+        val gateway = EventEmittingGateway()
+        val controller = testController(gateway)
+        controller.start()
+        runCurrent()
+
+        gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
+        runCurrent()
+        controller.stopActiveRun("conv-1")
+
+        assertEquals(RunPhase.INTERRUPTING, controller.runs.value.getValue("conv-1").phase)
         controller.close()
     }
 

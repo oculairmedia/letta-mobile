@@ -62,6 +62,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarLookTarget
+import com.letta.mobile.avatar.core.AvatarReaction
 import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.core.GazeDirector
 import com.letta.mobile.avatar.core.GazeDriveMode
@@ -225,6 +226,12 @@ private fun MascotBench(file: File, modifier: Modifier) {
     fun setState(state: AvatarState) {
         current = state
         runtime.applyState(state)
+        // Success and error flashes are reactions, not states (letta-mobile-te3n1.1).
+        when (state) {
+            AvatarState.SUCCESS -> runtime.react(AvatarReaction.RUN_DONE)
+            AvatarState.ERROR -> runtime.react(AvatarReaction.RUN_FAILED)
+            else -> Unit
+        }
     }
 
     fun setIdentity(value: MascotIdentity) {

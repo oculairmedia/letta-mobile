@@ -273,6 +273,12 @@ class DesktopChatController(
     private val runPhases by lazy { DesktopChatRunPhases(scope, state, runRegistry, closed = { closed }) }
 
     /**
+     * The window's active-subagent list (letta-mobile-te3n1.1): a tool with subagents under it
+     * reads DELEGATING and a background dream makes its agent dream, through the shared publisher.
+     */
+    fun publishSubagents(entries: List<com.letta.mobile.data.model.SubagentEntry>) = runPhases.publishSubagents(entries)
+
+    /**
      * Streaming/typing for the selected conversation through the shared presenter, so desktop and
      * Android agree on "Thinking…" and the cancel chrome, including across tool rounds.
      */
@@ -858,6 +864,8 @@ class DesktopChatController(
         if (active != null && active != conversationId) return
         val aborter = gateway as? DesktopTurnAborter
         val abort: (suspend () -> Boolean)? = aborter?.let { target -> suspend { target.abortConversationTurn(conversationId) } }
+        // INTERRUPTING first: a stop that lands its terminal at once must not be overwritten by it.
+        runPhases.markInterrupting(conversationId)
         interrupter.request(ChatStopRequest(key = conversationId, transport = "appServer", abort = abort))
     }
 

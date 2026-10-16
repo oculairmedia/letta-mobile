@@ -71,6 +71,28 @@ interface AvatarRuntime {
      */
     fun setCameraFraming(framing: AvatarCameraFraming) {}
 
+    /**
+     * Play a one-shot [reaction] (letta-mobile-te3n1); [arg] carries its magnitude or variant
+     * (LAND's impact, TRICK's id). A renderer whose asset has no animation for it plays its
+     * fallback or nothing. Default no-op so renderers opt in.
+     */
+    fun react(reaction: AvatarReaction, arg: Float = 0f) {}
+
+    /** How intently the mascot listens, 0..1 (the user's typing cadence while LISTENING). Default no-op. */
+    fun setListenLevel(level: Float) {}
+
+    /** The pointer is over the mascot. Default no-op. */
+    fun setHovered(hovered: Boolean) {}
+
+    /** The user is petting the mascot. Default no-op. */
+    fun setPetting(petting: Boolean) {}
+
+    /** The mascot's own motion through the window, in mascot widths per second. Default no-op. */
+    fun setMotion(vx: Float, vy: Float) {}
+
+    /** The platform asked for reduced motion; the asset holds still poses. Default no-op. */
+    fun setReducedMotion(reduced: Boolean) {}
+
     /** Advance renderer-side time (spring bones, blends, procedural idle). */
     fun update(deltaSeconds: Float)
 

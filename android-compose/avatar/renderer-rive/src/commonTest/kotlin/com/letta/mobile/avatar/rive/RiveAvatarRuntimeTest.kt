@@ -4,6 +4,7 @@ import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
+import com.letta.mobile.avatar.core.AvatarReaction
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
 import kotlinx.coroutines.test.runTest
@@ -15,32 +16,86 @@ import kotlin.test.assertTrue
 class RiveAvatarRuntimeTest {
 
     @Test
-    fun everySustainedStateHasItsOwnEnumKeyAndMomentaryOnesHaveNone() {
+    fun everySustainedStateTheRigDeclaresHasItsOwnEnumKeyAndMomentaryOnesHaveNone() {
         val momentary = setOf(AvatarState.SUCCESS, AvatarState.DRAGGED)
         val sustained = AvatarState.entries - momentary
-        val keys = sustained.map { checkNotNull(RiveAvatarContract.stateKey(it)) }
+        val full = RiveMascotCapabilities(states = setOf(RiveMascotCapabilities.STATE_WORKING, RiveMascotCapabilities.STATE_DREAMING))
+        val keys = sustained.map { checkNotNull(RiveAvatarContract.stateKey(it, full)) }
 
         assertEquals(sustained.size, keys.toSet().size, "two states share an enum key, so the asset cannot tell them apart")
         momentary.forEach { assertEquals(null, RiveAvatarContract.stateKey(it), "$it is a trigger/boolean, not an enum value") }
     }
 
     @Test
-    fun successIsAFlashTheFilePlaysAndDraggedIsHeldUntilReleased() = runTest {
+    fun aStateTheShippedRigLacksPlaysItsNearestNeighbour() {
+        // letta-mobile-te3n1.1: the shipped mascot.riv has no working or dreaming state yet (te3n1.5).
+        assertEquals("thinking", RiveAvatarContract.stateKey(AvatarState.WORKING))
+        assertEquals("sleeping", RiveAvatarContract.stateKey(AvatarState.DREAMING))
+        val withWorking = RiveMascotCapabilities(states = setOf(RiveMascotCapabilities.STATE_WORKING))
+        assertEquals("working", RiveAvatarContract.stateKey(AvatarState.WORKING, withWorking))
+    }
+
+    @Test
+    fun successAndErrorFlashesAreReactionsAndDraggedIsHeldUntilReleased() = runTest {
         val sink = RecordingSink()
         val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
         sink.writes.clear(); sink.fired.clear()
 
         runtime.applyState(AvatarState.SUCCESS)
-        assertEquals(listOf(RiveAvatarContract.TRIGGER_SUCCESS), sink.fired)
-        assertEquals(emptyList(), sink.stateEnums(), "success must not become the sustained state")
+        assertEquals(emptyList(), sink.writes, "success is a reaction; the state writes nothing")
 
         runtime.applyState(AvatarState.DRAGGED)
         runtime.applyState(AvatarState.IDLE)
         assertEquals(listOf(true, false), sink.draggedBooleans())
 
         runtime.applyState(AvatarState.ERROR)
-        assertEquals(RiveAvatarContract.TRIGGER_ERROR, sink.fired.last())
+        assertEquals(emptyList(), sink.fired, "the error flash is the RUN_FAILED reaction, not the state")
         assertEquals("error", sink.lastState())
+    }
+
+    @Test
+    fun reactionsTheFilePlaysFireItsTriggersEveryTime() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        sink.writes.clear(); sink.fired.clear()
+
+        runtime.react(AvatarReaction.RUN_DONE)
+        runtime.react(AvatarReaction.RUN_DONE)
+        runtime.react(AvatarReaction.RUN_FAILED)
+        assertEquals(
+            listOf(RiveAvatarContract.TRIGGER_SUCCESS, RiveAvatarContract.TRIGGER_SUCCESS, RiveAvatarContract.TRIGGER_ERROR),
+            sink.fired,
+            "back-to-back completions both play",
+        )
+    }
+
+    @Test
+    fun reactionsWithoutAnimationBlinkOrWriteNothing() = runTest {
+        val sink = RecordingSink()
+        val runtime = RiveAvatarRuntime(sink).also { it.load(model()) }
+        sink.writes.clear(); sink.fired.clear()
+
+        listOf(AvatarReaction.POKE, AvatarReaction.WAKE, AvatarReaction.TOOL_START).forEach(runtime::react)
+        assertEquals(List(3) { RiveAvatarContract.TRIGGER_BLINK }, sink.fired)
+
+        sink.writes.clear()
+        val silent = AvatarReaction.entries - RiveMascotCapabilities.CURRENT.reactionTriggers.keys - RiveMascotCapabilities.CURRENT.blinkFallback
+        silent.forEach(runtime::react)
+        assertEquals(emptyList(), sink.writes, "wrote a name the shipped file does not declare: ${sink.writes}")
+
+        runtime.setListenLevel(1f)
+        runtime.setHovered(true)
+        runtime.setPetting(true)
+        runtime.setMotion(1f, 1f)
+        runtime.setReducedMotion(true)
+        assertEquals(emptyList(), sink.writes, "the shipped file has none of these inputs yet")
+    }
+
+    @Test
+    fun reactionsBeforeLoadAreDropped() {
+        val sink = RecordingSink()
+        RiveAvatarRuntime(sink).react(AvatarReaction.RUN_DONE)
+        assertTrue(sink.writes.isEmpty())
     }
 
     @Test

@@ -94,6 +94,10 @@ object GazePlan {
         AvatarState.SLEEPING to listOf(
             GazeLook(GazeTarget.OWN, 100, 60f..60f),
         ),
+        // A dream is sleep with the agent busy inside it: the same held, inward look.
+        AvatarState.DREAMING to listOf(
+            GazeLook(GazeTarget.OWN, 100, 60f..60f),
+        ),
     )
 
     /** Spike fallback when the state is not in `GAZE_PLAN` (lifecycle states). */
