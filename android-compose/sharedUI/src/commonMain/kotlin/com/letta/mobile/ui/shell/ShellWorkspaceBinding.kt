@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.shell
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.data.agents.RecentAgentsPolicy
@@ -36,6 +37,30 @@ private val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
 
 private const val RAIL_EXPANDED = "+"
 private const val RAIL_COLLAPSED = "-"
+
+/** What a host's chat shows, as [SyncShellWorkspace] reports it to the workspace. */
+data class ShellChatSelection(
+    /** The session the chat runs over; a new one resets the workspace ([ShellWorkspaceState.sessionChanged]). */
+    val session: String,
+    val conversation: ConversationId?,
+    val agent: AgentId?,
+    /** The chat's conversations once its backend has reported them authoritatively; null until then. */
+    val reported: Set<ConversationId>?,
+)
+
+/**
+ * Keeps [workspace] in step with the host's chat: a new session resets it, the shown conversation is
+ * its agent's last active one and gets a tab while the chat is the page, and once the conversations
+ * are reported, gone ones lose their tabs.
+ */
+@Composable
+fun SyncShellWorkspace(workspace: ShellWorkspaceState, selection: ShellChatSelection) {
+    LaunchedEffect(workspace, selection.session) { workspace.sessionChanged(selection.session) }
+    LaunchedEffect(workspace, workspace.page.kind, selection.conversation, selection.agent) {
+        workspace.conversationShown(selection.conversation, selection.agent)
+    }
+    LaunchedEffect(workspace, selection.reported) { selection.reported?.let(workspace::conversationsReported) }
+}
 
 /**
  * The shared navigation drawer's input over the workspace and its roster [agents] as (id, name):

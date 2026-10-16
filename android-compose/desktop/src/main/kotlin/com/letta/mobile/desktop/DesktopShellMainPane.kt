@@ -161,10 +161,7 @@ private fun desktopMainContentInputs(
         agentEditor = navigator.agentEditor,
         agentEditorPage = context.agentEditorPage(),
         selectedDestination = navigator.selectedDestination,
-        pageDestination = navigator.pageFor(
-            frame.focus.selectedAgentId?.let(::AgentId),
-            frame.chatState.selectedConversationId?.let(::ConversationId),
-        ),
+        pageDestination = navigator.pageFor(frame),
         selectedConversationId = frame.chatState.selectedConversationId,
         destinationInputs = destinationContentInputs(context, frame),
         activeCanvasSession = core.canvasShell.activeSession,

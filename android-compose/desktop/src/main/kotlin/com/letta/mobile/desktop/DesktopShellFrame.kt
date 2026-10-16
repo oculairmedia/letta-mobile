@@ -18,7 +18,6 @@ import com.letta.mobile.data.memory.graph.MemoryPageState
 import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.presence.dreamingAgentIds
@@ -125,11 +124,7 @@ private fun rememberDesktopAgentFocus(context: DesktopShellContext, chatState: D
     }
     val conversations = chatState.conversations
     val railAgents = remember(conversations, rosterAgents) { buildRailAgents(conversations, rosterAgents) }
-    // The selected conversation's agent, else the agent the shell last focused, else the rail's head.
-    val selectedAgentId = context.navigator.focusFor(
-        chatState.selectedConversation?.agentId?.let(::AgentId),
-        railAgents.map { AgentId(it.first) },
-    )?.value
+    val selectedAgentId = context.navigator.focusFor(chatState, railAgents)
     // Session overrides win over the cached/backend value so a just-saved icon shows instantly.
     val identityByAgentId = rememberCachedIdentities(railAgents, rosterAgents, context.core.bootstrap.secureSettingsStore) +
         context.avatarOverrides.value

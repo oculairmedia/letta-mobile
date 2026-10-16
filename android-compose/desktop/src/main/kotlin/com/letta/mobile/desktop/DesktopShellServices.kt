@@ -19,7 +19,6 @@ import com.letta.mobile.data.notify.AttentionPrefsRepository
 import com.letta.mobile.data.notify.StoredAttentionPrefs
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
-import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.desktop.canvas.DesktopCanvasShell
 import com.letta.mobile.desktop.canvas.rememberDesktopCanvasShell
@@ -231,12 +230,12 @@ internal fun rememberDesktopShellPanels(core: DesktopShellCore, chatState: Deskt
 
 /** The window's image source for the composer: drag-and-drop while the chat shows. */
 @Composable
-internal fun rememberDesktopImageIntake(core: DesktopShellCore, navigator: ShellWorkspaceState): DesktopImageIntake {
+internal fun rememberDesktopImageIntake(core: DesktopShellCore, chatShowing: Boolean): DesktopImageIntake {
     val chatController = core.chatController
     val loader = remember { DesktopImageAttachmentLoader() }
     val isDragActive = DesktopImageIngressEffect(
         DesktopImageIngressConfig(
-            enabled = navigator.selectedDestination == DesktopDestination.Conversations,
+            enabled = chatShowing,
             scope = core.chatScope,
             loader = loader,
             onImage = chatController::attachImage,

@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,7 +11,6 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
-import com.letta.mobile.data.shell.ShellOverlays
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -30,22 +28,16 @@ internal data class DesktopSharedChatWiring(
 
 /**
  * letta-mobile-bglj6.1.10: everything the pieces of [LettaDesktopApp] work with - the window's
- * bindings, the services, the navigation and the overlays - built once per composition.
+ * bindings, the services, the shared workspace (letta-mobile-ckmub.17.3) and its verbs - built once per composition.
  */
 internal data class DesktopShellContext(
     val shell: DesktopAppShellBindings,
     val core: DesktopShellCore,
     val panels: DesktopShellPanels,
-    /** What the shell shows: the shared workspace state (letta-mobile-ckmub.17.3). */
     val navigator: ShellWorkspaceState,
-    /** The shared navigation verbs over [navigator] and this window's chat. */
     val router: ShellWorkspaceNavigator,
-    val overlays: ShellOverlays,
-    /**
-     * Avatar styles chosen via the editor this session, applied immediately to the orbs
-     * regardless of whether the backend round-trips agent metadata.
-     */
-    val avatarOverrides: MutableState<Map<String, MascotIdentity>>,
+    /** Mascots picked in the editor this session: on the orbs at once, before the backend round-trips them. */
+    val avatarOverrides: androidx.compose.runtime.MutableState<Map<String, MascotIdentity>>,
     val chatState: State<DesktopChatSurfaceState>,
     /** Sends an A2UI action over the live session, defaulting to the selected conversation. */
     val onA2uiAction: (A2uiAction) -> Unit,
@@ -65,7 +57,6 @@ internal fun rememberDesktopShellContext(
     val router = remember(navigator, chatController, chatState) {
         ShellWorkspaceNavigator(navigator, DesktopShellChatPort(chatController, chatState))
     }
-    val avatarOverrides = remember { mutableStateOf(emptyMap<String, MascotIdentity>()) }
     // No transport carries A2UI card actions (the shim's user_action frame is gone, by4vm.111) and
     // desktop has no registry-backed approval path (by4vm.2), so every card action is dropped, logged.
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
@@ -82,12 +73,11 @@ internal fun rememberDesktopShellContext(
         panels = panels,
         navigator = navigator,
         router = router,
-        overlays = navigator.overlays,
-        avatarOverrides = avatarOverrides,
+        avatarOverrides = remember { mutableStateOf(emptyMap()) },
         chatState = chatState,
         onA2uiAction = onA2uiAction,
         sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),
-        imageIntake = rememberDesktopImageIntake(core, navigator),
+        imageIntake = rememberDesktopImageIntake(core, navigator.selectedDestination == DesktopDestination.Conversations),
     )
 }
 

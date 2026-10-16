@@ -7,11 +7,14 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.shell.ShellChatPort
 import com.letta.mobile.data.shell.ShellConversationRef
 import com.letta.mobile.data.shell.ShellDestination
+import com.letta.mobile.data.shell.ShellOverlays
 import com.letta.mobile.data.shell.ShellPageKind
 import com.letta.mobile.data.shell.ShellWorkspaceNavigator
 import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.ui.shell.ShellChatSelection
 import com.letta.mobile.ui.shell.header.UnifiedSearchHit
 import com.letta.mobile.ui.shell.header.UnifiedSearchKind
 
@@ -82,6 +85,32 @@ internal fun ShellWorkspaceNavigator.openSearchHit(hit: UnifiedSearchHit, openCa
         UnifiedSearchKind.Destinations ->
             DesktopDestination.entries.firstOrNull { it.name == hit.id }?.let(state::navigate)
     }
+}
+
+/** The overlay stack's flags: the shared workspace's. */
+internal val DesktopShellContext.overlays: ShellOverlays get() = navigator.overlays
+
+/** The main pane's page for this frame's focused agent and selected conversation. */
+internal fun ShellWorkspaceState.pageFor(frame: DesktopShellFrame): ShellDestination =
+    pageFor(frame.focus.selectedAgentId?.let(::AgentId), frame.chatState.selectedConversationId?.let(::ConversationId))
+
+/** The focused agent: the selected conversation's, else the workspace's while on the rail, else the rail's head. */
+internal fun ShellWorkspaceState.focusFor(chatState: DesktopChatSurfaceState, railAgents: List<Pair<String, String>>): String? =
+    focusFor(chatState.selectedConversation?.agentId?.let(::AgentId), railAgents.map { AgentId(it.first) })?.value
+
+/**
+ * What the chat shows, for the shared workspace's sync: the gateway's conversation list counts once
+ * it is Live or has reported none.
+ */
+internal fun DesktopChatSurfaceState.shellChatSelection(): ShellChatSelection {
+    val authoritative = connectionState == DesktopChatConnectionState.Live ||
+        connectionState == DesktopChatConnectionState.NoConversations
+    return ShellChatSelection(
+        session = sessionGraphId.toString(),
+        conversation = selectedConversationId?.let(::ConversationId),
+        agent = selectedConversation?.agentId?.let(::AgentId),
+        reported = if (authoritative) conversations.mapTo(mutableSetOf()) { ConversationId(it.id) } else null,
+    )
 }
 
 /** The desktop chat controller as the shell navigator's chat. [chatState] is read when a verb runs. */
