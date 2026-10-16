@@ -17,7 +17,7 @@ import kotlinx.serialization.json.contentOrNull
  * - `getLocalProviderAuthPath()` resolves to
  *   `join(storageDir, "providers", "auth.json")`, where `storageDir`
  *   defaults to `~/.letta/lc-local-backend` but is overridden by the
- *   `LETTA_LOCAL_BACKEND_DIR` env var — which `DesktopLocalRuntimeManager`
+ *   `LETTA_LOCAL_BACKEND_DIR` env var — which `LocalAppServerHost`
  *   already sets when it spawns the bundled runtime.
  * - `emptyAuthFile()` returns `{ version: 1, providers: {} }`.
  * - `createOrUpdateLocalProvider()` writes each provider keyed by

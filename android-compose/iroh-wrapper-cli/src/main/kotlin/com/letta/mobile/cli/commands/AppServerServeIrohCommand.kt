@@ -23,6 +23,9 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
+import com.letta.mobile.data.runtime.host.LocalAppServerHost
+import com.letta.mobile.data.runtime.host.LocalAppServerLease
+import com.letta.mobile.data.runtime.host.ownedLocalAppServerHost
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
@@ -37,6 +40,7 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.transport.iroh.AutomergeIrohRepoProtocol
 import com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
@@ -190,11 +194,11 @@ class AppServerServeIrohCommand : CliktCommand(
     private val ownAppServer by option(
         "--own-app-server",
         envvar = "LETTA_OWN_APP_SERVER",
-        help = "lgns8.18 (desktop/bundled): spawn 'letta app-server' as an OWNED child " +
-            "process on an ephemeral loopback port and wrap it, instead of connecting to an " +
-            "external --app-server-url. Gives deterministic lifecycle (child death = process " +
-            "exit) with no external supervisor. NOT for the systemd server (keep external-ws " +
-            "there). Overrides --app-server-url when set.",
+        help = "lgns8.18 (desktop/bundled): run 'letta server' as an OWNED child on an ephemeral " +
+            "loopback port with a capability token (the shared LocalAppServerHost) and wrap it, " +
+            "instead of connecting to an external --app-server-url. Its data lives in " +
+            "--local-backend-dir (default ~/.letta/lc-local-backend). Child death = wrapper exit. " +
+            "NOT for the systemd server (keep external-ws there). Overrides --app-server-url when set.",
     ).flag(default = false)
 
     /**
@@ -337,7 +341,7 @@ class AppServerServeIrohCommand : CliktCommand(
         var irohEndpoint: IrohNodeEndpoint? = null
         var notebookStore: NotebookLocalStore? = null
         var notebookProtocol: AutomergeIrohRepoProtocol? = null
-        var ownedServer: com.letta.mobile.cli.appserver.OwnedAppServerProcess? = null
+        var ownedServer: LocalAppServerHost? = null
         var pluginHost: com.letta.mobile.data.plugin.host.PluginHostRuntime? = null
 
         runWithLifecycleCleanup(
@@ -382,15 +386,17 @@ class AppServerServeIrohCommand : CliktCommand(
             
             printDialInfo(endpoint)
 
-            // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
-            // on an ephemeral loopback port, instead of connecting to an external URL.
-            ownedServer = maybeSpawnOwnedAppServer(scope)
-            val effectiveAppServerUrl = ownedServer?.wsBaseUrl ?: appServerUrl
+            // lgns8.18 (Path A, desktop): optionally run + OWN the App Server child on an
+            // ephemeral loopback port, instead of connecting to an external URL.
+            ownedServer = if (ownAppServer) ownedAppServerHost(scope) else null
+            val ownedLease = ownedServer?.let { startOwnedAppServer(it, scope) }
 
             // Create the controller. With --own-app-server this connects the WS
-            // transport to the owned loopback child; otherwise to the external URL
-            // (null = Iroh-only/stub mode).
-            val (controller, nativeAdminClient) = createController(effectiveAppServerUrl, requestTimeout.toLong(), scope)
+            // transport to the owned loopback child with its token; otherwise to the
+            // external URL (null = Iroh-only/stub mode).
+            val appServerEndpoint = ownedLease?.let { AppServerEndpoint.fromWebSocketUrl(it.serverUrl, it.bearerToken) }
+                ?: appServerUrl?.let(AppServerEndpoint::fromWebSocketUrl)
+            val (controller, nativeAdminClient) = createController(appServerEndpoint, requestTimeout.toLong(), scope)
 
             setupAdminRpc(
                 endpoint = endpoint,
@@ -642,45 +648,42 @@ class AppServerServeIrohCommand : CliktCommand(
         }
     }
 
+    private fun ownedAppServerHost(scope: CoroutineScope): LocalAppServerHost {
+        val backendDir = localBackendDir ?: "${System.getProperty("user.home")}/.letta/lc-local-backend"
+        return ownedLocalAppServerHost(listOf(lettaCommand), backendDir, scope) { System.err.println("[app-server] $it") }
+    }
+
     /**
-     * lgns8.18 (Path A): with --own-app-server, spawn `letta app-server` as an owned
-     * child on an ephemeral loopback port and return it; else null. Registers a
-     * shutdown hook and takes the wrapper down if the child dies (no orphaned
-     * half-stack). Kept out of [run] so it stays within complexity bounds.
+     * lgns8.18 (Path A): start the owned App Server and claim it. Takes the wrapper down when the
+     * child exits (the owned host never restarts it), so the pair restarts together.
      */
-    private fun maybeSpawnOwnedAppServer(scope: CoroutineScope): com.letta.mobile.cli.appserver.OwnedAppServerProcess? {
-        if (!ownAppServer) return null
-        println("[iroh-app-server] Spawning owned App Server child ($lettaCommand app-server)...")
-        val owned = com.letta.mobile.cli.appserver.OwnedAppServerProcess.spawn(
-            command = com.letta.mobile.cli.appserver.OwnedAppServerProcess.buildCommand(lettaCommand),
-            log = { System.err.println(it) },
-        )
-        Runtime.getRuntime().addShutdownHook(Thread { owned.close() })
-        println("[iroh-app-server] Owned App Server ready at ${owned.wsBaseUrl}")
-        // Deterministic lifecycle: if the owned child dies, take the wrapper down
-        // with it so the pair restarts together — no orphaned half-stack.
+    private suspend fun startOwnedAppServer(host: LocalAppServerHost, scope: CoroutineScope): LocalAppServerLease {
+        println("[iroh-app-server] Starting owned App Server ($lettaCommand server)...")
+        Runtime.getRuntime().addShutdownHook(Thread(host::close))
+        val lease = host.acquire()
+        println("[iroh-app-server] Owned App Server ready at ${lease.serverUrl}")
         scope.launch {
-            val code = withContext(Dispatchers.IO) { owned.process.waitFor() }
+            val code = host.health.first { it.needsForceRestart }.lastExitCode
             System.err.println("[iroh-app-server] Owned App Server child exited (code $code); shutting down wrapper.")
             exitProcess(if (code == 0) 0 else 70)
         }
-        return owned
+        return lease
     }
 
     private fun createController(
-        appServerUrl: String?,
+        endpoint: AppServerEndpoint?,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, AppServerClient?> {
-        return if (appServerUrl != null) {
-            createLiveController(appServerUrl, requestTimeoutMs, scope)
+        return if (endpoint != null) {
+            createLiveController(endpoint, requestTimeoutMs, scope)
         } else {
             createStubController(requestTimeoutMs, scope)
         }
     }
 
     private fun createLiveController(
-        appServerUrl: String,
+        endpoint: AppServerEndpoint,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, AppServerClient> {
@@ -696,11 +699,11 @@ class AppServerServeIrohCommand : CliktCommand(
         var controllerRef: DefaultAppServerController? = null
         var coordinatorRef: ReconnectCoordinator? = null
         val adminClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
+            connect = { mintGeneration(httpClient, endpoint, requestTimeoutMs, scope) },
             telemetryComponent = "AppServerAdminReconnect",
         )
         val runtimeClient = ReconnectingAppServerClient(
-            connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
+            connect = { mintGeneration(httpClient, endpoint, requestTimeoutMs, scope) },
             listener = recoveryListener(
                 controller = { controllerRef },
                 coordinator = { coordinatorRef },
@@ -817,7 +820,7 @@ class AppServerServeIrohCommand : CliktCommand(
     @Suppress("NoDetachedCoroutineLifecycle")
     private fun mintGeneration(
         httpClient: HttpClient,
-        appServerUrl: String,
+        endpoint: AppServerEndpoint,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
     ): AppServerClientGeneration {
@@ -825,9 +828,9 @@ class AppServerServeIrohCommand : CliktCommand(
         val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
         val transport = KtorAppServerWebSocketTransport(
             httpClient = httpClient,
-            baseUrl = appServerUrl,
+            baseUrl = endpoint.address,
             scope = generationScope,
-            bearerToken = null,
+            bearerToken = endpoint.bearerToken,
         )
         return AppServerClientGeneration(
             client = DefaultAppServerClient(

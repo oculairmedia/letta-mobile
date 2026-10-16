@@ -81,7 +81,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 }
                 DesktopShellOverlays(context, frame)
                 // F03: the bundled runtime's crash notice, over every page while it is down.
-                val runtimeBanner = DesktopLocalRuntimeHost.health.collectAsState().value.runtimeBanner()
+                val runtimeBanner = DesktopLocalRuntimeHost.appServer.health.collectAsState().value.runtimeBanner()
                 OverlayWhile(runtimeBanner, key = runtimeBanner?.let { "${it.message}|${it.action?.label}" })
                 val chat = context.core.chatController
                 val offer = chat.deletionUndo.pending.collectAsState().value

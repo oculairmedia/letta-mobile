@@ -1,9 +1,7 @@
 package com.letta.mobile.desktop.runtime
 
 import com.letta.mobile.data.storage.SecureSettingsStore
-import java.io.BufferedReader
 import java.io.File
-import java.io.StringReader
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -144,46 +142,18 @@ class DesktopRuntimeLaunchSettingsTest {
     @Test
     fun `the child is spawned in the preferred directory with the launch environment`() {
         val work = File(root, "work").apply { mkdirs() }
-        val specs = mutableListOf<DesktopRuntimeLaunchSpec>()
-        val manager = DesktopLocalRuntimeManager(
-            installationProvider = {
-                DesktopLettaCodeInstallation(
-                    File(root, "node.exe").apply { createNewFile() },
-                    File(root, "letta.js").apply { createNewFile() },
-                )
-            },
-            backendDirectory = { File(root, "backend") },
-            processLauncher = DesktopRuntimeProcessLauncher { spec ->
-                specs += spec
-                ReadyProcess()
-            },
-            logLine = {},
-            readyTimeoutMs = 2_000,
-            stopTimeoutMs = 1,
-            launchContext = {
-                desktopRuntimeLaunchContext(DesktopRuntimeLaunchInputs(16L shl 30, "install-1", work))
-            },
+        val installation = DesktopLettaCodeInstallation(File(root, "node.exe"), File(root, "letta.js"))
+
+        val launch = desktopLocalAppServerLaunch(
+            installation = installation,
+            backendDirectory = File(root, "backend"),
+            context = desktopRuntimeLaunchContext(DesktopRuntimeLaunchInputs(16L shl 30, "install-1", work)),
         )
-        manager.ensureStarted()
-        manager.close()
 
-        val spec = specs.single()
-        assertEquals(work, spec.workingDirectory)
-        assertEquals("--max-old-space-size=8192", spec.environment["NODE_OPTIONS"])
-        assertEquals("1", spec.environment["LETTA_LOCAL_BACKEND_EXPERIMENTAL"], "the backend env is still set")
-    }
-
-    private class ReadyProcess : DesktopRuntimeProcess {
-        override val stdout = BufferedReader(StringReader("Listening on ws://127.0.0.1:4500\n"))
-        override val stderr = BufferedReader(StringReader(""))
-        override val descendants: List<DesktopRuntimeProcessHandle> = emptyList()
-        private var alive = true
-        override val isAlive: Boolean get() = alive
-        override val exitCodeOrNull: Int? get() = null
-        override fun waitFor(timeoutMs: Long): Boolean = !alive
-        override fun onExit(callback: (exitCode: Int?) -> Unit) = Unit
-        override fun destroy() { alive = false }
-        override fun destroyForcibly() { alive = false }
+        assertEquals(listOf(installation.nodeExecutable.absolutePath, installation.lettaEntryPoint.absolutePath), launch.command)
+        assertEquals(File(root, "backend").absolutePath, launch.backendDir)
+        assertEquals(work.absolutePath, launch.workingDirectory)
+        assertEquals("--max-old-space-size=8192", launch.environment["NODE_OPTIONS"])
     }
 
     private class InMemoryStore : SecureSettingsStore {
