@@ -11,7 +11,7 @@ import com.letta.mobile.runtime.RuntimeUserInputTools
 
 /**
  * letta-mobile-bglj6.1.22: the approval in [messages] (oldest first) that waits on the person, or
- * null: the newest request carrying a runtime user-input tool (AskUserQuestion) that no later
+ * null: the newest request carrying a runtime user-input tool (AskUserQuestion, ExitPlanMode) that no later
  * response answers. A later response answers it when it names the same request, or names none.
  *
  * Every other approval is resolved by the runtime, so only these need an answer from wherever the
@@ -30,7 +30,7 @@ fun pendingUserInputApproval(messages: List<UiMessage>): UiApprovalRequest? {
 
 /**
  * letta-mobile-bglj6.1.25: whether this request waits on the person: it carries a runtime
- * user-input tool (AskUserQuestion), or (letta-mobile-bzvro.11) the server's `can_use_tool`
+ * user-input tool (AskUserQuestion, ExitPlanMode), or (letta-mobile-bzvro.11) the server's `can_use_tool`
  * control request for it is parked, which only happens under a permission mode that does not
  * approve everything. Every other request (a Bash call under approve-all, say) is resolved by the
  * runtime, even while the projection still holds it as undecided because its tool has not

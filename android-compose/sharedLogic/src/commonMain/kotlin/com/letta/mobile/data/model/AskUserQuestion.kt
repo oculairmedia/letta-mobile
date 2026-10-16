@@ -112,15 +112,20 @@ object AskUserQuestion {
             put("answers", answersObj)
         }
     }
+}
 
-    private fun String.toArgsObject(): JsonObject? {
-        val element = runCatching { Json.parseToJsonElement(this) }.getOrNull() ?: return null
-        return when (element) {
-            is JsonObject -> element
-            is JsonPrimitive -> if (element.isString) {
-                runCatching { Json.parseToJsonElement(element.content).jsonObject }.getOrNull()
-            } else null
-            else -> null
-        }
+/**
+ * A tool call's arguments as a JSON object. [this] is normally a JSON object string, but some
+ * transports double-encode it as a JSON string containing that object; both are handled. Null
+ * when it is neither.
+ */
+internal fun String.toArgsObject(): JsonObject? {
+    val element = runCatching { Json.parseToJsonElement(this) }.getOrNull() ?: return null
+    return when (element) {
+        is JsonObject -> element
+        is JsonPrimitive -> if (element.isString) {
+            runCatching { Json.parseToJsonElement(element.content).jsonObject }.getOrNull()
+        } else null
+        else -> null
     }
 }

@@ -143,6 +143,9 @@
     <string name="rows_send_answer">Send answer</string>
     <string name="rows_other">Other</string>
     <string name="rows_option_description">%1$s: %2$s</string>
+    <string name="rows_plan_title">Ready to code? Here is your plan:</string>
+    <string name="rows_plan_reject_title">Reject plan</string>
+    <string name="rows_plan_feedback_placeholder">Tell the agent what to do differently</string>
 
     <!-- Images -->
     <string name="rows_attached_image">Attached image</string>
