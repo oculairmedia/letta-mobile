@@ -37,6 +37,8 @@ class SkillsViewModel @Inject constructor(
 
     fun uninstall(skillName: String) = controller.uninstall(skillName)
 
+    fun dismissActionError() = controller.dismissActionError()
+
     override fun onCleared() {
         controller.close()
     }

@@ -114,6 +114,7 @@ internal fun SkillsPageRowContent(row: SkillsPageRow, page: SkillsPageScope) {
     when (row) {
         is SkillsPageRow.SectionHeader -> SectionHeader(row, page)
         is SkillsPageRow.Info -> LettaInfoBox(row.message, Modifier.testTag(row.key), contentPadding = NoPadding)
+        is SkillsPageRow.ActionError -> ActionErrorNotice(row.message, page)
         is SkillsPageRow.Group -> Text(
             row.label,
             style = MaterialTheme.typography.labelLarge,
@@ -124,6 +125,15 @@ internal fun SkillsPageRowContent(row: SkillsPageRow, page: SkillsPageScope) {
         is SkillsPageRow.ToolCards -> CardRow(row.tools, page) { tool, modifier -> ToolCard(tool, page, modifier) }
         is SkillsPageRow.ToolTags -> ToolTagChips(row, page)
         is SkillsPageRow.LoadMoreTools -> LoadMoreTools(row, page)
+    }
+}
+
+/** A failed install / remove, with its own dismiss; the skills stay listed beneath it. */
+@Composable
+private fun ActionErrorNotice(message: String, page: SkillsPageScope) {
+    Row(Modifier.fillMaxWidth().testTag(SkillsPageTags.ACTION_ERROR), verticalAlignment = Alignment.CenterVertically) {
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+        IconButton(onClick = page.actions.onDismissSkillActionError) { Icon(Icons.Outlined.Close, contentDescription = DISMISS) }
     }
 }
 
@@ -173,7 +183,7 @@ private fun SkillCard(skill: Skill, page: SkillsPageScope, modifier: Modifier) {
 @Composable
 private fun SkillToggle(skill: Skill, page: SkillsPageScope) {
     val installed = skill.name in page.state.installedSkillNames
-    val canManage = page.state.canManageSkills
+    val canManage = page.state.canManageSkills && (!installed || skill.removable)
     val background = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = INSTALLED_ALPHA) else MaterialTheme.colorScheme.surfaceContainerHighest
     // On touch the 28dp button keeps its look but reaches the 48dp touch target.
     val target = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
@@ -258,21 +268,24 @@ internal fun SkillDetail(skill: Skill, page: SkillsPageScope) {
         skill.description?.takeIf { it.isNotBlank() }?.let {
             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        SkillDetailAction(skill.name, installed, page)
+        SkillDetailAction(skill, installed, page)
     }
 }
 
 @Composable
-private fun SkillDetailAction(name: String, installed: Boolean, page: SkillsPageScope) {
+private fun SkillDetailAction(skill: Skill, installed: Boolean, page: SkillsPageScope) {
     val canManage = page.state.canManageSkills
+    val hint = when {
+        !canManage -> SELECT_AGENT_HINT
+        installed && !skill.removable -> HOST_MANAGED_HINT
+        else -> null
+    }
     if (installed) {
-        OutlinedButton(onClick = { page.toggle(name, installed = true) }, enabled = canManage) { Text(REMOVE) }
+        OutlinedButton(onClick = { page.toggle(skill.name, installed = true) }, enabled = hint == null) { Text(REMOVE) }
     } else {
-        Button(onClick = { page.toggle(name, installed = false) }, enabled = canManage) { Text(INSTALL) }
+        Button(onClick = { page.toggle(skill.name, installed = false) }, enabled = canManage) { Text(INSTALL) }
     }
-    if (!canManage) {
-        Text(SELECT_AGENT_HINT, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    hint?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }
 
 @Composable
@@ -306,3 +319,5 @@ private const val CLOSE = "Close"
 private const val INSTALL = "Install"
 private const val REMOVE = "Remove"
 private const val SELECT_AGENT_HINT = "Open an agent to install or remove skills."
+private const val HOST_MANAGED_HINT = "This skill lives in the host's skills folder and can't be removed from here."
+private const val DISMISS = "Dismiss"
