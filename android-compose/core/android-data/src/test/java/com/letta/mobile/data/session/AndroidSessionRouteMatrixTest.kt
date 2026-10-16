@@ -83,6 +83,7 @@ class AndroidSessionRouteMatrixTest {
             scope = backgroundScope,
             channelTransport = transport,
             settingsRepository = settings,
+            cacheGate = com.letta.mobile.data.local.SessionCacheGate.Open,
         ),
     )
 

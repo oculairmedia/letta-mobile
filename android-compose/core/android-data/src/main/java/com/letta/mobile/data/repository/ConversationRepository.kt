@@ -11,6 +11,8 @@ import com.letta.mobile.data.chat.recompile.ConversationRecompileRequest
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
+import com.letta.mobile.data.local.GatedDao
+import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
@@ -28,6 +30,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap
 open class ConversationRepository(
     private val remote: RemoteRoute<ConversationCrudRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     private val agentRepository: IAgentRepository,
-    private val conversationDao: Lazy<ConversationDao>,
+    conversationDao: Lazy<ConversationDao>,
     repositoryScope: CoroutineScope,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
@@ -55,6 +59,8 @@ open class ConversationRepository(
      * device created or changed without reopening.
      */
     private val transport: IChannelTransport? = null,
+    /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
+    cacheGate: SessionCacheGate = SessionCacheGate.Open,
 ) : IConversationRepository, BackendScopedCache {
     /** A repository over a bound [remote] (tests bind a fake). */
     constructor(
@@ -76,6 +82,9 @@ open class ConversationRepository(
         irohConversationListSource,
         transport,
     )
+
+    /** Room, reachable only once this session's cache clear landed (letta-mobile-by4vm.94). */
+    private val conversationDao = GatedDao(conversationDao, cacheGate)
 
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     /** Single-flights network refreshes; held across the list request. Taken before [cacheMutex], never after. */
@@ -154,7 +163,7 @@ open class ConversationRepository(
         lastRefreshAtMillisByAgent.containsKey(agentId) || snapshotForAgent(agentId).isNotEmpty()
 
     override fun getConversations(agentId: AgentId): Flow<List<Conversation>> {
-        return conversationDao.get().observeForAgent(agentId.value).map { rows ->
+        return flow { emitAll(conversationDao.get().observeForAgent(agentId.value)) }.map { rows ->
             rows.map { it.toConversation() }.also { conversations ->
                 updateMemoryCache(agentId, conversations)
             }

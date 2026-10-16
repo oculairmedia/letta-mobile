@@ -55,6 +55,10 @@ class SessionGraphAssembler @Inject constructor(
     /** letta-mobile-wdm6i: where the context chip's last readings survive a restart. */
     private val settingsStore: SecureSettingsStore? = null,
 ) {
+    /**
+     * Deletes the previous session's cached rows over the raw DAOs. Runs in the background; the
+     * new generation's repositories wait on its [SessionGraphAssembleRequest.cacheGate].
+     */
     suspend fun clearCachesForNewSession() {
         agentDao.get().deleteAll()
         conversationDao.get().deleteAll()
@@ -116,6 +120,7 @@ class SessionGraphAssembler @Inject constructor(
             localAgentSource = localAgentSource,
             settingsRepository = request.settingsRepository,
             transport = request.channelTransport,
+            cacheGate = request.cacheGate,
         )
 
     private fun createConversationRepos(
@@ -133,6 +138,7 @@ class SessionGraphAssembler @Inject constructor(
                 irohConversationListSource = irohConversationListSource,
                 // letta-mobile-lks7m: conversations started on another device arrive as pushes.
                 transport = request.channelTransport,
+                cacheGate = request.cacheGate,
             ),
             conversation = ConversationRepository(
                 remote = remoteSources.conversations,
@@ -144,6 +150,7 @@ class SessionGraphAssembler @Inject constructor(
                 irohConversationListSource = irohConversationListSource,
                 // letta-mobile-xj85j: the in-chat picker follows other devices' changes too.
                 transport = request.channelTransport,
+                cacheGate = request.cacheGate,
             ),
         )
     }

@@ -4,6 +4,8 @@ import com.letta.mobile.data.backend.bound
 import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.local.AgentDao
+import com.letta.mobile.data.local.GatedDao
+import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.local.RoomAgentLocalCache
 import com.letta.mobile.data.repository.api.AgentRemoteSource
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -40,9 +42,11 @@ open class AgentRepository(
         } else {
             null
         },
+    /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
+    cacheGate: SessionCacheGate = SessionCacheGate.Open,
 ) : CachedAgentRepository(
     remote = remote,
-    localCache = { RoomAgentLocalCache(agentDao.get()) },
+    localCache = GatedDao(agentDao, cacheGate).let { dao -> { RoomAgentLocalCache(dao) } },
     repositoryScope = repositoryScope,
     localAgentSource = localAgentSource,
     settingsRepository = settingsRepository,
