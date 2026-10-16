@@ -14,11 +14,11 @@ import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.skills.SkillsCatalogState
+import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
-import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
@@ -68,7 +68,7 @@ internal data class DestinationContentInputs(
     val memoryState: MemoryPageState,
     val schedule: SchedulesPageState,
     val channels: ChannelsPageState,
-    val toolLibraryState: DesktopToolLibraryState,
+    val toolLibraryState: ToolLibraryState,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,

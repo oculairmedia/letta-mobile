@@ -130,7 +130,7 @@ fun StreamingMarkdownText(
     // rememberUpdatedState + a single long-running polling effect.
     //
     // The flk.3.1 design re-rendered the full MarkdownText subtree on
-    // every char. With the new ClientModeStreamSmoother delivering
+    // every char. With a stream smoother delivering
     // chars at 90–180 cps, the per-char re-parse caused visible
     // flicker.
     //

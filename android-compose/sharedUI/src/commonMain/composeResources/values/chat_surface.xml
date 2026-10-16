@@ -26,7 +26,6 @@
     <string name="chat_surface_collapsed_reply_unnamed">The agent replied: %1$s</string>
     <string name="chat_surface_collapsed_thinking">%1$s is thinking</string>
     <string name="chat_surface_collapsed_thinking_unnamed">The agent is thinking</string>
-    <string name="chat_surface_collapsed_working">Working…</string>
     <string name="chat_surface_collapsed_needs_input">Needs your input — open</string>
     <!-- letta-mobile-bglj6.1.9: the Touch canvas's chat head. -->
     <string name="chat_surface_head">Chat with %1$s</string>

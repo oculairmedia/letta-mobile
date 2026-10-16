@@ -361,7 +361,4 @@ private class FakeAllConversationsRepository(
         summarySearch: String?,
     ): Flow<PagingData<Conversation>> =
         throw UnsupportedOperationException()
-    @Deprecated("Used only to satisfy IAllConversationsRepository contract.")
-    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-    override suspend fun countConversations(): Int = conversations.value.size
 }

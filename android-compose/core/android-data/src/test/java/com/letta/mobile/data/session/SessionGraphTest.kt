@@ -101,7 +101,7 @@ class SessionGraphTest {
         assertEquals("local-lettacode:backend-a", graph.backendDescriptor.runtimeId.value)
         assertEquals("Local LettaCode", graph.backendDescriptor.label)
         assertTrue(graph.backendDescriptor.capabilities.supportsMemFs)
-        assertTrue(graph.backendDescriptor.capabilities.supportsTools)
+        assertTrue(graph.backendDescriptor.capabilities.supportsToolExecution)
         assertTrue(graph.channelTransport is NoOpChannelTransport)
 
         val backend = graph.localRuntimeBackend ?: error("Expected local runtime backend")
@@ -149,7 +149,7 @@ class SessionGraphTest {
         assertEquals(BackendKind.LocalKoog, graph.backendDescriptor.kind)
         assertEquals("local-koog:backend-a", graph.backendDescriptor.backendId.value)
         assertEquals("Local Koog runtime", graph.backendDescriptor.label)
-        assertFalse(graph.backendDescriptor.capabilities.supportsTools)
+        assertFalse(graph.backendDescriptor.capabilities.supportsToolExecution)
     }
 
     @Test

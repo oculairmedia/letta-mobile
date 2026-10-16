@@ -114,8 +114,6 @@ data class AppServerDeviceStatusSnapshot(
     val isOnline: Boolean? = null,
 )
 
-typealias DeviceStatusSnapshot = AppServerDeviceStatusSnapshot
-
 val AppServerInboundFrame.UpdateDeviceStatus.snapshot: AppServerDeviceStatusSnapshot
     get() = deviceStatus.toDeviceStatusSnapshot()
 

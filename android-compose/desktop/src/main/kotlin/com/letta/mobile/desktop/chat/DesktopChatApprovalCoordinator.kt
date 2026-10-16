@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.approval.ChatApprovalSubmission
 import com.letta.mobile.data.chat.runtime.AlwaysAllowAnswer
 import com.letta.mobile.data.chat.runtime.ApprovalQueueSource
 import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
+import com.letta.mobile.data.chat.runtime.PendingApprovalSource
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.runtime.PendingApprovalDetails
@@ -72,7 +73,7 @@ internal class DesktopChatApprovalCoordinator(
         bindQueue(gateway)
         detailsJob?.cancel()
         _pendingApprovalDetails.value = emptyMap()
-        val source = gateway as? DesktopPendingApprovalSource ?: return
+        val source = gateway as? PendingApprovalSource ?: return
         detailsJob = scope.launch {
             source.pendingApprovalDetails.collect {
                 _pendingApprovalDetails.value = it

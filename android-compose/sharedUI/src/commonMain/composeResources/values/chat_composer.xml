@@ -63,6 +63,5 @@
     <string name="composer_actions_open">Add to message</string>
     <string name="composer_actions_title">Add to message</string>
     <string name="composer_attach_image">Attach image</string>
-    <string name="composer_restore_chat">Show the reply</string>
     <string name="composer_open_chat">Open the chat</string>
 </resources>

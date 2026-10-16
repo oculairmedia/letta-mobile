@@ -21,9 +21,9 @@ import kotlinx.coroutines.CoroutineScope
  * Hilt-owned transport binder for a session graph generation.
  *
  * Selects Iroh QUIC or NoOp via shared [routedBackendKind] — mode is
- * authoritative over leftover `iroh://` URLs (same policy as desktop). The
- * legacy shim WebSocket transport is gone (g70jb.3): REST/HTTP configs get a
- * [NoOpChannelTransport] and talk to the server over REST only.
+ * authoritative over leftover `iroh://` URLs (same policy as desktop). A
+ * `ws://` (DIRECT_WS, dev/test seam) or local-runtime config gets a
+ * [NoOpChannelTransport].
  */
 @Singleton
 class SessionChannelTransportFactory @Inject constructor(
@@ -85,7 +85,7 @@ class SessionChannelTransportFactory @Inject constructor(
             }
             BackendKind.DIRECT_WS -> {
                 canvasClient?.detach()
-                reportChoice(if (localRuntimeBackend != null) "noop-local" else "noop-rest")
+                reportChoice(if (localRuntimeBackend != null) "noop-local" else "noop-direct-ws")
                 NoOpChannelTransport()
             }
         }

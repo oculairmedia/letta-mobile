@@ -34,7 +34,7 @@
     </queries>
 
     <!-- letta-mobile-g2d2i: CameraX QR scanner for the "scan a pairing code"
-         (client mode) flow. Requested at runtime by QrScanScreen on first
+         flow. Requested at runtime by QrScanScreen on first
          entry; required=false so devices/emulators without a camera (and
          the Root/Sideload flavors that may run on such hardware) still
          install and simply can't use the scan flow. -->

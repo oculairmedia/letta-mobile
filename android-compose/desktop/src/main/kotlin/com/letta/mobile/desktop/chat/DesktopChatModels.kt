@@ -25,7 +25,6 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopBootstrapState
 
 typealias DesktopConversationSummary = ChatConversationSummary
-typealias DesktopConversationGroup = ChatConversationGroup
 typealias DesktopChatConnectionState = ChatConnectionState
 
 @Immutable
@@ -76,7 +75,7 @@ data class DesktopChatSurfaceState(
     val selectedConversation: DesktopConversationSummary?
         get() = conversations.firstOrNull { it.id == selectedConversationId }
 
-    val conversationGroups: List<DesktopConversationGroup>
+    val conversationGroups: List<ChatConversationGroup>
         get() = groupConversationsByAgentName(conversations)
 
     val selectedMessages: List<UiMessage>
