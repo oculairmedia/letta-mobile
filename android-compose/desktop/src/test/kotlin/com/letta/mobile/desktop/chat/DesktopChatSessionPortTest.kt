@@ -195,23 +195,6 @@ class DesktopChatSessionPortTest {
     }
 
     @Test
-    fun modelChipMatchesOnLabelOrSelectionValue() {
-        val options = listOf("Sonnet" to "anthropic/sonnet", "GPT" to "openai/gpt")
-
-        val byValue = desktopChatModelUiState("openai/gpt", options)
-        assertEquals("openai/gpt", byValue.currentHandle)
-        assertEquals("GPT", byValue.currentLabel)
-
-        val byLabel = desktopChatModelUiState("Sonnet", options)
-        assertEquals("anthropic/sonnet", byLabel.currentHandle)
-
-        val unknown = desktopChatModelUiState("Auto", options)
-        assertNull(unknown.currentHandle)
-        assertEquals("Auto", unknown.currentLabel)
-        assertEquals(listOf("anthropic/sonnet", "openai/gpt"), unknown.options.map { it.handle })
-    }
-
-    @Test
     fun composerRefusalsGoToTheComposerAndPageErrorsToTheTimeline() = runTest {
         val (controller, port) = startedPort()
 

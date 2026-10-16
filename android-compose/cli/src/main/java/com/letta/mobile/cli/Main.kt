@@ -25,6 +25,14 @@ import com.letta.mobile.cli.commands.PeerListCommand
 import com.letta.mobile.cli.commands.PeerRenameCommand
 import com.letta.mobile.cli.commands.PeerRevokeCommand
 import com.letta.mobile.cli.commands.PeerSetCapabilitiesCommand
+import com.letta.mobile.cli.swarm.AgentsListCommand
+import com.letta.mobile.cli.swarm.MessagePendingCommand
+import com.letta.mobile.cli.swarm.MessageReadCommand
+import com.letta.mobile.cli.swarm.MessageSendCommand
+import com.letta.mobile.cli.swarm.MessageStatusCommand
+import com.letta.mobile.cli.swarm.SwarmGroupCommand
+import com.letta.mobile.cli.swarm.SwarmPairCommand
+import com.letta.mobile.cli.swarm.SwarmUnpairCommand
 
 class LettaMobileCli : CliktCommand(name = "meridian") {
     override fun run() = Unit
@@ -61,6 +69,12 @@ object Main {
                 AppServerIrohTwoClientProbeCommand(),
                 AppServerIrohDeviceGateCommand(),
                 AppServerSmokeCommand(),
+                // letta-mobile-jvctq: talk to the agent swarm as a paired device.
+                SwarmPairCommand(),
+                SwarmUnpairCommand(),
+                SwarmGroupCommand("agents", "Agents this paired device may message.").subcommands(AgentsListCommand()),
+                SwarmGroupCommand("message", "Message an agent as this paired device, with staged delivery receipts.")
+                    .subcommands(MessageSendCommand(), MessageReadCommand(), MessageStatusCommand(), MessagePendingCommand()),
             )
             .main(args)
     }
@@ -80,6 +94,9 @@ object Main {
           app-server-iroh-probe  Run headless Iroh transport probe scenarios.
           app-server-iroh-device-gate  Assert on-device Iroh live-stream invariants from logcat + /proc/net/tcp.
           app-server-smoke  Send one turn through a running Letta App Server.
+          pair / unpair  Pair this machine as a device with a one-time invite (or forget it).
+          agents list    Agents this paired device may message.
+          message send|read|status|pending  Message an agent over Iroh with staged receipts.
 
         Run with --help on any subcommand for details.
     """.trimIndent()

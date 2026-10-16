@@ -70,10 +70,25 @@ object IrohSecretKeyStores {
                 java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
             )
         }
-        if (posix.isFailure) {
+        // letta-mobile-jvctq: no POSIX permissions (Windows): an ACL granting the owner alone.
+        if (posix.isFailure && runCatching { restrictToOwnerAcl(file.toPath()) }.isFailure) {
             file.setReadable(false, false); file.setReadable(true, true)
             file.setWritable(false, false); file.setWritable(true, true)
             file.setExecutable(false, false)
         }
+    }
+
+    /** Replaces [path]'s ACL with one entry: full control for its owner. Throws where ACLs are unsupported. */
+    fun restrictToOwnerAcl(path: java.nio.file.Path) {
+        val view = requireNotNull(
+            java.nio.file.Files.getFileAttributeView(path, java.nio.file.attribute.AclFileAttributeView::class.java),
+        ) { "no ACL view for $path" }
+        view.acl = listOf(
+            java.nio.file.attribute.AclEntry.newBuilder()
+                .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+                .setPrincipal(view.owner)
+                .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission::class.java))
+                .build(),
+        )
     }
 }

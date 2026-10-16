@@ -222,6 +222,93 @@ Expected output includes:
 Set `APP_SERVER_TEST_TOKEN` or pass `--token` when connecting to a non-loopback
 server that requires bearer auth.
 
+## Messaging the agent swarm as a paired device
+
+`pair`, `agents list` and `message send|read|status|pending` let a script on this machine (the
+orchestrator) talk to an agent such as `PM-letta-mobile` over Iroh as a **paired device**: no
+SSH, no API key, no admin token. The device authenticates by its Iroh key; what it may do is the
+grant of the invite it redeemed. Sends run a turn through the shared App Server client and turn
+stack (`SwarmMessenger` in sharedLogic), with staged receipts.
+
+### Install once (Windows)
+
+```powershell
+cd android-compose
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26.0.1.8-hotspot"   # any JDK 21+
+.\gradlew.bat --no-daemon :cli:installDist
+```
+
+Then run `android-compose\cli\meridian.cmd <command>` (a shim for
+`cli\build\install\meridian\bin\meridian.bat`; it needs `JAVA_HOME` or `java` on `PATH`).
+Re-run `installDist` after pulling changes.
+
+### Pair once
+
+1. Create a **least-privilege** invite for this device: role `chat`, scoped to the agents it
+   needs, short-lived. In the Meridian app use the pairing screen (its default grant is chat;
+   limit it to PM-letta-mobile), or with an admin connection to the host:
+
+   ```powershell
+   meridian.cmd peer invite --ticket <host> --auth-token <admin-token> --name orchestrator-cli --role chat --agents <pm-agent-id> --ttl-ms 900000
+   ```
+
+   The invite's `pair_link` is a one-time bearer secret: do not paste it into logs or chats.
+   `chat` lets the device read and send chat and create conversations for the scoped agents; it
+   cannot administer the host. The CLI never answers a tool approval (see below).
+2. Redeem it, reading the invite from stdin so it never lands in shell history:
+
+   ```powershell
+   Get-Clipboard | android-compose\cli\meridian.cmd pair --invite - --yes
+   ```
+
+   Without `--yes` (and with `--invite <link>`) the CLI shows the host id and asks before
+   dialling; compare it with the inviting screen. `--name` sets the device label
+   (default `orchestrator-cli`).
+
+The device key, the paired host and the outbox live in `%APPDATA%\Meridian\cli` (or
+`~/.letta/meridian-cli`; override with `--profile-dir` / `MERIDIAN_CLI_HOME`), readable by the
+current user only (owner-only ACL on Windows, 0600/0700 elsewhere). The key is never printed.
+`meridian.cmd unpair` deletes them and prints the device node id: revoke it on the host too
+(app paired-devices screen, or `meridian peer revoke --node-id <id> --ticket <host>`).
+
+### Message
+
+```powershell
+meridian.cmd agents list
+meridian.cmd message send --agent PM-letta-mobile --from orchestrator --text "Status of the hard-cut slices?"
+meridian.cmd message send --agent PM-letta-mobile --conversation <conversation-id> --stdin --output json < note.md
+meridian.cmd message read --agent PM-letta-mobile --conversation <conversation-id> --since <message-id>
+meridian.cmd message status --agent PM-letta-mobile --conversation <conversation-id> --message-id <client-or-server-id>
+meridian.cmd message pending
+```
+
+- Without `--conversation`, a send creates a **new dedicated conversation** for its message (the
+  default for orchestrator traffic, so it never takes over a conversation a person is in); reuse
+  the printed conversation id to continue a thread.
+- `--from` adds a first line `[from: <label> (self-declared, via meridian cli)]`. It is display
+  only and not an identity; the host-stamped sender is a separate host change (letta-mobile-vqyr2).
+  `message read` shows the host's `sender_id` when the history carries one.
+- Receipts, in order: `connected` (dialled, device accepted, agent and conversation in scope),
+  `accepted` (`started`, or `queued` when the agent is busy; not a failure), `persisted` (the
+  server message id, read back once), `processed` (the turn's terminal and the stored reply).
+  `--wait accepted|persisted` returns early; check later with `message status` / `message read`.
+  `--output json` prints one JSON object per event, tool calls and approvals included.
+- Every send is written to the outbox before anything is dialled. The client message id
+  (`--client-message-id`, printed on `connected`) is the idempotency key: re-running the same send
+  with the same id retries a message that never left, and otherwise resumes it from the history;
+  it is never sent twice. A dropped link mid-turn reconnects and resumes the same way; the host turn
+  is never aborted, not on timeout either.
+- Tool approvals are never answered by the CLI: a turn that needs one exits `32` and stays parked
+  for the person in the Meridian app.
+
+Exit codes: `0` ok · `1` usage · `10` not paired · `11` device refused (revoked) · `12` host
+unreachable · `13` agent not found / out of scope · `14` ambiguous agent name · `15` conversation
+not found or not the agent's · `16` host error · `20` message rejected · `21` timed out · `22`
+unconfirmed after a dropped link · `23` outbox entry expired · `24` client id reused for another
+message · `30` turn failed · `31` turn cancelled · `32` needs approval · `33` reply read from
+history, terminal not observed · `40`-`47` pairing (invalid, expired, unreachable, host mismatch,
+refused, save failed, already paired, declined).
+
 ## Fixture workflow
 
 1. Start from an existing JSONL recording (the shim-WS `capture`/`record`
