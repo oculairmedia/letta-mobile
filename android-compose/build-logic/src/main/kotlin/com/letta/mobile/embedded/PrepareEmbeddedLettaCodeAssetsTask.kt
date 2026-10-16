@@ -183,6 +183,7 @@ abstract class PrepareEmbeddedLettaCodeAssetsTask @Inject constructor(
             // regjs*/unicode-* data) IS shipped: runtime/regexp-polyfill.cjs needs it for dynamically
             // constructed patterns that the static babel pass cannot reach.
             exclude("@babel/**", ".bin/**", "@jridgewell/**", "browserslist/**", "caniuse-lite/**", "electron-to-chromium/**")
+            exclude(HOST_ONLY_NODE_MODULES)
         }
     }
 
@@ -255,4 +256,27 @@ internal val LETTA_JS_PATCHES: List<LettaJsPatch> = listOf(
     LettaJsPatch.ToolGroups,
     LettaJsPatch.CopyShimModules,
     LettaJsPatch.Script("patch-runtime-introspection.mjs", "Failed to patch letta.js runtime-introspection turn boundary."),
+)
+
+/**
+ * node_modules content that can never load under nodejs-mobile (process.platform == "android",
+ * bionic libc), so shipping it only inflates the release APK (~31 MB compressed in v0.23.1):
+ *  - node-pty's Windows/macOS prebuilds and its Windows-only conpty/winpty sources; there is no
+ *    android prebuild, so node-pty resolves nothing on device either way.
+ *  - sharp's glibc/musl linux-x64 binaries: sharp looks up `@img/sharp-android-<arch>`, misses,
+ *    and falls back to `@img/sharp-wasm32`, which IS kept (see installSharpWasm).
+ *  - TypeScript declaration files, which the runtime never requires.
+ */
+internal val HOST_ONLY_NODE_MODULES: List<String> = listOf(
+    "node-pty/prebuilds/win32-*/**",
+    "node-pty/prebuilds/darwin-*/**",
+    "node-pty/third_party/conpty/**",
+    "node-pty/deps/winpty/**",
+    "@img/sharp-libvips-linux-*/**",
+    "@img/sharp-libvips-linuxmusl-*/**",
+    "@img/sharp-linux-*/**",
+    "@img/sharp-linuxmusl-*/**",
+    "**/*.d.ts",
+    "**/*.d.mts",
+    "**/*.d.cts",
 )
