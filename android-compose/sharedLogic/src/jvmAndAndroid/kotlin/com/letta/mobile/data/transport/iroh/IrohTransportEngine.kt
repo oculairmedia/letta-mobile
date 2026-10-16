@@ -6,8 +6,9 @@ import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.RuntimeSessionLink
 import com.letta.mobile.data.controller.reconnect.reattachRuntimes
 import com.letta.mobile.data.runtime.AppServerTurnEngine
-import com.letta.mobile.data.runtime.answerApprovalReplaysFrom
+import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.carryActiveLeasesInto
+import com.letta.mobile.data.runtime.turnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -128,14 +129,15 @@ internal class IrohTransportEngine(
         externalTools = externalToolRegistry?.advertisedToolsCommandGroups(audience = ToolAudience(runtime.agentId)),
     )
 
-    private fun buildEngine(info: AppServerRuntimeStartClientInfo): AppServerTurnEngine = AppServerTurnEngine(
-        client = client,
-        clientInfo = info.also { clientInfo = it },
-        permissionMode = PERMISSION_MODE,
-        eventRouter = router,
-        connectionGenerationProvider = { client.generation },
-        externalToolRegistry = externalToolRegistry,
-    ).also { it.answerApprovalReplaysFrom(router, scope) }
+    private fun buildEngine(info: AppServerRuntimeStartClientInfo): AppServerTurnEngine = router.turnEngine(
+        client,
+        scope,
+        AppServerTurnStackSpec(
+            clientInfo = info.also { clientInfo = it },
+            permissionMode = PERMISSION_MODE,
+            externalToolRegistry = externalToolRegistry,
+        ),
+    )
 
     private companion object {
         val PERMISSION_MODE = AppServerPermissionMode.Unrestricted
