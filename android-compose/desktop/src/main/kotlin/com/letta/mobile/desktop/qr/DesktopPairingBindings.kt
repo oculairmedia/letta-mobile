@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.iroh.IrohPairingRedeemer
 import com.letta.mobile.desktop.DesktopAgentFocus
 import com.letta.mobile.desktop.DesktopDestination
 import com.letta.mobile.desktop.DesktopShellContext
+import com.letta.mobile.desktop.selectedDestination
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.qr.ZxingQrEncoder

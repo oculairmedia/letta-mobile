@@ -20,6 +20,7 @@ import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
@@ -42,6 +43,11 @@ import com.letta.mobile.ui.chat.session.CoordinatorSendQueue
 import com.letta.mobile.ui.chat.session.DerivedStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryState
+import com.letta.mobile.ui.chat.session.ConversationModelBackend
+import com.letta.mobile.ui.chat.session.ConversationModelFocus
+import com.letta.mobile.ui.chat.session.ConversationModelHost
+import com.letta.mobile.ui.chat.session.ConversationModelUpdate
+import com.letta.mobile.ui.chat.session.ConversationModels
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
@@ -318,15 +324,16 @@ class DesktopChatController(
      * letta-mobile-by4vm.98.1: the chat's models (list, per-conversation picks and efforts, the
      * switch) and the composer's model chip, the shared extension point the session port reads.
      */
-    val models = DesktopConversationModels(scope, ModelHost(), agentByIdProvider)
+    val models = ConversationModels(scope, ModelHost(), agentByIdProvider)
 
-    private inner class ModelHost : DesktopModelHost {
-        override val gateway: DesktopChatGateway? get() = this@DesktopChatController.gateway
+    private inner class ModelHost : ConversationModelHost {
+        override val backend: ConversationModelBackend? get() = ConversationModelBackend.of(gateway)
         override val isClosed: Boolean get() = closed
-        override val surface: StateFlow<DesktopChatSurfaceState> get() = state
-        override val management: DesktopConversationManagement get() = conversationManagement
+        override val focus: StateFlow<ConversationModelFocus> = DerivedStateFlow(state.map(::modelFocusOf)) { modelFocusOf(state.value) }
 
-        override fun updateSurface(transform: (DesktopChatSurfaceState) -> DesktopChatSurfaceState) = _state.update(transform)
+        override fun showModel(update: ConversationModelUpdate) = _state.update { it.withModelUpdate(update) }
+
+        override suspend fun recordModel(model: String) = conversationManagement.recordModel(model)
     }
 
     private val connectionWatcher = DesktopChatConnectionWatcher(
@@ -686,8 +693,9 @@ class DesktopChatController(
      */
     suspend fun createAgentAndOpen(params: AgentCreateParams): com.letta.mobile.data.agenteditor.AgentCreated {
         val gw = gatewayExtras.takeUnless { closed } ?: error("Not connected to a backend")
+        val backend = ConversationModelBackend.of(gateway) ?: error("Not connected to a backend")
         val agentName = params.name?.ifBlank { null } ?: "New agent"
-        val catalogModel = params.model?.let { models.catalogLoader.requireCatalogModel(gw, models.available.value, it) }
+        val catalogModel = params.model?.let { models.catalogLoader.requireCatalogModel(backend, models.available.value, it) }
         val agent = gw.createAgent(
             params.copy(
                 name = agentName,
@@ -771,19 +779,6 @@ class DesktopChatController(
                 if (replace) item.copy(title = title.value) else item
             }
             current.withRuntimeState(current.runtimeState.copy(conversations = conversations))
-        }
-    }
-
-    private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
-        scope.launch {
-            val agentLookup = models.picks[conversationId] == null && !agentId.isNullOrBlank()
-            val agentModel = agentId.takeIf { agentLookup }?.let { id -> runCatching { agentByIdProvider(setOf(id)) }.getOrNull()?.get(id)?.model }
-            // letta-mobile-okvyf: read the override AFTER the agent lookup, so a pick
-            // made while the lookup was in flight is not overwritten by the agent model.
-            val label = models.picks.effectiveModel(conversationId, agentModel) ?: "Auto"
-            if (!closed && _state.value.selectedConversationId == conversationId) {
-                _state.update { it.copy(composerModelLabel = label) }
-            }
         }
     }
 
@@ -1059,7 +1054,7 @@ class DesktopChatController(
             val nextGateway = gatewayFactory()
             bindGateway(nextGateway)
 
-            gatewayExtras?.let(models.catalogLoader::startModelCatalogLoad)
+            ConversationModelBackend.of(nextGateway)?.let(models::load)
 
             reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
@@ -1224,7 +1219,7 @@ class DesktopChatController(
         val nextGateway = gateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
 
-        applyComposerModelLabel(conversationId, conversation.agentId)
+        models.showModelOf(ConversationId(conversationId), conversation.agentId?.let(::AgentId))
 
         timelineJob?.cancel()
         closeActiveLoopAsync()

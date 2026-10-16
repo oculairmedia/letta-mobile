@@ -6,7 +6,6 @@
     <ID>TooGenericExceptionCaught:FileSystemAccess.kt$WebWorkspaceController$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohWasmAppServerTransport.kt$IrohWasmAppServerTransport$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:IrohWasmBridge.kt$IrohWasmBridge.Companion$failure: Throwable</ID>
-    <ID>TooGenericExceptionCaught:LettaWebApp.kt$failure: Throwable</ID>
     <ID>TooGenericExceptionCaught:WasmAppServerClientGateway.kt$WasmAppServerClientGateway$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:WasmAppServerSession.kt$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:WebChatLoad.kt$failure: Exception</ID>

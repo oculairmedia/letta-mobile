@@ -1,12 +1,17 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.chat.runtime.EnginePermissionModes
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
+import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
-import com.letta.mobile.data.runtime.AppServerTurnStackSpec
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.RuntimePermissionDefaults
+import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -21,6 +26,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
@@ -43,6 +49,10 @@ internal class WasmAppServerSession(
     val label: String,
     private val scope: CoroutineScope,
     private val closeTransport: suspend () -> Unit,
+    /** The session's own App Server reads and writes (models, a conversation's record), as desktop's gateway makes them. */
+    val appServerAdmin: AppServerLocalAdminGateway,
+    /** letta-mobile-ckmub.17.2: the composer's mode chip; null over Iroh, whose host sets its own mode (as on desktop). */
+    val permissionModes: PermissionModeGateway? = null,
 ) {
     val conversationByAgent = mutableMapOf<String, String>()
     private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
@@ -132,23 +142,24 @@ internal suspend fun connectWasmAppServerSession(
     val isConnected: Flow<Boolean>
     val failureReason: () -> String?
     val closeTransport: suspend () -> Unit
-    if (isIrohBackendUrl(config.serverUrl)) {
+    val iroh = isIrohBackendUrl(config.serverUrl)
+    if (iroh) {
         // letta-mobile-ckmub.8: read the address here (a ticket, a short URL or a bare id) so a bad one
         // fails with a message that says what is expected, and the browser binding only ever gets
         // the endpoint id it can dial (through the relay; direct UDP is not available in a browser).
         val address = IrohServerAddress.parse(config.serverUrl)
-        val iroh = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
+        val irohTransport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
         try {
-            bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { iroh.isConnected.first { it } }
+            bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { irohTransport.isConnected.first { it } }
         } catch (error: Throwable) {
-            withContext(NonCancellable) { iroh.close() }
+            withContext(NonCancellable) { irohTransport.close() }
             throw error
         }
         label = "Iroh"
-        client = DefaultAppServerClient(iroh, parentScope = scope)
-        isConnected = iroh.isConnected
-        failureReason = { iroh.failureReason.value }
-        closeTransport = iroh::close
+        client = DefaultAppServerClient(irohTransport, parentScope = scope)
+        isConnected = irohTransport.isConnected
+        failureReason = { irohTransport.failureReason.value }
+        closeTransport = irohTransport::close
     } else {
         // letta-mobile-by4vm.110.6: the ws:// open desktop and Android share; it fails at once with
         // the socket's reason instead of waiting out the timeout.
@@ -166,15 +177,24 @@ internal suspend fun connectWasmAppServerSession(
     var router: AppServerRuntimeEventRouter? = null
     try {
         val eventRouter = AppServerRuntimeEventRouter().also { router = it }
+        // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
+        val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeUnless { iroh }
+        val engine = eventRouter.attachTurnStack(
+            client,
+            scope,
+            permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
+        )
         return WasmAppServerSession(
             client = client,
-            engine = eventRouter.attachTurnStack(client, scope, AppServerTurnStackSpec(requestIdFactory = { nextRequestId("turn") })),
+            engine = engine,
             router = eventRouter,
             isConnected = isConnected,
             failureReason = failureReason,
             label = label,
             scope = scope,
             closeTransport = closeTransport,
+            appServerAdmin = AppServerLocalAdminGateway(client, nextRequestId),
+            permissionModes = modes?.let { EnginePermissionModes(engine, it) },
         )
     } catch (error: Throwable) {
         withContext(NonCancellable) {
