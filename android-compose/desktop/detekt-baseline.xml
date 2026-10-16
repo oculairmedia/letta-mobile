@@ -3,7 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>ComplexCondition:DesktopConfirmedTimelineStore.kt$DesktopConfirmedTimelineStore.ImageBodyRetention$pointer.thumbnailBase64 == null &amp;&amp; pointer.bodyReference == null &amp;&amp; old?.bodyReference != null &amp;&amp; old.mediaType == pointer.mediaType &amp;&amp; old.byteSize == pointer.byteSize</ID>
-    <ID>CyclomaticComplexMethod:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$suspend fun commit(files: DesktopIndexedTimelineFiles)</ID>
     <ID>CyclomaticComplexMethod:RiveDesktopSpike.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MascotBench(file: File, modifier: Modifier)</ID>
     <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_advance(bridge: Pointer, seconds: Float)</ID>
     <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_artboard_height(bridge: Pointer): Float</ID>
@@ -29,9 +28,7 @@
     <ID>LongMethod:DesktopAppServerChatGateway.kt$DesktopAppServerChatGateway$override suspend fun sendConversationMessage( conversationId: ConversationId, request: MessageCreateRequest, ): Flow&lt;LettaMessage&gt;</ID>
     <ID>LongMethod:DesktopChatController.kt$DesktopChatController$private suspend fun selectRemoteConversation(conversationId: String, generation: Long)</ID>
     <ID>LongMethod:DesktopChatModels.kt$private fun sampleDesktopMessagesByConversation(): Map&lt;String, List&lt;UiMessage&gt;&gt;</ID>
-    <ID>LongMethod:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$fun publish( entries: Sequence&lt;Entry&gt;, prepareGeneration: (String) -&gt; Unit = {}, reuse: Snapshot? = null, checkpoint: () -&gt; Unit = {}, ): Snapshot</ID>
     <ID>LongMethod:DesktopJewelWindow.kt$@Composable internal fun DesktopJewelWindow( title: String, state: WindowState, onCloseRequest: () -&gt; Unit, header: DesktopHeaderChromeState = DesktopHeaderChromeState.Empty, content: @Composable AwtDecoratedWindowScope.() -&gt; Unit, )</ID>
-    <ID>LongMethod:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$suspend fun commit(files: DesktopIndexedTimelineFiles)</ID>
     <ID>LongMethod:Main.kt$@OptIn(ExperimentalComposeUiApi::class) private fun runDesktopApplication( args: Array&lt;String&gt;, activationHandler: DesktopWindowActivationHandler, )</ID>
     <ID>LongMethod:RiveDesktopSpike.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MascotBench(file: File, modifier: Modifier)</ID>
     <ID>LongMethod:ShaderLookdevMain.kt$@Composable private fun ControlsColumn(state: LookdevState)</ID>
@@ -159,7 +156,6 @@
     <ID>MaxLineLength:RiveDesktopSpike.kt$val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }</ID>
     <ID>MaxLineLength:TabletPen.kt$TabletPen$"TABLET: finger down contact=${sample.contact} fingersDown=${touchContacts.size} at=(${sample.x},${sample.y}) scale=$scale"</ID>
     <ID>MaxLineLength:TabletPen.kt$TabletPen$"TABLET: pen stroke tool=$toolName pressure=${sample.force} at=(${sample.x},${sample.y}) cursor=($cursorX,$cursorY) canvas=$canvas"</ID>
-    <ID>NestedBlockDepth:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$fun publish( entries: Sequence&lt;Entry&gt;, prepareGeneration: (String) -&gt; Unit = {}, reuse: Snapshot? = null, checkpoint: () -&gt; Unit = {}, ): Snapshot</ID>
     <ID>NestedBlockDepth:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage</ID>
     <ID>NewLineAtEndOfFile:CanvasWorkspaceUiTest.kt$com.letta.mobile.desktop.canvas.CanvasWorkspaceUiTest.kt</ID>
     <ID>NewLineAtEndOfFile:DesktopJewelWindow.kt$com.letta.mobile.desktop.DesktopJewelWindow.kt</ID>
@@ -186,7 +182,6 @@
     <ID>TooGenericExceptionCaught:DesktopChatRemoteSender.kt$DesktopChatRemoteSender$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopConversationModels.kt$DesktopConversationModels$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopDirectAppServerSession.kt$DesktopDirectAppServerSession.Companion$error: Throwable</ID>
-    <ID>TooGenericExceptionCaught:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$error: Exception</ID>
     <ID>TooGenericExceptionCaught:DesktopIrohAgentResolve.kt$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopIrohGenerations.kt$DesktopIrohGenerationMinter$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:DesktopLocalRuntimeManager.kt$DesktopLocalRuntimeManager$error: Throwable</ID>
@@ -218,7 +213,6 @@
     <ID>UnusedImports:DesktopChatShellHelpers.kt$import androidx.compose.runtime.LaunchedEffect</ID>
     <ID>UnusedImports:DesktopChatShellHelpers.kt$import androidx.compose.runtime.mutableStateOf</ID>
     <ID>UnusedImports:DesktopChatShellHelpers.kt$import com.letta.mobile.data.repository.api.IAgentRepository</ID>
-    <ID>UnusedImports:DesktopIndexedTimelineFiles.kt$import java.nio.file.StandardOpenOption.READ</ID>
     <ID>UnusedImports:DesktopJewelWindow.kt$import androidx.compose.runtime.DisposableEffect</ID>
     <ID>UnusedImports:DesktopSidebarChrome.kt$import androidx.compose.ui.unit.dp</ID>
     <ID>UnusedImports:Main.kt$import androidx.compose.foundation.layout.Box</ID>
