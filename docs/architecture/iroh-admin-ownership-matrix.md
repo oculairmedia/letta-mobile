@@ -72,9 +72,10 @@ approval.submit shim-fallback removal at cutover.
   0.29.12. `skill.list` serves an authoritative enumeration or reports
   `capability_unavailable` / `hydrated=false`; it never fabricates one. Since
   2026-08-01 that enumeration exists: `HostSkillsEnumerator` reads the letta-code
-  skills root (`--skills-dir` / `LETTA_SKILLS_DIR`, default `~/.letta/skills`; one
-  directory per skill, each with a `SKILL.md`) at startup and hydrates the catalog
-  through `NativeSkillsCatalog.hydrateFromHost` (`letta-mobile-7dm1q`).
+  skills root (`--skills-dir` / `LETTA_SKILLS_DIR`, default letta-code's own
+  `<LETTA_HOME>/skills`; one directory per skill, each with a `SKILL.md`) and
+  hydrates the catalog (`letta-mobile-7dm1q`); since skills-honest-controls it
+  re-reads that root on every `skill.list`. See "Skill controls" below.
   `skill.list_agent` no longer denies. That denial was reversed on live evidence:
   the desktop Skills surface issues `listSkills()` **and** `listAgentSkills(agentId)`
   in one snapshot load, so the typed capability error threw out of the loader and
@@ -85,6 +86,34 @@ approval.submit shim-fallback removal at cutover.
   served with an explicit `process_global: true` so a client can tell availability
   from assignment, and that flips false when upstream grows real per-agent
   assignment.
+- **Skill controls follow stock letta-code (2026-10-16, skills-honest-controls).**
+  letta-code's `skill_disable {name}` only unlinks a SYMLINK at
+  `<LETTA_HOME>/skills/<name>` (it refuses a real folder: "is not a symlink —
+  refusing to delete"), and `skill_enable {skill_path}` creates that symlink.
+  Nothing on the wire turns off a bundled, agent-memory or project skill. So every
+  `skill.list` entry carries `source` (`global` / `bundled` / `agent` / `project`)
+  and an explicit `controllable`, true only for a symlink directly in the control
+  root (`LETTA_HOME`, else `~/.letta`, plus `skills`; an enumerated root that is
+  not that directory is entirely read-only). The Skills page shows a toggle only
+  for controllable skills and a plain source label, with a one-line hint, for the
+  rest; a missing flag decodes as read-only. Skills the App Server advertises in
+  `device_status.current_available_skills` (populated from letta-code 0.34) are
+  merged in read-only; they no longer replace the host enumeration — that
+  replacement dropped every controllability flag, so the client defaulted all 92
+  skills to removable and the toggle could only fail. `skill.uninstall` of a
+  listed read-only skill is refused by the wrapper with `read_only: …`.
+  Known upstream caveat: on Node (22, as the live App Server runs) letta-code's
+  skills cache is invalidated by a recursive `fs.watch` that misses a symlink
+  being removed or added at the root, so an agent keeps seeing a just-disabled
+  skill until the App Server restarts; under Bun it updates immediately.
+  *Optional, this host only:* a host whose `~/.letta/skills` is one directory
+  link into a checkout (here `-> /opt/skills`) has only real folders, so all its
+  global skills are read-only. `scripts/deploy/skills-library-layout.sh` (dry run
+  by default, `--apply`, `--rollback`) makes them individually controllable by
+  turning the skills folder into a real directory of per-skill links into the
+  checkout, keeping the old link at `skills.pre-library-layout` for rollback; the
+  wrapper's `--skills-dir` must then name `~/.letta/skills` (the control root),
+  and the App Server should be restarted. The product never requires it.
 - **The store tier must be wired explicitly (2026-08-01).** `local_backend_store`
   owns six read-only methods, but the wrapper deployment template forbids
   inheriting `LETTA_LOCAL_BACKEND_DIR` from `appserver.env`. After the cutover the
@@ -97,9 +126,9 @@ approval.submit shim-fallback removal at cutover.
   measured 1447 blocks / ~1.83 MB on the live host — larger than
   `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB), so even once wired the
   response could not be delivered. The store tier honours `limit`/`offset`
-  (default 50, max 200) over a deterministic flat index, and answers
-  `{blocks, total, offset, limit, has_more}` when it windows; a bare array still
-  means "this is the complete set", which keeps older clients working.
+  (default 50, max 200) over a deterministic flat index, and always answers
+  `{blocks, total, offset, limit, has_more}` (the bare-array "complete set" shape
+  for older clients was removed in by4vm.111; `block.list_agent` matches).
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.
@@ -119,9 +148,10 @@ approval.submit shim-fallback removal at cutover.
   `accessToken`/`syncAccessToken` — in **cleartext**, so these frames stay
   controller-internal, are never fanned out to viewers, and are never logged. Any
   VIEWER-facing channel surface still needs the lgns8.12 sensitive-capability
-  policy. Ships OFF (`--channels-host` / `LETTA_CHANNELS_HOST`); lettashim remains
-  the host until the maintenance-window cutover documented in the retirement
-  runbook — running both double-starts accounts.
+  policy. Always on since the 2026-08-01 cutover (the `--channels-host` flag was
+  removed by4vm.111): every wrapper is the channels host for the App Server it
+  wraps, so never point two wrappers at one App Server — the second re-wires
+  channel ingress to its own socket.
 
 ## Scope revisions for .7/.8/.9
 

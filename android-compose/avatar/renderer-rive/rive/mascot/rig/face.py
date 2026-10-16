@@ -19,11 +19,14 @@ from rig.body import fill, rrect
 from rig.chart import Chart, Pen
 from rig.constants import JX, LEAN_BASE, PLATE_WHITE, TUNABLES, TURN_ARC, TURN_LEAN_DEG, rad
 from rig.ids import (
-    ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LOOK, CONV_MOUTH, CONV_TURN_ROT, CONV_TURN_X,
-    CONV_TURN_Y, FACE, HOST_TURN, JOYSTICK, LEAN_NODE, PLATE, PLATE_AB, PLATE_AUTO_X, PLATE_AUTO_Y,
-    PLATE_BLINK, PLATE_EXPR, PLATE_IN_BLINK, PLATE_IN_EXPR, PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN,
-    PLATE_SM, TRAIL1, TRAIL2, TURN_NODE, TURN_X_ANIM, TURN_Y_ANIM, VM_TURN_X, VM_TURN_Y,
+    ARC_NODE, AUTO_X, AUTO_Y, BODY_NODE, CONV_LISTEN_SCALE, CONV_LISTEN_Y, CONV_LOOK, CONV_MOUTH,
+    CONV_TURN_ROT, CONV_TURN_X, CONV_TURN_Y, FACE, HOST_TURN, JOYSTICK, LEAN_NODE, LISTEN_NODE,
+    PEEK_NODE, PLATE, PLATE_AB, PLATE_AUTO_X, PLATE_AUTO_Y, PLATE_BLINK, PLATE_EXPR, PLATE_IN_BLINK,
+    PLATE_IN_EXPR, PLATE_LOOKX, PLATE_LOOKY, PLATE_OPEN, PLATE_SM, TRAIL1, TRAIL2, TURN_NODE,
+    TURN_X_ANIM, TURN_Y_ANIM, VM_NEW, VM_TURN_X, VM_TURN_Y,
 )
+
+VM_LISTEN = VM_NEW["listenLevel"]
 
 
 # ================================================================================================
@@ -53,13 +56,20 @@ def face():
     """The face assembly: the placement chain, the nested Plate with its inputs and remaps, trails."""
     # FacePlacement > Turn (keyed only by the joystick's TurnX/TurnY) > Face (keyed by state motion).
     # Trails are declared after Turn so they draw underneath the plate.
+    # te3n1.5: Listen (bound to listenLevel: the face lifts and leans in) sits above HostTurn, and
+    # Peek (keyed by the React layer only: the plate ducks, nods, glances down) between Arc and Face.
     return f'''<Node x="0" y="{-8 - LEAN_BASE}" name="FacePlacement">
+<Node x="0" y="0" name="Listen" id="{LISTEN_NODE}">
+    {bind(VM_LISTEN, Y, CONV_LISTEN_Y)}
+    {bind(VM_LISTEN, SX, CONV_LISTEN_SCALE)}
+    {bind(VM_LISTEN, SY, CONV_LISTEN_SCALE)}
 <Node x="0" y="0" name="HostTurn" id="{HOST_TURN}">
     {bind(VM_TURN_X, X, CONV_TURN_X)}
     {bind(VM_TURN_X, ROT, CONV_TURN_ROT)}
     {bind(VM_TURN_Y, Y, CONV_TURN_Y)}
 <Node x="0" y="0" name="Turn" id="{TURN_NODE}">
 <Node x="0" y="0" name="Arc" id="{ARC_NODE}">
+<Node x="0" y="0" name="Peek" id="{PEEK_NODE}">
 <Node x="0" y="0" name="Face" id="{FACE}">
     <NestedArtboard artboardId="{PLATE_AB}" x="-100" y="-108" name="Plate" id="{PLATE}">
         <NestedStateMachine animationId="{PLATE_SM}" name="SM">
@@ -83,8 +93,10 @@ def face():
 </Node>
 </Node>
 </Node>
+</Node>
 {indent(trail("Trail1", TRAIL1), "")}
 {indent(trail("Trail2", TRAIL2), "")}
+</Node>
 </Node>'''
 
 

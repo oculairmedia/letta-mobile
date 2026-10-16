@@ -41,13 +41,9 @@ android-compose/appserver-cli/src/main/kotlin/com/letta/mobile/appservercli/AppS
 android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohDeviceGateCommand.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohProbeCommand.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/commands/PeerCommands.kt
-android-compose/cli/src/main/java/com/letta/mobile/cli/commands/ProfileCommands.kt
-android-compose/cli/src/main/java/com/letta/mobile/cli/commands/StreamCommand.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/commands/TwoClientProbeReport.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/probe/ProbeStubStore.kt
-android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliRestTransport.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliRuntime.kt
-android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/CliSetup.kt
 android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/ReplayInteractiveShell.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/AgentEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpEntity.kt

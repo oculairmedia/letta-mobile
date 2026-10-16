@@ -1,11 +1,5 @@
 package com.letta.mobile.data.transport
 
-sealed interface A2uiActionDispatchResult {
-    data class Sent(val frameId: String) : A2uiActionDispatchResult
-    data class Queued(val frameId: String) : A2uiActionDispatchResult
-    data object Failed : A2uiActionDispatchResult
-}
-
 sealed interface ChannelTransportState {
     data object Idle : ChannelTransportState
     data class Connecting(

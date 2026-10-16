@@ -43,7 +43,6 @@ class AdminChatComposerCoordinatorStopAbortTest {
     private lateinit var bannerController: ChatBannerController
     private lateinit var coordinator: AdminChatComposerCoordinator
 
-    private val noopClearThinking: () -> Unit = {}
 
     @Before
     fun setup() {
@@ -90,7 +89,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     fun `stop holds streaming and cancelling visible until the terminal frame`() {
         beginStreamingTurn()
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
 
         // No optimistic clear: the server turn is still running, so the UI must
         // still read as busy, now explicitly "cancelling".
@@ -113,7 +112,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `send is rejected while a stop is pending so frames cannot interleave`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
 
         // A frame lands between Stop and the terminal — the turn is still alive.
@@ -135,7 +134,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `send is accepted again once the terminal frame settles the cancelled turn`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         deliverTerminalFrame()
         testScope.runCurrent()
@@ -149,11 +148,11 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `second stop press force clears locally as the escape hatch`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         assertTrue(uiState.value.isStreaming)
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
 
         assertFalse("second stop press force-clears the local UI", uiState.value.isStreaming)
         assertFalse(uiState.value.isCancelling)
@@ -163,7 +162,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     @Test
     fun `late frames after the cancelled turn's terminal do not reopen streaming`() {
         beginStreamingTurn()
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
         deliverTerminalFrame()
         testScope.runCurrent()
@@ -182,7 +181,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
         beginStreamingTurn()
         coEvery { messageRepository.cancelMessage(any<AgentId>(), any<List<String>>()) } throws IllegalStateException("socket down")
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         assertTrue(uiState.value.isCancellingRun)
         testScope.runCurrent()
 
@@ -194,7 +193,7 @@ class AdminChatComposerCoordinatorStopAbortTest {
     fun `stop is a no-op when nothing is streaming`() {
         uiState.value = ChatUiState(isStreaming = false)
 
-        coordinator.interruptRun(noopClearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
 
         assertFalse(uiState.value.isCancelling)

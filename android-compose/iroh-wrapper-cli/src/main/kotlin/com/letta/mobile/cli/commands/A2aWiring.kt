@@ -1,6 +1,5 @@
 package com.letta.mobile.cli.commands
 
-import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
@@ -20,17 +19,11 @@ import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import com.letta.mobile.data.transport.iroh.IrohAgentMessageReceiver
+import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.util.Telemetry
-import computer.iroh.Endpoint
-import computer.iroh.EndpointOptions
-import computer.iroh.RelayMode
-import computer.iroh.SecretKey
-import kotlinx.coroutines.CoroutineScope
+import computer.iroh.EndpointAddr
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -44,45 +37,23 @@ import java.util.UUID
  * letta-mobile-bn008.6: production wiring for the a2a (direct agent-to-agent)
  * receiver on the live wrapper.
  *
- * Layer-1: a SECOND [Endpoint] bound to the a2a ALPN, co-located with the
- * wrapper's app-server endpoint. Re-uses the wrapper's stable host identity
- * (the same Ed25519 secret-key file) so the node id matches across both
- * endpoints — demux is by `IrohAgentMessage.toAgentId`, not by node id. This
- * avoids widening blast radius (no router changes, no dual-ALPN accept-loop
- * discrimination) at the cost of one extra bound UDP socket.
+ * letta-mobile-by4vm.112: the [receiver] is an
+ * [com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler] the wrapper
+ * registers on its ONE host [com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint],
+ * which demultiplexes `/letta/a2a/0` next to the App Server, canvas and notebook ALPNs.
+ * The wiring used to bind a SECOND endpoint with the same secret key; the relay keeps
+ * one registration per node id (the newest), so relay-routed App Server dials landed
+ * on the a2a-only twin and failed TLS with `no_application_protocol`.
  *
- * Build via [buildA2aWiring] (headless / testable). The receiver is started
- * by [A2aWiring.start].
+ * Build via [buildA2aWiring] before the host endpoint (its ALPNs are fixed at bind),
+ * then [publishHost] the bound endpoint's address.
  */
 class A2aWiring internal constructor(
-    val endpoint: Endpoint,
     val receiver: IrohAgentMessageReceiver,
     val router: IrohAgentMessageRouter,
     val addressStore: HostEndpointAddressStore,
     val identityDir: File,
-    /**
-     * M2 (PR #1125): the a2a node id (hex, 64 chars). Equal to the app-server
-     * node id when both endpoints share the same secret-key file. Computed
-     * once at bind time (suspending; the underlying `Endpoint.addr().id()`
-     * is async) and stored as a plain `val`, so callers can read it
-     * synchronously without a `runBlocking` per access. */
-    val nodeIdHex: String,
-) {
-    /** Start the receiver's accept loop on [scope]; returns the accept-loop Job. */
-    fun start(scope: CoroutineScope): Job = receiver.start(scope)
-
-    /** Best-effort shutdown: shuts down the underlying endpoint.
-     *
-     *  M1 (PR #1125): per the UniFFI Kotlin binding, `Endpoint::close()` is the
-     *  `AutoCloseable.close()` shim and is BLOCKING, while the native iroh
-     *  `Endpoint::close()` is async. UniFFI resolves the signature collision by
-     *  exposing the async one as `shutdown()`. Calling `endpoint.close()` here
-     *  would deadlock under load; call the suspend `shutdown()` via a
-     *  `runBlocking` (best-effort, wrapped) so the helper stays synchronous. */
-    fun close() {
-        runCatching { runBlocking { endpoint.shutdown() } }
-    }
-}
+)
 
 /**
  * Configuration for [buildA2aWiring]. Knobs are the ones the CLI exposes
@@ -95,10 +66,6 @@ class A2aWiring internal constructor(
  * this phase deletes.
  */
 data class A2aWiringConfig(
-    /** UDP port for the a2a endpoint. 0 = OS-assigned random. */
-    val port: Int,
-    /** File holding the wrapper's 32-byte Iroh secret key (mode 0600). */
-    val secretKeyPath: String?,
     /** Per-agent identity directory (mode 0700). Created on demand. */
     val identityDir: File,
     /** Address-book kv file (parent dir must exist with mode 0700). */
@@ -106,26 +73,23 @@ data class A2aWiringConfig(
 )
 
 /**
- * Build the production a2a wiring. Returns an [A2aWiring] the caller starts on
- * its scope. The receiver's `onDeliver` lands a body as a user message via
- * the supplied [client] (the same one the wrapper uses for everything else).
+ * Build the production a2a wiring. The receiver's `onDeliver` lands a body as a
+ * user message via the App Server client [client] returns at delivery time (the
+ * same one the wrapper uses for everything else; it is created after the host
+ * endpoint, so it is read late — the endpoint accepts nothing before then).
  *
  * **CreateAndDeliver** — the router returns CreateAndDeliver when the target
- * agent has NO interactive conversation. Implementing this requires the full
- * `runtime_start` + `create_conversation` orchestration, which the wrapper
- * does NOT have a clean layer-1 path for. Per the dispatch brief, this is
- * downgraded to `Dropped("no_conversation_create_path")` at the wrapper layer
- * with the gap flagged on the bead (non-blocking finding).
+ * agent has NO interactive conversation; the wrapper creates one through the
+ * client, or drops with `no_conversation_create_path` when it cannot.
  */
-suspend fun buildA2aWiring(
+fun buildA2aWiring(
     config: A2aWiringConfig,
-    client: AppServerClient?,
+    client: () -> AppServerClient?,
     /**
      * Optional letta-code local-backend root. When non-null, conversations
      * for the target agentId are read from `<root>/conversations/...` and
      * busy state from `<root>/runs/...`. Null = no candidates supplied
-     * (the router falls through to CreateAndDeliver, which the wrapper
-     * downgrades to Dropped).
+     * (the router falls through to CreateAndDeliver).
      *
      * letta-mobile-xmpqm: this is now also the membership oracle for the
      * host-level address book — [HostEndpointAddressStore] is wired to the
@@ -141,103 +105,29 @@ suspend fun buildA2aWiring(
      */
     ownAgentId: String = "",
 ): A2aWiring {
-    // letta-mobile-xmpqm: no more `publishAgents` allowlist, no more
-    // "nothing to bind" guard. The host record is written once at bind
-    // (publishHost), and the membership gate at resolve() decides which
-    // agents are addressable from the local backend dir.
-    // M3 (PR #1125): ONE [HostEndpointAddressStore] instance per bind. Sharing
-    // it between publishHost and the closures below prevents divergent
-    // in-memory state in the kv file (each new instance re-reads the file).
+    // M3 (PR #1125): ONE [HostEndpointAddressStore] instance per bind, shared by
+    // publishHost and the receiver, so the kv file has one in-memory owner.
     val store = HostEndpointAddressStore.withBackend(config.addressBook, localBackendDir)
-    val secretKeyBytes = loadSecretKey(config.secretKeyPath)  // suspend (FileIrohSecretKeyStore.loadOrCreate)
-    val bindAddr = "0.0.0.0:${config.port}"
-    val endpoint = Endpoint.bind(
-        EndpointOptions(
-            bindAddr = bindAddr,
-            secretKey = secretKeyBytes,
-            alpns = listOf(IrohAgentMessage.ALPN),
-            relayMode = RelayMode.defaultMode(),
-        ),
-    ).also { ep ->
-        // N2 (PR #1125): a relay-set-up failure no longer black-holes silently
-        // — emit a typed warning. The receiver still proceeds (the endpoint
-        // can serve direct addrs even when the relay is unavailable), but an
-        // operator can grep the log for `a2a.online_failed` and see why
-        // rendezvous dials keep timing out.
-        runCatching { ep.online() }.onFailure { t ->
-            Telemetry.event(
-                "A2aHost", "a2a.online_failed",
-                "reason" to (t::class.simpleName ?: "error"),
-                "message" to (t.message ?: ""),
-                level = Telemetry.Level.WARN,
-            )
-        }
+    // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once, not per
+    // inbound message. Without a client or a backend dir there are no candidates
+    // (router falls through to CreateAndDeliver).
+    val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
+    val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
+        if (client() == null || backendStore == null) emptyList()
+        else listConversationsForAgent(backendStore, AgentIdNamespace.normalizeToBareId(agentId))
     }
-    // letta-mobile-bn008.6 sweep round 2 (PR #1125): the endpoint is now BOUND
-    // but every subsequent step (endpointIdHex, publishHost,
-    // LocalBackendAdminStore construction, A2aWiring wiring) can still throw.
-    // Without this guard a post-bind failure would leak the bound Endpoint —
-    // the receiver would never start, so A2aWiring.close() would never run,
-    // and the address book entry that publishHost just wrote would point
-    // at a dead node. Wrap the post-bind init in try/catch; on failure
-    // shutdown() the endpoint (best-effort, runBlocking on the suspending call)
-    // and rethrow so the AppServerServeIrohCommand.run wrapper can degrade
-    // gracefully. The native-gated test `endpoint is released when post-bind
-    // setup fails` (in A2aWiringTest) pins this contract.
-    try {
-        // M2: compute hex node id once at bind time (suspend id() call) and store it
-        // on A2aWiring as a plain `val`.
-        val nodeIdHex = endpointIdHex(endpoint)
-
-        publishHost(config, endpoint, store)
-
-        // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once at
-        // bind time (sync file I/O had been running on the receiver's
-        // connection-coroutine dispatcher — a layering bug). The receiver's
-        // `conversationsFor` closure now captures it; if either client is null or
-        // the backend dir is null we short-circuit to an empty list (router
-        // falls through to CreateAndDeliver -> Dropped).
-        //
-        // letta-mobile-xmpqm: the same store instance backs the host endpoint
-        // address book (`store`) above, so membership checks via
-        // agentExists() and conversation reads share one file handle.
-        val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
-        val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
-            if (client == null || backendStore == null) emptyList()
-            else listConversationsForAgent(backendStore, AgentIdNamespace.normalizeToBareId(agentId))
-        }
-
-        val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> DeliveryOutcome = { message, decision ->
-            handleDecision(client, message, decision)
-        }
-
-        val router = IrohAgentMessageRouter(
-            ownAgentId = ownAgentId,
-        )
-
-        val receiver = IrohAgentMessageReceiver(
-            endpoint = endpoint,
-            router = router,
-            conversationsFor = conversationsFor,
-            onDeliver = onDeliver,
-        )
-
-        return A2aWiring(
-            endpoint = endpoint,
-            receiver = receiver,
-            router = router,
-            addressStore = store,
-            identityDir = config.identityDir,
-            nodeIdHex = nodeIdHex,
-        )
-    } catch (t: Throwable) {
-        // Best-effort release of the bound endpoint before propagating.
-        // The endpoint is bound to a UDP socket on the OS, so leaking it
-        // here would keep the port occupied until process exit — bad for
-        // a wrapper that may restart on configuration changes.
-        runCatching { withContext(NonCancellable) { endpoint.shutdown() } }
-        throw t
-    }
+    val router = IrohAgentMessageRouter(ownAgentId = ownAgentId)
+    val receiver = IrohAgentMessageReceiver(
+        router = router,
+        conversationsFor = conversationsFor,
+        onDeliver = { message, decision -> handleDecision(client(), message, decision) },
+    )
+    return A2aWiring(
+        receiver = receiver,
+        router = router,
+        addressStore = store,
+        identityDir = config.identityDir,
+    )
 }
 
 /**
@@ -271,11 +161,10 @@ suspend fun buildA2aWiring(
  */
 suspend fun publishHost(
     config: A2aWiringConfig,
-    endpoint: Endpoint,
+    addr: EndpointAddr,
     store: HostEndpointAddressStore = HostEndpointAddressStore(config.addressBook),
 ): HostEndpointRecord {
-    val addr = endpoint.addr()
-    val nodeHex = endpointIdHex(endpoint)
+    val nodeHex = IrohDiagnostics.endpointIdHex(addr.id())
     val direct = sortDirectAddresses(addr.directAddresses())
     val hostAddr = IrohAgentAddress(
         agentId = HOST_ONLY_AGENT_ID,
@@ -601,34 +490,4 @@ private suspend fun inputOnConversation(
         )
         DeliveryOutcome(false, "application_input_failure")
     }
-}
-
-/**
- * Load the wrapper's 32-byte Iroh secret key from [path]. Re-uses the
- * existing `FileIrohSecretKeyStore` so the on-disk format matches the
- * `IrohNodeEndpoint` path byte-for-byte (and the a2a node id matches the
- * app-server node id when both reference the same file).
- */
-private suspend fun loadSecretKey(path: String?): ByteArray {
-    if (path == null) {
-        // No path provided: generate ephemeral. Stable identity across restarts
-        // is operator-driven (LETTA_IROH_SECRET_KEY_FILE); absent that, the
-        // node id rotates every restart and dialers must use the ticket.
-        return SecretKey.generate().use { it.toBytes() }
-    }
-    return FileIrohSecretKeyStore(path).loadOrCreate()
-}
-
-/**
- * M2 (PR #1125): file-scope helper that returns the bound endpoint's node id
- * as a hex string. `Endpoint.id()` itself is `suspend` (UniFFI bridges the
- * async FFI call); the subsequent `EndpointId.toBytes()` is not. Wrapping
- * here lets `buildA2aWiring` compute the hex once at bind time and store it
- * on [A2aWiring] as a plain `val`, so the many property reads elsewhere do
- * not pay for a `runBlocking` apiece. Also used by [publishHost] when
- * it writes the address book — one helper, two callers, zero divergence.
- */
-private fun endpointIdHex(endpoint: Endpoint): String {
-    val id = endpoint.addr().id()
-    return id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } }
 }

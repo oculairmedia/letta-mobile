@@ -17,7 +17,6 @@ class MobileWsFrameDiscriminatorCommonTest {
     @Test
     fun everyServerDiscriminatorSelectsItsExistingPublicSubtype() {
         val payloads = linkedMapOf(
-            "welcome" to "\"server_id\":\"server\",\"session_id\":\"session\"",
             "error" to "\"code\":\"code\"",
             "turn_started" to routing() + ",\"agent_id\":\"agent\",\"conversation_id\":\"conversation\"",
             "turn_done" to "\"turn_id\":\"turn\",\"run_id\":\"run\",\"status\":\"completed\"",
@@ -29,12 +28,8 @@ class MobileWsFrameDiscriminatorCommonTest {
             "tool_call_message" to routing() + ",\"agent_id\":\"agent\",\"conversation_id\":\"conversation\"",
             "approval_request_message" to routing() + ",\"agent_id\":\"agent\",\"conversation_id\":\"conversation\"",
             "tool_return_message" to "\"tool_call_id\":\"tool\"",
-            "a2ui_frame" to "\"ok\":false",
-            "a2ui_capabilities" to "\"version\":\"0.9\",\"catalog_id\":\"basic\"",
             "subscribe_frame" to "\"run_id\":\"run\",\"seq\":1,\"frame\":{}",
             "subscribe_done" to "\"run_id\":\"run\",\"last_seq\":1,\"status\":\"completed\"",
-            "user_action_ack" to "\"action_id\":\"action\",\"status\":\"accepted\"",
-            "user_action_outcome" to "\"frameId\":\"frame\",\"outcome\":\"recorded_only\"",
             "cron_list_response" to "\"success\":true",
             "cron_add_response" to "\"success\":true",
             "cron_get_response" to "\"success\":true",
@@ -55,10 +50,10 @@ class MobileWsFrameDiscriminatorCommonTest {
 
         assertEquals(
             listOf(
-                "Welcome", "Error", "TurnStarted", "TurnDone", "StopReason", "UsageStatistics",
+                "Error", "TurnStarted", "TurnDone", "StopReason", "UsageStatistics",
                 "UserMessage", "AssistantMessage", "ReasoningMessage", "ToolCallMessage", "ToolCallMessage",
-                "ToolReturnMessage", "A2ui", "A2uiCapabilities", "SubscribeFrameMessage", "SubscribeDone",
-                "UserActionAck", "UserActionOutcome", "CronListResponse", "CronAddResponse", "CronGetResponse",
+                "ToolReturnMessage", "SubscribeFrameMessage", "SubscribeDone",
+                "CronListResponse", "CronAddResponse", "CronGetResponse",
                 "CronDeleteResponse", "CronDeleteAllResponse", "CronsUpdated", "GoalsUpdated", "AgentUpdated",
                 "SubagentListResponse", "SubagentTodosResponse", "SubagentsUpdated",
             ),

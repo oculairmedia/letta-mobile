@@ -1023,7 +1023,6 @@ private fun ServerFrame.conversationIdOrNull(): String? = when (this) {
     is ServerFrame.ReasoningMessage -> conversationId
     is ServerFrame.ToolCallMessage -> conversationId
     is ServerFrame.ToolReturnMessage -> conversationId
-    is ServerFrame.A2ui -> conversationId
     else -> null
 }
 
@@ -1038,7 +1037,6 @@ private fun ServerFrame.runIdForAssertionOrNull(): String? = when (this) {
     is ServerFrame.StopReason -> runId
     is ServerFrame.UsageStatistics -> runId
     is ServerFrame.Error -> runId
-    is ServerFrame.A2ui -> runId
     else -> null
 }
 

@@ -19,9 +19,10 @@ Rive rules that bite here:
     that key different properties of the same node (the hop's Body.y and the spin's Body.rotation)
     silently lose one of the two.
 """
+import math
 from typing import NamedTuple
 
-from rml import (ACCEL, BACK_IN, BACK_IN_OUT, BACK_SOFT, COLOR, EASE_OUT, ELASTIC_HEAVY,
+from rml import (ACCEL, BACK_IN, BACK_IN_OUT, BACK_OUT, BACK_SOFT, BONE_X, COLOR, EASE_OUT, ELASTIC_HEAVY,
                  ELASTIC_SOFT, EMPH_ACCEL, EMPH_DECEL, GRADIENT_OPACITY, LINEAR, M3_STANDARD,
                  NESTED_VALUE, OPACITY, REMAP_TIME, ROT, SINE, SOFT_OUT, SPRING, STANDARD,
                  STD_DECEL, SX, SY, X, Y, animation)
@@ -30,14 +31,16 @@ from rig.body import (
     LUMEN_REST, bone_pose, breath2, breath_scale, lumen_keys, shape_keys, sine, squash,
 )
 from rig.chart import Chart, Pen
-from rig.constants import (BLINK_FLIP, DESIGNED_PAIRS, EXPR, IDLE_WAITS, JX, JY, WANDER_WAITS, beat,
-                           frames, rad)
+from rig.constants import (BLINK_FLIP, DESIGNED_PAIRS, EXPR, IDLE_WAITS, JX, JY, LEAN_BASE, WANDER_WAITS,
+                           beat, frames, rad)
 from rig.face import spin_keys
 from rig.ids import (
-    AUTO_X, AUTO_Y, BODY_NODE, DRAG_ANIM, DRAG_REST_ANIM, ERROR_ANIM, FACE, FLASH_REST_ANIM, GLOSS,
-    HALO, IDLE_BEATS, IDLE_GLANCE_ANIM, JOYSTICK, PLATE_BLINK, PLATE_EXPR, SHAPES, SUCCESS_ANIM,
+    AUTO_X, AUTO_Y, BODY_NODE, BONE_BASE, BONE_CROWN, BREATH_CALM_ANIM, DRAG_ANIM, DRAG_REST_ANIM,
+    ERROR_ANIM, ERROR_CALM_ANIM, FACE, FLASH_REST_ANIM, GLOSS, HALO, IDLE_BEATS, IDLE_GLANCE_ANIM,
+    JOYSTICK, PEEK_NODE, PET_ANIM, PET_FACE_ANIM, PET_REST_ANIM, PLATE_BLINK, PLATE_EXPR,
+    REACT_CALM_ANIM, REACT_REST_ANIM, RESTING, SHAPES, SQUASH_NODE, SUCCESS_ANIM, SUCCESS_CALM_ANIM,
     SUSTAINED, TINT, WANDER_GLANCE, WANDER_PEEK, WANDER_SLEEP_SHIFT, WANDER_SLEEP_WAIT, WANDER_SPIN,
-    enter_anim, root_state_anim, shape_anim,
+    calm_state_anim, enter_anim, react_anim, root_state_anim, shape_anim,
 )
 
 
@@ -127,6 +130,9 @@ GAZE = {
     "speaking": (0.5, 0.5),
     "error": (0.5, 0.65),            # down
     "sleeping": (0.5, 0.75),
+    "working": (0.65, 0.66),         # down-right, at the work in hand
+    # Dreaming drifts: the closed eye wanders slowly across the plate, once per loop.
+    "dreaming": (lambda period: [(0, 0.4, SINE), (frames(period / 2), 0.6, SINE), (frames(period), 0.4)], 0.72),
 }
 
 
@@ -134,7 +140,9 @@ def sustained_facing():
     """The facing (joystick x, y) each sustained state rests at - SPEC section 1."""
     return {"idle": (-0.15, 0), "listening": (0, 0), "thinking": (-0.6, -0.2), "waitingInput": (0, 0),
               "speaking": (0.15, 0), "error": (-0.3, 0.25), "sleeping": (0.4, 0.5), "loading": (0, 0),
-              "failed": (0, 0.1), "degraded": (0.5, -0.1)}
+              "failed": (0, 0.1), "degraded": (0.5, -0.1),
+              # te3n1.5: working is square-on to the work; dreaming lies like sleeping, a little less turned.
+              "working": (0, 0), "dreaming": (0.35, 0.45)}
 
 
 class StateRow(NamedTuple):
@@ -158,6 +166,9 @@ STATE_ROWS = {  # SPEC 1 + 9.1
     "loading": StateRow({}, 1400, 0, (0, 0), "10000000", [(0, 0.8, SINE), (frames(700), 1.0, SINE), (frames(1400), 0.8)]),
     "failed": StateRow({}, 0, 0, (0, 0), "66808080", None),
     "degraded": StateRow({}, 0, 4, (0, 0), "00000000", None),
+    # te3n1.5: working sways quicker than thinking and squarer; dreaming is the sleep pose, lighter.
+    "working": StateRow({"x": sine(3, 2400)}, 2400, 0, (0, 0), "00000000", None),
+    "dreaming": StateRow({"y": breath2(9000)}, 18000, 3, (0, 4), "2C000000", None),
 }
 
 
@@ -185,38 +196,56 @@ def sustained_rest(state):
                 BREATHING[state].lo if state in BREATHING else 1)
 
 
-def sustained_animations():
-    """SPEC section 1: root motion (Body and Face move together), plate rotation/offset, tint,
-    gloss pulse, and the glyph index. Nothing keys body scale or body vertices."""
+def _held(keys):
+    """A key list held at its first value (a constant passes through) - the calm twin's pose."""
+    return keys[0][1] if isinstance(keys, list) else keys
+
+
+def sustained_animation(st, calm=False):
+    """One sustained state's loop (SPEC section 1): root motion (Body and Face move together),
+    plate rotation/offset, tint, gloss pulse, and the glyph index. Nothing keys body scale or body
+    vertices.
+
+    `calm=True` is the reduceMotion twin (te3n1.5): the same pose, every moving key held at its
+    first frame - no bob, no inflate, no rising light, no gloss pulse, no gaze drift. Frame 0 of
+    the loop and the calm hold are the same pose by construction, so an entry lands on either and
+    the Expression layer can blend between the two when `reduceMotion` flips."""
     FACING = sustained_facing()
-    out = []
-    for st in SUSTAINED:
-        row = STATE_ROWS[st]
-        motion, period, rot, tint, gloss = row.motion, row.period_ms, row.plate_rot_deg, row.tint, row.gloss_pulse
-        fx, fy = row.face_offset
+    row = STATE_ROWS[st]
+    motion, period, rot, tint, gloss = row.motion, row.period_ms, row.plate_rot_deg, row.tint, row.gloss_pulse
+    fx, fy = row.face_offset
 
-        def shifted(keys, offset):
-            if isinstance(keys, list):
-                return [(f, v + offset) + tuple(k[2:]) for k, (f, v) in zip(keys, [(k[0], k[1]) for k in keys])]
-            return keys + offset
+    def shifted(keys, offset):
+        if isinstance(keys, list):
+            return [(f, v + offset) + tuple(k[2:]) for k, (f, v) in zip(keys, [(k[0], k[1]) for k in keys])]
+        return keys + offset
 
-        mx, my = motion.get("x", 0), motion.get("y", 0)
-        body_keys = {X: mx, Y: my}
-        face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
-        jx, jy = FACING[st]
-        halo = {"sleeping": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
-        gx, gy = GAZE.get(st, (0.5, 0.5))
-        bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1   # period, lo, hi
-        objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
-                INFLATE_NODE: {SX: bs, SY: bs},
-                **bone_pose([(0, 1, 0, 0)]),
-                LUMEN: (lumen_keys(BREATHING[st].period_ms, LUMEN_PEAK * (0.6 if st == "sleeping" else 1))
-                        if st in BREATHING else LUMEN_REST),
-                GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
-                AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
-        duration = frames(period) if period else 1
-        out.append(animation("State" + st[0].upper() + st[1:], root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot"))
-    return out
+    mx, my = motion.get("x", 0), motion.get("y", 0)
+    body_keys = {X: mx, Y: my}
+    face_keys = {X: shifted(mx, fx), Y: shifted(my, fy), ROT: rad(rot)}
+    jx, jy = FACING[st]
+    halo = {"sleeping": HALO_SLEEP, "dreaming": HALO_SLEEP, "failed": HALO_FAILED}.get(st, HALO_OPACITY)
+    gx, gy = GAZE.get(st, (0.5, 0.5))
+    bs = breath_scale(*BREATHING[st]) if st in BREATHING else 1   # period, lo, hi
+    objs = {BODY_NODE: body_keys, FACE: face_keys, TINT: {COLOR: tint}, PLATE_EXPR: {NESTED_VALUE: EXPR[st]},
+            INFLATE_NODE: {SX: bs, SY: bs},
+            **bone_pose([(0, 1, 0, 0)]),
+            LUMEN: (lumen_keys(BREATHING[st].period_ms, LUMEN_PEAK * (0.6 if st in RESTING else 1))
+                    if st in BREATHING else LUMEN_REST),
+            GLOSS: {GRADIENT_OPACITY: gloss if gloss else 1}, JOYSTICK: {JX: jx, JY: jy}, HALO: {OPACITY: halo},
+            AUTO_X: {REMAP_TIME: gx(period) if callable(gx) else gx}, AUTO_Y: {REMAP_TIME: gy(period) if callable(gy) else gy}}
+    name = st[0].upper() + st[1:]
+    if calm:
+        objs = {obj: {k: _held(v) for k, v in props.items()} for obj, props in objs.items()}
+        objs[LUMEN] = dict(LUMEN_REST)
+        return animation("Calm" + name, calm_state_anim[st], 1, objs)
+    duration = frames(period) if period else 1
+    return animation("State" + name, root_state_anim[st], duration, objs, "loop" if duration > 1 else "oneShot")
+
+
+def sustained_animations():
+    """Every sustained loop, then (te3n1.5) every loop's reduceMotion twin."""
+    return [sustained_animation(st) for st in SUSTAINED] + [sustained_animation(st, calm=True) for st in SUSTAINED]
 
 
 class EnterTiming(NamedTuple):
@@ -247,7 +276,7 @@ def enter_duration(frm, to):
     from the curve alone."""
     if (frm, to) in DESIGNED_PAIRS:
         return EnterTiming(DESIGNED_PAIRS[(frm, to)], SOFT_OUT)
-    timing = {"sleeping": EnterTiming(600, STANDARD),
+    timing = {"sleeping": EnterTiming(600, STANDARD), "dreaming": EnterTiming(600, STANDARD),
               "waitingInput": EnterTiming(160, SPRING)}.get(to, EnterTiming(160, EASE_OUT))
     if turning(frm, to) > TURNING:
         return EnterTiming(round(timing.ms * TURN_STRETCH), timing.bezier)
@@ -354,6 +383,10 @@ def inflate_keys(e):
     if r0.inflate != r1.inflate:
         return {INFLATE_NODE: {SX: [(0, r0.inflate, e.bez), (n, r1.inflate)],
                                SY: [(0, r0.inflate, e.bez), (n, r1.inflate)]}}
+    if r0.inflate != 1:
+        # Both ends rest deflated (sleeping <-> dreaming): hold it, or the entry would let go of
+        # the inflate and it would pop to 1 for the length of the entry.
+        return {INFLATE_NODE: {SX: r0.inflate, SY: r0.inflate}}
     return {}
 
 
@@ -485,3 +518,167 @@ def idle_variety_animations():
              + [(beat(2250), -0.06, ELASTIC_HEAVY), (d, 0)])}})
     return ([animation("IdleWait" + str(k), w.anim, frames(w.ms), {}) for k, w in enumerate(IDLE_WAITS)]
             + [glance, stretch, tilt, bounce, shiver, sigh, wobble, shift, lookaround])
+
+
+# ================================================================================================
+# te3n1.5: calm twins, the Pet layer and the React layer.
+#
+# Ownership, so nothing fights over a property: the reactions key only SQUASH_NODE (pivot at the
+# feet, keyed by Pet and React and nothing else), PEEK_NODE (in the face chain, React only), the
+# Base bone's shear (rest 0 in every loop), the plate's `expr` and blink. They never key Face,
+# Body or the joystick - the Expression layer holds those at per-state poses, and a one-shot that
+# let go of them at a 0 ms exit would snap the state's pose back in.
+#
+# Every reaction starts and ends at rest, so its exit to ReactRest is an honest 0 ms cut, and the
+# glyph it shows is switched under a plate blink fired at frame 0 and again five frames before
+# the end (the blink is shut by frame 4, so the swap back lands while the eye is closed).
+# ================================================================================================
+def calm_animations():
+    """The reduceMotion holds that are not sustained twins: the breath's gloss, the two flashes and
+    the one shared reaction (a single blink - every reaction collapses to it)."""
+    breath = animation("BreathCalm", BREATH_CALM_ANIM, 1, {GLOSS: {GRADIENT_OPACITY: 1.0}})
+    n_s, n_e = frames(800), frames(600)
+    success = animation("SuccessCalm", SUCCESS_CALM_ANIM, n_s, {PLATE_EXPR: {NESTED_VALUE: EXPR["success"]}},
+                        fires={PLATE_BLINK: [0, n_s - 5]})
+    error = animation("ErrorCalm", ERROR_CALM_ANIM, n_e, {PLATE_EXPR: {NESTED_VALUE: EXPR["error"]}},
+                      fires={PLATE_BLINK: [0]})
+    react = animation("ReactCalm", REACT_CALM_ANIM, frames(500), {}, fires={PLATE_BLINK: [0]})
+    return [breath, success, error, react]
+
+
+def pet_animations():
+    """The Pet layer: a slow side sway about the feet with a tiny purr shiver on top, and the
+    PetFace layer's content glyph (its own layer so it can cut while the sway blends)."""
+    n = frames(1800)
+    purr = [(round(j * 4.5), 0 if j in (0, 24) else (0.6 if j % 2 else -0.6), SINE) for j in range(24)] + [(n, 0)]
+    pet = animation("Petting", PET_ANIM, n, {SQUASH_NODE: {ROT: sine(rad(2.5), 1800), X: purr}}, "loop")
+    face = animation("PettingFace", PET_FACE_ANIM, 1, {PLATE_EXPR: {NESTED_VALUE: EXPR["content"]}},
+                     fires={PLATE_BLINK: [0]})
+    return [animation("PetRest", PET_REST_ANIM, 1, {}), pet, face]
+
+
+def _react(name, n, keys, expr=None):
+    """One reaction one-shot; `expr` shows that glyph for its whole length under the shutter."""
+    fires = {}
+    if expr:
+        merge(keys, {PLATE_EXPR: {NESTED_VALUE: EXPR[expr]}})
+        fires = {PLATE_BLINK: [0, max(1, n - 5)]}
+    return animation("React_" + name, react_anim[name], n, keys, fires=fires)
+
+
+def _flip_keys(n, crouch, land, hop):
+    """A full forward flip about the body's CENTRE, on a node that pivots at the feet.
+
+    Squash rotates about the feet (that is what makes it right for squash and stretch), so a flip
+    there would cartwheel the whole body round a 150 px radius. The translation that keeps the
+    centre (0, -LEAN_BASE) on the hop path is solved per frame and keyed linearly - the in-betweens
+    are the spacing, as in spin_keys."""
+    rot, x, y = [], [], []
+    for f in range(crouch, land + 1, 2):
+        u = (f - crouch) / (land - crouch)
+        th = 2 * math.pi * u * u * (3 - 2 * u)           # smoothstep: slow off the ground and in
+        lift = -hop * 4 * u * (1 - u)                    # a parabola: up, over, down
+        rot.append((f, round(th, 5), LINEAR))
+        x.append((f, round(-LEAN_BASE * math.sin(th), 3), LINEAR))
+        y.append((f, round(-LEAN_BASE + LEAN_BASE * math.cos(th) + lift, 3), LINEAR))
+    # A full turn IS the rest pose, so the rotation steps from 2 pi to 0 on a held key the frame
+    # after landing: nothing moves on screen, and the one-shot ends at rest like every reaction.
+    rot[-1] = (rot[-1][0], rot[-1][1], None)
+    return ([(0, 0, None)] + rot + [(rot[-1][0] + 1, 0, None), (n, 0)],
+            [(0, 0, None)] + x + [(n, 0)], [(0, 0, None)] + y + [(n, 0)])
+
+
+def react_animations():
+    """The React layer: one one-shot per trigger, three impact tiers for `land`, four tricks.
+
+    Durations are exact milliseconds (frames(), not beat()): a reaction answers something that
+    just happened, and stretching it by BEAT_TEMPO would make the answer late."""
+    out = [animation("ReactRest", REACT_REST_ANIM, 1, {})]
+    sq = lambda keys: squash(SQUASH_NODE, keys)
+
+    # poke 420 ms: squish toward the impact, startled, rebound, settle.
+    n = frames(420)
+    k = sq([(0, 1, EMPH_ACCEL), (4, 1.16, STD_DECEL), (12, 0.935, SOFT_OUT), (19, 1.02, SINE), (n, 1)])
+    k[SQUASH_NODE].update({X: [(0, 0, EMPH_ACCEL), (4, -4, SOFT_OUT), (14, 0), (n, 0)],
+                           ROT: [(0, 0, EMPH_ACCEL), (4, rad(-3), SOFT_OUT), (12, rad(1.5), SINE), (n, 0)]})
+    out.append(_react("poke", n, k, "startled"))
+
+    # dizzy 1.5 s: the dizzy glyph, a decaying wobble about the feet, the base shearing against it.
+    n = frames(1500)
+    wob = [(0, 0, SINE)] + [(10 * j, rad(6 * (1 if j % 2 else -1) * 0.78 ** j), SINE) for j in range(1, 8)] + [(n, 0)]
+    base = [(0, 0, SINE)] + [(10 * j + 3, round(-10 * (1 if j % 2 else -1) * 0.78 ** j, 3), SINE) for j in range(1, 8)] + [(n, 0)]
+    # RootBone.x (BONE_X), not Node.x: the base bone is a RootBone, and key 13 on it moves nothing.
+    out.append(_react("dizzy", n, {SQUASH_NODE: {ROT: wob}, BONE_BASE: {BONE_X: base}}, "dizzy"))
+
+    # sent 350 ms: "got it" - a catch-dip, then a lift.
+    n = frames(350)
+    k = sq([(0, 1, EMPH_ACCEL), (5, 1.05, STD_DECEL), (13, 0.97, SOFT_OUT), (n, 1)])
+    k[SQUASH_NODE][Y] = [(0, 0, EMPH_ACCEL), (5, 4, STD_DECEL), (13, -6, SOFT_OUT), (n, 0)]
+    out.append(_react("sent", n, k))
+
+    # toolStart 300 ms: a small hop and a glance down at the work ("rolling up sleeves").
+    n = frames(300)
+    k = sq([(0, 1, EMPH_ACCEL), (3, 1.05, STD_DECEL), (9, 0.96, SOFT_OUT), (15, 1.02, SINE), (n, 1)])
+    k[SQUASH_NODE][Y] = [(0, 0, EMPH_ACCEL), (3, 2, STD_DECEL), (9, -10, EMPH_ACCEL), (n, 0)]
+    k[PEEK_NODE] = {Y: [(0, 0, STANDARD), (8, 5, SOFT_OUT), (n, 0)]}
+    out.append(_react("toolStart", n, k))
+
+    # toolDone 250 ms: a nod.
+    n = frames(250)
+    k = sq([(0, 1, STANDARD), (5, 1.02, SOFT_OUT), (n, 1)])
+    k[PEEK_NODE] = {Y: [(0, 0, STANDARD), (5, 6, SOFT_OUT), (n, 0)]}
+    out.append(_react("toolDone", n, k))
+
+    # wake 700 ms: startled, crouch, a tall stretch out of the sleep pose, elastic settle.
+    n = frames(700)
+    k = sq([(0, 1, EMPH_ACCEL), (5, 1.05, STD_DECEL), (15, 0.88, SOFT_OUT), (28, 1.02, ELASTIC_SOFT), (n, 1)])
+    k[PEEK_NODE] = {Y: [(0, 0, EMPH_ACCEL), (15, -8, SOFT_OUT), (n, 0)]}
+    out.append(_react("wake", n, k, "startled"))
+
+    # yawn 1.2 s: closed eye and the round mouth, a slow tall stretch with a lean, then back.
+    n = frames(1200)
+    k = sq([(0, 1, SINE), (30, 0.95, None), (50, 0.95, SINE), (n, 1)])
+    k[SQUASH_NODE][ROT] = [(0, 0, SINE), (30, rad(-2), None), (50, rad(-2), SINE), (n, 0)]
+    k[PEEK_NODE] = {Y: [(0, 0, SINE), (30, -4, None), (50, -4, SINE), (n, 0)]}
+    out.append(_react("yawn", n, k, "yawning"))
+
+    # land: an arrival squash about the feet, three tiers by `impact` (the machine picks one).
+    for name, a, ms in (("landSoft", 0.05, 300), ("landMid", 0.11, 400), ("landHard", 0.18, 500)):
+        n = frames(ms)
+        out.append(_react(name, n, sq([(0, 1, STD_DECEL), (2, 1 + a, SOFT_OUT),
+                                       (round(n * 0.45), round(1 - a / 3, 4), ELASTIC_SOFT), (n, 1)])))
+
+    # trick 0, spin-flip 900 ms: crouch, a full flip about the centre over a 60 px hop, landing squash.
+    n, c, l = frames(900), 6, 42
+    rot, fx, fy = _flip_keys(n, c, l, 60)
+    k = {SQUASH_NODE: {ROT: rot, X: fx, Y: fy}}
+    merge(k, sq([(0, 1, EMPH_ACCEL), (c, 1.1, STD_DECEL), (c + 6, 0.94, SINE), (l - 4, 0.97, STD_DECEL),
+                 (l + 2, 1.14, SOFT_OUT), (l + 8, 0.97, ELASTIC_SOFT), (n, 1)]))
+    out.append(_react("trick0", n, k, "trick"))
+
+    # trick 1, jump-twirl 1 s: a hop, the body turning edge-on and back twice (|cos| of the turn).
+    n, c, l = frames(1000), 6, 42
+    tw = ([(0, 1, None), (c, 1, LINEAR)]
+          + [(f, round(max(0.12, abs(math.cos(4 * math.pi * (f - c) / (l - c)))), 4), LINEAR) for f in range(c + 2, l, 2)]
+          + [(l, 1, SOFT_OUT), (l + 4, 1.12, ELASTIC_SOFT), (n, 1)])
+    sy = [(0, 1, EMPH_ACCEL), (c, 0.92, STD_DECEL), (c + 8, 1.06, SINE), (l - 2, 1, STD_DECEL), (l + 4, 0.9, ELASTIC_SOFT), (n, 1)]
+    hop = [(0, 0, None), (c, 0, EMPH_DECEL), ((c + l) // 2, -50, EMPH_ACCEL), (l, 0, None), (n, 0)]
+    out.append(_react("trick1", n, {SQUASH_NODE: {SX: tw, SY: sy, Y: hop}}, "trick"))
+
+    # trick 2, peekaboo 1.4 s: the plate ducks down into the body, hides, and pops back up.
+    n = frames(1400)
+    duck = [(0, 1, EMPH_ACCEL), (14, 0.35, None), (50, 0.35, BACK_OUT), (62, 1.08, ELASTIC_SOFT), (n, 1)]
+    k = {PEEK_NODE: {Y: [(0, 0, EMPH_ACCEL), (14, 34, None), (50, 34, BACK_OUT), (62, -4, ELASTIC_SOFT), (n, 0)],
+                     SX: list(duck), SY: list(duck)}}
+    merge(k, sq([(0, 1, None), (48, 1, EMPH_ACCEL), (54, 0.94, SOFT_OUT), (64, 1.03, ELASTIC_SOFT), (n, 1)]))
+    out.append(_react("trick2", n, k, "trick"))
+
+    # trick 3, melt-and-reform 1.6 s: slump to a puddle, wobble there, spring back up.
+    n = frames(1600)
+    # 1.4 wide at most: the 300 px body has to stay inside the 500 px artboard.
+    sy = [(0, 1, SINE), (30, 0.5, SINE), (42, 0.54, SINE), (54, 0.5, BACK_OUT), (70, 1.12, ELASTIC_SOFT), (n, 1)]
+    sxk = [(0, 1, SINE), (30, 1.36, SINE), (42, 1.4, SINE), (54, 1.36, BACK_OUT), (70, 0.92, ELASTIC_SOFT), (n, 1)]
+    k = {SQUASH_NODE: {SX: sxk, SY: sy},
+         PEEK_NODE: {Y: [(0, 0, SINE), (30, 10, None), (54, 10, BACK_OUT), (70, 0, None), (n, 0)]}}
+    out.append(_react("trick3", n, k, "trick"))
+    return out

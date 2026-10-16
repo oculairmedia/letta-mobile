@@ -985,7 +985,6 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         publishedRunKey?.let(runPhases::clear)
         abandonTimelineObserver()
-        adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
     }
 
@@ -1050,7 +1049,7 @@ internal class AdminChatViewModel @Inject constructor(
         if (replacingSendRuntime) return
         // The cancel is asked for; the run reads INTERRUPTING until its terminal lands (te3n1.1).
         runPhases.markInterrupting(RunScope(currentRunKey(), agentId.value))
-        composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+        composerCoordinator.interruptRun()
     }
 
     /**
