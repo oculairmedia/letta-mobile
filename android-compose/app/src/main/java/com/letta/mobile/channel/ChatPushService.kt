@@ -18,61 +18,19 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
 import ca.oculair.meridian.R
-import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.channel.NotificationCandidatePhase
-import com.letta.mobile.data.channel.NotificationCandidateSource
-import com.letta.mobile.data.channel.NotificationDeliveryCandidate
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.timeline.IngestedMessageListener
-import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.data.transport.appserver.BackgroundStreamBudget
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-fun installIngestedListener(
-    timelineRepository: TimelineRepository,
-    listener: IngestedMessageListener,
-): IngestedMessageListener {
-    timelineRepository.ingestedListener = listener
-    return listener
-}
-
-fun clearIngestedListenerIfActive(
-    timelineRepository: TimelineRepository,
-    installedListener: IngestedMessageListener?,
-): Boolean {
-    if (installedListener == null) return false
-    if (timelineRepository.ingestedListener !== installedListener) return false
-    timelineRepository.ingestedListener = null
-    return true
-}
-
 /**
- * Keeps the app process alive and the resume-stream subscribers running even
- * when no Activity is foregrounded. Without this, Android would stop our
- * activities when the screen turns off, cancelling UI coroutines and making
- * the [TimelineRepository]'s loops dormant.
+ * Keeps the app process alive while no Activity is foregrounded, so the session graph's channel
+ * and the approval watcher keep running when the screen turns off.
  *
- * Design:
- *   1. On start, iterate every conversation the current agent has and call
- *      [TimelineRepository.getOrCreate] — this spawns a subscriber coroutine
- *      for each that lives as long as the repository (a @Singleton).
- *   2. Install an [IngestedMessageListener] that submits settled timeline
- *      candidates to [NotificationDeliveryCoordinator], the single owner for
- *      publishing, duplicate suppression, and foreground suppression policy.
- *   3. Hold a persistent low-priority foreground notification so Android
- *      won't kill the process.
+ * letta-mobile-by4vm.15: the service no longer warms legacy TimelineRepository loops or listens to
+ * their ingest. The canonical ledger owns every Android timeline and pages on open; Iroh never fed
+ * those loops a live stream (its HTTP stream route is gated), so their ingest listener was idle.
+ * Notifications reach [NotificationDeliveryCoordinator] from its other sources (heartbeat, reply stream).
  *
  * See letta-mobile-mge5 for the architectural epic.
  */
@@ -88,16 +46,7 @@ class ChatPushService : LifecycleService() {
     // LifecycleService owns this scope and cancels it at onDestroy, so the service no longer
     // holds a root scope whose cancellation depends on remembering to do it by hand.
     private val scope get() = lifecycleScope
-    private var warmupJob: Job? = null
-    private var installedIngestedListener: IngestedMessageListener? = null
-
-    private val timelineRepository get() = deps.timelineRepository
-    private val conversationRepository get() = deps.conversationRepository
-    private val allConversationsRepository get() = deps.allConversationsRepository
-    private val agentRepository get() = deps.agentRepository
-    private val notificationDeliveryCoordinator get() = deps.notificationDeliveryCoordinator
     private val channelNotificationPublisher get() = deps.channelNotificationPublisher
-    private val currentConversationTracker get() = deps.currentConversationTracker
 
     override fun onBind(intent: Intent): IBinder? {
         super.onBind(intent)
@@ -116,8 +65,6 @@ class ChatPushService : LifecycleService() {
         if (!foregrounded) {
             Log.w(TAG, "Foreground promotion failed; running as background service")
         }
-        installListener()
-        warmupSubscribers()
         scope.launch { deps.approvalAttention.watch() }
         Telemetry.event(
             "ChatPushService", "created",
@@ -136,14 +83,12 @@ class ChatPushService : LifecycleService() {
             "intentAction" to (intent?.action ?: "<null>"),
         )
         channelNotificationPublisher.ensureChannel()
-        installListener()
         ensureForegroundNotification()
         return START_STICKY
     }
 
     override fun onDestroy() {
         Telemetry.event("ChatPushService", "destroyed")
-        clearInstalledListener()
         super.onDestroy()
     }
 
@@ -229,188 +174,10 @@ class ChatPushService : LifecycleService() {
         manager.createNotificationChannel(channel)
     }
 
-    private fun installListener() {
-        val listener = object : IngestedMessageListener {
-            override suspend fun onMessageIngested(
-                conversationId: String,
-                serverId: String,
-                messageType: String?,
-                contentPreview: String?,
-            ) {
-                Telemetry.event(
-                    "ChatPushService", "listener.messageIngested",
-                    "conversationId" to conversationId,
-                    "serverId" to serverId,
-                    "messageType" to (messageType ?: "<null>"),
-                    "previewLength" to (contentPreview?.length ?: 0),
-                )
-                val (agentId, agentName) = try {
-                    // Best-effort: look up the conversation's agent for a nice title.
-                    val conv = conversationRepository.getConversation(ConversationId(conversationId))
-                    conv.agentId.value to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    "" to ""
-                }
-
-                notificationDeliveryCoordinator.submit(
-                    NotificationDeliveryCandidate(
-                        conversationId = conversationId,
-                        agentId = agentId,
-                        agentName = agentName,
-                        conversationSummary = null,
-                        messageId = serverId,
-                        runId = null,
-                        source = NotificationCandidateSource.TimelineIngestion,
-                        phase = NotificationCandidatePhase.Settled,
-                        previewText = contentPreview.orEmpty(),
-                        isFinal = true,
-                    ),
-                )
-            }
-        }
-        installedIngestedListener = installIngestedListener(timelineRepository, listener)
-        Telemetry.event(
-            "ChatPushService", "listenerInstalled",
-            "listenerNonNull" to (timelineRepository.ingestedListener != null),
-        )
-    }
-
-    private fun clearInstalledListener() {
-        val cleared = clearIngestedListenerIfActive(
-            timelineRepository = timelineRepository,
-            installedListener = installedIngestedListener,
-        )
-        installedIngestedListener = null
-        Telemetry.event(
-            "ChatPushService", "listenerCleared",
-            "cleared" to cleared,
-        )
-    }
-
-    private fun warmupSubscribers() {
-        // Pre-create subscribers for the agent's top conversations so streaming
-        // kicks in before the user opens any chat screen.
-        //
-        // letta-mobile-qv6d/jmzq.4: limit reduced from 20 →
-        // MAX_BACKGROUND_PERSISTENT_STREAMS (3, data-efficiency H4) and made explicit. Each
-        // warmed conversation runs a permanent runStreamSubscriber coroutine
-        // that polls /v1/conversations/{id}/stream on the idle backoff ladder
-        // forever. At 20 convs and the prior 5s cap that produced ~4 RPS of
-        // background 400 traffic against letta.oculair.ca per device —
-        // saturating the OkHttp dispatcher (default maxRequestsPerHost = 5)
-        // and starving foreground SSE sends (Emmanuel's letta-mobile-kxsv
-        // hang).
-        //
-        // 3 proactively-created streams covers the realistic "I might tap any
-        // of these recents next" window. The currently visible conversation,
-        // when known, consumes the first warmup slot so it is never displaced
-        // by recency ordering. Anything older incurs a one-shot getOrCreate
-        // hydrate on first open (~500ms — imperceptible if the user just
-        // tapped) and starts its own subscriber from there. Foreground UI
-        // getOrCreate remains on-demand and is not evicted by this budget.
-        warmupJob?.cancel()
-        warmupJob = scope.launch(Dispatchers.IO) {
-            val warmupTimer = Telemetry.startTimer("ChatPushService", "warmup")
-            val currentConversationId = currentConversationTracker.current
-            try {
-                // letta-mobile-jmzq.5: emit warmup.start so we can measure
-                // time-to-first-hydrate and detect warmup that never starts.
-                Telemetry.event(
-                    "ChatPushService", "warmup.start",
-                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    "currentConversationId" to (currentConversationId ?: "<none>"),
-                    "activeLoopCountBefore" to timelineRepository.cachedLoopCount(),
-                )
-                allConversationsRepository.refreshIfStale(WARMUP_LIST_MAX_AGE_MS)
-                val recentConversations = allConversationsRepository.conversations.value
-                    .sortedByDescending { it.lastMessageAt.orEmpty() }
-                    .take(MAX_BACKGROUND_PERSISTENT_STREAMS)
-                val warmupConversationIds = buildList {
-                    currentConversationId?.let { add(it) }
-                    recentConversations.forEach { conversation ->
-                        if (conversation.id.value !in this) add(conversation.id.value)
-                    }
-                }.take(MAX_BACKGROUND_PERSISTENT_STREAMS)
-                Telemetry.event(
-                    "ChatPushService", "warmup.plan",
-                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    "requestedConversationCount" to warmupConversationIds.size,
-                    "recentConversationCount" to recentConversations.size,
-                    "currentPrioritized" to (currentConversationId != null && warmupConversationIds.firstOrNull() == currentConversationId),
-                    "currentIncluded" to (currentConversationId != null && currentConversationId in warmupConversationIds),
-                )
-                // Parallelize getOrCreate — each call blocks on an HTTP
-                // hydrate (~500ms). Sequential iteration was taking 10+ seconds
-                // to reach the most-recently-active conversation on the server
-                // (we observed conv-1598043a-* not hydrated even ~15s into
-                // warmup despite being first in the list). Parallel async
-                // starts every hydrate simultaneously. loopsMutex inside
-                // TimelineRepository still serializes the critical sections.
-                // letta-mobile-mge5.
-                val results = coroutineScope {
-                    warmupConversationIds.map { conversationId ->
-                        async {
-                            try {
-                                timelineRepository.getOrCreate(conversationId)
-                                WarmupResult.Success
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                throw cancelled
-                            } catch (t: Throwable) {
-                                Log.w(TAG, "warmup getOrCreate failed for $conversationId", t)
-                                WarmupResult.Failure
-                            }
-                        }
-                    }.awaitAll()
-                }
-                val successCount = results.count { it == WarmupResult.Success }
-                val failureCount = results.size - successCount
-                warmupTimer.stop(
-                    "conversationCount" to warmupConversationIds.size,
-                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    "successCount" to successCount,
-                    "failureCount" to failureCount,
-                    "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
-                )
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                warmupTimer.stopError(
-                    t,
-                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
-                )
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "ChatPushService"
         private const val SERVICE_CHANNEL_ID = "letta-chat-push-service"
         private const val FOREGROUND_NOTIFICATION_ID = 7531
-
-        /**
-         * Maximum number of persistent stream loops this foreground service
-         * proactively creates during startup warmup.
-         *
-         * letta-mobile data-efficiency Phase4: reduced from 5 → 3 (H4). Three
-         * slots cover current-conversation + top-2 by recency; anything older
-         * incurs a one-shot getOrCreate hydrate on first open (~500ms).
-         *
-         * Keep this conservative: every warmed conversation owns a long-lived
-         * resume-stream subscriber. The OkHttp dispatcher is currently tuned
-         * in LettaApiClient with maxRequestsPerHost = 16, leaving headroom for
-         * these 3 background streams plus foreground sends/fetches. Do not
-         * raise this without telemetry showing foreground requests are not
-         * starved.
-         */
-        private const val MAX_BACKGROUND_PERSISTENT_STREAMS = 3
-
-        /** How old the conversation list may be before warmup reads it again. */
-        private const val WARMUP_LIST_MAX_AGE_MS = 60_000L
-
-        private enum class WarmupResult { Success, Failure }
 
         fun start(context: Context, scheduleRecoveryAlarm: Boolean = true): Boolean {
             // On Android 13+, POST_NOTIFICATIONS is runtime-granted. We still

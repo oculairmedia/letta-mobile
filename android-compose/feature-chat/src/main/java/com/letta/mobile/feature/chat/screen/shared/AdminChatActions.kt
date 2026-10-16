@@ -84,13 +84,13 @@ internal class AdminChatActions(
 
     override fun toggleReasoningExpanded(messageId: ChatMessageId) = viewModel.toggleReasoningExpanded(messageId.value)
 
-    override fun loadOlderMessages() = viewModel.loadOlderMessages()
+    // letta-mobile-by4vm.15: the canonical paged timeline loads older pages itself. Truncated-preview
+    // expansion lived on the deleted legacy loop and had no route on the Iroh transport (no getToolReturn).
+    override fun loadOlderMessages() = Unit
 
-    override fun releaseOlderMessages() = viewModel.releaseOlderMessages()
+    override fun releaseOlderMessages() = Unit
 
-    override fun expandTruncatedToolResult(messageId: ChatMessageId) {
-        viewModel.onTruncatedToolResultExpanded(messageId.value)
-    }
+    override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
 
     override fun retryLoad() = viewModel.retryConversationLoad()
 

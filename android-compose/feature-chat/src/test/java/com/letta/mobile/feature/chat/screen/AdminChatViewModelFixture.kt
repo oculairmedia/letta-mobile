@@ -50,8 +50,6 @@ internal fun openedChatViewModel(
         SavedStateHandle(mapOf("agentId" to agent.id.value, "conversationId" to conversationId)),
     ),
     messageRepository = mockk(relaxed = true),
-    timelineRepository = mockk(relaxed = true),
-    externalTimelineWriter = mockk(relaxed = true),
     agentRepository = stubAgentRepository(agent),
     blockRepository = mockk(relaxed = true),
     bugReportRepository = mockk(relaxed = true),
