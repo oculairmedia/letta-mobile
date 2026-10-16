@@ -58,6 +58,7 @@ class AgentEditorPageTest {
         override val agents = MutableStateFlow(listOf(agent))
         override val models = MutableStateFlow(listOf(LlmModel(id = "m", handle = "openai/gpt-5", displayNameOverride = "GPT-5")))
         override val tools = MutableStateFlow(toolList)
+        override val modelsUnavailable = MutableStateFlow<String?>(null)
         private val byId = mapOf(agent.id.value to agent)
         val updates = mutableListOf<AgentUpdateParams>()
         val created = mutableListOf<AgentCreateParams>()

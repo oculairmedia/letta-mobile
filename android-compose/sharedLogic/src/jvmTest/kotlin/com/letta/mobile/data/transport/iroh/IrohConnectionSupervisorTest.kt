@@ -108,6 +108,50 @@ class IrohConnectionSupervisorTest {
         assertEquals(1, dials)
     }
 
+    /** letta-mobile-by4vm.121.11: the on-device runtime's single launch is over; redialling every 8 s fixes nothing. */
+    @Test
+    fun terminalDialFailureStopsRedialingAndFailsReadyAtOnce() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            throw IllegalStateException("dial failed", TerminalFailure("On-device runtime stopped. Restart the app."))
+        }
+
+        assertFailsWith<IllegalStateException> { supervisor.ready(timeout = 100.milliseconds) }
+        runCurrent()
+        advanceTimeBy(60_000)
+        advanceUntilIdle()
+
+        assertEquals(1, dials, "no redial after a terminal failure")
+        val failed = assertIs<IrohConnectionState.Failed>(supervisor.state.value)
+        assertEquals("dial failed", failed.reason)
+        val again = assertFailsWith<IllegalStateException> { supervisor.ready(timeout = 180_000.milliseconds) }
+        assertEquals("dial failed", again.message, "a later caller fails at once with the reason, not after its timeout")
+        assertEquals(1, dials)
+    }
+
+    @Test
+    fun terminalFailureClearsWhenTheConfigChanges() = runTest {
+        var config = configA
+        var dials = 0
+        val supervisor = supervisor(config = { config }) {
+            dials += 1
+            if (it == configA) throw TerminalFailure("runtime stopped")
+            fakeHandle(it, "b")
+        }
+        assertFailsWith<IllegalStateException> { supervisor.ready(timeout = 100.milliseconds) }
+        runCurrent()
+
+        config = configB
+        supervisor.refreshConfig()
+        assertEquals("b", supervisor.ready(timeout = 1_000.milliseconds).sessionId)
+        assertEquals(2, dials)
+    }
+
+    private class TerminalFailure(message: String) :
+        IllegalStateException(message),
+        com.letta.mobile.data.transport.TerminalConnectionFailure
+
     @Test
     fun readyRespectsScheduledBackoffAfterFailure() = runTest {
         var dials = 0

@@ -53,6 +53,17 @@ The Android implementation follows these constraints:
 
 - Node can only be started once per OS process: a stopped runtime asks for an app restart
   (`LocalAppServerHost.RESTART_THE_APP`; Settings shows the runtime's health, there is no Stop).
+  The host starts node at most once: the one start runs in the host's scope and every dial waits
+  on it, so a cancelled or timed-out dial never abandons a starting node. Once that launch is over
+  (node exited, or ended before it was ready) every dial fails with
+  `LocalAppServerTerminatedException`, a `TerminalConnectionFailure`: the channel supervisor stops
+  redialling and chat, the agent list and the model picker show "On-device runtime stopped.
+  Restart the app." (letta-mobile-by4vm.121.11).
+- The runtime's lifecycle (launch, asset time, listen line, readyz, exits, refusals, node's
+  stdout/stderr) is logged at INFO under `LocalAppServer` and kept in
+  `files/embedded-lettacode/runtime-lifecycle.log` (128 KiB, one rotated `.1`), so the first failure
+  outlives logcat: `adb shell run-as <package> cat files/embedded-lettacode/runtime-lifecycle.log`,
+  or Settings > Developer > Copy runtime log on a debug build.
 - `node::Start()` blocks forever and runs on a dedicated background thread; stdout/stderr are
   pumped back over JNI (the listen line), stdin is a pipe nobody writes.
 - Assets are extracted from APK assets into `filesDir` before Node starts (the first start after

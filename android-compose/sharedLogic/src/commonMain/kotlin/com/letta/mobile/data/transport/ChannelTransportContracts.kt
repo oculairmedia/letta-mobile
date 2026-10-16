@@ -30,3 +30,10 @@ sealed interface ChannelTransportState {
 object ChannelTransportDefaults {
     const val DEFAULT_CRON_TIMEOUT_MS: Long = 5_000L
 }
+
+/**
+ * A dial failure no redial can fix (letta-mobile-by4vm.121.11): the connection supervisor stops
+ * redialling and reports the failure's message as a final disconnect. The on-device runtime's
+ * single launch ending is one; only restarting the app recovers from it.
+ */
+interface TerminalConnectionFailure

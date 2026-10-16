@@ -28,8 +28,8 @@ class AndroidLocalRuntimeDialer @Inject constructor(
     @param:ProcessScope private val scope: CoroutineScope,
 ) : LocalRuntimeDialer {
     override suspend fun dial(config: IrohConnectConfig): DirectAppServerDial {
-        // Node ran once in this process and stopped: only a new app process can start it again.
-        if (host.health.value.gaveUp) error(host.health.value.lastError ?: LocalAppServerHost.RESTART_THE_APP)
+        // Once node's one launch is over the host refuses without launching (a terminal failure:
+        // the channel supervisor stops redialling, letta-mobile-by4vm.121.11).
         val lease = host.acquire()
         val backendDir = runCatching { launchSource.prepareModel(settingsRepository.activeConfig.value) }
             .onFailure { lease.close() }

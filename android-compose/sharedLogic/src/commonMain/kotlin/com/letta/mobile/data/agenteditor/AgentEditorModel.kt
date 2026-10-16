@@ -79,6 +79,8 @@ data class AgentEditorState(
     val starter: AgentStarter = AgentStarter.Blank,
     val starters: List<AgentStarter.CopyOf> = emptyList(),
     val models: List<ChatModelOption> = emptyList(),
+    /** Why the models could not be listed (letta-mobile-by4vm.121.11); null when they were, or still may be. */
+    val modelsUnavailable: String? = null,
     val tools: List<AgentToolOption> = emptyList(),
 ) {
     val agentId: String? get() = (mode as? AgentEditorMode.Edit)?.agentId
