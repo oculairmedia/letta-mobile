@@ -48,21 +48,9 @@ class ChatModelCatalogLoader(
         if (!replaceCurrent) modelCatalogLoad?.let { return it }
         modelCatalogLoad?.cancel()
         return scope.async {
-            try {
-                val models = backend.listModels()
-                sources.onModelsLoaded(models)
-                Result.success(models)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                Telemetry.event(
-                    TELEMETRY_TAG,
-                    "modelCatalog.loadFailed",
-                    "exceptionClass" to (t::class.simpleName ?: "Throwable"),
-                    level = Telemetry.Level.WARN,
-                )
-                Result.failure(t)
-            }
+            runCatching { backend.listModels() }
+                .onSuccess(sources.onModelsLoaded)
+                .onFailure(::reportLoadFailure)
         }.also { modelCatalogLoad = it }
     }
 
@@ -92,6 +80,17 @@ class ChatModelCatalogLoader(
         return RequiredCatalogModel(
             models = models,
             selectionValue = ModelCatalog.selectionValue(models, selectedModel),
+        )
+    }
+
+    /** A cancelled load stays cancelled; any other failure is the load's result, and is reported. */
+    private fun reportLoadFailure(failure: Throwable) {
+        if (failure is CancellationException) throw failure
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "modelCatalog.loadFailed",
+            "exceptionClass" to (failure::class.simpleName ?: "Throwable"),
+            level = Telemetry.Level.WARN,
         )
     }
 

@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.session
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
@@ -181,25 +182,30 @@ class ConversationModels(
     }
 
     private suspend fun apply(switch: ModelSwitch) {
-        try {
-            val transportModel = ModelCatalog.transportValue(loaded.value, switch.model).orEmpty()
-            val backend = host.backend ?: error("This backend cannot change a conversation's model")
-            val recorded = backend.switchModel(ConversationModelChange(switch.conversationId, ModelHandle(transportModel), switch.effort))
+        runCatching {
             // The host's record (model, effort, window) confirms the pick, as a reopen would read it.
-            picks.seedFromHost(listOf(recorded))
+            picks.seedFromHost(listOf(send(switch)))
             host.recordModel(switch.model)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            val restored = picks.rollback(switch.conversationId.value, switch.model, switch.previousOverride)
-            host.showModel(
-                ConversationModelUpdate(
-                    conversationId = switch.conversationId,
-                    label = switch.previousLabel.takeIf { restored },
-                    error = t.message ?: "Could not change model",
-                ),
-            )
-        }
+        }.onFailure { failure -> rollBack(switch, failure) }
+    }
+
+    private suspend fun send(switch: ModelSwitch): Conversation {
+        val transportModel = ModelCatalog.transportValue(loaded.value, switch.model).orEmpty()
+        val backend = host.backend ?: error("This backend cannot change a conversation's model")
+        return backend.switchModel(ConversationModelChange(switch.conversationId, ModelHandle(transportModel), switch.effort))
+    }
+
+    /** The host refused [switch]: the previous pick comes back (unless a newer one replaced it) and the refusal shows. */
+    private fun rollBack(switch: ModelSwitch, failure: Throwable) {
+        if (failure is CancellationException) throw failure
+        val restored = picks.rollback(switch.conversationId.value, switch.model, switch.previousOverride)
+        host.showModel(
+            ConversationModelUpdate(
+                conversationId = switch.conversationId,
+                label = switch.previousLabel.takeIf { restored },
+                error = failure.message ?: "Could not change model",
+            ),
+        )
     }
 
     companion object {

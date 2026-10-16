@@ -61,7 +61,8 @@ class TimelineChatComposerChipsTest {
         models.selectModel(ChatModelHandle(MINIMAX), ReasoningEffortChoice.Unchanged)
         runCurrent()
 
-        assertEquals(ConversationModelChange(ConversationId("conv-1"), ModelHandle(MINIMAX)), backend.switches.single())
+        val expected = ConversationModelChange(ConversationId("conv-1"), ModelHandle(MINIMAX))
+        assertEquals(expected, backend.switches.single())
         assertEquals(MINIMAX, models.model.value?.currentHandle)
     }
 
@@ -80,7 +81,8 @@ class TimelineChatComposerChipsTest {
     @Test
     fun theModeChipFollowsTheSessionsRegistryAndIsOffWithoutOne() = runTest {
         val registry = PermissionModeRegistry(MutableStateFlow(AppServerPermissionMode.Unrestricted))
-        val governed = chips(FakeModelBackend(recordedModel = SOL), permissions = EnginePermissionModes(engine = null, permissionModes = registry))
+        val permissions = EnginePermissionModes(engine = null, permissionModes = registry)
+        val governed = chips(FakeModelBackend(recordedModel = SOL), permissions = permissions)
 
         val chip = assertNotNull(governed.permissionModes?.permissionMode?.first())
         assertEquals(AppServerPermissionMode.Unrestricted, chip.selected)
@@ -114,7 +116,7 @@ class TimelineChatComposerChipsTest {
         fun recorded(id: ConversationId) = Conversation(id = id, agentId = AgentId("agent-1"), model = recordedModel)
 
         val backend = ConversationModelBackend(
-            list = { listOf(LlmModel(id = "sol", name = "Sol", handle = SOL), LlmModel(id = "minimax", name = "MiniMax", handle = MINIMAX)) },
+            list = { MODELS },
             setModel = { change ->
                 switches += change
                 check(!refuse) { "refused" }
@@ -127,5 +129,9 @@ class TimelineChatComposerChipsTest {
     private companion object {
         const val SOL = "openai/gpt-sol"
         const val MINIMAX = "lmstudio/minimax-m3"
+        val MODELS = listOf(
+            LlmModel(id = "sol", name = "Sol", handle = SOL),
+            LlmModel(id = "minimax", name = "MiniMax", handle = MINIMAX),
+        )
     }
 }

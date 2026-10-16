@@ -83,14 +83,13 @@ internal fun timelinePermissionModes(
 }
 
 /** A failed read keeps the agent's model on the chip; the next open reads it again. */
-private suspend fun readRecordedConversation(source: TimelineModelSource, conversation: ConversationId): Conversation? = try {
-    source.conversation(conversation)
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (failure: Exception) {
-    Telemetry.event(TELEMETRY_TAG, "conversationModel.readFailed", "error" to failure.message, level = Telemetry.Level.WARN)
-    null
-}
+private suspend fun readRecordedConversation(source: TimelineModelSource, conversation: ConversationId): Conversation? =
+    runCatching { source.conversation(conversation) }
+        .onFailure { failure ->
+            if (failure is CancellationException) throw failure
+            Telemetry.event(TELEMETRY_TAG, "conversationModel.readFailed", "error" to failure.message, level = Telemetry.Level.WARN)
+        }
+        .getOrNull()
 
 /** The [ConversationModelHost] of a page that serves exactly one conversation. */
 private class TargetConversationModelHost(
