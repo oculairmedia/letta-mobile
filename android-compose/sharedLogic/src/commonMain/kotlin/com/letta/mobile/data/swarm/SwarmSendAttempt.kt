@@ -206,15 +206,11 @@ internal class SendAttempt(
         var quietFor = Duration.ZERO
         while (deadline.remaining() > Duration.ZERO) {
             val reply = (history.replyAfter(conversation, persisted) as? Lookup.Found)?.value
-            if (reply.isUnchangedReplyOf(last)) {
-                quietFor += policy.pollInterval
-                if (quietFor >= policy.resumeQuiet) {
-                    reporter.report(DeliveryReceipt.Processed(TurnTerminal.Unobserved, reply))
-                    holder.delivered()
-                    return
-                }
-            } else {
-                quietFor = Duration.ZERO
+            quietFor = if (reply.isUnchangedReplyOf(last)) quietFor + policy.pollInterval else Duration.ZERO
+            reply?.takeIf { quietFor >= policy.resumeQuiet }?.let { settled ->
+                reporter.report(DeliveryReceipt.Processed(TurnTerminal.Unobserved, settled))
+                holder.delivered()
+                return
             }
             last = reply
             delay(policy.pollInterval)
