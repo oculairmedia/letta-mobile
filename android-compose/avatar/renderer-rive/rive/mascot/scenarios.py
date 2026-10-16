@@ -142,6 +142,31 @@ SCENARIOS = {s.name: s for s in [
                       advance(60)),
              note="the Drag layer, driven by the `dragged` boolean; the pointer gesture alone "
                   "does not reach the file's listener under the CLI"),
+    # te3n1.5: the two new sustained states and every reaction (React / Pet layers).
+    scenario("enter-working", (data("state=working"), advance(60)),
+             note="idle -> working: square-on, the quicker sway, the glance down-right"),
+    scenario("enter-dreaming", (data("state=dreaming"), advance(90)),
+             note="idle -> dreaming: the 600 ms settle into the sleep pose, lighter tint"),
+    scenario("poke", (data("poke=true"), advance(40)), note="420 ms squish, startled, rebound"),
+    scenario("dizzy", (data("dizzy=true"), advance(100)), note="1.5 s wobble on the feet, base shearing"),
+    scenario("sent", (data("sent=true"), advance(30)), note="350 ms catch-dip and lift"),
+    scenario("toolStart", (data("toolStart=true"), advance(30)), note="300 ms hop, glance down"),
+    scenario("toolDone", (data("toolDone=true"), advance(30)), note="250 ms nod"),
+    scenario("land", (data("impact=1"), data("land=true"), advance(40)),
+             note="the hard landing tier (impact 1): 500 ms squash about the feet"),
+    scenario("wake", (data("wake=true"), advance(50)), note="700 ms startle stretch"),
+    scenario("yawn", (data("yawn=true"), advance(80)), note="1.2 s yawn: closed eye, round mouth, stretch"),
+    *[scenario(f"trick{k}", (data(f"trickId={k}"), data("trick=true"), advance(110)),
+               note=["spin-flip about the centre", "jump-twirl", "peekaboo", "melt-and-reform"][k])
+      for k in range(4)],
+    scenario("petting", (data("petting=true"), advance(120)),
+             note="the Pet layer's sway and purr (one 1.8 s loop), content glyph"),
+    scenario("reduce-motion-idle", (data("reduceMotion=true"), advance(3600)),
+             note="60 s of idle with reduceMotion: IdleVariety, Wander and the breath bob held"),
+    scenario("reduce-motion-poke", (data("reduceMotion=true"), data("poke=true"), advance(40)),
+             note="a poke with reduceMotion: ReactCalm, one blink and nothing that moves"),
+    scenario("idle-60s", (advance(3600),),
+             note="60 s of plain idle: the control for reduce-motion-idle (beats and wander DO fire)"),
 ]}
 
 

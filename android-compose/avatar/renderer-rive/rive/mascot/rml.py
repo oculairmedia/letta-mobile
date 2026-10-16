@@ -5,12 +5,14 @@ from textwrap import indent
 
 # --- property keys (rive schema) --------------------------------------------------------------
 X, Y, ROT, SX, SY, OPACITY = 13, 14, 15, 16, 17, 18
+BONE_X = 90   # RootBone.x - a root bone's own x; Node.x (13) is not a bone property
 COLOR, GRADIENT_OPACITY = 37, 46
 VX, VY, VROT, VDIST = 24, 25, 82, 83                      # mirrored vertex
 VIN_ROT, VIN_DIST, VOUT_ROT, VOUT_DIST = 84, 85, 86, 87   # detached vertex
 NESTED_VALUE, NESTED_FIRE, REMAP_TIME = 239, 401, 202
 ACTIVE_CHILD = 296  # Solo.activeComponentId
 BIND_ENUM, BIND_TRIGGER, BIND_BOOL = 637, 686, 634
+BIND_NUMBER = 636   # BindablePropertyNumber.propertyValue
 
 # --- ids ----------------------------------------------------------------------------------------
 VM, VM_STATE, VM_MOUTH, VM_LOOKX, VM_LOOKY, VM_BLINK, VM_SHAPE, VM_COLOR, VM_HOVER = (
@@ -117,12 +119,23 @@ def callback_keyed(objects, frame=0):
         f'        <KeyFrameCallback frame="{frame}"/>\n    </KeyedProperty>\n</KeyedObject>' for o in objects)
 
 
+def callbacks_at(fires):
+    """{objectId: [frame, ...]} -> one KeyedObject per object with a callback at every frame."""
+    return "\n".join(
+        f'<KeyedObject objectId="{o}">\n    <KeyedProperty propertyKey="{NESTED_FIRE}">\n'
+        + "\n".join(f'        <KeyFrameCallback frame="{f}"/>' for f in frames)
+        + '\n    </KeyedProperty>\n</KeyedObject>' for o, frames in fires.items())
+
+
 def animation(*parts, **opts):
     name, aid, duration, objects = parts[0], parts[1], parts[2], parts[3]
     loop = parts[4] if len(parts) > 4 else opts.get("loop", "oneShot")
     callbacks = opts.get("callbacks", ())
+    fires = opts.get("fires", {})
     bezier = opts.get("bezier", SOFT_OUT)
     body = keyed(objects, bezier) + ("\n" + callback_keyed(callbacks) if callbacks else "")
+    if fires:
+        body += ("\n" if body else "") + callbacks_at(fires)
     return (f'<LinearAnimation fps="60" duration="{max(1, duration)}" loopValue="{loop}" name="{name}" id="{aid}">\n'
             + indent(body, "    ") + '\n</LinearAnimation>')
 
@@ -151,7 +164,7 @@ def layer_frame(*parts):
 
 
 def vm_condition(kind, prop, literal, op="equal"):
-    key = {"Enum": BIND_ENUM, "Trigger": BIND_TRIGGER, "Boolean": BIND_BOOL}[kind]
+    key = {"Enum": BIND_ENUM, "Trigger": BIND_TRIGGER, "Boolean": BIND_BOOL, "Number": BIND_NUMBER}[kind]
     return f'''<TransitionViewModelCondition opValue="{op}">
     <TransitionPropertyViewModelComparator>
         <BindableProperty{kind}>
@@ -205,8 +218,30 @@ def input_transition(to_id, input_id, value, duration=160):
             f'</StateTransition>')
 
 
-def exit_transition(to_id, duration=0, bezier=None):
-    return transition(to_id, duration, bezier, exit_time=True)
+def exit_transition(to_id, duration=0, bezier=None, condition=None):
+    return transition(to_id, duration, bezier, condition, exit_time=True)
+
+
+# --- conditions, for transitions that need more than one (Rive ANDs every condition) -------------
+def when_bool(prop, value):
+    return vm_condition("Boolean", prop, f'<TransitionValueBooleanComparator value="{value}"/>')
+
+
+def when_enum(prop, enum_value_id, op="equal"):
+    return vm_condition("Enum", prop, f'<TransitionValueEnumComparator value="{enum_value_id}"/>', op)
+
+
+def when_trigger(prop):
+    return vm_condition("Trigger", prop, '<TransitionValueTriggerComparator/>')
+
+
+def when_number(prop, op, value):
+    return vm_condition("Number", prop, f'<TransitionValueNumberComparator value="{value}"/>', op)
+
+
+def when_input(input_id, op, value):
+    """A nested-artboard input condition (the plate's `expr`)."""
+    return f'<TransitionNumberCondition inputId="{input_id}" opValue="{op}" value="{value}"/>'
 
 
 def weighted(t, weight):
