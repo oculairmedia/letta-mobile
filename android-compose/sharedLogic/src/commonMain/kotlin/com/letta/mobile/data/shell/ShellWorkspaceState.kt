@@ -70,7 +70,7 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
     private var lastActiveByAgent: Map<AgentId, ConversationId> by mutableStateOf(emptyMap())
 
     /** The session the state belongs to ([sessionChanged]). */
-    private var sessionKey: Any? = null
+    private var session: String? = null
 
     /** The page and the editor beside it, with the focus filled in: what the shared ShellPage draws. */
     val destination: ShellDestination
@@ -168,9 +168,9 @@ class ShellWorkspaceState(initialPage: ShellDestination = ShellDestination.Home)
      * the tabs and the editor belonged to the old one, so they go; the page stays, without its ids.
      * The first key only records itself.
      */
-    fun sessionChanged(key: Any) {
-        val previous = sessionKey
-        sessionKey = key
+    fun sessionChanged(key: String) {
+        val previous = session
+        session = key
         if (previous == null || previous == key) return
         focusedAgentId = null
         selectedConversationId = null

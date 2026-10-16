@@ -16,7 +16,8 @@ import com.letta.mobile.web.chat.WebChatCanvas
 import com.letta.mobile.web.chat.WebChatLoad
 import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.WasmAppServerClientGateway
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * The backend the page talks to and the roster it returned (until the shared session graph is bound,
@@ -39,12 +40,11 @@ internal class WebBackend(initialConfig: LettaConfig) {
     /** Fetches the roster for the current backend and hands it to [workspace]; a new backend resets the workspace. */
     suspend fun loadRoster(gateway: WasmAppServerClientGateway, workspace: ShellWorkspaceState) {
         val current = config.value
-        workspace.sessionChanged(current.serverUrl to current.mode)
-        agents.value = try {
-            gateway.listAgents(current)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (failure: Throwable) {
+        workspace.sessionChanged("${current.mode}|${current.serverUrl}")
+        val fetched = runCatching { gateway.listAgents(current) }
+        // A cancelled load (the backend changed again) ends here instead of reading as a failure.
+        currentCoroutineContext().ensureActive()
+        agents.value = fetched.getOrElse { failure ->
             // The gateway's state carries the failure (its cleaned message); the page shows it.
             println("Letta web: agent list failed: ${failure.message}")
             emptyList()

@@ -66,7 +66,8 @@ private fun DesktopShellChatEffects(
  */
 @Composable
 private fun SyncShellWorkspace(workspace: ShellWorkspaceState, chatState: DesktopChatSurfaceState) {
-    LaunchedEffect(workspace, chatState.sessionGraphId) { workspace.sessionChanged(chatState.sessionGraphId) }
+    val session = chatState.sessionGraphId.toString()
+    LaunchedEffect(workspace, session) { workspace.sessionChanged(session) }
     val shown = chatState.selectedConversationId?.let(::ConversationId)
     val shownAgent = chatState.selectedConversation?.agentId?.let(::AgentId)
     LaunchedEffect(workspace, workspace.page.kind, shown, shownAgent) { workspace.conversationShown(shown, shownAgent) }

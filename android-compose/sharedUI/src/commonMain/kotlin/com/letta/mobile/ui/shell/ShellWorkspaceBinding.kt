@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.shell
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.data.agents.RecentAgentsPolicy
 import com.letta.mobile.data.model.AgentId
@@ -25,13 +25,17 @@ import kotlin.time.Instant
 fun rememberShellWorkspaceState(initialPage: ShellDestination): ShellWorkspaceState =
     rememberSaveable(saver = ShellWorkspaceSaver) { ShellWorkspaceState(initialPage) }
 
-private val ShellWorkspaceSaver = listSaver<ShellWorkspaceState, Any>(
-    save = { listOf(ShellRoute.encode(it.page), it.railExpanded) },
+/** Saved as the rail's width mark, then the page's route: `+home`, `-chat?agent=a`. */
+private val ShellWorkspaceSaver = Saver<ShellWorkspaceState, String>(
+    save = { (if (it.railExpanded) RAIL_EXPANDED else RAIL_COLLAPSED) + ShellRoute.encode(it.page) },
     restore = { saved ->
-        val page = (saved[0] as String).let(ShellRoute::decode) ?: ShellDestination.Home
-        ShellWorkspaceState(page).apply { railExpanded = saved[1] as Boolean }
+        val page = ShellRoute.decode(saved.drop(1)) ?: ShellDestination.Home
+        ShellWorkspaceState(page).apply { railExpanded = saved.startsWith(RAIL_EXPANDED) }
     },
 )
+
+private const val RAIL_EXPANDED = "+"
+private const val RAIL_COLLAPSED = "-"
 
 /**
  * The shared navigation drawer's input over the workspace and its roster [agents] as (id, name):

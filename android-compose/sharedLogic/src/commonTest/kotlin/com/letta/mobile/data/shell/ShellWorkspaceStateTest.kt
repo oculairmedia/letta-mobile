@@ -150,15 +150,15 @@ class ShellWorkspaceStateTest {
     @Test
     fun aBackendSwitchClearsTheStaleFocusTabsAndEditor() {
         val state = ShellWorkspaceState(ShellDestination.Memory("agent-1"))
-        state.sessionChanged(1L)
+        state.sessionChanged("session-1")
         state.showChat()
         state.conversationShown(cOld, a1)
         state.navigate(ShellDestination.Memory("agent-1"))
         state.editAgentId = a1
-        state.sessionChanged(1L)
+        state.sessionChanged("session-1")
         assertEquals(a1, state.focusedAgentId, "the same session keeps everything")
 
-        state.sessionChanged(2L)
+        state.sessionChanged("session-2")
         assertNull(state.focusedAgentId)
         assertNull(state.selectedConversationId)
         assertNull(state.agentEditor)
