@@ -119,14 +119,16 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     var appContext: android.content.Context = mockk(relaxed = true),
     var cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
+) {
     /** Tests own the graph's outer bound; production uses the process lifecycle. */
-    var graphParentScope: () -> CoroutineScope = { CoroutineScope(SupervisorJob()) },
+    var graphParentScope: () -> CoroutineScope = { CoroutineScope(SupervisorJob()) }
+
     /**
      * letta-mobile-by4vm.94: Unconfined runs the (non-suspending) fake cache clear inside create(),
      * so most tests see an already-open gate, as they did when create() blocked on the clear.
      */
-    var cacheClearContext: kotlin.coroutines.CoroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
-) {
+    var cacheClearContext: kotlin.coroutines.CoroutineContext = kotlinx.coroutines.Dispatchers.Unconfined
+
     /** The fakes stand in for a non-App-Server backend through the letta-mobile-ckmub.4 seam. */
     private fun remoteSources() = SessionRemoteSources(
         agents = agentApi.bound(),

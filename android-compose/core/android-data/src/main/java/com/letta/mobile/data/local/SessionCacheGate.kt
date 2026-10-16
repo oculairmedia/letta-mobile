@@ -34,16 +34,11 @@ class SessionCacheGate private constructor(opened: Boolean) {
      */
     internal suspend fun runClear(clear: suspend () -> Unit) {
         if (cleared.isCompleted) return
-        try {
-            clear()
-            cleared.complete(Unit)
-        } catch (cancelled: CancellationException) {
-            cleared.completeExceptionally(cancelled)
-            throw cancelled
-        } catch (failure: Throwable) {
-            // Fail closed, and keep the background job quiet: callers see the error on access.
-            cleared.completeExceptionally(failure)
-        }
+        // Any outcome settles the gate: success opens it, a failure fails it closed (callers see
+        // the error on access, the background job stays quiet), and cancellation still propagates.
+        val outcome = runCatching { clear() }
+        outcome.fold(onSuccess = { cleared.complete(Unit) }, onFailure = { cleared.completeExceptionally(it) })
+        (outcome.exceptionOrNull() as? CancellationException)?.let { throw it }
     }
 
     /** A newer generation exists; anything still waiting on this one must not touch Room. */
