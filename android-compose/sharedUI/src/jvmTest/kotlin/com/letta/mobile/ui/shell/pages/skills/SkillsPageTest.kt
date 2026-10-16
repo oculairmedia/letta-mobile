@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,6 +31,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** The shared Skills page with its Tools section, on desktop and a phone (letta-mobile-zxk2n.32). */
 class SkillsPageTest {
@@ -119,6 +122,26 @@ class SkillsPageTest {
         onNodeWithTag(SkillsPageTags.ADD_TOOL).performClick()
         onNodeWithTag(SkillsPageTags.tool("tool-git")).performClick()
         assertEquals(listOf("install:github", "uninstall:notion", "add-tool", "tool:tool-git"), calls)
+    }
+
+    @Test
+    fun aFailedRemoveIsADismissibleNoticeAboveTheStillListedSkills() = runComposeUiTest {
+        var dismissed = false
+        val failed = state().copy(skillActionError = "Couldn't remove notion: not a symlink")
+        show(failed, SkillsPageActions(onDismissSkillActionError = { dismissed = true }))
+        onNodeWithText("Couldn't remove notion: not a symlink").assertIsDisplayed()
+        onNodeWithTag(SkillsPageTags.skill("notion")).assertExists()
+        onNodeWithTag("skills-error").assertDoesNotExist()
+        onNodeWithContentDescription("Dismiss").performClick()
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun aSkillTheHostCannotRemoveOffersNoRemove() = runComposeUiTest {
+        val calls = mutableListOf<String>()
+        show(state(skills = listOf(notion.copy(removable = false))), SkillsPageActions(onUninstallSkill = { calls += it }))
+        onNodeWithTag(SkillsPageTags.skillToggle("notion")).assertIsNotEnabled()
+        assertEquals(emptyList(), calls)
     }
 
     @Test

@@ -62,4 +62,5 @@ internal fun destinationSkillsActions(
     onRefresh = { skills.reload(selectedAgentId) },
     onInstall = skills::install,
     onUninstall = skills::uninstall,
+    onDismissActionError = skills::dismissActionError,
 )

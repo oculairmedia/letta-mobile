@@ -5,15 +5,16 @@ package com.letta.mobile.ui.shell.rail
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilExactlyOneExists
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -64,43 +65,22 @@ class ShellAgentRailTest {
     }
 
     @Test
-    fun hiddenAgentsAreOneTapAwayBehindAllAgents() = runComposeUiTest {
+    fun theOrbsEndInNoAllAgentsButtonNewIsTheOnlyWayToTheRest() = runComposeUiTest {
         var opened = 0
         setContent {
             MaterialTheme {
                 ShellAgentRail(
-                    state = ShellAgentRailState(entries = entries, hiddenAgentCount = 5),
-                    actions = ShellAgentRailActions(onShowAllAgents = { opened++ }),
+                    state = ShellAgentRailState(entries = entries),
+                    actions = ShellAgentRailActions(onNewSession = { opened++ }),
                 )
             }
         }
-        // An "All agents" button, not a count bubble: the count is only in its description.
-        onNodeWithContentDescription("All agents (5 more)").performClick()
-        onNodeWithText("+5").assertDoesNotExist()
+        waitUntilExactlyOneExists(hasTestTag(ShellAgentRailTags.orb("Beta")))
+        // The grid button under the orbs duplicated New (both opened the same agent picker).
+        onNodeWithContentDescription("All agents", substring = true).assertDoesNotExist()
+        onAllNodesWithContentDescription("New").assertCountEquals(1)
+        onNodeWithContentDescription("New").performClick()
         assertEquals(1, opened)
-    }
-
-    @Test
-    fun noAllAgentsControlWhenNothingIsHiddenOrTheHostHasNoList() = runComposeUiTest {
-        var hidden by mutableStateOf(0)
-        var action: (() -> Unit)? by mutableStateOf({})
-        setContent {
-            MaterialTheme {
-                ShellAgentRail(
-                    state = ShellAgentRailState(entries = entries, hiddenAgentCount = hidden),
-                    actions = ShellAgentRailActions(onShowAllAgents = action),
-                )
-            }
-        }
-        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()
-        hidden = 120
-        waitForIdle()
-        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertExists()
-        onNodeWithContentDescription("All agents", substring = true).assertExists()
-        onNodeWithText("99+").assertDoesNotExist()
-        action = null
-        waitForIdle()
-        onNodeWithTag(ShellAgentRailTags.ALL_AGENTS).assertDoesNotExist()
     }
 
     @Test

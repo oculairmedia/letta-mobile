@@ -81,7 +81,7 @@ internal fun ComposerActionChip(
             Icon(
                 imageVector = LettaIcons.KeyboardArrowDown,
                 contentDescription = null,
-                modifier = Modifier.size(LettaDimens.Control.iconSm),
+                modifier = Modifier.size(LettaDimens.Control.iconSm).testTag(ComposerTestTags.CHIP_CHEVRON),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

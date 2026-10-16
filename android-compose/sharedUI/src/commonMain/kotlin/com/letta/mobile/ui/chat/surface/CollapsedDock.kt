@@ -3,6 +3,9 @@ package com.letta.mobile.ui.chat.surface
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
@@ -43,6 +49,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -84,6 +92,7 @@ import com.letta.mobile.ui.markdown.LocalSharedRichMarkdownRenderer
 import com.letta.mobile.ui.markdown.MarkdownPaint
 import com.letta.mobile.ui.markdown.SharedMarkdownText
 import com.letta.mobile.ui.mascot.AgentInitialTile
+import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.MascotMirror
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotSeatVacancy
@@ -235,32 +244,70 @@ internal fun CollapsedDock(
     /** False while the dock opens back into the panel: the companion is on its way to the bar. */
     seated: Boolean = true,
 ) {
+    // The pointer over the mascot shows the layout button beside it.
+    val mascotHover = remember { MascotHover() }
     Column(modifier.testTag(DOCK_COLLAPSED_TAG)) {
         Box(Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.lg)) {
             // Even insets on both sides keep the mascot over the bar's centre and the bubble clear
             // of the restore control. The mascot's own motion is the thinking cue: no glow here.
             val sides = maxOf(LettaDimens.Control.iconButtonLg, BubbleLayoutDimens.control) + LettaDimens.Space.sm
             CollapsedTurnColumn(
-                state,
-                content,
-                seated,
+                CollapsedSeat(state, content, seated, mascotHover),
                 Modifier.align(Alignment.BottomCenter).padding(horizontal = sides),
             )
             // letta-mobile-zxk2n.29: the person's own layout, opposite the restore control.
-            BubbleLayoutButton(Modifier.align(Alignment.BottomStart))
+            BubbleLayoutButton(mascotHover.hovered(), Modifier.align(Alignment.BottomStart))
             RestoreButton(state, Modifier.align(Alignment.BottomEnd))
         }
     }
 }
 
+/** Where the minimised mascot stands and what it tells: the dock, its content, whether it is seated, and its hover. */
+@Immutable
+private class CollapsedSeat(
+    val state: ChatDockState,
+    val content: CollapsedDockContent,
+    val seated: Boolean,
+    val mascotHover: MascotHover,
+)
+
+/**
+ * Whether the pointer is over the minimised mascot's spot. The spot hears hover itself where
+ * nothing is drawn over it; on the chat page the one companion seat stands over the spot and
+ * takes its pointer input, so the window's cursor (the mascot registry's, captured at the root)
+ * is checked against the spot's bounds as well.
+ */
+@Stable
+private class MascotHover {
+    val interactions = MutableInteractionSource()
+
+    /** The spot in window coordinates, as last laid out. */
+    var bounds: Rect? by mutableStateOf(null)
+
+    @Composable
+    fun hovered(): Boolean {
+        val hovered by interactions.collectIsHoveredAsState()
+        val cursor = LocalMascotRegistry.current.cursor
+        val cursorOver by remember(cursor) {
+            derivedStateOf {
+                val at = cursor.value
+                val spot = bounds
+                at != null && spot != null && spot.contains(at)
+            }
+        }
+        return hovered || cursorOver
+    }
+
+    fun modifier(): Modifier = Modifier
+        .hoverable(interactions)
+        .onGloballyPositioned { bounds = it.boundsInWindow() }
+}
+
 /** The mascot over the bar's centre and above it the reply bubble (or, while it thinks, only its announcement). */
 @Composable
-private fun CollapsedTurnColumn(
-    state: ChatDockState,
-    content: CollapsedDockContent,
-    seated: Boolean,
-    modifier: Modifier,
-) {
+private fun CollapsedTurnColumn(seat: CollapsedSeat, modifier: Modifier) {
+    val state = seat.state
+    val content = seat.content
     val turn = content.turn()
     // Per turn: the next prompt brings a new turn, and with its reply a new bubble.
     var dismissedTurn by rememberSaveable { mutableStateOf<String?>(null) }
@@ -281,20 +328,22 @@ private fun CollapsedTurnColumn(
             )
         }
         if (turn.busy && !turn.hasReply) ThinkingAnnouncement(content.agentName)
-        CollapsedMascot(state, content, seated)
+        CollapsedMascot(seat)
     }
 }
 
 /** The agent itself: its mascot, or a sphere for an agent without one. Tap opens the agent pane. */
 @Composable
-private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent, seated: Boolean) {
+private fun CollapsedMascot(seat: CollapsedSeat) {
+    val content = seat.content
     // letta-mobile-zxk2n.29: as big as the person set it (Ctrl/Cmd + wheel over it, or the layout menu).
     val size = animatedBubbleMascotSize()
     Box(
         Modifier
             .size(size)
+            .then(seat.mascotHover.modifier())
             .pointerHoverIcon(movePointerIcon())
-            .dockDrag(state)
+            .dockDrag(seat.state)
             .then(rememberMascotWheelResize())
             .testTag(DOCK_COLLAPSED_MASCOT_TAG),
         contentAlignment = Alignment.Center,
@@ -303,7 +352,7 @@ private fun CollapsedMascot(state: ChatDockState, content: CollapsedDockContent,
         // open panel's badge as the dock folds); this spot only tells it where.
         val anchors = LocalCompanionSeatAnchors.current
         if (anchors != null && mascotAvailable(content.agentId)) {
-            if (seated) CompanionSeatAnchor(anchors, size = size)
+            if (seat.seated) CompanionSeatAnchor(anchors, size = size)
             // letta-mobile-8kpk7: the spot never stands empty. While another seat holds the
             // character (the desktop sidebar's agent hero) or the host cannot draw its scene, a
             // live mirror of it (or its initial) keeps the place; the transported one covers it once it is back.

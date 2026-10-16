@@ -44,6 +44,32 @@ class TimelineOwnershipAuthorityTest {
         rejected { authority.state(fresh) }
     }
 
+    /**
+     * letta-mobile-by4vm.15: canonical is the only route. An unclaimed conversation, one a managed
+     * backend has never seen, and one an older build left mid-migration all open canonical without a
+     * copy; a canonical one reopens at its own epoch, and the agent pin still fences other agents.
+     */
+    @Test fun claimOpensEveryScopeCanonicalAndReopensAtTheSameEpoch() = runBlocking {
+        val authority = authority()
+        val fresh = authority.claimCanonical(scope)
+        assertEquals(TimelineOwnershipAuthority.Route.Canonical, fresh.route)
+        assertEquals(TimelineOwnershipAuthority.Phase.Canonical, authority().state(scope).phase)
+        authority.withLease(fresh) { }
+        assertEquals(fresh, authority().claimCanonical(scope))
+
+        val unseen = scope.copy(conversationId = "unseen-in-managed-backend")
+        authority.withLease(authority.claimCanonical(unseen)) { }
+
+        val interrupted = TimelineScope("unmanaged-backend", "interrupted", "agent")
+        val migrating = authority.beginMigration(authority.acquire(interrupted, TimelineOwnershipAuthority.Route.Legacy))
+        val claimed = authority().claimCanonical(interrupted)
+        assertTrue(claimed.epoch > migrating.epoch)
+        rejected { authority.withLease(migrating) { fail("interrupted migration writer entered") } }
+        authority.withLease(claimed) { }
+
+        rejected { authority.claimCanonical(scope.copy(agentId = "other")) }
+    }
+
     @Test fun restartFencesOldLeasesAndCanonicalNeverRollsBack() = runBlocking {
         val authority = authority()
         val legacy = authority.acquire(scope, TimelineOwnershipAuthority.Route.Legacy)

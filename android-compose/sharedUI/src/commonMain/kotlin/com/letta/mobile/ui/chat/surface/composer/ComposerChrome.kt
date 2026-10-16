@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Folder
 import com.composables.icons.lucide.Lucide
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.workspace.directory.WorktreePaths
 import com.letta.mobile.data.workspace.directory.devicePathOrNull
 import com.letta.mobile.sharedui.resources.Res
@@ -152,9 +153,12 @@ internal fun ComposerErrorRow(message: String, onDismiss: () -> Unit) {
  * The keyboard-affordance strip under the composer. Faded rather than removed: it keeps its
  * space, so typing the first character dims a line instead of shifting the composer. Lifted
  * from desktop's ComposerHintRow.
+ *
+ * The context indicator ([contextUsage]) sits at the line's right end. It does not fade with the hint:
+ * it stays visible, announced and clickable while the draft has text.
  */
 @Composable
-internal fun ComposerHintRow(visible: Boolean) {
+internal fun ComposerHintRow(visible: Boolean, contextUsage: ContextWindowUsageState? = null) {
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = tween(durationMillis = LettaMotionTokens.CONTENT_SIZE_MILLIS),
@@ -165,10 +169,9 @@ internal fun ComposerHintRow(visible: Boolean) {
             .widthIn(max = ChatColumnMaxWidth)
             .fillMaxWidth()
             .padding(start = LettaDimens.Space.sm, top = LettaDimens.Space.hair, bottom = LettaDimens.Space.hair)
-            .graphicsLayer { this.alpha = alpha }
-            .testTag(ComposerTestTags.HINT)
-            // Hidden copy must not be announced or hit-tested.
-            .clearAndSetSemantics { },
+            .testTag(ComposerTestTags.HINT_FOOTER),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
     ) {
         Text(
             text = stringResource(Res.string.composer_hint),
@@ -176,6 +179,13 @@ internal fun ComposerHintRow(visible: Boolean) {
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ChatComposerDimens.hintAlpha),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .graphicsLayer { this.alpha = alpha }
+                .testTag(ComposerTestTags.HINT)
+                // Hidden copy must not be announced or hit-tested.
+                .clearAndSetSemantics { },
         )
+        contextUsage?.let { ComposerContextIndicator(it) }
     }
 }

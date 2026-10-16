@@ -13,13 +13,19 @@ object ComposerTestTags {
     const val SHOW_CANVAS = "composer-show-canvas"
     const val ERROR = "composer-error"
     const val HINT = "composer-hint"
+    /** The line under the card: the keyboard hint and, at its right, the context indicator. */
+    const val HINT_FOOTER = "composer-hint-footer"
     const val COMMAND_SUGGESTIONS = "composer-commands"
     const val COMMAND_ROW = "composer-command-"
     const val ATTACHMENTS = "composer-attachments"
     const val MODEL_CHIP = "composer-model"
     const val MODEL_SHEET = "composer-model-sheet"
     const val EFFORT_CHIP = "composer-effort"
+    /** The context indicator: a plain reading (no chip, no chevron) that opens its breakdown. */
+    const val CONTEXT_CHIP = "composer-context"
     const val CONTEXT_POPOVER = "composer-context-popover"
+    /** The chevron a chip that opens a picker ends with. */
+    const val CHIP_CHEVRON = "composer-chip-chevron"
     const val WORKING_DIRECTORY = "composer-working-directory"
     const val PERMISSION_MODE_CHIP = "composer-permission-mode"
     const val PERMISSION_MODE_POPOVER = "composer-permission-mode-popover"

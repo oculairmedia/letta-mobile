@@ -8,9 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -57,27 +58,62 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The prompt card's control row: the plus (attach / open canvas), the model and effort chips,
- * the context chip, the platform's voice button and the send/stop button. Below
- * [ChatComposerDimens.controlsWrapBreakpoint] the context chip wraps to a second row so the
- * primary controls and Send stay reachable. Lifted from desktop's ComposerControlRow.
+ * the permission-mode chip, the context chip (unless it rides the hint footer, see
+ * [ComposerModel.contextInHintFooter]), the platform's voice button and the send/stop button.
+ * Below [ChatComposerDimens.controlsWrapBreakpoint] the permission-mode and context chips wrap
+ * to a second row so the primary controls and Send stay reachable. Lifted from desktop's
+ * ComposerControlRow.
  */
 @Composable
 internal fun ComposerControlRow(model: ComposerModel, onAttachImage: () -> Unit) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag(ComposerTestTags.CONTROLS)) {
         val narrow = maxWidth < ChatComposerDimens.controlsWrapBreakpoint
-        val usage = model.composer.contextUsage
+        val secondary = secondaryControls(model)
         Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
             ControlsRow {
                 if (model.offersOpenCanvas) ComposerShowCanvasButton(onShowCanvas = { model.onIntent(ChatSurfaceIntent.OpenCanvas) })
                 ComposerPlusButton(model, onAttachImage)
-                if (model.showModel) model.composer.model?.let { ComposerModelControls(it, model.actions, model.host) }
-                if (!narrow && usage != null) ComposerContextChip(usage)
-                Spacer(Modifier.weight(1f))
+                // The chips take what is left and clip their labels before they push Send off the card.
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (model.showModel) model.composer.model?.let { ComposerModelControls(it, model.actions, model.host) }
+                    if (!narrow) secondary?.invoke()
+                }
                 ComposerVoiceButton(model)
                 ComposerActionButton(model)
             }
-            if (narrow && usage != null) ControlsRow { ComposerContextChip(usage) }
+            if (narrow && secondary != null) WrappedControlsRow { secondary() }
         }
+    }
+}
+
+/**
+ * The chips that wrap to their own row on a narrow card: the permission mode and (when it is not
+ * in the hint footer) the context window. Null when there are none.
+ */
+private fun secondaryControls(model: ComposerModel): (@Composable () -> Unit)? {
+    val permission = model.composer.permissionMode
+    val usage = model.composer.contextUsage.takeUnless { model.contextInHintFooter }
+    if (permission == null && usage == null) return null
+    return {
+        permission?.let { ComposerPermissionModeChip(it, model.actions::setPermissionMode) }
+        usage?.let { ComposerContextIndicator(it) }
+    }
+}
+
+/** The narrow card's second row: chips that flow onto another line rather than overflow. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun WrappedControlsRow(content: @Composable () -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.xs),
+    ) {
+        content()
     }
 }
 

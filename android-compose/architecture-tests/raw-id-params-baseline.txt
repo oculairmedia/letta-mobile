@@ -7,12 +7,10 @@ core/android-data/src/main/java/com/letta/mobile/data/channel/CurrentConversatio
 core/android-data/src/main/java/com/letta/mobile/data/local/BackendConversationCursorStore.kt 6
 core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpDao.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/local/ConfirmedTimelineSnapshotEntity.kt 33
-core/android-data/src/main/java/com/letta/mobile/data/local/ConversationCursorEntity.kt 3
 core/android-data/src/main/java/com/letta/mobile/data/local/ConversationDao.kt 8
 core/android-data/src/main/java/com/letta/mobile/data/local/PendingLocalDao.kt 7
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomAllConversationsLocalCache.kt 1
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomConfirmedTimelineStore.kt 9
-core/android-data/src/main/java/com/letta/mobile/data/local/RoomConversationCursorStore.kt 3
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomTimelineBoundedStore.kt 2
 core/android-data/src/main/java/com/letta/mobile/data/local/RoomTimelineManifestReader.kt 4
 core/android-data/src/main/java/com/letta/mobile/data/local/TimelineOwnershipAuthority.kt 2

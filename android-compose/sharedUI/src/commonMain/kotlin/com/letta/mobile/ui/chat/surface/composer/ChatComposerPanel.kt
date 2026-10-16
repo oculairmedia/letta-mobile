@@ -103,7 +103,7 @@ internal fun ChatComposerPanel(inputs: ComposerInputs, modifier: Modifier = Modi
         } else {
             ComposerCompanionRow(model) { ComposerPromptCard(model, attachImage) }
             if (inputs.platform.showKeyboardHints) {
-                ComposerHintRow(visible = composerHintVisible(composer))
+                ComposerHintRow(visible = composerHintVisible(composer), contextUsage = composer.contextUsage)
             }
         }
     }
@@ -160,9 +160,12 @@ private fun ComposerAboveCard(model: ComposerModel) {
     if (model.showWorkingDirectory && model.mode != ChatSurfaceMode.Docked) {
         model.composer.workingDirectory?.let { ComposerWorkingDirectoryRow(it, model.host.pickWorkingDirectory) }
     }
-    // The mode chip sits with the directory: chrome of the full page, not of the compact dock.
+    // The mode chip is chrome of the full page, not of the compact dock. On the pointer page it rides
+    // the card's control row (only its note stays here); the Touch bar has no control row to carry it.
     if (model.mode != ChatSurfaceMode.Docked) {
-        model.composer.permissionMode?.let { ComposerPermissionModeRow(it, actions::setPermissionMode) }
+        model.composer.permissionMode?.let { state ->
+            if (touchStyle()) ComposerPermissionModeRow(state, actions::setPermissionMode) else ComposerPermissionModeNoteRow(state)
+        }
         ComposerAgentMentionChips(model.composer.text, actions::updateComposerText)
     }
     if (model.composer.backgroundProcesses.isNotEmpty()) {

@@ -45,6 +45,12 @@
     <methods>;
 }
 
+# letta-mobile-by4vm.15: feature-chat's UnboundTimelineWriter is a Proxy over this interface
+# (the writer a send pipeline holds while no runtime is captured) and answers by method name.
+-keep interface com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter {
+    <methods>;
+}
+
 # ---------------------------------------------------------------------------
 # OkHttp — keep public API + TLS internals; let R8 shrink implementation.
 # The blanket `keep class okhttp3.** { *; }` prevented R8 from eliminating

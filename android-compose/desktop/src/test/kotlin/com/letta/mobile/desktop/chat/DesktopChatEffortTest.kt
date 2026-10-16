@@ -197,7 +197,6 @@ class DesktopChatEffortTest {
             scope = backgroundScope,
             gatewayFactory = { gateway },
             agentByIdProvider = { ids -> ids.associateWith { Agent(id = AgentId(it), name = it, model = SOL) } },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 
     private companion object {

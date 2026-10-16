@@ -36,7 +36,6 @@ import com.letta.mobile.desktop.chat.DesktopSharedChatPage
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageNavigation
 import com.letta.mobile.desktop.chat.DesktopSharedChatPageState
 import com.letta.mobile.desktop.chat.FakeDesktopChatGateway
-import com.letta.mobile.desktop.chat.noOpDesktopTimelinePersistence
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSurfaceModeReducer
@@ -143,7 +142,6 @@ class DesktopPhoneShellTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = scope,
             gatewayFactory = { FakeDesktopChatGateway() },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
         val port = DesktopChatSessionPort(controller = controller, scope = scope.backgroundScope)
         setContent {

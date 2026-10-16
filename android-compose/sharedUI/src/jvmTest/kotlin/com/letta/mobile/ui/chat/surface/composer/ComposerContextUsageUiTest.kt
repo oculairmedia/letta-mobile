@@ -26,7 +26,7 @@ class ComposerContextUsageUiTest {
 
     @Test
     fun chipShowsTheUsedShareAndOpensTheBreakdown() = runComposeUiTest {
-        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(usage = usage)) } }
+        setContent { MaterialTheme { ComposerContextIndicator(ContextWindowUsageState(usage = usage)) } }
 
         onNodeWithText("Context 5%").performClick()
 
@@ -38,7 +38,7 @@ class ComposerContextUsageUiTest {
 
     @Test
     fun chipReportsAFailedReadingInsteadOfATotal() = runComposeUiTest {
-        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(error = "Backend unreachable.")) } }
+        setContent { MaterialTheme { ComposerContextIndicator(ContextWindowUsageState(error = "Backend unreachable.")) } }
 
         onNodeWithText("Context —").performClick()
 
@@ -49,7 +49,7 @@ class ComposerContextUsageUiTest {
     fun chipShowsAStreamedTotalAgainstTheModelWindowWithNoCategoryRows() = runComposeUiTest {
         // letta-mobile-r2zo8: usage_statistics gives a total only, so only the total is drawn.
         val total = ContextWindowUsage.total(usedTokens = 29_193, windowTokens = 128_000)
-        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(usage = total)) } }
+        setContent { MaterialTheme { ComposerContextIndicator(ContextWindowUsageState(usage = total)) } }
 
         onNodeWithText("Context 23%").performClick()
 
@@ -63,7 +63,7 @@ class ComposerContextUsageUiTest {
     @Test
     fun chipShowsTheTotalAloneWhenTheWindowIsUnknown() = runComposeUiTest {
         val total = ContextWindowUsage.total(usedTokens = 29_193, windowTokens = null)
-        setContent { MaterialTheme { ComposerContextChip(ContextWindowUsageState(usage = total)) } }
+        setContent { MaterialTheme { ComposerContextIndicator(ContextWindowUsageState(usage = total)) } }
 
         onNodeWithText("Context 29.2k").performClick()
 

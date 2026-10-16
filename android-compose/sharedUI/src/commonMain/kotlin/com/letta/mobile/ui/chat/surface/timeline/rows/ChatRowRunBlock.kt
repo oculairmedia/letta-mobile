@@ -2,14 +2,13 @@ package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -40,7 +39,7 @@ import kotlinx.collections.immutable.toImmutableList
  * its own line; under it the body lifts up into its floor, working and settled alike, so settling only
  * rewrites the label.
  *
- * letta-mobile-zxk2n.37: the header is ONE summary line ([RunSummaryLine]: glyph, "Worked · 10.8s ·
+ * letta-mobile-zxk2n.37: the header is ONE summary line ([RunSummaryLine]: glyph, "Worked Â· 10.8s Â·
  * 1 tool", one chevron), and a run with work to show (its reasoning, its tool line) is folded by
  * default, working or settled alike: only its prose shows under the line. Opening the line lists the
  * work steps indented under it, each with its own disclosure. A request waiting on the person holds
@@ -62,16 +61,40 @@ internal fun RunBlockRow(
     val plan = rememberRunBlockPlan(messages, context) ?: return
     val row = RunRowScope(context, callbacks)
     Column(modifier = Modifier.fillMaxWidth().testTag(ChatRowTestTags.RUN_BLOCK)) {
-        RunHeader(plan.header(callbacks.actions))
+        val header = plan.header(callbacks.actions)
+        RunHeader(header)
         val lone = plan.loneMessage
         if (lone != null) {
-            // One message keeps its own row's geometry under the header (no body lift).
-            RunStepRow(PositionedRunStep(RunStep.Message(lone), position), row, Modifier.padding(top = runStepTop(lone, position)))
+            RunLoneStep(PositionedRunStep(RunStep.Message(lone), position), header, row)
         } else {
-            RunBody(plan.body, row)
+            RunBody(plan.body, header, row)
         }
     }
 }
+
+/**
+ * One message under its header keeps its own row's beat, and lifts it (and the header's floor) away
+ * while the header shows, so the reply starts right under the summary label. The header's height
+ * and the lift ease together, so the row keeps its height as the header shows or folds away.
+ */
+@Composable
+private fun RunLoneStep(positioned: PositionedRunStep, header: RunHeaderState, row: RunRowScope) {
+    val top = positioned.top()
+    val lift by animateRunBodyLift(if (header.visible) runHeaderFloor(header) + top else 0.dp)
+    RunStepRow(positioned, row, Modifier.pullUp { lift }.padding(top = top))
+}
+
+/** What the header's floor leaves under its label: the folding line's is taller. */
+private fun runHeaderFloor(header: RunHeaderState): Dp =
+    if (header.tall) ChatRowSpacing.runHeaderToggleFloor else ChatRowSpacing.runHeaderFloor
+
+/** The body lift, easing on the header's own fold curve (snapping under reduced motion). */
+@Composable
+private fun animateRunBodyLift(target: Dp): State<Dp> = animateDpAsState(
+    targetValue = target,
+    animationSpec = ChatRowMotion(LocalReducedMotion.current).contentSize(),
+    label = "runBodyLift",
+)
 
 /** What every part of a run block draws with: the row's inputs and where its intents leave. */
 @Immutable
@@ -163,7 +186,7 @@ private fun loneRunMessage(visible: List<UiMessage>, messageCount: Int): UiMessa
 /**
  * letta-mobile-sieej: what holds a run open whatever its owner's fold says: one of its requests waits
  * on the person's approval. letta-mobile-zxk2n.37: working no longer holds it open; the summary line
- * says "Working…", and a run folded the same way working and settled keeps its shape as it settles.
+ * says "Workingâ€¦", and a run folded the same way working and settled keeps its shape as it settles.
  */
 @Immutable
 internal class RunHold(val awaitingApproval: Boolean) {
@@ -242,21 +265,24 @@ private fun RunHeader(state: RunHeaderState) {
 }
 
 /**
- * The run's steps under its header. A settled run's body lifts [ChatRowSpacing.settledRunBodyLift]
- * up under the header's floor, easing (legacy jqiu3: by layout, so the lifted distance leaves no
- * band below).
+ * The run's steps under its header. A lifted body rises the header's floor under its label plus its
+ * first step's beat, easing (legacy jqiu3: by layout, so the lifted distance leaves no band below):
+ * the first step starts right under the summary label, whether that step is a work step (the grouped
+ * beat) or the run's prose opening a section (the ungrouped one).
  */
 @Composable
-private fun RunBody(body: RunBodyState, row: RunRowScope) {
-    val reducedMotion = LocalReducedMotion.current
-    val lift by animateDpAsState(
-        targetValue = if (body.lifted) ChatRowSpacing.settledRunBodyLift else 0.dp,
-        animationSpec = if (reducedMotion) snap() else tween(RUN_BODY_LIFT_MILLIS),
-        label = "runBodyLift",
-    )
+private fun RunBody(body: RunBodyState, header: RunHeaderState, row: RunRowScope) {
+    val steps = remember(body.messages) { compactRunSteps(body.messages) }
+    val lift by animateRunBodyLift(if (body.lifted) runHeaderFloor(header) + firstStepTop(steps) else 0.dp)
     Box(Modifier.fillMaxWidth().pullUp { lift }) {
-        RunSteps(remember(body.messages) { compactRunSteps(body.messages) }, body, row)
+        RunSteps(steps, body, row)
     }
+}
+
+/** The beat above the run's first step; a hidden (folded) work step takes the grouped one, as the prose after it does. */
+private fun firstStepTop(steps: List<RunStep>): Dp {
+    val first = steps.firstOrNull() ?: return 0.dp
+    return PositionedRunStep(first, stepPosition(0, steps.size)).top()
 }
 
 /** Draws the content [distance] higher and reports it [distance] shorter (legacy pullUp). */
@@ -347,8 +373,6 @@ private fun RunStepRow(positioned: PositionedRunStep, row: RunRowScope, modifier
         )
     }
 }
-
-private const val RUN_BODY_LIFT_MILLIS = 220
 
 /** Work the summary line stands for (a reasoning, the tool line), as opposed to the run's prose. */
 internal fun RunStep.isWork(): Boolean {

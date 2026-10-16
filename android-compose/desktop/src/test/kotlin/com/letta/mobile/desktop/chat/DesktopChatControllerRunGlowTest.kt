@@ -36,7 +36,6 @@ class DesktopChatControllerRunGlowTest {
             scope = this,
             gatewayFactory = { FakeDesktopChatGateway() },
             agentNamesByIdProvider = { emptyMap() },
-            timelinePersistence = noOpDesktopTimelinePersistence,
             loopFactory = { _, _, _ -> loop },
         )
         controller.start()

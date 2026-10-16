@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -203,7 +204,7 @@ class DesktopAppServerChatGatewayBuilderTest {
      * controller.startRuntime(Unrestricted) AND let AppServerTurnEngine's own
      * ensureRuntime issue a second runtime_start on the first send — a double
      * runtime_start. Dropping the controller and baking the mode into the
-     * engine (see [buildDesktopAppServerTurnEngine]) means ensureRuntime's
+     * engine (see [desktopTurnStackSpec]) means ensureRuntime's
      * single cached-runtime path is the only place runtime_start is ever
      * issued, Unrestricted, once per conversation.
      *
@@ -219,11 +220,7 @@ class DesktopAppServerChatGatewayBuilderTest {
     fun desktopTurnEngine_singleUnrestrictedRuntimeStartPerConversation() = runTest {
         val client = RecordingAppServerClient()
         val eventRouter = AppServerRuntimeEventRouter()
-        val engine = buildDesktopAppServerTurnEngine(
-            client = client,
-            scope = this,
-            config = DesktopAppServerEngineConfig(eventRouter = eventRouter),
-        )
+        val engine = eventRouter.attachTurnStack(client, this, desktopTurnStackSpec())
 
         try {
             runConversationTurnToCompletion(engine, client, "conv-1")

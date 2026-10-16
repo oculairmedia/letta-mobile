@@ -20,29 +20,10 @@ import kotlinx.coroutines.test.runTest
 
 class DesktopCanonicalTimelineRuntimeTest {
 
-    @Test fun disabledRouteBuildsNoRuntimeAndTouchesNoLedgerDirectory() {
-        val ledger = createTempDirectory("canonical-disabled").resolve("ledger")
-        val runtime = createDesktopCanonicalTimelineRuntime(
-            transport = NoTimelineTransport,
-            backendId = "backend",
-            ledgerDirectory = ledger,
-            enabled = false,
-        )
-        assertNull(runtime, "the canonical route must stay dormant unless explicitly enabled")
-        assertFalse(
-            ledger.toFile().exists(),
-            "constructing a disabled route must perform no disk IO",
-        )
-    }
-
-    @Test fun enabledRouteBuildsARuntime() {
-        val runtime = createDesktopCanonicalTimelineRuntime(
-            transport = NoTimelineTransport,
-            backendId = "backend",
-            ledgerDirectory = createTempDirectory("canonical-enabled").resolve("ledger"),
-            enabled = true,
-        )
-        assertNotNull(runtime)
+    @Test fun theRouteBuildsARuntimeWithoutTouchingTheLedgerDirectory() {
+        val ledger = createTempDirectory("canonical-runtime").resolve("ledger")
+        createDesktopCanonicalTimelineRuntime(NoTimelineTransport, "backend", ledger)
+        assertFalse(ledger.toFile().exists(), "constructing the route must perform no disk IO")
     }
 
     /**
@@ -116,29 +97,12 @@ class DesktopCanonicalTimelineRuntimeTest {
 
     /**
      * A default-shim conversation is served over a rewritten loop id, so a canonical scope built
-     * from its real id would index a different history. It must stay on the legacy route.
+     * from its real id would index a different history. It must stay on the in-memory loop.
      */
     @Test fun defaultShimConversationsAreNotServedByTheCanonicalRoute() {
-        val host = DesktopCanonicalTimelineHost(isEnabled = true)
+        val host = DesktopCanonicalTimelineHost()
         assertFalse(host.servesConversation("conv-default-abc"))
         assertTrue(host.servesConversation("conv-1234"))
-    }
-
-    /**
-     * Installing an opener makes the controller skip legacy whole-history hydration, so a disabled
-     * host must refuse rather than leave the transcript permanently empty.
-     */
-    @Test fun installingADisabledRouteFailsRatherThanEmptyingTheTranscript() = runTest {
-        val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
-        try {
-            assertFailsWith<IllegalStateException> {
-                DesktopCanonicalTimelineHost(isEnabled = false).installOn(controller, install(backgroundScope))
-            }
-            assertNull(controller.canonicalOpen)
-            assertNull(controller.canonicalSendFor)
-        } finally {
-            controller.close()
-        }
     }
 
     /**
@@ -148,7 +112,7 @@ class DesktopCanonicalTimelineRuntimeTest {
     @Test fun installingTheRouteWiresBothHistoryAndSend() = runTest {
         val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
         try {
-            DesktopCanonicalTimelineHost(isEnabled = true).installOn(controller, install(backgroundScope))
+            DesktopCanonicalTimelineHost().installOn(controller, install(backgroundScope))
             assertNotNull(controller.canonicalOpen)
             assertNotNull(controller.canonicalSendFor)
             assertTrue(controller.canonicalEligible("conv-1"))
@@ -162,7 +126,7 @@ class DesktopCanonicalTimelineRuntimeTest {
     @Test fun eachAgentKeepsOneSendCoordinator() = runTest {
         val controller = DesktopChatController(defaultDesktopBootstrapState(), this)
         try {
-            DesktopCanonicalTimelineHost(isEnabled = true).installOn(controller, install(backgroundScope))
+            DesktopCanonicalTimelineHost().installOn(controller, install(backgroundScope))
             val resolve = assertNotNull(controller.canonicalSendFor)
             val first = resolve("agent-1", NoTimelineTransport)
             assertSame(first, resolve("agent-1", NoTimelineTransport))
@@ -178,13 +142,13 @@ class DesktopCanonicalTimelineRuntimeTest {
      */
     private fun install(scope: kotlinx.coroutines.CoroutineScope) = DesktopCanonicalSendInstall(
         frameSource = NoOpChannelTransport(),
-        conversationRepository = unavailable(SessionRoute.CONVERSATIONS),
+        conversationRepository = { unavailable(SessionRoute.CONVERSATIONS) },
         scope = scope,
         activeConfig = { null },
         clientVersion = { "test" },
     )
 
-    @Test fun theLedgerDirectoryIsNotTheLegacySnapshotDirectory() {
+    @Test fun theLedgerLivesUnderLettaMobileHome() {
         assertEquals(
             listOf(".letta-mobile", "timeline-ledger"),
             defaultDesktopTimelineLedgerDirectory().toList().takeLast(2).map { it.toString() },

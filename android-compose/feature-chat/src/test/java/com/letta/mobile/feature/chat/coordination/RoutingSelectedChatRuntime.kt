@@ -10,10 +10,9 @@ import kotlinx.coroutines.CoroutineScope
 
 internal class RoutingSelectedChatRuntime(
     override val generation: Long,
-    private val routes: Map<String, SelectedTimelineRoute>,
+    private val conversations: Set<String>,
     private val presentations: Map<String, ChatPagingPresentation>,
     private val canonicalWriter: TimelineExternalTransportWriter,
-    private val legacyWriter: TimelineExternalTransportWriter,
     parent: CoroutineScope,
     private val onRetire: () -> Unit = {},
 ) : SelectedChatRuntime {
@@ -118,17 +117,14 @@ internal class RoutingSelectedChatRuntime(
             dest(conversationId).turnEnded(agentId, conversationId, clean)
 
         private suspend fun dest(conversationId: String): TimelineExternalTransportWriter {
-            check(!retired) { "Selected runtime retired" }
-            return when (routes.getValue(conversationId)) {
-                SelectedTimelineRoute.Canonical -> canonicalWriter
-                SelectedTimelineRoute.LegacyDeferred -> legacyWriter
-            }
+            ready(conversationId)
+            return canonicalWriter
         }
     }
 
-    override suspend fun ready(conversationId: String): SelectedTimelineRoute {
+    override suspend fun ready(conversationId: String) {
         check(!retired) { "Selected runtime retired" }
-        return routes.getValue(conversationId)
+        check(conversationId in conversations) { "Unknown conversation $conversationId" }
     }
 
     override suspend fun open(
@@ -136,9 +132,7 @@ internal class RoutingSelectedChatRuntime(
         target: String?,
         scope: CoroutineScope,
     ): ChatPagingPresentation {
-        check(ready(conversationId) == SelectedTimelineRoute.Canonical) {
-            "Deferred conversations use the legacy observer, not canonical paging"
-        }
+        ready(conversationId)
         opened += conversationId
         return presentations.getValue(conversationId)
     }
