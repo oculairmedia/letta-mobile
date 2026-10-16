@@ -11,9 +11,9 @@ package com.letta.mobile.data.transport.appserver
 object LettaCodeContract {
     /**
      * THE wire contract: the protocol `.d.ts` corpus the Kotlin wire types are verified against,
-     * equal to the desktop bundled runtime. Servers older than this (the deployed host while it
-     * is not redeployed) must keep working: decoding is additive-tolerant and 0.34-only commands
-     * are not sent without a capability.
+     * equal to the desktop bundled runtime. Hosts run at least this version; there is no
+     * compatibility path for older servers (no users yet, 2026-10-16). Decoding stays
+     * additive-tolerant so a newer server's extra fields never break a client.
      */
     const val VERSION: String = "0.34.8"
 

@@ -128,9 +128,7 @@ class WsChatBridge(
      *
      * lcp-dlj: when [attachments] is non-empty, builds a Letta
      * `content_parts` array in canonical `[text-if-any, ...images]`
-     * order and sends it alongside [text]. The shim ignores [text]
-     * once content_parts is present, but the field stays on the wire
-     * for compatibility with older shim builds.
+     * order and sends it alongside [text].
      */
     fun send(
         agentId: String,
@@ -522,23 +520,8 @@ private fun ServerFrame.serverNoticeEvent(): WsTimelineEvent? = when (this) {
 /**
  * Timeline message deltas (user / assistant / reasoning / tool_call /
  * tool_return frames).
- *
- * letta-mobile-y70m0: the shim's self-todo synthesized frame
- * (admin-shim buildSelfTodoFrame) is a `tool_call_message`
- * (name=TodoWrite) carrying constant per-conversation sentinel ids
- * (run_id/turn_id/tool_call_id all prefixed `selftodo-`). It is CHIP
- * DATA ONLY — consumed by SelfTodoRepository off the raw
- * `transport.events` stream for the self-todo chip — and must NOT
- * enter the chat timeline. Because it is re-emitted on every
- * TaskCreate/TaskUpdate and on resubscribe, folding it into the
- * message list produced multiple run blocks sharing the identical
- * constant run-key `run-selftodo-run-<conv>`, crashing the LazyColumn
- * with a duplicate-key IllegalArgumentException. Skip it here (the
- * single point where timeline messages are built) so the chip still
- * updates but no timeline run block is created.
  */
 private fun ServerFrame.messageDeltaEvent(isReplay: Boolean): WsTimelineEvent.MessageDelta? {
-    if (this is ServerFrame.ToolCallMessage && isSelfTodoChipFrame()) return null
     return WsFrameMapper.toLettaMessage(this)?.let {
         WsTimelineEvent.MessageDelta(
             message = it,
@@ -587,38 +570,6 @@ private fun ServerFrame.messageFrameTurnId(): String? = when (this) {
     is ServerFrame.ToolReturnMessage -> turnId
     else -> null
 }?.takeIf { it.isNotBlank() }
-
-/**
- * letta-mobile-y70m0: the self-todo sentinel prefix the shim stamps onto
- * the synthesized self-todo frame's run/turn/tool-call ids
- * (`selftodo-run-<conv>`, `selftodo-turn-<conv>`, `selftodo-<conv>`).
- * These ids are constant per conversation, so the frame is chip data only
- * and must never become a timeline run block.
- */
-internal const val SELF_TODO_SENTINEL_PREFIX = "selftodo-"
-
-/**
- * letta-mobile-y70m0: true when this `tool_call_message` is the shim's
- * synthesized self-todo chip frame rather than a real, timeline-bound
- * tool call. Identified robustly by the `selftodo-` sentinel prefix on the
- * frame's run/turn/tool-call ids (any one is sufficient — they are emitted
- * together). This predicate gates the MESSAGE-LIST / timeline path ONLY;
- * SelfTodoRepository subscribes to the raw `transport.events` stream and is
- * unaffected, so the chip keeps updating.
- *
- * The match is intentionally id-prefix based so it works against the
- * already-deployed shim. A future explicit marker field on the frame would
- * be additive — this prefix check stays as the source of truth.
- */
-internal fun ServerFrame.ToolCallMessage.isSelfTodoChipFrame(): Boolean {
-    if (runId?.startsWith(SELF_TODO_SENTINEL_PREFIX) == true) return true
-    if (turnId?.startsWith(SELF_TODO_SENTINEL_PREFIX) == true) return true
-    val calls = buildList {
-        toolCall?.let { add(it) }
-        toolCalls?.let { addAll(it) }
-    }
-    return calls.any { it.toolCallId.startsWith(SELF_TODO_SENTINEL_PREFIX) }
-}
 
 private fun ServerFrame.A2ui.toA2uiEvent(): A2uiFrameEvent = A2uiFrameEvent(
     transport = "admin-shim",

@@ -90,7 +90,7 @@ class DesktopAppServerChatGatewayBuilder(
         if (IrohChannelTransport.isIrohUrl(serverUrl)) {
             createIrohGateway(serverUrl, lettaConfig)
         } else {
-            createDirectGateway(serverUrl, lettaConfig)
+            createDirectGateway(serverUrl, appServerConfig.bearerToken, lettaConfig)
         }
     }
 
@@ -130,8 +130,14 @@ class DesktopAppServerChatGatewayBuilder(
      * ws:// — the shared [com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient]
      * owns the socket (letta-mobile-by4vm.9).
      */
-    private suspend fun createDirectGateway(serverUrl: String, lettaConfig: LettaConfig): DesktopAppServerChatGateway {
+    private suspend fun createDirectGateway(
+        serverUrl: String,
+        leaseToken: String?,
+        lettaConfig: LettaConfig,
+    ): DesktopAppServerChatGateway {
         val local = lettaConfig.mode == LettaConfig.Mode.LOCAL
+        // The bundled runtime's lease token (letta-mobile-by4vm.110.4), else the config's own.
+        val bearerToken = leaseToken ?: lettaConfig.accessToken
         return createSessionGateway(
             SessionGatewaySpec(
                 isIroh = false,
@@ -142,10 +148,10 @@ class DesktopAppServerChatGatewayBuilder(
                     DesktopDirectAppServerSession.open(
                         dial = DesktopDirectDial(
                             serverUrl = serverUrl,
-                            bearerToken = lettaConfig.accessToken,
+                            bearerToken = bearerToken,
                             readiness = readinessExpectationFor(lettaConfig),
                             // The bundled local child was just started by us and is checked by the readiness handshake.
-                            preflight = if (local) null else ({ preflightProbe(serverUrl, lettaConfig.accessToken) ?: notProbeable() }),
+                            preflight = if (local) null else ({ preflightProbe(serverUrl, bearerToken) ?: notProbeable() }),
                         ),
                         scope = scope,
                         listener = listener,

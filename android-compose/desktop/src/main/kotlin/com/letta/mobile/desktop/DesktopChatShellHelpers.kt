@@ -14,6 +14,7 @@ import com.letta.mobile.data.agents.RecentAgentsInput
 import com.letta.mobile.data.commands.ClientSlashCommand
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import com.letta.mobile.ui.shell.rail.ShellRailMapping
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
@@ -135,13 +136,13 @@ internal fun rememberRecentRailAgents(
 @Composable
 internal fun rememberRailActivityByAgentId(
     conversations: List<DesktopConversationSummary>,
-): Map<String, RailAgentActivity> = remember(conversations) {
+): Map<String, ShellRailActivity> = remember(conversations) {
     conversations
         .filter { !it.agentId.isNullOrBlank() }
         .groupBy { it.agentId!! }
         .mapValues { (_, convs) ->
             val latest = convs.maxBy { conversationRecency(it.updatedAtLabel) }
-            RailAgentActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
+            ShellRailActivity(updatedAtLabel = latest.updatedAtLabel, preview = latest.lastMessagePreview)
         }
 }
 

@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.local
 
 import android.content.Context
 import com.letta.mobile.data.controller.node.iroh.LocalBackendEmbeddedStore
+import com.letta.mobile.data.controller.node.iroh.StoredToolResult
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -16,9 +17,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-/** A persisted pi-ai toolResult row; parsed by the shared [LocalBackendEmbeddedStore.readToolResults]. */
-typealias StoredToolResult = com.letta.mobile.data.controller.node.iroh.StoredToolResult
 
 /**
  * The embedded runtime's handle on the on-device letta.js local-backend store

@@ -81,9 +81,9 @@ class IrohIngestDedupTest {
         val received = mutableListOf<ServerFrame>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) { publisher.events.collect { received += it } }
 
-        val selfTodo = toolCallFrame(arguments = "{}").copy(runId = "selftodo-run-conv", turnId = "selftodo-turn-conv")
-        publisher.publish(selfTodo)
-        publisher.publish(selfTodo)
+        val modeChange = ServerFrame.PermissionModeUpdated(agentId = "agent-dedup", conversationId = "conv-dedup", mode = "default")
+        publisher.publish(modeChange)
+        publisher.publish(modeChange)
         runCurrent()
 
         assertEquals(2, received.size)

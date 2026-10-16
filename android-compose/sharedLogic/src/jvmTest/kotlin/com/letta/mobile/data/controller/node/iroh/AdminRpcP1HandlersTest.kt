@@ -100,24 +100,24 @@ class AdminRpcP1HandlersTest {
     }
 
     @Test
-    fun `project handlers accept project_id alias and prefer identifier`() = runTest {
+    fun `project handlers address a project by identifier`() = runTest {
         val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
-        router.dispatchResult("project.get", params("project_id" to "legacy-proj"))
+        router.dispatchResult("project.get", params("identifier" to "proj"))
         router.dispatchResult(
             "project.update",
-            params("identifier" to "canonical", "project_id" to "legacy-proj", "git_url" to "https://example.com/repo.git"),
+            params("identifier" to "canonical", "git_url" to "https://example.com/repo.git"),
         )
         router.dispatchResult(
             "project.provisionBeadsRemote",
-            params("project_id" to "legacy-proj", "push" to "true"),
+            params("identifier" to "proj", "push" to "true"),
         )
 
         assertEquals(
             listOf(
-                ProxyCall("GET", "http://admin.test/api/projects/legacy-proj", null),
+                ProxyCall("GET", "http://admin.test/api/projects/proj", null),
                 ProxyCall("PATCH", "http://admin.test/api/registry/projects/canonical", "{\"git_url\":\"https://example.com/repo.git\"}"),
-                ProxyCall("POST", "http://admin.test/api/projects/legacy-proj/beads-remote/provision", "{\"push\":\"true\"}"),
+                ProxyCall("POST", "http://admin.test/api/projects/proj/beads-remote/provision", "{\"push\":\"true\"}"),
             ),
             calls,
         )

@@ -1,7 +1,8 @@
 # meridian-app-server
 
 Standalone host CLI for the official Letta App Server path. It is intentionally
-small: `app-server-serve` launches the upstream `letta app-server` process, and
+small: `app-server-serve` runs the upstream `letta server` through the shared
+`LocalAppServerHost` (the same host the desktop uses for its bundled runtime), and
 `app-server-smoke` sends one typed turn through the shared App Server client in
 `:sharedLogic`.
 
@@ -19,23 +20,25 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --listen ws://127.0.0.1:4500
-.\bin\meridian-app-server.bat app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --dry-run
+.\bin\meridian-app-server.bat app-server-serve --backend-dir C:\letta\backend --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8
 ```
 
-Loopback development uses no WebSocket auth. Non-loopback listeners require
-`--ws-auth`; the client then sends `Authorization: Bearer <token>`.
+The server always listens on an ephemeral loopback port (`--listen ws://127.0.0.1:0`)
+with `--ws-auth capability-token`: each start writes a fresh 32-byte token to
+`<backend-dir>/ws-token` (owner-only) and prints `ready at ws://127.0.0.1:<port>` once
+`/readyz` answers. Clients send `Authorization: Bearer <token>`. The command exits
+with the server's exit code and never restarts it; the caller (systemd) does.
 
 Each 0.29+ client opens one bidirectional `/ws` connection. Never add the
 removed `?channel=control|stream` query. Upstream supports concurrent clients;
 Iroh deployments still use the Kotlin wrapper as their authorization, runtime
 ownership, and fanout boundary.
 
-Smoke a running local App Server:
+Smoke a running local App Server (URL from the `ready at` line, token from `ws-token`):
 
 ```powershell
-$env:APP_SERVER_TEST_URL="ws://127.0.0.1:4500"
+$env:APP_SERVER_TEST_URL="ws://127.0.0.1:<port>"
+$env:APP_SERVER_TEST_TOKEN=Get-Content C:\letta\backend\ws-token
 $env:APP_SERVER_TEST_AGENT_ID="agt_x"
 $env:APP_SERVER_TEST_CONVERSATION_ID="conv_x"
 .\bin\meridian-app-server.bat app-server-smoke --message "hello"
@@ -44,14 +47,14 @@ $env:APP_SERVER_TEST_CONVERSATION_ID="conv_x"
 Expected output includes:
 
 ```text
-[app-server] connect ws://127.0.0.1:4500
+[app-server] connect ws://127.0.0.1:<port>
 [lifecycle] Started
 [stream] ...
 [lifecycle] Completed
 ```
 
-Set `APP_SERVER_TEST_TOKEN` or pass `--token` when connecting to a non-loopback
-server that requires bearer auth.
+Set `APP_SERVER_TEST_TOKEN` or pass `--token` for any server started with
+`--ws-auth`, which includes every `app-server-serve` server.
 
 ## Regenerating the restart/replay evidence
 

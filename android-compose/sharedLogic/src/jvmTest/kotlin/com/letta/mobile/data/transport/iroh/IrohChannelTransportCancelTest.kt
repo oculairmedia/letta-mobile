@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -72,7 +73,7 @@ class IrohChannelTransportCancelTest {
     fun closeCancelsPendingTerminalWaitButLeavesCallerScopeActive() = runBlocking {
         val client = ControllableClient()
         val transport = transportWith(client, serverTerminalWaitMs = 60_000L)
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
@@ -102,7 +103,7 @@ class IrohChannelTransportCancelTest {
     fun cancelSendsAbortAndSynthesizesExactlyOneCancelledTerminalWhenServerSilent() = runBlocking {
         val client = ControllableClient()
         val transport = transportWith(client)
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
@@ -139,7 +140,7 @@ class IrohChannelTransportCancelTest {
         // On abort, the server promptly streams its own terminal (stop_reason).
         val client = ControllableClient(emitTerminalOnAbort = true)
         val transport = transportWith(client)
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
@@ -168,7 +169,7 @@ class IrohChannelTransportCancelTest {
     fun firstServerFramePromotesSyntheticRunIdOntoTurnStartedAndTerminal() = runBlocking {
         val client = ControllableClient()
         val transport = transportWith(client)
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted

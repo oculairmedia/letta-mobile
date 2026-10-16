@@ -7,7 +7,6 @@ import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
-typealias DesktopToolLibraryState = ToolLibraryState
 
 class DesktopToolLibraryController(
     sessionGraphProvider: DesktopSessionGraphProvider,
@@ -20,7 +19,7 @@ class DesktopToolLibraryController(
         scope = scope,
         errorMessageMapper = { throwable -> throwable.toDesktopToolsMessage() },
     )
-    val state: StateFlow<DesktopToolLibraryState> = delegate.state
+    val state: StateFlow<ToolLibraryState> = delegate.state
 
     fun start() {
         delegate.start()

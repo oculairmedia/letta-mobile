@@ -49,15 +49,15 @@ internal interface DesktopLocalRuntimeBindings {
 }
 
 internal object DefaultDesktopLocalRuntimeBindings : DesktopLocalRuntimeBindings {
-    override val health: StateFlow<RuntimeHealth> get() = DesktopLocalRuntimeHost.health
+    override val health: StateFlow<RuntimeHealth> get() = DesktopLocalRuntimeHost.appServer.health
 
     override val git: StateFlow<DesktopGitStatus> get() = DesktopLocalRuntimeHost.gitEnvironment.status
 
-    override fun forceRestart() = DesktopLocalRuntimeHost.forceRestart()
+    override fun forceRestart() = DesktopLocalRuntimeHost.appServer.forceRestart()
 
-    override fun stop() = DesktopLocalRuntimeHost.stopByUser()
+    override fun stop() = DesktopLocalRuntimeHost.appServer.stopByUser()
 
-    override fun start() = DesktopLocalRuntimeHost.startByUser()
+    override fun start() = DesktopLocalRuntimeHost.appServer.startByUser()
 
     override fun recheckGit() {
         DesktopLocalRuntimeHost.gitEnvironment.refresh()
@@ -151,8 +151,8 @@ internal val RuntimeHealth.needsChatBanner: Boolean
 internal fun RuntimeHealth.runtimeBanner(): Overlay.Banner? {
     if (!needsChatBanner) return null
     val action = when {
-        stoppedByUser -> OverlayAction("Start", DesktopLocalRuntimeHost::startByUser)
-        needsForceRestart -> OverlayAction("Restart", DesktopLocalRuntimeHost::forceRestart)
+        stoppedByUser -> OverlayAction("Start", DesktopLocalRuntimeHost.appServer::startByUser)
+        needsForceRestart -> OverlayAction("Restart", DesktopLocalRuntimeHost.appServer::forceRestart)
         else -> null
     }
     return Overlay.Banner(

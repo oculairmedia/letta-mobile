@@ -8,7 +8,7 @@ SCAN_ROOT="$ROOT/android-compose"
 # handles, or coroutine scopes. Mocking them makes tests order-dependent and
 # blocks safe Gradle project parallelism. Mock their interface or use the
 # corresponding Fake* from :core:testutil instead.
-STATEFUL_TYPES='TimelineRepository|SettingsRepository|AgentRepository|ConversationRepository|ChannelTransport|NotificationReplyHandler|MessageRepository|ClientModeController|NotificationDelivery'
+STATEFUL_TYPES='TimelineRepository|SettingsRepository|AgentRepository|ConversationRepository|ChannelTransport|NotificationReplyHandler|MessageRepository|NotificationDelivery'
 PATTERN="mockk[[:space:]]*<[[:space:]]*([[:alnum:]_]+\\.)*(${STATEFUL_TYPES})([[:space:]>?,]|$)"
 
 matches="$(

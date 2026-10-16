@@ -357,7 +357,7 @@ class ShimOffParityGateTest {
         put("agent_id", "agent-1")
         put("conversation_id", "conv-1")
         put("message_id", "m-1")
-        put("project_id", "p-1")
+        put("identifier", "p-1")
         put("task_id", "t-1")
         put("tool_call_id", "tc-1")
         put("name", "demo")

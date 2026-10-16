@@ -50,6 +50,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.DisclosureChevron
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.util.formatRelativeTime
 import kotlinx.collections.immutable.toImmutableList
@@ -639,8 +640,8 @@ internal fun ProjectInfoTray(
 
             AnimatedVisibility(
                 visible = expanded,
-                enter = ChatMotion.expandEnter(),
-                exit = ChatMotion.expandExit(),
+                enter = LettaMotion.expandEnter(),
+                exit = LettaMotion.expandExit(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                     ProjectAgentsCard(
@@ -715,8 +716,8 @@ internal fun ProjectContextCard(
 
         AnimatedVisibility(
             visible = expanded,
-            enter = ChatMotion.expandEnter(),
-            exit = ChatMotion.expandExit(),
+            enter = LettaMotion.expandEnter(),
+            exit = LettaMotion.expandExit(),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm)) {
                 ProjectInfoLine(

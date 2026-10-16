@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.PendingApprovalSource
 import com.letta.mobile.data.runtime.PendingApprovalDetails
 import com.letta.mobile.data.runtime.binding
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
@@ -73,7 +74,7 @@ class DesktopChatApprovalCoordinatorTest {
 
     private class RecordingGateway(
         override val pendingApprovalDetails: MutableStateFlow<Map<String, PendingApprovalDetails>>,
-    ) : FakeDesktopChatGateway(), DesktopApprovalSubmitter, DesktopPendingApprovalSource {
+    ) : FakeDesktopChatGateway(), DesktopApprovalSubmitter, PendingApprovalSource {
         val submissions = mutableListOf<DesktopApprovalSubmission>()
 
         override suspend fun submitApproval(submission: DesktopApprovalSubmission) {

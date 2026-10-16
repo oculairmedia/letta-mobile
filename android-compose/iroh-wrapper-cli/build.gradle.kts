@@ -28,11 +28,9 @@ plugins {
 // involved. `:cli` now depends on THIS module for the wrapper command rather
 // than the other way around — the sources moved, they were not duplicated.
 //
-// Side effect worth naming: being JVM-only (no `android.jar`) makes
-// `java.lang.ProcessHandle` available here. That is exactly the API whose
-// absence caused lgns8.18's FU1 (process-group SIGKILL of orphaned App Server
-// children) to be declined — see the KDoc on `OwnedAppServerProcess`. FU1 is
-// NOT implemented here; this module only makes it possible.
+// `--own-app-server` runs its child through the shared `LocalAppServerHost` with the
+// JVM launcher in `:sharedLogic` jvmMain, which ends the child's descendants with it
+// (letta-mobile-by4vm.110.4).
 kotlin {
     compilerOptions {
         // JVM 21: computer.iroh:iroh:1.0.0 (pulled in transitively via

@@ -45,14 +45,14 @@ internal fun DesktopLocalRuntimeLifecycleEffect(
 ) {
     val localMode by rememberUpdatedState(isLocalMode)
     LaunchedEffect(chatController) {
-        DesktopLocalRuntimeHost.restarted.collect {
+        DesktopLocalRuntimeHost.appServer.restarted.collect {
             if (localMode) DesktopLocalRuntimeHost.handOffAfterRestart(chatController::retryConnection)
         }
     }
     LaunchedEffect(chatController, suspendSignal) {
         val responder = DesktopSuspendResponder(
-            onRuntimeSuspended = DesktopLocalRuntimeHost::onSystemSuspended,
-            onRuntimeResumed = DesktopLocalRuntimeHost::onSystemResumed,
+            onRuntimeSuspended = DesktopLocalRuntimeHost.appServer::onSuspended,
+            onRuntimeResumed = DesktopLocalRuntimeHost.appServer::onResumed,
             onChatResumed = chatController::onSystemResumed,
         )
         suspendSignal.events().collect(responder::handle)

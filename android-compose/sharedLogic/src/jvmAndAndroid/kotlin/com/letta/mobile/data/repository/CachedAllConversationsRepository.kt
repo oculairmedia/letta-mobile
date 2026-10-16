@@ -186,9 +186,6 @@ open class CachedAllConversationsRepository(
         )
     }
 
-    @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
-    override suspend fun countConversations(): Int = loadedCountEstimate()?.count ?: 0
-
     /** Exposed for the Android paging binder when Iroh list routing is active. */
     fun irohPageLoaderOrNull(): (suspend (
         agentId: AgentId?,

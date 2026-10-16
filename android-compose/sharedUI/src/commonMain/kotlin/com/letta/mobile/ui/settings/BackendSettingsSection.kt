@@ -55,16 +55,15 @@ data class BackendSettingsForm(
 ) {
     val problem: String? get() = BackendServerUrlCheck.problem(mode, serverUrl)
 
-    /** Whether saving would change [saved]: an edit, a typed token, or a migration notice to clear. */
+    /** Whether saving would change [saved]: an edit or a typed token. */
     fun isDirty(saved: LettaConfig): Boolean =
-        mode != saved.mode || serverUrl.trim() != saved.serverUrl || tokenInput.isNotBlank() || saved.migrationNotice != null
+        mode != saved.mode || serverUrl.trim() != saved.serverUrl || tokenInput.isNotBlank()
 
-    /** [saved] with this form applied; an empty token field keeps the saved token. Saving clears a migration notice. */
+    /** [saved] with this form applied; an empty token field keeps the saved token. */
     fun applyTo(saved: LettaConfig): LettaConfig = saved.copy(
         mode = mode,
         serverUrl = serverUrl.trim(),
         accessToken = tokenInput.trim().takeIf { it.isNotEmpty() } ?: saved.accessToken,
-        migrationNotice = null,
     )
 
     companion object {
@@ -81,7 +80,6 @@ object BackendSettingsTags {
     const val SCAN = "backend-scan"
     const val SAVE = "backend-save"
     const val TEST = "backend-test"
-    const val NOTICE = "backend-notice"
     const val TEST_RESULT = "backend-test-result"
     const val DANGER = "danger"
     const val CLEAR_TOKEN = "backend-clear-token"
@@ -170,7 +168,6 @@ fun BackendSettingsSection(state: BackendFormState, actions: BackendSettingsActi
         }
     }
     SettingsSection(SettingsHeader(BackendSettingsTags.SECTION, "Backend", showTitle = false), modifier) {
-        state.config.migrationNotice?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.NOTICE, SettingsStatus(it, SettingsTone.Warning))) }
         ChoiceRow(modeRow(state))
         state.connection?.let { StatusRow(SettingsRow.Status(SettingsCopy.STATUS.key, SettingsCopy.STATUS.title, it.settingsStatus(), it.settingsHelper())) }
         if (form.mode == LettaConfig.Mode.SELF_HOSTED) {

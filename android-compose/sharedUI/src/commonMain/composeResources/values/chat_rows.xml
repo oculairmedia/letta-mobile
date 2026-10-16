@@ -14,13 +14,11 @@
     <string name="rows_fork_from_here">Fork from here</string>
     <!-- letta-mobile-7mys7: rerun in a fork, and the fork naming dialog. -->
     <string name="rows_rerun">Rerun in a new branch</string>
-    <string name="rows_fork_more_actions">More actions</string>
     <string name="fork_dialog_title">Fork conversation</string>
     <string name="fork_dialog_body">The fork keeps the conversation up to this message. The original is not changed.</string>
     <string name="fork_dialog_name">Name (optional)</string>
     <string name="fork_dialog_confirm">Fork</string>
     <string name="fork_dialog_cancel">Cancel</string>
-    <string name="rows_not_sent">Not sent</string>
     <string name="rows_expand_prompt">Expand prompt</string>
     <string name="rows_collapse_prompt">Collapse prompt</string>
 
@@ -187,7 +185,6 @@
     <string name="rows_canvas_published">On the board</string>
     <string name="rows_canvas_dry_run">Preview only: nothing was added</string>
     <string name="rows_canvas_failed">Not added to the board</string>
-    <string name="rows_canvas_card_description">%1$s, %2$s</string>
     <string name="rows_canvas_kind_note">Note</string>
     <string name="rows_canvas_kind_checklist">Checklist</string>
     <string name="rows_canvas_kind_card">Card</string>
