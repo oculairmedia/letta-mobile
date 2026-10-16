@@ -84,21 +84,6 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
         source = RuntimeEventSource.ExternalTransport,
     )
 
-    is WsTimelineEvent.UserActionOutcome -> listOf(
-        runtimeDraft(
-            backend = backend,
-            agentId = agentId?.let(::AgentId) ?: fallbackAgentId,
-            conversationId = conversationId?.let(::ConversationId) ?: fallbackConversationId,
-            runId = runId?.toRunIdOrNull(),
-            source = RuntimeEventSource.ExternalTransport,
-            payload = RuntimeEventPayload.ExternalTransportFrame(
-                frameId = frameId,
-                transportMessageId = actionId,
-                body = reason?.let { "$outcome: $it" } ?: outcome,
-            ),
-        ),
-    )
-
     is WsTimelineEvent.RunActivity -> listOf(toRuntimeEventDraft(backend, fallbackAgentId, fallbackConversationId))
 
     is WsTimelineEvent.GoalsUpdated,

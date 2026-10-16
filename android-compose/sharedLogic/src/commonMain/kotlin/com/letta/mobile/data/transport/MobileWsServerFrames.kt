@@ -1,7 +1,5 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.a2ui.A2uiHandshakeAck
-import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
@@ -24,110 +22,6 @@ sealed interface ServerFrame {
     val v: Int
     val id: String
     val ts: String
-
-    @Serializable
-    data class Welcome(
-        override val v: Int = 1,
-        val type: String = "welcome",
-        override val id: String,
-        override val ts: String,
-        @SerialName("server_id") val serverId: String,
-        @SerialName("session_id") val sessionId: String,
-        @SerialName("device_id") val deviceId: String? = null,
-        // Shim emits both fields independently (§2.2). `a2uiNegotiated`
-        // is the boolean gate; `a2ui` carries the resolved version +
-        // catalog and is non-null only when negotiation succeeded.
-        @SerialName("a2ui_negotiated") val a2uiNegotiated: Boolean = false,
-        @SerialName("a2ui") val a2ui: A2uiHandshakeAck? = null,
-        @SerialName("canonical_live_transport") val canonicalLiveTransport: String? = null,
-    ) : ServerFrame
-
-    /**
-     * A2UI payload frame (§2.2 `a2ui_frame`). Emitted between
-     * assistant_message deltas when an `<a2ui-json>` block was
-     * extracted from the stream. Payloads route to the surface
-     * manager, not the LettaMessage timeline mapper.
-     *
-     * On parse/validation failure the shim emits `ok=false` with
-     * `parse_error` / `validation_error` populated — the renderer
-     * should skip the frame but keep the socket alive.
-     */
-    data class A2ui(
-        override val v: Int = 1,
-        val type: String = "a2ui_frame",
-        override val id: String,
-        override val ts: String,
-        @SerialName("agent_id") val agentId: String? = null,
-        @SerialName("conversation_id") val conversationId: String? = null,
-        @SerialName("turn_id") val turnId: String? = null,
-        @SerialName("run_id") val runId: String? = null,
-        @SerialName("request_id") val requestId: String? = null,
-        val seq: Long? = null,
-        val otid: String? = null,
-        val ok: Boolean = true,
-        @SerialName("parse_error") val parseError: String? = null,
-        @SerialName("validation_error") val validationError: String? = null,
-        val messages: List<A2uiMessage>,
-        val raw: JsonObject,
-    ) : ServerFrame
-
-    /**
-     * Server-advertised A2UI capabilities (§2.2 `a2ui_capabilities`).
-     * Sent immediately after `welcome` when negotiation succeeded;
-     * useful for clamping the renderer registry to what the server
-     * supports. Informational — don't block welcome handling on it.
-     */
-    @Serializable
-    data class A2uiCapabilities(
-        override val v: Int = 1,
-        val type: String = "a2ui_capabilities",
-        override val id: String,
-        override val ts: String,
-        val version: String,
-        @SerialName("catalog_id") val catalogId: String,
-        @SerialName("supported_catalogs") val supportedCatalogs: List<String> = emptyList(),
-        @SerialName("supported_widgets") val supportedWidgets: List<String> = emptyList(),
-    ) : ServerFrame
-
-    /**
-     * Server ack for client `user_action` (§2.2). `status` is opaque
-     * for forward-compat (`accepted`, `rejected`, future `queued`).
-     * `reason` is populated only when `status == "rejected"`.
-     */
-    @Serializable
-    data class UserActionAck(
-        override val v: Int = 1,
-        val type: String = "user_action_ack",
-        override val id: String,
-        override val ts: String,
-        @SerialName("action_id") val actionId: String,
-        val status: String,
-        val reason: String? = null,
-    ) : ServerFrame
-
-    /**
-     * Server outcome for a client `user_action` (lcp-uo5.14). Unlike
-     * [UserActionAck], this is UX-facing: it tells mobile whether the
-     * action was matched to a tool approval, injected as chat input,
-     * recorded for later, rejected, or failed. [frameId] correlates to
-     * the outbound `user_action` frame id.
-     */
-    @Serializable
-    data class UserActionOutcome(
-        override val v: Int = 1,
-        val type: String = "user_action_outcome",
-        override val id: String,
-        override val ts: String,
-        val frameId: String,
-        val outcome: String,
-        val actionId: String? = null,
-        val reason: String? = null,
-        val idempotent: Boolean = false,
-        @SerialName("agent_id") val agentId: String? = null,
-        @SerialName("conversation_id") val conversationId: String? = null,
-        @SerialName("turn_id") val turnId: String? = null,
-        @SerialName("run_id") val runId: String? = null,
-    ) : ServerFrame
 
     /**
      * Spec §7: `code` ∈ invalid_token | protocol_violation |

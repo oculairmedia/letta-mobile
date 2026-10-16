@@ -103,17 +103,6 @@ data class A2uiThemeHints(
     @SerialName("supports_dynamic_color") val supportsDynamicColor: Boolean = true,
 )
 
-/**
- * Per shim §2.2: nested `a2ui` object on the welcome frame, present
- * only when `a2ui_negotiated == true`. `catalog_id` is the shim's
- * short catalog handle (not the upstream `$id` URL).
- */
-@Serializable
-data class A2uiHandshakeAck(
-    val version: String,
-    @SerialName("catalog_id") val catalogId: String,
-)
-
 @Serializable(with = A2uiMessageSerializer::class)
 sealed interface A2uiMessage {
     val version: String
