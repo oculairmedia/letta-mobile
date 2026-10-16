@@ -5,12 +5,10 @@ import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -120,12 +118,8 @@ sealed interface ServerFrame {
         val type: String = "user_action_outcome",
         override val id: String,
         override val ts: String,
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonNames("frame_id")
         val frameId: String,
         val outcome: String,
-        @OptIn(ExperimentalSerializationApi::class)
-        @JsonNames("action_id")
         val actionId: String? = null,
         val reason: String? = null,
         val idempotent: Boolean = false,

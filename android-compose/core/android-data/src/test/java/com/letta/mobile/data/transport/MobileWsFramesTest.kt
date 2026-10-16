@@ -91,7 +91,7 @@ class MobileWsFramesTest : WordSpec({
             outcomes.forEach { outcome ->
                 val payload = """
                     {"v":1,"type":"user_action_outcome","id":"out-$outcome","ts":"t",
-                     "frameId":"frame-$outcome","action_id":"action-$outcome",
+                     "frameId":"frame-$outcome","actionId":"action-$outcome",
                      "outcome":"$outcome","reason":"reason-$outcome","idempotent":true,
                      "agent_id":"agent-1","conversation_id":"conv-1"}
                 """.trimIndent()
@@ -105,17 +105,6 @@ class MobileWsFramesTest : WordSpec({
                 parsed.agentId shouldBe "agent-1"
                 parsed.conversationId shouldBe "conv-1"
             }
-        }
-
-        "lcp-uo5.14 user_action_outcome — accepts snake_case frame_id fallback" {
-            val payload = """
-                {"v":1,"type":"user_action_outcome","id":"out-1","ts":"t",
-                 "frame_id":"frame-snake","outcome":"injected_as_input"}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.UserActionOutcome>()
-            parsed.frameId shouldBe "frame-snake"
-            parsed.outcome shouldBe "injected_as_input"
         }
 
         "spec §4.7 stop_reason — inner field is `stop_reason`, NOT `reason`" {
