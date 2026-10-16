@@ -460,6 +460,17 @@ object LettaDatabaseMigrations {
         }
     }
 
+    /**
+     * letta-mobile-by4vm.15: drops the legacy `conversation_cursors` table. Its only reader was the
+     * shim WebSocket replay, deleted in #1666; since then the legacy timeline leg wrote stream
+     * sequences here that nothing read. Captured graphs keep `backend_conversation_cursors`.
+     */
+    val MIGRATION_22_23 = object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS `conversation_cursors`")
+        }
+    }
+
     val ALL: Array<Migration> = arrayOf(
         MIGRATION_1_2,
         MIGRATION_2_3,
@@ -482,5 +493,6 @@ object LettaDatabaseMigrations {
         MIGRATION_19_20,
         MIGRATION_20_21,
         MIGRATION_21_22,
+        MIGRATION_22_23,
     )
 }

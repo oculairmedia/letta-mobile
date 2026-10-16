@@ -53,7 +53,6 @@ import com.letta.mobile.data.session.scopedAgentRepository
 import com.letta.mobile.data.session.scopedAllConversationsRepository
 import com.letta.mobile.data.session.sessionBackendScopedCaches
 import com.letta.mobile.data.session.sessionScoped
-import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -309,7 +308,6 @@ abstract class AppModule {
         fun provideTimelineRepository(
             timelineTransport: com.letta.mobile.data.timeline.TimelineTransport,
             pendingLocalStore: PendingLocalStore,
-            conversationCursorStore: ConversationCursorStore,
             confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
             settingsRepository: ISettingsRepository,
             @ProcessScope processScope: CoroutineScope,
@@ -319,7 +317,6 @@ abstract class AppModule {
                 // (letta-mobile-czomn); everything else uses the active remote route.
                 timelineTransport = timelineTransport,
                 pendingLocalStore = pendingLocalStore,
-                conversationCursorStore = conversationCursorStore,
                 confirmedTimelineStore = confirmedTimelineStore,
                 backendIdProvider = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
                 repositoryScope = processScope,

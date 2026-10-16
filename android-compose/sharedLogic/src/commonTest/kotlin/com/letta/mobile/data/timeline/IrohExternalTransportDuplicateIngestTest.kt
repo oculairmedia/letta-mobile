@@ -31,7 +31,6 @@ class IrohExternalTransportDuplicateIngestTest {
         val repository = TimelineRepository(
             EmptyTimelineTransport,
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = backgroundScope,
         )
         val reasoning = ReasoningMessage(
@@ -71,7 +70,6 @@ class IrohExternalTransportDuplicateIngestTest {
         val repository = TimelineRepository(
             EmptyTimelineTransport,
             NoOpPendingLocalStore,
-            NoOpConversationCursorStore,
             repositoryScope = backgroundScope,
         )
 
@@ -113,7 +111,6 @@ class IrohExternalTransportDuplicateIngestTest {
             conversationId = "conv-h30cy",
             scope = this,
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             startStreamSubscriber = false,
         )
         val message = AssistantMessage(

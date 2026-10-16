@@ -1,7 +1,6 @@
 package com.letta.mobile.channel
 
 import com.letta.mobile.data.timeline.IngestedMessageListener
-import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpPendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineTransport
@@ -47,7 +46,6 @@ class ChatPushServiceListenerTest {
         TimelineRepository(
             timelineTransport = mockk<TimelineTransport>(relaxed = true),
             pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
             repositoryScope = repositoryScope,
         )
 
