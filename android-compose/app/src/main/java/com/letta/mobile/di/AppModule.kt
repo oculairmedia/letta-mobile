@@ -195,19 +195,17 @@ abstract class AppModule {
         fun provideAndroidCanonicalRuntimeFactory(
             authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
             storage: com.letta.mobile.data.local.TimelineOwnedStorageFactory,
-            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
             writers: com.letta.mobile.data.session.CanonicalConversationWriters,
-        ) = AndroidCanonicalTimelineRuntimeFactory(authority, storage, local, writers)
+        ) = AndroidCanonicalTimelineRuntimeFactory(authority, storage, writers)
 
         @Provides
         @Singleton
         fun provideCanonicalTimelineTransport(
-            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
             remote: IrohAdminRpcTimelineTransport,
         ): com.letta.mobile.data.timeline.TimelineTransport =
-            // letta-mobile-ckmub.4: on-device conversations read the embedded runtime; every other
-            // conversation is an Iroh host's. There is no HTTP timeline any more.
-            com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(local = local, remote = remote)
+            // letta-mobile-by4vm.110.6: every conversation is read over the session channel's
+            // admin_rpc (Iroh, ws://, or the on-device runtime's in-process router).
+            remote
 
         // letta-mobile-by4vm.88: each repository below forwards to the current session graph
         // (SessionForwarding.kt), so a backend switch retargets it without a rebuild here.

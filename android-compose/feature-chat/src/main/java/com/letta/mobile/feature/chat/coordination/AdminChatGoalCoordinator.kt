@@ -12,10 +12,8 @@ import com.letta.mobile.ui.chat.render.GoalStatusUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -30,9 +28,6 @@ internal class AdminChatGoalCoordinator(
     private val wsChatBridge: WsChatBridge,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val bannerController: ChatBannerController,
-    /** Iroh OR shim WS — /goal rides the frame channel on both. */
-    private val usesChannelTransport: StateFlow<Boolean>,
-    private val localRuntimeRouting: () -> LocalRuntimeRouting,
     private val onGoalSlashCommandsDetected: () -> Unit,
 ) {
     private var goalStatusJob: Job? = null
@@ -43,12 +38,7 @@ internal class AdminChatGoalCoordinator(
                 if (event is WsTimelineEvent.GoalsUpdated) refreshGoalStatus()
             }
         }
-        scope.launch {
-            usesChannelTransport
-                .filter { it }
-                .distinctUntilChanged()
-                .collect { refreshGoalStatus() }
-        }
+        refreshGoalStatus()
         scope.launch {
             uiState
                 .map { (it.conversationState as? ConversationState.Ready)?.conversationId }
@@ -67,11 +57,6 @@ internal class AdminChatGoalCoordinator(
 
     fun refreshGoalStatus() {
         goalStatusJob?.cancel()
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-            goalStatusJob = null
-            uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
-            return
-        }
         val originatingConversationId = currentConversationId()
         goalStatusJob = scope.launch {
             uiState.update { it.copy(isGoalStatusLoading = true) }
@@ -105,7 +90,6 @@ internal class AdminChatGoalCoordinator(
         (uiState.value.conversationState as? ConversationState.Ready)?.conversationId
 
     fun sendGoalCommand(command: String) {
-        if (!usesChannelTransport.value) return
         scope.launch {
             slashCommandRepository.executeGoalCommand(agentId.value, command)
                 .onSuccess { message ->

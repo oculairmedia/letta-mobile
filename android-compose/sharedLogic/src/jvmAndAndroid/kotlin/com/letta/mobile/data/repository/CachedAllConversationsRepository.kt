@@ -3,15 +3,12 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.backend.RemoteRoute
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.AllConversationsLocalCache
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -39,8 +36,6 @@ open class CachedAllConversationsRepository(
     private val remote: RemoteRoute<ConversationRemoteSource>,
     private val localCache: (() -> AllConversationsLocalCache)? = null,
     private val repositoryScope: CoroutineScope = defaultCachedAllConversationsRepositoryScope(),
-    private val localConversationSource: LocalRuntimeConversationSource? = null,
-    private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     /**
      * letta-mobile-lks7m: when given, the list follows Meridian's `conversation_updated` pushes and
@@ -217,17 +212,6 @@ open class CachedAllConversationsRepository(
     }
 
     private suspend fun refreshLocked() {
-        val localSource = localConversationSource
-        if (localSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
-            val local = localSource.listConversations()
-            Telemetry.event(TAG, "refreshLocked: local source returned ${local.size} conversations")
-            _conversations.value = local
-            _hasMore.value = false
-            currentCursor = null
-            hasLoadedAtLeastOnce = true
-            lastRefreshAtMillis = nowMillis()
-            return
-        }
         val firstPage = fetchPage(after = null)
         currentCursor = null
         hasLoadedAtLeastOnce = false

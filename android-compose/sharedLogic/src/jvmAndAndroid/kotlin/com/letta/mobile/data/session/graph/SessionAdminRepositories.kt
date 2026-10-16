@@ -28,7 +28,6 @@ import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.repository.api.ModelRemoteSource
 import com.letta.mobile.data.repository.api.PassageRemoteSource
@@ -70,23 +69,16 @@ class AdminRemoteRoutes(
 /**
  * The graph generation's admin repositories over [transport]. [settings] scopes the Iroh sources
  * (they serve only while the active backend is Iroh); without it no Iroh source is bound.
- * [localModelSource] lists the on-device runtime's models when that runtime is the active backend.
  */
 fun SharedSessionGraph.adminRepositories(
     transport: IChannelTransport,
     settings: ISettingsRepository?,
     remotes: AdminRemoteRoutes = AdminRemoteRoutes(),
-    localModelSource: LocalRuntimeModelSource? = null,
 ): SessionAdminRepositories {
     fun <T> iroh(source: (IChannelTransport, ISettingsRepository) -> T): T? = settings?.let { source(transport, it) }
     return SessionAdminRepositories(
         mcpServerRepository = CachedMcpServerRepository(remotes.mcpServers, iroh(::IrohAdminRpcMcpSource)),
-        modelRepository = CachedModelRepository(
-            remote = remotes.models,
-            localModelSource = localModelSource,
-            settingsRepository = settings,
-            irohModelSource = iroh(::IrohAdminRpcModelSource),
-        ),
+        modelRepository = CachedModelRepository(remote = remotes.models, irohModelSource = iroh(::IrohAdminRpcModelSource)),
         passageRepository = CachedPassageRepository(remotes.passages, iroh(::IrohAdminRpcPassageSource)),
         projectRepository = CachedProjectRepository(remotes.projects, iroh(::IrohAdminRpcProjectSource)),
         providerRepository = CachedProviderRepository(remotes.providers, iroh(::IrohAdminRpcProviderSource)),

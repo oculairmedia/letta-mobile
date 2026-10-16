@@ -10,7 +10,6 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentRepository
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,19 +84,6 @@ class FakeAgentRepository(
             description = params.description,
             tags = params.tags.orEmpty(),
         )
-        agentsState.value += agent
-        return agent
-    }
-
-    override suspend fun createLocalAgent(params: AgentCreateParams): Agent {
-        calls += "createLocalAgent:${params.name.orEmpty()}"
-        val agent = TestData.agent(
-            id = "local-agent-${agentsState.value.size + 1}",
-            name = params.name ?: "Local Agent",
-            model = params.model,
-            description = params.description,
-            tags = params.tags.orEmpty(),
-        ).copy(metadata = params.metadata.orEmpty(), tools = persistentListOf())
         agentsState.value += agent
         return agent
     }

@@ -69,7 +69,7 @@ actual_node=$("$NODE18" --version)
   { echo "::error::node is $actual_node, the device ships $EXPECT_NODE_VERSION"; exit 1; }
 [[ -f "$LETTA_JS" ]] || { echo "::error::letta.js missing at $LETTA_JS (stage the tree first)"; exit 1; }
 PRELOADS=("$HERE/android-platform-emulation.cjs")
-for preload in node18-compat.cjs regexp-polyfill.cjs android-network-polyfill.cjs device-tools-preload.cjs; do
+for preload in node18-compat.cjs regexp-polyfill.cjs android-network-polyfill.cjs; do
   [[ -f "$PROJECT/$preload" ]] || { echo "::error::shipped preload $preload missing from the staged tree"; exit 1; }
   "$NODE18" --check "$PROJECT/$preload"
   PRELOADS+=("$PROJECT/$preload")

@@ -1,14 +1,5 @@
 package com.letta.mobile.runtime.local
 
-import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
-import com.letta.mobile.runtime.actions.MobileActionRegistry
-import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
-import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
-import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
-import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
-import com.letta.mobile.runtime.sensors.DeviceSensorSampler
-import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
-import com.letta.mobile.runtime.sensors.NoopDeviceSensorSampler
 import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
@@ -47,15 +38,14 @@ data class AndroidNetworkBridgeSession(
     override fun close() = closeAction()
 }
 
+/**
+ * The loopback HTTP bridge letta.js fetches and resolves names through (`/fetch`, `/dns/lookup`
+ * for android-network-polyfill.cjs), so its outbound TLS is Android's. Device tools are not served
+ * here: they reach the App Server through `runtime_start.register_external_tools`
+ * (letta-mobile-by4vm.110.6).
+ */
 @Singleton
-class LocalAndroidNetworkBridge @Inject constructor(
-    private val sensorSnapshotProvider: DeviceSensorSnapshotProvider,
-    private val sensorSampler: DeviceSensorSampler = NoopDeviceSensorSampler,
-    private val mobileActionRegistry: MobileActionRegistry,
-    private val mobileIntentActionTool: MobileIntentActionTool,
-    private val hardwareControlProvider: DeviceHardwareControlProvider,
-    private val deviceActionCommandRunner: DeviceActionCommandRunner,
-) : AndroidNetworkBridge {
+class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun start(): AndroidNetworkBridgeSession {
@@ -69,11 +59,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
             executor = executor,
             json = json,
             authToken = authToken,
-            sensorReadTool = DeviceSensorReadTool(sensorSnapshotProvider, sensorSampler),
-            mobileActionRegistry = mobileActionRegistry,
-            mobileIntentActionTool = mobileIntentActionTool,
-            hardwareControlTool = DeviceHardwareControlTool(hardwareControlProvider),
-            deviceActionCommandRunner = deviceActionCommandRunner,
         )
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
@@ -88,11 +73,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val executor: ExecutorService,
         private val json: Json,
         private val authToken: String,
-        private val sensorReadTool: DeviceSensorReadTool,
-        private val mobileActionRegistry: MobileActionRegistry,
-        private val mobileIntentActionTool: MobileIntentActionTool,
-        private val hardwareControlTool: DeviceHardwareControlTool,
-        private val deviceActionCommandRunner: DeviceActionCommandRunner,
     ) {
         @Volatile private var closed = false
 
@@ -143,135 +123,11 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 socket.outputStream.writeJsonResponse(401, errorBody("unauthorized", "Android bridge authorization token is missing or invalid."))
                 return
             }
-            when (method) {
-                "POST" -> when {
-                    path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
-                    path == "/fetch" -> handleFetch(socket.outputStream, body)
-                    path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
-                    path == "/device/actions/command" -> handleDeviceActionCommand(socket.outputStream, body)
-                    path == "/device/mobile-actions/execute" -> handleMobileActionExecute(socket.outputStream, body)
-                    path == "/device/mobile-actions/intent" -> handleMobileIntentAction(socket.outputStream, body)
-                    path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
-                "GET" -> when (path) {
-                    "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
+            when {
+                method == "POST" && path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
+                method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
-        }
-
-        private fun handleDeviceActionCommand(output: OutputStream, body: String) {
-            val response = runCatching { json.parseToJsonElement(deviceActionCommandRunner.runJson(body)).jsonObject }
-                .getOrElse { error ->
-                    output.writeJsonResponse(500, errorBody("device_action_failed", error.message ?: "Device action command failed."))
-                    return
-                }
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun handleMobileActionCapabilities(output: OutputStream) {
-            val response = runCatching { json.parseToJsonElement(mobileActionRegistry.matrixJson()).jsonObject }
-                .getOrElse {
-                    output.writeJsonResponse(500, errorBody("mobile_actions_failed", "Capability matrix was not valid JSON."))
-                    return
-                }
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun handleMobileActionExecute(output: OutputStream, body: String) {
-            val request = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
-            if (request == null) {
-                output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
-                return
-            }
-            val toolName = request.string("toolName")?.trim().orEmpty()
-            if (toolName.isBlank()) {
-                output.writeJsonResponse(400, errorBody("invalid_request", "toolName is required."))
-                return
-            }
-            val input = request["input"]?.jsonObject ?: JsonObject(emptyMap())
-            val actionId = request.string("actionId")?.trim()?.takeIf { it.isNotBlank() } ?: com.letta.mobile.runtime.actions.newActionId()
-            val responseText = runCatching {
-                json.encodeToString(com.letta.mobile.runtime.actions.MobileActionToolResponse.serializer(), mobileActionRegistry.handle(toolName, input, actionId))
-            }.getOrElse { error ->
-                output.writeJsonResponse(500, errorBody("mobile_actions_failed", error.message ?: "Unable to execute mobile action tool."))
-                return
-            }
-            val response = json.parseToJsonElement(responseText).jsonObject
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun handleReadSensors(output: OutputStream, body: String) {
-            val request = parseJsonBody(output, body) ?: return
-            val responseText = runCatching { sensorReadTool.handleJson(request) }
-                .getOrElse { error ->
-                    output.writeJsonResponse(500, errorBody("read_sensors_failed", error.message ?: "Unable to read sensors."))
-                    return
-                }
-            val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
-                .getOrElse {
-                    output.writeJsonResponse(500, errorBody("read_sensors_failed", "Tool response was not valid JSON."))
-                    return
-                }
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun handleMobileIntentAction(output: OutputStream, body: String) {
-            val request = parseJsonBody(output, body) ?: return
-            val responseText = runCatching { mobileIntentActionTool.handleJson(request) }
-                .getOrElse { error ->
-                    output.writeJsonResponse(500, errorBody("mobile_action_failed", error.message ?: "Unable to handle mobile action."))
-                    return
-                }
-            val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
-                .getOrElse {
-                    output.writeJsonResponse(500, errorBody("mobile_action_failed", "Tool response was not valid JSON."))
-                    return
-                }
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun handleHardwareControl(output: OutputStream, path: String, body: String) {
-            val request = runCatching {
-                if (body.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(body).jsonObject
-            }.getOrNull()
-            if (request == null) {
-                output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
-                return
-            }
-            val responseText = runCatching {
-                when (path) {
-                    "/device/hardware/capabilities" -> hardwareControlTool.capabilitiesJson()
-                    "/device/hardware/set_flashlight" -> hardwareControlTool.setFlashlightJson(request)
-                    "/device/hardware/vibrate" -> hardwareControlTool.vibrateJson(request)
-                    "/device/hardware/audio_status" -> hardwareControlTool.audioStatusJson()
-                    "/device/hardware/adjust_music_volume" -> hardwareControlTool.adjustMusicVolumeJson(request)
-                    else -> null
-                }
-            }.getOrElse { error ->
-                output.writeJsonResponse(500, errorBody("hardware_control_failed", error.message ?: "Hardware control failed."))
-                return
-            }
-            if (responseText == null) {
-                output.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                return
-            }
-            val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
-                .getOrElse {
-                    output.writeJsonResponse(500, errorBody("hardware_control_failed", "Tool response was not valid JSON."))
-                    return
-                }
-            output.writeJsonResponse(200, response)
-        }
-
-        private fun parseJsonBody(output: OutputStream, body: String): JsonObject? {
-            val request = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
-            if (request == null) {
-                output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
-            }
-            return request
         }
 
         private fun handleDnsLookup(output: OutputStream, body: String) {

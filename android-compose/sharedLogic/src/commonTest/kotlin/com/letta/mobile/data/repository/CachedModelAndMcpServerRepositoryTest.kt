@@ -1,9 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.backend.bound
-import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.EmbeddingModel
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
@@ -12,22 +10,14 @@ import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
-import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.repository.api.McpServerIrohSource
 import com.letta.mobile.data.repository.api.McpServerRemoteSource
 import com.letta.mobile.data.repository.api.ModelIrohSource
 import com.letta.mobile.data.repository.api.ModelRemoteSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
@@ -201,25 +191,6 @@ private fun testMcpServer(id: String): McpServer =
 class CachedModelRepositoryTest {
 
     @Test
-    fun refreshLlmModelsPrefersLocalRuntimeSource() = runTest {
-        val remote = FakeModelRemoteSource(llmModels = listOf(model("remote/model")))
-        val local = FakeLocalRuntimeModelSource(llmModels = listOf(model("local/model")))
-        val settings = MinimalSettingsRepository(
-            LettaConfig(
-                id = "local",
-                mode = LettaConfig.Mode.LOCAL,
-                serverUrl = "local-lettacode://device",
-            ),
-        )
-        val repository = CachedModelRepository(remote.bound(), local, settings)
-
-        repository.refreshLlmModels()
-
-        assertEquals(listOf("local/model"), repository.llmModels.value.map { it.handle })
-        assertTrue(remote.llmCalls == 0)
-    }
-
-    @Test
     fun refreshLlmModelsUsesIrohSourceWhenActive() = runTest {
         val remote = FakeModelRemoteSource(llmModels = listOf(model("remote/model")))
         val iroh = FakeModelIrohSource(llmModels = listOf(model("iroh/model")))
@@ -303,66 +274,4 @@ class CachedModelRepositoryTest {
         override suspend fun listEmbeddingModels(): List<EmbeddingModel> = embeddingModels
     }
 
-    private class FakeLocalRuntimeModelSource(
-        private val llmModels: List<LlmModel>,
-    ) : LocalRuntimeModelSource {
-        override suspend fun listLlmModels(): List<LlmModel> = llmModels
-    }
-
-    private class MinimalSettingsRepository(
-        initial: LettaConfig,
-    ) : ISettingsRepository {
-        private val config = MutableStateFlow<LettaConfig?>(initial)
-
-        override val configs: StateFlow<List<LettaConfig>> = MutableStateFlow(listOf(initial)).asStateFlow()
-        override val activeConfig: StateFlow<LettaConfig?> = config.asStateFlow()
-        override val activeConfigChanges: Flow<LettaConfig> = flowOf(initial)
-        override val favoriteAgentId: StateFlow<String?> = MutableStateFlow(null).asStateFlow()
-        override val adminAgentId: StateFlow<String?> = MutableStateFlow(null).asStateFlow()
-        override val lastChatSelection: StateFlow<LastChatSelection?> = MutableStateFlow(null).asStateFlow()
-        override val huggingFaceToken: StateFlow<String?> = MutableStateFlow(null).asStateFlow()
-
-        override fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
-        override suspend fun saveConfig(config: LettaConfig) = Unit
-        override suspend fun setActiveConfigId(id: String) = Unit
-        override suspend fun deleteConfig(id: String) = Unit
-        override suspend fun clearAllData() = Unit
-        override suspend fun setHuggingFaceToken(token: String?) = Unit
-        override fun getTheme(): Flow<AppTheme> = flowOf(AppTheme.SYSTEM)
-        override fun getThemePreset(): Flow<ThemePreset> = flowOf(ThemePreset.DEFAULT)
-        override fun getDynamicColor(): Flow<Boolean> = flowOf(false)
-        override fun observeResumeRecentConversation(): Flow<Boolean> = flowOf(false)
-        override fun getPinnedAgentIds(): Flow<Set<String>> = flowOf(emptySet())
-        override fun getPinnedAgentOrder(): Flow<List<String>> = flowOf(emptyList())
-        override fun getPinnedConversationIds(): Flow<Set<String>> = flowOf(emptySet())
-        override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) = Unit
-        override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) = Unit
-        override fun setFavoriteAgentId(agentId: String?) = Unit
-        override suspend fun setAgentPinned(agentId: String, pinned: Boolean) = Unit
-        override suspend fun setPinnedAgentOrder(order: List<String>) = Unit
-        override fun getPinnedProjectIds(): Flow<Set<String>> = flowOf(emptySet())
-        override suspend fun setProjectPinned(projectId: String, pinned: Boolean) = Unit
-        override fun getPinnedShortcutOrder(): Flow<List<String>> = flowOf(emptyList())
-        override suspend fun setPinnedShortcutOrder(order: List<String>) = Unit
-        override suspend fun addPinnedShortcut(name: String) = Unit
-        override suspend fun removePinnedShortcut(name: String) = Unit
-        override fun getPinnedItemsOrder(): Flow<List<String>> = flowOf(emptyList())
-        override suspend fun setPinnedItemsOrder(order: List<String>) = Unit
-        override fun getPinnedAgentNames(): Flow<Map<String, String>> = flowOf(emptyMap())
-        override suspend fun upsertPinnedAgentName(id: String, name: String) = Unit
-        override suspend fun removePinnedAgentName(id: String) = Unit
-        override fun getChatBackgroundKey(): Flow<String> = flowOf("default")
-        override suspend fun setChatBackgroundKey(key: String) = Unit
-        override fun getChatFontScale(): Flow<Float> = flowOf(1f)
-        override suspend fun setChatFontScale(scale: Float) = Unit
-        override fun getEnableProjects(): Flow<Boolean> = flowOf(false)
-        override fun getHapticsEnabled(): Flow<Boolean> = flowOf(true)
-        override suspend fun setTheme(theme: AppTheme) = Unit
-        override suspend fun setThemePreset(themePreset: ThemePreset) = Unit
-        override suspend fun setDynamicColor(enabled: Boolean) = Unit
-        override suspend fun setEnableProjects(enabled: Boolean) = Unit
-        override suspend fun setHapticsEnabled(enabled: Boolean) = Unit
-        override fun getOpenChatsOnCanvas(): Flow<Boolean> = flowOf(true)
-        override suspend fun setOpenChatsOnCanvas(enabled: Boolean) = Unit
-    }
 }

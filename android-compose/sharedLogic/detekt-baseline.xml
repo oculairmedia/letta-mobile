@@ -1085,9 +1085,6 @@
     <ID>MaxLineLength:LocalBackendAdminStoreTest.kt$LocalBackendAdminStoreTest$writeConversation(base, "conversation:c-arch", """{"id":"c-arch","agent_id":"agent-1","archived":true,"last_message_at":"2025-02-02T00:00:00.000Z"}""")</ID>
     <ID>MaxLineLength:LocalBackendAdminStoreTest.kt$LocalBackendAdminStoreTest$writeConversation(base, "conversation:c-other", """{"id":"c-other","agent_id":"agent-2","last_message_at":"2025-02-02T00:00:00.000Z"}""")</ID>
     <ID>MaxLineLength:LocalBackendAdminStoreTest.kt$LocalBackendAdminStoreTest${</ID>
-    <ID>MaxLineLength:LocalBackendEmbeddedStoreTest.kt$LocalBackendEmbeddedStoreTest$"""{"type":"message","id":"e1","message":{"id":"r1","role":"toolResult","toolCallId":"c1","content":[{"type":"text","text":"ok"}],"isError":true}}"""</ID>
-    <ID>MaxLineLength:LocalBackendEmbeddedStoreTest.kt$LocalBackendEmbeddedStoreTest$"""{"type":"message","id":"e1","message":{"id":"r2","role":"toolResult","toolCallId":"small","content":[{"type":"text","text":"fine"}]}}"""</ID>
-    <ID>MaxLineLength:LocalBackendEmbeddedStoreTest.kt$LocalBackendEmbeddedStoreTest$assertEquals(LocalBackendEmbeddedStore.DEFAULT_LOCAL_CONTEXT_WINDOW, store.contextWindowOverview(AgentId("agent-a"))?.contextWindowSizeMax)</ID>
     <ID>MaxLineLength:LocalBackendMessageReader.kt$LocalBackendMessageReader$val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode(support.conversationKey(internalConvId, resolvedAgentId)))</ID>
     <ID>MaxLineLength:MarkdownDocument.kt$MarkdownReducer$is MarkdownOp.SetMarkdown -&gt; if (wins(doc.markdownStamp, op)) doc.copy(markdown = op.markdown, markdownStamp = OpStamp.of(op)) else doc</ID>
     <ID>MaxLineLength:MemfsPageController.kt$MemfsPageController$perform</ID>
@@ -1625,9 +1622,7 @@
     <ID>ReturnCount:IrohNodeConnectionSupport.kt$internal fun tagStreamDeltaForOptimisticDedup( delta: JsonObject, ): JsonObject</ID>
     <ID>ReturnCount:IrohObserverIngestor.kt$IrohObserverIngestor$private fun sanitizeAgentReturn( streamDelta: AppServerInboundFrame.StreamDelta, received: AppServerReceivedFrame, ): AppServerReceivedFrame</ID>
     <ID>ReturnCount:IrohTurnRegistry.kt$IrohActiveTurn$fun promoteRunId(promotion: IrohRunPromotion): Boolean</ID>
-    <ID>ReturnCount:LocalAgentRuntimeMetadata.kt$AgentRuntimeBinding$fun isLocalBound(agent: Agent?): Boolean</ID>
     <ID>ReturnCount:LocalBackendConversationReader.kt$LocalBackendConversationReader$private fun parseConversationRecord(d: File, agentId: String?): ConvRecord?</ID>
-    <ID>ReturnCount:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords$private fun readDefaultConversation(directory: File): Conversation?</ID>
     <ID>ReturnCount:LocalBackendMessageReader.kt$LocalBackendMessageReader$private fun parseRunRec(dir: File, agentId: String, internalConvId: String): RunRec?</ID>
     <ID>ReturnCount:LocalBackendMessageReader.kt$LocalBackendMessageReader$private fun resolveConversation(externalId: String, agentIdHint: String?): Pair&lt;String, String&gt;?</ID>
     <ID>ReturnCount:LocalBackendRunReader.kt$LocalBackendRunReader$private fun matches(run: JsonObject, query: RunQuery): Boolean</ID>
@@ -1996,8 +1991,6 @@
     <ID>TooManyFunctions:JsonRpcCodec.kt$JsonRpcCodec</ID>
     <ID>TooManyFunctions:LcpInbound.kt$LcpInbound</ID>
     <ID>TooManyFunctions:LocalBackendAdminStore.kt$LocalBackendAdminStore</ID>
-    <ID>TooManyFunctions:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords</ID>
-    <ID>TooManyFunctions:LocalBackendEmbeddedTranscript.kt$LocalBackendEmbeddedTranscript</ID>
     <ID>TooManyFunctions:LocalBackendMessageProjection.kt$LocalBackendMessageProjection</ID>
     <ID>TooManyFunctions:MemfsPageController.kt$MemfsPageController : MemfsPageActionsAutoCloseable</ID>
     <ID>TooManyFunctions:MemfsPageReducer.kt$MemfsPageReducer</ID>
@@ -2195,8 +2188,6 @@
     <ID>UseCheckOrError:IrohChannelTransportAdminRpcTest.kt$IrohChannelTransportAdminRpcTest$throw IllegalStateException("timeout")</ID>
     <ID>UseCheckOrError:IrohConnectionSupervisorTest.kt$IrohConnectionSupervisorTest$throw IllegalStateException("temporary outage")</ID>
     <ID>UseCheckOrError:IrohEventSeqWireOrderTest.kt$IrohEventSeqWireOrderTest.&lt;no name provided&gt;$throw IllegalStateException("stream reset")</ID>
-    <ID>UseCheckOrError:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords$throw IllegalStateException("Local conversation record for ${agentId.value} could not be created")</ID>
-    <ID>UseCheckOrError:LocalBackendEmbeddedRecords.kt$LocalBackendEmbeddedRecords$throw IllegalStateException("Local conversation record for ${agentId.value} is unreadable")</ID>
     <ID>UseCheckOrError:PluginAdminLink.kt$&lt;no name provided&gt;$throw IllegalStateException("Not connected to a host")</ID>
     <ID>UseCheckOrError:SharedDocumentTest.kt$SharedDocumentTest.&lt;no name provided&gt;$throw IllegalStateException("disk full")</ID>
     <ID>UseCheckOrError:SharedDocumentTest.kt$SharedDocumentTest.&lt;no name provided&gt;$throw IllegalStateException("read-only volume")</ID>

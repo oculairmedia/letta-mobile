@@ -13,7 +13,6 @@ import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.repository.SlashCommandRepository
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
-import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -72,14 +71,10 @@ class AndroidSessionRouteMatrixTest {
         agentDao = dagger.Lazy<AgentDao> { FakeAgentDao() },
         conversationDao = dagger.Lazy<ConversationDao> { FakeConversationDao() },
         // Production: SessionRemoteSources.None, the default.
-        localConversationSource = mockk(relaxed = true),
-        localAgentSource = mockk(relaxed = true),
-        localModelSource = mockk(relaxed = true),
     ).assemble(
         SessionGraphAssembleRequest(
             graphId = 1L,
             activeConfig = config,
-            localRuntimeBackend = null,
             scope = backgroundScope,
             channelTransport = transport,
             settingsRepository = settings,

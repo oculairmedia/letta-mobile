@@ -73,7 +73,15 @@ class LocalAppServerDeviceSmokeTest {
 
             val host = androidLocalAppServerHost(
                 launcher = LibnodeAppServerLauncher(NativeLettaCodeNodeBridge()),
-                launchSource = AndroidLocalAppServerLaunchSource(context, EmbeddedLettaCodeAssetExtractor(context), networkBridge(context)),
+                launchSource = AndroidLocalAppServerLaunchSource(
+                    context,
+                    EmbeddedLettaCodeAssetExtractor(context),
+                    LocalAndroidNetworkBridge(),
+                    onDeviceBridge = object : OnDeviceOpenAiBridge {
+                        override fun start(modelSelection: EmbeddedLettaCodeModelSelection) =
+                            error("the smoke writes its own provider")
+                    },
+                ),
                 discovery = AppServerDiscovery(http),
                 scope = scope,
             )

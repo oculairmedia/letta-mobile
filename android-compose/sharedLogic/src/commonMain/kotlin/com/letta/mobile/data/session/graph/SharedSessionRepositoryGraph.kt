@@ -22,7 +22,6 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.LettaBackend
 import kotlinx.atomicfu.atomic
 
 /**
@@ -51,7 +50,6 @@ class HostSessionRepositories(
 class SessionGraphIdentity(
     val id: Long,
     val backendDescriptor: BackendDescriptor,
-    val localRuntimeBackend: LettaBackend?,
     val channelTransport: IChannelTransport,
     val capabilities: SessionCapabilities,
 )
@@ -72,7 +70,6 @@ class SharedSessionRepositoryGraph(
 ) : SessionRepositoryGraph {
     override val id: Long = identity.id
     override val backendDescriptor: BackendDescriptor = identity.backendDescriptor
-    override val localRuntimeBackend: LettaBackend? = identity.localRuntimeBackend
     override val channelTransport: IChannelTransport = identity.channelTransport
     override val capabilities: SessionCapabilities = identity.capabilities
 
