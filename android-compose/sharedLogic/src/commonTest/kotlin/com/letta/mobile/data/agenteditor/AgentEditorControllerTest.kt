@@ -43,6 +43,7 @@ class AgentEditorControllerTest {
         override val agents = MutableStateFlow(listOf(agent))
         override val models = MutableStateFlow(listOf(LlmModel(id = "m", handle = "openai/gpt-5", reasoningEffort = "low")))
         override val tools = MutableStateFlow<List<Tool>>(emptyList())
+        override val modelsUnavailable = MutableStateFlow<String?>(null)
         val byId = mutableMapOf(agent.id.value to agent)
         val updates = mutableListOf<AgentUpdateParams>()
         val created = mutableListOf<AgentCreateParams>()
@@ -73,6 +74,20 @@ class AgentEditorControllerTest {
 
     private fun TestScope.editor(backend: RecordingBackend, mode: AgentEditorMode = AgentEditorMode.Edit("a-1")) =
         AgentEditorController(backend, backgroundScope, mode)
+
+    /** letta-mobile-by4vm.121.11: the picker says why there are no models, not "no match". */
+    @Test
+    fun aFailedModelRefreshReasonReachesTheState() = runTest(UnconfinedTestDispatcher()) {
+        val backend = RecordingBackend(ada)
+        val controller = editor(backend, AgentEditorMode.Create)
+        assertNull(controller.state.value.modelsUnavailable)
+
+        backend.modelsUnavailable.value = "On-device runtime stopped. Restart the app."
+
+        assertEquals("On-device runtime stopped. Restart the app.", controller.state.value.modelsUnavailable)
+        backend.modelsUnavailable.value = null
+        assertNull(controller.state.value.modelsUnavailable)
+    }
 
     @Test
     fun editLoadsTheAgentIntoTheFormAndNothingIsDirty() = runTest(UnconfinedTestDispatcher()) {

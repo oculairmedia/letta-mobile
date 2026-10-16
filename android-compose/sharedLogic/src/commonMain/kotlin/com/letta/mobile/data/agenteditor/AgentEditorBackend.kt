@@ -27,8 +27,8 @@ interface AgentEditorBackend {
     val models: StateFlow<List<LlmModel>>
     val tools: StateFlow<List<Tool>>
 
-    /** Why the last model refresh failed (letta-mobile-by4vm.121.11), null once one succeeds; never set by default. */
-    val modelsUnavailable: StateFlow<String?> get() = NO_FAILURE
+    /** Why the last model refresh failed (letta-mobile-by4vm.121.11); null when it succeeded or has not run. */
+    val modelsUnavailable: StateFlow<String?>
 
     /** The agent as the server has it now. */
     suspend fun load(agentId: AgentId): Agent
@@ -128,9 +128,6 @@ class RepositoryAgentEditorBackend(
 /** [repository] when the session serves [route]; the backstop [AppServerRouteUnavailable] when not. */
 private fun <T : Any> served(repository: T?, route: SessionRoute): T = repository ?: throw AppServerRouteUnavailable(route)
 
-/** Runs [block], rethrowing cancellation and swallowing anything else (a refresh that may fail). */
-private val NO_FAILURE: StateFlow<String?> = MutableStateFlow(null)
-
 /** Runs [block]; why it failed, or null when it did not (a failed catalog keeps what it had). */
 private suspend fun refreshFailure(block: suspend () -> Unit): String? {
     val failure = runCatching { block() }.exceptionOrNull() ?: return null
@@ -138,6 +135,7 @@ private suspend fun refreshFailure(block: suspend () -> Unit): String? {
     return failure.message?.takeIf(String::isNotBlank) ?: "The models could not be listed"
 }
 
+/** Runs [block], rethrowing cancellation and swallowing anything else (a refresh that may fail). */
 private suspend fun refreshQuietly(block: suspend () -> Unit) {
     try {
         block()
