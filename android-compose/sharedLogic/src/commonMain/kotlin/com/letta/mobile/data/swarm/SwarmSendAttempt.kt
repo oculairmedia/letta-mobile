@@ -88,8 +88,9 @@ internal class SendAttempt(
     private val history = SwarmHistory(directory)
 
     suspend fun run(): AttemptOutcome {
-        val agent = directory.resolve(holder.current.agentRef).orReport() ?: return AttemptOutcome.Finished
-        val conversation = conversationFor(agent).orReport() ?: return AttemptOutcome.Finished
+        val (agent, conversation) = directory.resolve(holder.current.agentRef)
+            .then { agent -> conversationFor(agent).then { Lookup.Found(agent to it) } }
+            .orReport() ?: return AttemptOutcome.Finished
         val entry = holder.update { it.copy(agentId = agent.id, conversation = conversation) }
         reporter.report(DeliveryReceipt.Connected(agent, conversation, entry.id))
         if (entry.isPastSending()) return resume(conversation)

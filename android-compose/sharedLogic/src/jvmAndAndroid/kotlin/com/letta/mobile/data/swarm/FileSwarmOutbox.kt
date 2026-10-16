@@ -43,9 +43,9 @@ class FileSwarmOutbox(private val directory: Path) : SwarmOutbox {
 
     private fun readOrNull(file: Path): OutboxEntry? = try {
         read(file)
-    } catch (unreadable: SerializationException) {
+    } catch (expected: SerializationException) {
         null
-    } catch (oversized: IllegalStateException) {
+    } catch (expectedOversized: IllegalStateException) {
         null
     }
 

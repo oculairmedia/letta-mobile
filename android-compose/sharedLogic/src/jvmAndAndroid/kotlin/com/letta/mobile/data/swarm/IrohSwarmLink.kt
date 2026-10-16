@@ -67,7 +67,8 @@ class IrohSwarmLink(
 
     private suspend fun storedHost(): PairedHostRecord? = try {
         profile.host()
-    } catch (corrupt: SerializationException) {
+    } catch (expected: SerializationException) {
+        // An unreadable host file is no pairing: fail closed, the user re-pairs.
         null
     }
 

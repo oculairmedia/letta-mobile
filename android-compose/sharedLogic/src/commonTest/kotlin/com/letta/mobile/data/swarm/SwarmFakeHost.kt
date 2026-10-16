@@ -139,7 +139,12 @@ internal class SwarmFakeHost(
 
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse {
         aborts += command
-        return AppServerInboundFrame.AbortMessageResponse(requestId = command.requestId.orEmpty(), runtime = command.runtime, aborted = true, success = true)
+        return AppServerInboundFrame.AbortMessageResponse(
+            requestId = command.requestId.orEmpty(),
+            runtime = command.runtime,
+            aborted = true,
+            success = true,
+        )
     }
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit

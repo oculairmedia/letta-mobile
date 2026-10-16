@@ -164,7 +164,9 @@ class SwarmMessengerTest {
     fun conversationOfAnotherAgentIsRefusedBeforeAnythingIsSent() = runTest {
         val host = SwarmFakeHost(backgroundScope)
 
-        val events = messenger(Step.Host(host)).send(request(target = ConversationTarget.Existing(ConversationId(OTHER_CONVERSATION)))).toList()
+        val elsewhere = ConversationTarget.Existing(ConversationId(OTHER_CONVERSATION))
+
+        val events = messenger(Step.Host(host)).send(request(target = elsewhere)).toList()
 
         assertIs<DeliveryFailure.ConversationOutOfScope>(events.single())
         assertTrue(host.inputs.isEmpty())
@@ -198,7 +200,9 @@ class SwarmMessengerTest {
         val first = host.userMessage("hello", otid = null).also { host.store(PM_CONVERSATION, it) }
         host.store(PM_CONVERSATION, host.userMessage("from the phone", otid = null, sender = "device:phone"))
 
-        val result = messenger(Step.Host(host)).read(AgentRef(PM_AGENT), ConversationId(PM_CONVERSATION), since = MessageId(first.getValue("id").jsonPrimitive.content))
+        val since = MessageId(first.getValue("id").jsonPrimitive.content)
+
+        val result = messenger(Step.Host(host)).read(AgentRef(PM_AGENT), ConversationId(PM_CONVERSATION), since)
 
         val messages = assertIs<SwarmResult.Ok<List<SwarmMessage>>>(result).value
         assertEquals(listOf("from the phone"), messages.map { it.text })
