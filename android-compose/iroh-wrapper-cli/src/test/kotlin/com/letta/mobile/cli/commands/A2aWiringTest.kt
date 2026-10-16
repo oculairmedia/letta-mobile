@@ -11,6 +11,8 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import com.letta.mobile.data.transport.iroh.DeliveryOutcome
+import computer.iroh.EndpointAddr
+import computer.iroh.EndpointId
 import java.io.File
 import java.nio.file.Files
 import java.util.Base64
@@ -25,10 +27,8 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -37,53 +37,39 @@ import org.junit.jupiter.api.Test
  * depends on without bringing up a full controller / app-server.
  *
  * The live iroh-ffi loopback tests (`runIrohLiveE2E=true`) cover end-to-end
- * envelope delivery in `sharedLogic`; this layer stays JVM-only and tests:
- *  - the build returns an [A2aWiring] with a non-blank node id,
- *  - the receiver/router references are wired (same router instance the wiring
- *    received, accept-loop job is reachable),
+ * envelope delivery in `sharedLogic` (IrohAgentMessageReceiveE2ETest, which
+ * serves the receiver on a host IrohNodeEndpoint next to the App Server ALPN);
+ * this layer stays hermetic and tests:
+ *  - letta-mobile-by4vm.112: the wiring binds NO endpoint of its own; its
+ *    receiver is the a2a protocol handler the host endpoint registers,
  *  - letta-mobile-xmpqm: [publishHost] writes EXACTLY ONE host record into
- *    the kv store on bind, regardless of how many agents share the host —
+ *    the kv store, regardless of how many agents share the host —
  *    O(1) per bind, NOT O(agents),
- *  - the bind path migrates a legacy per-agent file to the single host
+ *  - publishing migrates a legacy per-agent file to the single host
  *    record (no stale per-agent rows can survive migration).
- *
- * Native bind (which talks QUIC) requires the iroh-ffi jar + a usable port.
- * Gated by `runIrohNativeE2E=true` so the default `:iroh-wrapper-cli:test`
- * gate stays hermetic.
  */
 class A2aWiringTest {
-    private fun nativeEnabled(): Boolean =
-        System.getProperty("runIrohNativeE2E") == "true"
+    private fun config(tmp: File, addressBook: File) = A2aWiringConfig(
+        identityDir = File(tmp, "identities"),
+        addressBook = addressBook,
+    )
+
+    /** A host address without binding anything: FFI value construction only, no socket. */
+    private fun hostAddr(): EndpointAddr =
+        EndpointAddr(EndpointId.fromBytes(ByteArray(32)), null, listOf("192.168.1.2:4501"))
 
     @Test
-    fun `build returns an A2aWiring with non-blank hex node id and a wired receiver`() {
-        assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
-        val tmp = Files.createTempDirectory("bn008-6-wire").toFile()
+    fun `wiring serves the a2a ALPN as a host endpoint protocol handler`() {
+        val tmp = Files.createTempDirectory("by4vm-112-wire").toFile()
         try {
             val addressBook = File(tmp, "agents.kv").also { it.createNewFile() }
-            val identitiesDir = File(tmp, "identities")
-            val cfg = A2aWiringConfig(
-                port = 0,
-                secretKeyPath = null,
-                identityDir = identitiesDir,
-                addressBook = addressBook,
+            val wiring = buildA2aWiring(config(tmp, addressBook), client = { null }, localBackendDir = null)
+            assertTrue(
+                wiring.receiver.alpn.contentEquals(IrohAgentMessage.ALPN),
+                "the receiver must claim /letta/a2a/0 on the host endpoint",
             )
-            val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
-            try {
-                assertNotNull(wiring.endpoint, "endpoint must be bound")
-                assertEquals(64, wiring.nodeIdHex.length, "nodeIdHex must be 64 hex chars")
-                // N4 (PR #1125): replace the previous self-compare tautologies
-                // (`assertEquals(wiring.router, wiring.router)` and
-                // `assertEquals(wiring.router::class, wiring.router::class)`,
-                // both trivially true) with assertions that pin the contract:
-                //   - the receiver is wired (not null and not a placeholder),
-                //   - the cached node id is a valid lowercase hex string
-                //     (stored at bind time — no per-read `runBlocking`).
-                assertNotNull(wiring.receiver, "receiver must be wired")
-                assertTrue(wiring.nodeIdHex.all { it in "0123456789abcdef" }, "nodeIdHex must be hex")
-            } finally {
-                wiring.close()
-            }
+            assertTrue(wiring.receiver.authorize("any-remote-host"), "a2a senders are other hosts, never paired devices")
+            assertEquals("", addressBook.readText(), "building the wiring publishes nothing before the endpoint binds")
         } finally {
             tmp.deleteRecursively()
         }
@@ -96,54 +82,33 @@ class A2aWiringTest {
      */
     @Test
     fun `publishHost writes exactly one host record per bind`() {
-        assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
         val tmp = Files.createTempDirectory("xmpqm-publish-host").toFile()
         try {
             val addressBook = File(tmp, "agents.kv").also { it.createNewFile() }
-            val identitiesDir = File(tmp, "identities")
-            val cfg = A2aWiringConfig(
-                port = 0,
-                secretKeyPath = null,
-                identityDir = identitiesDir,
-                addressBook = addressBook,
-            )
-            val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
-            try {
-                val record = runBlocking { publishHost(cfg, wiring.endpoint, wiring.addressStore) }
-                assertNotNull(record, "publishHost must return the HostEndpointRecord it wrote")
-                val content = addressBook.readText()
-                val lines = content.lines().filter { it.isNotBlank() }
-                assertEquals(
-                    1,
-                    lines.size,
-                    "kv file must hold EXACTLY ONE line after publishHost; got ${lines.size}: $content",
-                )
-                assertTrue(lines.single().startsWith("host:"), "kv line must use the host: prefix")
-                assertTrue(
-                    content.contains(wiring.nodeIdHex),
-                    "host record must carry the live node id: $content",
-                )
-                assertEquals(wiring.nodeIdHex.take(HostEndpointAddressStore.HOST_KEY_LENGTH), record.hostKey)
-            } finally {
-                wiring.close()
-            }
+            val cfg = config(tmp, addressBook)
+            val wiring = buildA2aWiring(cfg, client = { null }, localBackendDir = null)
+            val record = runBlocking { publishHost(cfg, hostAddr(), wiring.addressStore) }
+            val content = addressBook.readText()
+            val lines = content.lines().filter { it.isNotBlank() }
+            assertEquals(1, lines.size, "kv file must hold EXACTLY ONE line after publishHost; got ${lines.size}: $content")
+            assertTrue(lines.single().startsWith("host:"), "kv line must use the host: prefix")
+            assertTrue(content.contains(record.nodeIdHex), "host record must carry the endpoint's node id: $content")
+            assertEquals(64, record.nodeIdHex.length)
+            assertEquals(listOf("192.168.1.2:4501"), record.directAddrs)
+            assertEquals(record.nodeIdHex.take(HostEndpointAddressStore.HOST_KEY_LENGTH), record.hostKey)
         } finally {
             tmp.deleteRecursively()
         }
     }
 
     /**
-     * letta-mobile-xmpqm: [buildA2aWiring] must call [publishHost] exactly
-     * ONCE per wrapper start, not once per agent. Pinned here against the
-     * regression of per-agent publishing returning in a future refactor.
+     * letta-mobile-xmpqm: publishing must collapse a legacy per-agent file
+     * to the single host record, not write per-agent rows.
      */
     @Test
-    fun `build calls publishHost exactly once and never writes per-agent rows`() {
-        assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
+    fun `publishHost collapses a legacy per-agent file and never writes per-agent rows`() {
         val tmp = Files.createTempDirectory("xmpqm-build-once").toFile()
         try {
-            // Pre-populate a legacy per-agent file. The build MUST collapse it
-            // to a single host record — no per-agent rows can survive migration.
             val addressBook = File(tmp, "agents.kv").also {
                 it.writeText(
                     """
@@ -153,29 +118,16 @@ class A2aWiringTest {
                     """.trimIndent(),
                 )
             }
-            val identitiesDir = File(tmp, "identities")
-            val cfg = A2aWiringConfig(
-                port = 0,
-                secretKeyPath = null,
-                identityDir = identitiesDir,
-                addressBook = addressBook,
-            )
-            val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
-            try {
-                val content = addressBook.readText()
-                val lines = content.lines().filter { it.isNotBlank() }
-                assertEquals(
-                    1,
-                    lines.size,
-                    "build must collapse the legacy file to one host record; got ${lines.size} lines: $content",
-                )
-                assertTrue(lines.single().startsWith("host:"))
-                assertTrue("agent-1=" !in content, "legacy per-agent rows must NOT survive")
-                assertTrue("agent-2=" !in content)
-                assertTrue("agent-3=" !in content)
-            } finally {
-                wiring.close()
-            }
+            val cfg = config(tmp, addressBook)
+            val wiring = buildA2aWiring(cfg, client = { null }, localBackendDir = null)
+            runBlocking { publishHost(cfg, hostAddr(), wiring.addressStore) }
+            val content = addressBook.readText()
+            val lines = content.lines().filter { it.isNotBlank() }
+            assertEquals(1, lines.size, "publish must collapse the legacy file to one host record; got ${lines.size} lines: $content")
+            assertTrue(lines.single().startsWith("host:"))
+            assertTrue("agent-1=" !in content, "legacy per-agent rows must NOT survive")
+            assertTrue("agent-2=" !in content)
+            assertTrue("agent-3=" !in content)
         } finally {
             tmp.deleteRecursively()
         }
