@@ -10,8 +10,6 @@
 
 #include <atomic>
 #include <cerrno>
-#include <chrono>
-#include <condition_variable>
 #include <cstring>
 #include <cstdlib>
 #include <exception>
@@ -36,7 +34,6 @@ int gSavedStderrFd = -1;
 std::thread gStdoutPump;
 std::thread gStderrPump;
 std::mutex gIoMutex;
-std::condition_variable gStdinReadyCv;
 std::atomic<bool> gStopRequested(false);
 
 void LogError(const char* message) {
@@ -436,10 +433,11 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
         return -1;
     }
     {
+        // Nobody writes node's stdin (the App Server is driven over its WebSocket); the write end is
+        // held open so the server never sees EOF on stdin, as on the device smoke (by4vm.110.5).
         std::lock_guard<std::mutex> lock(gIoMutex);
         gStdinWriteFd = stdinPipe[1];
     }
-    gStdinReadyCv.notify_all();
     if (!RedirectFd(STDOUT_FILENO, stdoutPipe, false)) {
         cleanupRedirects();
         return -1;
@@ -461,54 +459,4 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     LogInfo(std::string("embedded node::Start returned: ") + std::to_string(exitCode));
     CleanupNativeIo();
     return exitCode;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeWriteStdin(
-    JNIEnv* env,
-    jobject,
-    jstring line
-) {
-    std::unique_lock<std::mutex> lock(gIoMutex);
-    if (gStdinWriteFd < 0) {
-        // nativeStart runs on a separate thread; the Kotlin side may write the
-        // first turn command before the stdin pipe is wired. Wait briefly for
-        // startup instead of failing the turn (fix/local-node-stdin-lifecycle).
-        gStdinReadyCv.wait_for(lock, std::chrono::seconds(10), [] { return gStdinWriteFd >= 0; });
-    }
-    if (gStdinWriteFd < 0) {
-        LogError("nativeWriteStdin: stdin write fd is closed (gStdinWriteFd < 0)");
-        return JNI_FALSE;
-    }
-    const int fd = gStdinWriteFd;
-    const std::string payload = ToString(env, line);
-    const char* data = payload.data();
-    size_t remaining = payload.size();
-    while (remaining > 0) {
-        const ssize_t written = write(fd, data, remaining);
-        if (written < 0) {
-            if (errno == EINTR) continue;
-            LogError(
-                std::string("nativeWriteStdin: write() failed errno=") +
-                std::to_string(errno) + " (" + strerror(errno) + ")"
-            );
-            return JNI_FALSE;
-        }
-        if (written == 0) {
-            LogError("nativeWriteStdin: write() returned 0");
-            return JNI_FALSE;
-        }
-        data += written;
-        remaining -= static_cast<size_t>(written);
-    }
-    return JNI_TRUE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStop(
-    JNIEnv*,
-    jobject
-) {
-    CleanupNativeIo();
-    return JNI_TRUE;
 }

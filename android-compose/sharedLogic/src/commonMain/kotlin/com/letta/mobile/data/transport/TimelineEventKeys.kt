@@ -34,9 +34,6 @@ internal object TimelineEventKeys {
         is WsTimelineEvent.Error -> with(event) {
             "error|${conversationId.orEmpty()}|${turnId.orEmpty()}|${runId.orEmpty()}|$code|$message"
         }
-        is WsTimelineEvent.UserActionOutcome -> with(event) {
-            "action|$frameId|${actionId.orEmpty()}|$outcome|${reason.orEmpty()}"
-        }
         else -> null
     }
 

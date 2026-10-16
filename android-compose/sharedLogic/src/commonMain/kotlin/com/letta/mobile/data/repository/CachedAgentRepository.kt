@@ -4,7 +4,6 @@ import com.letta.mobile.data.backend.RemoteRoute
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -14,17 +13,12 @@ import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.AgentIrohSource
 import com.letta.mobile.data.repository.api.AgentLocalCache
 import com.letta.mobile.data.repository.api.AgentRemoteSource
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.runCatchingCancellable
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,8 +43,6 @@ open class CachedAgentRepository(
     private val remote: RemoteRoute<AgentRemoteSource>,
     private val localCache: (() -> AgentLocalCache)? = null,
     private val repositoryScope: CoroutineScope = defaultCachedAgentRepositoryScope(),
-    private val localAgentSource: LocalRuntimeAgentSource? = null,
-    private val settingsRepository: ISettingsRepository? = null,
     transport: IChannelTransport? = null,
     // letta-mobile-71orq: Iroh admin_rpc agent reads. Platform wires
     // [AgentIrohSource] (Android: IrohAdminRpcAgentSource).
@@ -109,14 +101,8 @@ open class CachedAgentRepository(
      * small `{id, name, description}` projection instead of the ~621KB full
      * agents payload. Deliberately SEPARATE from [refreshAgents]/[agents],
      * which full-object consumers (edit-agent, chat config, …) still need.
-     *
-     * Local-runtime mode has no remote API, so it derives summaries from the
-     * on-device agents (via the shared cache / interface default).
      */
     override suspend fun listAgentSummaries(): List<AgentSummary> {
-        if (isLocalRuntimeActive()) {
-            return super.listAgentSummaries()
-        }
         if (irohAgentSource?.shouldUseIroh() == true) {
             return irohAgentSource.listAgents()
                 .distinctBy { it.id }
@@ -171,20 +157,7 @@ open class CachedAgentRepository(
         }
     }
 
-    private fun isLocalRuntimeActive(): Boolean =
-        localAgentSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
-
     private suspend fun refreshAgentsLocked() {
-        // Local-runtime mode: agents persist in the on-device store; the
-        // Room cache is wiped per session and must be repopulated from it.
-        val localSource = localAgentSource
-        if (localSource != null && isLocalRuntimeActive()) {
-            val local = localSource.listAgents()
-            _agents.update { local }
-            localCache?.invoke()?.insertAll(local)
-            lastRefreshAtMillis = nowMillis()
-            return
-        }
         val fresh = fetchAgentsForCache { partial ->
             _agents.update { partial }
         }
@@ -315,29 +288,9 @@ open class CachedAgentRepository(
             emit(cached)
         }
         if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
-        if (emitLocalAgentIfActive(id, cached)) return@flow
         val fresh = fetchAgentRemote(id)
         emit(fresh)
         updateAgentInCache(fresh)
-    }
-
-    /**
-     * Local-runtime path for [getAgent]: no remote API. Returns true when this
-     * flow should stop (local mode handled); false to continue with remote fetch.
-     */
-    private suspend fun kotlinx.coroutines.flow.FlowCollector<Agent>.emitLocalAgentIfActive(
-        id: AgentId,
-        cached: Agent?,
-    ): Boolean {
-        val localSource = localAgentSource ?: return false
-        if (!isLocalRuntimeActive()) return false
-        if (cached == null) {
-            val stored = localSource.listAgents().find { it.id == id }
-                ?: throw NoSuchElementException("Local agent ${id.value} not found in the on-device store.")
-            emit(stored)
-            updateAgentInCache(stored)
-        }
-        return true
     }
 
     /**
@@ -401,12 +354,6 @@ open class CachedAgentRepository(
         conversationId: ConversationId?,
         reportedTotal: Int?,
     ): ContextWindowOverview {
-        val localSource = localAgentSource
-        if (localSource != null && isLocalRuntimeActive()) {
-            // No remote API for local agents; estimate from the on-disk
-            // transcript (same chars/4 heuristic letta.js uses internally).
-            return localSource.contextWindowOverview(agentId) ?: ContextWindowOverview()
-        }
         val irohSource = irohAgentSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.getContextBreakdown(agentId, conversationId, reportedTotal)
@@ -432,51 +379,7 @@ open class CachedAgentRepository(
         return agent
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    override suspend fun createLocalAgent(params: AgentCreateParams): Agent {
-        val agent = Agent(
-            id = AgentId("local-agent-${Uuid.random()}"),
-            name = params.name?.takeIf { it.isNotBlank() } ?: "Local Agent",
-            description = params.description,
-            metadata = params.metadata.orEmpty(),
-            model = params.model,
-            embedding = params.embedding,
-            modelSettings = params.modelSettings,
-            llmConfig = params.llmConfig,
-            embeddingConfig = params.embeddingConfig,
-            contextWindowLimit = params.contextWindowLimit,
-            responseFormat = params.responseFormat,
-            tags = params.tags ?: persistentListOf(),
-            system = params.system,
-            enableSleeptime = params.enableSleeptime,
-            agentType = params.agentType,
-            messageBufferAutoclear = params.messageBufferAutoclear,
-            timezone = params.timezone,
-            maxFilesOpen = params.maxFilesOpen,
-            perFileViewWindowCharLimit = params.perFileViewWindowCharLimit,
-            hidden = params.hidden,
-            compactionSettings = params.compactionSettings,
-        )
-        localCache?.invoke()?.upsert(agent)
-        updateAgentInCache(agent)
-        // Room is wiped on every session-graph creation; the durable copy
-        // lives in the local-runtime store (letta-mobile-y5c9u).
-        localAgentSource?.persistAgent(agent)
-        return agent
-    }
-
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
-        val cached = _agents.value.find { it.id == id }
-        localAgentUpdate(id, cached, params)?.let { (source, preview) ->
-            // Local agents have no remote API even when their selected model is
-            // cloud/API-backed. Persist the update locally; the routing layer
-            // decides whether the next turn uses embedded runtime or remote
-            // transport from the updated model/metadata binding.
-            source.persistAgent(preview)
-            localCache?.invoke()?.upsert(preview)
-            updateAgentInCache(preview)
-            return preview
-        }
         // P4 iroh purity: raw HTTP AgentApi hard-fails in iroh:// mode; route
         // the update over admin_rpc agent.update (model switch from the drawer
         // failed with "Couldn't switch model" without this).
@@ -493,17 +396,6 @@ open class CachedAgentRepository(
         val agent = remote.source().updateAgent(id, params)
         refreshAgents()
         return agent
-    }
-
-    private fun localAgentUpdate(
-        id: AgentId,
-        cached: Agent?,
-        params: AgentUpdateParams,
-    ): Pair<LocalRuntimeAgentSource, Agent>? {
-        val source = localAgentSource ?: return null
-        val preview = cached?.let { applyAgentUpdates(it, params) } ?: return null
-        if (!id.value.startsWith("local-agent-")) return null
-        return source to preview
     }
 
     override suspend fun deleteAgent(id: AgentId) {
@@ -542,22 +434,6 @@ open class CachedAgentRepository(
         remote.source().detachArchive(agentId, archiveId)
         refreshAgents()
     }
-
-    private fun applyAgentCoreUpdates(agent: Agent, params: AgentUpdateParams): Agent = agent.copy(
-        name = params.name ?: agent.name,
-        description = params.description ?: agent.description,
-        model = params.model ?: agent.model,
-        modelSettings = params.modelSettings ?: agent.modelSettings,
-    )
-
-    private fun applyAgentUpdates(agent: Agent, params: AgentUpdateParams): Agent =
-        applyAgentCoreUpdates(agent, params).copy(
-            llmConfig = params.llmConfig ?: agent.llmConfig,
-            system = params.system ?: agent.system,
-            tags = params.tags ?: agent.tags,
-            metadata = params.metadata ?: agent.metadata,
-            contextWindowLimit = params.contextWindowLimit ?: agent.contextWindowLimit,
-        )
 
     private fun updateAgentInCache(agent: Agent) {
         _agents.update { current ->

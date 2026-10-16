@@ -1,0 +1,38 @@
+name: Mascot rig contract
+
+# The mascot .riv is generated from Python (android-compose/avatar/renderer-rive/rive/mascot) and
+# the app drives it by name. A drifted name or type fails silently at runtime, so this job fails
+# the PR instead: the shipped .riv (both copies, read directly - no Rive CLI on the runner) must
+# expose exactly the documented contract (rig/contract.py), RiveAvatarContract.kt may only write
+# names the contract offers, the doc tables must match, and the committed scene.rml must be what
+# the generator produces. Standard library only. The telemetry goldens (test_probe) need the
+# Windows Rive CLI and stay a local gate (rive/mascot/README.md).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mascot-rig.yml"
+      - "android-compose/avatar/renderer-rive/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mascot-rig.yml"
+      - "android-compose/avatar/renderer-rive/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Mascot contract + rig parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Contract, drift and rig checks
+        working-directory: android-compose/avatar/renderer-rive/rive/mascot
+        run: python3 -m unittest -v test_contract test_rig

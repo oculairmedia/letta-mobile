@@ -1,8 +1,5 @@
 package com.letta.mobile.cli.runtime
 
-import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationCreateParams
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -11,15 +8,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.call.body
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-import java.time.Instant
-import java.util.UUID
 import kotlinx.serialization.json.Json
 
 internal val CliJson = Json {
@@ -29,10 +20,6 @@ internal val CliJson = Json {
     explicitNulls = false
     coerceInputValues = true
 }
-
-internal fun newCliOtid(): String = "cm-cli-${UUID.randomUUID()}"
-
-internal fun nowIso(): String = Instant.now().toString()
 
 internal fun cliHttpClient(): HttpClient = HttpClient(OkHttp) {
     install(ContentNegotiation) {
@@ -50,19 +37,6 @@ internal class CliRestClient(
     private val token: String,
     private val client: HttpClient = cliHttpClient(),
 ) {
-    suspend fun createConversation(agentId: String): Conversation {
-        val response = client.post("${baseUrl.trimEnd('/')}/v1/conversations") {
-            bearerAuth(token)
-            contentType(ContentType.Application.Json)
-            parameter("agent_id", agentId)
-            setBody(ConversationCreateParams(agentId = AgentId(agentId)))
-        }
-        if (response.status.value !in 200..299) {
-            throw IllegalStateException("create conversation failed: HTTP ${response.status.value}: ${response.bodyAsText()}")
-        }
-        return response.body()
-    }
-
     suspend fun fetchMessages(
         conversationId: String,
         limit: Int,
@@ -75,7 +49,7 @@ internal class CliRestClient(
         if (response.status.value !in 200..299) {
             throw IllegalStateException("fetch messages failed: HTTP ${response.status.value}: ${response.bodyAsText()}")
         }
-        return response.body()
+        return response.body<List<LettaMessage>>()
     }
 
     fun close() {

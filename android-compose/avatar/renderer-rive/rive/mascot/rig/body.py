@@ -195,7 +195,8 @@ class Breathing(NamedTuple):
 BREATHING = {"idle": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
              "listening": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
              "speaking": Breathing(2 * BREATH_MS, 1.0, BREATH_SCALE),
-             "sleeping": Breathing(18000, 0.985, 1.045)}
+             "sleeping": Breathing(18000, 0.985, 1.045),
+             "dreaming": Breathing(18000, 0.985, 1.045)}
 
 
 # Lumen: the breath's light (a white radial fill on the body, gradient opacity 0 at rest).

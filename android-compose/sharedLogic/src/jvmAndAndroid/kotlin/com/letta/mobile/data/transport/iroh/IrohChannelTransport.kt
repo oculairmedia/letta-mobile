@@ -1,10 +1,8 @@
 package com.letta.mobile.data.transport.iroh
 
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ServerFrame
@@ -21,7 +19,6 @@ import com.letta.mobile.data.transport.api.CronPauseCommand
 import com.letta.mobile.data.transport.api.CronResumeCommand
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
-import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
@@ -43,8 +40,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import com.letta.mobile.runtime.RuntimeEventDraft
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -53,12 +48,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import com.letta.mobile.data.model.CronTask
-import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.util.UUID
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -114,6 +105,8 @@ class IrohChannelTransport(
     // letta-mobile-by4vm.50: when this device may run cadence syncs (phones: unmetered and charging
     // or screen on). Only used against hosts that advertise ordered event_seq.
     private val syncBudget: SyncBudgetPolicy = SyncBudgetPolicy.Unlimited,
+    // letta-mobile-by4vm.110.6: dial a plain ws:// App Server instead of an Iroh host.
+    private val directDialer: DirectAppServerDialer? = null,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport,
     FrameCollectorOverflowAwareChannelTransport, SubagentScopeAwareChannelTransport,
     CronControlTransport {
@@ -230,6 +223,7 @@ class IrohChannelTransport(
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
+        readyTimeout = directDialer?.readyTimeout ?: DEFAULT_READY_TIMEOUT,
     )
 
     init {
@@ -273,6 +267,7 @@ class IrohChannelTransport(
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
+        directDialer?.let { return irohDialer.attachDirect(it.dial(config), config) }
         val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
         return irohDialer.dial(
             config = config,
@@ -289,7 +284,8 @@ class IrohChannelTransport(
         if (state is IrohConnectionState.Ready) {
             notifyRedialIfTurnActive()
             connectionSession.onReady(state.handle)
-            livenessProbe.start(state.handle)
+            // A direct socket reports its own close; its admin_rpc is in process, so a probe proves nothing.
+            if (directDialer == null) livenessProbe.start(state.handle)
         } else {
             connectionSession.onNotReady()
             updateInterruptedTurns(state)
@@ -390,7 +386,6 @@ class IrohChannelTransport(
             adminRpc = { method, path, body -> adminRpc(method, path, body) },
             recordFrameOwnership = ::recordFrameOwnership,
             observerTerminalGraceMs = observerTerminalGraceMs,
-            hostCapabilities = connectionSession::hostCapabilities,
         )
     }
 
@@ -734,7 +729,6 @@ class IrohChannelTransport(
     }
 
     override fun bye(): Boolean = true
-    override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =

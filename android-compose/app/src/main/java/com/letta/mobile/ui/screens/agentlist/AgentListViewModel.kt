@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSearchMatcher
 import com.letta.mobile.data.model.AgentImportParams
@@ -86,14 +85,9 @@ class AgentListViewModel @Inject constructor(
         agentRepository.agents,
         settingsRepository.favoriteAgentId,
         settingsRepository.getPinnedAgentIds(),
-        settingsRepository.activeConfig,
         _transient,
-    ) { agents, favId, pinnedIds, activeConfig, transient ->
-        val displayAgents = if (AgentRuntimeBinding.isLocalRuntime(activeConfig)) {
-            agents.filter(AgentRuntimeBinding::isLocalBound)
-        } else {
-            agents
-        }
+    ) { agents, favId, pinnedIds, transient ->
+        val displayAgents = agents
         AgentListUiState(
             agents = displayAgents.toImmutableList(),
             favoriteAgentId = favId?.let { AgentId(it) },

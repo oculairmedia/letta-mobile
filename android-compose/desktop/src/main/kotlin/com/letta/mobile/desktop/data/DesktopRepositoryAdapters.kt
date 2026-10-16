@@ -86,7 +86,6 @@ class DesktopSessionGraphFactory(
             identity = SessionGraphIdentity(
                 id = nextId.incrementAndGet(),
                 backendDescriptor = desktopRemoteLettaDescriptor(config),
-                localRuntimeBackend = null,
                 channelTransport = channelTransport,
                 capabilities = adapters.capabilities,
             ),

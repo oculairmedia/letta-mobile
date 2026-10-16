@@ -4,11 +4,8 @@ import android.util.Log
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
-import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -19,9 +16,7 @@ internal class AdminChatSlashCommandsCoordinator(
     private val agentId: AgentId,
     private val slashCommandRepository: ISlashCommandRepository,
     private val composerCoordinator: AdminChatComposerCoordinator,
-    private val uiState: MutableStateFlow<ChatUiState>,
     private val projectContext: ProjectChatContext?,
-    private val localRuntimeRouting: () -> LocalRuntimeRouting,
     private val goalCoordinator: AdminChatGoalCoordinator,
 ) {
     private var loadVersion: Long = 0L
@@ -41,14 +36,6 @@ internal class AdminChatSlashCommandsCoordinator(
                         ),
                     )
                 }
-            }
-            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-                Log.d(TAG, "Slash commands skipped for local runtime agent=${agentId.value}")
-                if (version == loadVersion) {
-                    composerCoordinator.setSlashCommands(builtIns)
-                    uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
-                }
-                return@launch
             }
             val agentCommands = slashCommandRepository.listForAgent(agentId.value)
                 .getOrElse { e ->

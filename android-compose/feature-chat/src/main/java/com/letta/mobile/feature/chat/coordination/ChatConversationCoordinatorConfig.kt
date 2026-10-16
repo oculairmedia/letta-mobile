@@ -1,11 +1,9 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.ui.chat.render.ChatUiState
-import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -18,11 +16,9 @@ internal data class ChatConversationCoordinatorConfig(
     val currentConversationTracker: CurrentConversationTracker,
     val uiState: MutableStateFlow<ChatUiState>,
     val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
-    val bootstrap: LocalRuntimeBootstrapConfig,
     val observer: TimelineObserverConfig,
     val reconcileLauncher: RecentMessagesReconcileLauncher,
     val send: ConversationSendConfig,
-    val localRuntimeRouting: () -> LocalRuntimeRouting = { LocalRuntimeRouting.Remote },
     val hydration: HydrationRouteConfig,
 )
 
@@ -35,19 +31,12 @@ internal data class ChatConversationRoute(
     val isFresh: Boolean,
 )
 
-internal data class LocalRuntimeBootstrapConfig(
-    val pendingMessages: () -> ImmutableList<UiMessage>,
-    val setPendingUserMessage: (UiMessage) -> Unit,
-    val currentConversationId: () -> String?,
-)
-
 internal data class TimelineObserverConfig(
     val start: (String) -> Unit,
     val stop: suspend () -> Unit,
 )
 
 internal data class ConversationSendConfig(
-    val viaLocalRuntime: (String) -> Unit,
     val viaTimeline: (String) -> Unit,
     val markDuplicateInitialMessageInFlight: () -> Unit,
 )

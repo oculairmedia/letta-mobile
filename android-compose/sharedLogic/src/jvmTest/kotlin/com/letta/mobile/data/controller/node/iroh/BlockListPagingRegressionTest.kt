@@ -177,18 +177,17 @@ class BlockListPagingRegressionTest {
     }
 
     @Test
-    fun handlerServesABareArrayWhenTheWholeSetFitsSoOlderClientsAreUnaffected() = runTest {
+    fun handlerEnvelopesEvenAWholeSetThatFitsInOnePage() = runTest {
         val root = Files.createTempDirectory("block-paging-small").toFile().also { roots += it }
         LocalBackendFixtureStore.create(root)
         val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
         val router = AdminRpcRouter()
         ToolAdminHandlers.register(router, store, nativeClient = null)
 
-        val result = dispatchResult(router, buildJsonObject { })
-        assertTrue(
-            result is JsonArray,
-            "the legacy bare-array shape is the back-compat signal for 'this is the full set'",
-        )
+        val page = dispatchResult(router, buildJsonObject { }) as JsonObject
+        val blocks = page.getValue("blocks") as JsonArray
+        assertEquals(blocks.size, page.getValue("total").jsonPrimitive.content.toInt())
+        assertEquals("false", page.getValue("has_more").jsonPrimitive.content)
     }
 
     private fun idsOf(page: JsonArray): List<String> =

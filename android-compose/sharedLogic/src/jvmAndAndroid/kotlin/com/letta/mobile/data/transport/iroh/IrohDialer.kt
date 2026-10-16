@@ -9,6 +9,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohNodeProtocolHandler
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.util.Telemetry
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -142,8 +144,8 @@ internal class IrohDialer(
         val client = attachment.client
         val engine = transportEngine.engine(attachment.config.clientVersion)
         val bound = transportEngine.startDial(client) { router ->
-            // letta-mobile-by4vm.50: per dial, since event_seq and capabilities are the dial's.
-            bindIrohStreamIntegrity(router, client, attachment.serverCapabilities, scope)
+            // letta-mobile-by4vm.50: per dial, since event_seq is the dial's.
+            bindIrohStreamIntegrity(router, client, scope)
         }
         try {
             transportEngine.resumeSession()
@@ -164,6 +166,34 @@ internal class IrohDialer(
                 closeResources(reason)
             },
         )
+    }
+
+    /**
+     * letta-mobile-by4vm.110.6: attaches a direct ws:// [dial] as one dial of this engine: admin_rpc
+     * in process, the socket's stream deltas for the observer, and the socket closing reported as the
+     * connection loss the QUIC watcher reports for an Iroh dial.
+     */
+    suspend fun attachDirect(dial: DirectAppServerDial, config: IrohConnectConfig): IrohConnectionHandle {
+        var lossWatch: Job? = null
+        val attached = runCatching {
+            attachDial(
+                IrohDialAttachment(config, ticket = config.baseShimUrl, client = dial.client, serverCapabilities = dial.hostCapabilities),
+                closeResources = { reason ->
+                    lossWatch?.cancel()
+                    dial.close(reason)
+                },
+            )
+        }.onFailure { withContext(NonCancellable) { dial.close("attach_failed") } }.getOrThrow()
+        val handle = attached.copy(
+            adminRpcCall = dial.adminRpc,
+            observerStreamFrames = dial.streamFrames,
+            connectionAlive = { dial.connectionState.value.isReady },
+        )
+        lossWatch = scope.launch {
+            val ended = dial.connectionState.first { it is AppServerConnectionState.Failed } as AppServerConnectionState.Failed
+            onConnectionLost("app_server_socket_closed: ${ended.reason.orEmpty()}", handle)
+        }
+        return handle
     }
 
     /** letta-mobile-by4vm.96: the session ended for good (config change, disconnect, auth failure). */
@@ -316,17 +346,17 @@ internal class IrohDialer(
     }
 
     /**
-     * letta-mobile-by4vm.50: gap detection (and with it the busy/idle sync cadence, within
-     * [syncBudget]) only against a host that advertises ordered event_seq; older hosts keep the
-     * no-monitor behaviour, since their seq can reach the wire out of order.
+     * letta-mobile-by4vm.50: gap detection and with it the busy/idle sync cadence, within
+     * [syncBudget]. The host draws `event_seq` in wire order (it always advertises
+     * [com.letta.mobile.data.controller.fanout.StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]),
+     * so a jump is a lost frame.
      */
     internal fun bindIrohStreamIntegrity(
         router: AppServerRuntimeEventRouter,
         client: AppServerClient,
-        hostCapabilities: Set<String>?,
         scope: CoroutineScope,
-    ): Job? = StreamIntegrityBinding(client, { "iroh-sync-${UUID.randomUUID()}" }, syncBudget)
-        .bindIfHostOrdersEventSeq(router, hostCapabilities, scope)
+    ): Job = StreamIntegrityBinding(client, { "iroh-sync-${UUID.randomUUID()}" }, syncBudget)
+        .bindAndStart(router, detectGaps = true, scope = scope)
 
     private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
         Telemetry.event("IrohTrace", "transport.close.resources", "reason" to reason)

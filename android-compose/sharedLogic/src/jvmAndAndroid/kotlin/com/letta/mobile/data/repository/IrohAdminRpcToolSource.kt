@@ -29,7 +29,7 @@ class IrohAdminRpcToolSource(
     private val json: Json = LettaJson.adminRpc,
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     suspend fun listTools(): List<Tool> = listToolsRpc(JsonObject(emptyMap()))
 

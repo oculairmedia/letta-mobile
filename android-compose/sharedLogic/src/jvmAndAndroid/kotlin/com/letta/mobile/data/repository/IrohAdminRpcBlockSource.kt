@@ -12,7 +12,6 @@ import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -52,7 +51,7 @@ class IrohAdminRpcBlockSource private constructor(
     private fun channelTransport(): IChannelTransport = channelTransportProvider()
 
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     override suspend fun retrieveBlock(blockId: String): Block {
         val params = buildJsonObject { put("block_id", blockId) }
@@ -121,15 +120,9 @@ class IrohAdminRpcBlockSource private constructor(
      * One page of size 1 is enough: the envelope carries `total` for the whole
      * union, so a count never has to be inferred from how many rows the pager
      * managed to accumulate (inferring it is what produced a wrong exact count
-     * against a backend that ignored limit/offset). Falls back to a full sweep
-     * only when the server answered with the legacy bare array — in which case the
-     * array length IS the exact total, because a bare array means "full set".
+     * against a backend that ignored limit/offset).
      */
-    override suspend fun countBlocks(): Int {
-        val first = fetchPage(BlockListParams(offset = 0, limit = 1))
-        first.total?.let { return it }
-        return listAllBlocks().size
-    }
+    override suspend fun countBlocks(): Int = fetchPage(BlockListParams(offset = 0, limit = 1)).total
 
     /**
      * Pages `block.list` with a limit/offset cursor.
@@ -139,11 +132,8 @@ class IrohAdminRpcBlockSource private constructor(
      * 2,394,364 bytes measured on the live host — and one unwindowed response
      * exceeds the 1 MiB admin_rpc frame cap, so the Block Library rendered nothing.
      * This mirrors [IrohAdminRpcAgentSource.listAgents]: small pages, dedup by id,
-     * hard iteration cap so a backend that ignores `offset` cannot spin.
-     *
-     * `has_more` from the server's envelope is preferred over the page-size
-     * heuristic; the heuristic only applies to a legacy bare-array response, where
-     * a bare array already means "this is the full set".
+     * hard iteration cap so a backend that ignores `offset` cannot spin. The
+     * server's envelope says whether more exists (`has_more`).
      */
     override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         val merged = mutableListOf<Block>()
@@ -170,14 +160,10 @@ class IrohAdminRpcBlockSource private constructor(
      * Three stop conditions, in the order they can occur: an empty page (end of
      * set); a page that contributed nothing NEW, which means the backend ignored
      * `offset` and re-served page 1 — the exact pre-fix behaviour, and a signal to
-     * stop rather than spin; and the server's own `has_more`, preferred over the
-     * page-size heuristic (the heuristic only applies to a legacy bare array,
-     * where a bare array already means "this is the full set").
+     * stop rather than spin; and the server's own `has_more`.
      */
-    private fun shouldContinueAfter(page: BlockPage, fresh: List<Block>): Boolean {
-        if (page.blocks.isEmpty() || fresh.isEmpty()) return false
-        return page.hasMore ?: (page.blocks.size >= BLOCK_LIST_PAGE_SIZE)
-    }
+    private fun shouldContinueAfter(page: BlockPage, fresh: List<Block>): Boolean =
+        page.blocks.isNotEmpty() && fresh.isNotEmpty() && page.hasMore
 
     private suspend fun fetchPage(params: BlockListParams): BlockPage {
         val offset = params.offset ?: 0
@@ -194,32 +180,23 @@ class IrohAdminRpcBlockSource private constructor(
             body = requestParams.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc block.list failed")
-        val result = response.result ?: return BlockPage(emptyList(), total = null, hasMore = false)
-        // Dual shape: a bare array means the server delivered the FULL set (legacy
-        // contract), an object means it windowed and is telling us the true total.
-        return when (result) {
-            is JsonArray -> BlockPage(
-                blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), result),
-                total = null,
-                hasMore = false,
-            )
-
-            is JsonObject -> BlockPage(
-                blocks = result["blocks"]
-                    ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
-                    .orEmpty(),
-                total = (result["total"] as? JsonPrimitive)?.content?.toIntOrNull(),
-                hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull(),
-            )
-
-            else -> BlockPage(emptyList(), total = null, hasMore = false)
-        }
+        // The host always answers with the paged envelope `{blocks,total,offset,limit,has_more}`.
+        val result = response.result as? JsonObject ?: error("Iroh admin_rpc block.list answered without its page envelope")
+        return BlockPage(
+            blocks = result["blocks"]
+                ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
+                .orEmpty(),
+            total = (result["total"] as? JsonPrimitive)?.content?.toIntOrNull()
+                ?: error("Iroh admin_rpc block.list page has no total"),
+            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+                ?: error("Iroh admin_rpc block.list page has no has_more"),
+        )
     }
 
     private data class BlockPage(
         val blocks: List<Block>,
-        val total: Int?,
-        val hasMore: Boolean?,
+        val total: Int,
+        val hasMore: Boolean,
     )
     override suspend fun attachBlock(agentId: String, blockId: String) {
         val response = channelTransport().adminRpc(

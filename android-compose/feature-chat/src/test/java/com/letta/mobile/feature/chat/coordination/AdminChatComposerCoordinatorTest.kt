@@ -3,32 +3,23 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
-import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -40,9 +31,7 @@ class AdminChatComposerCoordinatorTest {
     private val composerController = mockk<ChatComposerController>(relaxed = true)
     private val chatSendStrategySelector = mockk<ChatSendStrategySelector>(relaxed = true)
     private val chatBannerController = mockk<ChatBannerController>(relaxed = true)
-    private val messageRepository = mockk<IMessageRepository>(relaxed = true)
     private val slashCommandRepository = mockk<ISlashCommandRepository>(relaxed = true)
-    private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val uiState = MutableStateFlow(ChatUiState())
 
     @Before
@@ -50,9 +39,6 @@ class AdminChatComposerCoordinatorTest {
         val stateFlow = MutableStateFlow(ChatComposerState())
         every { composerController.state } returns stateFlow
         
-        every { sessionManager.current } returns mockk(relaxed = true) {
-            every { localRuntimeBackend } returns null
-        }
 
         coordinator = AdminChatComposerCoordinator(
             scope = testScope,
@@ -63,8 +49,6 @@ class AdminChatComposerCoordinatorTest {
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
             backendKind = { BackendKind.DIRECT_WS },
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { false },
             projectContextAvailable = true,
@@ -104,7 +88,7 @@ class AdminChatComposerCoordinatorTest {
     }
     
     @Test
-    fun `submitComposer shows error if streaming`() {
+    fun `submitComposer queues a message sent while streaming`() {
         coordinator = AdminChatComposerCoordinator(
             scope = testScope,
             composerController = composerController,
@@ -114,17 +98,19 @@ class AdminChatComposerCoordinatorTest {
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
             backendKind = { BackendKind.DIRECT_WS },
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { true },
             projectContextAvailable = true,
         )
         
+        uiState.value = ChatUiState(conversationState = ConversationState.Ready("conv_123"), isStreaming = true)
+        every { composerController.payloadForSend("hello") } returns
+            ComposerSendPayload(text = "hello", attachments = emptyList())
+
         coordinator.submitComposer("hello")
-        
-        verify { composerController.setError(any()) }
-        verify(exactly = 0) { chatSendStrategySelector.send(any(), any(), any()) }
+
+        verify(exactly = 0) { composerController.setError(any()) }
+        verify { chatSendStrategySelector.send(eq("hello"), any(), any()) }
     }
 
     @Test
@@ -145,8 +131,6 @@ class AdminChatComposerCoordinatorTest {
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
             backendKind = { BackendKind.DIRECT_WS },
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { true },
             pendingUserInput = { pending },
@@ -199,27 +183,22 @@ class AdminChatComposerCoordinatorTest {
     @Test
     fun `interruptRun does nothing if not streaming`() = runTest {
         uiState.value = ChatUiState(isStreaming = false)
-        val clearThinking = mockk<() -> Unit>(relaxed = true)
-        
-        coordinator.interruptRun(clearThinking)
-        
-        verify(exactly = 0) { clearThinking.invoke() }
+        coordinator.interruptRun()
+
+        verify(exactly = 0) { chatBannerController.beginCancelling() }
     }
     
     @Test
-    fun `interruptRun cancels message if streaming and not shim`() {
+    fun `interruptRun cancels the turn through the channel route`() {
         uiState.value = ChatUiState(isStreaming = true)
-        val clearThinking = mockk<() -> Unit>(relaxed = true)
-        coEvery { messageRepository.cancelMessage(eq(AgentId("agent_123")), any()) } returns emptyMap()
         
-        coordinator.interruptRun(clearThinking)
+        coordinator.interruptRun()
         testScope.runCurrent()
-        
-        verify { clearThinking.invoke() }
+
         // letta-mobile-lgns8.19: the UI enters CANCELLING — it is NOT optimistically
         // cleared. The idle transition happens on the terminal frame instead.
         verify { chatBannerController.beginCancelling() }
         verify(exactly = 0) { chatBannerController.forceClearStreamingAfterInterrupt() }
-        coVerify { messageRepository.cancelMessage(eq(AgentId("agent_123")), any()) }
+        verify { chatSendStrategySelector.cancel() }
     }
 }

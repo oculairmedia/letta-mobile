@@ -17,54 +17,41 @@ The important compatibility lesson is that the UI/model runtime does not directl
 
 ## Android equivalent
 
-On Android, the trusted broker is the app process:
+On Android, the trusted broker is the app process (letta-mobile-by4vm.110.6):
 
-- `AndroidLettaCodeRuntimeController` prepares and starts the embedded Letta Code runtime.
-- `LocalAndroidNetworkBridge` starts a localhost HTTP bridge on `127.0.0.1:<random>`.
-- The bridge exposes Android-backed capabilities to embedded Letta Code.
-- `AndroidDeviceSensorSnapshotProvider` and related services own no-permission device context.
-- `DeviceActionCommandRunner` is the shared command facade for device actions.
-- The embedded preload registers a compact model-facing tool surface and routes calls to the bridge.
+- `LocalAppServerHost` + `LibnodeAppServerLauncher` start the embedded letta-code App Server in
+  process; `AndroidLocalAppServerLaunchSource` prepares the assets, the network bridge and the model
+  provider.
+- `LocalAndroidNetworkBridge` starts a localhost HTTP bridge on `127.0.0.1:<random>` that letta.js
+  fetches and resolves names through (`android-network-polyfill.cjs`), so outbound TLS is Android's.
+- Device tools are not bridge routes: the session channel registers them on every
+  `runtime_start` (`register_external_tools`), exactly as for an Iroh host, and answers their
+  `external_tool_call`s in the app process (`DeviceActionExternalTool` over `DeviceActionCommandRunner`).
 
 ## Route model
 
-Current Android bridge routes include:
-
 | Route | Purpose |
 | --- | --- |
-| `POST /device/actions/command` | Unified command facade used by `device_action`. |
-| `POST /device/sensors/read` | Direct `read_sensors` compatibility route. |
-| `POST /device/mobile-actions/intent` | User-mediated Android intent dry-run/launch route. |
-| `GET /device/mobile-actions/capabilities` | Mobile action capability matrix. |
-| `POST /device/mobile-actions/execute` | Generic mobile action registry execution route. |
-| `POST /device/hardware/*` | Hardware capability/control routes. |
 | `POST /fetch` | Android-backed fetch/curl route. |
 | `POST /dns/lookup` | Android-backed DNS route. |
-
-The long-term preferred model-facing route is `device_action` → `/device/actions/command`, because it keeps the model-visible tool list small while preserving structured commands.
 
 ## Auth model
 
 The Android local bridge is both loopback-bound and bearer-token protected:
 
 - `LocalAndroidNetworkBridge.start()` generates a random per-session token with `SecureRandom`.
-- The token is URL-safe Base64 without padding.
-- The token is not persisted and is not tied to user OAuth.
-- The token rotates whenever the bridge/runtime restarts.
-- Every HTTP bridge route requires `Authorization: Bearer <token>`.
-- `AndroidLettaCodeRuntimeController` injects the token as `LETTA_ANDROID_NETWORK_BRIDGE_TOKEN`.
-- The embedded preload and native curl bridge automatically attach the bearer token.
+- The token is URL-safe Base64 without padding, not persisted, not tied to user OAuth.
+- Every HTTP bridge route requires `Authorization: Bearer <token>`; the launch passes it as
+  `LETTA_ANDROID_NETWORK_BRIDGE_TOKEN` and the preload attaches it.
+- The App Server itself requires the per-launch capability token (`--ws-auth capability-token`).
 
 Debug-only ADB command activity does not use HTTP bridge auth because it calls `DeviceActionCommandRunner` directly in the app process and is only packaged in debug builds.
 
 ## Model-facing tool surface
 
-The embedded runtime currently exposes a compact tool surface:
-
-- `read_sensors` for direct no-permission device context reads.
-- `device_action` for command-facade access to sensors, hardware, intent dry-runs, and capability metadata.
-
-`device_action` supports `device.catalog` so the agent can discover supported commands on demand rather than carrying every command schema in the prompt.
+- `device_action` for command-facade access to sensors (`sensors.summary|catalog|sample|snapshot`),
+  hardware, intent dry-runs, and capability metadata. `device.catalog` lets the agent discover
+  supported commands on demand rather than carrying every command schema in the prompt.
 
 ## Gaps vs. desktop
 

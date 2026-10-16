@@ -51,7 +51,7 @@ class DesktopAppServerConnectionProbeTest {
                 dial = DesktopDirectDial(
                     serverUrl = "ws://127.0.0.1:9",
                     bearerToken = null,
-                    readiness = DesktopAppServerReadinessExpectation(),
+                    readiness = com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation(),
                     preflight = probe,
                 ),
                 scope = scope,

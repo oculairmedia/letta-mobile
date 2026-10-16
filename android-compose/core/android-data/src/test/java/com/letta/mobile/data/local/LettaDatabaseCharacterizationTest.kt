@@ -50,7 +50,7 @@ class LettaDatabaseCharacterizationTest {
             buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
         }
         assertTrue("legacy table survived the reset: $tables", "pending_local_messages" !in tables)
-        assertEquals(24, db.openHelper.readableDatabase.version)
+        assertEquals(25, db.openHelper.readableDatabase.version)
     }
 
     @Test

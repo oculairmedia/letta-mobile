@@ -43,20 +43,4 @@ class StreamIntegrityBinding(
         router.bindStreamIntegrity(monitor)
         return monitor.start(scope)
     }
-
-    /**
-     * letta-mobile-by4vm.50: an Iroh host relays frames per viewer and stamps each connection's
-     * `event_seq` itself. Only a host that advertises
-     * [StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY] draws that seq in wire order, so only
-     * then is a jump a lost frame. Any other host keeps today's behaviour: no monitor at all
-     * (null), so no gap detection and no cadence syncs either.
-     */
-    fun bindIfHostOrdersEventSeq(
-        router: AppServerRuntimeEventRouter,
-        hostCapabilities: Set<String>?,
-        scope: CoroutineScope,
-    ): Job? {
-        if (StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY !in hostCapabilities.orEmpty()) return null
-        return bindAndStart(router, detectGaps = true, scope = scope)
-    }
 }

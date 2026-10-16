@@ -4,21 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.letta.mobile.cli.commands.DumpTimelineCommand
-import com.letta.mobile.cli.commands.ProfileCommand
-import com.letta.mobile.cli.commands.ProfileDeleteCommand
-import com.letta.mobile.cli.commands.ProfileExportCommand
-import com.letta.mobile.cli.commands.ProfileImportCommand
-import com.letta.mobile.cli.commands.ProfileListCommand
-import com.letta.mobile.cli.commands.ProfileSetCommand
-import com.letta.mobile.cli.commands.ProfileShowCommand
-import com.letta.mobile.cli.commands.ProfileUseCommand
 import com.letta.mobile.cli.commands.RecordCursorStateCommand
-import com.letta.mobile.cli.commands.RestCommand
-import com.letta.mobile.cli.commands.RestDeleteCommand
-import com.letta.mobile.cli.commands.RestGetCommand
-import com.letta.mobile.cli.commands.RestPatchCommand
-import com.letta.mobile.cli.commands.RestPostCommand
-import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
 import com.letta.mobile.cli.commands.AgentMessageCommand
@@ -39,11 +25,6 @@ import com.letta.mobile.cli.commands.PeerListCommand
 import com.letta.mobile.cli.commands.PeerRenameCommand
 import com.letta.mobile.cli.commands.PeerRevokeCommand
 import com.letta.mobile.cli.commands.PeerSetCapabilitiesCommand
-import com.letta.mobile.cli.commands.SetupApplyCommand
-import com.letta.mobile.cli.commands.SetupCommand
-import com.letta.mobile.cli.commands.SetupExportCommand
-import com.letta.mobile.cli.commands.StreamCommand
-import com.letta.mobile.cli.commands.buildResourceCommands
 
 class LettaMobileCli : CliktCommand(name = "meridian") {
     override fun run() = Unit
@@ -61,27 +42,6 @@ object Main {
                 DumpTimelineCommand(),
                 ReplayCommand(),
                 RecordCursorStateCommand(),
-                RestCommand().subcommands(
-                    RestGetCommand(),
-                    RestPostCommand(),
-                    RestPutCommand(),
-                    RestPatchCommand(),
-                    RestDeleteCommand(),
-                ),
-                ProfileCommand().subcommands(
-                    ProfileListCommand(),
-                    ProfileShowCommand(),
-                    ProfileSetCommand(),
-                    ProfileUseCommand(),
-                    ProfileDeleteCommand(),
-                    ProfileExportCommand(),
-                    ProfileImportCommand(),
-                ),
-                SetupCommand().subcommands(
-                    SetupApplyCommand(),
-                    SetupExportCommand(),
-                ),
-                *buildResourceCommands().toTypedArray(),
                 AppServerServeCommand(),
                 AppServerServeIrohCommand(),
                 AgentMessageCommand().subcommands(AgentMessageSendCommand()),
@@ -101,7 +61,6 @@ object Main {
                 AppServerIrohTwoClientProbeCommand(),
                 AppServerIrohDeviceGateCommand(),
                 AppServerSmokeCommand(),
-                StreamCommand(),
             )
             .main(args)
     }
@@ -116,27 +75,11 @@ object Main {
           dump-timeline  Fetch conversation history and emit stable timeline JSON.
           replay         Replay a recorded JSONL fixture through the reducer.
           record-cursor-state  Snapshot highest observed run cursors from a JSONL fixture.
-          rest           Call arbitrary authenticated Letta REST endpoints.
-          profile        Manage local CLI backend profiles and defaults.
-          setup          Apply/export declarative CLI app/server setup files.
-          agents         Manage agents and agent-scoped attachments/messages.
-          conversations  Manage conversations and conversation messages.
-          tools          Manage tools and tool-agent attachments.
-          blocks         Manage core-memory blocks and identity attachments.
-          archives       Manage archives and archive passages.
-          folders        Manage folders, files, passages, and uploads.
-          groups         Manage multi-agent groups.
-          identities     Manage identities and identity links.
-          schedules      Manage agent scheduled messages.
-          mcp            Manage MCP servers and tools.
-          runs/jobs/steps Inspect and mutate execution resources.
-          projects       Manage Vibesync projects and beads remotes.
           app-server-serve  Launch host letta app-server with optional WS auth.
           app-server-serve-iroh-stub  Hermetic stub app-server over Iroh for probe CI.
           app-server-iroh-probe  Run headless Iroh transport probe scenarios.
           app-server-iroh-device-gate  Assert on-device Iroh live-stream invariants from logcat + /proc/net/tcp.
           app-server-smoke  Send one turn through a running Letta App Server.
-          stream         Direct Letta REST/SSE path for low-level comparison.
 
         Run with --help on any subcommand for details.
     """.trimIndent()

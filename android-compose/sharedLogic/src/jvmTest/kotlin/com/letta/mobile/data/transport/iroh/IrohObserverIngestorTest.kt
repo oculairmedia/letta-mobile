@@ -20,7 +20,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -471,9 +470,9 @@ class IrohObserverIngestorTest {
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(dispatchDelta, 1L))
 
-        val subagentUpdate1 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().firstOrNull()
-        assertNotNull(subagentUpdate1, "SubagentsUpdated must be emitted on Agent dispatch")
-        assertEquals(IrohObserverIngestor.SUBAGENT_REASON_STARTED, subagentUpdate1.reason)
+        val tracked = ingestor.subagentCorrelator.snapshot().single()
+        assertEquals("call-sub-1", tracked.toolCallId)
+        assertEquals(SubagentStatus.RUNNING, tracked.status)
 
         // 2. Agent tool return
         val returnDelta = streamDelta(
@@ -491,9 +490,8 @@ class IrohObserverIngestorTest {
         )
         ingestor.ingestObserverFrame(ObserverFrameRequest(returnDelta, 1L))
 
-        val updates = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>()
-        assertEquals(1, updates.size, "dispatch acknowledgement must not emit a child terminal")
-        assertEquals(SubagentStatus.RUNNING, updates.single().subagent?.status)
+        // letta-mobile-fxoew.2: the host's registry push is the only writer; the correlator only tracks.
+        assertTrue(emittedFrames.none { it is ServerFrame.SubagentsUpdated })
     }
 
     @Test

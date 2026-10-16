@@ -107,28 +107,6 @@ object DeviceSensorPipelineSelfTest {
             artifact = hardwareToolOut.name,
         )
 
-        val preloadArtifact = "letta-code/nodejs-project/device-tools-preload.cjs"
-        val preloadText = runCatching {
-            context.assets.open(preloadArtifact).bufferedReader().use { it.readText() }
-        }.getOrElse {
-            File(filesDir, "embedded-lettacode/nodejs-project/device-tools-preload.cjs")
-                .takeIf { file -> file.isFile }
-                ?.readText()
-                .orEmpty()
-        }
-        stages += stage(
-            id = "stage7.active_tool_transport_preload",
-            passed = preloadText.contains("read_sensors") && preloadText.contains("/device/sensors/read") && preloadText.contains("@letta/externalTools"),
-            details = "Embedded preload registers read_sensors external tool and routes to Android bridge endpoint.",
-            artifact = preloadArtifact,
-        )
-        stages += stage(
-            id = "stage8.device_action_tool_transport_preload",
-            passed = preloadText.contains("device_action") && preloadText.contains("/device/actions/command") && preloadText.contains("hardware.capabilities"),
-            details = "Embedded preload registers compact device_action tool and routes command payloads to the Android bridge endpoint.",
-            artifact = preloadArtifact,
-        )
-
         val report = PipelineSelfTestReport(
             passed = stages.all { it.passed },
             summary = summary,
