@@ -44,6 +44,8 @@ internal class AndroidSettingsInputs(
     val battery: BatteryOptimizationState,
     val onImportModel: () -> Unit,
     val onSaveModel: () -> Unit,
+    /** Debug builds: copies the on-device runtime's lifecycle log (letta-mobile-by4vm.121.11). */
+    val onCopyRuntimeLog: () -> Unit = {},
 )
 
 /** Android's own sections for [state]: nothing while loading, a retry when the load failed. */
@@ -55,7 +57,7 @@ internal fun androidSettingsContributions(state: UiState<ConfigUiState>, inputs:
     }
     val vm = inputs.viewModel
     val destinations = inputs.destinations
-    val debug = if (BuildConfig.DEBUG) DeveloperDestinations(destinations.onCanvasDebug) else null
+    val debug = if (BuildConfig.DEBUG) DeveloperDestinations(destinations.onCanvasDebug, inputs.onCopyRuntimeLog) else null
     return listOfNotNull(
         form.refreshError?.let { SettingsContribution(SettingsGroup.Backend, loadFailedSection(it, vm::loadConfig)) },
         // The `lite` variant ships no embedded runtime (letta-mobile-by4vm.110.8): nothing to configure.

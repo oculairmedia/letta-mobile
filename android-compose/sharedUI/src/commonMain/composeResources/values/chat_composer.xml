@@ -22,6 +22,8 @@
     <string name="composer_model_fallback">Model</string>
     <string name="composer_model_search">Search models</string>
     <string name="composer_model_no_match">No models match “%1$s”</string>
+    <string name="composer_model_none">No models available yet</string>
+    <string name="composer_model_none_hint">Download an on-device model or add a provider in Settings.</string>
     <string name="composer_model_selected">Selected</string>
     <string name="composer_model_other_provider">Other</string>
     <string name="composer_effort_header">Effort</string>

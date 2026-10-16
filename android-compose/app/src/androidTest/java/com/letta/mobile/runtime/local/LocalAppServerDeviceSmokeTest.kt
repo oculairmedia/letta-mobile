@@ -88,6 +88,7 @@ class LocalAppServerDeviceSmokeTest {
                         override fun start(modelSelection: EmbeddedLettaCodeModelSelection) =
                             error("the smoke writes its own provider")
                     },
+                    lifecycleLog = RuntimeLifecycleLog(context),
                 ),
                 discovery = AppServerDiscovery(http),
                 scope = scope,

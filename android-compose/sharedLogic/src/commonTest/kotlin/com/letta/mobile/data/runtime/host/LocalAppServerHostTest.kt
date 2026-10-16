@@ -4,9 +4,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -364,6 +366,113 @@ class LocalAppServerHostTest {
     }
 
     @Test
+    fun singleLaunchNeverLaunchesAgainOnceTheServerEnded() = hosted(singleLaunch = true) { f ->
+        f.host.acquire()
+        f.latest.crash(7)
+        runCurrent()
+
+        repeat(3) {
+            val refused = assertFailsWith<LocalAppServerTerminatedException> { f.host.acquire() }
+            assertEquals(LocalAppServerHost.RESTART_THE_APP, refused.message)
+            assertTrue(refused.reason.contains("exit=7"), refused.reason)
+        }
+        assertEquals(1, f.preparations, "not even the platform's preparation runs again")
+        assertEquals(1, f.launches.size)
+        assertTrue(f.host.health.value.gaveUp)
+        assertTrue(f.log.any { it.startsWith("[lifecycle] launch refused") })
+    }
+
+    /** letta-mobile-by4vm.121.11: the cold-start bug. A cancelled first dial used to abandon a live node. */
+    @Test
+    fun singleLaunchSurvivesACancelledFirstCallerAndTheNextJoinsTheSameStart() = hosted(singleLaunch = true) { f ->
+        f.silentNextStart = true
+        val first = launch { f.host.acquire() }
+        runCurrent()
+        first.cancel()
+        runCurrent()
+        assertTrue(f.latest.alive, "the node is not abandoned")
+
+        val second = async { f.host.acquire() }
+        runCurrent()
+        f.latest.say("Listening on ws://127.0.0.1:45000")
+        runCurrent()
+
+        assertEquals("ws://127.0.0.1:45000", second.await().serverUrl)
+        assertEquals(1, f.launches.size, "launched once")
+        assertTrue(f.log.any { it.startsWith("[lifecycle] a caller stopped waiting") })
+        assertTrue(f.log.any { it.startsWith("[lifecycle] listen line seen") })
+        assertTrue(f.log.any { it.startsWith("[lifecycle] readyz ok") })
+    }
+
+    @Test
+    fun singleLaunchReadinessTimeoutIsNotTerminal() = hosted(singleLaunch = true) { f ->
+        f.silentNextStart = true
+
+        val slow = assertFailsWith<LocalAppServerStartException> { f.host.acquire() }
+        assertTrue(slow.message.orEmpty().contains("still starting"))
+        assertFalse(f.host.health.value.gaveUp)
+        assertTrue(f.log.any { it.startsWith("[lifecycle] not ready within 2000 ms") })
+
+        f.latest.say("Listening on ws://127.0.0.1:45001")
+        assertEquals("ws://127.0.0.1:45001", f.host.acquire().serverUrl)
+        assertEquals(1, f.launches.size)
+        assertTrue(f.host.health.value.active)
+    }
+
+    @Test
+    fun singleLaunchThatDiesBeforeReadyIsTerminal() = hosted(singleLaunch = true) { f ->
+        f.silentNextStart = true
+        val waiting = async { runCatching { f.host.acquire() } }
+        runCurrent()
+        f.latest.crash(9)
+        runCurrent()
+
+        val failure = assertIs<LocalAppServerTerminatedException>(waiting.await().exceptionOrNull())
+        assertTrue(failure.reason.contains("before it was ready"), failure.reason)
+        assertFailsWith<LocalAppServerTerminatedException> { f.host.acquire() }
+        assertEquals(1, f.launches.size)
+        assertTrue(f.host.health.value.gaveUp)
+        assertTrue(f.host.health.value.needsForceRestart)
+    }
+
+    @Test
+    fun singleLaunchStartRefusedByTheLauncherIsTerminal() = hosted(singleLaunch = true) { f ->
+        f.refuseStarts = "node already ran"
+
+        val refused = assertFailsWith<LocalAppServerTerminatedException> { f.host.acquire() }
+        assertTrue(refused.reason.contains("node already ran"))
+        assertFailsWith<LocalAppServerTerminatedException> { f.host.acquire() }
+        assertEquals(1, f.starts.size, "the launcher is asked once")
+    }
+
+    @Test
+    fun singleLaunchPreparationFailureIsRetriedBecauseNothingStarted() = hosted(singleLaunch = true) { f ->
+        f.failNextPreparation = "foreground service could not start"
+
+        assertFailsWith<IllegalStateException> { f.host.acquire() }
+        assertFalse(f.host.health.value.gaveUp)
+        assertEquals("ws://127.0.0.1:40001", f.host.acquire().serverUrl)
+        assertEquals(2, f.preparations)
+        assertEquals(1, f.launches.size)
+    }
+
+    @Test
+    fun singleLaunchStaysOverThroughWakeStartAndForceRestart() = hosted(singleLaunch = true) { f ->
+        f.host.acquire()
+        f.latest.crash()
+        runCurrent()
+
+        f.host.onResumed()
+        f.host.startByUser()
+        f.host.forceRestart()
+        runCurrent()
+
+        assertTrue(f.host.health.value.gaveUp)
+        assertEquals(LocalAppServerHost.RESTART_THE_APP, f.host.health.value.lastError)
+        assertEquals(1, f.launches.size)
+    }
+
+    @Test
     fun listenParserAcceptsOnlyLoopbackAnnouncements() {
         assertEquals("ws://127.0.0.1:4500", parseLocalAppServerListenUrl("Listening on ws://127.0.0.1:4500"))
         assertEquals("ws://localhost:4501", parseLocalAppServerListenUrl("Listening on ws://localhost:4501"))
@@ -385,6 +494,9 @@ class LocalAppServerHostTest {
         val log = mutableListOf<String>()
         var failNextStart: Int? = null
         var silentNextStart = false
+        var refuseStarts: String? = null
+        var failNextPreparation: String? = null
+        var preparations = 0
         var readyAfterPolls = 1
         var readyzPolls = 0
         private var tokens = 0
@@ -396,10 +508,13 @@ class LocalAppServerHostTest {
 
                 override fun start(launch: LocalAppServerLaunch, tokenFile: String, token: String): LocalAppServerProcess {
                     starts += Start(launch.command, launch.environment, launch.workingDirectory, tokenFile, token)
+                    refuseStarts?.let { throw IllegalStateException(it) }
                     return nextProcess().also { launches += it }
                 }
             },
             launch = {
+                preparations += 1
+                failNextPreparation?.let { failNextPreparation = null; error(it) }
                 LocalAppServerLaunch(
                     command = listOf("node", "letta.js"),
                     backendDir = "/data/backend",
@@ -438,13 +553,14 @@ class LocalAppServerHostTest {
     private class FakeProcess(stdoutLines: List<String>?, exitCode: Int? = null) : LocalAppServerProcess {
         private val exit = CompletableDeferred<Int?>()
         private val stderrLines = Channel<String>(Channel.UNLIMITED)
+        private val stdoutChannel = Channel<String>(Channel.UNLIMITED)
         var alive = exitCode == null
 
         init {
             exitCode?.let(exit::complete)
         }
 
-        override val stdout: Flow<String> = stdoutLines?.let { flowOf(*it.toTypedArray()) } ?: Channel<String>().receiveAsFlow()
+        override val stdout: Flow<String> = stdoutLines?.let { flowOf(*it.toTypedArray()) } ?: stdoutChannel.receiveAsFlow()
         override val stderr: Flow<String> = stderrLines.receiveAsFlow()
         override val isAlive: Boolean get() = alive
 
@@ -459,10 +575,16 @@ class LocalAppServerHostTest {
             stderrLines.trySend(line)
         }
 
+        /** A stdout line from a server started silent. */
+        fun say(line: String) {
+            stdoutChannel.trySend(line)
+        }
+
         private fun end(exitCode: Int) {
             if (!alive) return
             alive = false
             exit.complete(exitCode)
+            stdoutChannel.close()
         }
     }
 }

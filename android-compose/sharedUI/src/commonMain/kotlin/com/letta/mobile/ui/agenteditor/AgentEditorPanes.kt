@@ -73,6 +73,7 @@ private fun ModelPane(inputs: AgentEditorPaneInputs, onClose: () -> Unit) {
             currentHandle = state.form.model.ifBlank { null },
             currentLabel = state.modelOption?.label ?: state.form.model,
             options = state.models.toImmutableList(),
+            unavailableReason = state.modelsUnavailable,
         ),
         onSelect = { option ->
             inputs.actions.update { copy(model = option.handle, reasoningEffort = reasoningEffort?.takeIf { it in option.reasoningEfforts }) }
