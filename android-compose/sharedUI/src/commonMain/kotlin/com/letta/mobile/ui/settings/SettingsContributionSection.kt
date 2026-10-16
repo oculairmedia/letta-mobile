@@ -2,6 +2,7 @@ package com.letta.mobile.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -17,10 +18,15 @@ import com.letta.mobile.ui.host.LettaConfirmRequest
 /**
  * A platform's [SettingsContribution], drawn with the shared rows as it changes. A new contribution
  * (a host that rebuilds its sections as its state changes) starts again from its own initial model.
+ *
+ * [produceState] remembers its initial value once and only restarts its producer on a new key, so
+ * the state itself is keyed on the contribution: without it a rebuilt contribution (Android builds
+ * one per view-model state, with no updates flow) kept drawing the first model, and a controlled
+ * field such as the Hugging Face token never showed what was typed (letta-mobile-by4vm).
  */
 @Composable
 fun SettingsContributionSection(contribution: SettingsContribution, modifier: Modifier = Modifier) {
-    val model by produceState(contribution.initial, contribution) { contribution.updates.collect { value = it } }
+    val model by key(contribution) { produceState(contribution.initial, contribution) { contribution.updates.collect { value = it } } }
     SettingsModelSection(model, modifier)
 }
 
