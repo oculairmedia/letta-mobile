@@ -117,11 +117,9 @@ internal fun A2uiComponent.resolveText(surface: A2uiSurfaceState, renderScope: A
 internal fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? {
     // letta-mobile-njzb: A2UI v0.9 Basic Catalog defines Button.child as
     // "the ID of the child component. Use a Text component for a labeled
-    // button." Resolve `child` first â€” that's the canonical spec field
-    // and what the shim emits. `labelComponentId` / `labelId` / `label`
-    // (string-id) are pre-spec aliases we keep for back-compat with any
-    // payload still using the older field names.
-    raw.stringValue("child", "labelComponentId", "labelId")?.let { childId ->
+    // button." Resolve `child` first; `label` (a component id or a text
+    // binding) stays because the renderer README documents it for agents.
+    raw.stringValue("child")?.let { childId ->
         surface.components[childId]?.resolveText(surface, renderScope)?.let { return it }
     }
     val label = raw["label"]

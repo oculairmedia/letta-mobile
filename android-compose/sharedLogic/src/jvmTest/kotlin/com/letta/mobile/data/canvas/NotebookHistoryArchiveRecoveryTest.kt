@@ -2,7 +2,6 @@ package com.letta.mobile.data.canvas
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.name
 import org.automerge.AmValue
@@ -101,45 +100,4 @@ class NotebookHistoryArchiveRecoveryTest {
 
     @Test
     fun aCrashBeforeTheJournalIsRemovedFinishesTheMove() = crashAfter(NotebookHistoryArchive.Step.OLD_DELETED, expectMoved = true)
-
-    /** Earlier builds restarted histories in place; a crash there left the old chunks moved aside. */
-    @Test
-    fun anEarlierBuildsRestartWithTheOldHistoryMovedAsideAndNoFreshDocumentPutsTheOldHistoryBack() {
-        val path = Files.createTempDirectory("notebook-crash-no-fresh-")
-        val id = notebook(path)
-        val key = id.key()
-        val archive = NotebookHistoryArchive(path)
-        val directory = archive.documentDirectory(key)
-        val staged = Files.createDirectories(archive.archiveRoot.resolve(key)).resolve("1.replaced")
-        Files.move(directory, staged, ATOMIC_MOVE)
-
-        NotebookLocalStore(path, "recovery-peer").use { store ->
-            assertEquals("Kept text", store.read(id)!!.markdown)
-        }
-        assertEquals(emptyList(), debris(path, key))
-    }
-
-    /**
-     * The state the earliest builds' restart left after a crash: old chunks moved aside and an
-     * empty `snapshot/` directory created in their place.
-     */
-    @Test
-    fun theEmptySnapshotDirectoryOlderBuildsLeftIsReplacedByTheOldHistory() {
-        val path = Files.createTempDirectory("notebook-crash-legacy-")
-        val id = notebook(path)
-        val key = id.key()
-        val archive = NotebookHistoryArchive(path)
-        val directory = archive.documentDirectory(key)
-        val archiveDirectory = Files.createDirectories(archive.archiveRoot.resolve(key))
-        Files.move(directory, archiveDirectory.resolve("1.replaced"), ATOMIC_MOVE)
-        Files.createDirectories(directory.resolve("snapshot"))
-        Files.createTempFile(archiveDirectory, ".snapshot-", ".tmp")
-
-        NotebookLocalStore(path, "recovery-peer").use { store ->
-            assertEquals(listOf(id), store.listDocuments())
-            assertEquals("Kept text", store.read(id)!!.markdown)
-            assertTrue(store.faults.faults.value.none { it.isError }, store.faults.faults.value.toString())
-        }
-        assertEquals(emptyList(), debris(path, key))
-    }
 }

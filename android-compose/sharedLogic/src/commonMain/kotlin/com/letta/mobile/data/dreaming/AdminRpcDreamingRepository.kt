@@ -16,9 +16,8 @@ import kotlinx.serialization.json.put
  *
  * A host that predates a method answers "Unknown method" ([DreamUnsupportedReason.HostNeedsUpdate]:
  * `reflection.run` and the merge fields are newer than `reflection.get/set`). One without a native
- * App Server client answers `capability_unavailable`, or, before this change, "require the native
- * App Server client" ([DreamUnsupportedReason.NoNativeAppServer]); a transport with no admin_rpc
- * at all is [DreamUnsupportedReason.NoConnection].
+ * App Server client answers `capability_unavailable` ([DreamUnsupportedReason.NoNativeAppServer]);
+ * a transport with no admin_rpc at all is [DreamUnsupportedReason.NoConnection].
  */
 class AdminRpcDreamingRepository(
     private val rpc: AdminRpcInvoker,
@@ -67,7 +66,7 @@ class AdminRpcDreamingRepository(
         message.contains(NO_ADMIN_RPC) || message.contains(NOT_CONNECTED, ignoreCase = true) ->
             DreamOutcome.Unsupported(DreamUnsupportedReason.NoConnection)
         message.contains(NO_DREAM_COMMAND) -> DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld)
-        message.contains(CAPABILITY_UNAVAILABLE) || message.contains(LEGACY_NO_NATIVE) ->
+        message.contains(CAPABILITY_UNAVAILABLE) ->
             DreamOutcome.Unsupported(DreamUnsupportedReason.NoNativeAppServer)
         else -> DreamOutcome.Failed(message.removePrefix(FAILED_PREFIX).ifBlank { "The host couldn't change dreaming" })
     }
@@ -77,7 +76,6 @@ class AdminRpcDreamingRepository(
         const val NO_DREAM_COMMAND = "capability_unavailable: this App Server has no /dream"
         const val NO_ADMIN_RPC = "admin_rpc is not supported"
         const val NOT_CONNECTED = "Not connected"
-        const val LEGACY_NO_NATIVE = "require the native App Server client"
         const val FAILED_PREFIX = "dream_failed: "
     }
 }

@@ -272,11 +272,9 @@ internal class AdminChatComposerCoordinator(
      * the escape hatch: it force-clears locally and is telemetered, because the
      * server turn may still be running at that point.
      */
-    fun interruptRun(clearA2uiThinkingOnResponse: () -> Unit) {
+    fun interruptRun() {
         if (!uiState.value.isStreaming) return
         val key = explicitConversationId.orEmpty()
-        // A second press is the local escape hatch; only the first one retires A2UI thinking.
-        if (!interrupter.isCancelling(key)) clearA2uiThinkingOnResponse()
         val context = chatSendContext()
         interrupter.request(
             ChatStopRequest(

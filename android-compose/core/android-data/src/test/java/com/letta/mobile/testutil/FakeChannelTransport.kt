@@ -1,7 +1,5 @@
 package com.letta.mobile.testutil
 
-import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -70,8 +68,6 @@ class FakeChannelTransport(
     var cancelResult: Boolean = true
     var byeResult: Boolean = true
     var subscribeResult: Boolean = true
-    var a2uiActionResult: A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("fake-action")
-
     val sendCalls = mutableListOf<SendCall>()
     val subscribeCalls = mutableListOf<SubscribeCall>()
 
@@ -178,9 +174,6 @@ class FakeChannelTransport(
     override suspend fun disconnect() {
         state.value = ChannelTransportState.Disconnected(1000, "fake disconnect")
     }
-
-    override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = a2uiActionResult
-
     override fun subscribe(runId: String, cursor: Long): Boolean {
         subscribeCalls += SubscribeCall(runId, cursor)
         return subscribeResult

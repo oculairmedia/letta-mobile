@@ -14,22 +14,17 @@ import com.letta.mobile.runtime.ConversationId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-by4vm.50: an Android Iroh dial binds a [StreamIntegrityMonitor] with gap
- * detection only when the host advertised [StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY]
- * in its auth_response. Older hosts keep today's behaviour: no monitor, so neither gap resyncs
- * nor cadence syncs.
+ * letta-mobile-by4vm.50: an Android Iroh dial always binds a [StreamIntegrityMonitor] with gap
+ * detection; every host draws `event_seq` in wire order.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohDialerStreamIntegrityTest {
@@ -39,9 +34,8 @@ class IrohDialerStreamIntegrityTest {
     @Test
     fun aHostThatOrdersEventSeqGetsAGapResyncWithApprovalRecovery() = runTest {
         val wire = Wire(this)
-        val job = wire.bind(setOf(IrohFrameCodec.FRAME_PART_CAPABILITY, StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY))
+        val job = wire.bind()
 
-        assertNotNull(job, "a capable host gets a monitor")
         wire.deliver(1L, 2L, 4L)
         runCurrent()
 
@@ -54,39 +48,15 @@ class IrohDialerStreamIntegrityTest {
     }
 
     @Test
-    fun aContiguousSequenceFromACapableHostSendsNoRecoverySync() = runTest {
+    fun aContiguousSequenceSendsNoRecoverySync() = runTest {
         val wire = Wire(this)
-        val job = wire.bind(setOf(StreamIntegrityMonitor.EVENT_SEQ_ORDERED_CAPABILITY))
+        val job = wire.bind()
 
         wire.deliver(1L, 2L, 3L, 4L)
         runCurrent()
 
         assertEquals(emptyList(), wire.client.syncs)
-        job?.cancel()
-    }
-
-    @Test
-    fun aHostWithoutTheCapabilityGetsNoMonitor() = runTest {
-        val wire = Wire(this)
-        val job = wire.bind(setOf(IrohFrameCodec.FRAME_PART_CAPABILITY))
-
-        assertNull(job, "no monitor is bound for an older host")
-        wire.deliver(1L, 2L, 9L)
-        wire.router.requestResync() // no monitor: a no-op
-        runCurrent()
-        advanceTimeBy(60_000)
-        runCurrent()
-
-        assertEquals(emptyList(), wire.client.syncs)
-    }
-
-    @Test
-    fun aHostThatSentNoCapabilitiesGetsNoMonitor() = runTest {
-        val wire = Wire(this)
-        assertNull(wire.bind(null))
-        wire.deliver(1L, 5L)
-        runCurrent()
-        assertEquals(emptyList(), wire.client.syncs)
+        job.cancel()
     }
 
     private inner class Wire(private val test: TestScope) {
@@ -99,8 +69,8 @@ class IrohDialerStreamIntegrityTest {
             syncBudget = SyncBudgetPolicy { false },
         )
 
-        fun bind(hostCapabilities: Set<String>?) =
-            dialer.bindIrohStreamIntegrity(router, client, hostCapabilities, test.backgroundScope).also {
+        fun bind() =
+            dialer.bindIrohStreamIntegrity(router, client, test.backgroundScope).also {
                 router.attach(test.backgroundScope, client.inbound)
                 router.subscribe(AgentId(runtime.agentId), ConversationId(runtime.conversationId))
             }
