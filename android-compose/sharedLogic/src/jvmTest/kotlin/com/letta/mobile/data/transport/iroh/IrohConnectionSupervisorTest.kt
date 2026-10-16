@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -96,7 +97,7 @@ class IrohConnectionSupervisorTest {
         }
 
         val error = assertFailsWith<IllegalStateException> {
-            supervisor.ready(timeoutMs = 100)
+            supervisor.ready(timeout = 100.milliseconds)
         }
         runCurrent()
         advanceTimeBy(5_000)
@@ -117,11 +118,11 @@ class IrohConnectionSupervisorTest {
         }
 
         assertFailsWith<IllegalStateException> {
-            supervisor.ready(timeoutMs = 1)
+            supervisor.ready(timeout = 1.milliseconds)
         }
         assertEquals(1, dials)
 
-        val retry = async { supervisor.ready(timeoutMs = 2_000) }
+        val retry = async { supervisor.ready(timeout = 2_000.milliseconds) }
         runCurrent()
         advanceTimeBy(499)
         runCurrent()
@@ -304,9 +305,9 @@ class IrohConnectionSupervisorTest {
         }
 
         val error = assertFailsWith<IllegalStateException> {
-            supervisor.ready(timeoutMs = 1_200)
+            supervisor.ready(timeout = 1_200.milliseconds)
         }
-        assertTrue(error.message.orEmpty().contains("Iroh connection not ready after 1200ms"))
+        assertTrue(error.message.orEmpty().contains("App Server connection not ready after 1200ms"))
         supervisor.close("test_done")
     }
 

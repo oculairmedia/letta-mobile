@@ -7,6 +7,8 @@ import com.letta.mobile.data.settings.SettingsSectionModel
 import com.letta.mobile.data.settings.SettingsStatus
 import com.letta.mobile.data.settings.SettingsTone
 import com.letta.mobile.data.transport.appserver.LettaCodeContract
+import com.letta.mobile.data.runtime.host.LocalAppServerHost
+import com.letta.mobile.data.runtime.supervisor.RuntimeHealth
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
@@ -38,7 +40,7 @@ internal fun onDeviceModelSection(state: ConfigUiState, actions: OnDeviceModelAc
         title = "On-device model",
         supporting = "The letta-code runtime on this phone runs its agents with a model file here, or with a model server on your network.",
         rows = buildList {
-            addAll(runtimeStatusRows(state.embeddedRuntimeStatus))
+            addAll(runtimeStatusRows(state.embeddedRuntimeStatus, state.localRuntimeHealth))
             add(
                 SettingsRow.Text(
                     key = "hugging-face-token",
@@ -58,24 +60,26 @@ internal fun onDeviceModelSection(state: ConfigUiState, actions: OnDeviceModelAc
 }
 
 /** Shown only in the `full` variant, i.e. when [EmbeddedLettaCodeRuntimeStatus.runnable]. */
-private fun runtimeStatusRows(status: EmbeddedLettaCodeRuntimeStatus): List<SettingsRow> = listOf(
+private fun runtimeStatusRows(status: EmbeddedLettaCodeRuntimeStatus, health: RuntimeHealth): List<SettingsRow> = listOf(
     SettingsRow.Info("runtime-version", "Embedded runtime", status.version),
     SettingsRow.Note(
         "runtime-note",
         SettingsStatus("Agents run on this device. Keep the app allowed in the background so replies and notifications arrive."),
     ),
-    SettingsRow.Note("runtime-limits", SettingsStatus(EMBEDDED_RUNTIME_LIMITS_NOTE, SettingsTone.Warning)),
+    SettingsRow.Note("runtime-health", localRuntimeHealthStatus(health)),
 )
 
 /**
- * The embedded runtime runs letta-code [LettaCodeContract.VERSION] (nodejs-mobile, Node 18) through
- * the headless protocol until it moves to the App Server path (letta-mobile-by4vm.110.6), so App
- * Server features need a desktop or remote host until then.
+ * letta-mobile-by4vm.110.6: the on-device App Server's state. Node runs once per app process
+ * (decision D3), so there is no Stop and no in-app restart: a stopped runtime asks for an app restart.
  */
-internal val EMBEDDED_RUNTIME_LIMITS_NOTE: String =
-    "The on-phone runtime runs letta-code ${LettaCodeContract.VERSION} in a reduced mode for now: " +
-        "one conversation per app run, and no forking, dreaming or approvals. " +
-        "Connect to a desktop or remote host for those."
+internal fun localRuntimeHealthStatus(health: RuntimeHealth): SettingsStatus = when {
+    health.gaveUp -> SettingsStatus(health.lastError ?: LocalAppServerHost.RESTART_THE_APP, SettingsTone.Error)
+    health.active -> SettingsStatus("Running on this phone (letta-code ${LettaCodeContract.VERSION}).", SettingsTone.Positive)
+    else -> SettingsStatus(
+        "Starts when a Local runtime chat opens. The first start after an install unpacks the runtime and can take a minute.",
+    )
+}
 
 private fun catalogRows(state: ConfigUiState, vm: ConfigViewModel): List<SettingsRow> {
     if (state.embeddedModelCatalog.isEmpty()) {

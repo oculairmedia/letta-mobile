@@ -17,6 +17,7 @@ import com.letta.mobile.data.runtime.AppServerTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.PermissionModeSettings
+import com.letta.mobile.data.transport.appserver.AppServerReadinessExpectation
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
@@ -233,8 +234,8 @@ class DesktopAppServerChatGatewayBuilder(
         StreamIntegrityBinding(client, { "desktop-sync-${UUID.randomUUID()}" }).bindAndStart(router, detectGaps = true, scope = scope)
     }
 
-    private fun readinessExpectationFor(lettaConfig: LettaConfig): DesktopAppServerReadinessExpectation =
-        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) localDesktopAppServerExpectation else DesktopAppServerReadinessExpectation()
+    private fun readinessExpectationFor(lettaConfig: LettaConfig): AppServerReadinessExpectation =
+        if (lettaConfig.mode == LettaConfig.Mode.LOCAL) AppServerReadinessExpectation.LocalBackend else AppServerReadinessExpectation()
 }
 
 /**

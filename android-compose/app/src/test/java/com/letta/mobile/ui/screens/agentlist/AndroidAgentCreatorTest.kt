@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -25,10 +24,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -58,32 +54,21 @@ class AndroidAgentCreatorTest {
         assertEquals(AgentCreated("a-remote"), creator.create(params))
         assertEquals(params, captured.captured)
         coVerify(exactly = 1) { agentRepository.refreshAgents() }
-        coVerify(exactly = 0) { agentRepository.createLocalAgent(any()) }
     }
 
     @Test
-    fun `a local create stamps the runtime and turns tools off`() = runTest {
+    fun `a local create runs on the on-device runtime's App Server with the configured model`() = runTest {
         activeConfig.value = localConfig()
         catalog.catalogFlow.value = listOf(downloadedModel())
         val captured = slot<AgentCreateParams>()
-        coEvery { agentRepository.createLocalAgent(capture(captured)) } returns Agent(id = AgentId("local-agent-test"), name = "Local")
+        coEvery { agentRepository.createAgent(capture(captured)) } returns Agent(id = AgentId("local-agent"), name = "Local")
 
-        val created = creator.create(
-            AgentCreateParams(name = "Local", toolIds = persistentListOf(ToolId("t1")), includeBaseTools = true, enableSleeptime = true),
-        )
+        val created = creator.create(AgentCreateParams(name = "Local", toolIds = persistentListOf(ToolId("t1"))))
 
-        assertEquals(AgentCreated("local-agent-test", conversationId = "local-conv-local-agent-test"), created)
-        val params = captured.captured
-        assertEquals("google/gemma-test-litert-lm", params.model)
-        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, params.modelSettings?.providerType)
-        assertNull(params.toolIds)
-        assertEquals(false, params.includeBaseTools)
-        assertEquals(false, params.enableSleeptime)
-        assertEquals(
-            "${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:local-config",
-            params.metadata?.get(LocalAgentRuntimeMetadata.RUNTIME_ID_KEY)?.jsonPrimitive?.contentOrNull,
-        )
-        coVerify(exactly = 0) { agentRepository.createAgent(any()) }
+        assertEquals(AgentCreated("local-agent"), created)
+        assertEquals("lmstudio/google/gemma-test-litert-lm", captured.captured.model)
+        assertEquals(persistentListOf(ToolId("t1")), captured.captured.toolIds)
+        coVerify(exactly = 1) { agentRepository.refreshAgents() }
     }
 
     // letta-mobile-3icw7: a model picked in the editor wins over the config-level default.
@@ -92,12 +77,11 @@ class AndroidAgentCreatorTest {
         activeConfig.value = localConfig()
         catalog.catalogFlow.value = listOf(downloadedModel())
         val captured = slot<AgentCreateParams>()
-        coEvery { agentRepository.createLocalAgent(capture(captured)) } returns Agent(id = AgentId("l"), name = "Local")
+        coEvery { agentRepository.createAgent(capture(captured)) } returns Agent(id = AgentId("l"), name = "Local")
 
         creator.create(AgentCreateParams(name = "Local", model = "MiniMax-M3"))
 
         assertEquals("MiniMax-M3", captured.captured.model)
-        assertEquals("MiniMax-M3", captured.captured.metadata?.get(LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY)?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -108,7 +92,6 @@ class AndroidAgentCreatorTest {
 
         assertTrue(failure is IllegalStateException)
         assertEquals("Download or import a model in Settings before creating a local agent.", failure?.message)
-        coVerify(exactly = 0) { agentRepository.createLocalAgent(any()) }
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
     }
 

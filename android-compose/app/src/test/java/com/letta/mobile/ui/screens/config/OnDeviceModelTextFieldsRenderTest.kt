@@ -69,6 +69,7 @@ class OnDeviceModelTextFieldsRenderTest {
         GatedModelRepository(),
         EndpointOpenAiModelCatalog(),
         FakeAppServerConnectionTester(),
+        idleLocalAppServerHost(),
         PermissionModeSettings(InMemorySecureSettingsStore()),
     )
 

@@ -24,7 +24,6 @@ import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
-import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -144,7 +143,6 @@ private class StubSessionGraph(
             supportsAgentFileExport = false,
         ),
     )
-    override val localRuntimeBackend: LettaBackend? = null
     override val channelTransport: IChannelTransport = NoOpChannelTransport()
 
     override val agentRepository: IAgentRepository get() = unused()

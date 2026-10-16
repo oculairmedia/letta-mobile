@@ -1,7 +1,6 @@
 package com.letta.mobile.runtime
 
 import kotlin.jvm.JvmInline
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
 @JvmInline
@@ -52,20 +51,6 @@ data class MemFsFile(
 )
 
 @Serializable
-data class MemFsWriteCommand(
-    val path: MemFsPath,
-    val content: String,
-    val metadata: MemFsMetadata = MemFsMetadata(),
-    val expectedRevision: MemFsRevision? = null,
-)
-
-@Serializable
-data class MemFsDeleteCommand(
-    val path: MemFsPath,
-    val expectedRevision: MemFsRevision? = null,
-)
-
-@Serializable
 data class MemFsCommit(
     val id: MemFsCommitId,
     val revision: MemFsRevision,
@@ -78,14 +63,4 @@ data class MemFsCommit(
 enum class MemFsOperation {
     Write,
     Delete,
-}
-
-interface MemFsStore {
-    suspend fun read(path: MemFsPath): MemFsFile?
-
-    suspend fun write(command: MemFsWriteCommand): MemFsCommit
-
-    suspend fun delete(command: MemFsDeleteCommand): MemFsCommit
-
-    fun commits(afterRevision: MemFsRevision): Flow<MemFsCommit>
 }

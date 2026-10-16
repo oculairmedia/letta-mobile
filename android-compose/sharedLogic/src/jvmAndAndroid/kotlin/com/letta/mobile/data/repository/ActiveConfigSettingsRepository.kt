@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.flowOf
 /**
  * Minimal [ISettingsRepository] that only carries an active [LettaConfig].
  * Used by desktop to drive Iroh admin_rpc sources that gate on
- * [activeBackendIsIroh] without Room/Hilt settings storage.
+ * [activeBackendUsesChannel] without Room/Hilt settings storage.
  */
 class ActiveConfigSettingsRepository(
     initialActiveConfig: LettaConfig?,

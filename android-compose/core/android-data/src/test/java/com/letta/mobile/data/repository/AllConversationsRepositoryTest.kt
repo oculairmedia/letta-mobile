@@ -1,11 +1,8 @@
 package com.letta.mobile.data.repository
 
 import androidx.paging.PagingSource
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -109,58 +106,6 @@ class AllConversationsRepositoryTest {
         reason = "created",
     )
 
-    // letta-mobile-ajtu2: local-runtime mode routes refreshes to the
-    // on-device letta.js store instead of the remote API, inside the
-    // repository so ViewModels need no per-screen branching.
-    @Test
-    fun `refresh uses local source when active config is local runtime`() = runTest {
-        fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
-        val localConversation = TestData.conversation(id = "local-conv-agent-1", agentId = "agent-1")
-        val localRepository = AllConversationsRepository(
-            remote = fakeApi,
-            conversationDao = null,
-            localConversationSource = FakeLocalRuntimeConversationSource {
-                listOf(localConversation)
-            },
-            settingsRepository = FakeSettingsRepository(
-                initialActiveConfig = LettaConfig(
-                    id = "local-1",
-                    mode = LettaConfig.Mode.LOCAL,
-                    serverUrl = "local-lettacode://device",
-                ),
-            ),
-        )
-
-        localRepository.refresh()
-
-        assertEquals(listOf("local-conv-agent-1"), localRepository.conversations.value.map { it.id.value })
-        assertEquals(0, fakeApi.calls.count { it == "listConversations" })
-        assertFalse(localRepository.hasMore.value)
-    }
-
-    @Test
-    fun `refresh uses remote api when active config is not local`() = runTest {
-        fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
-        val repositoryWithLocal = AllConversationsRepository(
-            remote = fakeApi,
-            conversationDao = null,
-            localConversationSource = FakeLocalRuntimeConversationSource {
-                throw AssertionError("local source must not be used for remote configs")
-            },
-            settingsRepository = FakeSettingsRepository(
-                initialActiveConfig = LettaConfig(
-                    id = "remote-1",
-                    mode = LettaConfig.Mode.SELF_HOSTED,
-                    serverUrl = "https://letta.example.dev",
-                ),
-            ),
-        )
-
-        repositoryWithLocal.refresh()
-
-        assertEquals(listOf("remote-1"), repositoryWithLocal.conversations.value.map { it.id.value })
-    }
-
     @Test
     fun `paged conversations factory injects existing iroh source`() = runTest {
         val transport = FakeChannelTransport().apply {
@@ -185,7 +130,6 @@ class AllConversationsRepositoryTest {
             remote = armedConversationApi(),
             conversationDao = null,
             repositoryScope = this,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
 
@@ -235,7 +179,6 @@ class AllConversationsRepositoryTest {
             remote = armedConversationApi(),
             conversationDao = null,
             repositoryScope = backgroundScope,
-            settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
             transport = transport,
         )
@@ -402,12 +345,4 @@ class AllConversationsRepositoryTest {
         assertTrue(ids.size >= 50)
     }
 
-    private class FakeLocalRuntimeConversationSource(
-        private val conversationsProvider: suspend () -> List<Conversation>,
-    ) : LocalRuntimeConversationSource {
-        override suspend fun listConversations(): List<Conversation> = conversationsProvider()
-
-        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
-            throw AssertionError("local create must not be used by all-conversations refresh")
-    }
 }

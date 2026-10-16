@@ -5,7 +5,6 @@ import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.BugReportDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.LettaDatabase
-import com.letta.mobile.data.local.MemFsDao
 import com.letta.mobile.data.local.RuntimeEventDao
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
@@ -82,10 +81,6 @@ object DatabaseModule {
         return database.runtimeEventDao()
     }
 
-    @Provides
-    fun provideMemFsDao(database: LettaDatabase): MemFsDao {
-        return database.memFsDao()
-    }
 
     @Provides
     @Singleton

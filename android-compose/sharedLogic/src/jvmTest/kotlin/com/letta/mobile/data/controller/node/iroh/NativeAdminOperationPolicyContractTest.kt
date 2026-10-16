@@ -89,7 +89,7 @@ class NativeAdminOperationPolicyContractTest {
     fun conversationRestoreTimeoutDoesNotTripReadBreaker() = runTest {
         assertFailsWith<IllegalArgumentException> {
             NativeAdmin.require(FakeClient, NativeAdminOp.ConversationRestore) {
-                delay(35_000)
+                delay(95_000)
                 "late"
             }
         }
@@ -126,7 +126,7 @@ class NativeAdminOperationPolicyContractTest {
         assertFailsWith<IllegalArgumentException> {
             NativeAdmin.require(FakeClient, NativeAdminOp.ConversationRestore) {
                 mutationAttempts++
-                delay(35_000)
+                delay(95_000)
                 "late-success"
             }
         }

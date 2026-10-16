@@ -6,117 +6,71 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class AndroidEmbeddedLettaCodeLaunchSpecTest {
     @Test
-    fun `shared launch spec preserves Android env bridge preload and stream-json fallback parity`() {
-        val baseDir = tempDir("letta-launch-parity")
+    fun `app server launch puts npm and the git-backed memfs helpers on the device path`() {
+        val baseDir = tempDir("letta-launch-tools")
         val project = preparedProject(baseDir, withNpm = true)
-        val selection = EmbeddedLettaCodeModelSelection(
-            modelHandle = "google/gemma-3n-E2B-it-litert-lm",
-            modelPath = File(baseDir, "gemma.litertlm").apply { writeText("model") }.absolutePath,
-            runtime = "litert-lm",
-            accelerator = "gpu",
-            maxTokens = 2048,
-        )
 
-        val spec = project.prepareAndroidEmbeddedLettaCodeLaunchSpec(
-            modelSelection = selection,
-            onDeviceProviderBaseUrl = "http://127.0.0.1:3456/v1",
-            onDeviceProviderApiKey = "openai-loopback-token",
-            androidNetworkBridgeBaseUrl = "http://127.0.0.1:4567",
-            androidNetworkBridgeToken = "android-bridge-token",
+        val env = project.androidLocalAppServerLaunch(
+            networkBridge = AndroidNetworkBridgeEndpoint("http://127.0.0.1:4567", "android-bridge-token"),
             toolInstaller = FakeToolInstaller(availableCommands = setOf("curl", "node", "npm", "git")),
-        )
-        val request = spec.toStreamJsonNodeStartRequest(
-            EmbeddedLettaCodeSessionKey(
-                agentId = "agent-1",
-                conversationId = "conv-1",
-                modelKey = selection.startKey,
-            ),
-        )
-        val env = spec.environment
-        val binDir = File(project.storageDirectory.parentFile, "bin")
-        val backgroundDir = File(project.storageDirectory.parentFile, "background")
-        val tmpDir = File(project.storageDirectory.parentFile, "tmp")
+        ).environment
+        val binDir = File(baseDir, "bin")
 
-        assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", spec.modelHandle)
-        assertEquals(project.storageDirectory.absolutePath, env["LETTA_LOCAL_BACKEND_DIR"])
-        assertEquals("1", env["LETTA_LOCAL_BACKEND_EXPERIMENTAL"])
         assertEquals("pi", env["LETTA_LOCAL_BACKEND_EXECUTOR"])
-        assertEquals(spec.modelHandle, env["LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"])
-        assertEquals(selection.modelPath, env["LETTA_ANDROID_ON_DEVICE_MODEL_PATH"])
-        assertEquals("litert-lm", env["LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME"])
-        assertEquals("gpu", env["LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR"])
-        assertEquals("2048", env["LETTA_ANDROID_ON_DEVICE_MODEL_MAX_TOKENS"])
-        assertEquals(
-            File(project.storageDirectory, "model-cache").absolutePath,
-            env["LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR"],
-        )
-        assertEquals("http://127.0.0.1:3456/v1", env["LMSTUDIO_BASE_URL"])
-        assertEquals("openai-loopback-token", env["LMSTUDIO_API_KEY"])
-        assertEquals("http://127.0.0.1:4567", env["LETTA_ANDROID_NETWORK_BRIDGE_URL"])
-        assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
-        assertEquals(tmpDir.absolutePath, env["TMPDIR"])
-        assertEquals(tmpDir.absolutePath, env["TMP"])
-        assertEquals(tmpDir.absolutePath, env["TEMP"])
-        assertEquals(backgroundDir.absolutePath, env["LETTA_BACKGROUND_DIR"])
-        assertEquals(backgroundDir.absolutePath, env["LETTA_TASK_OUTPUT_DIR"])
         assertEquals("/system/bin/sh", env["SHELL"])
-        assertEquals("--max-old-space-size=384 --max-semi-space-size=16", env["NODE_OPTIONS"])
         assertTrue(env["PATH"].orEmpty().startsWith("${binDir.absolutePath}:"))
-        assertEquals(
-            File(project.projectDir, "node_modules/npm/bin/npm-cli.js").absolutePath,
-            env["LETTA_NPM_CLI_JS"],
-        )
+        assertEquals(File(project.projectDir, "node_modules/npm/bin/npm-cli.js").absolutePath, env["LETTA_NPM_CLI_JS"])
         assertEquals(File(binDir, "node").absolutePath, env["LETTA_NODE_BIN"])
         assertEquals(binDir.absolutePath, env["GIT_EXEC_PATH"])
         assertEquals("", env["GIT_TEMPLATE_DIR"])
         assertEquals("1", env["GIT_CONFIG_NOSYSTEM"])
         val disabledHooksPath = File(baseDir, "git-hooks-disabled").absolutePath
         assertTrue(File(project.homeDirectory, ".gitconfig").readText().contains("hooksPath = $disabledHooksPath"))
-
-        assertEquals(
-            listOf(
-                "node18-compat.cjs",
-                "regexp-polyfill.cjs",
-                "android-network-polyfill.cjs",
-                "device-tools-preload.cjs",
-            ),
-            spec.preloadRequireFiles.map { it.name },
-        )
-        assertStreamJsonArgs(request, spec)
     }
 
     @Test
-    fun `shared launch spec skips git setup when packaged git is unavailable but keeps Android path setup`() {
+    fun `app server launch skips git setup when packaged git is unavailable`() {
         val baseDir = tempDir("letta-launch-no-git")
         val project = preparedProject(baseDir, withNpm = false)
-        val selection = EmbeddedLettaCodeModelSelection(
-            modelHandle = "lmstudio/minimax-m3",
-            modelPath = "/models/minimax.litertlm",
-            runtime = "litert-lm",
-            accelerator = "cpu",
-            maxTokens = 4096,
-        )
 
-        val spec = project.prepareAndroidEmbeddedLettaCodeLaunchSpec(
-            modelSelection = selection,
-            androidNetworkBridgeBaseUrl = "http://127.0.0.1:4567",
-            androidNetworkBridgeToken = "android-bridge-token",
+        val env = project.androidLocalAppServerLaunch(
+            networkBridge = AndroidNetworkBridgeEndpoint("http://127.0.0.1:4567", "android-bridge-token"),
             toolInstaller = FakeToolInstaller(availableCommands = setOf("bash", "curl", "node")),
-        )
-        val env = spec.environment
+        ).environment
 
-        assertEquals("lmstudio/minimax-m3", spec.modelHandle)
         assertNull(env["GIT_EXEC_PATH"])
         assertFalse(File(project.homeDirectory, ".gitconfig").exists())
         assertNull(env["LETTA_NPM_CLI_JS"])
-        assertNull(env["LETTA_NODE_BIN"])
         assertTrue(env["PATH"].orEmpty().startsWith("${File(baseDir, "bin").absolutePath}:"))
-        assertEquals("/system/bin/sh", env["SHELL"])
-        assertEquals("http://127.0.0.1:4567", env["LETTA_ANDROID_NETWORK_BRIDGE_URL"])
-        assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
+    }
+
+    @Test
+    fun `local provider file points lc-lmstudio at the endpoint and lists the selected model`() {
+        val backendDir = tempDir("letta-provider-auth")
+        val selection = EmbeddedLettaCodeModelSelection(
+            modelHandle = "google/gemma-3n-E2B-it-litert-lm",
+            modelPath = "/models/gemma.litertlm",
+            runtime = "litert-lm",
+            accelerator = "gpu",
+            maxTokens = 2048,
+        )
+
+        backendDir.writeLocalProviderAuth(ProviderEndpoint("http://127.0.0.1:3456/v1", "loopback-token"), selection)
+
+        val provider = kotlinx.serialization.json.Json.parseToJsonElement(File(backendDir, "providers/auth.json").readText())
+            .jsonObject.getValue("providers").jsonObject.getValue("lc-lmstudio").jsonObject
+        assertEquals("lmstudio", provider.getValue("provider_type").jsonPrimitive.content)
+        assertEquals("http://127.0.0.1:3456/v1", provider.getValue("base_url").jsonPrimitive.content)
+        assertEquals("loopback-token", provider.getValue("auth").jsonObject.getValue("key").jsonPrimitive.content)
+        val model = provider.getValue("models").jsonArray.single().jsonObject
+        assertEquals("google/gemma-3n-E2B-it-litert-lm", model.getValue("id").jsonPrimitive.content)
+        assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", selection.lettaCodeModelHandle)
     }
 
     @Test
@@ -148,25 +102,6 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals(File(baseDir, "tmp").absolutePath, env["TMPDIR"])
         assertTrue(env.keys.none { it.startsWith("LMSTUDIO_") || it.startsWith("LETTA_ANDROID_ON_DEVICE_MODEL") })
         assertNull("the host owns the backend variables", env["LETTA_LOCAL_BACKEND_DIR"])
-    }
-
-    private fun assertStreamJsonArgs(
-        request: LettaCodeNodeStartRequest,
-        spec: AndroidEmbeddedLettaCodeLaunchSpec,
-    ) {
-        assertEquals(spec.environment, request.environment)
-        assertEquals(spec.workingDirectory, request.workingDirectory)
-        assertEquals("node", request.arguments[0])
-        assertEquals("--max-old-space-size=384", request.arguments[1])
-        assertEquals("--max-semi-space-size=16", request.arguments[2])
-        val requirePairs = spec.preloadRequireFiles.flatMap { listOf("--require", it.absolutePath) }
-        assertEquals(requirePairs, request.arguments.drop(3).take(requirePairs.size))
-        assertTrue(
-            request.arguments.containsAll(
-                listOf("--backend", "local", "--input-format", "stream-json", "--output-format", "stream-json"),
-            ),
-        )
-        assertTrue(request.arguments.containsAll(listOf("--permission-mode", "unrestricted")))
     }
 
     private fun preparedProject(baseDir: File, withNpm: Boolean): PreparedLettaCodeProject {

@@ -25,13 +25,11 @@ everything else cites it (letta-mobile-bzvro.10, letta-mobile-ckmub.5).
 
 ### What "verified against a 0.33/0.34 server" means
 
-The desktop bundled runtime and any remote 0.34.x App Server speak the contract wire. The Android
-embedded runtime runs the same letta-code release, but until it moves to the App Server path
-(letta-mobile-by4vm.110.6) Android drives it through the headless stream-json protocol, which has
-no fork, dream, approvals or App Server admin commands. So any acceptance criterion of the form
-"verified against a 0.33/0.34 server" is still **desktop / remote-only** for now; on the embedded
-runtime those features must degrade (absent, not failing). The Iroh wrapper host has to run the
-contract letta-code for the 0.34 features to reach Android over Iroh.
+The desktop bundled runtime, the Android embedded runtime and any remote 0.34.x App Server speak
+the contract wire: since letta-mobile-by4vm.110.6 Android dials its on-device runtime's loopback
+`letta server` over ws:// through the same channel as an Iroh host (admin_rpc answered in process
+by the Iroh host's router). The Iroh wrapper host has to run the contract letta-code for the 0.34
+features to reach Android over Iroh.
 
 Moving the pin is a deliberate change: set `lettaCodeVersion` + `lettaCodeIntegrity` in
 `letta-code-runtime/letta-code-runtime.properties` and bump its `assetRevision`, then update the
