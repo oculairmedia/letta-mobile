@@ -1,0 +1,757 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CastToNullableType:ShellPage.kt$ShellPageDeps$as</ID>
+    <ID>ComplexCondition:StreamingMarkdownParser.kt$atLineStart &amp;&amp; i + 2 &lt; n &amp;&amp; prefix[i] == '`' &amp;&amp; prefix[i + 1] == '`' &amp;&amp; prefix[i + 2] == '`'</ID>
+    <ID>ComplexCondition:StreamingMarkdownRepair.kt$(marker.first() == '_' || marker.first() == '*') &amp;&amp; index &gt; 0 &amp;&amp; line[index - 1].isLetterOrDigit() &amp;&amp; line[next].isLetterOrDigit()</ID>
+    <ID>CyclomaticComplexMethod:A2uiBasicWidgets.kt$@Composable private fun A2uiComponent.iconTint(): Color</ID>
+    <ID>CyclomaticComplexMethod:A2uiBasicWidgets.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun A2uiChoicePicker( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, surfaceSubmitting: Boolean, renderScope: A2uiRenderScope, )</ID>
+    <ID>CyclomaticComplexMethod:A2uiRenderer.kt$@Composable private fun A2uiComponentNodeContent( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, visited: Set&lt;String&gt;, onAction: (A2uiAction) -&gt; Unit, surfaceSubmitting: Boolean, onPendingActionDelta: (Int) -&gt; Unit, actionResolutionToken: Int, renderScope: A2uiRenderScope, )</ID>
+    <ID>CyclomaticComplexMethod:A2uiToolApprovalWidgets.kt$@Composable internal fun A2uiToolApprovalCard( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, onAction: (A2uiAction) -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:CanvasKeys.kt$internal fun canvasKeyAction(event: KeyEvent): CanvasKeyAction?</ID>
+    <ID>CyclomaticComplexMethod:CanvasNotesLayer.kt$@Composable private fun CanvasNoteCard( session: CanvasSession, document: CanvasSceneDocument, /** Read in layout and draw only, never in composition. */ viewport: () -&gt; Viewport, defaultFrame: CanvasDocumentFrame, active: Boolean, expanded: Boolean, onActivate: () -&gt; Unit, onExpand: () -&gt; Unit, onToolbar: ((NoteToolbar?) -&gt; Unit)?, selection: NoteSelection, eraseMode: Boolean = false, onErase: () -&gt; Unit = {}, onLiveFrame: (CanvasDocumentFrame?) -&gt; Unit = {}, onFittedHeight: (Float?) -&gt; Unit = {}, )</ID>
+    <ID>CyclomaticComplexMethod:CanvasPropertyControl.kt$@Composable private fun CanvasPropertyPanel( state: ControlsBarState, properties: CanvasProperties, dispatch: (ControlsBarIntent) -&gt; Unit, dispatchProperty: (CanvasPropertyIntent) -&gt; Unit, note: NoteBarActions?, shapeText: ShapeTextActions?, onClose: () -&gt; Unit, )</ID>
+    <ID>CyclomaticComplexMethod:LettaSearch.kt$@Composable internal fun LettaSearchScaffold( query: String, onQueryChange: (String) -&gt; Unit, sections: List&lt;LettaSearchSection&gt;, onRowSelected: (LettaSearchRow) -&gt; Unit, modifier: Modifier, config: LettaSearchConfig, parts: LettaSearchParts, )</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownParser.kt$fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>CyclomaticComplexMethod:StreamingMarkdownRepair.kt$private fun inlineMarkdownClosersForLastLine(text: String): String</ID>
+    <ID>CyclomaticComplexMethod:ToolOutputSyntaxHighlighter.kt$internal fun highlightCodeOutput(text: String, languageHint: String?): List&lt;ToolOutputHighlightSpan&gt;</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:LettaListParts.kt$val (_, icon, trailing, selected) = spec</ID>
+    <ID>ForEachOnRange:ScheduleFormPane.kt$1..DAYS_IN_WEEK</ID>
+    <ID>ForEachOnRange:ScheduleWeekView.kt$0 until GRID_HOURS</ID>
+    <ID>ForEachOnRange:ToolOutputSyntaxHighlighter.kt$start.coerceAtLeast(0) until end.coerceAtMost(size)</ID>
+    <ID>LongMethod:A2uiBasicWidgets.kt$@Composable internal fun A2uiButton( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, onAction: (A2uiAction) -&gt; Unit, onPendingActionDelta: (Int) -&gt; Unit, actionResolutionToken: Int, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiBasicWidgets.kt$@Composable internal fun A2uiDateTimeInput( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiBasicWidgets.kt$@Composable internal fun A2uiListView( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, visited: Set&lt;String&gt;, onAction: (A2uiAction) -&gt; Unit, surfaceSubmitting: Boolean, onPendingActionDelta: (Int) -&gt; Unit, actionResolutionToken: Int, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiBasicWidgets.kt$@Composable internal fun A2uiMedia( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, renderScope: A2uiRenderScope, kind: A2uiMediaKind, )</ID>
+    <ID>LongMethod:A2uiBasicWidgets.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun A2uiChoicePicker( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, surfaceSubmitting: Boolean, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiRenderer.kt$@Composable private fun A2uiComponentNodeContent( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, visited: Set&lt;String&gt;, onAction: (A2uiAction) -&gt; Unit, surfaceSubmitting: Boolean, onPendingActionDelta: (Int) -&gt; Unit, actionResolutionToken: Int, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiScheduleWidgets.kt$@Composable internal fun A2uiScheduleCard( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, onAction: (A2uiAction) -&gt; Unit, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiScheduleWidgets.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun A2uiScheduleSelectorInput( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, onAction: (A2uiAction) -&gt; Unit, surfaceSubmitting: Boolean, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiSelectionWidgets.kt$@Composable internal fun A2uiAccordion( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, visited: Set&lt;String&gt;, onAction: (A2uiAction) -&gt; Unit, surfaceSubmitting: Boolean, onPendingActionDelta: (Int) -&gt; Unit, actionResolutionToken: Int, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiSelectionWidgets.kt$@Composable internal fun A2uiSlider( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, surfaceSubmitting: Boolean, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiSelectionWidgets.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun A2uiDropdown( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, surfaceSubmitting: Boolean, renderScope: A2uiRenderScope, )</ID>
+    <ID>LongMethod:A2uiToolApprovalWidgets.kt$@Composable internal fun A2uiToolApprovalCard( component: A2uiComponent, surface: A2uiSurfaceState, modifier: Modifier = Modifier, onAction: (A2uiAction) -&gt; Unit, )</ID>
+    <ID>LongMethod:ActiveSubagentRings.kt$@Composable private fun ActivityRing( subagent: ActiveSubagent, now: Long, modifier: Modifier = Modifier, onClick: () -&gt; Unit = {}, onLongClick: () -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:CanvasBlockEditor.kt$@OptIn(ExperimentalCascadePreviewApi::class) @Composable fun CanvasBlockEditor( session: CanvasSession, documentId: String, storedJson: String, modifier: Modifier = Modifier, actorId: CanvasActorId = CanvasSession.LOCAL_USER_ACTOR, active: Boolean = true, /** True when the editor sits on a pale tint (a coloured note), so its text stays dark. */ onLightSurface: Boolean = false, /** Receives the editor's formatting controls while active, null again when it leaves. */ onToolbar: ((NoteToolbar?) -&gt; Unit)? = null, /** How this document's text is set: size, family, colour, alignment. */ style: CanvasTextStyle? = null, /** Sets the text in the middle of the space, top to bottom, as a shape's label is. */ centerVertically: Boolean = false, )</ID>
+    <ID>LongMethod:CanvasColorPicker.kt$@Composable fun CanvasColorPicker( current: Color, palette: List&lt;NamedColor&gt;, allowNone: Boolean, onPick: (color: Color, done: Boolean) -&gt; Unit, /** True when embedded in another panel, which then owns the surface and padding. */ flat: Boolean = false, /** False for the phone's short form: the preset swatches only, no recents, sliders or hex. */ showCustom: Boolean = true, )</ID>
+    <ID>LongMethod:CanvasNoteEditorPanel.kt$@Composable fun CanvasNoteEditorPanel( session: CanvasSession, document: CanvasSceneDocument, onClose: () -&gt; Unit, modifier: Modifier = Modifier, onToolbar: ((NoteToolbar?) -&gt; Unit)? = null, /** The whole overlay, scrim included, is chrome: nothing behind it is drawable. */ chromeRegions: CanvasChromeRegions? = null, /** Narrow boards use the same editor inside a bottom sheet. */ compact: Boolean = false, actions: NoteEditorActions? = null, /** What the editor keeps clear of: the system bars and keyboard, and any host chrome over the board. */ insets: WindowInsets = WindowInsets.safeDrawing, )</ID>
+    <ID>LongMethod:CanvasNotesLayer.kt$@Composable private fun CanvasNoteCard( session: CanvasSession, document: CanvasSceneDocument, /** Read in layout and draw only, never in composition. */ viewport: () -&gt; Viewport, defaultFrame: CanvasDocumentFrame, active: Boolean, expanded: Boolean, onActivate: () -&gt; Unit, onExpand: () -&gt; Unit, onToolbar: ((NoteToolbar?) -&gt; Unit)?, selection: NoteSelection, eraseMode: Boolean = false, onErase: () -&gt; Unit = {}, onLiveFrame: (CanvasDocumentFrame?) -&gt; Unit = {}, onFittedHeight: (Float?) -&gt; Unit = {}, )</ID>
+    <ID>LongMethod:CanvasPropertyControl.kt$@Composable private fun CanvasPropertyPanel( state: ControlsBarState, properties: CanvasProperties, dispatch: (ControlsBarIntent) -&gt; Unit, dispatchProperty: (CanvasPropertyIntent) -&gt; Unit, note: NoteBarActions?, shapeText: ShapeTextActions?, onClose: () -&gt; Unit, )</ID>
+    <ID>LongMethod:ChatTimeline.kt$@Composable internal fun ChatTimeline( state: ChatUiState, pagedTimeline: CanonicalTimelinePresentation?, actions: ChatActions, capabilities: ChatSurfaceCapabilities, host: ChatSurfaceHost, appearance: ChatSurfaceAppearance, modifier: Modifier = Modifier, /** The page's scroll position; hoisted so it survives docking and expanding the chat. */ listState: LazyListState = rememberLazyListState(), /** * Host chrome floating over the timeline's top edge (ChatSurfacePlatform.topChromeInset). The * list scrolls under it; everything that rests at the top (the oldest row, the goal card, the * loading, welcome and failure states) rests below it. */ topInset: Dp = 0.dp, )</ID>
+    <ID>LongMethod:DockedChatPanel.kt$@Composable internal fun DockedChatPanel( state: ChatDockState, content: DockedPanelContent, modifier: Modifier = Modifier, morph: SurfaceMorph = SurfaceMorph.Docked, )</ID>
+    <ID>LongMethod:LettaSearch.kt$@Composable internal fun LettaSearchScaffold( query: String, onQueryChange: (String) -&gt; Unit, sections: List&lt;LettaSearchSection&gt;, onRowSelected: (LettaSearchRow) -&gt; Unit, modifier: Modifier, config: LettaSearchConfig, parts: LettaSearchParts, )</ID>
+    <ID>LongMethod:LettaSearch.kt$@Composable private fun LettaSearchField( query: String, onQueryChange: (String) -&gt; Unit, placeholder: String, prefix: String?, focusRequester: FocusRequester, )</ID>
+    <ID>LongMethod:PagedTimelineList.kt$@Composable private fun PagedTimelineBody( params: PagedTimelineParams, settled: LazyPagingItems&lt;CanonicalTimelinePresentation.Row&gt;, rows: PagedRows, modifier: Modifier, )</ID>
+    <ID>LongMethod:SharedMaterialTheme.kt$fun lettaColorScheme(dark: Boolean): ColorScheme</ID>
+    <ID>LongMethod:StreamingMarkdownParser.kt$fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>LongMethod:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>LongMethod:TimelineListFrame.kt$@Composable internal fun TimelineListFrame( listState: LazyListState, bindings: TimelineRowBindings, overlays: TimelineFrameOverlays, modifier: Modifier = Modifier, /** Whether the older / newer end of the history is fully loaded, so a fling may bounce there. */ olderHistoryComplete: () -&gt; Boolean = { true }, newerHistoryComplete: () -&gt; Boolean = { true }, content: LazyListScope.() -&gt; Unit, )</ID>
+    <ID>LongMethod:TouchCanvasDock.kt$@Composable private fun ChatHead(content: TouchHeadContent, place: HeadPlace, onTap: () -&gt; Unit)</ID>
+    <ID>LongParameterList:CanvasWorkspaceState.kt$CanvasWorkspaceHost$( val controller: DrawBoxController, val session: CanvasSession?, val sessionRegistry: CanvasSessionRegistry?, val initialJson: String?, val presenceTransport: CanvasPresenceTransport?, val assets: AssetStore?, val currentPeerId: String?, val callbacks: CanvasWorkspaceCallbacks, val chrome: CanvasWorkspaceChromeOptions, val cameraRequest: CanvasCameraRequest?, )</ID>
+    <ID>LongParameterList:ChatSurface.kt$ChatSurfaceFrame$( val port: ChatSessionPort, val listState: LazyListState, val uiState: ChatUiState, val composer: ChatComposerUiState, val capabilities: ChatSurfaceCapabilities, val presentation: ChatSurfacePresentation, val onIntent: (ChatSurfaceIntent) -&gt; Unit, val host: ChatSurfaceHost, val appearance: ChatSurfaceAppearance, val platform: ChatSurfacePlatform, val pagedTimeline: CanonicalTimelinePresentation?, /** The page's one composer-companion seat. */ val companionAnchors: CompanionSeatAnchors, /** Null until the host knows where the person put the dock (or, on Touch, the head). */ val dock: ChatDockState?, /** The agent's conversations for the "+" (letta-mobile-y5q9z); null hides it. */ val recents: ChatRecentInteractions? = null, )</ID>
+    <ID>LongParameterList:ChatTimeline.kt$TimelineBodyParams$( val state: ChatUiState, val pagedTimeline: CanonicalTimelinePresentation?, val actions: ChatActions, val capabilities: ChatSurfaceCapabilities, val appearance: ChatSurfaceAppearance, val bindings: TimelineRowBindings, val bottomReserve: Dp, val listState: LazyListState, /** The mascot's pencil on the welcome hero. */ val editAgent: (() -&gt; Unit)? = null, /** Host chrome floating over the body's top: the list scrolls under it, the other phases rest below it. */ val topReserve: Dp = 0.dp, )</ID>
+    <ID>LongParameterList:DockedChatPanelSemantics.kt$DockSemanticsLabels$( val panel: String, val moveUp: String, val moveDown: String, val moveLeft: String, val moveRight: String, val grow: String, val shrink: String, val reset: String, val collapse: String, val restore: String, )</ID>
+    <ID>LongParameterList:InstallAndPairCard.kt$InstallAndPairBindings$( /** Builds the join flow once (identity + paired-host store are platform services). */ val joinFlow: () -&gt; PairingFlow, val qrEncoder: QrEncoder, /** admin_rpc to the connected host; null when no host is connected (inviting needs one). */ val rpc: AdminRpcInvoker?, val agents: List&lt;AgentChoice&gt;, val onOpenChat: () -&gt; Unit, val nowMs: () -&gt; Long, /** A deep-linked pairing link to redeem once; [onPendingLinkConsumed] clears it. */ val pendingLink: String? = null, val onPendingLinkConsumed: () -&gt; Unit = {}, /** This device's own NodeId (groups "This device" in the list); null when unknown. */ val selfNodeId: suspend () -&gt; String? = { null }, /** The platform share sheet, when there is one. */ val onShareLink: ((String) -&gt; Unit)? = null, )</ID>
+    <ID>LongParameterList:LettaHost.kt$LettaHost$( input: LettaInput = this.input, sheet: PaneContainer = this.sheet, popover: PaneContainer = this.popover, dialog: PaneContainer = this.dialog, alert: PaneContainer = this.alert, menu: MenuContainer = this.menu, tooltip: @Composable (String, @Composable () -&gt; Unit) -&gt; Unit = this.tooltip, hoverCard: @Composable (LettaHoverCard, @Composable () -&gt; Unit) -&gt; Unit = this.hoverCard, rowMenu: @Composable (List&lt;LettaMenuItem&gt;, @Composable () -&gt; Unit) -&gt; Unit = this.rowMenu, )</ID>
+    <ID>LongParameterList:SchedulesPageParts.kt$SchedulesBody$( val state: SchedulesPageState, val defs: List&lt;ScheduleDef&gt;, val view: SchedulesView, val clock: ScheduleClock, val dates: SchedulesDates, val selectedId: String?, val history: HistorySummary, val onRefresh: () -&gt; Unit, val onSelectDate: (LocalDate) -&gt; Unit, val onSelectRun: (ScheduleRun) -&gt; Unit, val onSelectSchedule: (String) -&gt; Unit, )</ID>
+    <ID>LongParameterList:SendLiftFrameInvariantsTest.kt$SendLiftFrameInvariantsTest$( t: Int, bubble: Rect? = null, ghost: Rect? = null, older: Rect? = null, edge: Boolean = true, composed: Int = 0, chevrons: Int = 0, companion: Float = 0f, departing: Int = 0, )</ID>
+    <ID>LongParameterList:ShellPage.kt$ShellPageDeps$( home: ShellPageContent&lt;ShellDestination.Home&gt;? = null, chat: ShellPageContent&lt;ShellDestination.Chat&gt;? = null, canvas: ShellPageContent&lt;ShellDestination.Canvas&gt;? = null, memory: ShellPageContent&lt;ShellDestination.Memory&gt;? = null, schedules: ShellPageContent&lt;ShellDestination.Schedules&gt;? = null, channels: ShellPageContent&lt;ShellDestination.Channels&gt;? = null, skills: ShellPageContent&lt;ShellDestination.Skills&gt;? = null, settings: ShellPageContent&lt;ShellDestination.Settings&gt;? = null, agentEditor: ShellPageContent&lt;ShellDestination.AgentEditor&gt;? = null, providers: ShellPageContent&lt;ShellDestination.Providers&gt;? = null, admin: ShellAdminPages = ShellAdminPages(), val fallback: ShellPageContent&lt;ShellDestination&gt; = EmptyShellPage, )</ID>
+    <ID>LoopWithTooManyJumpStatements:CanvasBubbleLayoutControls.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:LettaTabStrip.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:MemoryGraphCanvas.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:ShellAgentLibrary.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownDocumentParser.kt$StreamingMarkdownDocumentParser$while</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownParser.kt$for</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownParser.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:StreamingMarkdownRepair.kt$while</ID>
+    <ID>MatchingDeclarationName:AgentContextCard.kt$AgentContextTags</ID>
+    <ID>MatchingDeclarationName:AgentContextLimitBinding.kt$LimitTarget</ID>
+    <ID>MatchingDeclarationName:AgentEditorPanes.kt$AgentEditorPaneInputs</ID>
+    <ID>MatchingDeclarationName:BackgroundTasksPanel.kt$BackgroundTasksTags</ID>
+    <ID>MatchingDeclarationName:CanvasCompactToolbar.kt$CompactToolbarActions</ID>
+    <ID>MatchingDeclarationName:CanvasHistoryDialog.kt$CanvasHistoryDialogState</ID>
+    <ID>MatchingDeclarationName:CanvasKeys.kt$CanvasKeyAction</ID>
+    <ID>MatchingDeclarationName:CanvasNoteEditorPanel.kt$NoteEditorActions</ID>
+    <ID>MatchingDeclarationName:CanvasPenStrokes.kt$CanvasPenStroke</ID>
+    <ID>MatchingDeclarationName:CanvasSnapLayer.kt$CanvasSnapping</ID>
+    <ID>MatchingDeclarationName:CanvasStorageFaultBanner.kt$CanvasStorageFaultText</ID>
+    <ID>MatchingDeclarationName:CanvasSyncStatus.kt$CanvasSyncStatusText</ID>
+    <ID>MatchingDeclarationName:ChatApprovalStepper.kt$ApprovalStepperState</ID>
+    <ID>MatchingDeclarationName:ChatComposerPanel.kt$ComposerInputs</ID>
+    <ID>MatchingDeclarationName:ChatComposerSnapshot.kt$ComposerSnapshotContent</ID>
+    <ID>MatchingDeclarationName:ChatRowCompaction.kt$ChatCompactionTestTags</ID>
+    <ID>MatchingDeclarationName:ChatRowCopyButton.kt$CopyAction</ID>
+    <ID>MatchingDeclarationName:ChatRowQuietClick.kt$QuietClick</ID>
+    <ID>MatchingDeclarationName:CollapsedReplyHold.kt$ReplyHold</ID>
+    <ID>MatchingDeclarationName:ComposerCompanion.kt$ComposerCompanionTags</ID>
+    <ID>MatchingDeclarationName:ConversationsPage.kt$ConversationsPageTags</ID>
+    <ID>MatchingDeclarationName:DockedChatPanelSemantics.kt$DockSemanticsLabels</ID>
+    <ID>MatchingDeclarationName:DockedReplyCard.kt$DockedReplyParams</ID>
+    <ID>MatchingDeclarationName:ForkNameDialog.kt$ForkNameDialogTags</ID>
+    <ID>MatchingDeclarationName:InstallAndPairCard.kt$InstallAndPairBindings</ID>
+    <ID>MatchingDeclarationName:LettaPopupMenu.kt$LettaMenuItem</ID>
+    <ID>MatchingDeclarationName:LettaSearch.kt$LettaSearchParts</ID>
+    <ID>MatchingDeclarationName:LobeIcon.kt$LobePath</ID>
+    <ID>MatchingDeclarationName:MemoryGraphCanvas.kt$MemoryGraphCanvasParams</ID>
+    <ID>MatchingDeclarationName:MemoryGraphDrawing.kt$GraphFrame</ID>
+    <ID>MatchingDeclarationName:MemoryNodeCard.kt$MemoryNodeCardState</ID>
+    <ID>MatchingDeclarationName:MemoryPageChrome.kt$MemoryChromeOptions</ID>
+    <ID>MatchingDeclarationName:PairInviteCard.kt$AgentChoice</ID>
+    <ID>MatchingDeclarationName:PairingStatusCard.kt$PairingScanActions</ID>
+    <ID>MatchingDeclarationName:PersistedLayoutPrefs.kt$LayoutPrefStorage&lt;T : Any&gt;</ID>
+    <ID>MatchingDeclarationName:ProjectsPageDetail.kt$ProjectDetailKeys</ID>
+    <ID>MatchingDeclarationName:ProviderConnectDialog.kt$ProviderFormActions</ID>
+    <ID>MatchingDeclarationName:ProviderManagementPane.kt$ProviderManagementActions</ID>
+    <ID>MatchingDeclarationName:QuickQueryPanel.kt$QuickQueryActions</ID>
+    <ID>MatchingDeclarationName:RunsPageDetail.kt$RunDetailTags</ID>
+    <ID>MatchingDeclarationName:SendFlightLayer.kt$SendFlightTestTags</ID>
+    <ID>MatchingDeclarationName:SettingsSearch.kt$SettingsSearchEntry</ID>
+    <ID>MatchingDeclarationName:ShellAgentRail.kt$ShellAgentRailTags</ID>
+    <ID>MatchingDeclarationName:ShellConversationRename.kt$ShellConversationTags</ID>
+    <ID>MatchingDeclarationName:ShellListDetail.kt$ShellListDetailTags</ID>
+    <ID>MatchingDeclarationName:ShellPanelLibrary.kt$ShellPanelItem</ID>
+    <ID>MatchingDeclarationName:ShellRenameChatDialog.kt$ShellRenameChatDialogTags</ID>
+    <ID>MatchingDeclarationName:SubagentRingsOverlay.kt$SubagentRingsState</ID>
+    <ID>MatchingDeclarationName:TimelineMascot.kt$TimelineMascotTags</ID>
+    <ID>MatchingDeclarationName:TimelineRowBinding.kt$TimelineRowContexts</ID>
+    <ID>MatchingDeclarationName:TimelineRows.kt$TimelineRow</ID>
+    <ID>MatchingDeclarationName:TimelineScrollToLatest.kt$NewestEdgeGlide</ID>
+    <ID>MatchingDeclarationName:TimelineScrollToLatestVisibility.kt$ScrollToLatestThresholds</ID>
+    <ID>MatchingDeclarationName:TimelineThinkingStatus.kt$ActiveRunActivity</ID>
+    <ID>MaxLineLength:A2uiSelectionWidgets.kt$Column</ID>
+    <ID>MaxLineLength:ActiveSubagentRings.kt$drawArc(color = color, startAngle = TWELVE_O_CLOCK, sweepAngle = sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)</ID>
+    <ID>MaxLineLength:ActiveSubagentRings.kt$drawArc(color = color.copy(alpha = TRACK_ALPHA), startAngle = 0f, sweepAngle = COMPLETED_SWEEP, useCenter = false, topLeft = topLeft, size = arcSize, style = stroke)</ID>
+    <ID>MaxLineLength:AgentContextCardConversationOverrideTest.kt$AgentContextCardConversationOverrideTest$selections.seedFromHost(listOf(json.decodeFromString(Conversation.serializer(), """{"id":"$CONVERSATION","agent_id":"agent-c356b54a"}""")))</ID>
+    <ID>MaxLineLength:AgentContextCardUiTest.kt$AgentContextCardUiTest$val deps = AgentContextCardDeps(readings, breakdown = null, compaction = CompactionController(repository, readings), pickerSource = null)</ID>
+    <ID>MaxLineLength:AgentContextCardUiTest.kt$AgentContextCardUiTest$val result = ConversationCompactResult("execute_command", messagesBefore = 48, messagesAfter = 12, contextTokensBefore = 60_000, contextTokensAfter = 10_000)</ID>
+    <ID>MaxLineLength:AgentContextCardUiTest.kt$CompositionLocalProvider(LocalLettaHost provides LettaHost.Pointer) { AgentContextCardHost(AgentContextCardBinding(deps, actions), focus) }</ID>
+    <ID>MaxLineLength:AgentEditorPageTest.kt$AgentEditorPageTest$private val ada = Agent(id = AgentId("a-1"), name = "Ada", model = "openai/gpt-5", system = "You are Ada.", tools = persistentListOf(search))</ID>
+    <ID>MaxLineLength:AgentEditorPanes.kt$TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End).padding(vertical = LettaDimens.Space.sm)) { Text("Done") }</ID>
+    <ID>MaxLineLength:AgentEditorPanes.kt$inputs.actions.update { copy(model = option.handle, reasoningEffort = reasoningEffort?.takeIf { it in option.reasoningEfforts }) }</ID>
+    <ID>MaxLineLength:AgentEditorPanes.kt$onPick = { item -&gt; inputs.actions.update { copy(toolIds = if (item.value in toolIds) toolIds - item.value else toolIds + item.value) } }</ID>
+    <ID>MaxLineLength:AgentMascotIdentityWriterTest.kt$AgentMascotIdentityWriterTest$val writer = AgentMascotIdentityWriter(agentId, FakeSettings(), backgroundScope, { loaded }, remote::push, onFailed = { failures += it })</ID>
+    <ID>MaxLineLength:AgentSettingsDrillInUiTest.kt$AgentSettingsDrillInUiTest$ModelPickerEntry(value = value, handle = ModelHandle(value), displayName = value, tier = null, efforts = emptyList(), selected = selected)</ID>
+    <ID>MaxLineLength:AgentSettingsDrillInUiTest.kt$AgentSettingsDrillInUiTest$actions = ModelPickerActions(onSelect = {}, onQueryChange = {}, onToggleGroup = {}, onRefresh = {}, onEditModels = null)</ID>
+    <ID>MaxLineLength:AgentVaultPage.kt$Surface</ID>
+    <ID>MaxLineLength:AgentVaultPage.kt$Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)</ID>
+    <ID>MaxLineLength:AgentVaultPageParts.kt$Button</ID>
+    <ID>MaxLineLength:AgentVaultPageParts.kt$IconButton</ID>
+    <ID>MaxLineLength:BackendConnectionViews.kt$error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }</ID>
+    <ID>MaxLineLength:BackendConnectionViews.kt$modifier = modifier.widthIn(max = LettaDimens.Pane.noticeMaxWidth).padding(LettaDimens.Space.xl).testTag(BackendConnectionTags.NOTICE)</ID>
+    <ID>MaxLineLength:BackendSettingsSection.kt$ConnectionTest.Testing</ID>
+    <ID>MaxLineLength:BackendSettingsSection.kt$message = "This device gets a new Iroh identity. Hosts it paired with won't recognise it until you pair it again; this can't be undone."</ID>
+    <ID>MaxLineLength:BackendSettingsSection.kt$state.config.migrationNotice?.let { NoteRow(SettingsRow.Note(BackendSettingsTags.NOTICE, SettingsStatus(it, SettingsTone.Warning))) }</ID>
+    <ID>MaxLineLength:BackendSettingsSection.kt$state.connection?.let { StatusRow(SettingsRow.Status(SettingsCopy.STATUS.key, SettingsCopy.STATUS.title, it.settingsStatus(), it.settingsHelper())) }</ID>
+    <ID>MaxLineLength:CanvasBackgroundPainter.kt$PatternTilePainter$Shape.DOTS -&gt; drawCircle(color, radius = (line * DOT_RADIUS_FACTOR), center = Offset(w / 2f, h / 2f), style = Stroke(width = line))</ID>
+    <ID>MaxLineLength:CanvasBubbleLayoutControls.kt$valueText = if (width &gt;= CanvasBubbleLayout.COMPOSER_FULL_DP) stringResource(Res.string.chat_surface_bubble_layout_full) else dpText(width)</ID>
+    <ID>MaxLineLength:CanvasBubbleUiTest.kt$CanvasBubbleUiTest$private val reply = UiMessage(id = "a1", role = "assistant", content = "Here's an L-shaped plan.", timestamp = "2026-09-30T18:02:09Z", runId = "run-1")</ID>
+    <ID>MaxLineLength:CanvasChrome.kt$Column</ID>
+    <ID>MaxLineLength:CanvasChrome.kt$IconButton</ID>
+    <ID>MaxLineLength:CanvasChrome.kt$MenuChip</ID>
+    <ID>MaxLineLength:CanvasChrome.kt$color = if (entry.color == background.color) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant</ID>
+    <ID>MaxLineLength:CanvasColorPicker.kt$Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)</ID>
+    <ID>MaxLineLength:CanvasColorPicker.kt$Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(swatchSize * 0.7f), tint = MaterialTheme.colorScheme.outline)</ID>
+    <ID>MaxLineLength:CanvasColorPicker.kt$textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = MaterialTheme.typography.bodySmall.fontSize)</ID>
+    <ID>MaxLineLength:CanvasCompactToolbar.kt$modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$AssistantMessage(id = "$run-assistant", contentRaw = JsonPrimitive("It's on the board."), runId = run, seqId = 3, otid = "$run-a")</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$ToolCallMessage(id = "$run-call", runId = run, seqId = 1, otid = "$run-c", toolCall = ToolCall(id = callId, name = CanvasToolContract.COMPOSE, arguments = call.input))</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$assertTrue(drawn.left &gt;= -1f &amp;&amp; drawn.top &gt;= -1f &amp;&amp; drawn.right &lt;= WORKSPACE_WIDTH + 1f &amp;&amp; drawn.bottom &lt;= WORKSPACE_HEIGHT + 1f, "$id is drawn at $drawn")</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$put("elementJson", """{"type":"Shape","shapeType":"CIRCLE","points":["80.0,80.0","560.0,400.0"],"strokeColor":"#1f2937ff","strokeWidth":3.0,"zIndex":0}""")</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$putJsonArray("tool_returns") { add(buildJsonObject { put("tool_call_id", callId); put("status", "success"); put("tool_return", answer) }) }</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$val (a, b) = (frame["points"] as kotlinx.serialization.json.JsonArray).map { p -&gt; (p as JsonPrimitive).content.split(",").map(String::toFloat) }</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$val elements = (json.parseToJsonElement(session.sceneJsonOrEmpty()).jsonObject["elements"] as kotlinx.serialization.json.JsonArray).map { it.jsonObject }</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$val narrating = timeline.events.filterIsInstance&lt;TimelineEvent.Confirmed&gt;().single { it.messageType == TimelineMessageType.ASSISTANT }</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$val scales = documents.associate { it.id to onNodeWithContentDescription("Note ${it.id}").fetchSemanticsNode().config.getOrNull(NoteFontScaleKey) }</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest$val session = CanvasSession.create(NotebookCanvasDocumentStore(notebooks), CanvasCreateOptions(canvasId = canvasId, conversationId = CONVERSATION, agentId = AGENT))</ID>
+    <ID>MaxLineLength:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest.Companion$"""{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"%s","spans":[]}}]}"""</ID>
+    <ID>MaxLineLength:CanvasComposeReceiptRenderTest.kt$CanvasComposeReceiptRenderTest$assertTrue(rect.right &lt;= size.width + 1f &amp;&amp; rect.bottom &lt;= size.height + 1f, "$what ends outside the ${size.snapshot} window: $rect")</ID>
+    <ID>MaxLineLength:CanvasConnectFollowTest.kt$CanvasConnectFollowTest$DrawingSerializer.deserialize(CanvasOpProjector.stripMetadataForDrawBox(scene)).elements.forEach { controller.onIntent(Intent.AddElement(it)) }</ID>
+    <ID>MaxLineLength:CanvasConnectOpRenderTest.kt$CanvasConnectOpRenderTest$json.decodeFromString(CanvasGetSceneResult.serializer(), call(CanvasToolContract.GET_SCENE, JsonObject(emptyMap())).content()).sceneJson</ID>
+    <ID>MaxLineLength:CanvasConnectOpRenderTest.kt$CanvasConnectOpRenderTest.Companion$"""{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"%s","spans":[]}}]}"""</ID>
+    <ID>MaxLineLength:CanvasConnectorLabelRenderTest.kt$CanvasConnectorLabelRenderTest$a(Offset(MARGIN, 660f), Offset(right, 660f), "a much longer label that keeps going until it has to wrap onto another line", 14f)</ID>
+    <ID>MaxLineLength:CanvasControlsBar.kt$modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.sm)</ID>
+    <ID>MaxLineLength:CanvasControlsBridge.kt$CanvasControlsBridge$applyTarget(hasSelection, { controller.setSelectionCornerRadius(intent.radius) }, { controller.setCornerRadius(intent.radius) })</ID>
+    <ID>MaxLineLength:CanvasControlsBridge.kt$CanvasControlsBridge$applyTarget(hasSelection, { controller.setSelectionStrokeEnabled(intent.enabled) }, { controller.setStrokeEnabled(intent.enabled) })</ID>
+    <ID>MaxLineLength:CanvasControlsBridge.kt$CanvasControlsBridge$applyTarget(hasSelection, { controller.setSelectionTextAlignment(intent.alignment) }, { controller.setTextAlignment(intent.alignment) })</ID>
+    <ID>MaxLineLength:CanvasFormattingBar.kt$modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.xs, vertical = LettaDimens.Space.hair)</ID>
+    <ID>MaxLineLength:CanvasGetLayoutRenderTest.kt$CanvasGetLayoutRenderTest$assertEquals(listOf(moved.x.toInt(), moved.y.toInt(), moved.width.toInt(), moved.height.toInt()), after.rows.single { it.id == "n-plan" }.frame)</ID>
+    <ID>MaxLineLength:CanvasGetLayoutRenderTest.kt$CanvasGetLayoutRenderTest$assertTrue(node.positionInRoot.x &gt;= -1f &amp;&amp; node.positionInRoot.y &gt;= -1f &amp;&amp; right &lt;= size.width + 1f &amp;&amp; bottom &lt;= size.height + 1f, "${row.id} clipped at $right,$bottom on ${size.width}x${size.height}")</ID>
+    <ID>MaxLineLength:CanvasGetLayoutRenderTest.kt$CanvasGetLayoutRenderTest$json.parseToJsonElement(call(CanvasToolContract.GET_SCENE, JsonObject(emptyMap())).content()).jsonObject["scene_json"]!!.jsonPrimitiveContent()</ID>
+    <ID>MaxLineLength:CanvasGetLayoutRenderTest.kt$CanvasGetLayoutRenderTest.Companion$"""{"version":2,"blocks":[{"id":"b1","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"%s","spans":[]}}]}"""</ID>
+    <ID>MaxLineLength:CanvasHistoryDialog.kt$val spec = LettaAlertSpec("Revision History", LettaPaneButtons(confirm = LettaPaneButton("Close", onDismiss)), kind = LettaPaneKind.Modal)</ID>
+    <ID>MaxLineLength:CanvasImageAssetsTest.kt$CanvasImageAssetsTest.DamagedStore$private</ID>
+    <ID>MaxLineLength:CanvasKeyboardCameraUiTest.kt$CanvasKeyboardCameraUiTest$CanvasWorkspace(session = board.session, controller = board.controller, showTitle = false, layout = CanvasLayout.COMPACT)</ID>
+    <ID>MaxLineLength:CanvasLargeSceneBench.kt$CanvasLargeSceneBench$log("localScene.diffApply.ms=${fmt(medianOf(List(5) { val t = System.nanoTime(); session.applyLocalScene(if (it % 2 == 0) diffJson else json); (System.nanoTime() - t) / 1e6 }))}")</ID>
+    <ID>MaxLineLength:CanvasLargeSceneBench.kt$CanvasLargeSceneBench$log("render.importApply.mainThread.ms=${median(reps = 8) { controller.importExternal(payload.copy(elements = payload.elements.map { it.freshCopy() })) }}")</ID>
+    <ID>MaxLineLength:CanvasLargeSceneBench.kt$CanvasLargeSceneBench$return CanvasOp.UpdateElementOp(opId = "bench-$i", actorId = "local_user", lamport = 10_000L + i, elementId = element.id, elementJson = elementJson)</ID>
+    <ID>MaxLineLength:CanvasLargeSceneBench.kt$CanvasLargeSceneBench$val diffJson = DrawingSerializer.serialize(payload.copy(elements = payload.elements.map { if (it.id == shapes.first().id) it.translate(Offset(1f, 0f)) else it }))</ID>
+    <ID>MaxLineLength:CanvasLargeSceneFixtures.kt$CanvasLargeSceneFixtures$for (y in 0 until side) for (x in 0 until side) img.setRGB(x, y, (0xFF shl 24) or ((x * 255 / side) shl 16) or ((y * 255 / side) shl 8) or 0x80)</ID>
+    <ID>MaxLineLength:CanvasLargeSceneFixtures.kt$CanvasLargeSceneFixtures.Cell$return Element.Path(id = "p$index", samples = samples, strokeColor = Color(0xFF1E3A8A), strokeWidth = 4f, alpha = 1f, zIndex = index)</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitFixtures.kt$CanvasNoteAutoFitFixtures$listOf(B("heading", day, level = 3), B("todo", "$day dinner: pasta bake", checked = false), B("todo", "$day lunch: soup", checked = false))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitFixtures.kt$CanvasNoteAutoFitFixtures$private const val LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest$assertEquals(CanvasTextStyle(fontScale = 1.5f * 0.9f, align = "center"), CanvasNoteAutoFit.scaledStyle(CanvasTextStyle(fontScale = 1.5f, align = "center"), 0.9f))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest$assertEquals(NoteSizing.VERBATIM, noteSizing(CanvasSceneDocument("n", "", frame, owner = CanvasGeometryOwner.USER, compose = provenance)))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest$private val provenance = CanvasComposeProvenance(artifactId = "a", key = "i1", kind = "NOTE", catalog = "letta.canvas.compose", version = 1)</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"arrow","type":"Shape","zIndex":3,"points":["300.0,0.0","500.0,0.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"ARROW","bend":"0.0,-80.0"},"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"circle","type":"Shape","zIndex":2,"points":["100.0,100.0","160.0,180.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"CIRCLE"},"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"image","type":"Image","zIndex":5,"points":["900.0,400.0","1000.0,500.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"intrinsicWidth":100.0,"intrinsicHeight":100.0}"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"path","type":"Path","zIndex":0,"points":[],"strokeColor":"#000000ff","strokeWidth":2.0,"samples":["-20.0,10.0,2.0","40.0,30.0,2.0"]},"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"rect","type":"Shape","zIndex":1,"points":["0.0,200.0","50.0,220.0","120.0,260.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"RECTANGLE"},"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitTest.kt$CanvasNoteAutoFitTest.Companion$"""{"id":"text","type":"Text","zIndex":4,"points":[],"strokeColor":"#000000ff","strokeWidth":1.0,"text":"Hello","textTopLeft":"600.0,50.0","wrapWidth":200.0,"fontSize":20.0},"""</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$assertTrue(line.top &gt;= card.top - 0.5f, "'$text' at $line starts above note $id's card $card; ${nodes.size} nodes: ${nodes.map { it.unclipped().toString() + " " + it.config }}")</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$println(report.joinToString("\n") { (case, measured, _) -&gt; "reserve-gate ${case.name}: rendered=$measured reserve=${case.reserve}" })</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$private</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$private fun Rect.round(): Rect</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("a", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("b", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(500f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(700f, 20f, 320f, 200f), CanvasGeometryOwner.EXPLICIT))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("grown", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(360f, 20f, 320f, 200f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("long", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(500f, 80f, 480f, 150f), CanvasGeometryOwner.EXPLICIT))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "A short note")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Two short lines"), B("paragraph", "of text")), CanvasDocumentFrame(80f, 80f, 320f, 600f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("n", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(80f, 80f, 320f, 150f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("short", CanvasNoteAutoFitFixtures.document(B("paragraph", "Hi")), CanvasDocumentFrame(80f, 80f, 300f, 400f), CanvasGeometryOwner.EXPLICIT))</ID>
+    <ID>MaxLineLength:CanvasNoteAutoFitUiTest.kt$CanvasNoteAutoFitUiTest$session.put(FitNote("shrunk", CanvasNoteAutoFitFixtures.document(B("heading", "Weekend", level = 2), B("paragraph", "A booking far taller than this.")), CanvasDocumentFrame(20f, 20f, 320f, 600f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteEditorPanel.kt$.</ID>
+    <ID>MaxLineLength:CanvasNoteEditorPanel.kt$Box</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$CanvasSession.create(store = InMemoryCanvasDocumentStore(), options = CanvasCreateOptions(title = "World Units", initialSceneJson = ""))</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$assertTrue(kotlin.math.abs(box.width - reference.width) &lt;= 2 &amp;&amp; kotlin.math.abs(box.height - reference.height) &lt;= 2, "at $display the text inks $box, on a desktop $reference")</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$assertTrue(reserve &gt; com.letta.mobile.data.canvas.compose.CanvasComposeReserve.reserveDocument(flat, 320f), "the reserve reads the indentation")</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$println(cases.indices.joinToString("\n") { "reserve-gate@$phone ${cases[it].name}: rendered=${onPhone[it].first} reserve=${cases[it].reserve}" })</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$session</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$session.put(WorldNote("auto", CanvasNoteAutoFitFixtures.mealPlan, CanvasDocumentFrame(40f, 40f, 320f, 4000f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$session.put(WorldNote("explicit", CanvasNoteAutoFitFixtures.shoppingList, CanvasDocumentFrame(400f, 40f, 300f, 260f), CanvasGeometryOwner.EXPLICIT))</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$session.put(WorldNote("frameless", CanvasNoteAutoFitFixtures.document(B("heading", "Errands", level = 2), B("paragraph", "Post office, then the bank."))))</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$session.put(WorldNote("n", CanvasNoteAutoFitFixtures.document(B("paragraph", "Pack")), CanvasDocumentFrame(80f, 80f, 320f, 400f), CanvasGeometryOwner.AUTO))</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$showNotes(session, Display(2.75f, 1f), viewport = viewport, active = active, probe = { id -&gt; compositions[id] = (compositions[id] ?: 0) + 1 })</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$val</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$val flat = """{"version":2,"blocks":[${levels.mapIndexed { i, _ -&gt; block("f$i", if (i % 2 == 0) "bullet_list" else "todo", 0) }.joinToString(",")}]}"""</ID>
+    <ID>MaxLineLength:CanvasNoteWorldUnitsUiTest.kt$CanvasNoteWorldUnitsUiTest$val indented = """{"version":2,"blocks":[${levels.mapIndexed { i, l -&gt; block("i$i", if (i % 2 == 0) "bullet_list" else "todo", l) }.joinToString(",")}]}"""</ID>
+    <ID>MaxLineLength:CanvasNotesLayer.kt$val onMove: (Offset) -&gt; Unit = if (groupDrag != null) groupDrag else { delta -&gt; frame = frame.copy(x = frame.x + delta.x, y = frame.y + delta.y) }</ID>
+    <ID>MaxLineLength:CanvasPenInput.kt$CanvasPenRegistry$private</ID>
+    <ID>MaxLineLength:CanvasPluginLayer.kt$state = PluginHostState(selected = element.id == selection.selectedId, eraseMode = selection.eraseMode, onSelect = select.select)</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$PluginCardFixtures.element("broken-props", props = JsonObject(mapOf("status" to JsonPrimitive(42), "progress" to JsonPrimitive("lots"))))</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$PluginCardFixtures.place(session, PluginCardFixtures.element("late").copy(snapshot = CanvasPluginSnapshot(assetRef = ref, mediaType = "image/png")))</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$PluginCardFixtures.place(session, PluginCardFixtures.element("other", type = "ext:unknown.plugin/thing").copy(frame = CanvasDocumentFrame(400f, 40f, 300f, 240f)))</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$assertEquals("Nightly render, plugin element", card.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.single())</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$assertEquals(listOf(null, null, null, null, null, null, null), listOf(move.elementType, move.v, move.ref, move.props, move.snapshot, move.fallback, move.meta))</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$assertNull(onNodeWithTag(CanvasPluginTestTags.card("pe-report")).fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions))</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$selection = PluginBoardSelection(host.selected.value, onSelect = { id -&gt; if (vp.scale &gt; 0f) host.selected.value = id })</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$val actions = onNodeWithTag(CanvasPluginTestTags.card("pe-frame")).fetchSemanticsNode().config.getOrNull(SemanticsActions.CustomActions)</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$waitUntil(timeoutMillis = 5_000) { onAllNodesWithTag(CanvasPluginTestTags.placeholder("broken-snapshot")).fetchSemanticsNodes().isNotEmpty() }</ID>
+    <ID>MaxLineLength:CanvasPluginLayerUiTest.kt$CanvasPluginLayerUiTest$waitUntil(timeoutMillis = 5_000) { onAllNodesWithTag(CanvasPluginTestTags.snapshot("pe-render")).fetchSemanticsNodes().isNotEmpty() }</ID>
+    <ID>MaxLineLength:CanvasPluginSnapshotTest.kt$CanvasPluginSnapshotTest$waitUntil(timeoutMillis = 5_000) { onAllNodesWithTag(CanvasPluginTestTags.snapshot("pe-render")).fetchSemanticsNodes().isNotEmpty() }</ID>
+    <ID>MaxLineLength:CanvasPropertyControl.kt$ColorTarget.TEXT -&gt; if (shapeText != null) shapeText.onColor(color) else textOwner?.onStyle(style.copy(textColor = color.toHex()))</ID>
+    <ID>MaxLineLength:CanvasPropertyControl.kt$IconButton</ID>
+    <ID>MaxLineLength:CanvasPropertyControl.kt$Toggle("Align start", Lucide.AlignLeft, selected = (style.align ?: "start") == "start") { note.onStyle(style.copy(align = "start")) }</ID>
+    <ID>MaxLineLength:CanvasPropertyControl.kt$if (color.alpha == 0f) Icon(Lucide.Ban, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = MaterialTheme.colorScheme.outline)</ID>
+    <ID>MaxLineLength:CanvasSelectionBar.kt$io.ak1.drawbox.domain.model.TextAlignment.CENTER -&gt; Lucide.AlignCenter to io.ak1.drawbox.domain.model.TextAlignment.RIGHT</ID>
+    <ID>MaxLineLength:CanvasSelectionBar.kt$modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs)</ID>
+    <ID>MaxLineLength:CanvasStorageFaultBanner.kt$internal</ID>
+    <ID>MaxLineLength:CanvasSyncStatus.kt$color = if (inBar) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f)</ID>
+    <ID>MaxLineLength:CanvasTableBlock.kt$.</ID>
+    <ID>MaxLineLength:CanvasTableBlock.kt$TableBlockRenderer$Column</ID>
+    <ID>MaxLineLength:CanvasTableBlock.kt$TableBlockRenderer$if ((rows.firstOrNull()?.size ?: 0) &gt; 1) SmallAction(Lucide.Minus, "Remove table column") { write(rows.map { it.dropLast(1) }) }</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"arrow","type":"Shape","zIndex":3,"points":["300.0,0.0","500.0,0.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"ARROW","bend":"0.0,-80.0"},"""</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"circle","type":"Shape","zIndex":2,"points":["100.0,100.0","160.0,180.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"CIRCLE"},"""</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"image","type":"Image","zIndex":5,"points":["900.0,400.0","1000.0,500.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"intrinsicWidth":100.0,"intrinsicHeight":100.0}"""</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"path","type":"Path","zIndex":0,"points":[],"strokeColor":"#000000ff","strokeWidth":2.0,"samples":["-20.0,10.0,2.0","40.0,30.0,2.0"]},"""</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"rect","type":"Shape","zIndex":1,"points":["0.0,200.0","50.0,220.0","120.0,260.0"],"strokeColor":"#000000ff","strokeWidth":1.0,"shapeType":"RECTANGLE"},"""</ID>
+    <ID>MaxLineLength:CanvasViewportFitTest.kt$CanvasViewportFitTest.Companion$"""{"id":"text","type":"Text","zIndex":4,"points":[],"strokeColor":"#000000ff","strokeWidth":1.0,"text":"Hello","textTopLeft":"600.0,50.0","wrapWidth":200.0,"fontSize":20.0},"""</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$LettaChipTab(ALL_CHANNELS, filter == null, { page.actions.selectStatusFilter(null) }, chipModifier.testTag(ChannelsPageTags.filter(ALL_CHANNELS)))</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$LettaChipTab(status.label, filter == status, { page.actions.selectStatusFilter(status) }, chipModifier.testTag(ChannelsPageTags.filter(status.label)))</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$LettaRefreshAction</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$Text(channel.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$Text(page.state.library.summaryLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$modifier = Modifier.fillMaxWidth().padding(start = horizontal, end = horizontal, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm)</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg).testTag(ChannelsPageTags.DETAIL)</ID>
+    <ID>MaxLineLength:ChannelsPageParts.kt$trailing = { if (page.wide) Row(horizontalArrangement = Arrangement.spacedBy(LettaDimens.Space.sm), verticalAlignment = Alignment.CenterVertically) { pills() } }</ID>
+    <ID>MaxLineLength:ChatComposerPanelUiTest.kt$ChatComposerPanelUiTest$ChatModelOption(handle = "openai/a", label = "Model A", provider = "OpenAI", reasoningEfforts = persistentListOf("low", "high"))</ID>
+    <ID>MaxLineLength:ChatRowApprovalDetailsUiTest.kt$ChatRowApprovalDetailsUiTest$toolCalls = listOf(UiToolCall(name = "Edit", arguments = """{"file_path":"/repo/a.txt"}""", result = null, toolCallId = "call-edit"))</ID>
+    <ID>MaxLineLength:ChatRowApprovals.kt$return</ID>
+    <ID>MaxLineLength:ChatRowApprovals.kt$val answer: (ChatApprovalAnswer) -&gt; Unit = if (stepper != null &amp;&amp; steps?.stepping == true) stepper::decide else callbacks.actions::submitApproval</ID>
+    <ID>MaxLineLength:ChatRowBranchActionsUiTest.kt$ChatRowBranchActionsUiTest$setContent { MaterialTheme { RenderRow(single(reply), rowContext(capabilities = branching), rowCallbacks(RecordingChatActions())) } }</ID>
+    <ID>MaxLineLength:ChatRowCanvasArtifactUiTest.kt$ChatRowCanvasArtifactUiTest$MaterialTheme { RenderRow(single(narration(published)), callbacks = rowCallbacks(host = ChatSurfaceHost(openCanvas = { opened++ }))) }</ID>
+    <ID>MaxLineLength:ChatRowCanvasArtifactUiTest.kt$ChatRowCanvasArtifactUiTest$setContent { MaterialTheme { RenderRow(ChatRenderItem.RunBlock("run-1", listOf(call to GroupPosition.First, other to GroupPosition.Last))) } }</ID>
+    <ID>MaxLineLength:ChatRowCanvasArtifactUiTest.kt$ChatRowCanvasArtifactUiTest$setContent { MaterialTheme { RenderRow(single(narration(failed)), callbacks = rowCallbacks(host = ChatSurfaceHost(showOnCanvas = {}))) } }</ID>
+    <ID>MaxLineLength:ChatRowCanvasArtifactUiTest.kt$ChatRowCanvasArtifactUiTest$toolCalls = listOf(UiToolCall(name = "canvas_get_scene", arguments = "{}", result = "{}", status = "success", toolCallId = "t2"))</ID>
+    <ID>MaxLineLength:ChatRowErrorActionUiTest.kt$ChatRowErrorActionUiTest$ChatMessageRow(error(TurnFailureNotices.messageFor("rate_limited")), rowContext(newestMessageId = null), callbacks(RecordingChatActions(), lastPrompt = prompt))</ID>
+    <ID>MaxLineLength:ChatRowErrorActionUiTest.kt$ChatRowErrorActionUiTest$private fun error(text: String)</ID>
+    <ID>MaxLineLength:ChatRowInteractionUiTest.kt$ChatRowInteractionUiTest$MaterialTheme { RenderRow(single(thought), rowContext(itemState = renderState(expandedReasoning = expanded)), rowCallbacks(actions)) }</ID>
+    <ID>MaxLineLength:ChatRowLegacyParityUiTest.kt$ChatRowLegacyParityUiTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = if (status == null) null else "ok", status = status, toolCallId = id)</ID>
+    <ID>MaxLineLength:ChatRowLegacyParityUiTest.kt$ChatRowLegacyParityUiTest$private fun runOf(vararg messages: UiMessage)</ID>
+    <ID>MaxLineLength:ChatRowLegacyParityUiTest.kt$ChatRowLegacyParityUiTest$private val reasoning = UiMessage(id = "r", role = "assistant", content = "Thinking it through.", timestamp = "2026-10-11T16:00:00Z", runId = "run-1", isReasoning = true)</ID>
+    <ID>MaxLineLength:ChatRowLegacyParityUiTest.kt$ChatRowLegacyParityUiTest$private val tools = UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2", "error")))</ID>
+    <ID>MaxLineLength:ChatRowMessage.kt$modifier = Modifier.padding(horizontal = ChatRowSpacing.bubblePaddingHorizontal, vertical = ChatRowSpacing.bubblePaddingVertical)</ID>
+    <ID>MaxLineLength:ChatRowMotionUiTest.kt$ChatRowMotionUiTest$UiMessage(id = "a", role = "assistant", content = "", timestamp = "2026-07-19T12:00:00Z", runId = "run-1", toolCalls = listOf(call("c1")))</ID>
+    <ID>MaxLineLength:ChatRowPendingApprovalUiTest.kt$ChatRowPendingApprovalUiTest$RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), toolDetails = ChatToolDetails.Sheet))</ID>
+    <ID>MaxLineLength:ChatRowPendingApprovalUiTest.kt$ChatRowPendingApprovalUiTest$val narration = UiMessage(id = "n", role = "assistant", content = "Let me look.", timestamp = "2026-07-19T12:00:00Z", runId = RUN_ID)</ID>
+    <ID>MaxLineLength:ChatRowReasoning.kt$Column</ID>
+    <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$UiMessage(id = "e", role = "assistant", content = "Run failed: rate limit exceeded.", timestamp = "2026-10-11T16:05:00Z", isError = true)</ID>
+    <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$UiMessage(id = "r", role = "assistant", content = "Thinking it through.", timestamp = "2026-10-11T16:00:00Z", runId = "run-1", isReasoning = true)</ID>
+    <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2", "error")))</ID>
+    <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = if (status == null) null else "ok", status = status, toolCallId = id)</ID>
+    <ID>MaxLineLength:ChatRowReconcileNoJumpTest.kt$ChatRowReconcileNoJumpTest$private fun runOf(vararg messages: UiMessage)</ID>
+    <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = opened), newestMessageId = newest, toolDetails = details))</ID>
+    <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$UiMessage(id = "a", role = "assistant", content = "", timestamp = "2026-07-19T12:00:00Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2")))</ID>
+    <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$assertEquals(0, onAllNodesWithContentDescription("command details", substring = true).fetchSemanticsNodes().size, "$details @ $width")</ID>
+    <ID>MaxLineLength:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$assertTrue(abs(tools.left - label.left) &lt; TOLERANCE_PX, "the tool step is not under the summary's label ($details @ $width)")</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$RenderRow(item, rowContext(itemState = state, newestMessageId = "a", toolDetails = ChatToolDetails.Sheet), rowCallbacks(actions))</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiMessage(id = "r", role = "assistant", content = "Thinking it through.", timestamp = "2026-10-11T16:00:00Z", runId = RUN_ID, isReasoning = true)</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID, toolCalls = listOf(call("c1"), call("c2")))</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = if (status == null) null else "ok", status = status, toolCallId = id)</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$private</ID>
+    <ID>MaxLineLength:ChatRowRunBlockSummaryUiTest.kt$ChatRowRunBlockSummaryUiTest$private fun runOf(vararg messages: UiMessage)</ID>
+    <ID>MaxLineLength:ChatRowRunSettleGlitchTest.kt$ChatRowRunSettleGlitchTest$UiMessage(id = "a", role = "assistant", content = "", timestamp = "2026-07-19T12:00:00Z", runId = "run-1", toolCalls = listOf(call("c1"), call("c2")))</ID>
+    <ID>MaxLineLength:ChatRowRunSettleGlitchTest.kt$ChatRowRunSettleGlitchTest$assertEquals(activeHeight, settledFromCold, "a settled run is not the working run's shape (active=$activeHeight, settled=$settledFromCold)")</ID>
+    <ID>MaxLineLength:ChatRowRunStep.kt$RunStepDisclosureLabels.Companion$val</ID>
+    <ID>MaxLineLength:ChatRowRunStep.kt$RunSummaryTone.Attention -&gt; Icon(LettaIcons.Warning, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.secondary)</ID>
+    <ID>MaxLineLength:ChatRowRunStep.kt$RunSummaryTone.Done -&gt; Icon(LettaIcons.Check, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:ChatRowRunStep.kt$RunSummaryTone.Failed -&gt; Icon(LettaIcons.Error, contentDescription = null, modifier = glyph, tint = MaterialTheme.colorScheme.error)</ID>
+    <ID>MaxLineLength:ChatRowRunStep.kt$val states = remember(toolCalls, calls.approvals) { toolCalls.map { call -&gt; call.runState(calls.approvals.requestFor(call), toolCalls) } }</ID>
+    <ID>MaxLineLength:ChatRowRunStepPrimitivesUiTest.kt$ChatRowRunStepPrimitivesUiTest$RenderRow(item, rowContext(itemState = renderState(collapsedRunIds = setOf(RUN_ID)), newestMessageId = "a", toolDetails = details))</ID>
+    <ID>MaxLineLength:ChatRowRunStepPrimitivesUiTest.kt$ChatRowRunStepPrimitivesUiTest$UiMessage(id = "t", role = "assistant", content = "", timestamp = "2026-10-11T16:00:02Z", runId = RUN_ID, toolCalls = calls.toList())</ID>
+    <ID>MaxLineLength:ChatRowToolStatus.kt$Icon(imageVector = outcome.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm), tint = outcome.tint)</ID>
+    <ID>MaxLineLength:ChatRowToolStatus.kt$ToolTimelineState.Succeeded -&gt; if (executionTimeMs != null) formatRunDuration(executionTimeMs) else stringResource(Res.string.rows_tool_done)</ID>
+    <ID>MaxLineLength:ChatSurface.kt$head = frame.dock?.let { touchHeadContent(frame, it, TouchHeadInputs(touchInputPending(frame, turn.pendingApproval), bubble)) { turn } }</ID>
+    <ID>MaxLineLength:ChatSurfaceContinuityTest.kt$ChatSurfaceContinuityTest$val seat = assertNotNull(shell.transport.seat(MascotTransport.SeatKey(ChatSurfaceFlickerRig.AGENT, MascotStage.COMPOSER_COMPANION)))</ID>
+    <ID>MaxLineLength:ChatSurfaceFlickerRig.kt$ChatSurfaceFlickerRig$appendLine("canvas $canvas, timeline $timeline, composer $composer, mascot scene $mascotScene, seat registrations $seatRegistrations")</ID>
+    <ID>MaxLineLength:ChatSurfaceFlickerRig.kt$ChatSurfaceFlickerRig$f.label</ID>
+    <ID>MaxLineLength:ChatSurfacePhoneSnapshotTest.kt$ChatSurfacePhoneSnapshotTest$Shot(PhoneScenes.canvasReplyPopup.copy(id = "phone-morph", presentation = ChatSurfacePresentation.ChatFirst), morphMillis = MID_MORPH_MILLIS)</ID>
+    <ID>MaxLineLength:ChatSurfaceSnapshotTest.kt$ChatSurfaceSnapshotTest$UiToolCall(name = "canvas_add_element", arguments = "{\"kind\":\"checklist\"}", result = "ok", status = "success", toolCallId = "t1")</ID>
+    <ID>MaxLineLength:ChatSurfaceStability.kt$return forwardIfSet&lt;(CanvasArtifactReceipt) -&gt; Unit&gt;(current.value.showOnCanvas) { { receipt -&gt; current.value.showOnCanvas?.invoke(receipt) } }</ID>
+    <ID>MaxLineLength:ChatSurfaceUiTest.kt$ChatSurfaceUiTest$ChatSurface(port = port, presentation = presentation, onIntent = {}, host = ChatSurfaceHost(), canvas = { _ -&gt; Text("CANVAS") })</ID>
+    <ID>MaxLineLength:ChatTimelineLogicTest.kt$ChatTimelineLogicTest$ChatRenderItem.Single(UiMessage(id = id, role = "assistant", content = "body", timestamp = "2026-09-12T10:00:00Z"), GroupPosition.None)</ID>
+    <ID>MaxLineLength:ChatTimelineUiTest.kt$ChatTimelineUiTest$assertTrue(oldest.top.value - list.top.value &lt; SHORT_CHAT_TOP_SLACK_DP, "the short chat starts at the top, not on the composer: $oldest in $list")</ID>
+    <ID>MaxLineLength:CollapsedDockUiTest.kt$CollapsedDockUiTest$val answer = UiMessage(id = "a2", role = "assistant", content = "Island added.", timestamp = "2026-09-30T18:03:05Z", runId = "run-2")</ID>
+    <ID>MaxLineLength:CommandPalettePane.kt$internal</ID>
+    <ID>MaxLineLength:CommandPalettePane.kt$val</ID>
+    <ID>MaxLineLength:CommandPalettePane.kt$val groups = sections.map { section -&gt; PickerSection(section.title, section.title, section.rows.map { it.toPickerItem(section.title) }) }</ID>
+    <ID>MaxLineLength:CommandPalettePane.kt$val unified = rememberUnifiedSearchSections(UnifiedSearchQuery(query, filterToAgent = false, surface = UnifiedSearchSurface.Palette), sources)</ID>
+    <ID>MaxLineLength:CommandPalettePaneTest.kt$CommandPalettePaneTest$listOf(MessageSearchHit("c1", "a1", "m1", "Ask Emmanuel about the ${query.text} release")).takeIf { query.text == "emmanuel" }.orEmpty()</ID>
+    <ID>MaxLineLength:ComposerAgentMentionUiTest.kt$ComposerAgentMentionUiTest$setContent { MaterialTheme { ChatComposerPanel(ComposerInputs(composer = composer("plain text"), actions = RecordingChatActions())) } }</ID>
+    <ID>MaxLineLength:ComposerModelPickerSheet.kt$val selected = model.currentHandle?.let { handle -&gt; sections.flatMap { it.items }.filter { it.value.handle == handle }.map { it.key }.toSet() }</ID>
+    <ID>MaxLineLength:ComposerThinkingPlacementTest.kt$ComposerThinkingPlacementTest$messages = persistentListOf(UiMessage(id = "u1", role = "user", content = "update the changelog", timestamp = "2026-10-11T16:06:00Z"))</ID>
+    <ID>MaxLineLength:ContextLimitSliderUiTest.kt$ContextLimitSliderUiTest$AgentContextCardInputs("opus", null, ContextMeter.of(112_800, 1_000_000), true, null, compacting = false, turnRunning = false)</ID>
+    <ID>MaxLineLength:ContextLimitStrings.kt$ContextLimitStrings$"Below the ${usedTokens?.let(::formatContextTokens).orEmpty()} already in context: compact first, or the next turn compacts to fit"</ID>
+    <ID>MaxLineLength:ConversationsPage.kt$menu = { model, row -&gt; shellConversationMenu(model, conversationRowActions(model, panel), ui, row) + actions.rowMenu(model) }</ID>
+    <ID>MaxLineLength:ConversationsPage.kt$selection = RosterSelection(isSelected = ShellConversationRowModel::selected, onSelect = { panel.onConversationSelected(it.id) })</ID>
+    <ID>MaxLineLength:DockedReplyTurnTest.kt$DockedReplyTurnTest$val newestFirst = listOf(item("a2", "assistant"), item("a1", "assistant"), item("u2", "user"), item("a0", "assistant"), item("u1", "user"))</ID>
+    <ID>MaxLineLength:DreamingPanel.kt$Button</ID>
+    <ID>MaxLineLength:DreamingPanel.kt$OutlinedTextField(value = focus, onValueChange = { focus = it }, label = { Text(DreamingStrings.FOCUS) }, singleLine = true, modifier = Modifier.fillMaxWidth())</ID>
+    <ID>MaxLineLength:DreamingPanel.kt$Row</ID>
+    <ID>MaxLineLength:DreamingPanel.kt$Text(live?.let(DreamingStrings::live) ?: DreamingStrings.NOW_IDLE, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:DreamingPanel.kt$fun</ID>
+    <ID>MaxLineLength:DreamingPanelUiTest.kt$DreamingPanelUiTest$private val run = DreamRun("abc1234def", "Learned the build commands", "2026-10-11T10:00:00Z", DreamCommitKind.Change, "Reflection Subagent")</ID>
+    <ID>MaxLineLength:DreamingSettingsSection.kt$IconButton</ID>
+    <ID>MaxLineLength:DreamingSettingsSection.kt$TextButton</ID>
+    <ID>MaxLineLength:DreamingSettingsSection.kt$state.error?.let { Text(DreamingStrings.failure(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }</ID>
+    <ID>MaxLineLength:DreamingStrings.kt$DreamingStrings$DreamUnsupportedReason.HostNeedsUpdate -&gt; "This Iroh host is too old for dreaming controls. Update the host (meridian-iroh-wrapper)."</ID>
+    <ID>MaxLineLength:DreamingStrings.kt$DreamingStrings$DreamUnsupportedReason.NoConnection -&gt; "Dreaming needs a connection to letta-code: the bundled local runtime, an App Server, or an Iroh host."</ID>
+    <ID>MaxLineLength:HomeCompactDashboard.kt$if (page.offers(HomeShortcut.RUNS)) page.navigation.onOpenShortcut(HomeShortcut.RUNS) else page.navigation.onOpenAgent(running.first().agentId)</ID>
+    <ID>MaxLineLength:HomeCompactDashboard.kt$leadingIcon = { Icon(item.shortcut.icon, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.iconSm)) }</ID>
+    <ID>MaxLineLength:HomeConnectionPanel.kt$is ChatScreenStatus.NoConversations -&gt; "Ask a question, paste an error, or point me at a repo. I can read code, run tools, and help you ship."</ID>
+    <ID>MaxLineLength:HomeFleetSection.kt$FleetCell(agent.conversationCount.toString(), Modifier.width(CountWidth), strong = agent.conversationCount &gt; 0, align = TextAlign.End)</ID>
+    <ID>MaxLineLength:HomeFleetSection.kt$Text("${agent.modelLabel} · ${agent.conversationCount} chats", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomeFleetSection.kt$color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA)</ID>
+    <ID>MaxLineLength:HomeFleetSection.kt$horizontalArrangement = if (alignEnd) Arrangement.spacedBy(LettaDimens.Space.xs, Alignment.End) else Arrangement.spacedBy(LettaDimens.Space.xs)</ID>
+    <ID>MaxLineLength:HomeFleetSection.kt$style = if (agent.nameIsIdFallback) MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace) else MaterialTheme.typography.bodyMedium</ID>
+    <ID>MaxLineLength:HomePageParts.kt$AgentAvatar(agentId = conversation.agentId, name = conversation.agentName, size = LettaDimens.Orb.sm, cornerRadius = LettaDimens.Radius.sm)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(caption, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = MUTED_ALPHA))</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(conversation.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(secondary, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = align, modifier = modifier)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(tile.label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$Text(tile.value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:HomePageParts.kt$val secondary = if (page.wide) conversation.preview else listOf(conversation.agentName, conversation.preview).filter { it.isNotBlank() }.joinToString(" · ")</ID>
+    <ID>MaxLineLength:HomePageTest.kt$HomePageTest$val state = HomePageReducer.withPersistedAgentNames(baseState(pins = listOf(HomePinnedItem.agentKey("a-1"))), mapOf("a-1" to "Scout"))</ID>
+    <ID>MaxLineLength:HomePinnedGrid.kt$AgentAvatar(agentId = agent.id, name = agent.name, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)</ID>
+    <ID>MaxLineLength:HomePinnedGrid.kt$Icon(tile.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))</ID>
+    <ID>MaxLineLength:HomePinnedGrid.kt$Text(it, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomePinnedGrid.kt$Text(tile.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomePinnedGrid.kt$TileContent$private</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$AgentAvatar(agentId = hit.agentId, name = hit.primary, size = LettaDimens.Control.iconButtonSm, cornerRadius = LettaDimens.Radius.sm)</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$Icon(section.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconButtonSm))</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$SearchSection$private</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$SearchSection("agents", "Agents", LettaIcons.Agent, search.agents.map { SearchHit(it.id.value, it.name, it.description, agentId = it.id.value) { nav.onOpenAgent(it.id.value) } })</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$SearchSection("blocks", "Blocks", LettaIcons.ViewModule, search.blocks.map { SearchHit(it.id.value, it.label ?: UNNAMED_BLOCK, it.description) { nav.onOpenBlock(it.id.value) } })</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$SearchSection("tools", "Tools", LettaIcons.Tool, search.tools.map { SearchHit(it.id.value, it.name, it.description) { nav.onOpenTool(it.id.value) } })</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = section.maxSecondaryLines, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:HomeSearchResults.kt$modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).clickable(onClick = onToggle).padding(vertical = LettaDimens.Space.xs)</ID>
+    <ID>MaxLineLength:InspectorPaneTest.kt$InspectorPaneTest$setContent { Frame(WIDE, LettaHost.Pointer) { if (open) BackgroundTasksSidePane(subagents = emptyList&lt;SubagentEntry&gt;(), onClose = { open = false }) } }</ID>
+    <ID>MaxLineLength:LettaCatalog.kt$.</ID>
+    <ID>MaxLineLength:LettaCatalog.kt$Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:LettaHost.kt$LettaHost$LettaPaneKind.Modal -&gt; if (input == LettaInput.Touch &amp;&amp; windowClass == PaneWindowClass.Compact) LettaPaneKind.Sheet else LettaPaneKind.Dialog</ID>
+    <ID>MaxLineLength:LettaPaneDefaults.kt$modifier = Modifier.padding(start = LettaDimens.Space.xl, end = LettaDimens.Space.xl, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.md)</ID>
+    <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$LettaConfirmPane(request, onConfirm = { outcomes += "confirm"; shown = false }, onDismiss = { outcomes += "dismiss"; shown = false })</ID>
+    <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$MaterialTheme { CompositionLocalProvider(LocalPaneWindowClass provides PaneWindowClass.Compact) { ProvideLettaHost(host, content) } }</ID>
+    <ID>MaxLineLength:LettaPaneTest.kt$LettaPaneTest$setContent { Host(recording) { AgentContextCardHost(AgentContextCardBinding(contextDeps, AgentContextCardActions(onModelSelected = {})), contextFocus) } }</ID>
+    <ID>MaxLineLength:LettaPicker.kt$private</ID>
+    <ID>MaxLineLength:LettaPickerSearchField.kt$Icon(LettaIcons.Clear, contentDescription = LettaPickerStrings.CLEAR_SEARCH, modifier = Modifier.size(LettaDimens.Control.icon))</ID>
+    <ID>MaxLineLength:LettaPickerTest.kt$LettaPickerTest$callbacks = PickerCallbacks(onQuery = {}, onPick = { chosen = if (it.key in chosen) chosen - it.key else chosen + it.key })</ID>
+    <ID>MaxLineLength:LettaPickerTest.kt$LettaPickerTest$spec = LettaPickerSpec(listOf(PickerSection("root", null, listOf(PickerItem("model", "model", "Model", drillIn = true)))))</ID>
+    <ID>MaxLineLength:LettaRefreshableTest.kt$LettaRefreshableTest$LettaRefreshable</ID>
+    <ID>MaxLineLength:LettaSearchAnchoredField.kt$LettaSearchTriggerStyle.Icon -&gt; LettaSearchIconTrigger(active = query.isNotBlank(), label = config.placeholder) { expanded = true }</ID>
+    <ID>MaxLineLength:LettaSearchAnchoredFieldTest.kt$LettaSearchAnchoredFieldTest$config = LettaSearchConfig(placeholder = PLACEHOLDER, autoFocus = false, toggle = toggle, showResults = showResults)</ID>
+    <ID>MaxLineLength:LettaTabStrip.kt$Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(LettaDimens.Control.icon), tint = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:MascotLayerDragUiTest.kt$MascotLayerDragUiTest.Port$UiMessage(id = "a1", role = "assistant", content = "Here's an L-shaped plan.", timestamp = "2026-09-30T18:02:09Z", runId = "run-1")</ID>
+    <ID>MaxLineLength:MascotPicker.kt$.</ID>
+    <ID>MaxLineLength:MascotPicker.kt$MascotShape.PILL -&gt; drawRoundRect(color, Offset(c.x - r, c.y - r * 0.68f), Size(2 * r, 2 * r * 0.68f), androidx.compose.ui.geometry.CornerRadius(r * 0.68f))</ID>
+    <ID>MaxLineLength:MascotPicker.kt$MascotShape.ROUNDED_SQUARE -&gt; drawRoundRect(color, Offset(c.x - r * 0.92f, c.y - r * 0.92f), Size(1.84f * r, 1.84f * r), androidx.compose.ui.geometry.CornerRadius(r * 0.16f))</ID>
+    <ID>MaxLineLength:MascotPicker.kt$drawRoundRect(color, Offset(c.x - r * 0.62f, c.y + r * 0.05f), Size(r * 1.5f, r * 0.58f), androidx.compose.ui.geometry.CornerRadius(r * 0.29f))</ID>
+    <ID>MaxLineLength:MascotPresenceTest.kt$MascotPresenceTest$val</ID>
+    <ID>MaxLineLength:MascotSeat.kt$is SeatPresence.InPlace -&gt; MascotInPlace(presence.mascot.agentId, presence.mascot.identity, size = size * overscale, live = live, onClick = onClick)</ID>
+    <ID>MaxLineLength:MascotStillsTest.kt$MascotStillsTest$private</ID>
+    <ID>MaxLineLength:MemfsPageEditor.kt$modifier = Modifier.fillMaxWidth().padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.xs).testTag(MemfsPageTags.CONFLICT)</ID>
+    <ID>MaxLineLength:MemfsPageEditor.kt$tags = LettaConfirmTags(pane = MemfsPageTags.DISCARD_DIALOG, confirm = MemfsPageTags.DISCARD_CONFIRM, dismiss = MemfsPageTags.DISCARD_CANCEL)</ID>
+    <ID>MaxLineLength:MemfsPageHistory.kt$Text(commit.message.ifBlank { NO_MESSAGE }, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:MemfsPageHistory.kt$Text(file.path, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:MemfsPageList.kt$Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)</ID>
+    <ID>MaxLineLength:MemfsPageOverIrohTest.kt$MemfsPageOverIrohTest$"""{"relative_path":"system/human/communication_style.md","is_system":true,"content":"x","size":1}],"done":true,"success":true}]}"""</ID>
+    <ID>MaxLineLength:MemfsPageTest.kt$MemfsPageTest$val patch = "diff --git a/system/persona.md b/system/persona.md\n--- a/system/persona.md\n+++ b/system/persona.md\n@@ -1 +1 @@\n-I like tea.\n+I like coffee."</ID>
+    <ID>MaxLineLength:MemoryNodeCard.kt$Text(detail.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:MessageMenu.kt$if (available.canCopy) add(LettaMenuItem(label = copy, icon = LettaIcons.Copy) { clipboard.setText(AnnotatedString(message.content)) })</ID>
+    <ID>MaxLineLength:ModelControlStrings.kt$ModelControlStrings$const val CONNECT_ACCOUNT_SUBTITLE = "Use a subscription you already pay for. The host keeps the sign-in; every app on it can use the models."</ID>
+    <ID>MaxLineLength:ModelControlUiFixtures.kt$ModelControlUiFixtures$model = LlmModel(id = handle, name = label, handle = handle, displayNameOverride = label, providerType = handle.substringBefore('/'))</ID>
+    <ID>MaxLineLength:ModelControlUiTest.kt$ModelControlUiTest$setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState(), pickerActions(refreshes = refreshes, edits = edits)) } } }</ID>
+    <ID>MaxLineLength:ModelControlUiTest.kt$ModelControlUiTest$setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState().copy(canEditModels = false), pickerActions()) } } }</ID>
+    <ID>MaxLineLength:ModelControlUiTest.kt$ModelControlUiTest$setContent { Frame { Column { ModelPickerContent(ModelControlUiFixtures.pickerState().copy(refreshing = true), pickerActions()) } } }</ID>
+    <ID>MaxLineLength:ModelsEditContent.kt$item("empty") { EmptyHint(if (state.searching) ModelControlStrings.noMatch(state.query.trim()) else ModelControlStrings.NO_PROVIDER_MODELS) }</ID>
+    <ID>MaxLineLength:ModelsEditContent.kt$modifier = Modifier.padding(horizontal = LettaDimens.Space.sm, vertical = LettaDimens.Space.xs).testTag(ModelsEditTags.ADD_PROVIDER)</ID>
+    <ID>MaxLineLength:OverlayHostTest.kt$OverlayHostTest$OverlayWhile(if (down) Overlay.Banner("Local runtime: Restarting…", presentation = OverlayPresentation(tone = OverlayTone.Error, durationMillis = null)) else null)</ID>
+    <ID>MaxLineLength:OverlayHostTest.kt$OverlayHostTest$host.show(Overlay.Banner("runtime down", presentation = OverlayPresentation(OverlayPriority.Critical, null, tone = OverlayTone.Error)))</ID>
+    <ID>MaxLineLength:OverlayLayer.kt$(fadeIn(tween(LettaMotionTokens.ENTER_MILLIS)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(LettaMotionTokens.ENTER_MILLIS))</ID>
+    <ID>MaxLineLength:PageInsetModifierGuardTest.kt$PageInsetModifierGuardTest.Companion$"""\.(statusBarsPadding|navigationBarsPadding|systemBarsPadding|safeDrawingPadding|safeContentPadding|imePadding|displayCutoutPadding)\s*\(\s*\)"""</ID>
+    <ID>MaxLineLength:PagedSendLiftRig.kt$PagedSendLiftRig.Companion$AssistantMessage(id = "old-reply-$i", contentRaw = JsonPrimitive("Answer number $i, a sentence long."), date = "2026-09-25T03:$minute:01.000Z")</ID>
+    <ID>MaxLineLength:PagedSendLiftRig.kt$PagedSendLiftRig.Companion$UserMessage(id = "old-prompt-$i", contentRaw = JsonPrimitive("Question number $i"), date = "2026-09-25T03:$minute:00.000Z", otid = "cm-old-$i")</ID>
+    <ID>MaxLineLength:PagedTimelineFollowTest.kt$PagedTimelineFollowTest$assertTrue(listState().isAtNewestEdge(), "ended at ${listState().firstVisibleItemIndex}/${listState().firstVisibleItemScrollOffset}")</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$AnnouncementLatch$InviteCountdown.crossedThreshold(previous, remainingMs)?.let { text = PairingStrings.countdownAnnouncement(TimeLeft(it * MS_PER_SECOND)) }</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$OutlinedButton(onClick = actions.onNewCode, modifier = Modifier.testTag(PairingTags.INVITE_NEW_CODE)) { Text(PairingStrings.NEW_CODE) }</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$Text(PairingStrings.INVITE_SETTINGS_BODY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$Text(PairingStrings.LINK_SECRET_NOTE, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$Text(PairingStrings.accessSummary(form.summary), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:PairInviteCard.kt$modifier = Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Switch, onValueChange = onChange).testTag(PairingTags.INVITE_SETTINGS)</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$PairDevicePanel(PairDeviceView(PairInviteUiState(), listOf(AgentChoice("a1", "Sage"), AgentChoice("a2", "Atlas")), 0), r.actions())</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$devices = listOf(device("me", "This phone"), device("lap", "Laptop", agents = setOf("a1")), device("tab", "Tablet", caps = setOf("admin.full")))</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(), listOf(AgentChoice("a1", "Sage")), 0), r.actions()) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(accepted = pixel, devices = listOf(pixel)), emptyList(), 0), Recorder().actions()) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(cancelled = true), emptyList(), 0), Recorder().actions()) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 0), Recorder().actions(share = false)) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 28_000), r.actions()) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 290_000), Recorder().actions()) } }</ID>
+    <ID>MaxLineLength:PairInviteSurfacesUiTest.kt$PairInviteSurfacesUiTest$setContent { MaterialTheme { PairDevicePanel(PairDeviceView(PairInviteUiState(invite = invite, qr = qr), emptyList(), 300_000), r.actions()) } }</ID>
+    <ID>MaxLineLength:PairedDevicesList.kt$!confirming</ID>
+    <ID>MaxLineLength:PairedDevicesList.kt$TextButton</ID>
+    <ID>MaxLineLength:PairedDevicesList.kt$colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)</ID>
+    <ID>MaxLineLength:PairingScanScreen.kt$CameraSection(camera, onDecoded = { raw -&gt; if (state is PairingState.Idle) actions.onSubmit(raw) }, onPaste = { pasting = true })</ID>
+    <ID>MaxLineLength:PairingScanScreen.kt$PasteSection(pasteOnly = pasteOnly, enabled = state.acceptsInput(), onSubmit = actions.onSubmit, onUseCamera = { pasting = false })</ID>
+    <ID>MaxLineLength:PairingScanScreen.kt$Surface</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$MaterialTheme { PairingScanContent(PairingScan(PairingState.ConfirmHost(nodeId, 900_000), ScanCamera.Unavailable, Recorder().actions()), nowMs = 0) }</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$MaterialTheme { PairingScanContent(PairingScan(PairingState.Idle, ScanCamera(CameraAccess.DENIED, onOpenSettings = { settings++ }), r.actions()), nowMs = 0) }</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$MaterialTheme { PairingStatusCard(PairingState.Failed(PairingError.HOST_UNREACHABLE, retryable = true), r.actions(), nowMs = 0) }</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$PairingScanContent(PairingScan(PairingState.Idle, ScanCamera(CameraAccess.NEEDS_RATIONALE, onRequestAccess = { requested++ }), Recorder().actions()), nowMs = 0)</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$PairingStatusCard(PairingState.Paired(PairedHost(nodeId, nodeId), alreadyPaired = false, deviceName = "Pixel 9"), r.actions(), nowMs = 0)</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$redeemer = { invite, _ -&gt; dials++; RedeemOutcome.Paired(PairedHost(invite.nodeId, "${invite.nodeId}@h:1"), alreadyPaired = false) }</ID>
+    <ID>MaxLineLength:PairingSurfacesUiTest.kt$PairingSurfacesUiTest$setContent { MaterialTheme { PairingScanContent(PairingScan(PairingState.Idle, ScanCamera.Unavailable, Recorder().actions()), nowMs = 0) } }</ID>
+    <ID>MaxLineLength:PluginCardFixtures.kt$PluginCardFixtures$fallback = com.letta.mobile.data.canvas.plugin.CanvasPluginFallback(title = "Card $id", subtitle = "Example", icon = "box", openUrl = "https://example.test/$id")</ID>
+    <ID>MaxLineLength:PluginCardFixtures.kt$PluginCardFixtures$if (card.snapshot == "image" &amp;&amp; snapshot != null) card.copy(element = card.element.copy(snapshot = snapshot.copy(assetRef = picture.ref))) else card</ID>
+    <ID>MaxLineLength:PluginConsentPane.kt$FilterChip(decision == false, onClick = { onDecide(false) }, label = { Text(DENY) }, modifier = Modifier.testTag(PluginsPageTags.deny(item)))</ID>
+    <ID>MaxLineLength:PluginConsentPane.kt$FilterChip(decision == true, onClick = { onDecide(true) }, label = { Text(ALLOW) }, modifier = Modifier.testTag(PluginsPageTags.allow(item)))</ID>
+    <ID>MaxLineLength:PluginConsentPane.kt$Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = LettaDimens.Space.lg)</ID>
+    <ID>MaxLineLength:PluginConsentPane.kt$confirm = LettaPaneButton(INSTALL, actions::installConsented, enabled = sheet.allDecided &amp;&amp; !busy, testTag = PluginsPageTags.CONSENT_INSTALL)</ID>
+    <ID>MaxLineLength:PluginElementModelTest.kt$PluginElementModelTest$assertEquals(CanvasDocumentFrame(0f, 5f, 320f, 240f), PluginElementFrames.sanitized(CanvasDocumentFrame(Float.NaN, 5f, Float.POSITIVE_INFINITY, -1f)))</ID>
+    <ID>MaxLineLength:PluginElementModelTest.kt$PluginElementModelTest$assertEquals(PluginElementStatus("running", 0.42f), PluginElementStatus.of(props("status" to JsonPrimitive("running"), "progress" to JsonPrimitive(0.42))))</ID>
+    <ID>MaxLineLength:PluginElementModelTest.kt$PluginElementModelTest$assertEquals(listOf(PluginCardBadge.NEWER_VERSION), badgesOf(PluginElementView(element, PluginAvailability(PluginInstallState.NEWER_VERSION))))</ID>
+    <ID>MaxLineLength:PluginElementView.kt$PluginElementStatus.Companion$val status = (props[STATUS] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.take(MAX_STATUS)?.takeIf { it.isNotEmpty() }</ID>
+    <ID>MaxLineLength:PluginFallbackCard.kt$if (open != null) PluginOpenButton(open = open, touch = touch, modifier = Modifier.testTag(CanvasPluginTestTags.open(view.element.id)))</ID>
+    <ID>MaxLineLength:PluginsPage.kt$private const val INTRO = "Plugins add element kinds, agent tools and pages. Each one runs only with what you allowed when you installed it."</ID>
+    <ID>MaxLineLength:PluginsPageParts.kt$IconButton</ID>
+    <ID>MaxLineLength:PluginsPageParts.kt$TextButton</ID>
+    <ID>MaxLineLength:PluginsPageParts.kt$TextButton(onClick = actions::discardPicked, enabled = !busy, modifier = Modifier.testTag(PluginsPageTags.DISCARD)) { Text(DISCARD) }</ID>
+    <ID>MaxLineLength:PluginsPageParts.kt$message = "Every plugin stops now: its tools leave every agent and its elements show as static cards. You can enable each one again."</ID>
+    <ID>MaxLineLength:PluginsPageParts.kt$modifier = Modifier.testTag(PluginsPageTags.fault(id)).semantics(mergeDescendants = true) { contentDescription = "$FAULT: $reason" }</ID>
+    <ID>MaxLineLength:PluginsPageTest.kt$PluginsPageTest$listOf("canvas:place", "assets:write", "ui:pages", "pages/chart.html").forEach { onNodeWithText(it).performScrollTo().assertExists() }</ID>
+    <ID>MaxLineLength:PointerHost.jvm.kt$Column</ID>
+    <ID>MaxLineLength:PointerHost.jvm.kt$modifier = Modifier.padding(horizontal = LettaDimens.Space.md, vertical = LettaDimens.Space.sm).widthIn(max = LettaDimens.Pane.sidePanelWidth)</ID>
+    <ID>MaxLineLength:ProjectsPage.kt$Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ProjectsPage.kt$private const val UNAVAILABLE_BODY = "Projects come from a VibeSync host relayed over Iroh. This backend has none: connect to an Iroh host to see its projects."</ID>
+    <ID>MaxLineLength:ProjectsPageDetail.kt$LettaPane</ID>
+    <ID>MaxLineLength:ProjectsPageDetail.kt$SettingsRow</ID>
+    <ID>MaxLineLength:ProjectsPageDetail.kt$beads?.let { SettingsRow.Info("project-beads", "Beads remote", it.status, if (it.isProvisioned) SettingsTone.Positive else SettingsTone.Normal) }</ID>
+    <ID>MaxLineLength:ProjectsPageDetail.kt$confirm = SettingsConfirmText("Provision Beads remote?", "This creates the remote backing store for ${project.name}.", "Provision")</ID>
+    <ID>MaxLineLength:ProjectsPageDetail.kt$return listOf(SettingsRow.Link(ProjectDetailKeys.OPEN_CHAT, "Open chat", supporting = "This project has no agent yet.", enabled = false) {})</ID>
+    <ID>MaxLineLength:ProjectsPageTest.kt$ProjectsPageTest$ProjectsPageActions(list = ProjectsListActions(onSelect = { calls += "select:${it?.value}" }, onQueryChange = { calls += "query:$it" }, onStartCreate = { calls += "create" }))</ID>
+    <ID>MaxLineLength:ProjectsPageTest.kt$ProjectsPageTest$private val alpha = ProjectSummary(identifier = "alpha", name = "Alpha", filesystemPath = "/src/alpha", lettaAgentId = AgentId("agent-a"))</ID>
+    <ID>MaxLineLength:ProjectsPageTest.kt$ProjectsPageTest$show(ProjectsPageState(loading = false, error = "no relay"), ProjectsPageActions(list = ProjectsListActions(onRefresh = { calls += "refresh" })))</ID>
+    <ID>MaxLineLength:ProjectsPageTest.kt$ProjectsPageTest$show(loaded(alpha).copy(selectedKey = alpha.key, beadsStatus = mapOf(alpha.key to BeadsRemoteStatus(status = "provisioned"))), actions)</ID>
+    <ID>MaxLineLength:ProviderConnectDialog.kt$val spec = LettaAlertSpec("Connect ${form.provider.displayName}", buttons, kind = LettaPaneKind.Dialog, icon = form.provider.logoOrNull())</ID>
+    <ID>MaxLineLength:ProviderManagementPane.kt$ProviderHeaderRow(section, expanded = expanded, inAppSignIn = actions.canSignIn, onClick = { actions.onToggleExpanded(section.key) })</ID>
+    <ID>MaxLineLength:ProviderManagementPane.kt$item("empty") { LettaEmptyHint(if (state.error == null) "No providers reported by the host yet" else "Nothing to show") }</ID>
+    <ID>MaxLineLength:ProviderSettingsPages.kt$Icon(LettaIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(LettaDimens.Control.iconSm))</ID>
+    <ID>MaxLineLength:ProviderSettingsPages.kt$Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier, content = inner)</ID>
+    <ID>MaxLineLength:ProviderSettingsPages.kt$modifier = Modifier.testTag("${if (connected) ProviderSettingsTags.EDIT_PREFIX else ProviderSettingsTags.ADD_PREFIX}${provider.id}")</ID>
+    <ID>MaxLineLength:ProviderSignInDialog.kt$LettaPaneButton(ModelControlStrings.SIGN_IN_CONNECT, actions.onSubmitCode, enabled = state.canSubmit, testTag = ProviderSignInTags.SUBMIT)</ID>
+    <ID>MaxLineLength:ProviderSignInDialog.kt$is ProviderSignInState.Failed -&gt; LettaPaneButton(ModelControlStrings.SIGN_IN_TRY_AGAIN, actions.onRetry, testTag = ProviderSignInTags.RETRY)</ID>
+    <ID>MaxLineLength:ReasoningEffortSliderUiTest.kt$ReasoningEffortSliderUiTest$ModelPickerGroup("anthropic", "Anthropic", listOf(entry("opus", tiers, selected = true), entry("fable-5", emptyList(), false)))</ID>
+    <ID>MaxLineLength:ReasoningEffortSliderUiTest.kt$ReasoningEffortSliderUiTest$actions = ModelPickerActions(onSelect = {}, onQueryChange = {}, onToggleGroup = {}, onRefresh = {}, onEditModels = null)</ID>
+    <ID>MaxLineLength:RecordingChatActions.kt$RecordingChatActions$approvals += Approval(answer.requestId, answer.toolCallIds, answer.approve, answer.reason, answer.selectedSuggestionIds, answer.suggestionBinding)</ID>
+    <ID>MaxLineLength:RefreshButtonGuardTest.kt$RefreshButtonGuardTest.Companion$private val REFRESH_GLYPH = Regex("""LettaIcons\.Refresh\b|Icons\.\w+\.Refresh\b|import androidx\.compose\.material\.icons\.\w+\.Refresh\b""")</ID>
+    <ID>MaxLineLength:RosterDrag.kt$RosterDrag$val neighbour = (shown.lines.getOrNull(line + direction) as? RosterLine.Row&lt;*&gt;)?.takeIf { it.sectionKey == row.sectionKey } ?: return null</ID>
+    <ID>MaxLineLength:RosterListTest.kt$RosterListTest$actions = RosterActions(rename = RosterRename(titleOf = Fruit::name, onRename = { item, title -&gt; renames += item.id to title }))</ID>
+    <ID>MaxLineLength:RosterListTest.kt$RosterListTest$listOf(RosterSection("a", listOf(banana), title = "A"), RosterSection("b", emptyList&lt;Fruit&gt;(), title = "B", emptyHint = "None"))</ID>
+    <ID>MaxLineLength:RosterListTest.kt$RosterListTest$val layout = RosterLayout.of(listOf(RosterSection("a", listOf(apple)), RosterSection("fruit", listOf(banana, cherry, apple)))) { it.id }</ID>
+    <ID>MaxLineLength:RunStatusLineUiTest.kt$RunStatusLineUiTest$CommandActivity("cmd-9", "git status", slash = false, state = CommandState.Failed, output = "fatal: not a repo", preformatted = true)</ID>
+    <ID>MaxLineLength:RunStatusLineUiTest.kt$RunStatusLineUiTest$RuntimeLiveStatus(phase = LoopPhase.ExecutingCommand, notice = LiveNotice("Compacting conversation", NoticeLevel.Warning))</ID>
+    <ID>MaxLineLength:RunSummarySnapshotTest.kt$RunSummarySnapshotTest$Shot("run-summary-desktop-docked", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.CanvasFirst, ChatPlatformStyle.Pointer)</ID>
+    <ID>MaxLineLength:RunSummarySnapshotTest.kt$RunSummarySnapshotTest$Shot("run-summary-desktop-full", DESKTOP_WIDTH_DP, DESKTOP_HEIGHT_DP, scale = 1, ChatSurfacePresentation.ChatFirst, ChatPlatformStyle.Pointer)</ID>
+    <ID>MaxLineLength:RunsPageDetail.kt$ActionButton(RunDetailTags.OPEN_CONVERSATION, "Open conversation", { openConversation(run.agentId, conversationId.orEmpty()) }, primary = true)</ID>
+    <ID>MaxLineLength:RunsPageTest.kt$RunsPageTest$show(RunsPageState(monitor = RunMonitorState(loading = false, error = "host down")), RunsPageActions(onRefresh = { calls += "refresh" }))</ID>
+    <ID>MaxLineLength:RunsPageTest.kt$RunsPageTest$show(loaded(running, detail = RunDetail(run = running, full = true), canManage = true), RunsPageActions(onCancelRun = { cancelled += it }))</ID>
+    <ID>MaxLineLength:RunsPageTest.kt$RunsPageTest$show(loaded(running, detail = detail), RunsPageActions(onOpenConversation = { agent, conversation -&gt; opened += "$agent/$conversation" }))</ID>
+    <ID>MaxLineLength:ScheduleFormPane.kt$Text(CronBuilder.preview(state), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:ScheduleFormPane.kt$Text(ScheduleFormat.clockLabel(state.hour, state.minute), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor)</ID>
+    <ID>MaxLineLength:ScheduleHistoryView.kt$Box(Modifier.size(LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm)).background(reliabilitySquareColor(ok)))</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Box</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline)))</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Icon(Icons.Outlined.ArrowBack, description, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(LettaDimens.Control.icon))</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Modifier.fillMaxWidth().clip(RoundedCornerShape(LettaDimens.Radius.md)).background(MaterialTheme.colorScheme.surfaceContainer).padding(LettaDimens.Space.lg)</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$StatCell(history.overallSuccessRate?.let { "${(it * 100).toInt()}%" } ?: "—", "success", MaterialTheme.customColors.successColor, Modifier.weight(1f))</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Text("${reliability.succeeded}/${reliability.total}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Text(ScheduleRailText.nextRunHeadline(now, next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:ScheduleRail.kt$is ScheduleRailState.Detail -&gt; params.defsById[rail.scheduleId]?.let { ScheduleDetailRail(it, params) } ?: ScheduleOverviewRail(params)</ID>
+    <ID>MaxLineLength:ScheduleTimelineView.kt$Box(Modifier.size(width = LettaDimens.Space.hair, height = LettaDimens.Control.iconSm).background(MaterialTheme.colorScheme.primary))</ID>
+    <ID>MaxLineLength:ScheduleTimelineView.kt$Modifier.size(width = LettaDimens.Space.sm, height = LettaDimens.Control.icon).clip(RoundedCornerShape(LettaDimens.Radius.sm))</ID>
+    <ID>MaxLineLength:SchedulesPageParts.kt$Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.size(LettaDimens.Orb.lg))</ID>
+    <ID>MaxLineLength:SchedulesPageParts.kt$if (def.active) ScheduleRailText.relativeOrDash(now, ScheduleProjection.nextRun(def, now)) else ScheduleRailText.status(false)</ID>
+    <ID>MaxLineLength:SearchSlot.kt$SearchSlot(query = query, onQuery = onQuery, config = LettaSearchConfig(placeholder = placeholder, autoFocus = false, showResults = false))</ID>
+    <ID>MaxLineLength:SendFrame.kt$SendFrame$"scrolls=$scrollCommands composed=$rowCompositions chevrons=$chevronCount departing=$departingTextCount latestButton=$latestButton"</ID>
+    <ID>MaxLineLength:SendLiftFrameInvariants.kt$return if (last.atNewestEdge) emptyList() else listOf("ends at item ${last.firstVisibleItemIndex} offset ${last.scrollOffset}, not the newest edge")</ID>
+    <ID>MaxLineLength:SendLiftFrameInvariants.kt$return if (total &gt; MAX_ARRIVAL_COMPOSITIONS) listOf("$total row compositions from the send frame, at most $MAX_ARRIVAL_COMPOSITIONS allowed") else emptyList()</ID>
+    <ID>MaxLineLength:SendLiftListView.kt$SendLiftListView$test.onNodeWithTag(ChatTimelineTags.LIST).performTouchInput { swipeDown(startY = top + SWIPE_FROM_PX, endY = top + SWIPE_TO_PX, durationMillis = SWIPE_MILLIS) }</ID>
+    <ID>MaxLineLength:SendLiftPort.kt$SendLiftPort.Companion$UiMessage(id = "a$i", role = "assistant", content = "Answer number $i, a sentence long.", timestamp = STAMP, runId = "seed-run-$i")</ID>
+    <ID>MaxLineLength:SettingsCopy.kt$SettingsCopy$val RESET_IDENTITY = SettingsLabel(BackendSettingsTags.RESET_IDENTITY, "Reset device identity", "Paired hosts must pair this device again")</ID>
+    <ID>MaxLineLength:SettingsLayout.kt$Column</ID>
+    <ID>MaxLineLength:SettingsLayout.kt$internal</ID>
+    <ID>MaxLineLength:SettingsPageBody.kt$SettingsPageModel$val bar = Modifier.widthIn(max = LettaDimens.Pane.settingsColumnMaxWidth).padding(horizontal = LettaDimens.Space.xl, vertical = LettaDimens.Space.sm)</ID>
+    <ID>MaxLineLength:SettingsPageTest.kt$SettingsPageTest$assertEquals(listOf(SettingsGroup.Backend to emptyList(), SettingsGroup.About to listOf(about)), services.visibleGroups(LettaConfig.Mode.SELF_HOSTED, true))</ID>
+    <ID>MaxLineLength:SettingsPageTest.kt$SettingsPageTest$page(SettingsPageState(remote), SettingsPageServices(BackendSettingsActions(onConfigSaved = {}), contributions = listOf(onlyLocal, about)))</ID>
+    <ID>MaxLineLength:SettingsPageTest.kt$SettingsPageTest$val about = SettingsContribution(SettingsGroup.About, SettingsSectionModel("about", "About", listOf(SettingsRow.Info("v", "Version", "1.0"))))</ID>
+    <ID>MaxLineLength:SettingsPageTest.kt$SettingsPageTest$val local = SettingsContribution(SettingsGroup.Backend, SettingsSectionModel("m", "Model", emptyList()), showForMode = LettaConfig.Mode.LOCAL)</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$SettingsRow.Choice("choice", "Preset", options = (1..5).map { SettingsOption("o$it", "Option $it") }, selected = "o1", supporting = "Pick one") {}</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$SettingsSectionModel("s", "S", listOf(SettingsRow.Status("st", "Host", SettingsStatus("Can't reach host", SettingsTone.Error))))</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$assertTrue(services.visibleGroups(LettaConfig.Mode.SELF_HOSTED, true, hasSavedToken = false).none { it.first == SettingsGroup.Danger })</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$listOf("Vibrate while replies run", "Pick one", "Tap to copy", "Since 10:00", "Accounts and keys").forEach { onNodeWithText(it).assertExists() }</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$rows.forEach { row -&gt; onNodeWithTag(SettingsSectionTags.ROW_PREFIX + row.key).assertHeightIsAtLeast(LettaDimens.Control.minTouchTarget) }</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$setContent { Frame { DangerZoneSection(BackendFormState(remote.copy(accessToken = "sk"), BackendSettingsForm.of(remote)) {}, services.backend) } }</ID>
+    <ID>MaxLineLength:SettingsQualityPassTest.kt$SettingsQualityPassTest$val about = SettingsContribution(SettingsGroup.About, SettingsSectionModel("about", "About", listOf(SettingsRow.Info("v", "Version", "1.0"))))</ID>
+    <ID>MaxLineLength:SettingsSearch.kt$private val PAIRING_ENTRY = SettingsSearchEntry(SettingsGroup.Backend, SettingsGroup.Backend.title, "Pair a device", "Install Letta elsewhere and pair it with this host")</ID>
+    <ID>MaxLineLength:SettingsSection.kt$ActionButton$data</ID>
+    <ID>MaxLineLength:SettingsSection.kt$SettingsScope$Column</ID>
+    <ID>MaxLineLength:SettingsSection.kt$SettingsScope$row.status.tone.glyph?.let { Icon(it, contentDescription = null, tint = color, modifier = Modifier.size(LettaDimens.Control.iconSm)) }</ID>
+    <ID>MaxLineLength:SettingsSectionTest.kt$SettingsSectionTest$val row = SettingsRow.Toggle("auto-launch", "Launch Letta when I sign in", checked = true, supporting = "Unsupported here.", enabled = false) {}</ID>
+    <ID>MaxLineLength:SettingsStandardSections.kt$NoteRow(SettingsRow.Note("chat-permission-mode-failed", SettingsStatus("Couldn't save the default; it is unchanged.", SettingsTone.Error)))</ID>
+    <ID>MaxLineLength:SharedUiDisclosureChevronContractTest.kt$SharedUiDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
+    <ID>MaxLineLength:ShellAgentLibrary.kt$empty = { LettaEmptyHint("No agents match \"$needle\"", Modifier.padding(horizontal = LettaDimens.Space.lg, vertical = LettaDimens.Space.md)) }</ID>
+    <ID>MaxLineLength:ShellAgentLibrary.kt$internal</ID>
+    <ID>MaxLineLength:ShellAgentPanelTest.kt$ShellAgentPanelTest$ShellAgentPanelActions(onDeleteConversation = { deleted += it }, deleteBehavior = ConversationDeleteBehavior.MovesToArchived)</ID>
+    <ID>MaxLineLength:ShellAgentRailTest.kt$ShellAgentRailTest$MaterialTheme { ShellAgentRail(state = ShellAgentRailState(entries = entries, expanded = true), actions = ShellAgentRailActions()) }</ID>
+    <ID>MaxLineLength:ShellConversationOptionsTest.kt$ShellConversationOptionsTest$val summaries = listOf("a", "b", "c").map { ChatConversationSummary(id = it, title = it, agentName = "", updatedAtLabel = "", lastMessagePreview = "") }</ID>
+    <ID>MaxLineLength:ShellDrawerMascotTest.kt$ShellDrawerMascotTest$state = ShellAgentPanelState(agent = ShellPanelAgent(name = "PM-letta-mobile", agentId = AGENT, identity = turned))</ID>
+    <ID>MaxLineLength:ShellHeaderSearchBar.kt$Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)</ID>
+    <ID>MaxLineLength:ShellHeaderTest.kt$ShellHeaderTest$search = SearchSlot(query = "", onQuery = {}, config = LettaSearchConfig(autoFocus = false), openRequest = request)</ID>
+    <ID>MaxLineLength:ShellHeaderTest.kt$ShellHeaderTest$search = rememberShellSearchSlot(home, ShellSearchContext(onHome = onHome, inChat = inChat), sources) { opened += it }</ID>
+    <ID>MaxLineLength:ShellPage.kt$SettingsPage(state = state.copy(section = destination.section ?: state.section), services = services, modifier = modifier, onBack = onBack)</ID>
+    <ID>MaxLineLength:ShellRowMenusTest.kt$ShellRowMenusTest$val manage = ShellConversationManageMenu(pinned = false, onRenameRequest = { events += "rename" }, onPinToggle = { events += "pin" })</ID>
+    <ID>MaxLineLength:ShellSidebarMappingTest.kt$ShellSidebarMappingTest$ChatConversationSummary(id = "c1", title = "Shipping notes", agentName = "", updatedAtLabel = "2026-10-07T11:00:00Z", lastMessagePreview = "Loaded from backend")</ID>
+    <ID>MaxLineLength:SkillsPageParts.kt$FlowRow</ID>
+    <ID>MaxLineLength:SkillsPageParts.kt$LettaChipTab(ALL_SKILLS, !assignedOnly, { page.controls.onAssignedOnlyChange(false) }, chipModifier.testTag(SkillsPageTags.ALL_SKILLS))</ID>
+    <ID>MaxLineLength:SkillsPageParts.kt$modifier = Modifier.fillMaxWidth().padding(start = horizontal, end = horizontal, top = LettaDimens.Space.lg, bottom = LettaDimens.Space.sm)</ID>
+    <ID>MaxLineLength:SkillsPageParts.kt$modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(LettaDimens.Space.lg).testTag(SkillsPageTags.DETAIL)</ID>
+    <ID>MaxLineLength:SkillsPageParts.kt$val background = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = INSTALLED_ALPHA) else MaterialTheme.colorScheme.surfaceContainerHighest</ID>
+    <ID>MaxLineLength:SkillsPageRows.kt$SkillsPageRows$library.isLoading &amp;&amp; library.tools.isEmpty() -&gt; listOf(SkillsPageRow.Info("tools-loading", "Loading tools from the active backend."))</ID>
+    <ID>MaxLineLength:SkillsPageRows.kt$SkillsPageRows$listOf(SkillsPageRow.Group(SkillsPageSection.Tools, category.label)) + inGroup.chunked(columns).map { SkillsPageRow.ToolCards(it) }</ID>
+    <ID>MaxLineLength:SkillsPageRows.kt$SkillsPageRows$state.skillsLoading &amp;&amp; state.skills.isEmpty() -&gt; add(SkillsPageRow.Info("skills-loading", "Loading skills from the active backend."))</ID>
+    <ID>MaxLineLength:SkillsPageTest.kt$SkillsPageTest$private val gitStatus = Tool(id = ToolId("tool-git"), name = "git_status", description = "Show the working tree status", toolType = "custom")</ID>
+    <ID>MaxLineLength:SkillsPageTest.kt$SkillsPageTest$show(state().copy(tools = ToolLibraryState(tools = listOf(withSource), isLoading = false, hasMorePages = false)), frame = TestFrame(pointer = true))</ID>
+    <ID>MaxLineLength:SkillsPageTest.kt$SkillsPageTest$show(state(skills = many, installed = emptySet()), options = SkillsPageOptions(initialSection = SkillsPageSection.Tools), frame = TestFrame(width = COMPACT))</ID>
+    <ID>MaxLineLength:SkillsToolDetail.kt$FlowRow</ID>
+    <ID>MaxLineLength:SkillsToolDetail.kt$listOfNotNull(tool.toolType, tool.sourceType).filter(String::isNotBlank).forEach { LettaPill(it, MaterialTheme.colorScheme.onSurfaceVariant) }</ID>
+    <ID>MaxLineLength:SplitMarkdownBlocksTest.kt$SplitMarkdownBlocksTest$val text = "Before\n\n| Language | Runtime | UI |\n| --- | --- | --- |\n| Kotlin | JVM | Compose |\n| Swift | Native | SwiftUI |\nAfter"</ID>
+    <ID>MaxLineLength:StackedToolRunSnapshotTest.kt$StackedToolRunSnapshotTest$UiMessage(id = "u1", role = "user", content = "Run the checks and fix what fails.", timestamp = secondsAgo(START_SECONDS_AGO))</ID>
+    <ID>MaxLineLength:StreamingFlickerTest.kt$StreamingFlickerTest$val text = "Here is **bold** and *italic* and `code` mixed together in one paragraph that goes on for a while and then continues with **another bold span** before ending.\n\nNext paragraph here."</ID>
+    <ID>MaxLineLength:SubagentRingsOverlay.kt$onOpenConversation = onViewConversation?.let { view -&gt; { item -&gt; item.openWith { agent, id -&gt; target = null; view(agent, id) } } }</ID>
+    <ID>MaxLineLength:SubagentRingsOverlay.kt$onViewConversation = { subagent -&gt; subagent.conversation()?.let { (agent, conversation) -&gt; onViewConversation?.invoke(agent, conversation) } }</ID>
+    <ID>MaxLineLength:SubagentRingsOverlayTest.kt$SubagentRingsOverlayTest$SubagentRingsOverlay(listOf(entry("subagent-reflect", type = "Reflection")), SubagentTodoLoader { Result.success(emptyList()) })</ID>
+    <ID>MaxLineLength:SubagentRingsOverlayTest.kt$SubagentRingsOverlayTest$val background = SubagentEntry(toolCallId = "", taskId = "task_9", description = "Build", subagentType = "Bash", status = "success").toActiveSubagent()</ID>
+    <ID>MaxLineLength:SubagentRosterList.kt$add(RosterSection("running", roster.running.map { SubagentRosterLine(it, card = true) }, title = "Running · ${roster.running.size}"))</ID>
+    <ID>MaxLineLength:SubagentRosterList.kt$val sections = subagentRosterSections(roster, backgroundShown, SubagentRosterHeaderActions(onClearFinished) { backgroundShown = !backgroundShown })</ID>
+    <ID>MaxLineLength:TemplatesPage.kt$LettaListRowSpec(title = "${template.icon} ${template.name}", subtitle = template.description, trailing = template.tags.joinToString(" · "))</ID>
+    <ID>MaxLineLength:TerminalSignInDialog.kt$confirm = LettaPaneButton(ModelControlStrings.CHECK_AGAIN, onCheck, enabled = !state.busy, testTag = ProviderSettingsTags.CHECK_AGAIN)</ID>
+    <ID>MaxLineLength:TimelineDockedPromptImageUiTest.kt$TimelineDockedPromptImageUiTest$private</ID>
+    <ID>MaxLineLength:TimelineDomainRig.kt$TimelineDomainRig$coordinator.appendPending(owner, CanonicalPendingLocalStore.Record(echo.otid.orEmpty(), echo.content, emptyList(), echo.date.orEmpty()))</ID>
+    <ID>MaxLineLength:TimelineNewChatFollowTest.kt$TimelineNewChatFollowTest$assertTrue(buttons.isEmpty(), "scroll-to-latest showed while the reader never scrolled:\n" + buttons.joinToString("\n") + "\n\n$log")</ID>
+    <ID>MaxLineLength:TimelineNewChatFollowTest.kt$TimelineNewChatFollowTest$val tall = frames.filter { it.step.startsWith("stream") }.any { f -&gt; f.rows.sumOf { it.height.toDouble() } &gt; TimelineUiFrameRecorder.HEIGHT }</ID>
+    <ID>MaxLineLength:TimelineScrollToLatestUiTest.kt$TimelineScrollToLatestUiTest$runOnIdle { assertTrue(listState.atNewestEdge(), "landed at ${listState.firstVisibleItemIndex}/${listState.firstVisibleItemScrollOffset}") }</ID>
+    <ID>MaxLineLength:TimelineScrollToLatestVisibilityTest.kt$TimelineScrollToLatestVisibilityTest$assertFalse(nextScrollToLatestVisible(visible = false, eligible = false, distancePx = Float.POSITIVE_INFINITY, thresholds = thresholds))</ID>
+    <ID>MaxLineLength:TimelineScrollToLatestVisibilityTest.kt$TimelineScrollToLatestVisibilityTest$assertTrue(nextScrollToLatestVisible(visible = false, eligible = true, distancePx = Float.POSITIVE_INFINITY, thresholds = thresholds))</ID>
+    <ID>MaxLineLength:TimelineUiFrame.kt$UiFrame$"latestButton=$scrollToLatestShown scrolls=$scrollCommands composed=$rowCompositions rows="</ID>
+    <ID>MaxLineLength:TimelineUiFrameRecorder.kt$TimelineUiFrameRecorder$check(deadline.hasNotPassedNow()) { "$step never finished (store failures: [${rig.storeFailures}]); last frame: ${recorded.last()}" }</ID>
+    <ID>MaxLineLength:TimelineUiFrameRecorder.kt$TimelineUiFrameRecorder$rows.any { it.key == FOOTER_LOADING_KEY } || SPINNER_TAGS.any { tag -&gt; test.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }</ID>
+    <ID>MaxLineLength:TimelineUiFramesTest.kt$TimelineUiFramesTest.Companion$AssistantMessage(id = "old-reply-$i", contentRaw = JsonPrimitive("Earlier answer $i."), date = "2026-09-25T03:%02d:01.000Z".format(i))</ID>
+    <ID>MaxLineLength:TimelineUiFramesTest.kt$TimelineUiFramesTest.Companion$UserMessage(id = "old-prompt-$i", contentRaw = JsonPrimitive("Earlier question $i"), date = "2026-09-25T03:%02d:00.000Z".format(i), otid = "cm-old-$i")</ID>
+    <ID>MaxLineLength:TouchCanvasDock.kt$border = BorderStroke(LettaDimens.Stroke.hairline, MaterialTheme.colorScheme.outlineVariant.copy(alpha = LettaDimens.Alpha.hairline))</ID>
+    <ID>MaxLineLength:TouchCanvasDockUiTest.kt$TouchCanvasDockUiTest$private val reply = UiMessage(id = "a1", role = "assistant", content = "Here's an L-shaped plan.", timestamp = "2026-09-30T18:02:09Z", runId = "run-1")</ID>
+    <ID>MaxLineLength:TouchComposerBarUiTest.kt$TouchComposerBarUiTest$TouchPanel(ComposerInputs(composer = ready(text = "").copy(canSend = false, acceptsInput = false), actions = RecordingChatActions()))</ID>
+    <ID>MaxLineLength:TouchImageViewerTest.kt$TouchImageViewerTest$assertEquals(ImageTransformState(), applyImageTransformGesture(pinched, ImageGestureFrame(0.1f, Offset.Zero, Offset.Zero), container))</ID>
+    <ID>MaxLineLength:TouchRowPolishTest.kt$TouchRowPolishTest$val tool = message("a-1", "assistant", "").copy(toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = null, toolCallId = "c")))</ID>
+    <ID>MaxLineLength:TouchRowPolishTest.kt$TouchRowPolishTest$val toolLine = message("a-3", "assistant", "").copy(toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = null, toolCallId = "c")))</ID>
+    <ID>MaxLineLength:TouchRowPolishTest.kt$TouchRowPolishTest$val toolsOnly = ChatRenderItem.RunBlock(runId = "r", messages = listOf(tool to GroupPosition.First, tool.copy(id = "a-3") to GroupPosition.Last))</ID>
+    <ID>MaxLineLength:TouchTextSelectionTest.kt$TouchTextSelectionTest$toolbar.showMenu(Rect(0f, 40f, 10f, 50f), onCopyRequested = {}, onPasteRequested = null, onCutRequested = null, onSelectAllRequested = null)</ID>
+    <ID>MaxLineLength:UnifiedShellSearch.kt$UnifiedShellSearch.SectionSearch$.</ID>
+    <ID>MaxLineLength:UnifiedShellSearchTest.kt$UnifiedShellSearchTest$val agentsOnly = UnifiedShellSearch.sections(UnifiedSearchQuery("", filterToAgent = false, scopeId = UnifiedSearchKind.Agents.id), sources)</ID>
+    <ID>MaxLineLength:WorkingDirectoryPicker.kt$confirm = LettaPaneButton(stringResource(Res.string.cwd_picker_create), { onCreate(name) }, enabled = valid, testTag = WorkingDirectoryPickerTags.CREATE)</ID>
+    <ID>MaxLineLength:WorkingDirectoryPicker.kt$modifier = Modifier.weight(1f, fill = false).fillMaxWidth().padding(bottom = LettaDimens.Space.lg).testTag(WorkingDirectoryPickerTags.ROOT)</ID>
+    <ID>MaxLineLength:WorkingDirectoryPicker.kt$private</ID>
+    <ID>MaxLineLength:WorkingDirectoryPickerUiTest.kt$WorkingDirectoryPickerUiTest$show("/work/repo", host = WorkingDirectoryPickerHost(openInFileManager = { opened += it }, pickWithSystemDialog = { systemDialogs++ }))</ID>
+    <ID>MaxLineLength:WorkspaceFileViewer.kt$Box</ID>
+    <ID>MaxLineLength:WorkspaceFileViewer.kt$Text(WorkspacePaths.fileName(path), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:WorkspaceFileViewer.kt$Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)</ID>
+    <ID>MaxLineLength:WorkspaceFileViewer.kt$modifier = Modifier.fillMaxWidth().padding(start = LettaDimens.Space.lg, end = LettaDimens.Space.xs, top = LettaDimens.Space.sm)</ID>
+    <ID>MayBeConst:CanvasComposeEndToEndRenderTest.kt$CanvasComposeEndToEndRenderTest.Companion$val SECOND_REQUEST = """{"title":"Where to eat","items":[ {"kind":"NOTE","title":"Alfama","markdown":"- Taberna Sal Grosso\n- Prado"}, {"kind":"NOTE","title":"Baixa","markdown":"- Cervejaria Ramiro\n- *O Trevo* for a bifana"}, {"kind":"CHECKLIST","title":"Book ahead","items":[{"text":"Ramiro, Friday"},{"text":"Prado, Saturday"}]} ]}"""</ID>
+    <ID>MayBeConst:CanvasSamples.kt$CanvasSamples$/** Build cycle sample diagram: Idea -&gt; Plan -&gt; Build -&gt; Ship */ val buildCycleJson: String = """{ "bgColor": "#eceff1ff", "elements": [ { "id": "title", "type": "Text", "zIndex": 10, "points": [], "strokeColor": "#1b2a41ff", "strokeWidth": 0.0, "modifiedAt": 1782669085173, "text": "Build Cycle", "fontFamilyKey": "serif", "fontSize": 64.0, "alignment": "CENTER", "textTopLeft": "502.0,212.0", "wrapWidth": 900.0 }, { "id": "subtitle", "type": "Text", "zIndex": 10, "points": [], "strokeColor": "#5d6d7eff", "strokeWidth": 0.0, "modifiedAt": 1782669082446, "text": "an idea on monday is a shipped feature by friday", "fontFamilyKey": "sans", "fontSize": 22.0, "alignment": "CENTER", "textTopLeft": "366.0,408.0", "wrapWidth": 1274.0 }, { "id": "track", "type": "Shape", "zIndex": 0, "points": [ "268.0,650.0", "1528.0,650.0" ], "strokeColor": "#d5dbdbff", "strokeWidth": 2.0, "shapeType": "LINE", "strokeStyle": "DOTTED", "modifiedAt": 1782669074313 }, { "id": "idea-tri", "type": "Shape", "zIndex": 1, "points": [ "210.0,542.0", "490.0,762.0" ], "strokeColor": "#f39c12ff", "strokeWidth": 5.0, "shapeType": "TRIANGLE", "fillColor": "#fce9c4ff", "cornerRadius": 12.0, "modifiedAt": 1782669102603 }, { "id": "idea-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#1b2a41ff", "strokeWidth": 0.0, "modifiedAt": 1782669105793, "text": "Idea", "fontFamilyKey": "sans", "fontSize": 30.0, "alignment": "CENTER", "textTopLeft": "294.0,643.0", "wrapWidth": 280.0 }, { "id": "arrow-1", "type": "Shape", "zIndex": 2, "points": [ "420.0,652.0", "568.0,650.0" ], "strokeColor": "#34495eff", "strokeWidth": 3.0, "shapeType": "ARROW", "startBinding": "idea-tri", "endBinding": "plan-rect", "modifiedAt": 1782669102603 }, { "id": "plan-rect", "type": "Shape", "zIndex": 1, "points": [ "568.0,560.0", "868.0,740.0" ], "strokeColor": "#16a085ff", "strokeWidth": 5.0, "shapeType": "RECTANGLE", "fillColor": "#d1f2ebff", "cornerRadius": 24.0, "modifiedAt": 1782669074313 }, { "id": "plan-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#0e6655ff", "strokeWidth": 0.0, "modifiedAt": 1782669108292, "text": "Plan", "fontFamilyKey": "sans", "fontSize": 36.0, "alignment": "CENTER", "textTopLeft": "642.0,600.0", "wrapWidth": 300.0 }, { "id": "arrow-2", "type": "Shape", "zIndex": 2, "points": [ "868.0,650.0", "948.0,650.0" ], "strokeColor": "#34495eff", "strokeWidth": 3.0, "shapeType": "ARROW", "startBinding": "plan-rect", "endBinding": "build-rect", "modifiedAt": 1782669074313 }, { "id": "build-rect", "type": "Shape", "zIndex": 1, "points": [ "948.0,560.0", "1248.0,740.0" ], "strokeColor": "#e74c3cff", "strokeWidth": 5.0, "shapeType": "RECTANGLE", "fillColor": "#fadbd8ff", "cornerRadius": 24.0, "strokeStyle": "DASHED", "modifiedAt": 1782669074313 }, { "id": "build-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#922b21ff", "strokeWidth": 0.0, "modifiedAt": 1782669111523, "text": "Build", "fontFamilyKey": "mono", "fontSize": 36.0, "alignment": "CENTER", "textTopLeft": "988.0,602.0", "wrapWidth": 300.0 }, { "id": "arrow-3", "type": "Shape", "zIndex": 2, "points": [ "1248.0,650.0", "1328.0,650.0" ], "strokeColor": "#34495eff", "strokeWidth": 3.0, "shapeType": "ARROW", "startBinding": "build-rect", "endBinding": "ship-circle", "modifiedAt": 1782669074313 }, { "id": "ship-circle", "type": "Shape", "zIndex": 1, "points": [ "1328.0,650.0", "1528.0,650.0" ], "strokeColor": "#27ae60ff", "strokeWidth": 0.0, "shapeType": "CIRCLE", "fillColor": "#27ae60ff", "modifiedAt": 1782669074313, "strokeEnabled": false }, { "id": "ship-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#ffffffff", "strokeWidth": 0.0, "modifiedAt": 1782669113638, "text": "Ship", "fontFamilyKey": "sans", "fontSize": 32.0, "alignment": "CENTER", "textTopLeft": "1360.0,607.0", "wrapWidth": 200.0 }, { "id": "caption", "type": "Text", "zIndex": 10, "points": [], "strokeColor": "#7f8c8dff", "strokeWidth": 0.0, "modifiedAt": 1782669122928, "text": "from sketch to release · four moves · one repo", "fontFamilyKey": "serif", "fontSize": 20.0, "alignment": "CENTER", "textTopLeft": "428.0,822.0", "wrapWidth": 900.0 } ] } """</ID>
+    <ID>MayBeConst:CanvasSamples.kt$CanvasSamples$/** Daily loop sample diagram */ val dailyLoopJson: String = """{ "bgColor": "#fff8f0ff", "elements": [ { "id": "title", "type": "Text", "zIndex": 10, "points": [], "strokeColor": "#2c3e50ff", "strokeWidth": 0.0, "modifiedAt": 1782669322976, "text": "Daily Loop", "fontFamilyKey": "serif", "fontSize": 56.0, "alignment": "CENTER", "textTopLeft": "108.0,34.0", "wrapWidth": 600.0 }, { "id": "subtitle", "type": "Text", "zIndex": 10, "points": [], "strokeColor": "#7f8c8dff", "strokeWidth": 0.0, "modifiedAt": 1782669330731, "text": "eat · drink coffee · sleep · repeat", "fontFamilyKey": "sans", "fontSize": 22.0, "alignment": "CENTER", "textTopLeft": "78.0,160.0", "wrapWidth": 692.0 }, { "id": "divider", "type": "Shape", "zIndex": 1, "points": [ "280.0,200.0", "520.0,200.0" ], "strokeColor": "#bdc3c7ff", "strokeWidth": 2.0, "shapeType": "LINE" }, { "id": "eat-box", "type": "Shape", "zIndex": 1, "points": [ "150.0,240.0", "650.0,360.0" ], "strokeColor": "#e67e22ff", "strokeWidth": 5.0, "shapeType": "RECTANGLE", "fillColor": "#ffeaa7ff", "cornerRadius": 30.0 }, { "id": "eat-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#2c3e50ff", "strokeWidth": 0.0, "modifiedAt": 1782669303327, "text": "Eat", "fontFamilyKey": "mono", "fontSize": 42.0, "alignment": "CENTER", "textTopLeft": "324.0,251.0", "wrapWidth": 162.0 }, { "id": "arrow-eat-coffee", "type": "Shape", "zIndex": 2, "points": [ "400.0,360.0", "400.0,430.29437" ], "strokeColor": "#34495eff", "strokeWidth": 4.0, "shapeType": "ARROW", "startBinding": "eat-box", "endBinding": "coffee-circle", "modifiedAt": 1782669280844 }, { "id": "coffee-circle", "type": "Shape", "zIndex": 1, "points": [ "280.0,480.0", "520.0,720.0" ], "strokeColor": "#6f4e37ff", "strokeWidth": 0.0, "shapeType": "CIRCLE", "fillColor": "#a0522dff", "strokeEnabled": false }, { "id": "coffee-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#ffffffff", "strokeWidth": 0.0, "modifiedAt": 1782669296172, "text": "Drink\nCoffee", "fontFamilyKey": "serif", "fontSize": 32.0, "alignment": "CENTER", "textTopLeft": "302.0,516.0", "wrapWidth": 240.0 }, { "id": "arrow-coffee-sleep", "type": "Shape", "zIndex": 2, "points": [ "400.0,769.7056", "400.0,840.0" ], "strokeColor": "#34495eff", "strokeWidth": 4.0, "shapeType": "ARROW", "startBinding": "coffee-circle", "endBinding": "sleep-box", "modifiedAt": 1782669280844 }, { "id": "sleep-box", "type": "Shape", "zIndex": 1, "points": [ "150.0,840.0", "650.0,960.0" ], "strokeColor": "#3498dbff", "strokeWidth": 5.0, "shapeType": "RECTANGLE", "fillColor": "#d6eaf8ff", "cornerRadius": 30.0, "strokeStyle": "DASHED" }, { "id": "sleep-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#2c3e50ff", "strokeWidth": 0.0, "modifiedAt": 1782669310972, "text": "Sleep", "fontFamilyKey": "mono", "fontSize": 42.0, "alignment": "CENTER", "textTopLeft": "270.0,847.0", "wrapWidth": 270.0 }, { "id": "arrow-sleep-repeat", "type": "Shape", "zIndex": 2, "points": [ "400.0,960.0", "400.0,1080.0" ], "strokeColor": "#34495eff", "strokeWidth": 4.0, "shapeType": "ARROW", "startBinding": "sleep-box", "endBinding": "repeat-box" }, { "id": "repeat-box", "type": "Shape", "zIndex": 1, "points": [ "150.0,1080.0", "650.0,1200.0" ], "strokeColor": "#9b59b6ff", "strokeWidth": 5.0, "shapeType": "RECTANGLE", "fillColor": "#f4ecf7ff", "cornerRadius": 30.0 }, { "id": "repeat-label", "type": "Text", "zIndex": 5, "points": [], "strokeColor": "#2c3e50ff", "strokeWidth": 0.0, "modifiedAt": 1782669318743, "text": "Repeat", "fontFamilyKey": "sans", "fontSize": 42.0, "alignment": "CENTER", "textTopLeft": "250.0,1085.0", "wrapWidth": 300.0 }, { "id": "86f85c95-0098-4258-8f45-5fd9ef0dd10e", "type": "Path", "zIndex": 15, "points": [], "strokeColor": "#ff0000ff", "strokeWidth": 10.0, "alpha": 1.0, "createdAt": 1782669276307, "modifiedAt": 1782669276307, "samples": [ "768.0,846.0,10.0" ] } ] } """</ID>
+    <ID>MayBeConst:StreamingRevealCue.kt$private val STREAMING_REVEAL_CUE_BOUNDARY_CHARS = ".,;:!?)]}"</ID>
+    <ID>MayBeConst:TimelineNewChatFollowTest.kt$TimelineNewChatFollowTest.Companion$private val sentence = "Once upon a time a very long reply kept streaming in, line after line after line. "</ID>
+    <ID>MemberNameEqualsClassName:TouchCanvasChromeUiTest.kt$TouchCanvasChromeUiTest.Host$val host = ChatSurfaceHost(openCanvas = {}, openAgentSwitcher = { switched++ }, openAgentPane = { menus++ })</ID>
+    <ID>NestedBlockDepth:SharedUiDisclosureChevronContractTest.kt$SharedUiDisclosureChevronContractTest$@Test fun `no unapproved disclosure icons in sharedUI production sources`()</ID>
+    <ID>NestedBlockDepth:SharedUiSourceScan.kt$SharedUiSourceScan$fun scan(skip: Set&lt;String&gt; = emptySet(), find: (String) -&gt; List&lt;String&gt;): Map&lt;String, List&lt;String&gt;&gt;</ID>
+    <ID>NestedBlockDepth:StreamingFlickerTest.kt$StreamingFlickerTest$@Test fun `active tail is byte-append-only across consecutive ticks`()</ID>
+    <ID>NestedBlockDepth:StreamingFlickerTest.kt$StreamingFlickerTest$private fun unmatchedInlineMarker(line: String): String?</ID>
+    <ID>NestedBlockDepth:StreamingMarkdownParser.kt$fun splitMarkdownBlocks(prefix: String): List&lt;MarkdownBlock&gt;</ID>
+    <ID>NestedBlockDepth:StreamingMarkdownParser.kt$internal fun findLastSafeBoundary(text: String): Int</ID>
+    <ID>NestedBlockDepth:StreamingMarkdownRepair.kt$private fun findUnclosedInlineCodeMarker(text: String): String?</ID>
+    <ID>NestedBlockDepth:ToolOutputSyntaxHighlighter.kt$internal fun highlightShellOutput(text: String): List&lt;ToolOutputHighlightSpan&gt;</ID>
+    <ID>NewLineAtEndOfFile:ChatComposerSnapshot.kt$com.letta.mobile.ui.chat.surface.composer.ChatComposerSnapshot.kt</ID>
+    <ID>NewLineAtEndOfFile:ChatHapticCuesTest.kt$com.letta.mobile.ui.chat.surface.composer.ChatHapticCuesTest.kt</ID>
+    <ID>NewLineAtEndOfFile:RosterModel.kt$com.letta.mobile.ui.components.list.RosterModel.kt</ID>
+    <ID>NewLineAtEndOfFile:SharedMarkdownRendererSeamTest.kt$com.letta.mobile.ui.markdown.SharedMarkdownRendererSeamTest.kt</ID>
+    <ID>NewLineAtEndOfFile:StreamingRevealCue.kt$com.letta.mobile.ui.chat.render.StreamingRevealCue.kt</ID>
+    <ID>NewLineAtEndOfFile:StreamingRevealCueTest.kt$com.letta.mobile.ui.chat.render.StreamingRevealCueTest.kt</ID>
+    <ID>ReturnCount:A2uiRendererSupport.kt$internal fun A2uiComponent.localOpenUrl(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): A2uiLink?</ID>
+    <ID>ReturnCount:CanvasImageAssets.kt$CanvasImageAssets$fun hydrate(image: Element.Image, store: AssetStore): Element.Image</ID>
+    <ID>ReturnCount:CanvasNotesLayer.kt$private fun computeScaledStyle( plain: Boolean, started: CanvasDocumentFrame?, committed: CanvasDocumentFrame, currentStyle: CanvasTextStyle?, ): CanvasTextStyle?</ID>
+    <ID>ReturnCount:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport$fun deleteFocused(params: DeleteFocusedParams): Boolean</ID>
+    <ID>ReturnCount:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport$fun handleWheelZoom( event: PointerEvent, controller: DrawBoxController, zoomStep: Float = WHEEL_ZOOM_STEP, ): Boolean</ID>
+    <ID>ReturnCount:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport$fun quickCreateAnchor(params: QuickCreateAnchorParams): Rect?</ID>
+    <ID>ReturnCount:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport$private fun validatePenPosition( event: CanvasPenEvent, params: PenConsumerParams, ): Offset?</ID>
+    <ID>ReturnCount:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport.PenInk$fun consume(event: CanvasPenEvent): Boolean</ID>
+    <ID>ReturnCount:RosterDrag.kt$RosterDrag$private fun stepTowards(dragged: String, shown: RosterLayout&lt;*&gt;, items: List&lt;LazyListItemInfo&gt;): RosterDragStep?</ID>
+    <ID>ReturnCount:StreamingFlickerTest.kt$StreamingFlickerTest$private fun unmatchedInlineMarker(line: String): String?</ID>
+    <ID>ReturnCount:StreamingMarkdownDocumentParser.kt$StreamingMarkdownDocumentParser$private fun MarkdownLine.startsInterruptingBlock(): Boolean</ID>
+    <ID>ReturnCount:StreamingMarkdownParser.kt$fun parseMarkdownTable(text: String): ParsedMarkdownTable?</ID>
+    <ID>ReturnCount:StreamingMarkdownRepair.kt$fun repairIncompleteMarkdownForStreaming(text: String): String</ID>
+    <ID>ReturnCount:StreamingMarkdownRepair.kt$private fun isLikelyInlineMathBody(body: String): Boolean</ID>
+    <ID>TooGenericExceptionCaught:AgentMascotIdentityWriter.kt$AgentMascotIdentityWriter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:TimelineDeferredBody.kt$DeferredPageReader$thrown: Exception</ID>
+    <ID>TooManyFunctions:A2uiBasicWidgets.kt$com.letta.mobile.ui.a2ui.A2uiBasicWidgets.kt</ID>
+    <ID>TooManyFunctions:A2uiRendererSupport.kt$com.letta.mobile.ui.a2ui.A2uiRendererSupport.kt</ID>
+    <ID>TooManyFunctions:CanvasBoardActions.kt$com.letta.mobile.ui.canvas.CanvasBoardActions.kt</ID>
+    <ID>TooManyFunctions:CanvasBoardChrome.kt$com.letta.mobile.ui.canvas.CanvasBoardChrome.kt</ID>
+    <ID>TooManyFunctions:CanvasBoardLayers.kt$com.letta.mobile.ui.canvas.CanvasBoardLayers.kt</ID>
+    <ID>TooManyFunctions:CanvasBoardSync.kt$com.letta.mobile.ui.canvas.CanvasBoardSync.kt</ID>
+    <ID>TooManyFunctions:CanvasQuickCreate.kt$CanvasQuickCreate</ID>
+    <ID>TooManyFunctions:CanvasWorkspaceSupport.kt$CanvasWorkspaceSupport</ID>
+    <ID>TooManyFunctions:ChatRowApprovals.kt$com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowApprovals.kt</ID>
+    <ID>TooManyFunctions:ChatRowRunBlock.kt$com.letta.mobile.ui.chat.surface.timeline.rows.ChatRowRunBlock.kt</ID>
+    <ID>TooManyFunctions:ChatSurface.kt$com.letta.mobile.ui.chat.surface.ChatSurface.kt</ID>
+    <ID>TooManyFunctions:CollapsedDock.kt$com.letta.mobile.ui.chat.surface.CollapsedDock.kt</ID>
+    <ID>TooManyFunctions:DockedChatPanel.kt$com.letta.mobile.ui.chat.surface.DockedChatPanel.kt</ID>
+    <ID>TooManyFunctions:HomePageTags.kt$HomePageTags</ID>
+    <ID>TooManyFunctions:PairingStrings.kt$PairingStrings</ID>
+    <ID>TooManyFunctions:ProviderSettingsPages.kt$com.letta.mobile.ui.modelcontrol.ProviderSettingsPages.kt</ID>
+    <ID>TooManyFunctions:SkillsPageRows.kt$SkillsPageRows</ID>
+    <ID>TooManyFunctions:StreamingMarkdownDocumentParser.kt$StreamingMarkdownDocumentParser</ID>
+    <ID>TooManyFunctions:StreamingMarkdownParser.kt$com.letta.mobile.ui.markdown.StreamingMarkdownParser.kt</ID>
+    <ID>TooManyFunctions:StreamingMarkdownRepair.kt$com.letta.mobile.ui.markdown.StreamingMarkdownRepair.kt</ID>
+    <ID>TooManyFunctions:ToolOutputSyntaxHighlighter.kt$com.letta.mobile.ui.chat.render.ToolOutputSyntaxHighlighter.kt</ID>
+    <ID>TooManyFunctions:TouchCanvasDock.kt$com.letta.mobile.ui.chat.surface.TouchCanvasDock.kt</ID>
+    <ID>TooManyFunctions:TouchComposerBar.kt$com.letta.mobile.ui.chat.surface.composer.TouchComposerBar.kt</ID>
+    <ID>UnusedImports:ActiveSubagentRingsTest.kt$import kotlin.test.assertNotNull</ID>
+    <ID>UnusedImports:AgentAvatar.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:AgentOrb.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:CanvasColorPicker.kt$import codes.side.colorpicker.conversion.toComposeColor</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.foundation.layout.offset</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.draw.clip</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.graphics.TransformOrigin</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.graphics.graphicsLayer</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.layout.layout</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.unit.Constraints</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import androidx.compose.ui.unit.IntOffset</ID>
+    <ID>UnusedImports:CanvasNotesLayer.kt$import kotlin.math.roundToInt</ID>
+    <ID>UnusedImports:CanvasSnapLayer.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ChatPanelAmbientGlow.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ChatSurfaceMorph.kt$import androidx.compose.foundation.layout.WindowInsets</ID>
+    <ID>UnusedImports:ChatSurfaceMorph.kt$import androidx.compose.foundation.layout.ime</ID>
+    <ID>UnusedImports:ChatSurfaceMorph.kt$import androidx.compose.ui.platform.LocalDensity</ID>
+    <ID>UnusedImports:DockedChatPanel.kt$import androidx.compose.foundation.layout.Arrangement</ID>
+    <ID>UnusedImports:DockedChatPanel.kt$import androidx.compose.foundation.layout.Row</ID>
+    <ID>UnusedImports:ImageDropOverlay.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:LegacyTimelineList.kt$import androidx.compose.foundation.lazy.rememberLazyListState</ID>
+    <ID>UnusedImports:LettaListParts.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:LettaPopupMenu.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:MascotLoading.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.animation.core.Animatable</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.animation.core.FastOutSlowInEasing</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.animation.core.tween</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.background</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.clickable</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.hoverable</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.interaction.MutableInteractionSource</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.interaction.collectIsHoveredAsState</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.layout.offset</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.foundation.shape.CircleShape</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.material3.MaterialTheme</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.material3.Text</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.runtime.compositionLocalOf</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.runtime.mutableStateMapOf</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.runtime.rememberUpdatedState</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.runtime.snapshotFlow</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.draw.clip</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.geometry.Offset</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.graphics.graphicsLayer</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.input.pointer.PointerIcon</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.input.pointer.pointerHoverIcon</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.platform.LocalDensity</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.unit.IntOffset</ID>
+    <ID>UnusedImports:MascotSeat.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:MascotSeat.kt$import kotlin.math.roundToInt</ID>
+    <ID>UnusedImports:MascotSeat.kt$import kotlinx.coroutines.coroutineScope</ID>
+    <ID>UnusedImports:MascotSeat.kt$import kotlinx.coroutines.flow.conflate</ID>
+    <ID>UnusedImports:MascotSeat.kt$import kotlinx.coroutines.flow.distinctUntilChanged</ID>
+    <ID>UnusedImports:MascotSeat.kt$import kotlinx.coroutines.launch</ID>
+    <ID>UnusedImports:MascotTransport.kt$import androidx.compose.ui.unit.Dp</ID>
+    <ID>UnusedImports:MascotTransport.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:MemoryWorkspacePageTest.kt$import com.letta.mobile.data.memory.graph.MemoryPageActions</ID>
+    <ID>UnusedImports:MemoryWorkspacePageTest.kt$import com.letta.mobile.data.memory.memfs.MemfsPageActions</ID>
+    <ID>UnusedImports:PresenceLayer.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:PresenceLayer.kt$import androidx.compose.ui.unit.sp</ID>
+    <ID>UnusedImports:ScheduleHistoryView.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ScheduleViewSupport.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:TimelineListChrome.kt$import androidx.compose.foundation.background</ID>
+    <ID>UnusedImports:TimelineListChrome.kt$import androidx.compose.foundation.layout.Arrangement</ID>
+    <ID>UnusedImports:TimelineListChrome.kt$import androidx.compose.material3.CircularProgressIndicator</ID>
+    <ID>UnusedImports:ToolOutputSyntaxHighlighterTest.kt$import org.junit.Assert.assertEquals</ID>
+    <ID>UnusedParameter:CanvasControlsBar.kt$onAddText: (() -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:CanvasNotesLayer.kt$cardColor: Color</ID>
+    <ID>UnusedParameter:CanvasNotesLayer.kt$onActivate: () -&gt; Unit</ID>
+    <ID>UnusedParameter:MascotAvatar.kt$identity: MascotIdentity</ID>
+    <ID>UnusedPrivateMember:CanvasColorPicker.kt$@Composable private fun HslSlider(label: String, value: Float, range: ClosedFloatingPointRange&lt;Float&gt;, onChange: (Float) -&gt; Unit)</ID>
+    <ID>UnusedPrivateProperty:ActiveSubagentRingsTest.kt$ActiveSubagentRingsTest$val expired = holds.filterValues { ts -&gt; now + COMPLETED_FILL_LINGER_MS - ts &lt;= COMPLETED_FILL_LINGER_MS }</ID>
+    <ID>UnusedPrivateProperty:ChatRowRunAlignmentUiTest.kt$ChatRowRunAlignmentUiTest$/** A run with no tool calls: its label sits on a line of its own. */ private val proseRun = ChatRenderItem.RunBlock( runId = "run-2", messages = listOf( UiMessage(id = "p", role = "assistant", content = "Looking into it.", timestamp = "2026-07-19T12:00:00Z", runId = "run-2"), UiMessage(id = "q", role = "assistant", content = "All done here.", timestamp = "2026-07-19T12:00:04Z", runId = "run-2"), ).map { it to GroupPosition.None }, )</ID>
+    <ID>UnusedPrivateProperty:TimelineElasticOverscroll.kt$TimelineElasticOverscroll.Companion$private const val MIN_BOUNCE_VELOCITY: Float = 1f</ID>
+  </CurrentIssues>
+</SmellBaseline>

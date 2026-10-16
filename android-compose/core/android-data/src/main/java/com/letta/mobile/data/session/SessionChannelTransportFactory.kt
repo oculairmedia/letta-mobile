@@ -2,8 +2,10 @@ package com.letta.mobile.data.session
 
 import android.content.Context
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -18,7 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * Hilt-owned transport binder for a session graph generation.
  *
- * Selects Iroh QUIC or NoOp via shared [sessionBackendBinding] — mode is
+ * Selects Iroh QUIC or NoOp via shared [routedBackendKind] — mode is
  * authoritative over leftover `iroh://` URLs (same policy as desktop). The
  * legacy shim WebSocket transport is gone (g70jb.3): REST/HTTP configs get a
  * [NoOpChannelTransport] and talk to the server over REST only.
@@ -37,15 +39,14 @@ class SessionChannelTransportFactory @Inject constructor(
         localRuntimeBackend: LocalLettaBackend?,
         settingsRepository: ISettingsRepository?,
     ): IChannelTransport {
-        val forceIroh = IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl)
         fun reportChoice(chosen: String) {
             com.letta.mobile.util.Telemetry.event(
                 "IrohSelect", "transport", "chosen" to chosen,
                 "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
             )
         }
-        return when (activeConfig.sessionBackendBinding(forceIroh = forceIroh)) {
-            SessionBackendBinding.Iroh -> {
+        return when (activeConfig.routedBackendKind()) {
+            BackendKind.IROH -> {
                 reportChoice("iroh")
                 IrohChannelTransport(
                     scope = scope,
@@ -76,13 +77,13 @@ class SessionChannelTransportFactory @Inject constructor(
                     canvasClient?.attach(transport.readyHandle, scope)
                 }
             }
-            SessionBackendBinding.LocalRuntime -> {
+            BackendKind.LOCAL_RUNTIME -> {
                 // No Iroh host behind this backend: canvases stay on this device, and say so.
                 canvasClient?.detach()
                 reportChoice("noop-local")
                 NoOpChannelTransport()
             }
-            SessionBackendBinding.RemoteHttp -> {
+            BackendKind.DIRECT_WS -> {
                 canvasClient?.detach()
                 reportChoice(if (localRuntimeBackend != null) "noop-local" else "noop-rest")
                 NoOpChannelTransport()

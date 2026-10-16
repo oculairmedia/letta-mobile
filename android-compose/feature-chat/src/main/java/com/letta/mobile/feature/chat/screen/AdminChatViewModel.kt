@@ -814,11 +814,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun sendCoordinatorMessage(message: String) {
         if (replacingSendRuntime) return
-        sendPipeline.timelineChatSendStrategy.send(
-            text = message,
-            attachments = emptyList(),
-            context = composerCoordinator.chatSendContext(),
-        )
+        sendPipeline.timelineSendCoordinator.send(message)
     }
 
     private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(

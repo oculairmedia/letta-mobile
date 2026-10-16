@@ -231,7 +231,7 @@ Medium — Gradle source-set surgery.
 
 ### Scope
 
-**Already shared:** `SessionRepositoryGraph`, `SessionRepositoryGraphFactory`, `SessionRepositoryGraphProvider`, `DefaultSessionRepositoryGraphProvider`, plus Phase 4b helpers: `SessionBackendBinding` / `sessionBackendBinding`, `remoteLettaBackendDescriptor`, `BackendConnectionKey`.
+**Already shared:** `SessionRepositoryGraph`, `SessionRepositoryGraphFactory`, `SessionRepositoryGraphProvider`, `DefaultSessionRepositoryGraphProvider`, plus Phase 4b helpers: `remoteLettaBackendDescriptor`, `BackendConnectionKey`.
 
 **Still split:**
 

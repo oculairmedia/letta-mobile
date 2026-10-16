@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
@@ -285,43 +286,49 @@ private fun LazyListScope.pagedRows(scope: PagedRowsScope) {
     val rows = scope.rows
     if (rows.leading > 0) item(key = THINKING_KEY) { ThinkingRow(scope.params.thinkingMessages) }
     items(count = rows.size - rows.leading, key = { rows.key(it + rows.leading) }) { offset ->
-        val index = offset + rows.leading
-        if (offset < rows.liveCount) {
-            val item = rows.assembly.live[offset]
-            PagedRow(item, rows.itemAt(index + 1), scope, timelineRowMotion(fadesIn = !item.isUserPrompt()))
-        } else {
-            // Settled rows page in from history: they glide when displaced but never fade in,
-            // or every page load would flash its rows.
-            SettledRow(scope, index, timelineRowMotion(fadesIn = false))
-        }
+        PagedSlot(scope, offset + rows.leading, offset)
     }
     pagedLoadFooter(scope)
 }
 
 /**
- * One settled row through [LazyPagingItems.get], so the access registers with Paging and drives
- * prefetch. A not-yet-loaded row still occupies space, or the list would collapse toward the tail
- * while a page loads and drag the reader with it.
+ * One slot of the list: a live row, or a settled row read through [LazyPagingItems.get] so the
+ * access registers with Paging and drives prefetch. A not-yet-loaded row still occupies space, or
+ * the list would collapse toward the tail while a page loads and drag the reader with it.
+ *
+ * letta-mobile-by4vm.105: a settled row takes over its live twin's key (TimelineRowAssembly), and
+ * it must take over its composition too. Live and settled rows are drawn from the one [PagedRow]
+ * call below, so at settle the item recomposes in place; drawn from two call sites, the hand-over
+ * switched branches, tore the row's content down and rebuilt it (remembered markdown parse, text
+ * layout, size animation), and the newest row collapsed for a frame and sprang back.
  */
 @Composable
-private fun SettledRow(scope: PagedRowsScope, index: Int, modifier: Modifier) {
-    val settledIndex = index - scope.rows.leading - scope.rows.liveCount
-    val row = scope.settled[settledIndex]
-    if (row == null) {
-        Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
-    } else if (row.deferred != null) {
-        // A body too large to decode inline pages in on demand, above its (blanked) row.
-        val presentation = scope.params.presentation
-        Column(modifier.fillMaxWidth()) {
-            TimelineDeferredBody(
-                rowKey = row.identity.value,
-                read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
-                modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
-            )
-            PagedRow(row.item, scope.rows.itemAt(index + 1), scope, Modifier)
-        }
-    } else {
-        PagedRow(row.item, scope.rows.itemAt(index + 1), scope, modifier)
+private fun LazyItemScope.PagedSlot(scope: PagedRowsScope, index: Int, offset: Int) {
+    val live = scope.rows.assembly.live.getOrNull(offset)
+    val row = if (live == null) scope.settled[offset - scope.rows.liveCount] else null
+    val item = live ?: row?.item
+    // Settled rows page in from history: they glide when displaced but never fade in, or every
+    // page load would flash its rows.
+    val modifier = timelineRowMotion(fadesIn = live != null && !live.isUserPrompt())
+    val deferred = row?.takeIf { it.deferred != null }
+    when {
+        item == null -> Box(modifier.height(ChatTimelineDimens.placeholderRowHeight))
+        deferred != null -> DeferredSettledRow(scope, deferred, index, modifier)
+        else -> PagedRow(item, scope.rows.itemAt(index + 1), scope, modifier)
+    }
+}
+
+/** A body too large to decode inline pages in on demand, above its (blanked) row. */
+@Composable
+private fun DeferredSettledRow(scope: PagedRowsScope, row: CanonicalTimelinePresentation.Row, index: Int, modifier: Modifier) {
+    val presentation = scope.params.presentation
+    Column(modifier.fillMaxWidth()) {
+        TimelineDeferredBody(
+            rowKey = row.identity.value,
+            read = { field, offset -> presentation.readTextWindow(row, field, offset, Dispatchers.Default) },
+            modifier = Modifier.padding(horizontal = LettaDimens.Space.md),
+        )
+        PagedRow(row.item, scope.rows.itemAt(index + 1), scope, Modifier)
     }
 }
 

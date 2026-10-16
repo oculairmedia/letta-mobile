@@ -20,9 +20,9 @@ package com.letta.mobile.data.model
  * backend family: a new one needs a [LettaConfig.Mode] value (the Settings page lists
  * `Mode.entries`), a kind here returned by [backendKind], and then each place that binds a
  * transport or picks a send path for it:
- *  - Android: [com.letta.mobile.data.session.sessionBackendBinding] (session graph assembly and
- *    `SessionChannelTransportFactory`) and the chat `ChatSendStrategySelector`;
- *  - desktop: `sessionBackendBinding` in `DesktopRepositoryAdapters`, and
+ *  - Android: `routedBackendKind` (session graph assembly and `SessionChannelTransportFactory`)
+ *    and the chat `ChatSendStrategySelector`;
+ *  - desktop: `routedBackendKind` in `DesktopRepositoryAdapters`, and
  *    `DesktopAppServerChatGateways.createDefault`, which chooses on mode and address;
  *  - web: `WasmAppServerSession`, which still chooses on [isIrohBackendUrl] directly.
  *
