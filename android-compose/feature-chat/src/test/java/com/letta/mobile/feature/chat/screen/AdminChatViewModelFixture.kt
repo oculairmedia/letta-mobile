@@ -98,7 +98,6 @@ private fun stubChatBridge() = mockk<WsChatBridge>(relaxed = true) {
 }
 
 private fun stubSessionManager(session: FixtureSession) = mockk<SessionManager>(relaxed = true) {
-    every { current.localRuntimeBackend } returns null
     every { current.backendDescriptor.backendId } returns BackendId(session.tag)
     every { current.backendDescriptor.runtimeId } returns RuntimeId(session.tag)
     every { currentGraph } returns MutableStateFlow(

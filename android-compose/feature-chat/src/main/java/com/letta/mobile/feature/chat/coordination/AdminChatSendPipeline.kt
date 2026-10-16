@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.BackendKind
-import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
@@ -22,7 +21,6 @@ internal data class AdminChatSendSources(
     val conversationRepository: IConversationRepository,
     val settingsRepository: ISettingsRepository,
     val sessionManager: SessionManager,
-    val messageRepository: MessageRepository,
     val slashCommandRepository: com.letta.mobile.data.repository.api.ISlashCommandRepository,
     val wsChatBridge: WsChatBridge,
     val runtimeEventOutbox: RuntimeEventOutbox,
@@ -67,7 +65,6 @@ internal class AdminChatSendPipeline(
     private val conversationRepository = sources.conversationRepository
     private val settingsRepository = sources.settingsRepository
     private val sessionManager = sources.sessionManager
-    private val messageRepository = sources.messageRepository
     private val slashCommandRepository = sources.slashCommandRepository
     private val wsChatBridge = sources.wsChatBridge
     private val runtimeEventOutbox = sources.runtimeEventOutbox
@@ -117,30 +114,13 @@ internal class AdminChatSendPipeline(
         )
     }
 
-    val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
-        LocalRuntimeChatSendCoordinator(
-            scope = scope,
-            agentId = agentId.value,
-            localBackend = { sessionManager.current.localRuntimeBackend },
-            timelineRepository = writer,
-            uiState = uiState,
-            clearComposerAfterSend = { composerController.clearAfterSend() },
-            activeConversationId = activeConversationId,
-            setActiveConversationId = setActiveConversationId,
-            startTimelineObserver = startTimelineObserver,
-        )
-    }
-
     /**
-     * lgns8.10.4.1: Iroh's route drives [wsChatSendCoordinator] (transport-neutral: it talks to
-     * whichever `IChannelTransport` the session graph bound).
+     * lgns8.10.4.1 / by4vm.110.6: the one route drives [wsChatSendCoordinator] over whichever
+     * `IChannelTransport` the session graph bound (Iroh, ws:// or the on-device runtime).
      */
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
-            localStrategy = ChatSendStrategy("local", localRuntimeChatSendCoordinator::send) {
-                localRuntimeChatSendCoordinator.cancel()
-            },
-            irohStrategy = ChatSendStrategy("iroh", wsChatSendCoordinator::send) { wsChatSendCoordinator.cancel() },
+            ChatSendStrategy("channel", wsChatSendCoordinator::send) { wsChatSendCoordinator.cancel() },
         )
     }
 
@@ -154,8 +134,6 @@ internal class AdminChatSendPipeline(
             agentId = agentId,
             explicitConversationId = explicitConversationId,
             backendKind = backendKind,
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
             isStreaming = { uiState.value.isStreaming },
             pendingUserInput = {

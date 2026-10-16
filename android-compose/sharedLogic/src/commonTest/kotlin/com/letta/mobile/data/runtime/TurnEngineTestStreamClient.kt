@@ -109,6 +109,7 @@ internal const val AUTO_FINISH_MESSAGE_ID = "auto-finish"
 internal enum class TestApprovalTool(val wire: String) {
     Bash("Bash"),
     AskUserQuestion("AskUserQuestion"),
+    ExitPlanMode("ExitPlanMode"),
     ;
 
     /** A `can_use_tool` control request (`perm-1`) for this tool on `agent-1/conv-1`. */

@@ -33,7 +33,10 @@ package com.letta.mobile.data.model
  * until its session factory binds exactly that row. Nothing in sharedUI keys on the backend family.
  */
 enum class BackendKind {
-    /** On-device embedded runtime — no network transport at all. */
+    /**
+     * The on-device runtime: a loopback App Server this device hosts (letta-mobile-by4vm.110.6).
+     * Android dials it through the same App Server channel as [DIRECT_WS].
+     */
     LOCAL_RUNTIME,
 
     /** Iroh QUIC node (`iroh://…`). Production transport. Never dials the shim. */
@@ -46,14 +49,7 @@ enum class BackendKind {
      * letta-mobile-ckmub.4 removed. The kind is derived from [LettaConfig] on every read and never
      * persisted, so the rename needs no settings migration.
      */
-    DIRECT_WS;
-
-    /**
-     * True when this backend is served by an [com.letta.mobile.data.transport.api.IChannelTransport]
-     * (a duplex frame channel). Only Iroh is.
-     */
-    val usesChannelTransport: Boolean
-        get() = this == IROH
+    DIRECT_WS,
 }
 
 /**

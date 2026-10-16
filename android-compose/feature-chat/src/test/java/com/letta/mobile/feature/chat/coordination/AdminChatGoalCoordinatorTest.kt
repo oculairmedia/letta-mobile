@@ -53,8 +53,6 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            usesChannelTransport = MutableStateFlow(false),
-            localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )
         coordinator.startObserving()
@@ -110,8 +108,6 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            usesChannelTransport = MutableStateFlow(false),
-            localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )
         coordinator.startObserving()
@@ -150,8 +146,6 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            usesChannelTransport = MutableStateFlow(false),
-            localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )
         coordinator.startObserving()

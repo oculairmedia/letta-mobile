@@ -28,7 +28,6 @@ class HostSessionGraphFactory(
             identity = SessionGraphIdentity(
                 id = nextId.incrementAndGet(),
                 backendDescriptor = hostRemoteLettaDescriptor(binding.platform, binding.config),
-                localRuntimeBackend = null,
                 channelTransport = binding.channelTransport,
                 capabilities = adapters.capabilities,
             ),

@@ -29,38 +29,37 @@ a live Day 0 spike confirming Node-version compatibility.
 - The local runtime slot must remain pluggable so LettaCode can coexist with
   future engines such as Koog.
 
-## Proposal
+## Shape (letta-mobile-by4vm.110.6)
 
-Android hosts a foreground service that starts nodejs-mobile with bundled
-`letta.js --backend local --input-format stream-json --output-format stream-json`.
-Kotlin/Compose remains the UI shell and talks to the local runtime over the
-LettaCode headless stream-json wire protocol through JNI-managed stdin/stdout
-pipes. Remote REST/SSE and admin-shim WS remain unchanged; LocalLettaCode is the
-default local runtime provider behind a pluggable local runtime boundary, while
-explicit schemes such as `local-koog://device` can keep other engines
-addressable.
-
-## Android Shape
+Android hosts the same thing every client hosts: a stock `letta.js server --backend local --listen
+ws://127.0.0.1:0 --ws-auth capability-token` on nodejs-mobile, supervised by the shared
+`LocalAppServerHost` (`sharedLogic/.../data/runtime/host/`) and launched in process by
+`LibnodeAppServerLauncher`. A LOCAL_RUNTIME session's channel (`IrohChannelTransport` with an
+`AndroidLocalRuntimeDialer`) takes a lease, dials `ws://127.0.0.1:<port>` with the lease's token
+through the shared `openAppServerWebSocket`, and answers `admin_rpc` in process with the router an
+Iroh host runs (`AdminRpcRegistry.buildRouter` over the dial's client). Chat, timeline, agents,
+conversations, fork, dream and device tools (`runtime_start.register_external_tools`) are the
+same code paths as an Iroh host. The headless stream-json protocol, its Kotlin mapper and the
+stdin half of the JNI bridge are gone.
 
 ```text
 Compose UI
-  -> Local runtime registry
-  -> LocalLettaCodeRuntime
-  -> LocalLettaCodeService
-  -> JNI bridge
-  -> stdin/stdout stream-json
-  -> libnode.so
-  -> assets/letta-code/letta.js --backend local
+  -> session channel (IrohChannelTransport, direct dial)
+  -> ws://127.0.0.1:<port> + capability token
+  -> letta.js server --backend local   (libnode, in process)
 ```
 
 The Android implementation follows these constraints:
 
-- Node can only be started once per OS process.
-- `node::Start()` blocks forever and must run on a dedicated background thread.
-- `stdin`, `stdout`, and `stderr` must be redirected through native pipes.
-- Assets are extracted from APK assets into `filesDir` before Node starts.
-- `HOME` and `LETTA_LOCAL_BACKEND_DIR` point into app-private storage.
-- The remote/shim transport must not be changed by the spike.
+- Node can only be started once per OS process: a stopped runtime asks for an app restart
+  (`LocalAppServerHost.RESTART_THE_APP`; Settings shows the runtime's health, there is no Stop).
+- `node::Start()` blocks forever and runs on a dedicated background thread; stdout/stderr are
+  pumped back over JNI (the listen line), stdin is a pipe nobody writes.
+- Assets are extracted from APK assets into `filesDir` before Node starts (the first start after
+  an install takes up to a minute; dials wait up to three minutes).
+- `HOME` and `LETTA_LOCAL_BACKEND_DIR` point into app-private storage; the model comes from the
+  runtime's own `providers/auth.json` (`lc-lmstudio` at the on-device LiteRT bridge or the
+  configured model server), written before every dial.
 
 ## Android Implementation Notes
 
@@ -71,8 +70,6 @@ The Android implementation follows these constraints:
 - `prepareEmbeddedLettaCodeAssets` installs the pinned `@letta-ai/letta-code`
   (`lettaCodeVersion` in `android-compose/letta-code-runtime/letta-code-runtime.properties`)
   into generated APK assets when asset packaging is enabled.
-- The JNI bridge starts Node once, writes user/control frames to stdin, and
-  emits stdout JSON lines into the Kotlin stream-json mapper.
 
 ## App Server Compatibility Gate
 
@@ -104,7 +101,7 @@ The embedded App Server wedge was version-blocked:
    gzip'd staged tree exceeds **28 MiB** (0.34.14 stages 26.4 MiB gzip, ~123 MiB raw; raw size is not
    budgeted), then runs the tree with the shipped preloads in device order behind
    `android-platform-emulation.cjs` (`process.platform = "android"`, no `Intl`) against
-   `fake-llm.cjs`: a headless stream-json Bash turn, then `letta server` through
+   `fake-llm.cjs`: a CLI stream-json Bash turn (it creates the agent), then `letta server` through
    `LocalAppServerHost` (`app-server-serve`) driven by the shared `AppServerClient`
    (`app-server-smoke`: `runtime_start` -> Bash tool -> `end_turn`).
 3. A failure prints the first missing-API line from the runtime's stderr (for example

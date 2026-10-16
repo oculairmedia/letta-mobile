@@ -46,7 +46,6 @@ import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
-import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -178,7 +177,6 @@ class SessionHomePageSourceTest {
                 supportsAgentFileExport = false,
             ),
         )
-        override val localRuntimeBackend: LettaBackend? = null
         override val channelTransport: IChannelTransport = FakeIrohAdminTransport()
         override val agentRepository: IAgentRepository = FakeAgents()
         override val conversationRepository: IConversationRepository get() = unused()

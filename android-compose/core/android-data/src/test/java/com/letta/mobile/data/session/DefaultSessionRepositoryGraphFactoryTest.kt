@@ -8,13 +8,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
-import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeEventOutbox
-import com.letta.mobile.runtime.MemFsStore
-import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakeProviderApi
 import io.mockk.coVerify
@@ -23,8 +17,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,7 +31,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
 
     private fun factory(
         settingsRepository: ISettingsRepository? = null,
-        localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
         modelApi: FakeModelApi? = null,
         providerApi: FakeProviderApi? = null,
     ): DefaultSessionRepositoryGraphFactory =
@@ -48,7 +39,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
             this.conversationDao = lazyOf(this@DefaultSessionRepositoryGraphFactoryTest.conversationDao)
             this.appContext = this@DefaultSessionRepositoryGraphFactoryTest.appContext
             this.settingsRepository = settingsRepository
-            this.localRuntimeOptions = localRuntimeOptions
             modelApi?.let { this.modelApi = it }
             providerApi?.let { this.providerApi = it }
         }
@@ -73,11 +63,10 @@ class DefaultSessionRepositoryGraphFactoryTest {
 
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("remote-letta:default", graph.backendDescriptor.backendId.value)
-        assertNull(graph.localRuntimeBackend)
     }
 
     @Test
-    fun `remote and local-disabled configs map to remote descriptors`() {
+    fun `remote and local configs map to remote descriptors`() {
         val remote = factory(
             settingsRepository = settingsWith(
                 LettaConfig(
@@ -90,7 +79,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
         assertEquals(BackendKind.RemoteLetta, remote.backendDescriptor.kind)
         assertEquals("remote-letta:test-remote", remote.backendDescriptor.backendId.value)
         assertEquals("https://test.letta.com", remote.backendDescriptor.label)
-        assertNull(remote.localRuntimeBackend)
 
         val localDisabled = factory(
             settingsRepository = settingsWith(
@@ -100,10 +88,8 @@ class DefaultSessionRepositoryGraphFactoryTest {
                     serverUrl = "local",
                 ),
             ),
-            localRuntimeOptions = LocalRuntimeOptions.Disabled,
         ).create()
         assertEquals("remote-letta:test-local", localDisabled.backendDescriptor.backendId.value)
-        assertNull(localDisabled.localRuntimeBackend)
     }
 
     @Test
@@ -120,40 +106,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
         assertTrue(graph.channelTransport is IrohChannelTransport)
         assertFalse(graph.scheduleRepository is ScheduleRepository)
         graph.close()
-    }
-
-    @Test
-    fun `create with local config and enabled options creates local backend`() {
-        val config = LettaConfig(
-            id = "test-local-enabled",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = "local",
-        )
-        val provider: LocalRuntimeProvider = mockk()
-        every { provider.supports(config) } returns true
-        every { provider.priority } returns 1
-        every { provider.providerId } returns "test-provider"
-        every { provider.descriptor(config) } returns BackendDescriptor(
-            backendId = BackendId("local:test"),
-            runtimeId = RuntimeId("local:test"),
-            kind = BackendKind.LocalKoog,
-            label = "local",
-            capabilities = mockk(relaxed = true),
-        )
-        every { provider.turnEngine(config) } returns mockk<TurnEngine>()
-
-        val graph = factory(
-            settingsRepository = settingsWith(config),
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
-                runtimeEventOutbox = mockk<RuntimeEventOutbox>(),
-                memFsStore = mockk<MemFsStore>(),
-                providers = setOf(provider),
-            ),
-        ).create()
-
-        assertEquals(BackendKind.LocalKoog, graph.backendDescriptor.kind)
-        assertEquals("local:test", graph.backendDescriptor.backendId.value)
-        assertNotNull(graph.localRuntimeBackend)
     }
 
     @Test
@@ -179,29 +131,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
             graph.modelRepository.llmModels.value.map { it.handle }.toSet(),
         )
         graph.close()
-    }
-
-    @Test
-    fun `create with local config and enabled options falls back if no provider supports`() {
-        val config = LettaConfig(
-            id = "test-local-unsupported",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = "local",
-        )
-        val provider: LocalRuntimeProvider = mockk()
-        every { provider.supports(config) } returns false
-
-        val graph = factory(
-            settingsRepository = settingsWith(config),
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
-                runtimeEventOutbox = mockk<RuntimeEventOutbox>(),
-                memFsStore = mockk<MemFsStore>(),
-                providers = setOf(provider),
-            ),
-        ).create()
-
-        assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
-        assertNull(graph.localRuntimeBackend)
     }
 
     private fun model(handle: String): LlmModel {

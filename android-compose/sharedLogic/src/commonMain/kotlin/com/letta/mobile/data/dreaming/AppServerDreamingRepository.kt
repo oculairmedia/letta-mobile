@@ -13,8 +13,8 @@ import kotlinx.serialization.json.JsonObject
  * App Server URL): letta-code's own `get/set_reflection_settings` and `execute_command dream`.
  *
  * [supportedCommands] is the server's `device_status.supported_commands`, or null when no status
- * has arrived (then `/dream` is simply tried). A server that lists commands without `dream` (the
- * embedded 0.26.1 runtime, letta-code before 0.33) or answers "Unknown command" cannot dream:
+ * has arrived (then `/dream` is simply tried). A server that lists commands without `dream`
+ * (letta-code before 0.33) or answers "Unknown command" cannot dream:
  * [DreamUnsupportedReason.RuntimeTooOld]. A client that does not carry these requests at all
  * (`UnsupportedOperationException`), or no client, is [DreamUnsupportedReason.NoConnection].
  */

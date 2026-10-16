@@ -88,7 +88,7 @@ class SessionCapabilitiesTest {
 
     @Test
     fun boundRemoteSourcesExtendTheRowAndNoneServesNothing() {
-        val capabilities = SessionCapabilities.forSession(SessionPlatform.ANDROID, BackendKind.DIRECT_WS, extraBound = setOf(SessionRoute.STEPS))
+        val capabilities = SessionCapabilities.forSession(SessionPlatform.ANDROID, kind = null, extraBound = setOf(SessionRoute.STEPS))
         assertEquals(setOf(SessionRoute.STEPS), capabilities.bound)
         assertTrue(SessionRoute.entries.none(SessionCapabilities.None::supports))
     }

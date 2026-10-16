@@ -20,12 +20,8 @@ android-compose/app/src/main/java/com/letta/mobile/runtime/actions/DeviceActionC
 android-compose/app/src/main/java/com/letta/mobile/runtime/actions/MobileActionRegistry.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/hardware/DeviceHardwareControlTool.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidEmbeddedLettaCodeLaunch.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidLettaCodeRuntimeController.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/EndpointOpenAiModelCatalog.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/LettaCodeStreamJsonMapper.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalConversationHealer.kt
-android-compose/app/src/main/java/com/letta/mobile/runtime/local/LocalImageContextStripper.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceOpenAiBridge.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/OnDeviceToolCallProtocol.kt
 android-compose/app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelCatalog.kt
@@ -48,7 +44,6 @@ android-compose/cli/src/main/java/com/letta/mobile/cli/runtime/ReplayInteractive
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/AgentEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/ConversationEntity.kt
-android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomMemFsStore.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomRuntimeEventOutbox.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcSlashCommandSource.kt
@@ -141,7 +136,6 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/contr
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/IrohNodeConnectionSupport.kt
 # moved from app LettaCodeLocalBackendStore (by4vm.21); prettyPrint sidecar records, encodeDefaults=false
-android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendEmbeddedRecords.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/LocalBackendStoreSupport.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true ignoreUnknownKeys=true prettyPrint=true

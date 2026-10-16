@@ -9,12 +9,9 @@ import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
-import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
-import com.letta.mobile.feature.chat.send.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
@@ -40,8 +37,6 @@ internal class AdminChatComposerCoordinator(
     private val agentId: AgentId,
     private val explicitConversationId: String?,
     private val backendKind: () -> BackendKind,
-    private val sessionManager: SessionManager,
-    private val messageRepository: IMessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
     private val isStreaming: () -> Boolean,
     private val pendingUserInput: () -> PendingUserInput? = { null },
@@ -104,7 +99,7 @@ internal class AdminChatComposerCoordinator(
     fun submitComposer(text: String = state.value.inputText): ChatComposerEffect? {
         val trimmed = text.trim()
         val firstToken = trimmed.substringBefore(' ').substringBefore('\n')
-        if (firstToken == "/goal" && backendKind().usesChannelTransport) {
+        if (firstToken == "/goal") {
             composerController.clearText()
             scope.launch {
                 slashCommandRepository.executeGoalCommand(agentId.value, trimmed)
@@ -135,10 +130,6 @@ internal class AdminChatComposerCoordinator(
                     // while a stop is in flight — matching the existing
                     // "no free-form steering during an active run" convention.
                     composerController.setError(STOPPING_SEND_BLOCKED_MESSAGE)
-                } else if (isStreaming() && !canQueueWhileStreaming()) {
-                    composerController.setError(
-                        "Letta does not support free-form steering during an active run yet. Stop the run before sending another message."
-                    )
                 } else {
                     sendMessage(text)
                 }
@@ -181,20 +172,12 @@ internal class AdminChatComposerCoordinator(
         }
 
         val payload = composerController.payloadForSend(text) ?: return
-        if (isStreaming() && canQueueWhileStreaming()) {
+        // letta-mobile-1n5py / by4vm.110.6: every backend's channel route queues a send made during a turn.
+        if (isStreaming()) {
             queueMessagePayload(payload)
         } else {
             sendMessagePayload(payload.text, payload.attachments)
         }
-    }
-
-    /**
-     * letta-mobile-1n5py: the Iroh route queues a message sent during a turn instead of refusing
-     * it. The other routes still have no queue, so they keep the "stop first" rule.
-     */
-    fun canQueueWhileStreaming(): Boolean {
-        val context = chatSendContext()
-        return !context.isLocalRuntime && context.backendKind == BackendKind.IROH
     }
 
     /**
@@ -246,11 +229,6 @@ internal class AdminChatComposerCoordinator(
     fun chatSendContext() = ChatSendContext(
         explicitConversationId = explicitConversationId,
         backendKind = backendKind(),
-        isLocalRuntime = LocalRuntimeRouting.shouldUseLocalRuntime(
-            sessionHasLocalRuntimeBackend = sessionManager.current.localRuntimeBackend != null,
-            agentId = agentId.value,
-            conversationId = explicitConversationId,
-        ),
     )
 
     private fun GoalStatus.toUi() = GoalStatusUi(
@@ -289,12 +267,9 @@ internal class AdminChatComposerCoordinator(
     }
 
     /** Asks the transport to stop the turn: true once the request went out, throws when it could not. */
+    @Suppress("UnusedParameter", "RedundantSuspendModifier") // ChatStopRequest's abort contract.
     private suspend fun dispatchCancel(context: ChatSendContext): Boolean {
-        if (context.usesChannelTransport || context.isLocalRuntime) {
-            chatSendStrategySelector.cancel(context)
-        } else {
-            messageRepository.cancelMessage(agentId = agentId, runIds = activeRunIds().takeIf { it.isNotEmpty() })
-        }
+        chatSendStrategySelector.cancel()
         return true
     }
 
@@ -324,17 +299,11 @@ internal class AdminChatComposerCoordinator(
         }
     }
 
-    private fun cancelTransportLabel(context: ChatSendContext): String = when {
-        context.isLocalRuntime -> "localRuntime"
-        context.backendKind == BackendKind.IROH -> "iroh"
-        else -> "appServer"
+    private fun cancelTransportLabel(context: ChatSendContext): String = when (context.backendKind) {
+        BackendKind.IROH -> "iroh"
+        BackendKind.LOCAL_RUNTIME -> "localRuntime"
+        BackendKind.DIRECT_WS -> "appServer"
     }
-
-    private fun activeRunIds(): List<String> = uiState.value.messages
-        .asReversed()
-        .mapNotNull { it.runId }
-        .distinct()
-        .take(1)
 
     internal companion object {
         const val STOPPING_SEND_BLOCKED_MESSAGE =

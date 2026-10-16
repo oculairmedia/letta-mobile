@@ -8,14 +8,12 @@
     <ID>CyclomaticComplexMethod:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
     <ID>CyclomaticComplexMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
     <ID>CyclomaticComplexMethod:DeviceActionCommandRunner.kt$DeviceActionCommandRunner$fun run(commandJson: String): DeviceActionCommandResult</ID>
-    <ID>CyclomaticComplexMethod:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
     <ID>CyclomaticComplexMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
     <ID>DestructuringDeclarationWithTooManyEntries:HomeScreen.kt$val (navigation, routes, backend, title) = spec</ID>
     <ID>LargeClass:ConfigViewModelTest.kt$ConfigViewModelTest</ID>
     <ID>LongMethod:AdminGraph.kt$fun NavGraphBuilder.adminGraph( navController: NavHostController, activeBackendLabel: String?, openBackendSwitcher: () -&gt; Unit, clearAllData: () -&gt; Unit, )</ID>
     <ID>LongMethod:AndroidDeviceSensorSampler.kt$AndroidDeviceSensorSampler$override fun sample( descriptor: SensorDescriptor, sampleCount: Int, timeoutMs: Long, ): SensorSampleResponse</ID>
     <ID>LongMethod:AndroidEmbeddedLettaCodeLaunchSpecTest.kt$AndroidEmbeddedLettaCodeLaunchSpecTest$@Test fun `shared launch spec preserves Android env bridge preload and stream-json fallback parity`()</ID>
-    <ID>LongMethod:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean</ID>
     <ID>LongMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readCalendar(input: JsonObject): ProviderReadResult</ID>
     <ID>LongMethod:AndroidProviderReadTool.kt$AndroidProviderReadTool$private fun readContacts(input: JsonObject): ProviderReadResult</ID>
     <ID>LongMethod:BackendSwitcherSheet.kt$@OptIn(ExperimentalFoundationApi::class) @Composable private fun BackendSwitcherRow( config: ServerConfig, onSelect: () -&gt; Unit, onEdit: () -&gt; Unit, onLongPress: () -&gt; Unit, )</ID>
@@ -26,17 +24,11 @@
     <ID>LongMethod:ConfigListScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun ConfigCard( config: ServerConfig, onSetActive: () -&gt; Unit, onDelete: () -&gt; Unit, modifier: Modifier = Modifier )</ID>
     <ID>LongMethod:ConfigViewModel.kt$ConfigViewModel$fun saveConfig( onSuccess: () -&gt; Unit, onError: ((String) -&gt; Unit)? = null, asNewEntry: Boolean = createNew, )</ID>
     <ID>LongMethod:DeviceSensorReadTool.kt$DeviceSensorReadTool$fun handle(input: JsonObject, nowMillis: Long = System.currentTimeMillis()): ReadSensorsToolResponse</ID>
-    <ID>LongMethod:ImagePipelineSchemaTest.kt$ImagePipelineSchemaTest$@Test fun caseB_secondImageAfterStripProducesValidProviderRequest()</ID>
-    <ID>LongMethod:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$suspend fun readTranscript(agentId: String): List&lt;LettaMessage&gt;</ID>
-    <ID>LongMethod:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
     <ID>LongMethod:MobileActionRegistry.kt$AndroidMobileActionCapabilityProvider$override fun capabilities(): List&lt;MobileActionCapability&gt;</ID>
     <ID>LongMethod:MobileIntentActionTool.kt$MobileIntentActionTool$private fun handleIntent( toolName: String, dryRun: Boolean, userActionRequired: Boolean, buildIntent: () -&gt; Intent, ): MobileIntentActionResponse</ID>
     <ID>LongMethod:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
     <ID>LongMethod:TagDrillInDialog.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun TagDrillInItemCard(item: TagDrillInItem)</ID>
     <ID>LongMethod:TelemetryScreen.kt$@Composable private fun TelemetryEventRow(ev: Telemetry.Event)</ID>
-    <ID>LoopWithTooManyJumpStatements:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$while</ID>
-    <ID>LoopWithTooManyJumpStatements:LocalConversationHealer.kt$LocalConversationHealer$for</ID>
-    <ID>LoopWithTooManyJumpStatements:LocalImageContextStripper.kt$LocalImageContextStripper$for</ID>
     <ID>MatchingDeclarationName:AgentEditorScreen.kt$AgentEditorNavigation</ID>
     <ID>MatchingDeclarationName:AppStartDestination.kt$AppStartInputs</ID>
     <ID>MatchingDeclarationName:CanvasScreen.kt$CanvasViewModel : ViewModel</ID>
@@ -52,14 +44,8 @@
     <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$private fun remoteConfig(): LettaConfig</ID>
     <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$val params = AgentCreateParams(name = "Remote", model = "openai/gpt-4o", toolIds = persistentListOf(ToolId("t1")), includeBaseTools = true)</ID>
     <ID>MaxLineLength:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$check(!retired &amp;&amp; graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true &amp;&amp; scope.backendId == backendId) { "Stale canonical backend generation" }</ID>
-    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))</ID>
-    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assetExtractor = FakeAssetExtractor(File(System.getProperty("java.io.tmpdir"), "letta-timeout-${System.nanoTime()}").apply { mkdirs() })</ID>
-    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$val events = controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).let { flow -&gt; async { flow.toList() } }</ID>
-    <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$val job = launch { controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).collect {} }</ID>
     <ID>MaxLineLength:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$json.encodeToString(com.letta.mobile.runtime.actions.MobileActionToolResponse.serializer(), mobileActionRegistry.handle(toolName, input, actionId))</ID>
     <ID>MaxLineLength:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$socket.outputStream.writeJsonResponse(401, errorBody("unauthorized", "Android bridge authorization token is missing or invalid."))</ID>
-    <ID>MaxLineLength:AndroidNetworkBridgeReadSensorsTest.kt$AndroidNetworkBridgeReadSensorsTest.&lt;no name provided&gt;$HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)</ID>
-    <ID>MaxLineLength:AndroidNetworkBridgeReadSensorsTest.kt$AndroidNetworkBridgeReadSensorsTest.&lt;no name provided&gt;$audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test")</ID>
     <ID>MaxLineLength:AndroidNetworkBridgeStreamingTest.kt$AndroidNetworkBridgeStreamingTest.&lt;no name provided&gt;$HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)</ID>
     <ID>MaxLineLength:AndroidNetworkBridgeStreamingTest.kt$AndroidNetworkBridgeStreamingTest.&lt;no name provided&gt;$audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test")</ID>
     <ID>MaxLineLength:AndroidSettingsBindings.kt$SettingsContribution(SettingsGroup.Notifications, backgroundDeliverySection(inputs.battery.exempt, inputs.battery.requestExemption))</ID>
@@ -130,38 +116,12 @@
     <ID>MaxLineLength:DeviceSensorGatedCapabilitiesTest.kt$DeviceSensorGatedCapabilitiesTest$assertEquals(DeviceSensorGatedStatus.Disabled, caps.single { it.id == DeviceSensorGatedCapabilityIds.NOTIFICATION_NOW_PLAYING }.status)</ID>
     <ID>MaxLineLength:DeviceSensorReadTool.kt$DeviceSensorReadTool$timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS</ID>
     <ID>MaxLineLength:DeviceSensorReadTool.kt$DeviceSensorReadTool$val timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS</ID>
-    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$val corrupt = json.decodeFromJsonElement(com.letta.mobile.data.model.LettaMessage.serializer(), readConversation(base, DEFAULT_CONV_ID).single())</ID>
-    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$val restored = json.decodeFromString(com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent.serializer(), encoded).toConfirmedTimelineEvent()</ID>
-    <ID>MaxLineLength:ImagePipelineEndToEndTest.kt$ImagePipelineEndToEndTest$writeTranscript(base, DEFAULT_CONV_KEY, listOf(sessionHeader(), messageEnvelope("m-ref", userRow("ui-ref", JsonArray(listOf(pointer))))))</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"m1","role":"assistant","content":[{"type":"text","text":"on it"},{"type":"toolCall","id":"call_9","name":"Read","arguments":{"file_path":"/tmp/x"}}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"ui-msg-2","role":"assistant","content":[{"type":"thinking","thinking":"hm"},{"type":"toolCall","id":"call_1","name":"Bash","arguments":{"command":"echo hi"}}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$"""{"id":"ui-msg-3","role":"toolResult","toolCallId":"call_1","toolName":"Bash","content":[{"type":"text","text":"hi\n"}],"isError":false}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"look at this"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"$ref","mediaType":"image/png"}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"missing image"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"sha256:nonexistent","mediaType":"image/png"}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val latestImageRow = """{"id":"u2","role":"user","content":[{"type":"text","text":"new"},{"type":"image","mimeType":"image/jpeg","data":"TEVTVF9MQVRFU1Q="}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val latestImageRow = """{"id":"u2","role":"user","content":[{"type":"text","text":"second image"},{"type":"image","mimeType":"image/png","data":"TEFURVNU"}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val olderImageRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"first image"},{"type":"image","mimeType":"image/jpeg","data":"$base64Image"}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$val olderImageRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"old"},{"type":"image","mimeType":"image/png","data":"$base64Image"}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeLocalBackendStoreTest.kt$LettaCodeLocalBackendStoreTest$writer.write("""{"id":"u1","role":"user","content":[{"type":"text","text":"huge one"},{"type":"image","mimeType":"image/png","data":"""")</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"control_request","request_id":"approval-random-123","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"control_request","request_id":"perm-call-1","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-126","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"Hey"}],"run_id":"local-run-2","seq_id":17}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-127","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"!"}],"run_id":"local-run-2","seq_id":18}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-16","message_type":"approval_request_message","tool_call":{"tool_call_id":"call_00_abc","name":"Bash","arguments":"{\"command\":\"echo hi\"}"},"run_id":"local-run-1"}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"letta-msg-17","message_type":"tool_return_message","tool_call_id":"call_00_abc","status":"error","tool_return":"boom","run_id":"local-run-1"}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"m","message_type":"tool_return_message","tool_call_id":"call_b","is_err":true,"tool_return":"nope"}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"message","id":"msg-1","message_type":"assistant_message","content":[{"type":"text","text":"hello"}],"run_id":"run-1"}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"stream_event","run_id":"run-wrapper","event":{"type":"message","id":"msg-1","message_type":"assistant_message","content":"hello"}}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"tool_call","run_id":"run-1","tool_calls":[{"id":"call-1","function":{"name":"Write","arguments":{"file_path":"README.md"}}}]}"""</ID>
-    <ID>MaxLineLength:LettaCodeStreamJsonMapperTest.kt$LettaCodeStreamJsonMapperTest$"""{"type":"tool_return_message","run_id":"run-1","tool_call_id":"call-1","status":"error","func_response":"permission denied"}"""</ID>
-    <ID>MaxLineLength:LettaCodeTurnEngine.kt$LettaCodeTurnEngine$Log.i("LOCAL_HANDOFF", "engine_runTurn_start agent=${command.agentId.value} conversation=${command.conversationId.value} model=${config.localModelHandle} serverUrl=${config.serverUrl}")</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}"</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} key=$key backend=${requestedBackend.javaClass.simpleName} vision=$requiresVision path=${modelFile.absolutePath}"</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"handle=${modelSelection.modelHandle} runtime=${modelSelection.runtime} accelerator=${modelSelection.accelerator} maxTokens=${modelSelection.maxTokens}"</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"modelPath=${modelFile.absolutePath} backend=${backend.javaClass.simpleName} vision=$visionEnabled cacheDir=${cacheDir.absolutePath}"</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$"path=${modelFile.absolutePath} exists=${modelFile.exists()} isFile=${modelFile.isFile} size=${modelFile.takeIf { it.exists() }?.length() ?: -1L}"</ID>
     <ID>MaxLineLength:LiteRtLmOnDeviceChatCompletionEngine.kt$LiteRtLmOnDeviceChatCompletionEngine$logLiteRtInfo("engine_initialize_success", "modelPath=${modelFile.absolutePath} backend=${backend.javaClass.simpleName} vision=$visionEnabled")</ID>
-    <ID>MaxLineLength:LocalImageContextStripperTest.kt$LocalImageContextStripperTest$val assistantImage = """{"id":"a99","role":"assistant","content":[{"type":"image","mimeType":"image/png","data":"QVNTU1RfSU1BRw=="}]}"""</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED</ID>
     <ID>MaxLineLength:MainActivity.kt$MainActivity$val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S)</ID>
     <ID>MaxLineLength:MobileActionRegistryTest.kt$MobileActionRegistryTest$assertEquals("android.settings.APPLICATION_DETAILS_SETTINGS", capability["requiredSettings"]!!.jsonArray.single().jsonPrimitive.content)</ID>
@@ -200,17 +160,10 @@
     <ID>NestedBlockDepth:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readLines(file: File, maxInlineValueChars: Int = DEFAULT_MAX_INLINE_VALUE_CHARS): List&lt;BoundedLine&gt;</ID>
     <ID>NestedBlockDepth:BoundedTranscriptReader.kt$BoundedTranscriptReader$fun readSingleLineFull(file: File, targetLineIndex: Int): String?</ID>
     <ID>NestedBlockDepth:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$private suspend fun streamDownloadToFile( url: String, target: File, expectedTotalBytes: Long?, state: MutableStateFlow&lt;EmbeddedModelDownloadState&gt;, )</ID>
-    <ID>NestedBlockDepth:ImagePipelineSchemaTest.kt$ImagePipelineSchemaTest$private fun extractProviderImageUrls(transcript: List&lt;JsonObject&gt;): List&lt;String&gt;</ID>
-    <ID>NestedBlockDepth:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
-    <ID>NestedBlockDepth:LocalConversationHealer.kt$LocalConversationHealer$private fun rewriteSelectively( source: File, out: OutputStream, dropIndices: Set&lt;Int&gt;, insertAfterIndex: Map&lt;Int, List&lt;JsonObject&gt;&gt;, )</ID>
-    <ID>NestedBlockDepth:LocalImageContextStripper.kt$LocalImageContextStripper$private fun copyWithReplacements(source: File, replacements: Map&lt;Int, String&gt;, out: java.io.Writer)</ID>
     <ID>NewLineAtEndOfFile:ConversationsGraph.kt$com.letta.mobile.ui.navigation.ConversationsGraph.kt</ID>
     <ID>ReturnCount:AndroidNetworkBridge.kt$BridgeEgressGuard$fun isBlockedHost( host: String, resolve: (String) -&gt; List&lt;InetAddress&gt; = { InetAddress.getAllByName(it).toList() }, ): Boolean</ID>
     <ID>ReturnCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleFetch(output: OutputStream, body: String)</ID>
     <ID>ReturnCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
-    <ID>ReturnCount:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$private fun readDefaultConversation(directory: File): Conversation?</ID>
-    <ID>ReturnCount:LocalConversationHealer.kt$LocalConversationHealer$fun healTranscript(transcript: File): HealReport</ID>
-    <ID>ReturnCount:LocalImageContextStripper.kt$LocalImageContextStripper$fun stripTranscript(transcript: File): StripReport</ID>
     <ID>ReturnCount:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision</ID>
     <ID>ReturnCount:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge.BridgeServerSession$private fun handleSocket(socket: Socket)</ID>
     <ID>ReturnCount:OnDeviceToolCallProtocol.kt$OnDeviceToolCallProtocol$private fun parseToolCallObject(candidate: String): ModelTurn.ToolCall?</ID>
@@ -218,10 +171,8 @@
     <ID>SpreadOperator:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$( "NotificationDelivery", "published", *telemetryAttrs(notificationId), )</ID>
     <ID>SpreadOperator:NotificationDeliveryCoordinator.kt$NotificationDeliveryCoordinator$( "NotificationDelivery", "suppressed", *telemetryAttrs(notificationId), "reason" to reason.name, )</ID>
     <ID>SwallowedException:ConversationsViewModel.kt$ConversationsViewModel$e: Exception</ID>
-    <ID>ThrowsCount:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean</ID>
     <ID>ThrowsCount:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$private fun fetchViaHttpUrlConnection( output: OutputStream, url: String, method: String, headers: List&lt;Pair&lt;String, String&gt;&gt;, bodyText: String?, )</ID>
     <ID>TooGenericExceptionCaught:AgentListViewModel.kt$AgentListViewModel$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AndroidProviderReadTool.kt$AndroidProviderReadTool$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChannelNotificationPublisher.kt$ChannelNotificationPublisher$t: Throwable</ID>
@@ -245,8 +196,6 @@
     <ID>TooManyFunctions:ConfigViewModel.kt$ConfigViewModel : ViewModel</ID>
     <ID>TooManyFunctions:ConversationsViewModel.kt$ConversationsViewModel : ViewModel</ID>
     <ID>TooManyFunctions:DatabaseModule.kt$DatabaseModule</ID>
-    <ID>TooManyFunctions:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore : LocalRuntimeConversationSourceLocalRuntimeAgentSource</ID>
-    <ID>TooManyFunctions:LocalImageContextStripper.kt$LocalImageContextStripper</ID>
     <ID>TooManyFunctions:OnDeviceOpenAiBridge.kt$LocalOpenAiOnDeviceBridge$BridgeServerSession</ID>
     <ID>TooManyFunctions:OnDeviceToolCallProtocol.kt$OnDeviceToolCallProtocol</ID>
     <ID>TooManyFunctions:ProductionSelectedChatRuntimeProvider.kt$SelectedRuntimeWriter : TimelineExternalTransportWriter</ID>
@@ -263,14 +212,6 @@
     <ID>UnusedImports:ChatPushService.kt$import kotlinx.coroutines.CoroutineScope</ID>
     <ID>UnusedImports:ChatPushService.kt$import kotlinx.coroutines.SupervisorJob</ID>
     <ID>UnusedImports:ConfigListScreen.kt$import androidx.compose.ui.unit.dp</ID>
-    <ID>UnusedImports:EncodeUserTurnWireLineTest.kt$import kotlinx.serialization.json.JsonPrimitive</ID>
-    <ID>UnusedImports:ImagePipelineEndToEndTest.kt$import org.junit.Assert.assertNull</ID>
-    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import java.io.File</ID>
-    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import java.nio.file.Files</ID>
-    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import kotlinx.serialization.json.JsonPrimitive</ID>
-    <ID>UnusedImports:ImagePipelineSchemaTest.kt$import kotlinx.serialization.json.jsonArray</ID>
-    <ID>UnusedImports:LettaCodeStreamJsonMapperTest.kt$import org.junit.Assert.assertTrue</ID>
-    <ID>UnusedImports:LocalImageContextStripperTest.kt$import kotlinx.serialization.json.JsonArray</ID>
     <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertNotNull</ID>
     <ID>UnusedImports:RouteSerializationTest.kt$import org.junit.Assert.assertTrue</ID>
     <ID>UnusedImports:ScheduleListViewModelTest.kt$import com.letta.mobile.data.local.AgentDao</ID>
@@ -297,9 +238,6 @@
     <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventRowErrorPreview()</ID>
     <ID>UnusedPrivateMember:TelemetryScreen.kt$@PreviewLightDark @Composable private fun TelemetryEventRowInfoPreview()</ID>
     <ID>UnusedPrivateProperty:ConversationAdminDialog.kt$i</ID>
-    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode custom provider requires a selected provider model before it can start.", )</ID>
-    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.", )</ID>
-    <ID>UseCheckOrError:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$throw IllegalStateException( "Embedded LettaCode requires an imported .litertlm model path before it can start.", )</ID>
     <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Redirect response missing Location header.")</ID>
     <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Redirect to unsupported target: $location")</ID>
     <ID>UseCheckOrError:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalStateException("Response body exceeds $limit bytes.")</ID>
@@ -310,9 +248,6 @@
     <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("Downloaded model file is empty.")</ID>
     <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("No download URL is configured for ${entry.name}.")</ID>
     <ID>UseCheckOrError:EmbeddedModelRepository.kt$AssetEmbeddedModelRepository$throw IllegalStateException("Not enough storage is available for ${entry.name}.")</ID>
-    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local agent ${agentId.value} is not persisted in the embedded LettaCode store")</ID>
-    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local conversation record for ${agentId.value} could not be created")</ID>
-    <ID>UseCheckOrError:LettaCodeLocalBackendStore.kt$LettaCodeLocalBackendStore$throw IllegalStateException("Local conversation record for ${agentId.value} is unreadable")</ID>
     <ID>UseCheckOrError:OnDeviceModelImporter.kt$SafOnDeviceModelImporter$throw IllegalStateException("Could not open the selected model file.")</ID>
     <ID>UseCheckOrError:OnDeviceModelImporter.kt$SafOnDeviceModelImporter$throw IllegalStateException("The selected model file is empty.")</ID>
     <ID>UseRequire:AndroidNetworkBridge.kt$LocalAndroidNetworkBridge.BridgeServerSession$throw IllegalArgumentException("Request body too large.")</ID>

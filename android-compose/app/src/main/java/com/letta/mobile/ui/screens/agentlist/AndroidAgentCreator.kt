@@ -3,10 +3,7 @@ package com.letta.mobile.ui.screens.agentlist
 import com.letta.mobile.data.agenteditor.AgentCreated
 import com.letta.mobile.data.agenteditor.AgentCreator
 import com.letta.mobile.data.model.AgentCreateParams
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
-import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeModelSelection
@@ -14,7 +11,6 @@ import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
-import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 data class LocalLettaCodeCreateReadiness(
@@ -37,10 +33,9 @@ data class LocalLettaCodeCreateReadiness(
 }
 
 /**
- * letta-mobile-ckmub.3.24: how Android creates an agent from the shared agent editor (moved from the
- * agent list's create dialog). Under the on-device runtime (Local LettaCode) the agent is bound to
- * it and opens on its one embedded conversation; anywhere else it is created on the session's
- * repository, which the roster then refreshes from.
+ * letta-mobile-ckmub.3.24: how Android creates an agent from the shared agent editor. Every backend
+ * creates it on the session's App Server (letta-mobile-by4vm.110.6); under the on-device runtime the
+ * agent defaults to the model Settings picked for it, once that model is ready.
  */
 class AndroidAgentCreator @Inject constructor(
     private val agentRepository: IAgentRepository,
@@ -50,20 +45,18 @@ class AndroidAgentCreator @Inject constructor(
 ) : AgentCreator {
     override suspend fun create(params: AgentCreateParams): AgentCreated {
         val config = settingsRepository.activeConfig.value
-        if (config == null || !AgentRuntimeBinding.isLocalRuntime(config)) {
-            val agent = agentRepository.createAgent(params)
-            agentRepository.refreshAgents()
-            return AgentCreated(agent.id.value)
+        val toCreate = if (config?.mode == LettaConfig.Mode.LOCAL) {
+            config.localLettaCodeCreateReadiness(
+                runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
+                downloadedModelHandles = embeddedModelRepository.catalog.value.downloadedModelHandles(),
+            ).setupMessage?.let { throw IllegalStateException(it) }
+            params.withOnDeviceModel(config)
+        } else {
+            params
         }
-        val readiness = config.localLettaCodeCreateReadiness(
-            runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
-            downloadedModelHandles = embeddedModelRepository.catalog.value.downloadedModelHandles(),
-        )
-        readiness.setupMessage?.let { throw IllegalStateException(it) }
-        val agent = agentRepository.createLocalAgent(params.withLocalLettaCodeRuntimeBinding(config))
-        // Stable per agent: every embedded session is the same on-disk default conversation; a random
-        // suffix would fragment the timeline and never match list rows.
-        return AgentCreated(agent.id.value, conversationId = "local-conv-${agent.id.value}")
+        val agent = agentRepository.createAgent(toCreate)
+        agentRepository.refreshAgents()
+        return AgentCreated(agent.id.value)
     }
 }
 
@@ -72,7 +65,7 @@ internal fun LettaConfig?.localLettaCodeCreateReadiness(
     downloadedModelHandles: Set<String>,
 ): LocalLettaCodeCreateReadiness {
     val config = this
-    val activeConfigIsLocal = AgentRuntimeBinding.isLocalRuntime(config)
+    val activeConfigIsLocal = config?.mode == LettaConfig.Mode.LOCAL
     // A custom OpenAI-compatible endpoint replaces the on-device model
     // entirely (letta-mobile-3icw7) — no download/import required.
     val customProviderConfigured = config?.localProviderBaseUrl?.trim()?.takeIf { it.isNotBlank() } != null
@@ -98,36 +91,6 @@ internal fun List<EmbeddedModelCatalogItem>.downloadedModelHandles(): Set<String
         item.entry.modelId.takeIf { item.state is EmbeddedModelDownloadState.Downloaded }
     }.toSet()
 
-/** Text only, tools and approvals off: what the on-device runtime runs today. */
-private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConfig): AgentCreateParams {
-    val selection = EmbeddedLettaCodeModelSelection.from(config)
-    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }
-    val effectiveModel = pickedModel ?: selection.modelHandle
-    val localMetadata = mapOf(
-        LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-        LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-        LocalAgentRuntimeMetadata.RUNTIME_ID_KEY to JsonPrimitive("${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:${config.id}"),
-        // Track the effective model, not the config default — otherwise the
-        // agent record's model and its metadata handle disagree and the
-        // per-agent override could be lost on later reads (CodeRabbit).
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY to JsonPrimitive(effectiveModel),
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY to JsonPrimitive(selection.runtime),
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY to JsonPrimitive(selection.accelerator),
-    )
-    return copy(
-        model = effectiveModel,
-        modelSettings = (modelSettings ?: ModelSettings()).copy(
-            providerType = LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
-            parallelToolCalls = false,
-            maxOutputTokens = selection.maxTokens,
-        ),
-        metadata = metadata.orEmpty() + localMetadata,
-        toolIds = null,
-        tools = null,
-        enableSleeptime = false,
-        includeBaseTools = false,
-        includeMultiAgentTools = false,
-        includeBaseToolRules = false,
-        parallelToolCalls = false,
-    )
-}
+/** The on-device runtime's `lc-lmstudio` handle for the configured model, unless the editor picked one. */
+private fun AgentCreateParams.withOnDeviceModel(config: LettaConfig): AgentCreateParams =
+    copy(model = model?.trim()?.takeIf { it.isNotBlank() } ?: EmbeddedLettaCodeModelSelection.from(config).lettaCodeModelHandle)

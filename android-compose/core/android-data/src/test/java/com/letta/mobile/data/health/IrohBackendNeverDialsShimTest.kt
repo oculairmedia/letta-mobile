@@ -5,8 +5,6 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.routedBackendKind
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -25,11 +23,10 @@ import org.junit.Test
 class IrohBackendNeverDialsShimTest {
 
     @Test
-    fun `iroh config classifies as IROH and uses the channel transport`() {
+    fun `iroh config classifies as IROH`() {
         for (url in IROH_URLS) {
             val config = config(url)
             assertEquals("expected IROH for $url", BackendKind.IROH, config.backendKind())
-            assertTrue(config.backendKind().usesChannelTransport)
         }
     }
 
@@ -38,7 +35,6 @@ class IrohBackendNeverDialsShimTest {
         val kind = config("iroh://node-abc").routedBackendKind()
 
         assertEquals(BackendKind.IROH, kind)
-        assertTrue(kind.usesChannelTransport)
     }
 
     @Test
@@ -46,7 +42,6 @@ class IrohBackendNeverDialsShimTest {
         val kind = config("http://localhost:8291").copy(mode = LettaConfig.Mode.LOCAL).routedBackendKind()
 
         assertEquals(BackendKind.LOCAL_RUNTIME, kind)
-        assertFalse(kind.usesChannelTransport)
     }
 
     @Test
@@ -55,7 +50,6 @@ class IrohBackendNeverDialsShimTest {
             val kind = config.routedBackendKind()
 
             assertEquals("config=$config", BackendKind.DIRECT_WS, kind)
-            assertFalse(kind.usesChannelTransport)
         }
     }
 

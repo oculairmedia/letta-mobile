@@ -8,7 +8,7 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
@@ -31,13 +31,11 @@ class IrohAdminRpcTimelineTransport(
     private val json: Json = LettaJson.adminRpc,
 ) : TimelineTransport {
     /**
-     * letta-mobile-71orq: true when the active backend is an `iroh://`
-     * endpoint, so callers (e.g. MessageRepository.fetchOlderMessages) can
-     * branch reads onto admin_rpc instead of the raw HTTP path that the
-     * LettaApiClient purity choke-point hard-fails in iroh:// mode.
+     * letta-mobile-71orq / by4vm.110.6: true when a backend is configured, so callers (e.g.
+     * MessageRepository.fetchOlderMessages) read over the session channel's admin_rpc, which
+     * every Android backend (Iroh, ws://, the on-device runtime) serves.
      */
-    fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+    fun shouldUseIroh(): Boolean = settingsRepository.activeBackendUsesChannel()
 
     override suspend fun sendConversationMessage(
         conversationId: ConversationId,
