@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.chat.surface.timeline.rows
+package com.letta.mobile.ui.chat.surface.timeline.rows
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState

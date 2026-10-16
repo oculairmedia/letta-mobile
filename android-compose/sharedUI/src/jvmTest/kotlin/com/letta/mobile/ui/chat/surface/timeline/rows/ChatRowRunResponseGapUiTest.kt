@@ -1,4 +1,4 @@
-﻿@file:OptIn(ExperimentalTestApi::class)
+@file:OptIn(ExperimentalTestApi::class)
 
 package com.letta.mobile.ui.chat.surface.timeline.rows
 
