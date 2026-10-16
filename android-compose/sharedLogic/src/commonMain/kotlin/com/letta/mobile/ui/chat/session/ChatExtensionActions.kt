@@ -25,37 +25,18 @@ class ChatExtensionActionState(
  * extension point bound is a no-op its capabilities hide.
  */
 abstract class ChatExtensionActions(
-    private val options: TimelineChatSessionOptions,
+    options: TimelineChatSessionOptions,
     private val state: ChatExtensionActionState,
-) : ChatActions {
-    override fun runComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.run?.invoke() ?: Unit
-
-    override fun uninstallComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.uninstall?.invoke() ?: Unit
-
-    private fun hostCommand(command: ChatComposerCommand) = options.composerHost?.value?.commands?.firstOrNull { it.label == command.id }
-
-    override fun dismissRecompileStatus() = options.recompile?.dismiss() ?: Unit
-
+) : ChatActions,
+    ChatHostCommandActions by HostCommandExtensions(options),
+    ChatBranchActions by BranchExtensions(options.branching, state.branchView),
+    ChatSendQueueActions by SendQueueExtensions(options.sendQueue),
+    ChatConversationSettingsActions by SettingsExtensions(options) {
     override fun rerun(message: UiMessage) = Unit
-
-    override fun forkFromMessage(message: UiMessage, name: String?) =
-        options.branching?.forkFrom(message, state.branchView(), name) ?: Unit
-
-    override fun editAndResend(message: UiMessage) = options.branching?.editAndResend(message, state.branchView()) ?: Unit
-
-    override fun rerunInFork(message: UiMessage) = options.branching?.rerun(message, state.branchView()) ?: Unit
-
-    override fun submitA2uiAction(action: A2uiAction) = options.onA2uiAction?.invoke(action) ?: Unit
 
     override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
 
     override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
-
-    override fun cancelQueuedSend(id: QueuedSendId) = options.sendQueue?.cancel(id) ?: Unit
-
-    override fun sendQueuedNow(id: QueuedSendId) = options.sendQueue?.sendNow(id) ?: Unit
-
-    override fun resumeSendQueue() = options.sendQueue?.resume() ?: Unit
 
     override fun toggleRunCollapsed(runId: ChatRunId) = state.local.update { it.toggleRun(runId.value) }
 
@@ -72,14 +53,6 @@ abstract class ChatExtensionActions(
 
     override fun setFontScale(scale: Float) = Unit
 
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) =
-        options.models?.selectModel(handle, effort) ?: Unit
-
-    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
-        options.workingDirectory?.changeWorkingDirectory(directory) ?: Unit
-
-    override fun setPermissionMode(mode: AppServerPermissionMode) = options.permissionModes?.setPermissionMode(mode) ?: Unit
-
     override fun updateSearchQuery(query: String) = Unit
 
     override fun clearSearch() = Unit
@@ -87,4 +60,47 @@ abstract class ChatExtensionActions(
     override fun refreshGoalStatus() = Unit
 
     override fun continueGoal() = Unit
+}
+
+/** Composer commands, `/recompile` and A2UI actions, answered by the host's inputs. */
+private class HostCommandExtensions(private val options: TimelineChatSessionOptions) : ChatHostCommandActions {
+    override fun runComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.run?.invoke() ?: Unit
+
+    override fun uninstallComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.uninstall?.invoke() ?: Unit
+
+    private fun hostCommand(command: ChatComposerCommand) = options.composerHost?.value?.commands?.firstOrNull { it.label == command.id }
+
+    override fun dismissRecompileStatus() = options.recompile?.dismiss() ?: Unit
+
+    override fun submitA2uiAction(action: A2uiAction) = options.onA2uiAction?.invoke(action) ?: Unit
+}
+
+/** Fork, edit-and-resend and rerun, planned against the page's timeline now. */
+private class BranchExtensions(
+    private val branching: ChatBranchingSource?,
+    private val branchView: () -> ChatBranchView,
+) : ChatBranchActions {
+    override fun forkFromMessage(message: UiMessage, name: String?) = branching?.forkFrom(message, branchView(), name) ?: Unit
+
+    override fun editAndResend(message: UiMessage) = branching?.editAndResend(message, branchView()) ?: Unit
+
+    override fun rerunInFork(message: UiMessage) = branching?.rerun(message, branchView()) ?: Unit
+}
+
+private class SendQueueExtensions(private val queue: ChatSendQueueSource?) : ChatSendQueueActions {
+    override fun cancelQueuedSend(id: QueuedSendId) = queue?.cancel(id) ?: Unit
+
+    override fun sendQueuedNow(id: QueuedSendId) = queue?.sendNow(id) ?: Unit
+
+    override fun resumeSendQueue() = queue?.resume() ?: Unit
+}
+
+private class SettingsExtensions(private val options: TimelineChatSessionOptions) : ChatConversationSettingsActions {
+    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) =
+        options.models?.selectModel(handle, effort) ?: Unit
+
+    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
+        options.workingDirectory?.changeWorkingDirectory(directory) ?: Unit
+
+    override fun setPermissionMode(mode: AppServerPermissionMode) = options.permissionModes?.setPermissionMode(mode) ?: Unit
 }
