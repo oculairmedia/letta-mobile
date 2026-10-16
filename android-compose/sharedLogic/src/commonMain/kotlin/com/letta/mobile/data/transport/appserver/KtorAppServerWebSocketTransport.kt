@@ -238,16 +238,3 @@ internal fun appServerUrl(baseUrl: String): String =
         encodedPath = "/ws"
         parameters.clear()
     }.buildString()
-
-/** @deprecated Prefer [appServerUrl]; both historical channels resolve to the same socket. */
-@Deprecated(
-    message = "App Server uses one bidirectional WebSocket; channel URLs are rejected by ≥0.29.7",
-    replaceWith = ReplaceWith("appServerUrl(baseUrl)"),
-)
-internal fun appServerChannelUrl(baseUrl: String, channel: AppServerChannel): String {
-    // Keep the parameter referenced so call sites that still pass a channel compile
-    // during the migration window without unused-parameter warnings.
-    @Suppress("UNUSED_VARIABLE")
-    val ignored = channel
-    return appServerUrl(baseUrl)
-}

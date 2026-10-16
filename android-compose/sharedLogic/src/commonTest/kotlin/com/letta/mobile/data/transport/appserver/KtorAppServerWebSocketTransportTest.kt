@@ -17,19 +17,6 @@ class KtorAppServerWebSocketTransportTest {
     }
 
     @Test
-    @Suppress("DEPRECATION")
-    fun deprecatedChannelUrlHelperAlsoOmitsChannel() {
-        assertEquals(
-            "ws://127.0.0.1:4500/ws",
-            appServerChannelUrl("ws://127.0.0.1:4500", AppServerChannel.Control),
-        )
-        assertEquals(
-            "wss://example.test/ws",
-            appServerChannelUrl("wss://example.test/base?old=true", AppServerChannel.Stream),
-        )
-    }
-
-    @Test
     fun classifyInboundChannelMatchesUpstreamStreamSet() {
         assertEquals(
             AppServerChannel.Stream,

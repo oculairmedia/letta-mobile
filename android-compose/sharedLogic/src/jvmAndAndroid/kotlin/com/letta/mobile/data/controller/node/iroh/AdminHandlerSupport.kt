@@ -119,14 +119,12 @@ internal fun JsonObject?.requireParam(key: AdminParamKey): String =
 internal fun JsonObject?.requireParam(key: AdminParamKey, error: AdminParamError): String =
     param(this, key) ?: adminError(error.value)
 
-/** Prefer `identifier` when both alias keys are present (back-compat with legacy `project_id`). */
-internal fun projectIdentifierParam(params: JsonObject?): String? =
-    param(params, AdminParamKey("identifier")) ?: param(params, AdminParamKey("project_id"))
+internal val PROJECT_IDENTIFIER = AdminParamKey("identifier")
 
 internal fun JsonObject?.requireProjectIdentifierParam(): String =
-    projectIdentifierParam(this) ?: adminError(PROJECT_IDENTIFIER_REQUIRED)
+    param(this, PROJECT_IDENTIFIER) ?: adminError(PROJECT_IDENTIFIER_REQUIRED)
 
-internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier or project_id required"
+internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier required"
 
 /**
  * Reject path-traversal and multi-segment ids before they reach memfs joins.
