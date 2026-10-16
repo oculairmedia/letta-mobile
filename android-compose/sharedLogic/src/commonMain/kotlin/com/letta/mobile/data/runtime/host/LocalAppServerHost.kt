@@ -37,7 +37,11 @@ interface LocalAppServerLease : AutoCloseable {
 }
 
 /** The server died or stayed silent before it was ready. */
-class LocalAppServerStartException(message: String, val exitCode: Int?) : IllegalStateException(message)
+class LocalAppServerStartException(
+    message: String,
+    val exitCode: Int?,
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
 
 /** The user stopped the local App Server; it stays off until they start it again. */
 class LocalAppServerStoppedException :

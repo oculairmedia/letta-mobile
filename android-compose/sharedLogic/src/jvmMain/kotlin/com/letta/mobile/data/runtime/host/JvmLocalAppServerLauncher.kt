@@ -35,7 +35,7 @@ class JvmLocalAppServerLauncher(
                 launch.workingDirectory?.let { directory(File(it)) }
             }.start()
         } catch (e: IOException) {
-            throw LocalAppServerStartException("Could not start ${launch.command.firstOrNull()}: ${e.message}", null)
+            throw LocalAppServerStartException("Could not start ${launch.command.firstOrNull()}: ${e.message}", null, e)
         }
         onSpawned(process)
         return JvmLocalAppServerProcess(process, stopTimeoutMs)
