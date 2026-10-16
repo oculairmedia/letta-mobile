@@ -1,6 +1,7 @@
 package com.letta.mobile.data.a2ui
 
 import app.cash.turbine.test
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -40,7 +41,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        val surface = manager.surface("s1")!!
+        val surface = manager.surface(A2uiSurfaceId("s1"))!!
         assertEquals(A2UI_BASIC_CATALOG_ID, surface.catalogId)
         assertEquals("compact", surface.theme!!.jsonObject["density"]!!.jsonPrimitive.content)
         assertEquals("card", surface.rootComponentId)
@@ -53,7 +54,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        assertNull(manager.surface("s1"))
+        assertNull(manager.surface(A2uiSurfaceId("s1")))
     }
 
     @Test
@@ -77,7 +78,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        assertNull(manager.surface("s1"))
+        assertNull(manager.surface(A2uiSurfaceId("s1")))
         assertEquals(emptyMap(), manager.surfaces.value)
     }
 
@@ -106,8 +107,8 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        assertEquals("body", manager.surface("s1")!!.rootComponentId)
-        assertNull(manager.surface("missing"))
+        assertEquals("body", manager.surface(A2uiSurfaceId("s1"))!!.rootComponentId)
+        assertNull(manager.surface(A2uiSurfaceId("missing")))
     }
 
     @Test
@@ -129,9 +130,9 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        manager.dismissSurface("s1")
+        manager.dismissSurface(A2uiSurfaceId("s1"))
 
-        assertNull(manager.surface("s1"))
+        assertNull(manager.surface(A2uiSurfaceId("s1")))
         assertEquals(emptyMap(), manager.surfaces.value)
     }
 
@@ -153,7 +154,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        val surface = manager.surface("s1")!!
+        val surface = manager.surface(A2uiSurfaceId("s1"))!!
         assertEquals("root", surface.rootComponentId)
         assertTrue("root" in surface.components)
         assertTrue("title" in surface.components)
@@ -188,9 +189,9 @@ class A2uiSurfaceManagerCommonTest {
         )
         manager.replaceWith(messages)
 
-        assertNull(manager.surface("stale"))
-        assertNull(manager.surface("s1"))
-        assertEquals(A2UI_BASIC_CATALOG_ID, manager.surface("s2")!!.catalogId)
+        assertNull(manager.surface(A2uiSurfaceId("stale")))
+        assertNull(manager.surface(A2uiSurfaceId("s1")))
+        assertEquals(A2UI_BASIC_CATALOG_ID, manager.surface(A2uiSurfaceId("s2"))!!.catalogId)
 
         manager.clear()
 
@@ -215,7 +216,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        val dataModel = manager.surface("s1")!!.dataModel
+        val dataModel = manager.surface(A2uiSurfaceId("s1"))!!.dataModel
         assertNull(A2uiBindingResolver.resolvePath(dataModel, "/approval/status"))
         assertSame(JsonNull, A2uiBindingResolver.resolvePath(dataModel, "/approval/reason"))
     }
@@ -280,7 +281,7 @@ class A2uiSurfaceManagerCommonTest {
             ),
         )
 
-        val surface = manager.surface("s1")!!
+        val surface = manager.surface(A2uiSurfaceId("s1"))!!
         assertEquals("agent-1", surface.agentId)
         assertEquals("conv-1", surface.conversationId)
         assertEquals("turn-1", surface.turnId)

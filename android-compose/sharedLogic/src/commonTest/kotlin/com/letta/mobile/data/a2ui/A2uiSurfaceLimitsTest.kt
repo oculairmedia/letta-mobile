@@ -1,5 +1,7 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.data.model.A2uiComponentId
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -39,14 +41,14 @@ class A2uiSurfaceLimitsTest {
 
         manager.applyMessage(updateComponents("s1", (0 until tooMany).map { text("t$it") }))
 
-        val surface = assertNotNull(manager.surface("s1"))
+        val surface = assertNotNull(manager.surface(A2uiSurfaceId("s1")))
         val violation = assertIs<A2uiSurfaceLimitViolation.TooManyComponents>(surface.limitViolation)
         assertEquals(tooMany, violation.count)
         assertTrue(surface.components.isEmpty())
 
         // A later, small update cannot resurrect a rejected surface.
         manager.applyMessage(updateComponents("s1", listOf(text("ok"))))
-        assertTrue(manager.surface("s1")!!.components.isEmpty())
+        assertTrue(manager.surface(A2uiSurfaceId("s1"))!!.components.isEmpty())
     }
 
     @Test
@@ -57,7 +59,7 @@ class A2uiSurfaceLimitsTest {
         manager.applyMessage(updateComponents("s1", (0 until half).map { text("a$it") }))
         manager.applyMessage(updateComponents("s1", (0 until half).map { text("b$it") }))
 
-        val surface = assertNotNull(manager.surface("s1"))
+        val surface = assertNotNull(manager.surface(A2uiSurfaceId("s1")))
         assertNull(surface.limitViolation)
         assertEquals(A2uiSurfaceLimits.MAX_COMPONENTS_PER_SURFACE, surface.components.size)
     }
@@ -66,13 +68,13 @@ class A2uiSurfaceLimitsTest {
     fun budgetStopsGrantingAtTheNodeCapAndReleaseFreesSlots() {
         val budget = A2uiRenderBudget(maxNodes = 3)
 
-        assertEquals(A2uiRenderClaim.Granted, budget.claim("a"))
-        assertEquals(A2uiRenderClaim.Granted, budget.claim("b"))
-        assertEquals(A2uiRenderClaim.Granted, budget.claim("c"))
-        assertEquals(A2uiRenderClaim.DeniedBudget, budget.claim("d"))
+        assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("a")))
+        assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("b")))
+        assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("c")))
+        assertEquals(A2uiRenderClaim.DeniedBudget, budget.claim(A2uiComponentId("d")))
 
-        budget.release("b")
-        assertEquals(A2uiRenderClaim.Granted, budget.claim("d"))
+        budget.release(A2uiComponentId("b"))
+        assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("d")))
     }
 
     @Test
@@ -80,10 +82,10 @@ class A2uiSurfaceLimitsTest {
         val budget = A2uiRenderBudget()
         val cap = A2uiSurfaceLimits.MAX_INSTANCES_PER_COMPONENT
 
-        repeat(cap) { assertEquals(A2uiRenderClaim.Granted, budget.claim("row")) }
-        assertEquals(A2uiRenderClaim.DeniedRepeat, budget.claim("row"))
+        repeat(cap) { assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("row"))) }
+        assertEquals(A2uiRenderClaim.DeniedRepeat, budget.claim(A2uiComponentId("row")))
         // A list template renders the same component once per data item; each item is its own scope.
-        assertEquals(A2uiRenderClaim.Granted, budget.claim("row", scopeKey = "/items/0"))
+        assertEquals(A2uiRenderClaim.Granted, budget.claim(A2uiComponentId("row"), scopeKey = "/items/0"))
     }
 
     @Test
@@ -100,7 +102,7 @@ class A2uiSurfaceLimitsTest {
         fun walk(id: String, depthSoFar: Int) {
             attempted++
             if (depthSoFar > A2uiSurfaceLimits.MAX_RENDER_DEPTH) return
-            if (budget.claim(id) != A2uiRenderClaim.Granted) return
+            if (budget.claim(A2uiComponentId(id)) != A2uiRenderClaim.Granted) return
             components.getValue(id).children.take(A2uiSurfaceLimits.MAX_CHILDREN_PER_CONTAINER)
                 .forEach { walk(it, depthSoFar + 1) }
         }

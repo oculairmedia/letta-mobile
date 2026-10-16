@@ -1,5 +1,6 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -168,7 +169,7 @@ class A2uiDataModelCommonTest {
             )
         }
 
-        assertEquals("999", manager.surface("perf")!!.dataModel.resolve("/counter")!!.jsonPrimitive.content)
+        assertEquals("999", manager.surface(A2uiSurfaceId("perf"))!!.dataModel.resolve("/counter")!!.jsonPrimitive.content)
     }
 
     @Test
@@ -197,8 +198,8 @@ class A2uiDataModelCommonTest {
         batched.applyMessages(messages)
         messages.forEach(incremental::applyMessage)
 
-        val batchedSurface = batched.surface("booking")!!
-        val incrementalSurface = incremental.surface("booking")!!
+        val batchedSurface = batched.surface(A2uiSurfaceId("booking"))!!
+        val incrementalSurface = incremental.surface(A2uiSurfaceId("booking"))!!
         assertEquals(batchedSurface.rootComponentId, incrementalSurface.rootComponentId)
         assertEquals(batchedSurface.components, incrementalSurface.components)
         assertEquals(batchedSurface.dataModel.root, incrementalSurface.dataModel.root)

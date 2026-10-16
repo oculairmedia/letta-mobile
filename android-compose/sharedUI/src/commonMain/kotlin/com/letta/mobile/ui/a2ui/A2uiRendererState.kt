@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiJsonPointer
+import com.letta.mobile.data.model.A2uiComponentId
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 
@@ -23,14 +25,14 @@ import kotlinx.serialization.json.contentOrNull
  */
 @Stable
 class A2uiLocalStateScope private constructor(
-    val surfaceId: String,
-    val componentId: String,
+    val surfaceId: A2uiSurfaceId,
+    val componentId: A2uiComponentId,
     private val booleanStates: MutableMap<A2uiLocalStateKey, MutableState<Boolean>>,
     private val intStates: MutableMap<A2uiLocalStateKey, MutableState<Int>>,
     private val defaults: JsonObject,
 ) {
     fun child(
-        componentId: String,
+        componentId: A2uiComponentId,
         defaults: JsonObject = JsonObject(emptyMap()),
     ): A2uiLocalStateScope = A2uiLocalStateScope(
         surfaceId = surfaceId,
@@ -51,9 +53,9 @@ class A2uiLocalStateScope private constructor(
         }
 
     companion object {
-        fun root(surfaceId: String): A2uiLocalStateScope = A2uiLocalStateScope(
+        fun root(surfaceId: A2uiSurfaceId): A2uiLocalStateScope = A2uiLocalStateScope(
             surfaceId = surfaceId,
-            componentId = A2uiLocalStateRootComponentId,
+            componentId = A2uiComponentId(A2uiLocalStateRootComponentId),
             booleanStates = mutableMapOf(),
             intStates = mutableMapOf(),
             defaults = JsonObject(emptyMap()),
@@ -64,8 +66,8 @@ class A2uiLocalStateScope private constructor(
 val LocalA2uiLocalState = compositionLocalOf<A2uiLocalStateScope?> { null }
 
 internal data class A2uiLocalStateKey(
-    val surfaceId: String,
-    val componentId: String,
+    val surfaceId: A2uiSurfaceId,
+    val componentId: A2uiComponentId,
     val key: String,
 )
 @Composable

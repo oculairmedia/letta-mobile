@@ -1,5 +1,7 @@
 package com.letta.mobile.data.a2ui
 
+import com.letta.mobile.data.model.A2uiComponentId
+import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -55,11 +57,11 @@ internal fun checkComponentBudget(
     }
 }
 
-internal fun logSurfaceRejected(surfaceId: String, violation: A2uiSurfaceLimitViolation) {
+internal fun logSurfaceRejected(surfaceId: A2uiSurfaceId, violation: A2uiSurfaceLimitViolation) {
     when (violation) {
         is A2uiSurfaceLimitViolation.TooManyComponents -> Telemetry.event(
             A2uiSurfaceLimits.TELEMETRY_TAG, "surface.rejected",
-            "surfaceId" to surfaceId,
+            "surfaceId" to surfaceId.value,
             "reason" to "tooManyComponents",
             "count" to violation.count,
             "limit" to violation.limit,
@@ -84,7 +86,7 @@ enum class A2uiRenderClaim { Granted, DeniedBudget, DeniedRepeat }
 class A2uiRenderBudget(
     private val maxNodes: Int = A2uiSurfaceLimits.MAX_RENDERED_NODES_PER_SURFACE,
     private val maxInstancesPerComponent: Int = A2uiSurfaceLimits.MAX_INSTANCES_PER_COMPONENT,
-    private val onDenied: (componentId: String, claim: A2uiRenderClaim) -> Unit = { _, _ -> },
+    private val onDenied: (componentId: A2uiComponentId, claim: A2uiRenderClaim) -> Unit = { _, _ -> },
 ) {
     private val instances = HashMap<String, Int>()
     private var deniedReported = false
@@ -94,7 +96,7 @@ class A2uiRenderBudget(
         private set
 
     /** Claims a slot for an instance of [componentId] rendered under list-item [scopeKey]. */
-    fun claim(componentId: String, scopeKey: String = ""): A2uiRenderClaim {
+    fun claim(componentId: A2uiComponentId, scopeKey: String = ""): A2uiRenderClaim {
         val key = instanceKey(componentId, scopeKey)
         val claim = when {
             rendered >= maxNodes -> A2uiRenderClaim.DeniedBudget
@@ -112,22 +114,22 @@ class A2uiRenderBudget(
     }
 
     /** Gives back a slot [claim] granted for [componentId] under [scopeKey]. */
-    fun release(componentId: String, scopeKey: String = "") {
+    fun release(componentId: A2uiComponentId, scopeKey: String = "") {
         val key = instanceKey(componentId, scopeKey)
         val held = instances[key] ?: return
         if (held <= 1) instances.remove(key) else instances[key] = held - 1
         rendered = (rendered - 1).coerceAtLeast(0)
     }
 
-    private fun instanceKey(componentId: String, scopeKey: String) = "$scopeKey\u0000$componentId"
+    private fun instanceKey(componentId: A2uiComponentId, scopeKey: String) = "$scopeKey\u0000${componentId.value}"
 
     companion object {
         /** A budget that reports its first denial for [surfaceId] through Telemetry. */
-        fun forSurface(surfaceId: String): A2uiRenderBudget = A2uiRenderBudget { componentId, claim ->
+        fun forSurface(surfaceId: A2uiSurfaceId): A2uiRenderBudget = A2uiRenderBudget { componentId, claim ->
             Telemetry.event(
                 A2uiSurfaceLimits.TELEMETRY_TAG, "render.truncated",
-                "surfaceId" to surfaceId,
-                "componentId" to componentId,
+                "surfaceId" to surfaceId.value,
+                "componentId" to componentId.value,
                 "reason" to claim.name,
                 level = Telemetry.Level.WARN,
             )
