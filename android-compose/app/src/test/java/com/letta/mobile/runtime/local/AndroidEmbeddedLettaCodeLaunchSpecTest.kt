@@ -77,7 +77,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals(
             "the host appends `server …`; node18-compat first, no device-tools preload",
             listOf("node", "--max-old-space-size=512", "--max-semi-space-size=16") +
-                listOf("node18-compat.cjs", "regexp-polyfill.cjs", "android-network-polyfill.cjs")
+                listOf("node18-compat.cjs", "regexp-polyfill.cjs", "android-network-polyfill.cjs", "child-node.cjs")
                     .flatMap { listOf("--require", File(project.projectDir, it).absolutePath) } +
                 project.entrypoint.absolutePath,
             launch.command,
@@ -90,6 +90,7 @@ class AndroidEmbeddedLettaCodeLaunchSpecTest {
         assertEquals("android-bridge-token", env["LETTA_ANDROID_NETWORK_BRIDGE_TOKEN"])
         assertEquals(File(baseDir, "bin").absolutePath, env["GIT_EXEC_PATH"])
         assertEquals(File(baseDir, "tmp").absolutePath, env["TMPDIR"])
+        assertEquals("helpers run on the node CLI, not app_process", File(baseDir, "bin/node").absolutePath, env[CHILD_NODE_ENV])
         assertTrue(env.keys.none { it.startsWith("LMSTUDIO_") || it.startsWith("LETTA_ANDROID_ON_DEVICE_MODEL") })
         assertNull("the host owns the backend variables", env["LETTA_LOCAL_BACKEND_DIR"])
     }

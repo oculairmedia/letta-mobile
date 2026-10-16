@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.appserver.AppServerSmokeSpec
 import com.letta.mobile.appserver.runAppServerSmokeTurn
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.runtime.host.LocalAppServerLease
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerDiscovery
@@ -40,7 +41,7 @@ import org.junit.Test
  * binds in Hilt: [LibnodeAppServerLauncher] on the in-process libnode, the shared
  * [com.letta.mobile.data.runtime.host.LocalAppServerHost] (lease, `/readyz`, capability token),
  * then the shared App Server client: `app-server-info`, `agent_create`, `conversation_create`, and
- * one `runtime_start` + tool turn through `runAppServerSmokeTurn`.
+ * one `runtime_start` + tool turn through `runAppServerSmokeTurn`, then one turn with an image.
  *
  * node::Start runs once per process: run this class ALONE, in its own instrumentation run, on a
  * full-fat build (`-PembedLettaCodeNative=true -PembedLettaCodeAssets=true`):
@@ -55,6 +56,9 @@ import org.junit.Test
  * letta-mobile-by4vm.121.1: the provider file is the app's own ([writeLocalProviderAuth], no
  * `models[]`), so letta-code resolves the agent's `lmstudio/<vendor>/<model>` handle by discovery,
  * exactly as it does against [OnDeviceOpenAiBridge].
+ * letta-mobile-by4vm.121.12: letta-code prepares every image in a child node it starts with
+ * `process.execPath`, the app process here; the image turn fails ("Image worker exited from signal
+ * SIGABRT") unless child-node.cjs relaunches it on the packaged node CLI.
  * letta-mobile-by4vm.121.2: every `device-smoke-*` agent (this run's and any a crashed run left)
  * is deleted through `agent_delete` before the lease closes, and the test fails if one remains:
  * they would otherwise be listed as the user's agents.
@@ -118,12 +122,13 @@ class LocalAppServerDeviceSmokeTest {
                     emit = { line -> log(line); lines += line },
                 )
 
-                assertTrue(lines.joinToString("\n"), lines.any { it == "[lifecycle] Completed" })
+                assertTrue(lines.joinToString("\n"), lines.any { it.startsWith("[lifecycle] Completed") })
                 if (fake != null) {
                     assertTrue("tool call; fake served ${fake.requests}: $lines", lines.any { it.startsWith("[tool-call]") })
                     assertTrue("tool return: $lines", lines.any { it.startsWith("[tool-return]") })
                     assertTrue("the shell tool must succeed: $lines", lines.none { it.startsWith("[tool-return] Failed") })
                 }
+                assertImageTurnCompletes(lease, agentId, conversationId)
                 assertTrue("the host is still serving", host.health.value.active)
             }
             lease.close()
@@ -132,6 +137,27 @@ class LocalAppServerDeviceSmokeTest {
             fake?.close()
             scope.cancel()
         }
+    }
+
+    private suspend fun assertImageTurnCompletes(lease: LocalAppServerLease, agentId: String, conversationId: String) {
+        val lines = mutableListOf<String>()
+        runAppServerSmokeTurn(
+            engineFactory = CIO,
+            identityPrefix = "device-image",
+            spec = AppServerSmokeSpec(
+                url = lease.serverUrl,
+                token = lease.bearerToken,
+                agentId = agentId,
+                conversationId = conversationId,
+                message = "What is in this picture?",
+                timeoutMs = TURN_TIMEOUT_MS,
+                images = listOf(MessageContentPart.Image(base64 = SMOKE_PNG_BASE64, mediaType = "image/png")),
+            ),
+            newToken = { UUID.randomUUID().toString() },
+            emit = { line -> log(line); lines += line },
+        )
+        assertTrue("the image turn must complete: $lines", lines.any { it.startsWith("[lifecycle] Completed") })
+        assertTrue("image preparation failed: $lines", lines.none { "Failed to prepare image" in it })
     }
 
     private suspend fun assertServesThisContract(http: HttpClient, lease: LocalAppServerLease) {
@@ -243,5 +269,9 @@ class LocalAppServerDeviceSmokeTest {
         const val SMOKE_AGENT_PREFIX = "device-smoke-"
         const val SMOKE_API_KEY = "lm-studio"
         const val AGENT_LIST_LIMIT = 1_000
+
+        /** A 4x4 PNG, sent the way the app sends a photo. */
+        const val SMOKE_PNG_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP4z8AARwzEcQCukw/x0F8jngAAAABJRU5ErkJggg=="
     }
 }

@@ -23,6 +23,11 @@
 //   App processes also inherit zygote's AT_SECURE, so Node's safeGetenv() refuses every variable:
 //   os.tmpdir() is /tmp whatever TMPDIR says, and /tmp is not writable by apps (the Bash tool's
 //   mkdtemp failed with EACCES).
+//   The App Server runs IN the app process on libnode, so process.execPath is the app's own
+//   executable, /system/bin/app_process64 (ART), not a node: letta-code's
+//   spawn(process.execPath, [image-resize-worker.js, …]) started ART with node arguments and it
+//   aborted (image sends failed with "Image worker exited from signal SIGABRT"). execPath here is
+//   a stub that dies of SIGABRT the same way, silently (ART writes to logcat, not stderr).
 // It cannot remove V8's ICU-backed \p{...} regex support, so property-escape coverage still needs
 // a device run (the shipped transform-unicode-property patch covers the bundle's literals).
 'use strict';
@@ -103,6 +108,18 @@ Object.defineProperty(execFile, promisify.custom, {
 childProcess.execFile = execFile;
 
 const os = require('node:os');
+const path = require('node:path');
+// The ART stand-in (see the header). Written once per runner (rename is atomic, so a process that
+// execs it never sees a half-written file) under the runner's own temp dir.
+const appProcess = path.join(os.tmpdir(), `android-emulation-${process.getuid()}`, 'app_process64');
+if (!fs.existsSync(appProcess)) {
+  fs.mkdirSync(path.dirname(appProcess), { recursive: true });
+  const staging = `${appProcess}.${process.pid}`;
+  fs.writeFileSync(staging, '#!/bin/sh\n# ART started with node arguments: Runtime aborting\nkill -ABRT $$\n', { mode: 0o755 });
+  fs.renameSync(staging, appProcess);
+}
+process.execPath = appProcess;
+
 os.tmpdir = function tmpdir() { return '/tmp'; }; // safeGetenv('TMPDIR') is refused under AT_SECURE
 // The device's /tmp; a runner whose own TMPDIR lives under /tmp keeps that.
 const sandboxTmp = process.env.TMPDIR;

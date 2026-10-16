@@ -43,12 +43,21 @@ fun PreparedLettaCodeProject.androidLocalAppServerLaunch(
  * node18-compat.cjs must come first: the other preloads may already use the globals it backfills.
  * Device tools reach the App Server through `runtime_start.register_external_tools` (the channel's
  * [com.letta.mobile.data.controller.extras.ExternalToolRegistry]), so there is no tools preload.
+ * child-node.cjs relaunches letta-code's node helpers on the node CLI ([CHILD_NODE_ENV]).
  */
 fun embeddedAppServerPreloadRequireFiles(projectDir: File): List<File> = listOf(
     File(projectDir, "node18-compat.cjs"),
     File(projectDir, "regexp-polyfill.cjs"),
     File(projectDir, "android-network-polyfill.cjs"),
+    File(projectDir, "child-node.cjs"),
 )
+
+/**
+ * letta-mobile-by4vm.121.12: the node letta-code starts its helpers on (child-node.cjs). In-process
+ * libnode's own `process.execPath` is the app's executable (app_process64, ART), which aborts when
+ * started with node's arguments; this names the packaged node CLI (`bin/node` -> libnodecli.so).
+ */
+const val CHILD_NODE_ENV = "LETTA_CHILD_NODE_PATH"
 
 /** The device environment: home, tools on PATH, temp dirs, the network bridge, the heap. */
 private fun PreparedLettaCodeProject.embeddedRuntimeEnvironment(
@@ -157,9 +166,10 @@ private fun PreparedLettaCodeProject.memfsEnvironment(toolInstaller: AndroidEmbe
         Log.i("LettaCodeLaunch", "npm-cli.js not bundled or node missing; npm unavailable")
         emptyMap()
     }
+    val childNodeEnvironment = if (nodeAvailable) mapOf(CHILD_NODE_ENV to nodeLink.absolutePath) else emptyMap()
     val pathEnvironment = mapOf(
         "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
-    ) + npmEnvironment
+    ) + npmEnvironment + childNodeEnvironment
     // letta-code 0.34 has no process-wide memfs opt-out (LETTA_LOCAL_BACKEND_NO_MEMFS is gone; only
     // stateless sessions, `--no-memfs` and the `memfs:disabled` agent tag skip it). The embedded build
     // is arm64-v8a only, where libgit.so is always packaged; without it memfs startup fails loudly.
