@@ -2,7 +2,8 @@
 // Each turn: when the last message is the user's and a shell-like tool is offered, answer with ONE
 // tool call (exercises tool execution + child_process on Node 18); once the tool result is back (or
 // with no tool offered) answer with the text NODE18-OK. Requests are logged as JSON lines to
-// $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran.
+// $FAKE_LLM_LOG, including any tool result text, so the caller can assert the tool really ran, and
+// the number of images in the last user message (`images`), so it can assert an image arrived.
 // Routes mirror the on-device bridge (OnDeviceOpenAiBridge): GET /v1/models lists FAKE_LLM_MODEL,
 // POST /v1/chat/completions answers, anything else (LM Studio's /api/v0/models) is a 404.
 // usage: FAKE_LLM_PORT=4711 FAKE_LLM_LOG=<log path> FAKE_LLM_MODEL=<served id> node fake-llm.cjs
@@ -26,13 +27,22 @@ function textOf(content) {
   return '';
 }
 
+// OpenAI chat parts (`image_url`), as letta-code sends images to an lmstudio provider.
+function imagesIn(content) {
+  return Array.isArray(content) ? content.filter((part) => part && (part.type === 'image_url' || part.type === 'image')).length : 0;
+}
+
 function plan(parsed) {
   const toolNames = (parsed.tools || []).map((t) => (t.function ? t.function.name : t.name));
   const msgs = parsed.messages || [];
   const last = msgs[msgs.length - 1] || {};
   const shellTool = SHELL_TOOLS.find((t) => toolNames.includes(t)) || null;
   const toolResult = last.role === 'tool' ? textOf(last.content).slice(0, 200) : null;
-  return { toolNames, lastRole: last.role, shellTool, toolResult, callTool: Boolean(shellTool) && last.role === 'user' };
+  const lastUser = [...msgs].reverse().find((m) => m.role === 'user') || {};
+  return {
+    toolNames, lastRole: last.role, shellTool, toolResult, images: imagesIn(lastUser.content),
+    callTool: Boolean(shellTool) && last.role === 'user',
+  };
 }
 
 function streamReply(res, id, step) {

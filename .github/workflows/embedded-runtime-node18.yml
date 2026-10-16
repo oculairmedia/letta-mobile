@@ -9,7 +9,9 @@ name: Embedded runtime on Node 18
 #      Node 18.20.4 with the shipped preloads (node18-compat.cjs first) behind an android-platform
 #      emulation preload, against a fake OpenAI-compatible LLM: a headless stream-json Bash turn,
 #      then `letta server` through LocalAppServerHost driven by app-server-smoke (runtime_start ->
-#      Bash tool -> end_turn). The first missing-API error lands in the job summary.
+#      Bash tool -> end_turn, then one turn with an image, prepared in a child node while
+#      process.execPath is an emulated app_process). The first missing-API error lands in the job
+#      summary.
 on:
   pull_request:
     paths:
