@@ -14,8 +14,11 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerRunControls
 import com.letta.mobile.data.transport.appserver.AppServerTimelineConnection
 import com.letta.mobile.data.transport.appserver.AppServerTimelineTransport
+import com.letta.mobile.ui.chat.session.ConversationModelBackend
 import com.letta.mobile.ui.chat.session.TimelineChatRunControls
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
+import com.letta.mobile.ui.chat.session.TimelineChipSources
+import com.letta.mobile.ui.chat.session.TimelineModelSource
 import com.letta.mobile.web.chat.WebChatBinding
 import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
@@ -122,10 +125,19 @@ class WasmAppServerClientGateway(
             ),
         )
         val target = TimelineChatTarget(agentId = agent.id, agentName = agent.name, conversationId = conversationId)
+        val admin = session.appServerAdmin
         return WebChatBinding(
             target = target,
             transport = transport,
             controls = webRunControls(AppServerRunControls(session.engine), target),
+            chips = TimelineChipSources(
+                models = TimelineModelSource(
+                    backend = ConversationModelBackend.of(admin),
+                    conversation = { admin.getConversation(it.value) },
+                    agentModel = agent.model,
+                ),
+                permissionModes = session.permissionModes,
+            ),
         )
     }
 

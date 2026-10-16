@@ -2,6 +2,7 @@ package com.letta.mobile.web.data
 
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
@@ -36,6 +37,7 @@ class WasmAppServerSessionTest {
             label = "test",
             scope = this,
             closeTransport = {},
+            appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
         )
         val (_, events) = router.subscribe(AgentId("agent-1"), ConversationId("conv-1"))
         val started = CompletableDeferred<Unit>()

@@ -1,12 +1,17 @@
 package com.letta.mobile.web.data
 
+import com.letta.mobile.data.chat.runtime.EnginePermissionModes
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.IrohServerAddress
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.isIrohBackendUrl
+import com.letta.mobile.data.repository.appserver.AppServerLocalAdminGateway
 import com.letta.mobile.data.runtime.AppServerTurnEngine
-import com.letta.mobile.data.runtime.AppServerTurnStackSpec
+import com.letta.mobile.data.runtime.PermissionModeRegistry
+import com.letta.mobile.data.runtime.RuntimePermissionDefaults
+import com.letta.mobile.data.runtime.permissionGovernedTurnStackSpec
 import com.letta.mobile.data.runtime.attachTurnStack
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -20,6 +25,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
@@ -39,6 +45,10 @@ internal class WasmAppServerSession(
     val label: String,
     private val scope: CoroutineScope,
     private val closeTransport: suspend () -> Unit,
+    /** The session's own App Server reads and writes (models, a conversation's record), as desktop's gateway makes them. */
+    val appServerAdmin: AppServerLocalAdminGateway,
+    /** letta-mobile-ckmub.17.2: the composer's mode chip; null over Iroh, whose host sets its own mode (as on desktop). */
+    val permissionModes: PermissionModeGateway? = null,
 ) {
     val conversationByAgent = mutableMapOf<String, String>()
     private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
@@ -126,15 +136,16 @@ internal suspend fun connectWasmAppServerSession(
     val transport: AppServerTransport
     val label: String
     val closeTransport: suspend () -> Unit
-    if (isIrohBackendUrl(config.serverUrl)) {
+    val iroh = isIrohBackendUrl(config.serverUrl)
+    if (iroh) {
         // letta-mobile-ckmub.8: read the address here (a ticket, a short URL or a bare id) so a bad one
         // fails with a message that says what is expected, and the browser binding only ever gets
         // the endpoint id it can dial (through the relay; direct UDP is not available in a browser).
         val address = IrohServerAddress.parse(config.serverUrl)
-        val iroh = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
-        transport = iroh
+        val irohTransport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
+        transport = irohTransport
         label = "Iroh"
-        closeTransport = iroh::close
+        closeTransport = irohTransport::close
     } else {
         val websocket = KtorAppServerWebSocketTransport(
             httpClient = httpClient,
@@ -151,14 +162,23 @@ internal suspend fun connectWasmAppServerSession(
         bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
         val client = DefaultAppServerClient(transport, parentScope = scope)
         val eventRouter = AppServerRuntimeEventRouter().also { router = it }
+        // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
+        val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeUnless { iroh }
+        val engine = eventRouter.attachTurnStack(
+            client,
+            scope,
+            permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
+        )
         return WasmAppServerSession(
             client = client,
-            engine = eventRouter.attachTurnStack(client, scope, AppServerTurnStackSpec(requestIdFactory = { nextRequestId("turn") })),
+            engine = engine,
             router = eventRouter,
             transport = transport,
             label = label,
             scope = scope,
             closeTransport = closeTransport,
+            appServerAdmin = AppServerLocalAdminGateway(client, nextRequestId),
+            permissionModes = modes?.let { EnginePermissionModes(engine, it) },
         )
     } catch (error: Throwable) {
         withContext(NonCancellable) {

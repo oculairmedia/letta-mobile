@@ -5,17 +5,10 @@ import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.withPendingApprovalDetails
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.send.ConversationSendQueue
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.modelcontrol.CatalogModel
-import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
-import com.letta.mobile.data.repository.modelcontrol.reasoningEffortsOf
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
-import com.letta.mobile.ui.chat.session.ChatModelOption
-import com.letta.mobile.ui.chat.session.ChatModelUiState
 import com.letta.mobile.ui.chat.session.TimelineHostApprovals
 import com.letta.mobile.ui.chat.session.TimelineLocalState
 import com.letta.mobile.ui.chat.session.TimelineRunState
@@ -108,55 +101,3 @@ internal fun DesktopChatSurfaceState.composerUiState(limits: AttachmentLimits): 
     maxAttachments = limits.maxAttachmentCount,
     attachmentLimits = limits,
 )
-
-/**
- * letta-mobile-by4vm.85: the reasoning efforts the composer offers. [byValue] holds each option's
- * efforts by selection value (empty where the gateway cannot send an effort, so no effort chip
- * shows); [current] is the selected conversation's effort, this session's pick else the host's.
- */
-internal data class DesktopModelEfforts(
-    val byValue: Map<String, List<String>> = emptyMap(),
-    val current: String? = null,
-)
-
-/** Everything [desktopModelEfforts] reads, at one instant. */
-internal data class DesktopModelEffortInputs(
-    val models: List<LlmModel>,
-    /** The host catalog's rows (`model.list`), which advertise each model's efforts. */
-    val catalog: List<CatalogModel>,
-    val choices: ConversationModelChoices,
-    val selectedConversationId: String?,
-    /** False where the gateway cannot send an effort with a switch: no option offers one then. */
-    val supported: Boolean,
-)
-
-/** letta-mobile-by4vm.85: each option's efforts (by selection value) and the conversation's effort. */
-internal fun desktopModelEfforts(inputs: DesktopModelEffortInputs): DesktopModelEfforts {
-    if (!inputs.supported) return DesktopModelEfforts()
-    val byValue = inputs.models.mapNotNull { model ->
-        reasoningEffortsOf(inputs.catalog, model).takeIf { it.isNotEmpty() }
-            ?.let { ModelCatalog.selectionValue(inputs.models, model) to it }
-    }.toMap()
-    return DesktopModelEfforts(byValue = byValue, current = inputs.selectedConversationId?.let(inputs.choices.efforts::get))
-}
-
-/**
- * The composer model chip. Desktop stores either a display label or (after a switch) the selection
- * value in `composerModelLabel`, so the current option is matched on either.
- */
-internal fun desktopChatModelUiState(
-    composerModelLabel: String,
-    modelOptions: List<Pair<String, String>>,
-    efforts: DesktopModelEfforts = DesktopModelEfforts(),
-): ChatModelUiState {
-    val options = modelOptions.map { (label, value) ->
-        ChatModelOption(handle = value, label = label, reasoningEfforts = efforts.byValue[value].orEmpty().toImmutableList())
-    }
-    val current = options.firstOrNull { it.handle == composerModelLabel || it.label == composerModelLabel }
-    return ChatModelUiState(
-        currentHandle = current?.handle,
-        currentLabel = current?.label ?: composerModelLabel,
-        currentEffort = efforts.current,
-        options = options.toImmutableList(),
-    )
-}

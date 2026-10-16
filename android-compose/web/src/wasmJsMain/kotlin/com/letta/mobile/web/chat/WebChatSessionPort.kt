@@ -11,7 +11,9 @@ import com.letta.mobile.ui.chat.session.TimelineChatRunControls
 import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineChatSessionPort
 import com.letta.mobile.ui.chat.session.TimelineChatTarget
+import com.letta.mobile.ui.chat.session.TimelineChipSources
 import com.letta.mobile.ui.chat.session.TimelineSyncLoopSession
+import com.letta.mobile.ui.chat.session.withChips
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -21,6 +23,8 @@ class WebChatBinding(
     /** The conversation's timeline source: the App Server socket (WebSocket or Iroh). */
     val transport: TimelineTransport,
     val controls: TimelineChatRunControls,
+    /** letta-mobile-ckmub.17.2: the composer's model and permission-mode chips; null shows neither. */
+    val chips: TimelineChipSources? = null,
 )
 
 /**
@@ -50,7 +54,7 @@ class WebChatSessionPort(
         session = TimelineSyncLoopSession(loop),
         target = binding.target,
         scope = scope,
-        options = TimelineChatSessionOptions(controls = binding.controls),
+        options = TimelineChatSessionOptions(controls = binding.controls).withChips(scope, binding.target, binding.chips),
     )
 
     /** The conversation this port serves; the canvas docked under the page is that conversation's board. */
