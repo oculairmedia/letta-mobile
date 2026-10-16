@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.local
 
 import android.content.Context
 import android.util.Log
+import com.letta.mobile.data.runtime.host.LocalAppServerLaunch
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -25,8 +26,7 @@ data class AndroidEmbeddedLettaCodeLaunchSpec(
         LettaCodeNodeStartRequest(
             arguments = buildList {
                 add("node")
-                add("--max-old-space-size=384")
-                add("--max-semi-space-size=16")
+                addAll(NodeHeap.STREAM_JSON.flags)
                 preloadRequireFiles.forEach { preload ->
                     add("--require")
                     add(preload.absolutePath)
@@ -65,12 +65,12 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
     androidNetworkBridgeToken: String,
     toolInstaller: AndroidEmbeddedToolInstaller,
 ): AndroidEmbeddedLettaCodeLaunchSpec {
-    workingDirectory.mkdirs()
-    storageDirectory.mkdirs()
-    homeDirectory.mkdirs()
+    val baseEnvironment = embeddedRuntimeEnvironment(
+        AndroidNetworkBridgeEndpoint(androidNetworkBridgeBaseUrl, androidNetworkBridgeToken),
+        toolInstaller,
+        heap = NodeHeap.STREAM_JSON,
+    )
     val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
-    val tempDirectory = File(storageDirectory.parentFile, "tmp").apply { mkdirs() }
-    val backgroundDirectory = File(storageDirectory.parentFile, "background").apply { mkdirs() }
     val modelHandle = modelSelection.androidEmbeddedLaunchModelHandle(onDeviceProviderBaseUrl)
     if (onDeviceProviderBaseUrl != null) {
         writeEmbeddedLettaCodeProviderAuth(
@@ -85,12 +85,9 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
         modelHandle = modelHandle,
         preloadRequireFiles = embeddedLettaCodePreloadRequireFiles(projectDir),
         environment = buildMap {
-            put("HOME", homeDirectory.absolutePath)
+            putAll(baseEnvironment)
             put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
             put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
-            put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
-            putAll(memfsEnvironment(toolInstaller))
-            put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
             put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelHandle)
             put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
             put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
@@ -99,20 +96,79 @@ fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
             onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
             onDeviceProviderApiKey?.let { put("LMSTUDIO_API_KEY", it) }
             modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
-            put("SHELL", "/system/bin/sh")
-            put("NO_COLOR", "1")
-            put("UV_USE_IO_URING", "0")
-            put("UV_THREADPOOL_SIZE", "2")
-            put("TMPDIR", tempDirectory.absolutePath)
-            put("TMP", tempDirectory.absolutePath)
-            put("TEMP", tempDirectory.absolutePath)
-            put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
-            put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
-            put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
-            put("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN", androidNetworkBridgeToken)
-            put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
         },
     )
+}
+
+/** Where letta.js reaches [AndroidNetworkBridge] (`/fetch`, `/dns/lookup` for android-network-polyfill.cjs). */
+data class AndroidNetworkBridgeEndpoint(val baseUrl: String, val token: String)
+
+/**
+ * The on-device App Server launch (letta-mobile-by4vm.110.5): `node` with the heap flags and the
+ * App Server preloads in front of letta.js, plus the device environment.
+ * [com.letta.mobile.data.runtime.host.LocalAppServerHost] appends `server --backend local
+ * --listen …` and the local-backend variables. Providers and models are the App Server's own
+ * (`providers/auth.json` in the backend dir, `agent_create`), so nothing here is model-specific.
+ */
+fun PreparedLettaCodeProject.androidLocalAppServerLaunch(
+    networkBridge: AndroidNetworkBridgeEndpoint,
+    toolInstaller: AndroidEmbeddedToolInstaller,
+): LocalAppServerLaunch = LocalAppServerLaunch(
+    command = buildList {
+        add("node")
+        addAll(NodeHeap.APP_SERVER.flags)
+        embeddedAppServerPreloadRequireFiles(projectDir).forEach { preload ->
+            add("--require")
+            add(preload.absolutePath)
+        }
+        add(entrypoint.absolutePath)
+    },
+    backendDir = storageDirectory.absolutePath,
+    environment = embeddedRuntimeEnvironment(networkBridge, toolInstaller, NodeHeap.APP_SERVER),
+    workingDirectory = workingDirectory.absolutePath,
+)
+
+/** The device environment both launch modes share: home, tools on PATH, temp dirs, the network bridge, the heap. */
+private fun PreparedLettaCodeProject.embeddedRuntimeEnvironment(
+    networkBridge: AndroidNetworkBridgeEndpoint,
+    toolInstaller: AndroidEmbeddedToolInstaller,
+    heap: NodeHeap,
+): Map<String, String> {
+    workingDirectory.mkdirs()
+    storageDirectory.mkdirs()
+    homeDirectory.mkdirs()
+    val tempDirectory = File(storageDirectory.parentFile, "tmp").apply { mkdirs() }
+    val backgroundDirectory = File(storageDirectory.parentFile, "background").apply { mkdirs() }
+    return buildMap {
+        put("HOME", homeDirectory.absolutePath)
+        put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
+        putAll(memfsEnvironment(toolInstaller))
+        put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
+        put("SHELL", "/system/bin/sh")
+        put("NO_COLOR", "1")
+        put("UV_USE_IO_URING", "0")
+        put("UV_THREADPOOL_SIZE", "2")
+        put("TMPDIR", tempDirectory.absolutePath)
+        put("TMP", tempDirectory.absolutePath)
+        put("TEMP", tempDirectory.absolutePath)
+        put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
+        put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
+        put("LETTA_ANDROID_NETWORK_BRIDGE_URL", networkBridge.baseUrl)
+        put("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN", networkBridge.token)
+        put("NODE_OPTIONS", heap.flags.joinToString(" "))
+    }
+}
+
+/** V8 heap per launch mode; the flags go on argv and into NODE_OPTIONS. */
+private enum class NodeHeap(oldSpaceMb: Int) {
+    /** The headless stream-json runtime, tuned for 0.26.1 (goes with that path in by4vm.110.6). */
+    STREAM_JSON(oldSpaceMb = 384),
+
+    /** App Server mode keeps more resident (runtime cache, cron, terminals): the plan's 512, measured in W7. */
+    APP_SERVER(oldSpaceMb = 512),
+    ;
+
+    val flags: List<String> = listOf("--max-old-space-size=$oldSpaceMb", "--max-semi-space-size=16")
 }
 
 interface AndroidEmbeddedToolInstaller {

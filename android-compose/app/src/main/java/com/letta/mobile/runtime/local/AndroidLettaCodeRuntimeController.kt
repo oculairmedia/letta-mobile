@@ -435,12 +435,19 @@ data class EmbeddedLettaCodeSessionKey(
     val modelKey: String,
 )
 
-/** node18-compat.cjs must come first: the other preloads may already use the globals it backfills. */
-fun embeddedLettaCodePreloadRequireFiles(projectDir: File): List<File> = listOf(
+/** The headless runtime's preloads: the App Server's plus the device tools it registers in-process. */
+fun embeddedLettaCodePreloadRequireFiles(projectDir: File): List<File> =
+    embeddedAppServerPreloadRequireFiles(projectDir) + File(projectDir, "device-tools-preload.cjs")
+
+/**
+ * node18-compat.cjs must come first: the other preloads may already use the globals it backfills.
+ * The App Server gets device tools through `runtime_start.register_external_tools` instead
+ * (letta-mobile-by4vm.110.6), so it has no device-tools preload.
+ */
+fun embeddedAppServerPreloadRequireFiles(projectDir: File): List<File> = listOf(
     File(projectDir, "node18-compat.cjs"),
     File(projectDir, "regexp-polyfill.cjs"),
     File(projectDir, "android-network-polyfill.cjs"),
-    File(projectDir, "device-tools-preload.cjs"),
 )
 
 /**
