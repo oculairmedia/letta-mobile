@@ -47,7 +47,7 @@ internal class IrohFramePublisher(
         connectionGeneration = connectionGeneration,
     )
 
-    val collectorOverflows: SharedFlow<FrameCollectorOverflowEvent> = overflowEvents
+    val collectorOverflows: SharedFlow<FrameCollectorOverflowIncident> = overflowEvents
 
     val frameEvents: SharedFlow<TransportFrameEvent> =
         NamedTransportFrameSharedFlow(FRAME_EVENTS_SUBSCRIPTION, canonicalEvents)
@@ -86,8 +86,6 @@ internal class IrohFramePublisher(
     }
 }
 
-/** Recovery provenance emitted once when a corrupt bounded subscription is detached. */
-internal typealias FrameCollectorOverflowEvent = FrameCollectorOverflowIncident
 
 /**
  * Bounded recovery provenance with a retained latest incident.
@@ -100,19 +98,19 @@ internal typealias FrameCollectorOverflowEvent = FrameCollectorOverflowIncident
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
 private class BoundedOverflowBroadcast(
     private val bufferCapacity: Int,
-) : SharedFlow<FrameCollectorOverflowEvent> {
+) : SharedFlow<FrameCollectorOverflowIncident> {
     private val mutex = Mutex()
-    private val subscriptions = mutableListOf<Channel<FrameCollectorOverflowEvent>>()
-    private val latest = atomic<FrameCollectorOverflowEvent?>(null)
+    private val subscriptions = mutableListOf<Channel<FrameCollectorOverflowIncident>>()
+    private val latest = atomic<FrameCollectorOverflowIncident?>(null)
 
     init {
         require(bufferCapacity > 0) { "bufferCapacity must be positive" }
     }
 
-    override val replayCache: List<FrameCollectorOverflowEvent>
+    override val replayCache: List<FrameCollectorOverflowIncident>
         get() = latest.value?.let(::listOf).orEmpty()
 
-    suspend fun publish(event: FrameCollectorOverflowEvent) {
+    suspend fun publish(event: FrameCollectorOverflowIncident) {
         val overflowed = mutex.withLock {
             latest.value = event
             val failed = subscriptions.filter { it.trySend(event).isFailure }
@@ -122,8 +120,8 @@ private class BoundedOverflowBroadcast(
         overflowed.forEach { it.close() }
     }
 
-    override suspend fun collect(collector: FlowCollector<FrameCollectorOverflowEvent>): Nothing {
-        val subscription = Channel<FrameCollectorOverflowEvent>(bufferCapacity)
+    override suspend fun collect(collector: FlowCollector<FrameCollectorOverflowIncident>): Nothing {
+        val subscription = Channel<FrameCollectorOverflowIncident>(bufferCapacity)
         mutex.withLock {
             latest.value?.let { subscription.trySend(it) }
             subscriptions += subscription
@@ -179,7 +177,7 @@ private fun ServerFrame.overflowFrameType(): String = when (this) {
 @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
 private class BoundedFrameBroadcast(
     private val bufferCapacity: Int,
-    private val onOverflow: suspend (FrameCollectorOverflowEvent) -> Unit,
+    private val onOverflow: suspend (FrameCollectorOverflowIncident) -> Unit,
     private val connectionGeneration: () -> Long,
 ) : SharedFlow<TransportFrameEvent> {
     private val mutex = Mutex()
@@ -205,7 +203,7 @@ private class BoundedFrameBroadcast(
             overflowed.forEach { subscription ->
                 try {
                     onOverflow(
-                        FrameCollectorOverflowEvent(
+                        FrameCollectorOverflowIncident(
                             subscriptionId = subscription.id,
                             subscriptionIdentity = subscription.identity,
                             capacity = bufferCapacity,

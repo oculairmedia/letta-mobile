@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.SlashCommand
 import org.junit.Assert.assertEquals
@@ -9,8 +10,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatComposerController
 import com.letta.mobile.feature.chat.coordination.ChatComposerTelemetry
-import com.letta.mobile.feature.chat.coordination.MAX_COMPOSER_ATTACHMENTS
-import com.letta.mobile.feature.chat.coordination.MAX_COMPOSER_TOTAL_BYTES
 
 class ChatComposerControllerTest {
     private val noTelemetry = ChatComposerTelemetry { _, _ -> }
@@ -108,15 +107,15 @@ class ChatComposerControllerTest {
     @Test
     fun `attachment count cap rejects fifth image`() {
         val controller = ChatComposerController(telemetry = noTelemetry)
-        repeat(MAX_COMPOSER_ATTACHMENTS) { index ->
+        repeat(AttachmentLimits.Default.maxAttachmentCount) { index ->
             assertTrue(controller.addAttachment(image(base64 = "image-$index")))
         }
 
         assertFalse(controller.addAttachment(image(base64 = "extra")))
 
-        assertEquals(MAX_COMPOSER_ATTACHMENTS, controller.state.value.pendingAttachments.size)
+        assertEquals(AttachmentLimits.Default.maxAttachmentCount, controller.state.value.pendingAttachments.size)
         assertEquals(
-            "Attachment limit reached ($MAX_COMPOSER_ATTACHMENTS max).",
+            "Attachment limit reached (${AttachmentLimits.Default.maxAttachmentCount} max).",
             controller.state.value.error,
         )
     }
@@ -125,7 +124,7 @@ class ChatComposerControllerTest {
     fun `attachment size cap rejects too-large total`() {
         val controller = ChatComposerController(telemetry = noTelemetry)
 
-        assertFalse(controller.addAttachment(image(base64 = "x".repeat(MAX_COMPOSER_TOTAL_BYTES + 1))))
+        assertFalse(controller.addAttachment(image(base64 = "x".repeat(AttachmentLimits.Default.maxTotalBase64Bytes + 1))))
 
         assertTrue(controller.state.value.pendingAttachments.isEmpty())
         assertEquals(

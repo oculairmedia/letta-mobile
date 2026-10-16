@@ -79,7 +79,7 @@ fun BackendSwitcherSheet(
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
 
     // letta-mobile-qmxn: re-probe backend health each time the sheet opens
-    // so the dot reflects current state (e.g. shim came back up between
+    // so the dot reflects current state (e.g. the host came back up between
     // visits) rather than the last cached probe result.
     LaunchedEffect(Unit) { viewModel.refreshHealth() }
 

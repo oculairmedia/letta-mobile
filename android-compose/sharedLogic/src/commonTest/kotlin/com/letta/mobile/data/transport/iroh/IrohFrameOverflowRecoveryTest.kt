@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.FrameCollectorOverflowIncident
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,7 +24,7 @@ class IrohFrameOverflowRecoveryTest {
         val stalledJob = launch(start = CoroutineStart.UNDISPATCHED) {
             publisher.events.collect { stallGate.await() }
         }
-        val overflowEvents = mutableListOf<FrameCollectorOverflowEvent>()
+        val overflowEvents = mutableListOf<FrameCollectorOverflowIncident>()
         val overflowJob = launch(start = CoroutineStart.UNDISPATCHED) {
             publisher.collectorOverflows.collect { overflowEvents += it }
         }
@@ -66,7 +67,7 @@ class IrohFrameOverflowRecoveryTest {
     @Test
     fun cancellationDoesNotEmitOverflowEvent() = runTest(UnconfinedTestDispatcher()) {
         val publisher = IrohFramePublisher(bufferCapacity = 1)
-        val overflowEvents = mutableListOf<FrameCollectorOverflowEvent>()
+        val overflowEvents = mutableListOf<FrameCollectorOverflowIncident>()
         val overflowJob = launch(start = CoroutineStart.UNDISPATCHED) {
             publisher.collectorOverflows.collect { overflowEvents += it }
         }
@@ -86,7 +87,7 @@ class IrohFrameOverflowRecoveryTest {
     fun concurrentOverflowEventsRemainOnePerDetachedSubscription() = runTest(UnconfinedTestDispatcher()) {
         val publisher = IrohFramePublisher(bufferCapacity = 1)
         val stallGate = CompletableDeferred<Unit>()
-        val overflowEvents = mutableListOf<FrameCollectorOverflowEvent>()
+        val overflowEvents = mutableListOf<FrameCollectorOverflowIncident>()
         val overflowJob = launch(start = CoroutineStart.UNDISPATCHED) {
             publisher.collectorOverflows.collect { overflowEvents += it }
         }
@@ -121,7 +122,7 @@ class IrohFrameOverflowRecoveryTest {
         (1..3).forEach { publisher.publish(assistantFrame("offline-overflow-$it")) }
         runCurrent()
 
-        val observed = mutableListOf<FrameCollectorOverflowEvent>()
+        val observed = mutableListOf<FrameCollectorOverflowIncident>()
         val observer = launch(start = CoroutineStart.UNDISPATCHED) {
             publisher.collectorOverflows.collect { observed += it }
         }

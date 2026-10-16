@@ -15,6 +15,7 @@ import com.letta.mobile.data.channel.ChannelsPageState
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.memory.graph.MemoryPageState
+import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.desktop.workspace.rememberDesktopFileMentions
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.SubagentEntry
@@ -32,10 +33,10 @@ import com.letta.mobile.data.home.buildFleetOverview
 import com.letta.mobile.desktop.home.DesktopHomeInputs
 import com.letta.mobile.desktop.home.toFleetConversation
 import com.letta.mobile.data.schedules.ScheduleLibraryState
-import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.mascot.LocalMascotRegistry
 import com.letta.mobile.ui.mascot.resolveMascotIdentity
 import com.letta.mobile.ui.shell.pages.home.HomePageOptions
+import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -46,7 +47,7 @@ internal data class DesktopAgentFocus(
     val rosterAgents: List<Agent>,
     /** Same-named agents are stacked in the rail (see [buildRailAgents]). */
     val railAgents: List<Pair<String, String>>,
-    val railActivityByAgentId: Map<String, RailAgentActivity>,
+    val railActivityByAgentId: Map<String, ShellRailActivity>,
     val selectedAgentId: String?,
     val selectedAgentName: String,
     val selectedAgentOrbIndex: Int,
@@ -70,7 +71,7 @@ internal data class DesktopLibraryStates(
     val memory: MemoryPageState,
     val schedules: ScheduleLibraryState,
     val channels: ChannelsPageState,
-    val tools: DesktopToolLibraryState,
+    val tools: ToolLibraryState,
 )
 
 /** The lists the sidebar, composer, palette and pickers draw from. */

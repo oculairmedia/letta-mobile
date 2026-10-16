@@ -19,7 +19,6 @@ import com.letta.mobile.desktop.chat.DesktopBranchOrigin
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationMarks
 import com.letta.mobile.desktop.chat.DesktopTranscriptExport
-import com.letta.mobile.ui.shell.rail.ShellRailActivity
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelActions
 import com.letta.mobile.ui.shell.sidebar.ShellAgentPanelState
 import com.letta.mobile.ui.shell.sidebar.ShellArchiveFilter
@@ -33,8 +32,6 @@ import com.letta.mobile.ui.shell.sidebar.ShellSidebarMapping
 import com.letta.mobile.ui.shell.sidebar.shellSectionIcon
 import kotlin.time.Clock
 
-/** What the rail orb's hover shows: the shared rail's activity (when the agent last spoke, what it said). */
-internal typealias RailAgentActivity = ShellRailActivity
 
 /**
  * letta-mobile-ckmub.3.10 (hard cut S7): the desktop's binding of the shared agent panel. The panel,

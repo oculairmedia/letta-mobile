@@ -127,8 +127,7 @@ class AppServerServeIrohCommand : CliktCommand(
         "--vibesync-base-url",
         envvar = "LETTA_IROH_VIBESYNC_BASE_URL",
         help = "Base URL of the VibeSync product service that project.* methods call " +
-            "DIRECTLY (lgns8.9), bypassing the lettashim /api reverse-proxy splice. " +
-            "Server-side localhost only.",
+            "DIRECTLY (lgns8.9). Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
 
     private val canvasOpsDir by option(

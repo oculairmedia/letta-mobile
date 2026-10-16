@@ -6,7 +6,6 @@
     "sources": [
       "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.29.12, lgns8.21.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
-      "docs/architecture/app-server-rest-admin-audit-fanout.md (ph9ws.14/.15, lgns8.1)",
       "AdminRpcRegistry.buildRouter registered methods (enumerated by IrohAdminOwnershipMatrixTest)",
       "docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md (shim-only surfaces disposition, lgns8.25)",
       "admin-shim server.ts / lib/{runs,store,crons}.ts route inventory read on the 0.29.12 host (/opt/stacks/letta-code-parallel/admin-shim) — the per-method evidence for owner-vs-deny (lgns8.9)"
