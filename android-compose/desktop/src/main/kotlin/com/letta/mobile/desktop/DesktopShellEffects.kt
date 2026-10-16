@@ -2,13 +2,12 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.dreaming.DreamNotifyPrefs
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.ui.shell.SyncShellWorkspace
 
 /**
  * letta-mobile-bglj6.1.10: the shell's effects - controller lifecycles, the tab strip's sync,
@@ -19,9 +18,9 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 internal fun DesktopShellEffects(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    tabs: MutableState<ConversationTabsState>,
 ) {
-    DesktopShellChatEffects(context, frame, tabs)
+    DesktopShellChatEffects(context, frame)
+    SyncShellWorkspace(context.navigator, frame.chatState.shellChatSelection())
     DesktopShellNucleusEffects(context, frame)
     DesktopShellQuickQueryBridge(context, frame)
     DesktopShellFocusedAgentLoaders(context, frame)
@@ -31,7 +30,6 @@ internal fun DesktopShellEffects(
 private fun DesktopShellChatEffects(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    tabs: MutableState<ConversationTabsState>,
 ) {
     val chatController = context.core.chatController
     val chatState = frame.chatState
@@ -56,7 +54,6 @@ private fun DesktopShellChatEffects(
             cronPanel = context.panels.cronPanel,
         ),
     )
-    SyncConversationTabs(chatState, selectedDestination, tabs.value) { tabs.value = it }
 }
 
 /**

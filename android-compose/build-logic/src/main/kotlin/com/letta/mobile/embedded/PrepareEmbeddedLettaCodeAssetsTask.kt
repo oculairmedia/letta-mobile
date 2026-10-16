@@ -232,7 +232,6 @@ internal val LETTA_JS_PATCHES: List<LettaJsPatch> = listOf(
     ),
     LettaJsPatch.Script("patch-vision-model-input.mjs", "Vision-model-input transform for letta.js failed."),
     LettaJsPatch.Script("patch-image-url-shape.mjs", "image_url-shape transform for letta.js failed."),
-    LettaJsPatch.Script("bypass-image-resize.mjs", "Image-resize bypass transform for letta.js failed."),
     LettaJsPatch.ToolGroups,
 )
 

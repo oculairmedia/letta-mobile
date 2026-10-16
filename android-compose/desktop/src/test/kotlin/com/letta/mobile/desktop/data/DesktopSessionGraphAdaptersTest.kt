@@ -2,24 +2,22 @@ package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.storage.InMemorySecureSettingsStore
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
-import com.letta.mobile.data.backend.isUnavailable
-import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.backend.SessionPlatform
+import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.chat.runtime.BackendConfigStore
 import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.ServerHealthState
-import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.CachedBlockRepository
+import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.appserver.AppServerAgentBlockRepository
 import com.letta.mobile.data.repository.appserver.AppServerAgentRepository
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
-import com.letta.mobile.data.repository.CachedBlockRepository
-import com.letta.mobile.data.repository.ToolRepository
-import com.letta.mobile.data.timeline.TimelineStreamFrame
-import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
+import com.letta.mobile.data.session.graph.HostSessionGraphProvider
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.runtime.BackendKind
 import java.nio.file.Files
 import kotlin.test.Test
@@ -29,10 +27,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 
+/**
+ * Desktop's binding of the shared session graph (letta-mobile-ckmub.17.1). The route matrix itself
+ * is held by the shared `HostSessionGraphFactoryTest`; these cover what desktop binds: its App
+ * Server registries, the Iroh transport and its storage.
+ */
 class DesktopSessionGraphAdaptersTest {
+    private fun graphFor(config: LettaConfig?): SharedSessionRepositoryGraph =
+        desktopSessionGraphFactory(configProvider = { config }, channelTransportFactory = ::NoOpChannelTransport).create()
+
     @Test
     fun factoryCreatesDesktopGraphWithoutAndroidImplementations() {
         val config = LettaConfig(
@@ -40,9 +45,8 @@ class DesktopSessionGraphAdaptersTest {
             mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "http://localhost:8283",
         )
-        val factory = DesktopSessionGraphFactory(configProvider = { config })
 
-        val graph = factory.create()
+        val graph = graphFor(config)
 
         assertEquals(1L, graph.id)
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
@@ -53,124 +57,89 @@ class DesktopSessionGraphAdaptersTest {
         assertFalse(graph.agentRepository.isRefreshing.value)
         assertNull(graph.agentRepository.refreshError.value)
         assertFalse(graph.isClosed)
+        graph.close()
     }
 
     /**
      * letta-mobile-ckmub.4: no backend binds a Letta REST repository any more. The bundled runtime
      * and a remote host reached directly (ws://) are both App Servers: agents and memory are read
-     * over that session; schedules and tools have no direct App Server route yet, so they are the
-     * unavailable repository rather than a REST fallback.
+     * over that session; schedules and tools have no direct App Server route yet, so they are their
+     * absent-route form rather than a REST fallback.
      */
     @Test
-    fun appServerBackendsReadAgentsAndMemoryOverTheAppServer() {
+    fun appServerBackendsReadAgentsAndMemoryOverTheAppServer() = runTest {
         val backends = listOf(
             LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = ""),
             LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "ws://localhost:4500"),
         )
         for (config in backends) {
-            val adapters = DesktopRepositoryAdapters(config)
+            val graph = graphFor(config)
 
-            assertIs<AppServerAgentRepository>(adapters.agentRepository, config.id)
-            assertIs<AppServerAgentBlockRepository>(adapters.blockRepository, config.id)
-            assertUnavailable(adapters.scheduleRepository)
-            assertUnavailable(adapters.toolRepository)
+            assertIs<AppServerAgentRepository>(graph.agentRepository, config.id)
+            assertIs<AppServerAgentBlockRepository>(graph.blockRepository, config.id)
+            assertIs<ScheduleRepository>(graph.scheduleRepository, config.id)
+            assertUnserved(SessionRoute.TOOLS) { graph.toolRepository.refreshTools() }
+            graph.close()
         }
-    }
-
-    private fun assertUnavailable(repository: Any) {
-        assertTrue(isUnavailable(repository), "expected the unavailable repository, got $repository")
     }
 
     @Test
     fun irohModeBindsBlockRepositoryThroughIroh() {
-        val adapters = DesktopRepositoryAdapters(
-            LettaConfig(
-                id = "desktop-iroh",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
-            ),
-        )
+        val graph = graphFor(LettaConfig(id = "desktop-iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = IROH_URL))
 
-        assertIs<CachedBlockRepository>(adapters.blockRepository)
+        assertIs<CachedBlockRepository>(graph.blockRepository)
+        graph.close()
     }
 
     /**
-     * letta-mobile-9v9nu regression: before the fix, `irohMode` was computed
-     * purely from `IrohChannelTransport.isIrohUrl(config.serverUrl)`, so a
-     * LOCAL config with a leftover `iroh://` serverUrl still built
-     * the Iroh repositories and routed `toolRepository`/`scheduleRepository`
-     * through the Iroh-backed implementations instead of falling back to the
-     * (correctly local-only) unavailable repository.
+     * letta-mobile-9v9nu regression: a LOCAL config with a leftover `iroh://` serverUrl must not
+     * route tools or schedules through the Iroh-backed implementations.
      */
     @Test
-    fun localModeWithStaleIrohServerUrlNeverUsesIrohRepositories() {
-        val adapters = DesktopRepositoryAdapters(
-            LettaConfig(
-                id = "desktop-local",
-                mode = LettaConfig.Mode.LOCAL,
-                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
-            ),
-        )
+    fun localModeWithStaleIrohServerUrlNeverUsesIrohRepositories() = runTest {
+        val graph = graphFor(LettaConfig(id = "desktop-local", mode = LettaConfig.Mode.LOCAL, serverUrl = IROH_URL))
 
-        assertFalse(adapters.toolRepository is ToolRepository)
-        assertFalse(adapters.scheduleRepository is com.letta.mobile.data.repository.iroh.IrohScheduleRepository)
+        assertFalse(graph.capabilities.supports(SessionRoute.TOOLS))
+        assertUnserved(SessionRoute.TOOLS) { graph.toolRepository.refreshTools() }
+        assertFalse(graph.scheduleRepository is IrohScheduleRepository)
+        graph.close()
     }
 
     @Test
     fun irohModeBindsSharedCronSelfTodoSubagentAndAdminReads() = runTest {
-        val adapters = DesktopRepositoryAdapters(
-            config = LettaConfig(
-                id = "desktop-iroh",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
-            ),
-            channelTransport = NoOpChannelTransport(),
-        )
+        val graph = graphFor(LettaConfig(id = "desktop-iroh", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = IROH_URL))
 
-        assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
-        assertIs<com.letta.mobile.data.repository.SelfTodoRepository>(adapters.selfTodoRepository)
-        assertIs<com.letta.mobile.data.repository.SubagentRepository>(adapters.subagentRepository)
+        assertIs<com.letta.mobile.data.repository.CronRepository>(graph.cronRepository)
+        assertIs<com.letta.mobile.data.repository.SelfTodoRepository>(graph.selfTodoRepository)
+        assertIs<com.letta.mobile.data.repository.SubagentRepository>(graph.subagentRepository)
 
-        val adminError = runCatching { adapters.providerRepository.refreshProviders() }.exceptionOrNull()
-        assertFalse(
-            adminError is AppServerRouteUnavailable,
-            "Iroh admin reads should be bound, not unavailable proxies",
-        )
-        adapters.closeables.forEach { it.close() }
+        val adminError = runCatching { graph.providerRepository.refreshProviders() }.exceptionOrNull()
+        assertFalse(adminError is AppServerRouteUnavailable, "Iroh admin reads should be bound, not unserved")
+        graph.close()
     }
 
     @Test
-    fun remoteAppServerKeepsAdminReadsWithoutARouteUnavailable() = runTest {
-        val adapters = DesktopRepositoryAdapters(
-            LettaConfig(
-                id = "desktop-self-hosted",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "http://localhost:8283",
-            ),
+    fun remoteAppServerKeepsAdminReadsWithoutARoute() = runTest {
+        val graph = graphFor(
+            LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://localhost:8283"),
         )
 
-        assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
-        val error = assertFailsWith<AppServerRouteUnavailable> {
-            adapters.passageRepository.searchArchival(AgentId("agent-1"), "query")
-        }
-        assertTrue(error.message.orEmpty().contains("IPassageRepository"))
+        assertIs<com.letta.mobile.data.repository.CronRepository>(graph.cronRepository)
+        assertUnserved(SessionRoute.PASSAGES) { graph.passageRepository.searchArchival(AgentId("agent-1"), "query") }
+        graph.close()
     }
 
     @Test
-    fun unavailableRepositoriesFailWhenInvokedBeforeJvmBindingExists() = runTest {
-        val graph = DesktopSessionGraphFactory().create()
+    fun noBackendServesNoAgents() = runTest {
+        val graph = desktopSessionGraphFactory().create()
 
-        val error = assertFailsWith<AppServerRouteUnavailable> {
-            graph.agentRepository.countAgents()
-        }
-
-        assertTrue(error.message.orEmpty().contains("IAgentRepository"))
-        assertTrue(error.message.orEmpty().contains("countAgents"))
+        assertUnserved(SessionRoute.AGENTS) { graph.agentRepository.countAgents() }
+        graph.close()
     }
 
     @Test
     fun providerRebuildClosesPreviousGraphAndPublishesNextGraph() {
-        val provider = DesktopSessionGraphProvider(DesktopSessionGraphFactory())
+        val provider = HostSessionGraphProvider(desktopSessionGraphFactory(), SessionPlatform.DESKTOP)
         val first = provider.current
 
         val second = provider.rebuild()
@@ -180,6 +149,11 @@ class DesktopSessionGraphAdaptersTest {
         assertEquals(2L, second.id)
         assertEquals(second, provider.currentGraph.value)
         assertNull(provider.sessionError.value)
+    }
+
+    private suspend fun assertUnserved(route: SessionRoute, call: suspend () -> Unit) {
+        val error = assertFailsWith<AppServerRouteUnavailable> { call() }
+        assertEquals(route, error.route)
     }
 
     @Test
@@ -335,8 +309,9 @@ class DesktopSessionGraphAdaptersTest {
             mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "http://one.example",
         )
-        val provider = DesktopSessionGraphProvider(
-            DesktopSessionGraphFactory(configProvider = { config }),
+        val provider = HostSessionGraphProvider(
+            desktopSessionGraphFactory(configProvider = { config }),
+            SessionPlatform.DESKTOP,
         )
 
         val first = provider.current
@@ -348,48 +323,7 @@ class DesktopSessionGraphAdaptersTest {
         assertEquals("http://two.example", second.backendDescriptor.label)
     }
 
-    @Test
-    fun chatSessionGraphClosesRepositoriesAndGatewayTogether() {
-        var closedGatewayCount = 0
-        val repositoryGraph = DesktopSessionGraphFactory().create()
-        val chatGraph = DesktopChatSessionGraph(
-            repositories = repositoryGraph,
-            gateway = object : ChatGateway, AutoCloseable {
-                override suspend fun listConversations(limit: Int, archiveStatus: String?) = emptyList<Conversation>()
-                override suspend fun getConversation(conversationId: String): Conversation =
-                    error("not used")
-
-                override suspend fun sendConversationMessage(
-                    conversationId: ConversationId,
-                    request: MessageCreateRequest,
-                ) = emptyFlow<LettaMessage>()
-
-                override suspend fun streamConversation(conversationId: ConversationId) =
-                    emptyFlow<TimelineStreamFrame>()
-
-                override suspend fun listConversationMessages(
-                    conversationId: ConversationId,
-                    limit: Int?,
-                    after: String?,
-                    order: String?,
-                ) = emptyList<LettaMessage>()
-
-                override suspend fun listAgentMessages(
-                    agentId: AgentId,
-                    limit: Int?,
-                    order: String?,
-                    conversationId: ConversationId?,
-                ) = emptyList<LettaMessage>()
-
-                override fun close() {
-                    closedGatewayCount += 1
-                }
-            },
-        )
-
-        chatGraph.close()
-
-        assertTrue(repositoryGraph.isClosed)
-        assertEquals(1, closedGatewayCount)
+    private companion object {
+        const val IROH_URL = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501"
     }
 }

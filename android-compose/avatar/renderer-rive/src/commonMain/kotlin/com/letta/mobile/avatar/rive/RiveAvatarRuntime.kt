@@ -7,6 +7,13 @@ import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarHeadTurn
 import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
+import com.letta.mobile.avatar.core.AvatarReaction
+import com.letta.mobile.avatar.core.Hover
+import com.letta.mobile.avatar.core.ListenLevel
+import com.letta.mobile.avatar.core.MascotMotion
+import com.letta.mobile.avatar.core.MotionPreference
+import com.letta.mobile.avatar.core.Petting
+import com.letta.mobile.avatar.core.ReactionArg
 import com.letta.mobile.avatar.core.AvatarRuntime
 import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
@@ -30,6 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class RiveAvatarRuntime(
     private val sink: RiveInputSink,
     private val capabilities: AvatarCapabilities = MASCOT_CAPABILITIES,
+    /** What the loaded `.riv` plays beyond the base contract; see [RiveMascotCapabilities]. */
+    private val rig: RiveMascotCapabilities = RiveMascotCapabilities.CURRENT,
 ) : AvatarRuntime, AvatarHeadTurn {
 
     private val _state = MutableStateFlow<AvatarRuntimeState>(AvatarRuntimeState.Idle)
@@ -124,14 +133,16 @@ class RiveAvatarRuntime(
 
     /**
      * The director's arbitrated state, written the way the file's state machine reads it:
-     * sustained states as the enum, SUCCESS as a trigger the file plays and returns from, ERROR as
-     * a trigger for the flash plus the sustained `error` settle, DRAGGED as a boolean held until
-     * the next non-dragged state. The director still owns priority; the file owns choreography.
+     * sustained states as the enum, DRAGGED as a boolean held until the next non-dragged state.
+     * SUCCESS writes nothing and ERROR only its sustained settle: their flashes are the
+     * [AvatarReaction.RUN_DONE] / [AvatarReaction.RUN_FAILED] reactions ([react]), which fire for
+     * every completion rather than only on a change of state. The director still owns priority;
+     * the file owns choreography.
      */
     fun applyState(state: AvatarState) {
         if (disposed) return
         when (state) {
-            AvatarState.SUCCESS -> sink.fire(RiveAvatarContract.TRIGGER_SUCCESS)
+            AvatarState.SUCCESS -> Unit
             AvatarState.DRAGGED -> {
                 dragged = true
                 sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, true)
@@ -141,26 +152,78 @@ class RiveAvatarRuntime(
                     dragged = false
                     sink.setBoolean(RiveAvatarContract.INPUT_DRAGGED, false)
                 }
-                if (state == AvatarState.ERROR) sink.fire(RiveAvatarContract.TRIGGER_ERROR)
                 sink.setEnum(RiveAvatarContract.INPUT_STATE, checkNotNull(RiveAvatarContract.stateKey(state)))
             }
         }
     }
 
-    private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
-
-    private fun stateForExpression(expression: AvatarExpression): AvatarState? = when (expression) {
-        AvatarExpression.Happy -> AvatarState.SUCCESS
-        AvatarExpression.Sad, AvatarExpression.Angry -> AvatarState.ERROR
-        AvatarExpression.Surprised -> AvatarState.WAITING_INPUT
-        AvatarExpression.Relaxed -> AvatarState.THINKING
-        AvatarExpression.Neutral -> AvatarState.IDLE
-        is AvatarExpression.Custom -> null
+    /**
+     * A one-shot, as far as the loaded file can play it ([rig]): its own trigger, else a blink,
+     * else nothing - never a name the file does not declare.
+     */
+    override fun react(reaction: AvatarReaction, arg: ReactionArg) {
+        if (!ready()) return
+        val trigger = rig.reactionTriggers[reaction]
+        when {
+            trigger != null -> {
+                writeArgument(reaction, arg)
+                sink.fire(trigger)
+            }
+            reaction in rig.blinkFallback -> sink.fire(RiveAvatarContract.TRIGGER_BLINK)
+        }
     }
+
+    /** The argument rides on its own input, written before the trigger reads it. */
+    private fun writeArgument(reaction: AvatarReaction, arg: ReactionArg) {
+        when (reaction) {
+            AvatarReaction.LAND -> {
+                val impact = arg.value.coerceIn(0f, 1f)
+                optional(RiveHostInput.IMPACT)?.setNumber(RiveHostInput.IMPACT.key, impact)
+            }
+            AvatarReaction.TRICK -> {
+                val trick = arg.value.coerceIn(0f, MAX_TRICK_ID)
+                optional(RiveHostInput.TRICK_ID)?.setNumber(RiveHostInput.TRICK_ID.key, trick)
+            }
+            else -> Unit
+        }
+    }
+
+    override fun setListenLevel(level: ListenLevel) {
+        optional(RiveHostInput.LISTEN_LEVEL)?.setNumber(RiveHostInput.LISTEN_LEVEL.key, level.value.coerceIn(0f, 1f))
+    }
+
+    override fun setHovered(hover: Hover) {
+        optional(RiveHostInput.HOVERED)?.setBoolean(RiveHostInput.HOVERED.key, hover.over)
+    }
+
+    override fun setPetting(petting: Petting) {
+        optional(RiveHostInput.PETTING)?.setBoolean(RiveHostInput.PETTING.key, petting.active)
+    }
+
+    override fun setMotion(motion: MascotMotion) {
+        optional(RiveHostInput.MOVE_X)?.setNumber(RiveHostInput.MOVE_X.key, motion.x.coerceIn(-1f, 1f))
+        optional(RiveHostInput.MOVE_Y)?.setNumber(RiveHostInput.MOVE_Y.key, motion.y.coerceIn(-1f, 1f))
+    }
+
+    override fun setReducedMotion(preference: MotionPreference) {
+        optional(RiveHostInput.REDUCE_MOTION)?.setBoolean(RiveHostInput.REDUCE_MOTION.key, preference.reduced)
+    }
+
+    override val honorsReducedMotion: Boolean get() = rig.honorsReducedMotion
+
+    override val carriesBody: Boolean get() = rig.carriesBody
+
+    /** The sink for an optional te3n1.5 input, or null when the loaded file does not declare it. */
+    private fun optional(input: RiveHostInput): RiveInputSink? = sink.takeIf { ready() && input in rig.inputs }
+
+    private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
 
     companion object {
         /** The gesture id the director fires for the idle blink schedule. */
         const val BLINK_GESTURE: String = "blink"
+
+        /** The highest trick id the rig plays (rig/contract.py `trickId` 0..3). */
+        private const val MAX_TRICK_ID = 3f
 
         /**
          * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so

@@ -6,7 +6,7 @@ import com.letta.mobile.data.runs.RunMonitorController
 import com.letta.mobile.data.session.ifSupported
 import com.letta.mobile.data.templates.AgentTemplatesController
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.data.DesktopSessionGraphFactory
+import com.letta.mobile.desktop.data.desktopSessionGraphFactory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -27,7 +27,7 @@ class DesktopAdminPagesTest {
 
     @Test
     fun theRunsPageOverASessionWithoutRunsShowsWhyNotAnEmptyList() = runTest {
-        val graph = DesktopSessionGraphFactory(configProvider = { directAppServer }).create()
+        val graph = desktopSessionGraphFactory(configProvider = { directAppServer }).create()
         val runs = graph.ifSupported(SessionRoute.RUNS) { runRepository }
         assertNull(runs, "a direct App Server session serves no runs")
 
@@ -44,7 +44,7 @@ class DesktopAdminPagesTest {
 
     @Test
     fun theTemplatesPageOverASessionWithoutAgentsOffersNoCreate() = runTest {
-        val graph = DesktopSessionGraphFactory().create()
+        val graph = desktopSessionGraphFactory().create()
         val agents = graph.ifSupported(SessionRoute.AGENTS) { agentRepository }
         assertNull(agents, "no backend configured serves no agents")
 

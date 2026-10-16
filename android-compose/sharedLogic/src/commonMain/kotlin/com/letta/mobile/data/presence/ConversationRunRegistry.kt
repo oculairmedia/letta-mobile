@@ -37,6 +37,13 @@ data class ConversationRunState(
      * already announced. Null whenever [phase] is not [RunPhase.AWAITING_INPUT].
      */
     val awaitingApprovalId: String? = null,
+    /**
+     * letta-mobile-iczm7: a background dream (reflection) or memory-upkeep run is in flight under
+     * this conversation. Orthogonal to [phase]: a dream is not a turn.
+     */
+    val dreaming: Boolean = false,
+    /** letta-mobile-te3n1.1: the moments this conversation's runs have been through, as counts. */
+    val edges: RunEdges = RunEdges.NONE,
 ) {
     /** How many tool calls are in flight; tools overlap, so this is a count, not a flag. */
     val openToolCalls: Int get() = openToolCallIds.size
@@ -101,6 +108,8 @@ fun Map<String, ConversationRunState>.presenceByAgent(): Map<String, AgentPresen
             awaitingApproval = states.any { it.awaitingApproval },
             userTyping = states.any { it.userTyping },
             error = states.any { it.error },
+            dreaming = states.any { it.dreaming },
+            edges = states.fold(RunEdges.NONE) { sum, state -> sum + state.edges },
             // The name of the tool behind the activity that won, never a WORKING conversation's
             // tool while another one is DELEGATING, and none at all while the agent is speaking.
             toolName = when {

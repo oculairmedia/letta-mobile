@@ -35,6 +35,7 @@ class NativeLettaCodeNodeBridge @Inject constructor() : EmbeddedNode {
         val args = request.arguments.toTypedArray()
         val env = request.environment.map { (key, value) -> "$key=$value" }.toTypedArray()
         val cwd = request.workingDirectory.absolutePath
+        Log.i(TAG, "Embedded App Server node::Start begins (cwd=$cwd)")
         thread(name = NODE_THREAD, isDaemon = true) {
             val exitCode = runCatching { nativeStart(args, env, cwd) }
                 .onFailure { error -> Log.e(TAG, "Embedded App Server node crashed", error) }

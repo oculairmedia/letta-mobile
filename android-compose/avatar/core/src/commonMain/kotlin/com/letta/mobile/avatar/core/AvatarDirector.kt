@@ -65,7 +65,9 @@ fun interface AvatarStateListener {
  * - [setAwaitingApproval] → [AvatarState.WAITING_INPUT];
  * - [setDragged] → [AvatarState.DRAGGED];
  * - [notifyTaskSucceeded] → [AvatarState.SUCCESS] (self-expires per §6);
+ * - [setFailed] → [AvatarState.ERROR] for as long as the failure stands;
  * - [setQuietHours] → [AvatarState.SLEEPING];
+ * - [setDreaming] → [AvatarState.DREAMING] when nothing in the foreground needs the mascot;
  * - [setLifecycle] — avatar-asset load status → LOADING/FAILED/DEGRADED;
  * - [setSpeechLevel] with audio amplitude while TTS plays (without it, SPEAKING
  *   falls back to procedural mouth chatter, e.g. for streamed text);
@@ -166,6 +168,10 @@ class AvatarDirector(
     private var successRemaining = 0f
     /** ERROR from [setActivity]/[notifyError]: latched until a non-error legacy activity or success clears it. */
     private var errorLatched = false
+    /** ERROR as a level ([setFailed]): holds while the failure stands, whatever else changes. */
+    private var failed = false
+    /** A background dream is running ([setDreaming]). */
+    private var dreaming = false
 
     private val listeners = mutableListOf<AvatarStateListener>()
 
@@ -288,9 +294,25 @@ class AvatarDirector(
         arbitrate()
     }
 
+    /**
+     * The last attempt failed and nothing has replaced it yet → [AvatarState.ERROR] (letta-mobile-
+     * te3n1.1). A level, not a latch: it is independent of [setActivity], so an unrelated change
+     * (the user starting to type) cannot clear a failure that still stands.
+     */
+    fun setFailed(isFailed: Boolean) {
+        failed = isFailed
+        arbitrate()
+    }
+
     /** Quiet hours → [AvatarState.SLEEPING], which gates all behavior except DRAGGED/ERROR (§4 P2, §6). */
     fun setQuietHours(quiet: Boolean) {
         quietHours = quiet
+        arbitrate()
+    }
+
+    /** A background dream is running → [AvatarState.DREAMING] whenever nothing else is (letta-mobile-iczm7). */
+    fun setDreaming(isDreaming: Boolean) {
+        dreaming = isDreaming
         arbitrate()
     }
 
@@ -332,42 +354,67 @@ class AvatarDirector(
     // Arbitration (PRD §4 P2 priority)
     // ==========================================================================
 
+    /** True while [batch] applies several signals; arbitration waits for the last one. */
+    private var holding = false
+
+    /**
+     * Applies several signals as one change (letta-mobile-te3n1.1): the state is arbitrated once
+     * at the end, so a snapshot that moves two signals together (a failure lands as "idle" plus
+     * "failed") makes one transition rather than flashing through the state in between.
+     */
+    internal fun batch(block: AvatarDirector.() -> Unit) {
+        holding = true
+        try {
+            block()
+        } finally {
+            holding = false
+        }
+        arbitrate()
+    }
+
     /**
      * Recompute the winning [AvatarState] from all current signals and, if it
      * changed, run exit/enter side effects and notify listeners. Called after
      * every signal mutation and once per [tick] (for the timed signals).
      */
     private fun arbitrate() {
+        if (holding) return
         val next = resolveState()
         if (next == state) return
         transitionTo(next)
     }
 
-    private fun resolveState(): AvatarState {
-        // Lifecycle overrides everything: a broken/loading asset has no behavior.
-        when (lifecycle) {
-            AvatarLifecycle.LOADING -> return AvatarState.LOADING
-            AvatarLifecycle.FAILED -> return AvatarState.FAILED
-            AvatarLifecycle.DEGRADED -> return AvatarState.DEGRADED
-            AvatarLifecycle.NONE -> Unit
-        }
+    private fun resolveState(): AvatarState = gateState() ?: behaviorState()
 
-        // DRAGGED and ERROR bypass SLEEPING gating (§4 P2).
-        if (dragged) return AvatarState.DRAGGED
-        val error = errorLatched || legacyActivity == AvatarActivity.ERROR
-        if (error) return AvatarState.ERROR
+    /**
+     * The states that override behavior: lifecycle (a broken/loading asset has no behavior), then
+     * DRAGGED and ERROR, which bypass SLEEPING gating, then SLEEPING, which gates the rest (§4 P2).
+     */
+    private fun gateState(): AvatarState? = when {
+        lifecycle == AvatarLifecycle.LOADING -> AvatarState.LOADING
+        lifecycle == AvatarLifecycle.FAILED -> AvatarState.FAILED
+        lifecycle == AvatarLifecycle.DEGRADED -> AvatarState.DEGRADED
+        dragged -> AvatarState.DRAGGED
+        showsError() -> AvatarState.ERROR
+        quietHours -> AvatarState.SLEEPING
+        else -> null
+    }
 
-        // SLEEPING gates every remaining behavior (§4 P2).
-        if (quietHours) return AvatarState.SLEEPING
+    /** A standing failure ([setFailed]), else the legacy latch or activity. */
+    private fun showsError(): Boolean {
+        if (failed) return true
+        return errorLatched || legacyActivity == AvatarActivity.ERROR
+    }
 
-        // Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS > WORKING >
-        // THINKING > LISTENING > IDLE.
+    /** Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS > WORKING > THINKING > LISTENING > DREAMING > IDLE. */
+    private fun behaviorState(): AvatarState {
         if (awaitingApproval) return AvatarState.WAITING_INPUT
         if (legacyActivity == AvatarActivity.SPEAKING) return AvatarState.SPEAKING
         if (successRemaining > 0f) return AvatarState.SUCCESS
         if (workingHoldRemaining > 0f) return AvatarState.WORKING
         if (legacyActivity == AvatarActivity.THINKING) return AvatarState.THINKING
         if (listening()) return AvatarState.LISTENING
+        if (dreaming) return AvatarState.DREAMING
         return AvatarState.IDLE
     }
 
@@ -432,7 +479,7 @@ class AvatarDirector(
                 emotionDecayTotal = config.errorDecaySeconds
             }
 
-            AvatarState.SLEEPING -> {
+            AvatarState.SLEEPING, AvatarState.DREAMING -> {
                 // Eyes closed: hold blink at full weight, suppress the blink loop.
                 runtime.setExpression(BLINK, config.sleepingBlinkWeight)
             }
@@ -445,8 +492,8 @@ class AvatarDirector(
             -> Unit
         }
 
-        // Leaving SLEEPING must release the held-closed eyes.
-        if (entered != AvatarState.SLEEPING) {
+        // Leaving SLEEPING / DREAMING must release the held-closed eyes.
+        if (!entered.eyesClosed) {
             // Only relevant if we were sleeping; harmless otherwise (blink loop
             // owns this key and will re-drive it).
             if (blinkCloseRemaining <= 0f) runtime.setExpression(BLINK, 0f)
@@ -521,8 +568,8 @@ class AvatarDirector(
     // --- blinking -------------------------------------------------------------
 
     private fun tickBlink(delta: Float) {
-        // SLEEPING holds the eyes closed and suppresses the blink loop (§6).
-        if (state == AvatarState.SLEEPING) return
+        // SLEEPING / DREAMING hold the eyes closed and suppress the blink loop (§6).
+        if (state.eyesClosed) return
         if (!blinkScheduled) {
             scheduleNextBlink()
         }

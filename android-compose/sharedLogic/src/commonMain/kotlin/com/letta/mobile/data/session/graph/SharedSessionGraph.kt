@@ -13,7 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * letta-mobile-by4vm.24: the one place a [SessionRepositoryGraph] generation's platform-neutral
  * repositories are built. Android (`SessionGraph` via Hilt's assembler) and desktop
- * (`DesktopRepositoryAdapters`) both call it instead of wiring these by hand, so a repository
+ * (`HostRepositoryAdapters`, desktop and web) both call it instead of wiring these by hand, so a repository
  * added here reaches every host at once.
  *
  * Its own package, not `data.session`: it imports `data.repository`, which already imports

@@ -10,6 +10,7 @@ import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.PendingApprovalSource
+import com.letta.mobile.data.chat.runtime.EnginePermissionModes
 import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.model.Agent
@@ -38,8 +39,6 @@ import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.runtime.ApprovalBinding
-import com.letta.mobile.data.runtime.ModeChangeResult
-import com.letta.mobile.data.runtime.setPermissionMode
 import com.letta.mobile.data.runtime.PermissionModeRegistry
 import com.letta.mobile.data.runtime.pendingApprovalDetails
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -199,10 +198,11 @@ class DesktopAppServerChatGateway internal constructor(
 
     private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
 
+    /** letta-mobile-ckmub.17.2: the shared engine-side mode change the web's chat page binds too. */
+    private val modeChanges = EnginePermissionModes(turnEngine as? AppServerTurnEngine, permissionModes)
+
     override suspend fun setPermissionMode(runtime: AppServerRuntimeScope, mode: AppServerPermissionMode): Boolean =
-        permissionModes?.change(runtime, mode) { requested ->
-            (turnEngine as? AppServerTurnEngine)?.setPermissionMode(runtime, requested) ?: ModeChangeResult.Unconfirmed
-        } ?: false
+        modeChanges.setPermissionMode(runtime, mode)
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         abortConversationTurn(ConversationId(conversationId))

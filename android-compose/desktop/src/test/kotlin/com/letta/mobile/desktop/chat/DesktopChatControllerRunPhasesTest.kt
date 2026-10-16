@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.presence.AgentActivityKind
 import com.letta.mobile.data.presence.RunPhase
 import com.letta.mobile.data.presence.presenceByAgent
@@ -10,11 +11,14 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Desktop's half of the run-phase pipeline: the gateway's runtime events reach the window's
@@ -74,6 +78,57 @@ class DesktopChatControllerRunPhasesTest {
         val presence = controller.runs.value.presenceByAgent()
         assertEquals(true, presence.getValue("agent-0").awaitingApproval)
 
+        controller.close()
+    }
+
+    @Test
+    fun theWindowsSubagentsMakeAToolDelegatingAndADreamDream() = runTest {
+        // letta-mobile-te3n1.1: DELEGATING and dreaming are produced on desktop, through the shared publisher.
+        val gateway = EventEmittingGateway()
+        val controller = testController(gateway)
+        controller.start()
+        runCurrent()
+
+        gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("Task")))
+        runCurrent()
+        val running = { id: String, type: String ->
+            SubagentEntry(
+                toolCallId = id,
+                subagentType = type,
+                status = "running",
+                parentAgentId = "agent-0",
+                parentConversationId = "conv-1",
+            )
+        }
+        controller.publishSubagents(listOf(running("s1", "General-purpose"), running("s2", "Reflection")))
+
+        assertEquals(RunPhase.DELEGATING, controller.runs.value.getValue("conv-1").phase)
+        val presence = controller.runs.value.presenceByAgent().getValue("agent-0")
+        assertEquals(AgentActivityKind.DELEGATING, presence.activity)
+        assertEquals(true, presence.dreaming)
+
+        controller.close()
+    }
+
+    @Test
+    fun stoppingARunMarksItInterrupting() = runTest {
+        val gateway = EventEmittingGateway()
+        val controller = testController(gateway)
+        controller.start()
+        runCurrent()
+
+        gateway.emit(RuntimeEventPayload.ToolCallObserved(ToolCallId("t1"), ToolName("grep")))
+        runCurrent()
+        // Every phase the conversation passes through, unconflated: a stop with nothing to abort
+        // lands its terminal at once, so INTERRUPTING is a step on the way, not the end state.
+        val phases = mutableListOf<RunPhase?>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            controller.runs.collect { phases += it["conv-1"]?.phase }
+        }
+        controller.stopActiveRun("conv-1")
+        runCurrent()
+
+        assertTrue(RunPhase.INTERRUPTING in phases, "the stop was published as INTERRUPTING: $phases")
         controller.close()
     }
 

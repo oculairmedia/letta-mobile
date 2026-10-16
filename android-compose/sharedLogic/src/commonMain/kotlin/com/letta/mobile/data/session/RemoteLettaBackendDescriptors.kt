@@ -22,6 +22,9 @@ const val ANDROID_REMOTE_LETTA_ID_PREFIX = "remote-letta"
 /** Desktop remote descriptor id prefix (`desktop-remote-letta:<configId>`). */
 const val DESKTOP_REMOTE_LETTA_ID_PREFIX = "desktop-remote-letta"
 
+/** Browser remote descriptor id prefix (`web-remote-letta:<configId>`). */
+const val WEB_REMOTE_LETTA_ID_PREFIX = "web-remote-letta"
+
 /**
  * Shared remote-Letta [BackendDescriptor] for hosts that are not running a
  * local embedded runtime. [idPrefix] keeps Android and Desktop ids distinct

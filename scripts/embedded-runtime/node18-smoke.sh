@@ -10,7 +10,16 @@
 #   2. headless  the current Android mode: stream-json over stdin, one Bash tool turn -> result
 #   3. server    `letta server` through the shared LocalAppServerHost (appserver-cli
 #                app-server-serve: loopback, capability token), one Bash tool turn on the agent
-#                from step 2 driven by the shared Kotlin AppServerClient (app-server-smoke)
+#                from step 2 driven by the shared Kotlin AppServerClient (app-server-smoke), then
+#                one turn WITH AN IMAGE: letta-code prepares images in a child node it launches with
+#                process.execPath, which on the phone is the app process (emulated, see
+#                android-platform-emulation.cjs), so this fails unless the shipped preloads relaunch
+#                helpers on the packaged node CLI (LETTA_CHILD_NODE_PATH, as the device sets it)
+#
+# The model is resolved the way the device resolves it (letta-mobile-by4vm.121.1): the agent handle
+# is `lmstudio/<vendor>/<model>`, providers/auth.json carries no models[], and the fake serves the
+# id the on-device bridge serves (the handle minus `lmstudio/`, lettaCodeLookupId in the app) only on
+# /v1/models, so a letta-code bump that changes lmstudio model discovery fails here.
 #
 # On failure the first missing-API style error from the runtime's stderr is printed as a GitHub
 # error annotation and, with the stderr tail, into $GITHUB_STEP_SUMMARY.
@@ -33,7 +42,8 @@ WORK=${WORK:-$(mktemp -d)}
 mkdir -p "$WORK"
 LETTA_JS="$PROJECT/node_modules/@letta-ai/letta-code/letta.js"
 LLM_PORT=${FAKE_LLM_PORT:-4711}
-MODEL=lmstudio/node18-model
+MODEL=lmstudio/ci/node18-model
+SERVED_MODEL=${MODEL#lmstudio/} # what OnDeviceOpenAiBridge advertises for this handle
 SUMMARY=${GITHUB_STEP_SUMMARY:-/dev/null}
 PIDS=()
 
@@ -69,7 +79,7 @@ actual_node=$("$NODE18" --version)
   { echo "::error::node is $actual_node, the device ships $EXPECT_NODE_VERSION"; exit 1; }
 [[ -f "$LETTA_JS" ]] || { echo "::error::letta.js missing at $LETTA_JS (stage the tree first)"; exit 1; }
 PRELOADS=("$HERE/android-platform-emulation.cjs")
-for preload in node18-compat.cjs regexp-polyfill.cjs android-network-polyfill.cjs; do
+for preload in node18-compat.cjs regexp-polyfill.cjs android-network-polyfill.cjs child-node.cjs; do
   [[ -f "$PROJECT/$preload" ]] || { echo "::error::shipped preload $preload missing from the staged tree"; exit 1; }
   "$NODE18" --check "$PROJECT/$preload"
   PRELOADS+=("$PROJECT/$preload")
@@ -100,23 +110,28 @@ cat > "$WORK/backend/providers/auth.json" <<EOF
 { "version": 1, "providers": { "lc-lmstudio": {
   "id": "local-provider-lc-lmstudio", "name": "lc-lmstudio", "provider_type": "lmstudio",
   "provider_category": "byok", "auth": { "type": "api", "key": "lm-studio" },
-  "base_url": "http://127.0.0.1:$LLM_PORT/v1",
-  "models": [ { "id": "node18-model", "contextWindow": 128000, "maxTokens": 4096, "input": ["text"], "cost": {"input":0,"output":0} } ] } } }
+  "base_url": "http://127.0.0.1:$LLM_PORT/v1" } } }
 EOF
 # The device environment (AndroidEmbeddedLettaCodeLaunch) minus the Android-only bridge/tool paths.
 export HOME="$WORK/home" TMPDIR="$WORK/tmp" TMP="$WORK/tmp" TEMP="$WORK/tmp" SHELL=/bin/sh NO_COLOR=1 \
   LETTA_LOCAL_BACKEND_EXPERIMENTAL=1 LETTA_LOCAL_BACKEND_DIR="$WORK/backend" LETTA_LOCAL_BACKEND_EXECUTOR=pi \
-  UV_USE_IO_URING=0 UV_THREADPOOL_SIZE=2 LETTA_COMPAT_TRACE=1 \
+  UV_USE_IO_URING=0 UV_THREADPOOL_SIZE=2 LETTA_COMPAT_TRACE=1 LETTA_CODE_VISION_MODEL_IDS=node18-model \
   LMSTUDIO_BASE_URL="http://127.0.0.1:$LLM_PORT/v1" LMSTUDIO_API_KEY=lm-studio \
   NODE_OPTIONS="--max-old-space-size=384 --max-semi-space-size=16"
 NODE18_BIN=$(dirname "$(command -v "$NODE18")")
 export PATH="$NODE18_BIN:$PATH"
+# What AndroidEmbeddedLettaCodeLaunch sets: the node letta-code starts its helpers on (child-node.cjs).
+LETTA_CHILD_NODE_PATH=$(command -v "$NODE18")
+export LETTA_CHILD_NODE_PATH
 
-FAKE_LLM_LOG="$WORK/llm.log" FAKE_LLM_PORT=$LLM_PORT "$NODE18" "$HERE/fake-llm.cjs" 2> "$WORK/llm.err" &
+FAKE_LLM_LOG="$WORK/llm.log" FAKE_LLM_PORT=$LLM_PORT FAKE_LLM_MODEL=$SERVED_MODEL "$NODE18" "$HERE/fake-llm.cjs" 2> "$WORK/llm.err" &
 PIDS+=($!)
 for _ in $(seq 50); do grep -q "fake llm on" "$WORK/llm.err" 2>/dev/null && break; sleep 0.1; done
 
 tool_runs() { grep -c 'NODE18-TOOL-42' "$WORK/llm.log" 2>/dev/null || true; }
+image_requests() { grep -c '"images":[1-9]' "$WORK/llm.log" 2>/dev/null || true; }
+# 4x4 PNG: the app sends photos as a base64 image part next to the text.
+base64 -d > "$WORK/smoke.png" <<< 'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP4z8AARwzEcQCukw/x0F8jngAAAABJRU5ErkJggg=='
 
 # --- 2. headless stream-json (the current Android mode) ----------------------------------------
 phase "headless stream-json on node $actual_node"
@@ -176,6 +191,14 @@ APP_SERVER_TEST_TOKEN=$(cat "$WORK/backend/ws-token") cli app-server-smoke --url
 smoke_exit=$?
 set -e
 cat "$WORK/smoke.out"
+images_before=$(image_requests)
+set +e
+APP_SERVER_TEST_TOKEN=$(cat "$WORK/backend/ws-token") cli app-server-smoke --url "$url" \
+  --agent "$AGENT_ID" --conversation "$CONVERSATION_ID" --message "what is in this picture?" \
+  --image "$WORK/smoke.png" --timeout-ms 120000 > "$WORK/image.out" 2> "$WORK/image.err"
+image_exit=$?
+set -e
+cat "$WORK/image.out"
 grep '\[node18-compat\]' "$WORK/server.err" || true
 kill "$SERVER_PID" 2>/dev/null || true
 endphase
@@ -184,6 +207,10 @@ grep -q '^\[tool-return\]' "$WORK/smoke.out" || fail server "no tool return reac
 { grep -q '^\[lifecycle\] Completed' "$WORK/smoke.out" && grep -q '"stop_reason":"end_turn"' "$WORK/smoke.out"; } ||
   fail server "the turn never completed with end_turn" "$WORK/server.err" "$WORK/smoke.out"
 [[ "$(tool_runs)" -gt "$before" ]] || fail server "the Bash tool output never reached the model" "$WORK/server.err" "$WORK/llm.log"
-summary "| App Server (Kotlin client) | runtime_start, Bash tool, end_turn |" \
+[[ "$image_exit" -eq 0 ]] || fail image "the image turn (app-server-smoke --image) exited $image_exit" "$WORK/server.err" "$WORK/image.err" "$WORK/image.out"
+{ grep -q '^\[lifecycle\] Completed' "$WORK/image.out" && ! grep -q 'Failed to prepare image' "$WORK/image.out"; } ||
+  fail image "the image turn did not complete: $(grep -m1 '^\[lifecycle\] Failed' "$WORK/image.out" || echo 'no Completed terminal')" "$WORK/image.out" "$WORK/server.err"
+[[ "$(image_requests)" -gt "$images_before" ]] || fail image "the image never reached the model" "$WORK/llm.log" "$WORK/server.err"
+summary "| App Server (Kotlin client) | runtime_start, Bash tool, end_turn; image turn prepared on the child node |" \
   "| node18-compat shims hit | $(grep -ho '\[node18-compat\] hit [^ ]*' "$WORK/headless.err" "$WORK/server.err" | awk '{print $3}' | sort -u | paste -sd' ' -) |"
 echo "embedded-runtime-node18: OK"
