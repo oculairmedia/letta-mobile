@@ -1,0 +1,242 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:DesktopConfirmedTimelineStore.kt$DesktopConfirmedTimelineStore.ImageBodyRetention$pointer.thumbnailBase64 == null &amp;&amp; pointer.bodyReference == null &amp;&amp; old?.bodyReference != null &amp;&amp; old.mediaType == pointer.mediaType &amp;&amp; old.byteSize == pointer.byteSize</ID>
+    <ID>CyclomaticComplexMethod:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$suspend fun commit(files: DesktopIndexedTimelineFiles)</ID>
+    <ID>CyclomaticComplexMethod:RiveDesktopSpike.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MascotBench(file: File, modifier: Modifier)</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_advance(bridge: Pointer, seconds: Float)</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_artboard_height(bridge: Pointer): Float</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_artboard_width(bridge: Pointer): Float</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_create(adapterNameOut: ByteArray, adapterNameCap: Int): Pointer?</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_destroy(bridge: Pointer)</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_fire_trigger(bridge: Pointer, name: String): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_load(bridge: Pointer, bytes: ByteArray, length: Int, stateMachine: String?): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_load_artboard( bridge: Pointer, bytes: ByteArray, length: Int, stateMachine: String?, artboard: String?, ): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_pointer(bridge: Pointer, kind: Int, x: Float, y: Float)</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_render(bridge: Pointer, width: Int, height: Int, clearArgb: Int, rgbaOut: Pointer): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_set_number(bridge: Pointer, name: String, value: Float): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_fire(bridge: Pointer, name: String): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_get_number(bridge: Pointer, name: String, out: FloatArray): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_number_names(bridge: Pointer, out: ByteArray, cap: Int): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_set_boolean(bridge: Pointer, name: String, value: Int): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_set_color(bridge: Pointer, name: String, argb: Int): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_set_enum(bridge: Pointer, name: String, key: String): Int</ID>
+    <ID>FunctionNaming:RiveDesktopBridge.kt$RiveBridgeNative$fun rive_bridge_vm_set_number(bridge: Pointer, name: String, value: Float): Int</ID>
+    <ID>LargeClass:DesktopChatController.kt$DesktopChatController</ID>
+    <ID>LongMethod:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$@Test fun canvasWorkspace_twoSessionsWithSharedHostTransport_converge()</ID>
+    <ID>LongMethod:DesktopAmbientChatBackground.kt$@Composable internal fun DesktopAmbientChatBackground( /** The shared run status (rememberChatAmbientStatus), which also drives the docked panel's glow. */ status: AmbientMotionStatus, modifier: Modifier = Modifier, /** * Optional per-agent identity color: non-terminal states lean toward it so * the glow says who you're talking to. Failed keeps the semantic error * tint untouched — the alarm channel must survive every agent palette. */ identitySeed: Color? = null, content: @Composable BoxScope.() -&gt; Unit, )</ID>
+    <ID>LongMethod:DesktopAppServerChatGateway.kt$DesktopAppServerChatGateway$override suspend fun sendConversationMessage( conversationId: ConversationId, request: MessageCreateRequest, ): Flow&lt;LettaMessage&gt;</ID>
+    <ID>LongMethod:DesktopChatController.kt$DesktopChatController$private suspend fun selectRemoteConversation(conversationId: String, generation: Long)</ID>
+    <ID>LongMethod:DesktopChatModels.kt$private fun sampleDesktopMessagesByConversation(): Map&lt;String, List&lt;UiMessage&gt;&gt;</ID>
+    <ID>LongMethod:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$fun publish( entries: Sequence&lt;Entry&gt;, prepareGeneration: (String) -&gt; Unit = {}, reuse: Snapshot? = null, checkpoint: () -&gt; Unit = {}, ): Snapshot</ID>
+    <ID>LongMethod:DesktopJewelWindow.kt$@Composable internal fun DesktopJewelWindow( title: String, state: WindowState, onCloseRequest: () -&gt; Unit, header: DesktopHeaderChromeState = DesktopHeaderChromeState.Empty, content: @Composable AwtDecoratedWindowScope.() -&gt; Unit, )</ID>
+    <ID>LongMethod:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$suspend fun commit(files: DesktopIndexedTimelineFiles)</ID>
+    <ID>LongMethod:Main.kt$@OptIn(ExperimentalComposeUiApi::class) private fun runDesktopApplication( args: Array&lt;String&gt;, activationHandler: DesktopWindowActivationHandler, )</ID>
+    <ID>LongMethod:RiveDesktopSpike.kt$@OptIn(ExperimentalLayoutApi::class) @Composable private fun MascotBench(file: File, modifier: Modifier)</ID>
+    <ID>LongMethod:ShaderLookdevMain.kt$@Composable private fun ControlsColumn(state: LookdevState)</ID>
+    <ID>LongParameterList:DesktopCanonicalChatSend.kt$DesktopCanonicalSendBindings$( val runtimeFor: (TimelineTransport) -&gt; DesktopCanonicalTimelineRuntime, val bridge: WsChatBridge, val conversationRepository: IConversationRepository, val scope: CoroutineScope, val activeConfig: () -&gt; LettaConfig?, val surface: DesktopChatSendSurface, val clearComposerAfterSend: () -&gt; Unit, val activeConversationId: () -&gt; String?, val setActiveConversationId: (String) -&gt; Unit, val startTimelineObserver: (String) -&gt; Unit, val clientVersion: () -&gt; String, )</ID>
+    <ID>LongParameterList:DesktopChatController.kt$DesktopChatController$( private val bootstrapState: DesktopBootstrapState, private val scope: CoroutineScope, /** Read by the shared page's port, so its picker encodes to the limits this controller enforces. */ internal val attachmentLimits: AttachmentLimits = AttachmentLimits.Default, private val gatewayFactory: suspend () -&gt; DesktopChatGateway = { createDefaultDesktopChatGateway(bootstrapState.config) }, private val agentNamesByIdProvider: suspend (agentIds: Set&lt;String&gt;) -&gt; Map&lt;String, String&gt; = { emptyMap() }, private val agentByIdProvider: suspend (agentIds: Set&lt;String&gt;) -&gt; Map&lt;String, Agent&gt; = { emptyMap() }, // The backend doesn't yet persist a conversation's archived flag, so we keep a // local, durable record of archived ids and overlay it on every load. Still // PATCHes the server so this lights up automatically once the backend lands. loadArchivedConversationIds: () -&gt; Set&lt;String&gt; = { emptySet() }, private val persistArchivedConversationIds: (Set&lt;String&gt;) -&gt; Unit = {}, private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(), /** Window-scoped run state; every conversation this window drives publishes its phase here. */ private val runRegistry: ConversationRunRegistry = ConversationRunRegistry(), private val loopFactory: suspend ( gateway: DesktopChatGateway, conversation: DesktopConversationSummary, scope: CoroutineScope, ) -&gt; DesktopTimelineLoop = { gateway, conversation, loopScope -&gt; RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence) }, /** * letta-mobile-lks7m: the transport carrying Meridian's `conversation_updated` pushes. When set, * a conversation another client creates or changes lands in the list without a restart. Null * (HTTP / demo backends) keeps the list to startup, reconnect and this window's own writes. */ private val conversationChanges: IChannelTransport? = null, /** letta-mobile-bzvro.17 / .18: pinned conversations and recently used models. */ private val conversationPrefs: DesktopConversationPrefs = DesktopConversationPrefs(), )</ID>
+    <ID>LongParameterList:MermaidNativeRenderer.kt$MermaidNativeRenderer$( source: String, darkTheme: Boolean, textArgb: Int, borderArgb: Int, surfaceArgb: Int, primaryArgb: Int, secondaryArgb: Int, tertiaryArgb: Int, )</ID>
+    <ID>LongParameterList:MermaidNativeRenderer.kt$MermaidNativeRenderer$( source: String, darkTheme: Boolean, textArgb: Int, borderArgb: Int, surfaceArgb: Int, primaryArgb: Int, secondaryArgb: Int, tertiaryArgb: Int, targetWidthPx: Int, )</ID>
+    <ID>LoopWithTooManyJumpStatements:DesktopChatConnectionWatcher.kt$DesktopChatConnectionWatcher$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DesktopChatFontScale.kt$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$for</ID>
+    <ID>LoopWithTooManyJumpStatements:RiveDesktopSpike.kt$while</ID>
+    <ID>MatchingDeclarationName:DesktopDestinationWiring.kt$ScheduleWiringDeps</ID>
+    <ID>MatchingDeclarationName:DesktopDreamingPane.kt$DesktopDreamingDeps</ID>
+    <ID>MatchingDeclarationName:DesktopImageIngress.kt$DesktopImageIngressConfig</ID>
+    <ID>MatchingDeclarationName:DesktopImageIngressSupport.kt$DesktopImageIngressSink</ID>
+    <ID>MatchingDeclarationName:DesktopIrohHttpApis.kt$DesktopHttpApis</ID>
+    <ID>MatchingDeclarationName:DesktopJewelTheme.kt$DesktopThemeOverride</ID>
+    <ID>MatchingDeclarationName:DesktopLocalBackendRepositories.kt$DesktopAppServerRepositoryBundle</ID>
+    <ID>MatchingDeclarationName:DesktopLocalRuntimeEffects.kt$DesktopSuspendResponder</ID>
+    <ID>MatchingDeclarationName:DesktopPhoneShellUi.kt$PhoneShellTags</ID>
+    <ID>MatchingDeclarationName:DesktopPhoneShortcuts.kt$PhoneShortcut</ID>
+    <ID>MatchingDeclarationName:DesktopShellRoutes.kt$DesktopShellRoute</ID>
+    <ID>MatchingDeclarationName:DesktopTouchOrigin.kt$DesktopTouchOriginTracker</ID>
+    <ID>MatchingDeclarationName:LettaDesktopApp.kt$DesktopAppShellBindings</ID>
+    <ID>MatchingDeclarationName:RiveDesktopSurface.kt$RiveOnionSkin</ID>
+    <ID>MaxLineLength:CanvasBackgroundSyncUiTest.kt$CanvasBackgroundSyncUiTest$CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = "", syncTransport = relay))</ID>
+    <ID>MaxLineLength:CanvasBlockEditorToolbarTest.kt$CanvasBlockEditorToolbarTest$assertEquals(listOf("paragraph"), toolbar!!.holder.state.blocks.map { it.type.typeId }, "a fresh note has one paragraph to type into")</ID>
+    <ID>MaxLineLength:CanvasCascadeBlocksOracleTest.kt$CanvasCascadeBlocksOracleTest$assertEquals(canonical(DocumentSchema.encodeToString(libraryBlocks)), canonical(json), "the library writes these blocks differently")</ID>
+    <ID>MaxLineLength:CanvasCascadeBlocksOracleTest.kt$CanvasCascadeBlocksOracleTest$listOf(ComposeChecklistItem("Milk"), ComposeChecklistItem("Eggs", checked = true), ComposeChecklistItem("*Bread*", checked = false))</ID>
+    <ID>MaxLineLength:CanvasCascadeBlocksOracleTest.kt$CanvasCascadeBlocksOracleTest$val content = assertIs&lt;BlockContent.Text&gt;(DocumentSchema.decodeFromStringWithReport(CanvasCascadeBlocks.document(blocks)).blocks.single().content)</ID>
+    <ID>MaxLineLength:CanvasGridColorUiTest.kt$CanvasGridColorUiTest$runBlocking { session.setBackgroundPattern(CanvasBackgroundPattern(kind = CanvasBackgroundPattern.GRID, spacing = 32f, colorHex = "#ff0000")) }</ID>
+    <ID>MaxLineLength:CanvasImageAssetsUiTest.kt$CanvasImageAssetsUiTest$CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = boardWithAnInlineImage(bytes)))</ID>
+    <ID>MaxLineLength:CanvasPhoneTypingLayoutUiTest.kt$CanvasPhoneTypingLayoutUiTest$waitUntil(timeoutMillis = 5000) { controller.state.value.elements.none { it is Element.Shape &amp;&amp; it.shapeType == ShapeType.RECTANGLE } }</ID>
+    <ID>MaxLineLength:CanvasQuickCreateUiTest.kt$CanvasQuickCreateUiTest$assertTrue(right.left &gt; card.right &amp;&amp; right.left - card.right &lt; 40f, "the right target should sit just off the card at ${card.right}, it is at ${right.left}")</ID>
+    <ID>MaxLineLength:CanvasRemoteTextUiTest.kt$CanvasRemoteTextUiTest$CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "Board", initialSceneJson = "", syncTransport = relay))</ID>
+    <ID>MaxLineLength:CanvasShapeLabelMigrationUiTest.kt$CanvasShapeLabelMigrationUiTest$"""{"version":2,"blocks":[{"id":"b","type":{"typeId":"paragraph"},"content":{"kind":"text","version":1,"text":"$text","spans":[]}}]}"""</ID>
+    <ID>MaxLineLength:CanvasShapeLabelMigrationUiTest.kt$CanvasShapeLabelMigrationUiTest$waitUntil(timeoutMillis = 10_000) { session.sceneJsonOrEmpty().contains("fdafd") &amp;&amp; session.sceneJsonOrEmpty().contains("\"text\"") }</ID>
+    <ID>MaxLineLength:CanvasShapeTextRenderUiTest.kt$CanvasShapeTextRenderUiTest$ {</ID>
+    <ID>MaxLineLength:CanvasShapeTextRenderUiTest.kt$CanvasShapeTextRenderUiTest$setContent { MaterialTheme(colorScheme = lightColorScheme()) { Box(Modifier.size(1000.dp, 520.dp)) { CanvasWorkspace(controller = controller, initialJson = json) } } }</ID>
+    <ID>MaxLineLength:CanvasSyncWiringTest.kt$CanvasProductionWiringTest$"DesktopCanvasHostSync.client.attach(transport.readyHandle)" in wiring.getValue("desktop/src/main/kotlin/com/letta/mobile/desktop/DesktopIrohBindings.kt")</ID>
+    <ID>MaxLineLength:CanvasSyncWiringTest.kt$CanvasProductionWiringTest$"canvasClient?.attach(transport.readyHandle, scope)" in wiring.getValue("core/android-data/src/main/java/com/letta/mobile/data/session/SessionChannelTransportFactory.kt")</ID>
+    <ID>MaxLineLength:CanvasSyncWiringTest.kt$CanvasProductionWiringTest$"handle?.openConnection" in wiring.getValue("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohCanvasRelayClient.kt")</ID>
+    <ID>MaxLineLength:CanvasSyncWiringTest.kt$CanvasProductionWiringTest$assertTrue("): com.letta.mobile.data.canvas.CanvasSyncTransport = relay" in appModule, "Android provides the relay client as its canvas transport")</ID>
+    <ID>MaxLineLength:CanvasSyncWiringTest.kt$CanvasProductionWiringTest$if (path.endsWith("CanvasRelayClient.kt") &amp;&amp; pattern == "InMemoryCanvasPresenceTransport(") continue</ID>
+    <ID>MaxLineLength:CanvasTouchAndShapeTextUiTest.kt$CanvasTouchAndShapeTextUiTest$assertTrue(controller.state.value.viewport.scale &gt; 1.5f, "spreading two fingers should zoom in, scale is ${controller.state.value.viewport.scale}")</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.D); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$keyDown(androidx.compose.ui.input.key.Key.CtrlLeft); pressKey(androidx.compose.ui.input.key.Key.Z); keyUp(androidx.compose.ui.input.key.Key.CtrlLeft)</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$kotlin.test.assertTrue(tl.x &gt;= 0f &amp;&amp; tl.y &gt;= 0f &amp;&amp; br.x &lt;= board.width &amp;&amp; br.y &lt;= board.height, "${element.id} at $tl..$br outside $board")</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$onNodeWithContentDescription("Opacity").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.SetProgress) { it(0.5f) }</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$val copyShape = controller.state.value.elements.filterIsInstance&lt;io.ak1.drawbox.domain.model.Element.Shape&gt;().first { it.id != "rect-1" }</ID>
+    <ID>MaxLineLength:CanvasWorkspaceUiTest.kt$CanvasWorkspaceUiTest$waitUntil(timeoutMillis = 5000) { onAllNodes(androidx.compose.ui.test.isFocused() and androidx.compose.ui.test.hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }</ID>
+    <ID>MaxLineLength:DesktopAdminPages.kt$projects = if (binding.projectsAvailable) desktopProjectsPage(binding) else shellProjectsUnavailablePage(binding.navigation.openSettings)</ID>
+    <ID>MaxLineLength:DesktopAdminPages.kt$val actions = remember(controller, openAgent) { controller.projectsPageActions { project, _ -&gt; project.agentIdOrNull()?.let(openAgent) } }</ID>
+    <ID>MaxLineLength:DesktopAdminPagesTest.kt$DesktopAdminPagesTest$val controller = AgentTemplatesController(agentRepository = agents, scope = backgroundScope, errorMessageMapper = ::desktopAdminErrorMessage)</ID>
+    <ID>MaxLineLength:DesktopAppServerChatGateway.kt$DesktopAppServerChatGateway$private</ID>
+    <ID>MaxLineLength:DesktopAppServerChatGatewayTest.kt$DesktopAppServerChatGatewayTest$DeltaSpec(messageType = "assistant_message", messageId = "letta-msg-a1", logicalMessageId = "lm-a1", runId = "run-1", content = "Hello")</ID>
+    <ID>MaxLineLength:DesktopAppServerChatGatewayTest.kt$DesktopAppServerChatGatewayTest$DeltaSpec(messageType = "reasoning_message", messageId = "letta-msg-r1", logicalMessageId = "lm-r1", runId = "run-1", content = "thinking")</ID>
+    <ID>MaxLineLength:DesktopAppServerConnectionProbeTest.kt$DesktopAppServerConnectionProbeTest$assertEquals("The server rejected the access token", connectionFailureHeadline(com.letta.mobile.data.chat.runtime.ChatScreenStatus.BackendOffline(auth.message), auth.message))</ID>
+    <ID>MaxLineLength:DesktopAppState.kt$description = "Conversation list, detail pane, shared run-block rows, tool cards, A2UI payload cards, and local composer queue are available in the Windows shell."</ID>
+    <ID>MaxLineLength:DesktopAppState.kt$description = "Desktop can construct a shared session graph with JVM settings, health adapters, and remote read repositories for agents, tools, schedules, and context."</ID>
+    <ID>MaxLineLength:DesktopAppState.kt$description = "Skills, memory blocks, schedules, and channel state are displayed from shared common-code models in the Windows shell."</ID>
+    <ID>MaxLineLength:DesktopCanvasDocumentStoreTest.kt$DesktopCanvasDocumentStoreTest$assertEquals(frame, DesktopCanvasDocumentStore(rootDirectory = tempDir).get(canvasId)?.let { CanvasOpProjector.pluginElementsOf(it.sceneJson).single().frame })</ID>
+    <ID>MaxLineLength:DesktopCanvasDocumentStoreTest.kt$DesktopCanvasDocumentStoreTest$val first = CanvasDocument(id = CanvasId("c-1"), conversationId = "conv-x", title = "First", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 1L)</ID>
+    <ID>MaxLineLength:DesktopCanvasDocumentStoreTest.kt$DesktopCanvasDocumentStoreTest$val second = CanvasDocument(id = CanvasId("c-2"), conversationId = "conv-x", title = "Second", revision = 1L, sceneJson = "{}", updatedAtEpochMs = 2L)</ID>
+    <ID>MaxLineLength:DesktopCanvasLibrary.kt$internal</ID>
+    <ID>MaxLineLength:DesktopCanvasToolRegistryTest.kt$DesktopCanvasToolRegistryTest$val names = desktopCanvasToolRegistry(isIroh = false, canvasSessions = CanvasSessionRegistry()).listAdvertisedTools().map { it.name }</ID>
+    <ID>MaxLineLength:DesktopChatController.kt$DesktopChatController$val agentModel = agentId.takeIf { agentLookup }?.let { id -&gt; runCatching { agentByIdProvider(setOf(id)) }.getOrNull()?.get(id)?.model }</ID>
+    <ID>MaxLineLength:DesktopChatControllerSnapshotTest.kt$DesktopChatControllerSnapshotTest.PresentationStore.&lt;no name provided&gt;$override suspend fun unresolvedTools(afterCallId: String?, maxRows: Int)</ID>
+    <ID>MaxLineLength:DesktopChatModels.kt$content = "I also kept the A2UI payload as a contract-level card so desktop can display the generated surface even before the Android renderer is extracted."</ID>
+    <ID>MaxLineLength:DesktopChatModels.kt$content = "The desktop chat shell now has a persistent conversation list, chronological detail pane, shared run-block rendering, tool cards, A2UI fallback cards, and a local composer queue. Live remote send/receive remains behind the desktop transport/repository follow-up."</ID>
+    <ID>MaxLineLength:DesktopChatModels.kt$content = "Transport/runtime interfaces and session graph contracts are now enough for a desktop shell to boot. The next shared layer is projection parity fixtures and real repository implementations."</ID>
+    <ID>MaxLineLength:DesktopChatModels.kt$propsJson = """{"catalog":"basic","status":"preview","items":["shared render model","tool call contracts","A2UI payload surface"]}"""</ID>
+    <ID>MaxLineLength:DesktopChatShellHelpers.kt$UnifiedSearchSources(conversations, focus.rosterAgents, canvases, focus.avatarStyleByAgentId, focus.selectedAgentId, destinations, messages)</ID>
+    <ID>MaxLineLength:DesktopChatShellHelpers.kt$internal</ID>
+    <ID>MaxLineLength:DesktopChatShellHelpers.kt$private val PaletteAdminDestinations = listOf(DesktopDestination.Runs, DesktopDestination.Templates, DesktopDestination.Projects, DesktopDestination.Plugins)</ID>
+    <ID>MaxLineLength:DesktopConversationModels.kt$DesktopConversationModels$chip(DesktopModelEffortInputs(loaded.value, rows, picks.choices.value, it.selectedConversationId, supportsReasoningEffort), it.composerModelLabel)</ID>
+    <ID>MaxLineLength:DesktopConversationModels.kt$DesktopConversationModels$val label = if (restored &amp;&amp; surface.selectedConversationId == conversationId) switch.previousLabel else surface.composerModelLabel</ID>
+    <ID>MaxLineLength:DesktopDisclosureChevronContractTest.kt$DesktopDisclosureChevronContractTest.Companion$"""Icon\s*\(.*?(LettaIcons\.(ExpandMore|ExpandLess|ChevronDown|ChevronUp)|Lucide\.(ChevronDown|ChevronUp)|Icons\.[A-Za-z0-9_]+\.Expand)"""</ID>
+    <ID>MaxLineLength:DesktopDisclosureChevronContractTest.kt$DesktopDisclosureChevronContractTest.Companion$"""import\s+(com\.composables\.icons\.lucide\.Chevron(Down|Up)|androidx\.compose\.material\.icons\.[A-Za-z0-9_.]*Expand(More|Less))"""</ID>
+    <ID>MaxLineLength:DesktopLocalRuntimeController.kt$active -&gt; if (consecutiveCrashes &gt; 0) "Running (recovered from $consecutiveCrashes recent crash${if (consecutiveCrashes == 1) "" else "es"})." else "Running."</ID>
+    <ID>MaxLineLength:DesktopLocalRuntimeControllerTest.kt$DesktopLocalRuntimeControllerTest$DesktopLocalRuntimeController(InMemoryStore(), this, onRestart, bindings, io = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))</ID>
+    <ID>MaxLineLength:DesktopLocalRuntimeManager.kt$DesktopLocalRuntimeManager$if (exitCode != null) throw DesktopRuntimeStartException("Bundled Letta Code runtime exited before ready (exit=$exitCode)", exitCode)</ID>
+    <ID>MaxLineLength:DesktopMainContentPane.kt$private</ID>
+    <ID>MaxLineLength:DesktopMemfsBindingTest.kt$DesktopMemfsBindingTest.PagedMemoryClient$"""{"type":"list_memory_response","request_id":"${command.requestId}","entries":[{"relative_path":"system/persona.md","is_system":true,"content":"x","size":1}],"done":true,"total":1,"success":true}"""</ID>
+    <ID>MaxLineLength:DesktopMemfsBindingTest.kt$DesktopMemfsBindingTest.RelayingHost$"""{"frames":[{"type":"list_memory_response","request_id":"h","entries":[{"relative_path":"system/human/communication_style.md","is_system":true,"content":"x","size":1}],"done":true,"success":true}]}"""</ID>
+    <ID>MaxLineLength:DesktopPersistentTimelineIndex.kt$DesktopPersistentTimelineIndex$for (ref in listOf(roots.order, roots.identity, roots.evidence, roots.tools, roots.unresolved, previous)) data.write(refBytes(ref))</ID>
+    <ID>MaxLineLength:DesktopPhoneShellTest.kt$DesktopPhoneShellTest$FixtureMascotShell { PhoneSceneSurface(PhoneScenes.fullScreenDark, port, PhoneScenes.fullScreenDark.presentation, onIntent = {}) }</ID>
+    <ID>MaxLineLength:DesktopPhoneShellTest.kt$DesktopPhoneShellTest$PhoneSceneSurface(scene, port, presentation, onIntent = { presentation = ChatSurfaceModeReducer.reduce(presentation, it) })</ID>
+    <ID>MaxLineLength:DesktopPhoneShellTest.kt$DesktopPhoneShellTest$private</ID>
+    <ID>MaxLineLength:DesktopPhoneTouchPointer.kt$DesktopPhoneTouchPointer.TouchQueue$TabletPenDecoder.DecodedSample(kind = kind, x = x, y = y, rawX = x, rawY = y, force = 1f, tool = FINGER_TOOL, contact = MOUSE_CONTACT)</ID>
+    <ID>MaxLineLength:DesktopPluginViews.kt$DesktopLivePluginViewsStore$internal</ID>
+    <ID>MaxLineLength:DesktopRuntimeLaunchSettingsTest.kt$DesktopRuntimeLaunchSettingsTest$DesktopRuntimeLaunchInputs(totalMemoryBytes = null, instanceId = "install-1", workingDirectory = root, allowWindowsAutoReflection = true)</ID>
+    <ID>MaxLineLength:DesktopSettingsPage.kt$)</ID>
+    <ID>MaxLineLength:DesktopSettingsPage.kt$private</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$!directory.exists() -&gt; "This folder doesn't exist yet — it will be created empty, and the bundled runtime will start with no agents."</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$"${if (system.connected == true) "Online" else "Offline"} · ↓${formatBytes(system.receivedBytes)} ↑${formatBytes(system.transmittedBytes)}"</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$DesktopUpdatePhase.ReadyToInstall -&gt; SettingsAction("updates-install", "Install and restart", primary = true) { actions.onInstallUpdate() }</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$SettingsAction("updates-download", "Download ${state.updateVersion.orEmpty()}".trim(), primary = true) { actions.onDownloadUpdate() }</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$SettingsRow.Info("system-cpu", "CPU", system.cpuUsagePercent?.let { "${it.toInt()}% · ${system.physicalCores ?: "?"} cores" } ?: "—")</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$SettingsStatus("Node heap ${launch.heapMb / MB_PER_GB} GB (half of this machine's memory, at least 4 GB) · instance ${launch.instanceId.take(INSTANCE_ID_PREVIEW)}")</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$SettingsStatus(state.justUpdatedMessage ?: state.updateMessage ?: "GitHub releases, SHA-512 verification, and safe installer restart.")</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$add(SettingsAction("directory-change", if (state.isSaving) "Saving…" else "Change…", primary = true, enabled = !state.isSaving) { actions.pick() })</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$if (!state.isDefault) add(SettingsAction("directory-reset", "Reset to default", enabled = !state.isSaving) { actions.reset() })</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$if (launch.workingDirectory != null) add(SettingsAction("runtime-directory-reset", "Use Documents") { actions.resetWorkingDirectory() })</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$launch.message?.let { add(SettingsRow.Note("runtime-launch-message", SettingsStatus(it, if (launch.isError) SettingsTone.Error else SettingsTone.Positive))) }</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$problem = { url -&gt; if (url.isBlank() || LocalRuntimeProviderConfig.isValidBaseUrl(url)) null else "Enter an http:// or https:// URL." }</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$val externallyLocked = autoLaunch in setOf(AutoLaunchState.DISABLED_BY_USER, AutoLaunchState.DISABLED_BY_POLICY, AutoLaunchState.ENABLED_BY_POLICY)</ID>
+    <ID>MaxLineLength:DesktopSettingsSections.kt$val line = SettingsRow.Note("runtime-git", SettingsStatus("Git: ${git.describe()}", if (missing != null) SettingsTone.Error else SettingsTone.Normal))</ID>
+    <ID>MaxLineLength:DesktopSharedChatKeybindingTest.kt$DesktopSharedChatKeybindingTest.RecordingPort$ChatComposerUiState(text = text, canSend = text.isNotBlank(), commands = persistentListOf&lt;ChatComposerCommand&gt;().addAll(commands))</ID>
+    <ID>MaxLineLength:DesktopSharedChatPage.kt$private</ID>
+    <ID>MaxLineLength:DesktopShellMainPane.kt$pageDestination = navigator.currentRoute(frame.chatState.selectedConversationId, frame.focus.selectedAgentId).page.toShellDestination()</ID>
+    <ID>MaxLineLength:JcefPluginViewHost.kt$JcefPluginViewHost$val slot = remember(app, session) { JcefViewSlot(views, app, session) { reason -&gt; SwingUtilities.invokeLater { onFailure(reason) } } }</ID>
+    <ID>MaxLineLength:Main.kt$CanvasBubbleLayoutHost</ID>
+    <ID>MaxLineLength:PhoneAgentPillTest.kt$PhoneAgentPillTest$PhoneCanvasIdentityPill(phoneAgentIdentity("agent-1", "A very long agent name that would run across the whole phone screen") {})</ID>
+    <ID>MaxLineLength:PluginViewLifecycleTest.kt$PluginViewLifecycleTest$private val session = PluginViewTestFixtures.session(host, options = ViewBridgeOptions(audit = ViewAuditSink { }, teardownTimeoutMs = TEARDOWN_MS))</ID>
+    <ID>MaxLineLength:PluginViewLifecycleTest.kt$PluginViewLifecycleTest$private val views = JcefLiveViews(runtime, work, PluginBrowserFactory { app, wired -&gt; check(app == APP); wiring = wired; handle }, WAIT_MS)</ID>
+    <ID>MaxLineLength:PluginViewLifecycleTest.kt$PluginViewLifecycleTest$val readyViews = JcefLiveViews(runtime, work, PluginBrowserFactory { _, wired -&gt; readyWiring = wired; FakeBrowserHandle() }, READY_WATCH_MS)</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$Hotspot(HotspotMark("input (you typing)", inputSpot, ink).also { it.width = 260f; it.height = 44f }, target == GazeTarget.INPUT)</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$Hotspot(HotspotMark("timeline / code", timelineSpot, ink).also { it.width = 220f; it.height = 160f }, target == GazeTarget.TIMELINE)</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$OutlinedButton({ update(spec.copy(nodes = spec.nodes.filterIndexed { i, _ -&gt; i != sel })); select(-1) }) { Text("remove") }</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$Slider(((n.argb ushr 24) and 0xFF) / 255f, onValueChange = { set(n.copy(argb = (n.argb and 0x00FFFFFF) or ((it * 255).toInt() shl 24))) })</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$SwatchRow(SURROUND_COLORS, n.argb or 0xFF000000.toInt()) { set(n.copy(argb = (it and 0x00FFFFFF) or (n.argb and 0xFF000000.toInt()))) }</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$cursorLook = ((p.x - mascotBounds.center.x) / reach).coerceIn(-1f, 1f) to ((p.y - mascotBounds.center.y) / reach).coerceIn(-1f, 1f)</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$setIdentity(MascotIdentity(MascotShape.entries[tick % MascotShape.entries.size], MascotPalette.ALL[tick % MascotPalette.ALL.size]))</ID>
+    <ID>MaxLineLength:RiveDesktopSpike.kt$val tune = remember { mutableStateMapOf("tuneScale" to 0.5f, "tunePlate" to 0.5f, "tuneGlyph" to 0.5f, "tuneMouth" to 0.5f, "tuneMouthY" to 0.5f) }</ID>
+    <ID>MaxLineLength:TabletPen.kt$TabletPen$"TABLET: finger down contact=${sample.contact} fingersDown=${touchContacts.size} at=(${sample.x},${sample.y}) scale=$scale"</ID>
+    <ID>MaxLineLength:TabletPen.kt$TabletPen$"TABLET: pen stroke tool=$toolName pressure=${sample.force} at=(${sample.x},${sample.y}) cursor=($cursorX,$cursorY) canvas=$canvas"</ID>
+    <ID>NestedBlockDepth:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$fun publish( entries: Sequence&lt;Entry&gt;, prepareGeneration: (String) -&gt; Unit = {}, reuse: Snapshot? = null, checkpoint: () -&gt; Unit = {}, ): Snapshot</ID>
+    <ID>NestedBlockDepth:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore.Transaction$override suspend fun metadata(position: TimelineReadPosition, maxRows: Int): TimelineMetadataPage</ID>
+    <ID>NewLineAtEndOfFile:CanvasWorkspaceUiTest.kt$com.letta.mobile.desktop.canvas.CanvasWorkspaceUiTest.kt</ID>
+    <ID>NewLineAtEndOfFile:DesktopJewelWindow.kt$com.letta.mobile.desktop.DesktopJewelWindow.kt</ID>
+    <ID>ReturnCount:DesktopChatApprovalCoordinator.kt$DesktopChatApprovalCoordinator$private fun validateSubmissionTarget(request: ApprovalSubmissionRequest): SubmissionTarget?</ID>
+    <ID>ReturnCount:DesktopChatController.kt$DesktopChatController$private suspend fun refreshConversationRoster(): Boolean</ID>
+    <ID>ReturnCount:DesktopChatController.kt$DesktopChatController$private suspend fun selectRemoteConversation(conversationId: String, generation: Long)</ID>
+    <ID>ReturnCount:DesktopPersistentTimelineIndex.kt$DesktopPersistentTimelineIndex$private fun balance(entry: Entry, left: String?, right: String?, budget: Budget): String</ID>
+    <ID>ReturnCount:DesktopPersistentTimelineIndex.kt$DesktopPersistentTimelineIndex$private fun change(ref: String?, entry: Entry, delete: Boolean, budget: Budget, depth: Int): String?</ID>
+    <ID>SpreadOperator:JcefViewHandlers.kt$JcefQueryHandler$(JcefInertRouterHandler, *(args ?: emptyArray()))</ID>
+    <ID>SwallowedException:DesktopCanvasArchiveStore.kt$DesktopCanvasArchiveStore$e: IOException</ID>
+    <ID>SwallowedException:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$e: IOException</ID>
+    <ID>SwallowedException:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$unreadable: Exception</ID>
+    <ID>SwallowedException:DesktopCanvasLibrary.kt$DesktopCanvasLibrary$e: java.io.IOException</ID>
+    <ID>SwallowedException:DesktopDirectorySync.kt$rejected: AccessDeniedException</ID>
+    <ID>SwallowedException:DesktopLocalRuntimeProviderStore.kt$DesktopLocalRuntimeProviderStore$unsupported: java.nio.file.AtomicMoveNotSupportedException</ID>
+    <ID>ThrowingExceptionsWithoutMessageOrCause:JcefPluginViewHost.kt$JcefViewSlot$IllegalStateException()</ID>
+    <ID>ThrowsCount:DesktopLocalRuntimeManager.kt$DesktopLocalRuntimeManager$@Synchronized fun ensureStarted(): String</ID>
+    <ID>TooGenericExceptionCaught:DesktopAppServerChatAdapter.kt$DesktopAppServerChatGateways$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopAppServerChatGatewayBuilder.kt$DesktopAppServerChatGatewayBuilder$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopCanvasDocumentStore.kt$DesktopCanvasDocumentStore$unreadable: Exception</ID>
+    <ID>TooGenericExceptionCaught:DesktopChatController.kt$DesktopChatController$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:DesktopChatController.kt$DesktopChatController$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopChatModelCatalogHelper.kt$DesktopChatModelCatalogHelper$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopChatRemoteSender.kt$DesktopChatRemoteSender$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopConversationModels.kt$DesktopConversationModels$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopDirectAppServerSession.kt$DesktopDirectAppServerSession.Companion$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopIndexedTimelineFiles.kt$DesktopIndexedTimelineFiles$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:DesktopIrohAgentResolve.kt$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopIrohGenerations.kt$DesktopIrohGenerationMinter$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopLocalRuntimeManager.kt$DesktopLocalRuntimeManager$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DesktopRuntimeSupervisor.kt$DesktopRuntimeSupervisor$e: Exception</ID>
+    <ID>TooManyFunctions:DesktopAppServerChatGateway.kt$DesktopAppServerChatGateway : DesktopChatGatewayConnectionStatusGatewayDesktopReconnectOwningGatewayChatGatewayExtrasConversationSummaryGatewayConversationForkGatewayConversationRecompileGatewayDesktopApprovalSubmitterDesktopPendingApprovalSourceDesktopPermissionModeControllerDesktopTurnAborterDesktopWorkingDirectoryControllerDesktopRuntimeEventSourceAutoCloseable</ID>
+    <ID>TooManyFunctions:DesktopChatController.kt$DesktopChatController</ID>
+    <ID>TooManyFunctions:DesktopChatSendUiSink.kt$DesktopChatSendUiSink : ChatSendUiSink</ID>
+    <ID>TooManyFunctions:DesktopChatSessionPort.kt$DesktopChatActions : ChatActions</ID>
+    <ID>TooManyFunctions:DesktopLettaCodeRuntime.kt$DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle</ID>
+    <ID>TooManyFunctions:DesktopNucleusEffects.kt$com.letta.mobile.desktop.DesktopNucleusEffects.kt</ID>
+    <ID>TooManyFunctions:DesktopPersistentTimelineAccess.kt$DesktopPersistentTimelineAccess</ID>
+    <ID>TooManyFunctions:DesktopPersistentTimelineIndex.kt$DesktopPersistentTimelineIndex</ID>
+    <ID>TooManyFunctions:DesktopSettingsAdapters.kt$DesktopLettaConfigStore : BackendConfigStoreSecureTokenStore</ID>
+    <ID>TooManyFunctions:DesktopSettingsSections.kt$com.letta.mobile.desktop.DesktopSettingsSections.kt</ID>
+    <ID>TooManyFunctions:DesktopTimelineBoundedStore.kt$DesktopTimelineBoundedStore$Transaction : ReaderTimelineStoreTransactionTimelineImageBodyWriter</ID>
+    <ID>TooManyFunctions:DesktopTimelineImageBodies.kt$DesktopTimelineImageBodies</ID>
+    <ID>TooManyFunctions:RiveDesktopBridge.kt$RiveBridgeNative : Library</ID>
+    <ID>TooManyFunctions:RiveDesktopSpike.kt$com.letta.mobile.desktop.avatar.rive.RiveDesktopSpike.kt</ID>
+    <ID>TooManyFunctions:TabletPen.kt$TabletPen</ID>
+    <ID>UnusedImports:CanvasOpenCrashRepro.kt$import androidx.compose.runtime.withFrameNanos</ID>
+    <ID>UnusedImports:DesktopAppServerChatGateway.kt$import com.letta.mobile.data.chat.runtime.ChatGateway</ID>
+    <ID>UnusedImports:DesktopChatControllerTest.kt$import com.letta.mobile.data.chat.runtime.ChatGatewayExtras</ID>
+    <ID>UnusedImports:DesktopChatControllerTest.kt$import com.letta.mobile.data.model.Agent</ID>
+    <ID>UnusedImports:DesktopChatControllerTest.kt$import com.letta.mobile.data.model.AgentCreateParams</ID>
+    <ID>UnusedImports:DesktopChatControllerTest.kt$import com.letta.mobile.data.model.LlmModel</ID>
+    <ID>UnusedImports:DesktopChatSessionPortTest.kt$import com.letta.mobile.ui.chat.session.ChatSurfaceIntent</ID>
+    <ID>UnusedImports:DesktopChatSessionPortTest.kt$import com.letta.mobile.ui.chat.session.ChatSurfacePresentation</ID>
+    <ID>UnusedImports:DesktopChatShellHelpers.kt$import androidx.compose.runtime.DisposableEffect</ID>
+    <ID>UnusedImports:DesktopChatShellHelpers.kt$import androidx.compose.runtime.LaunchedEffect</ID>
+    <ID>UnusedImports:DesktopChatShellHelpers.kt$import androidx.compose.runtime.mutableStateOf</ID>
+    <ID>UnusedImports:DesktopChatShellHelpers.kt$import com.letta.mobile.data.repository.api.IAgentRepository</ID>
+    <ID>UnusedImports:DesktopIndexedTimelineFiles.kt$import java.nio.file.StandardOpenOption.READ</ID>
+    <ID>UnusedImports:DesktopJewelWindow.kt$import androidx.compose.runtime.DisposableEffect</ID>
+    <ID>UnusedImports:DesktopSidebarChrome.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.foundation.layout.Box</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.foundation.layout.fillMaxSize</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.ui.Modifier</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.ui.input.pointer.PointerEventPass</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.ui.input.pointer.PointerEventType</ID>
+    <ID>UnusedImports:Main.kt$import androidx.compose.ui.input.pointer.pointerInput</ID>
+    <ID>UnusedImports:RiveDesktopTelemetry.kt$import androidx.compose.ui.unit.dp</ID>
+    <ID>UnusedImports:ShaderLookdevMain.kt$import androidx.compose.ui.unit.sp</ID>
+    <ID>UnusedParameter:DesktopChatController.kt$DesktopChatController$attempt: RemoteSendAttempt</ID>
+    <ID>UnusedPrivateMember:TabletPen.kt$TabletPen$private fun windowTitle(): String</ID>
+    <ID>UseCheckOrError:DesktopTouchKeyboardGateTest.kt$DesktopTouchKeyboardGateTest.FailingStandInToolkit$throw IllegalStateException("boom")</ID>
+    <ID>UseCheckOrError:DesktopTouchKeyboardGateTest.kt$DesktopTouchKeyboardGateTest.FailingStandInToolkit$throw IllegalStateException("boom: $show")</ID>
+    <ID>VariableNaming:CanvasTextToolUiTest.kt$CanvasTextToolUiTest$/** Past the double-tap timeout, so a single tap is settled as one. */ private val DOUBLE_TAP_GRACE_MS = 1000L</ID>
+    <ID>WildcardImport:DesktopPersistentTimelineAccess.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:DesktopTimelineBoundedStore.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:DesktopTimelineBoundedStoreTest.kt$import com.letta.mobile.data.timeline.*</ID>
+    <ID>WildcardImport:DesktopTimelineBoundedStoreTest.kt$import kotlin.test.*</ID>
+  </CurrentIssues>
+</SmellBaseline>
