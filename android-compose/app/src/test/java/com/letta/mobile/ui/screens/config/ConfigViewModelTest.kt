@@ -79,7 +79,7 @@ class ConfigViewModelTest {
             fakeModelImporter,
             fakeEmbeddedModelRepository,
             fakeEndpointCatalog,
-            fakeConnectionTester,
+            fakeConnectionTester, idleLocalAppServerHost(),
             PermissionModeSettings(InMemorySecureSettingsStore()),
         )
 

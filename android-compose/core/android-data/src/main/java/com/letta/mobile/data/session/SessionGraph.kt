@@ -4,19 +4,16 @@ import com.letta.mobile.data.context.ContextTokenReadings
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
-import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 
 /**
  * One Android session graph generation: the shared, interface-typed
  * [SharedSessionRepositoryGraph] (letta-mobile-by4vm.86) plus what only Android binds — the
- * generation's [scope], the paging conversation list, the captured config, and a
- * local runtime typed as [LocalLettaBackend].
+ * generation's [scope], the paging conversation list and the captured config.
  */
 class SessionGraph internal constructor(
     private val repositories: SharedSessionRepositoryGraph,
-    override val localRuntimeBackend: LocalLettaBackend?,
     val scope: CoroutineScope,
     val allConversationsRepository: AllConversationsRepository,
     /** Configuration captured at creation, never resolved from mutable settings. */

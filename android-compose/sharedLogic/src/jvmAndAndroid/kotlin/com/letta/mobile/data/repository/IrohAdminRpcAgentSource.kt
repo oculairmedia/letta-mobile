@@ -41,7 +41,7 @@ class IrohAdminRpcAgentSource(
     private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
 ) : com.letta.mobile.data.repository.api.AgentIrohSource {
     override fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        settingsRepository.activeBackendUsesChannel()
 
     /**
      * Update an agent over admin_rpc (server AgentAdminHandlers `agent.update`

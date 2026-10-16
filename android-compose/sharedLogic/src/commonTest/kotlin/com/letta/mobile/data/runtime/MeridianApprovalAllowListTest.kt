@@ -70,6 +70,18 @@ class MeridianApprovalAllowListTest {
         turn.job.cancel()
     }
 
+    /** letta-mobile-8fq4j: a plan-mode run never starts coding without the person, even under Unrestricted. */
+    @Test
+    fun exitPlanModeWaitsForThePersonEvenUnderUnrestricted() = runTest {
+        val turn = startTurn(AppServerPermissionMode.Unrestricted)
+        turn.client.emit(TestApprovalTool.ExitPlanMode.controlRequest())
+        runCurrent()
+
+        assertEquals(1, turn.drafts.approvalCards())
+        assertTrue(turn.client.approvalInputs().isEmpty(), "ExitPlanMode is never auto-approved")
+        turn.job.cancel()
+    }
+
     @Test
     fun streamedMeridianApprovalUnderStandardSendsNoReplyAndShowsNoCard() = runTest {
         val turn = startTurn(AppServerPermissionMode.Standard)

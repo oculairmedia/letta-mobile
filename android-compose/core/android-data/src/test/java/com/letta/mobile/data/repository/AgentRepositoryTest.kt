@@ -6,15 +6,12 @@ import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.TestData
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +26,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -52,76 +47,6 @@ class AgentRepositoryTest {
         fakeApi = FakeAgentApi()
         fakeDao = lazyOf(FakeAgentDao())
         repository = AgentRepository(fakeApi, fakeDao)
-    }
-
-    // letta-mobile-y5c9u / yfo86 / 6oglt: local-runtime mode routes agent
-    // reads/writes to the on-device store instead of the remote API.
-    private class FakeLocalAgentSource : com.letta.mobile.data.repository.api.LocalRuntimeAgentSource {
-        val persisted = mutableListOf<com.letta.mobile.data.model.Agent>()
-        var stored = mutableListOf<com.letta.mobile.data.model.Agent>()
-        var overview: com.letta.mobile.data.model.ContextWindowOverview? = null
-
-        override suspend fun listAgents(): List<com.letta.mobile.data.model.Agent> = stored.toList()
-
-        override suspend fun persistAgent(agent: com.letta.mobile.data.model.Agent) {
-            persisted += agent
-            stored.removeAll { it.id == agent.id }
-            stored += agent
-        }
-
-        override suspend fun contextWindowOverview(agentId: AgentId) = overview
-    }
-
-    private fun localRepository(source: FakeLocalAgentSource): AgentRepository = AgentRepository(
-        remote = fakeApi,
-        agentDao = fakeDao,
-        localAgentSource = source,
-        settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
-            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
-                id = "local-1",
-                mode = com.letta.mobile.data.model.LettaConfig.Mode.LOCAL,
-                serverUrl = "local-lettacode://device",
-            ),
-        ),
-    )
-
-    @Test
-    fun `refreshAgents lists from local source when local runtime active`() = runTest {
-        val source = FakeLocalAgentSource().apply {
-            stored += TestData.agent(id = "local-agent-1", name = "My Local Agent")
-        }
-        val localRepo = localRepository(source)
-
-        localRepo.refreshAgents()
-
-        assertEquals(listOf("My Local Agent"), localRepo.agents.value.map { it.name })
-        assertEquals(0, fakeApi.calls.count { it == "listAgents" })
-    }
-
-    @Test
-    fun `createLocalAgent persists to local source`() = runTest {
-        val source = FakeLocalAgentSource()
-        val localRepo = localRepository(source)
-
-        val agent = localRepo.createLocalAgent(AgentCreateParams(name = "Persisted Agent"))
-
-        assertEquals(listOf(agent.id), source.persisted.map { it.id })
-    }
-
-    @Test
-    fun `getContextWindow uses local estimate when local runtime active`() = runTest {
-        val source = FakeLocalAgentSource().apply {
-            overview = com.letta.mobile.data.model.ContextWindowOverview(
-                contextWindowSizeMax = 128_000,
-                contextWindowSizeCurrent = 420,
-            )
-        }
-        val localRepo = localRepository(source)
-
-        val overview = localRepo.getContextWindow(AgentId("local-agent-1"), null)
-
-        assertEquals(420, overview.contextWindowSizeCurrent)
-        assertTrue(fakeApi.calls.isEmpty())
     }
 
     @Test
@@ -154,106 +79,6 @@ class AgentRepositoryTest {
         assertEquals("agent.context", transport.adminRpcCalls.single().method)
         assertEquals("/v1/agents/agent-1/context?conversation_id=conversation-1", transport.adminRpcCalls.single().path)
         assertEquals(420, overview.contextWindowSizeCurrent)
-    }
-
-    @Test
-    fun `updateAgent on local-bound agent persists locally without remote call`() = runTest {
-        val source = FakeLocalAgentSource().apply {
-            stored += TestData.agent(id = "local-agent-1", name = "Before", model = "google/gemma-3n-E2B-it-litert-lm")
-        }
-        val localRepo = localRepository(source)
-        localRepo.refreshAgents()
-
-        val updated = localRepo.updateAgent(
-            AgentId("local-agent-1"),
-            com.letta.mobile.data.model.AgentUpdateParams(name = "After"),
-        )
-
-        assertEquals("After", updated.name)
-        assertEquals("After", source.stored.single().name)
-        assertTrue(fakeApi.calls.none { it.startsWith("updateAgent") })
-    }
-
-    @Test
-    fun `local-agent id with bare api model is not local-bound`() {
-        val agent = TestData.agent(
-            id = "local-agent-1",
-            model = "gpt-5.5",
-        )
-
-        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
-    }
-
-    @Test
-    fun `local-agent id with cloud model is not local-bound`() {
-        val agent = TestData.agent(
-            id = "local-agent-1",
-            model = "openai/gpt-4o-mini",
-        )
-
-        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
-    }
-
-    @Test
-    fun `local-agent id with lmstudio cloud model is not local-bound`() {
-        val agent = TestData.agent(
-            id = "local-agent-1",
-            model = "lmstudio/deepseek-v4-flash",
-        )
-
-        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
-    }
-
-    @Test
-    fun `local-agent id with local model remains local-bound`() {
-        val agent = TestData.agent(
-            id = "local-agent-1",
-            model = "google/gemma-3n-E2B-it-litert-lm",
-        )
-
-        assertTrue(AgentRuntimeBinding.isLocalBound(agent))
-    }
-
-    @Test
-    fun `local runtime metadata with cloud model is not local-bound`() {
-        val agent = TestData.agent(
-            id = "local-agent-1",
-            model = "anthropic/claude-3-5-sonnet",
-        ).copy(
-            metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
-        )
-
-        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
-    }
-
-    @Test
-    fun `switching local agent to cloud model persists locally without remote update`() = runTest {
-        val source = FakeLocalAgentSource().apply {
-            stored += TestData.agent(
-                id = "local-agent-1",
-                name = "Before",
-                model = "google/gemma-3n-E2B-it-litert-lm",
-            )
-        }
-        fakeApi.agents.add(
-            TestData.agent(
-                id = "local-agent-1",
-                name = "Before",
-                model = "google/gemma-3n-E2B-it-litert-lm",
-            ),
-        )
-        val localRepo = localRepository(source)
-        localRepo.refreshAgents()
-
-        val updated = localRepo.updateAgent(
-            AgentId("local-agent-1"),
-            com.letta.mobile.data.model.AgentUpdateParams(model = "openai/gpt-4o-mini"),
-        )
-
-        assertEquals("openai/gpt-4o-mini", updated.model)
-        assertTrue(fakeApi.calls.none { it == "updateAgent:local-agent-1" })
-        assertTrue(source.persisted.any { it.model == "openai/gpt-4o-mini" })
-        assertFalse(AgentRuntimeBinding.isLocalBound(updated))
     }
 
     @Test
@@ -344,28 +169,6 @@ class AgentRepositoryTest {
         assertEquals(listOf(50, 50, 126), fakeApi.listLimits)
         assertEquals(listOf(0, 50, null), fakeApi.listOffsets)
         assertEquals(1, fakeApi.calls.count { it == "countAgents" })
-    }
-
-    @Test
-    fun `createLocalAgent inserts local-bound row and emits cache without api`() = runTest {
-        val agent = repository.createLocalAgent(
-            AgentCreateParams(
-                name = "Local",
-                model = "google/gemma-3n-E2B-it-litert-lm",
-                metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
-                toolIds = persistentListOf(com.letta.mobile.data.model.ToolId("tool-1")),
-                includeBaseTools = true,
-            )
-        )
-
-        assertTrue(agent.id.value.startsWith("local-agent-"))
-        assertTrue(AgentRuntimeBinding.isLocalBound(agent))
-        assertEquals("google/gemma-3n-E2B-it-litert-lm", agent.model)
-        assertTrue(agent.tools.isEmpty())
-        assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
-        assertEquals(listOf(agent.id.value), fakeDao.get().getAllOnce().map { it.id })
-        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, fakeDao.get().getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RUNTIME_KEY]?.jsonPrimitive?.contentOrNull)
-        assertFalse(fakeApi.calls.any { it.startsWith("createAgent") })
     }
 
     @Test

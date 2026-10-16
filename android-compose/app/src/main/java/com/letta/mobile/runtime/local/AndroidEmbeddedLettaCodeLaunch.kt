@@ -6,99 +6,10 @@ import com.letta.mobile.data.runtime.host.LocalAppServerLaunch
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 private val embeddedProviderAuthJson = Json { prettyPrint = true }
-
-data class AndroidEmbeddedLettaCodeLaunchSpec(
-    val entrypoint: File,
-    val workingDirectory: File,
-    val modelHandle: String,
-    val preloadRequireFiles: List<File>,
-    val environment: Map<String, String>,
-) {
-    // Android keeps the stream-json bridge until the bundled Letta Code version
-    // exposes app-server on a nodejs-mobile-compatible Node runtime.
-    fun toStreamJsonNodeStartRequest(session: EmbeddedLettaCodeSessionKey): LettaCodeNodeStartRequest =
-        LettaCodeNodeStartRequest(
-            arguments = buildList {
-                add("node")
-                addAll(NodeHeap.STREAM_JSON.flags)
-                preloadRequireFiles.forEach { preload ->
-                    add("--require")
-                    add(preload.absolutePath)
-                }
-                add(entrypoint.absolutePath)
-                add("--backend")
-                add("local")
-                add("--model")
-                add(modelHandle)
-                add("--agent")
-                add(session.agentId)
-                add("--conversation")
-                add("default")
-                add("--input-format")
-                add("stream-json")
-                add("--output-format")
-                add("stream-json")
-                add("--permission-mode")
-                add("unrestricted")
-            },
-            environment = environment,
-            workingDirectory = workingDirectory,
-        )
-}
-
-fun EmbeddedLettaCodeModelSelection.androidEmbeddedLaunchModelHandle(
-    onDeviceProviderBaseUrl: String?,
-): String =
-    if (onDeviceProviderBaseUrl == null) modelHandle else lettaCodeModelHandle
-
-fun PreparedLettaCodeProject.prepareAndroidEmbeddedLettaCodeLaunchSpec(
-    modelSelection: EmbeddedLettaCodeModelSelection,
-    onDeviceProviderBaseUrl: String? = null,
-    onDeviceProviderApiKey: String? = null,
-    androidNetworkBridgeBaseUrl: String,
-    androidNetworkBridgeToken: String,
-    toolInstaller: AndroidEmbeddedToolInstaller,
-): AndroidEmbeddedLettaCodeLaunchSpec {
-    val baseEnvironment = embeddedRuntimeEnvironment(
-        AndroidNetworkBridgeEndpoint(androidNetworkBridgeBaseUrl, androidNetworkBridgeToken),
-        toolInstaller,
-        heap = NodeHeap.STREAM_JSON,
-    )
-    val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
-    val modelHandle = modelSelection.androidEmbeddedLaunchModelHandle(onDeviceProviderBaseUrl)
-    if (onDeviceProviderBaseUrl != null) {
-        writeEmbeddedLettaCodeProviderAuth(
-            baseUrl = onDeviceProviderBaseUrl,
-            apiKey = onDeviceProviderApiKey ?: EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_API_KEY,
-            modelSelection = modelSelection,
-        )
-    }
-    return AndroidEmbeddedLettaCodeLaunchSpec(
-        entrypoint = entrypoint,
-        workingDirectory = workingDirectory,
-        modelHandle = modelHandle,
-        preloadRequireFiles = embeddedLettaCodePreloadRequireFiles(projectDir),
-        environment = buildMap {
-            putAll(baseEnvironment)
-            put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
-            put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
-            put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelHandle)
-            put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
-            put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
-            put("LETTA_ANDROID_ON_DEVICE_MODEL_MAX_TOKENS", modelSelection.maxTokens.toString())
-            put("LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR", modelCacheDirectory.absolutePath)
-            onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
-            onDeviceProviderApiKey?.let { put("LMSTUDIO_API_KEY", it) }
-            modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
-        },
-    )
-}
 
 /** Where letta.js reaches [AndroidNetworkBridge] (`/fetch`, `/dns/lookup` for android-network-polyfill.cjs). */
 data class AndroidNetworkBridgeEndpoint(val baseUrl: String, val token: String)
@@ -128,7 +39,18 @@ fun PreparedLettaCodeProject.androidLocalAppServerLaunch(
     workingDirectory = workingDirectory.absolutePath,
 )
 
-/** The device environment both launch modes share: home, tools on PATH, temp dirs, the network bridge, the heap. */
+/**
+ * node18-compat.cjs must come first: the other preloads may already use the globals it backfills.
+ * Device tools reach the App Server through `runtime_start.register_external_tools` (the channel's
+ * [com.letta.mobile.data.controller.extras.ExternalToolRegistry]), so there is no tools preload.
+ */
+fun embeddedAppServerPreloadRequireFiles(projectDir: File): List<File> = listOf(
+    File(projectDir, "node18-compat.cjs"),
+    File(projectDir, "regexp-polyfill.cjs"),
+    File(projectDir, "android-network-polyfill.cjs"),
+)
+
+/** The device environment: home, tools on PATH, temp dirs, the network bridge, the heap. */
 private fun PreparedLettaCodeProject.embeddedRuntimeEnvironment(
     networkBridge: AndroidNetworkBridgeEndpoint,
     toolInstaller: AndroidEmbeddedToolInstaller,
@@ -159,11 +81,8 @@ private fun PreparedLettaCodeProject.embeddedRuntimeEnvironment(
     }
 }
 
-/** V8 heap per launch mode; the flags go on argv and into NODE_OPTIONS. */
+/** The V8 heap; the flags go on argv and into NODE_OPTIONS. */
 private enum class NodeHeap(oldSpaceMb: Int) {
-    /** The headless stream-json runtime, tuned for 0.26.1 (goes with that path in by4vm.110.6). */
-    STREAM_JSON(oldSpaceMb = 384),
-
     /** App Server mode keeps more resident (runtime cache, cron, terminals): the plan's 512, measured in W7. */
     APP_SERVER(oldSpaceMb = 512),
     ;
@@ -268,61 +187,42 @@ private fun PreparedLettaCodeProject.memfsEnvironment(toolInstaller: AndroidEmbe
     )
 }
 
-private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(
-    baseUrl: String,
-    apiKey: String,
-    modelSelection: EmbeddedLettaCodeModelSelection,
-) {
-    val authFile = File(storageDirectory, "providers/auth.json")
+/** Where the runtime's `lc-lmstudio` provider sends model calls: the on-device bridge or a model server. */
+data class ProviderEndpoint(val baseUrl: String, val apiKey: String)
+
+/**
+ * letta-mobile-by4vm.110.6: the runtime's own provider file, `<backendDir>/providers/auth.json`,
+ * with one `lc-lmstudio` provider at [endpoint]. It carries only the connection: letta-code
+ * 0.34.14 discovers lmstudio models from the endpoint itself (`/api/v0/models`, then `/models`)
+ * and ignores a `models[]` array here, so the endpoint must advertise [lettaCodeLookupId] of the
+ * agents' handle (by4vm.121.1). Vision stays with `LETTA_CODE_VISION_MODEL_IDS` (by4vm.110.2).
+ */
+fun File.writeLocalProviderAuth(endpoint: ProviderEndpoint) {
     val root = buildJsonObject {
         put("version", 1)
         put(
             "providers",
             buildJsonObject {
                 put(
-                    "lc-lmstudio",
+                    LOCAL_PROVIDER_NAME,
                     buildJsonObject {
-                        put("id", "local-provider-lc-lmstudio")
-                        put("name", "lc-lmstudio")
+                        put("id", "local-provider-$LOCAL_PROVIDER_NAME")
+                        put("name", LOCAL_PROVIDER_NAME)
                         put("provider_type", "lmstudio")
                         put("provider_category", "byok")
-                        put(
-                            "auth",
-                            buildJsonObject {
-                                put("type", "api")
-                                put("key", apiKey)
-                            },
-                        )
-                        put("base_url", baseUrl)
-                        put(
-                            "models",
-                            buildJsonArray {
-                                add(
-                                    buildJsonObject {
-                                        put("id", modelSelection.openAiModelId)
-                                        put("contextWindow", DEFAULT_LOCAL_CONTEXT_WINDOW)
-                                        put("maxTokens", EmbeddedLettaCodeModelSelection.DEFAULT_MAX_TOKENS)
-                                        put("input", buildJsonArray {
-                                            add(JsonPrimitive("text"))
-                                        })
-                                        put("cost", buildJsonObject {
-                                            put("input", 0)
-                                            put("output", 0)
-                                        })
-                                    },
-                                )
-                            },
-                        )
+                        put("auth", buildJsonObject { put("type", "api"); put("key", endpoint.apiKey) })
+                        put("base_url", endpoint.baseUrl)
                     },
                 )
             },
         )
     }
+    val authFile = File(this, "providers/auth.json")
     authFile.parentFile?.mkdirs()
     authFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), root))
 }
 
-private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
+private const val LOCAL_PROVIDER_NAME = "lc-lmstudio"
 
 private val VISION_MODEL_PATTERNS = listOf(
     "llava", "vision", "opus", "sonnet", "haiku", "claude", "fable",

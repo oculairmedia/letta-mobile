@@ -4,120 +4,34 @@ import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.MessageContentPart
 import kotlinx.coroutines.Job
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotSame
-import org.junit.Assert.assertSame
 import org.junit.Test
 
+/**
+ * letta-mobile-by4vm.110.6: every Android backend (Iroh, ws://, the on-device runtime) is served by
+ * the session's App Server channel, so every send and every stop takes the one channel route.
+ */
 class ChatSendStrategySelectorTest {
     @Test
-    fun `a direct ws backend uses the channel strategy`() {
-        val f = Fixture()
-
-        val selected = f.selector.select(
-            ChatSendContext(explicitConversationId = "conv-1"),
-        )
-
-        assertSame(f.iroh.strategy, selected)
-    }
-
-    // ---------------------------------------------------------------------
-    // letta-mobile-lgns8.10.4.1 — the routing inversion.
-    //
-    // Before this bead ShimBackendDetector reported `isShimBackend = true` for
-    // Iroh backends, so the live production transport selected the shim-shaped
-    // WS strategy. Routing now keys on BackendKind (and since g70jb.4 there is
-    // no shim backend kind at all).
-    // ---------------------------------------------------------------------
-
-    @Test
-    fun `iroh backend selects the iroh strategy`() {
-        val f = Fixture()
-        val selected = f.selectFor(BackendKind.IROH)
-        assertSame(f.iroh.strategy, selected)
-        assertNotSame(f.local.strategy, selected)
-    }
-
-    @Test
-    fun `only an iroh context uses the channel transport`() {
+    fun `every backend kind sends and stops through the channel route`() {
         for (kind in BackendKind.entries) {
-            val context = ChatSendContext(
-                explicitConversationId = null,
-                backendKind = kind,
-            )
-            assertEquals("kind=$kind", kind == BackendKind.IROH, context.usesChannelTransport)
+            val channel = Recorder()
+            val selector = ChatSendStrategySelector(channel.strategy)
+            val image = MessageContentPart.Image(base64 = "abc", mediaType = "image/png")
+
+            selector.send("hello", listOf(image), ChatSendContext(explicitConversationId = "conv-1", backendKind = kind))
+            selector.cancel()
+
+            assertEquals("kind=$kind", listOf(RecordedSend("hello", listOf(image))), channel.sent)
+            assertEquals("kind=$kind", 1, channel.cancels)
         }
     }
 
-    @Test
-    fun `local runtime routing wins over every backend kind`() {
-        for (kind in BackendKind.entries) {
-            val f = Fixture()
-            val selected = f.selector.select(
-                ChatSendContext(
-                    explicitConversationId = null,
-                    backendKind = kind,
-                    isLocalRuntime = true,
-                ),
-            )
-            assertSame("local runtime must win for kind=$kind", f.local.strategy, selected)
-        }
-    }
-
-    @Test
-    fun `local runtime backend kind selects the local strategy`() {
-        val f = Fixture()
-
-        assertSame(f.local.strategy, f.selectFor(BackendKind.LOCAL_RUNTIME))
-    }
-
-    @Test
-    fun `send delegates payload to selected strategy`() {
-        val f = Fixture()
-        val image = MessageContentPart.Image(base64 = "abc", mediaType = "image/png")
-        val context = ChatSendContext(explicitConversationId = "conv-1")
-
-        f.selector.send("hello", listOf(image), context)
-
-        assertEquals(listOf(RecordedSend("hello", listOf(image))), f.iroh.sent)
-        assertEquals(0, f.local.sent.size)
-    }
-
-    @Test
-    fun `send and cancel over an iroh backend never reach the local strategy`() {
-        val f = Fixture()
-        val context = ChatSendContext(
-            explicitConversationId = "conv-1",
-            backendKind = BackendKind.IROH,
-        )
-
-        f.selector.send("hello", emptyList(), context)
-        f.selector.cancel(context)
-
-        assertEquals(1, f.iroh.sent.size)
-        assertEquals(1, f.iroh.cancels)
-        assertEquals(0, f.local.sent.size)
-        assertEquals(0, f.local.cancels)
-    }
-
-    private class Fixture {
-        val local = Recorder("local")
-        val iroh = Recorder("iroh")
-        val selector = ChatSendStrategySelector(
-            localStrategy = local.strategy,
-            irohStrategy = iroh.strategy,
-        )
-
-        fun selectFor(kind: BackendKind): ChatSendStrategy = selector.select(
-            ChatSendContext(explicitConversationId = null, backendKind = kind),
-        )
-    }
-
-    private class Recorder(routeName: String) {
+    private class Recorder {
         val sent = mutableListOf<RecordedSend>()
         var cancels = 0
             private set
         val strategy = ChatSendStrategy(
-            routeName = routeName,
+            routeName = "channel",
             sendVia = { text, attachments -> sent += RecordedSend(text, attachments); Job() },
             cancelVia = { cancels++ },
         )

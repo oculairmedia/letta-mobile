@@ -30,6 +30,7 @@ data class OnDeviceImage(
     val bytes: ByteArray,
     val mediaType: String?,
 ) {
+    @Suppress("NoAnyType") // equals' signature is fixed by Any; content equality for the byte array.
     override fun equals(other: Any?): Boolean =
         this === other || other is OnDeviceImage && bytes.contentEquals(other.bytes) && mediaType == other.mediaType
 
@@ -106,7 +107,8 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     ) {
         @Volatile private var closed = false
 
-        private val servedModelId: String = modelSelection.lettaCodeModelHandle
+        /** The id letta-code looks up for the agents' handle (by4vm.121.1), never the prefixed handle. */
+        private val servedModelId: String = lettaCodeLookupId(modelSelection.lettaCodeModelHandle)
 
         fun acceptLoop() {
             while (!closed) {

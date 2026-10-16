@@ -7,8 +7,6 @@ import kotlinx.serialization.Serializable
 enum class BackendKind {
     RemoteLetta,
     LocalLettaCode,
-    LocalKoog,
-    CompatibleRuntime,
 }
 
 @Serializable
@@ -40,14 +38,6 @@ data class BackendCapabilities(
     val supportsAgentFileImport: Boolean,
     val supportsAgentFileExport: Boolean,
 )
-
-interface LettaBackend {
-    val descriptor: BackendDescriptor
-
-    fun runTurn(command: TurnCommand): Flow<RuntimeEventEnvelope>
-
-    fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope>
-}
 
 interface RuntimeEventOutbox {
     suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope = appendAll(listOf(draft)).single()

@@ -6,8 +6,6 @@ import com.letta.mobile.data.local.TimelineOwnershipAuthority
 import com.letta.mobile.data.session.CanonicalConversationWriters
 import com.letta.mobile.data.timeline.CanonicalTimelineCoordinator
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport
-import com.letta.mobile.runtime.local.LocalRoutingTimelineTransport
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,13 +13,12 @@ import kotlinx.coroutines.plus
 
 /**
  * letta-mobile-by4vm.15: the canonical ledger is the only Android timeline, for every backend.
- * The captured transport routes on-device conversations to the embedded runtime's transcript and
- * every other conversation to the session graph's channel (Iroh admin_rpc).
+ * The captured transport reads every conversation over the session graph's channel (admin_rpc;
+ * by4vm.110.6 put the on-device runtime on the same channel).
  */
 class AndroidCanonicalTimelineRuntimeFactory(
     private val authority: TimelineOwnershipAuthority,
     private val storage: TimelineOwnedStorageFactory,
-    private val local: LettaCodeLocalTimelineTransport,
     private val writers: CanonicalConversationWriters,
 ) {
     fun captured(
@@ -30,10 +27,7 @@ class AndroidCanonicalTimelineRuntimeFactory(
         ownerScope: kotlinx.coroutines.CoroutineScope,
     ): AndroidCanonicalTimelineRuntime {
         val remote = com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport(graph.channelTransport, settings)
-        val owned = com.letta.mobile.data.timeline.GenerationTimelineTransport(
-            LocalRoutingTimelineTransport(local = local, remote = remote),
-            ownerScope,
-        )
+        val owned = com.letta.mobile.data.timeline.GenerationTimelineTransport(remote, ownerScope)
         return AndroidCanonicalTimelineRuntime(
             graph.backendDescriptor.backendId.value,
             owned,

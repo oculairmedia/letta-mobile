@@ -7,7 +7,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
@@ -40,7 +39,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.system.measureNanoTime
 import org.junit.Assert.assertFalse
 import org.junit.After
@@ -235,57 +233,6 @@ class ConversationsViewModelTest {
 
         viewModel.loadConversations()
 
-        assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
-    }
-
-    @Test
-    fun `local config filters cached remote state and shows first run onboarding`() = runTest {
-        settingsRepository.saveConfig(localConfig())
-        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("remote-agent"), name = "Remote Agent")))
-        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "remote-conv", agentId = "remote-agent")))
-        fakeAllRepo.didRefresh = false
-        fakeAgentRepo.didRefresh = false
-        viewModel = newViewModel()
-
-        viewModel.loadConversations()
-
-        // letta-mobile-y5c9u/ajtu2: refreshes now flow unconditionally — the
-        // local-vs-remote routing happens inside the repositories, which list
-        // from the on-device store in local mode. The display filters still
-        // keep remote-shaped cache rows out of local-mode UI state.
-        assertTrue(fakeAgentRepo.didRefresh)
-        assertTrue(fakeAllRepo.didRefresh)
-        assertEquals(0, viewModel.uiState.value.agents.size)
-        assertEquals(0, viewModel.uiState.value.conversations.size)
-        assertTrue(viewModel.uiState.value.shouldShowFirstRunOnboarding())
-    }
-
-    @Test
-    fun `local config displays local agents and conversations only`() = runTest {
-        settingsRepository.saveConfig(localConfig())
-        val localAgent = localAgent(id = "local-agent-1", name = "Local Agent")
-        fakeAgentRepo.setAgents(
-            listOf(
-                Agent(id = AgentId("remote-agent"), name = "Remote Agent"),
-                localAgent,
-            )
-        )
-        fakeAllRepo.setConversations(
-            listOf(
-                TestData.conversation(id = "remote-conv", agentId = "remote-agent"),
-                TestData.conversation(id = "local-agent-conv", agentId = localAgent.id.value),
-                TestData.conversation(id = "local-conv-orphan", agentId = "missing-agent"),
-            )
-        )
-        viewModel = newViewModel()
-
-        viewModel.loadConversations()
-
-        assertEquals(listOf(localAgent.id), viewModel.uiState.value.agents.map { it.id })
-        assertEquals(
-            setOf(ConversationId("local-agent-conv"), ConversationId("local-conv-orphan")),
-            viewModel.uiState.value.conversations.map { it.conversation.id }.toSet(),
-        )
         assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
     }
 
@@ -620,11 +567,7 @@ class ConversationsViewModelTest {
         serverUrl = "https://api.letta.other",
     )
 
-    private fun localAgent(id: String, name: String): Agent = Agent(
-        id = AgentId(id),
-        name = name,
-        metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
-    )
+    private fun localAgent(id: String, name: String): Agent = Agent(id = AgentId(id), name = name)
 
     private class FakeAllConversationsRepository : AllConversationsRepository(FakeConversationApi()) {
         private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())

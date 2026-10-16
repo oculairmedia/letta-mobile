@@ -14,8 +14,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.paging.ConversationPagingSource
 import com.letta.mobile.data.repository.api.ConversationRemoteSource
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +27,7 @@ internal fun defaultAllConversationsScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
- * Android binding for [CachedAllConversationsRepository]: Room cache + Iroh / local-runtime sources.
+ * Android binding for [CachedAllConversationsRepository]: Room cache + the session channel's admin_rpc source.
  *
  * letta-mobile-ckmub.4: [remote] is the seam for a non-App-Server backend; production binds no
  * route (the Letta REST backend was removed).
@@ -41,8 +39,6 @@ open class AllConversationsRepository(
     private val remote: RemoteRoute<ConversationRemoteSource> = RemoteRoute.Absent(SessionRoute.CONVERSATIONS),
     conversationDao: Lazy<ConversationDao>? = null,
     repositoryScope: CoroutineScope,
-    localConversationSource: LocalRuntimeConversationSource? = null,
-    settingsRepository: ISettingsRepository? = null,
     irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     transport: IChannelTransport? = null,
     /** letta-mobile-by4vm.94: the session's cache clear every Room access waits for. */
@@ -51,8 +47,6 @@ open class AllConversationsRepository(
     remote = remote,
     localCache = conversationDao?.let { GatedDao(it, cacheGate) }?.let { dao -> { RoomAllConversationsLocalCache(dao) } },
     repositoryScope = repositoryScope,
-    localConversationSource = localConversationSource,
-    settingsRepository = settingsRepository,
     irohConversationListSource = irohConversationListSource,
     transport = transport,
 ) {
@@ -61,17 +55,13 @@ open class AllConversationsRepository(
         remote: ConversationRemoteSource,
         conversationDao: Lazy<ConversationDao>? = null,
         repositoryScope: CoroutineScope = defaultAllConversationsScope(),
-        localConversationSource: LocalRuntimeConversationSource? = null,
-        settingsRepository: ISettingsRepository? = null,
-        irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+                irohConversationListSource: IrohAdminRpcConversationListSource? = null,
         transport: IChannelTransport? = null,
     ) : this(
         remote = remote.bound(),
         conversationDao = conversationDao,
         repositoryScope = repositoryScope,
-        localConversationSource = localConversationSource,
-        settingsRepository = settingsRepository,
-        irohConversationListSource = irohConversationListSource,
+                irohConversationListSource = irohConversationListSource,
         transport = transport,
     )
 

@@ -38,7 +38,6 @@ import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
-import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.runtime.RuntimeEventOutbox
@@ -74,7 +73,6 @@ import com.letta.mobile.feature.chat.coordination.AdminChatScreenLifecycleCoordi
 import com.letta.mobile.feature.chat.coordination.AdminChatSendPipeline
 import com.letta.mobile.feature.chat.coordination.AdminChatSlashCommandsCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatTransportCoordinator
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.subagent.WsSelfTodoSource
@@ -87,18 +85,15 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinatorConfig
 import com.letta.mobile.feature.chat.coordination.ChatConversationRoute
-import com.letta.mobile.feature.chat.coordination.LocalRuntimeBootstrapConfig
 import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
 import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
-import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
 import com.letta.mobile.data.chat.branch.branchHistory
@@ -113,24 +108,6 @@ import com.letta.mobile.ui.chat.session.withHostApprovals
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.send.QueuedSendId
-
-internal fun resolveLocalRuntimeRouting(
-    agent: Agent?,
-    localRuntimeBackendAvailable: Boolean,
-): LocalRuntimeRouting {
-    if (agent != null) {
-        return if (AgentRuntimeBinding.isLocalBound(agent)) {
-            LocalRuntimeRouting.LocalBound
-        } else {
-            LocalRuntimeRouting.Remote
-        }
-    }
-    return if (localRuntimeBackendAvailable) {
-        LocalRuntimeRouting.Blocked()
-    } else {
-        LocalRuntimeRouting.Remote
-    }
-}
 
 internal fun chatFontScaleState(
     scales: Flow<Float>,
@@ -215,34 +192,15 @@ internal class AdminChatViewModel @Inject constructor(
      * defaults to the fake for previews/tests but gets the real per-socket
      * registry in production. Hot-shared off [viewModelScope].
      */
-    // letta-mobile-7vs4s: the bar's WS-backed feed reads the shim's per-socket
-    // subagent registry. On the LOCAL embedded runtime there is no shim WS
-    // subagent feed, so the WS source can never deliver the terminal
-    // transitions its linger accumulator needs — phantom chips would appear on
-    // every prompt and never clear. Wrap the WS source so it is GATED to empty
-    // while the active agent is local-bound, and passes the real registry
-    // through on remote/shim. `by lazy` because the gate reads [activeAgent]
-    // (declared below), so construction must happen after field init.
     val activeSubagentSource: ActiveSubagentSource by lazy {
         val parentConversationId = _uiState
             .map { state -> (state.conversationState as? ConversationState.Ready)?.conversationId }
             .stateIn(viewModelScope, SharingStarted.Lazily, conversationId?.value)
-        val localBound: StateFlow<Boolean> = activeAgent
-            .map { AgentRuntimeBinding.isLocalBound(it) }
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5000),
-                AgentRuntimeBinding.isLocalBound(activeAgent.value),
-            )
-        LocalAwareActiveSubagentSource(
-            delegate = WsActiveSubagentSource(
-                repository = subagentRepository,
-                scope = viewModelScope,
-                parentAgentId = agentId.value,
-                parentConversationId = parentConversationId,
-            ),
-            isLocalBoundFlow = localBound,
+        WsActiveSubagentSource(
+            repository = subagentRepository,
             scope = viewModelScope,
+            parentAgentId = agentId.value,
+            parentConversationId = parentConversationId,
         )
     }
 
@@ -269,20 +227,13 @@ internal class AdminChatViewModel @Inject constructor(
 
     private val explicitNewChat: Boolean
         get() = routeArgs.explicitNewChat
-    /**
-     * lgns8.10.4.1: the chat screen's real question is "is this backend served
-     * by a frame channel?" — not "is this the shim?". Only Iroh is. Both flags
-     * are classified from the active config alone (see [routedBackendKind]).
-     */
+    /** lgns8.10.4.1: the active config's backend kind (see [routedBackendKind]), for telemetry. */
     private val backendKind: StateFlow<BackendKind> = settingsRepository.activeConfig
         .map { it.routedBackendKind() }
         .stateIn(viewModelScope, SharingStarted.Lazily, settingsRepository.activeConfig.value.routedBackendKind())
-    private val usesChannelTransport: StateFlow<Boolean> = backendKind
-        .map { it.usesChannelTransport }
-        .stateIn(viewModelScope, SharingStarted.Lazily, backendKind.value.usesChannelTransport)
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
-        get() = chatConversationCoordinator.conversationId(ConversationAccessMode.Timeline)?.let { ConversationId(it) }
+        get() = chatConversationCoordinator.conversationId()?.let { ConversationId(it) }
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver: ChatSessionResolver = ChatSessionResolver(
@@ -292,7 +243,7 @@ internal class AdminChatViewModel @Inject constructor(
     )
     private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository) { entry ->
         // letta-mobile-bzvro.14: over the Iroh channel an answer made offline waits in the outbox.
-        approvalBinding.deliver(entry, overChannel = usesChannelTransport.value)
+        approvalBinding.deliver(entry, overChannel = true)
     }
     // The route's agent is this screen's for its whole life. The shared chat page reads it from
     // here to draw the agent's mascot (the Touch chat head, the composer companion) and to scope
@@ -411,7 +362,6 @@ internal class AdminChatViewModel @Inject constructor(
                 conversationRepository = conversationRepository,
                 settingsRepository = settingsRepository,
                 sessionManager = sessionManager,
-                messageRepository = messageRepository,
                 slashCommandRepository = slashCommandRepository,
                 wsChatBridge = wsChatBridge,
                 runtimeEventOutbox = runtimeEventOutbox,
@@ -458,8 +408,6 @@ internal class AdminChatViewModel @Inject constructor(
             wsChatBridge = wsChatBridge,
             uiState = _uiState,
             bannerController = chatBannerController,
-            usesChannelTransport = usesChannelTransport,
-            localRuntimeRouting = ::localRuntimeRouting,
             onGoalSlashCommandsDetected = ::refreshGoalStatus,
         )
     }
@@ -470,9 +418,7 @@ internal class AdminChatViewModel @Inject constructor(
             agentId = agentId,
             slashCommandRepository = slashCommandRepository,
             composerCoordinator = composerCoordinator,
-            uiState = _uiState,
             projectContext = projectContext,
-            localRuntimeRouting = ::localRuntimeRouting,
             goalCoordinator = goalCoordinator,
         )
     }
@@ -480,7 +426,6 @@ internal class AdminChatViewModel @Inject constructor(
     private val transportCoordinator: AdminChatTransportCoordinator by lazy {
         AdminChatTransportCoordinator(
             scope = viewModelScope,
-            usesChannelTransport = usesChannelTransport,
             wsChatBridge = wsChatBridge,
             uiState = _uiState,
             updateSessionState = ::updateSessionState,
@@ -703,10 +648,10 @@ internal class AdminChatViewModel @Inject constructor(
         agentId = agentId.value,
         conversationId = { conversationId?.value },
     )
-    private fun hydrationIdentity(scopedAgentId: String?, convId: String): ChatHydrationTrace.Identity {
+    private fun hydrationIdentity(scopedAgentId: AgentId, convId: String): ChatHydrationTrace.Identity {
         val descriptor = sessionManager.current.backendDescriptor
         return ChatHydrationTrace.Identity(
-            agentId = scopedAgentId,
+            agentId = scopedAgentId.value,
             conversationId = convId,
             backendId = descriptor.backendId.value,
             runtimeId = descriptor.runtimeId.value,
@@ -734,11 +679,6 @@ internal class AdminChatViewModel @Inject constructor(
             currentConversationTracker = currentConversationTracker,
             uiState = _uiState,
             updateSessionState = ::updateSessionState,
-            bootstrap = LocalRuntimeBootstrapConfig(
-                pendingMessages = { persistentListOf() },
-                setPendingUserMessage = { },
-                currentConversationId = { null },
-            ),
             observer = TimelineObserverConfig(::startTimelineObserver, ::stopTimelineObserver),
             reconcileLauncher = RecentMessagesReconcileLauncher(
                 scope = viewModelScope,
@@ -753,18 +693,11 @@ internal class AdminChatViewModel @Inject constructor(
                 },
             ),
             send = ConversationSendConfig(
-                viaLocalRuntime = sendInitialMessage,
                 viaTimeline = sendInitialMessage,
                 markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
             ),
-            localRuntimeRouting = ::localRuntimeRouting,
-            hydration = HydrationRouteConfig(identity = { convId -> hydrationIdentity(agentId.value, convId) }),
+            hydration = HydrationRouteConfig(identity = { convId -> hydrationIdentity(agentId, convId) }),
         ),
-    )
-
-    private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(
-        agent = activeAgent.value,
-        localRuntimeBackendAvailable = sessionManager.current.localRuntimeBackend != null,
     )
 
     private val projectChatCoordinator: ProjectChatCoordinator = ProjectChatCoordinator(
@@ -805,9 +738,9 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     private fun resolveConversationAndLoad() =
-        chatConversationCoordinator.resolveConversationAndLoad(ConversationAccessMode.Timeline)
+        chatConversationCoordinator.resolveConversationAndLoad()
 
-    fun loadMessages() = chatConversationCoordinator.loadMessages(ConversationAccessMode.Timeline)
+    fun loadMessages() = chatConversationCoordinator.loadMessages()
 
     fun retryConversationLoad() {
         updateSessionState { current ->
@@ -1028,15 +961,14 @@ internal class AdminChatViewModel @Inject constructor(
 
     /**
      * The branches of a page whose forks open with [open] (a rerun forks before the prompt and
-     * sends it again there; this conversation is unchanged). Null where this backend cannot fork
-     * (the embedded runtime), so the page offers no branch actions.
+     * sends it again there; this conversation is unchanged).
      */
     fun branching(open: (agentId: String, conversationId: String) -> Unit) =
         conversationBranching.Page { view ->
             conversationId?.let {
                 com.letta.mobile.feature.chat.coordination.ChatConversationBranching.Origin(it.value, agentId.value, view, open)
             }
-        }.takeIf { conversationRepository.canForkConversations() }
+        }
 
     /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
     private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
@@ -1059,9 +991,10 @@ internal class AdminChatViewModel @Inject constructor(
     val sendQueue: com.letta.mobile.ui.chat.session.ChatSendQueueSource by lazy(LazyThreadSafetyMode.NONE) {
         object : com.letta.mobile.ui.chat.session.ChatSendQueueSource {
             override val queue = uiState.map { it.sendQueue }
+            // letta-mobile-by4vm.110.6: every backend's channel route queues a send made during a turn.
             override val canQueueWhileStreaming = com.letta.mobile.ui.chat.session.DerivedStateFlow(
-                uiState.map { composerCoordinator.canQueueWhileStreaming() },
-                composerCoordinator::canQueueWhileStreaming,
+                uiState.map { true },
+                { true },
             )
 
             override fun cancel(id: QueuedSendId) {

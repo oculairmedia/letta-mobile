@@ -6,8 +6,21 @@ import com.letta.mobile.data.model.backendKind
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 
-fun ISettingsRepository.activeBackendIsIroh(): Boolean {
-    return IrohChannelTransport.shouldUseIroh(this.activeConfig.value?.serverUrl)
+/**
+ * letta-mobile-by4vm.110.6: true when the active backend is an App Server Android reaches through
+ * the session's channel (an Iroh host, a ws:// App Server, the on-device runtime), whose admin_rpc
+ * the channel's sources call. An http(s) address is another backend family's (the cloud seam,
+ * [com.letta.mobile.data.session.SessionRemoteSources]); no address is no backend.
+ */
+fun ISettingsRepository.activeBackendUsesChannel(): Boolean = activeConfig.value.usesAppServerChannel()
+
+/** See [activeBackendUsesChannel]. */
+fun LettaConfig?.usesAppServerChannel(): Boolean {
+    val url = this?.serverUrl?.trim().orEmpty()
+    return IrohChannelTransport.shouldUseIroh(url) ||
+        this?.mode == LettaConfig.Mode.LOCAL ||
+        url.startsWith("ws://", ignoreCase = true) ||
+        url.startsWith("wss://", ignoreCase = true)
 }
 
 /**

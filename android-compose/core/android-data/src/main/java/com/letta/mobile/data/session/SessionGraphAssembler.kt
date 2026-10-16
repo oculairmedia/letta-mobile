@@ -13,7 +13,6 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationRepository
@@ -24,10 +23,8 @@ import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
-import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
-import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcConversationListSource
+import com.letta.mobile.data.repository.activeBackendUsesChannel
 import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
@@ -49,9 +46,6 @@ class SessionGraphAssembler @Inject constructor(
     private val conversationDao: Lazy<ConversationDao>,
     /** letta-mobile-ckmub.4: the backend seam; production binds [SessionRemoteSources.None]. */
     private val remoteSources: SessionRemoteSources = SessionRemoteSources.None,
-    private val localConversationSource: LocalRuntimeConversationSource? = null,
-    private val localAgentSource: LocalRuntimeAgentSource? = null,
-    private val localModelSource: LocalRuntimeModelSource? = null,
     /** letta-mobile-wdm6i: where the context chip's last readings survive a restart. */
     private val settingsStore: SecureSettingsStore? = null,
 ) {
@@ -75,12 +69,12 @@ class SessionGraphAssembler @Inject constructor(
             scope = request.scope,
             snapshots = settingsStore?.let(::ContextReadingSnapshots),
         )
-        val useIroh = request.activeConfig.routedBackendKind() == BackendKind.IROH
+        // letta-mobile-by4vm.110.6: every backend's channel answers the schedule admin_rpc.
+        val useIroh = request.settingsRepository?.activeBackendUsesChannel() == true
         val repositories = SharedSessionRepositoryGraph(
             identity = SessionGraphIdentity(
                 id = request.graphId,
                 backendDescriptor = request.backendDescriptor,
-                localRuntimeBackend = request.localRuntimeBackend,
                 channelTransport = request.channelTransport,
                 capabilities = sessionCapabilities(request),
             ),
@@ -104,7 +98,6 @@ class SessionGraphAssembler @Inject constructor(
         )
         return SessionGraph(
             repositories = repositories,
-            localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
             allConversationsRepository = conversationRepos.allConversations,
             capturedConfig = request.activeConfig,
@@ -116,7 +109,6 @@ class SessionGraphAssembler @Inject constructor(
             remote = remoteSources.agents,
             agentDao = agentDao,
             repositoryScope = request.scope,
-            localAgentSource = localAgentSource,
             settingsRepository = request.settingsRepository,
             transport = request.channelTransport,
             cacheGate = request.cacheGate,
@@ -132,8 +124,6 @@ class SessionGraphAssembler @Inject constructor(
                 remote = remoteSources.conversations,
                 conversationDao = conversationDao,
                 repositoryScope = request.scope,
-                localConversationSource = localConversationSource,
-                settingsRepository = request.settingsRepository,
                 irohConversationListSource = irohConversationListSource,
                 // letta-mobile-lks7m: conversations started on another device arrive as pushes.
                 transport = request.channelTransport,
@@ -144,8 +134,6 @@ class SessionGraphAssembler @Inject constructor(
                 agentRepository = agentRepository,
                 conversationDao = conversationDao,
                 repositoryScope = request.scope,
-                localConversationSource = localConversationSource,
-                settingsRepository = request.settingsRepository,
                 irohConversationListSource = irohConversationListSource,
                 // letta-mobile-xj85j: the in-chat picker follows other devices' changes too.
                 transport = request.channelTransport,
@@ -169,7 +157,6 @@ class SessionGraphAssembler @Inject constructor(
                 runs = remoteSources.runs,
                 tools = remoteSources.tools,
             ),
-            localModelSource = localModelSource,
         )
 
     /**
