@@ -124,10 +124,10 @@ private fun rememberDesktopAgentFocus(context: DesktopShellContext, chatState: D
     }
     val conversations = chatState.conversations
     val railAgents = remember(conversations, rosterAgents) { buildRailAgents(conversations, rosterAgents) }
-    val selectedAgentId = chatState.selectedConversation?.agentId ?: railAgents.firstOrNull()?.first
+    val selectedAgentId = context.navigator.focusFor(chatState, railAgents)
     // Session overrides win over the cached/backend value so a just-saved icon shows instantly.
     val identityByAgentId = rememberCachedIdentities(railAgents, rosterAgents, context.core.bootstrap.secureSettingsStore) +
-        context.navigator.avatarOverrides
+        context.avatarOverrides.value
     val avatarStyleByAgentId = identityByAgentId.mapValues { it.value.legacyOrbIndex() }
     // Every AgentOrb in the app reads identities from the registry; keep it current.
     val mascotRegistry = LocalMascotRegistry.current
