@@ -83,7 +83,6 @@ class DefaultAppServerLocalRepositoryTransport(
                     },
                 ),
             ) ?: error("Bundled App Server block listing returned no result")
-            if (result is JsonArray) return JsonArray(merged + result)
             val page = result as? JsonObject
                 ?: error("Bundled App Server block listing returned an unsupported result")
             val blocks = page["blocks"] as? JsonArray

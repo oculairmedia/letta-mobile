@@ -1,6 +1,5 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.a2ui.A2uiMessage
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -25,88 +24,6 @@ class MobileWsFramesTest : WordSpec({
     }
 
     "ServerFrame deserialization" should {
-        "spec §2.2 welcome — exposes server_id / session_id / device_id" {
-            val payload = """
-                {"v":1,"type":"welcome","id":"f1","ts":"t",
-                 "server_id":"S","session_id":"sess-1","device_id":"d-1",
-                 "canonical_live_transport":"ws"}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.Welcome>()
-            parsed.serverId shouldBe "S"
-            parsed.sessionId shouldBe "sess-1"
-            parsed.deviceId shouldBe "d-1"
-            parsed.canonicalLiveTransport shouldBe "ws"
-        }
-
-        "letta-mobile-51xm.2 welcome — parses A2UI negotiation ack (§2.2)" {
-            val payload = """
-                {"v":1,"type":"welcome","id":"f1","ts":"t",
-                 "server_id":"S","session_id":"sess-1",
-                 "a2ui_negotiated":true,
-                 "a2ui":{"version":"0.9","catalog_id":"basic"}}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.Welcome>()
-            parsed.a2uiNegotiated shouldBe true
-            parsed.a2ui?.version shouldBe "0.9"
-            parsed.a2ui?.catalogId shouldBe "basic"
-        }
-
-        "spec §2.2 a2ui_capabilities — captures server-advertised catalog + widgets" {
-            val payload = """
-                {"v":1,"type":"a2ui_capabilities","id":"caps-1","ts":"t",
-                 "version":"0.9","catalog_id":"basic",
-                 "supported_catalogs":["basic"],
-                 "supported_widgets":["Text","Button","ToolApprovalCard"]}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.A2uiCapabilities>()
-            parsed.version shouldBe "0.9"
-            parsed.catalogId shouldBe "basic"
-            parsed.supportedWidgets shouldBe listOf("Text", "Button", "ToolApprovalCard")
-        }
-
-        "spec §2.2 user_action_ack — accepted has null reason" {
-            val payload = """
-                {"v":1,"type":"user_action_ack","id":"f","ts":"t",
-                 "action_id":"act-1","status":"accepted"}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.UserActionAck>()
-            parsed.actionId shouldBe "act-1"
-            parsed.status shouldBe "accepted"
-            parsed.reason shouldBe null
-        }
-
-        "lcp-uo5.14 user_action_outcome — parses all outcome values and frameId correlation" {
-            val outcomes = listOf(
-                "matched_approval",
-                "injected_as_input",
-                "recorded_only",
-                "rejected",
-                "error",
-            )
-
-            outcomes.forEach { outcome ->
-                val payload = """
-                    {"v":1,"type":"user_action_outcome","id":"out-$outcome","ts":"t",
-                     "frameId":"frame-$outcome","actionId":"action-$outcome",
-                     "outcome":"$outcome","reason":"reason-$outcome","idempotent":true,
-                     "agent_id":"agent-1","conversation_id":"conv-1"}
-                """.trimIndent()
-                val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-                parsed.shouldBeInstanceOf<ServerFrame.UserActionOutcome>()
-                parsed.frameId shouldBe "frame-$outcome"
-                parsed.actionId shouldBe "action-$outcome"
-                parsed.outcome shouldBe outcome
-                parsed.reason shouldBe "reason-$outcome"
-                parsed.idempotent shouldBe true
-                parsed.agentId shouldBe "agent-1"
-                parsed.conversationId shouldBe "conv-1"
-            }
-        }
-
         "spec §4.7 stop_reason — inner field is `stop_reason`, NOT `reason`" {
             val payload = """
                 {"v":1,"type":"stop_reason","id":"f","ts":"t",
@@ -224,35 +141,6 @@ class MobileWsFramesTest : WordSpec({
             parsed.shouldBeInstanceOf<ServerFrame.ToolCallMessage>()
             parsed.toolCall?.toolCallId shouldBe "tc-1"
             parsed.toolCall?.name shouldBe "Bash"
-        }
-
-        "letta-mobile-51xm.2 a2ui_frame — routes typed A2UI messages from `a2ui` payload (§2.2)" {
-            val payload = """
-                {"v":1,"type":"a2ui_frame","id":"a2ui-1","ts":"t",
-                 "agent_id":"a","conversation_id":"c","turn_id":"T","run_id":"R",
-                 "otid":"cm-android-x","ok":true,
-                 "a2ui":{"version":"v0.9","createSurface":{"surfaceId":"approval-1","catalogId":"com.letta.mobile:tool-approval/v1"}}}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.A2ui>()
-            parsed.runId shouldBe "R"
-            parsed.otid shouldBe "cm-android-x"
-            parsed.ok shouldBe true
-            parsed.messages.single().shouldBeInstanceOf<A2uiMessage.CreateSurface>()
-            parsed.messages.single().surfaceId shouldBe "approval-1"
-        }
-
-        "spec §2.2 a2ui_frame — ok=false surfaces parse_error without payload" {
-            val payload = """
-                {"v":1,"type":"a2ui_frame","id":"a2ui-bad","ts":"t",
-                 "turn_id":"T","run_id":"R","ok":false,
-                 "parse_error":"Unexpected token } in JSON at position 42"}
-            """.trimIndent()
-            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
-            parsed.shouldBeInstanceOf<ServerFrame.A2ui>()
-            parsed.ok shouldBe false
-            parsed.parseError shouldBe "Unexpected token } in JSON at position 42"
-            parsed.messages shouldBe emptyList()
         }
 
         "spec §2 forward-compat — unknown type lands as ServerFrame.Unknown" {

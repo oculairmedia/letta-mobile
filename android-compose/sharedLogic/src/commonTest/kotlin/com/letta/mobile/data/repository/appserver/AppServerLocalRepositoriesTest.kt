@@ -101,8 +101,8 @@ class AppServerLocalRepositoriesTest {
 
     @Test
     fun `default transport follows active client rotation`() = runTest {
-        val first = FakeClient { okBlocks("[]") }
-        val second = FakeClient { okBlocks("[]") }
+        val first = FakeClient { okBlocks(emptyBlockPage) }
+        val second = FakeClient { okBlocks(emptyBlockPage) }
         var active: AppServerClient = first
         val transport = DefaultAppServerLocalRepositoryTransport(
             clientProvider = { active },
@@ -276,6 +276,8 @@ class AppServerLocalRepositoriesTest {
 
         private fun unsupported(): Nothing = error("Unexpected App Server operation")
     }
+
+    private val emptyBlockPage = """{"blocks":[],"total":0,"offset":0,"limit":50,"has_more":false}"""
 
     private fun okBlocks(json: String) = AppServerInboundFrame.AdminRpcResponse(
         requestId = "request",

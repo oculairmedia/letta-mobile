@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -100,25 +101,10 @@ object ToolAdminHandlers {
             val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             val page = store.listBlocksProjected(limit, offset)
                 ?: adminError("block.list could not read the local backend memory store")
-            val total = store.blockCountProjected()
-            // Dual shape, mirroring MessageListPageGuard: a bare array when the
-            // FULL set was delivered (byte-identical to the pre-paging contract,
-            // so an older client is unaffected), an envelope carrying an
-            // authoritative `total`/`has_more` whenever it was not. The client
-            // must never have to infer "more exists" from page size — inferring it
-            // is what produced a wrong exact count against a backend that ignored
-            // limit/offset entirely.
-            if (offset == 0 && page.size >= total) {
-                page
-            } else {
-                buildJsonObject {
-                    put("blocks", page)
-                    put("total", total)
-                    put("offset", offset)
-                    put("limit", limit)
-                    put("has_more", offset + page.size < total)
-                }
-            }
+            // Always the envelope, with an authoritative `total`/`has_more`: the client must
+            // never infer "more exists" from page size — inferring it is what produced a wrong
+            // exact count against a backend that ignored limit/offset entirely.
+            blockPage(page, store.blockCountProjected(), offset, limit)
         }
         router.register("block.get") { params ->
             val blockId = params.requireParam(AdminParamKey("block_id"))
@@ -129,30 +115,26 @@ object ToolAdminHandlers {
                 params.requireParam(AdminParamKey("agent_id")),
                 "agent_id",
             )
-            // Same frame-cap window as block.list: absent limit means the
-            // default page, not "everything". Dual shape keeps the legacy bare
-            // array when the full agent set fits in one page.
+            // Same frame-cap window and envelope as block.list: absent limit means the
+            // default page, not "everything".
             val limit = param(params, AdminParamKey("limit"))?.toIntOrNull()
                 ?.coerceIn(1, MAX_BLOCK_LIST_LIMIT)
                 ?: DEFAULT_BLOCK_LIST_LIMIT
             val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()?.coerceAtLeast(0) ?: 0
             val all = store.blocksForAgentProjected(agentId)
-            val total = all.size
             val page = buildJsonArray {
                 all.drop(offset).take(limit).forEach { add(it) }
             }
-            if (offset == 0 && page.size >= total) {
-                page
-            } else {
-                buildJsonObject {
-                    put("blocks", page)
-                    put("total", total)
-                    put("offset", offset)
-                    put("limit", limit)
-                    put("has_more", offset + page.size < total)
-                }
-            }
+            blockPage(page, all.size, offset, limit)
         }
+    }
+
+    private fun blockPage(page: JsonArray, total: Int, offset: Int, limit: Int) = buildJsonObject {
+        put("blocks", page)
+        put("total", total)
+        put("offset", offset)
+        put("limit", limit)
+        put("has_more", offset + page.size < total)
     }
 
     private fun registerBlockWrites(

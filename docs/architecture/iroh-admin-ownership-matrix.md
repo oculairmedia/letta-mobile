@@ -97,9 +97,9 @@ approval.submit shim-fallback removal at cutover.
   measured 1447 blocks / ~1.83 MB on the live host — larger than
   `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB), so even once wired the
   response could not be delivered. The store tier honours `limit`/`offset`
-  (default 50, max 200) over a deterministic flat index, and answers
-  `{blocks, total, offset, limit, has_more}` when it windows; a bare array still
-  means "this is the complete set", which keeps older clients working.
+  (default 50, max 200) over a deterministic flat index, and always answers
+  `{blocks, total, offset, limit, has_more}` (the bare-array "complete set" shape
+  for older clients was removed in by4vm.111; `block.list_agent` matches).
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.

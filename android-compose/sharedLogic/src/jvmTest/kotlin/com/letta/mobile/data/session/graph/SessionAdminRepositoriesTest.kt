@@ -29,7 +29,18 @@ class SessionAdminRepositoriesTest {
                 put("label", "human")
                 put("value", "remembered")
             }
-            return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = true, result = JsonArray(listOf(row)))
+            val rows = JsonArray(listOf(row))
+            // Memory blocks always come back in the paged envelope.
+            val result = if (method.startsWith("block.list")) {
+                buildJsonObject {
+                    put("blocks", rows)
+                    put("total", 1)
+                    put("has_more", false)
+                }
+            } else {
+                rows
+            }
+            return AppServerInboundFrame.AdminRpcResponse(requestId = "r", success = true, result = result)
         }
     }
 

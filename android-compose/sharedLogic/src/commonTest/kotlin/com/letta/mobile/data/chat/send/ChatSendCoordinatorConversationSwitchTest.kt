@@ -1,6 +1,5 @@
 package com.letta.mobile.data.chat.send
 
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -11,7 +10,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -265,7 +263,6 @@ class ChatSendCoordinatorConversationSwitchTest {
         override fun cancel(conversationId: String): Boolean = true
         override fun bye(): Boolean = true
         override suspend fun disconnect() = Unit
-        override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("frame-1")
         override fun subscribe(runId: String, cursor: Long): Boolean = true
         override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long) = error("unused")
         override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long) = error("unused")
