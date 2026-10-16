@@ -8,12 +8,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
-import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineImageBodies
-import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
-import com.letta.mobile.data.timeline.snapshot.TimelineScope
-import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
-import com.letta.mobile.data.timeline.snapshot.toTimelineWithImageBodies
-import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -50,40 +44,22 @@ value class MessageListOrder(val value: String)
 @JvmInline
 value class TimelinePageLimit(val value: Int)
 
-private val sharedDesktopConfirmedTimelineStore: ConfirmedTimelineStore by lazy {
-    DesktopConfirmedTimelineStore()
-}
-
-data class DesktopTimelinePersistence(
-    val store: ConfirmedTimelineStore = sharedDesktopConfirmedTimelineStore,
-    val backendId: String = "desktop-local",
-)
-
-internal class RealDesktopTimelineLoop private constructor(
+/**
+ * The timeline loop for backends that cannot serve the canonical ledger route (App Server, and
+ * default-shim conversations). It keeps no durable copy: each selection hydrates from the backend.
+ */
+internal class RealDesktopTimelineLoop(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
     scope: CoroutineScope,
-    confirmedTimelineStore: ConfirmedTimelineStore,
-    backendId: String,
-    initialTimeline: Timeline?,
-    initialRevision: Long,
 ) : DesktopTimelineLoop {
     private val routing = resolveDesktopTimelineRouting(gateway, conversation)
-    private val timelineScope = TimelineScope(
-        backendId = backendId,
-        conversationId = routing.loopConversationId.value,
-        agentId = conversation.agentId,
-    )
     private val delegate = TimelineSyncLoop(
         messageApi = routing.transport,
         conversationId = routing.loopConversationId.value,
         agentId = conversation.agentId,
         scope = scope,
         logTag = DESKTOP_CHAT_LOG_TAG.value,
-        confirmedTimelineStore = confirmedTimelineStore,
-        timelineScope = timelineScope,
-        initialTimeline = initialTimeline,
-        initialRevision = initialRevision,
     )
 
     override val state: StateFlow<Timeline> = delegate.state
@@ -105,30 +81,6 @@ internal class RealDesktopTimelineLoop private constructor(
     override suspend fun closeAndAwait() {
         delegate.closeAndJoin()
     }
-
-    companion object {
-        suspend fun create(
-            gateway: DesktopChatGateway,
-            conversation: DesktopConversationSummary,
-            scope: CoroutineScope,
-            persistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
-        ): RealDesktopTimelineLoop {
-            val routing = resolveDesktopTimelineRouting(gateway, conversation)
-            val timelineScope = TimelineScope(persistence.backendId, routing.loopConversationId.value, conversation.agentId)
-            val snapshot = runCatching { persistence.store.readSnapshot(timelineScope) }.getOrNull()
-            // The legacy loop holds the whole conversation, so its images are resolved here,
-            // newest first and within a byte budget; the rest stay placeholders.
-            val imageBodies = persistence.store as? ConfirmedTimelineImageBodies
-            val initialTimeline = snapshot?.let { stored ->
-                imageBodies?.let { stored.toTimelineWithImageBodies(it) }
-                    ?: TimelineSnapshotCodec.storedEnvelopeToTimeline(stored)
-            }
-            return RealDesktopTimelineLoop(
-                gateway, conversation, scope, persistence.store, persistence.backendId,
-                initialTimeline, snapshot?.revision ?: 0L,
-            )
-        }
-    }
 }
 
 @JvmInline
@@ -144,8 +96,8 @@ private value class ConversationIdPrefix(val value: String)
 
 /**
  * What the canonical opener needs from the controller. The transport is resolved here, by the same
- * routing the legacy loop uses, so the canonical ledger and the legacy loop can never disagree
- * about which remote conversation a scope names.
+ * routing the in-memory loop uses, so the two can never disagree about which remote conversation a
+ * scope names.
  */
 data class DesktopCanonicalOpenRequest(
     val agentId: String,

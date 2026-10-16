@@ -49,6 +49,7 @@ internal data class DestinationSkillsActions(
     val onRefresh: () -> Unit,
     val onInstall: (String) -> Unit,
     val onUninstall: (String) -> Unit,
+    val onDismissActionError: () -> Unit,
 )
 
 internal data class DestinationToolsActions(
@@ -196,6 +197,7 @@ private fun desktopSkillsPage(
             installedSkillNames = skills.catalog.installedSkillNames,
             skillsLoading = skills.catalog.isLoading,
             skillsError = skills.catalog.errorMessage,
+            skillActionError = skills.catalog.actionError,
             canManageSkills = skills.catalog.canManage,
             focusedAgentName = skills.focusedAgentName,
             tools = inputs.toolLibraryState,
@@ -204,6 +206,7 @@ private fun desktopSkillsPage(
             onRefreshSkills = actions.skills.onRefresh,
             onInstallSkill = actions.skills.onInstall,
             onUninstallSkill = actions.skills.onUninstall,
+            onDismissSkillActionError = actions.skills.onDismissActionError,
             onRefreshTools = actions.tools.onRefresh,
             onToolTagToggled = actions.tools.onTagToggled,
             onClearToolTags = actions.tools.onClearTags,

@@ -146,6 +146,17 @@ internal object NativeAdmin {
         return result
     }
 
+    /**
+     * The App Server answered `success=false`: a refusal by the host, not a transport
+     * failure, so the breaker is left alone. Call from inside a [require] block; the
+     * thrown admin error carries the host's own [reason] (or the generic text without one).
+     */
+    fun refused(op: NativeAdminOp, reason: String?): Nothing {
+        val detail = reason?.takeIf { it.isNotBlank() } ?: "native command unsuccessful"
+        markSelected(op.method, "error", "native_unsuccessful")
+        adminError("app_server_error: ${op.method} failed: $detail")
+    }
+
     private fun onRequireTimeout(op: String, policy: NativeAdminOperationPolicy): Nothing {
         // Mutations: report timeout but do not trip the breaker — a late success
         // on the server must not black-hole subsequent reads/writes for 60s.

@@ -37,7 +37,14 @@ class ChatRowRunResponseGapUiTest {
     private val reasoningRun = ChatRenderItem.RunBlock(
         runId = RUN_ID,
         messages = listOf(
-            UiMessage(id = "r", role = "assistant", content = "Thinking it over.", timestamp = "2026-10-16T12:00:00Z", runId = RUN_ID, isReasoning = true),
+            UiMessage(
+                id = "r",
+                role = "assistant",
+                content = "Thinking it over.",
+                timestamp = "2026-10-16T12:00:00Z",
+                runId = RUN_ID,
+                isReasoning = true,
+            ),
             UiMessage(
                 id = "t", role = "assistant", content = "", timestamp = "2026-10-16T12:00:02Z", runId = RUN_ID,
                 toolCalls = listOf(UiToolCall(name = "Bash", arguments = "{}", result = "ok", status = "success", toolCallId = "c1")),
@@ -90,7 +97,10 @@ class ChatRowRunResponseGapUiTest {
         val gap = reply.top - label.bottom
         val beat = with(density) { ChatRowSpacing.grouped.toPx() }
         assertTrue(gap >= -TOLERANCE_PX, "$what: the reply overlaps the summary label (label=$label, reply=$reply)")
-        assertTrue(gap <= beat + TOLERANCE_PX, "$what: the reply sits $gap px under the summary label, more than one grouped beat ($beat px)")
+        assertTrue(
+            gap <= beat + TOLERANCE_PX,
+            "$what: the reply sits $gap px under the summary label, more than one grouped beat ($beat px)",
+        )
     }
 
     @Test

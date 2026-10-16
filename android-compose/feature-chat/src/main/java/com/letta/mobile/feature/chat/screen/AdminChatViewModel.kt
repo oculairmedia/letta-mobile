@@ -76,10 +76,8 @@ import com.letta.mobile.feature.chat.coordination.AdminChatScreenLifecycleCoordi
 import com.letta.mobile.feature.chat.coordination.AdminChatSendPipeline
 import com.letta.mobile.feature.chat.coordination.AdminChatSlashCommandsCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatTransportCoordinator
-import com.letta.mobile.feature.chat.coordination.AdminChatTruncatedToolReturnCoordinator
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
-import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.subagent.WsSelfTodoSource
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
@@ -95,7 +93,6 @@ import com.letta.mobile.feature.chat.coordination.LocalRuntimeBootstrapConfig
 import com.letta.mobile.feature.chat.coordination.ConversationSendConfig
 import com.letta.mobile.feature.chat.coordination.HydrationRouteConfig
 import com.letta.mobile.feature.chat.coordination.TimelineObserverConfig
-import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.coordination.ConversationAccessMode
 import com.letta.mobile.feature.chat.coordination.RecentMessagesReconcileLauncher
@@ -103,7 +100,6 @@ import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.retireSelectedGeneration
@@ -116,10 +112,6 @@ import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.send.QueuedSendId
-import com.letta.mobile.data.timeline.TimelineAcquisitionFrameFamily
-import com.letta.mobile.data.timeline.TimelineAcquisitionProvenance
-import com.letta.mobile.data.timeline.TimelineAcquisitionSource
-import com.letta.mobile.data.timeline.TimelineConversationSelectionMode
 
 internal fun resolveLocalRuntimeRouting(
     agent: Agent?,
@@ -152,8 +144,6 @@ internal fun chatFontScaleState(
 internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
-    private val timelineRepository: TimelineRepository,
-    private val externalTimelineWriter: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter,
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
@@ -415,31 +405,29 @@ internal class AdminChatViewModel @Inject constructor(
         AdminChatSendPipeline(
             scope = pipelineLifetime.scope,
             agentId = agentId,
-            isFreshRoute = isFreshRoute,
             explicitConversationId = explicitConversationId,
             projectContextAvailable = projectContext != null,
-            conversationRepository = conversationRepository,
-            timelineRepository = timelineRepository,
-            externalTimelineWriter = externalTimelineWriter,
-            settingsRepository = settingsRepository,
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
-            slashCommandRepository = slashCommandRepository,
-            wsChatBridge = wsChatBridge,
-            runtimeEventOutbox = runtimeEventOutbox,
-            clientVersionProvider = clientVersionProvider,
-            uiState = _uiState,
-            composerController = composerController,
-            chatBannerController = chatBannerController,
-            submitApproval = chatApprovalController::submitApproval,
-            // lgns8.10.4.1: config truth, classified once by routedBackendKind().
-            // The inline iroh:// URL sniff that used to live here is gone.
-            backendKind = { backendKind.value },
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
-            startTimelineObserver = ::startTimelineObserver,
+            sources = com.letta.mobile.feature.chat.coordination.AdminChatSendSources(
+                conversationRepository = conversationRepository,
+                settingsRepository = settingsRepository,
+                sessionManager = sessionManager,
+                messageRepository = messageRepository,
+                slashCommandRepository = slashCommandRepository,
+                wsChatBridge = wsChatBridge,
+                runtimeEventOutbox = runtimeEventOutbox,
+                clientVersionProvider = clientVersionProvider,
+            ),
+            ui = com.letta.mobile.feature.chat.coordination.AdminChatSendUi(_uiState, composerController, chatBannerController),
+            hooks = com.letta.mobile.feature.chat.coordination.AdminChatSendHooks(
+                submitApproval = chatApprovalController::submitApproval,
+                // lgns8.10.4.1: config truth, classified once by routedBackendKind().
+                backendKind = { backendKind.value },
+                activeConversationId = { chatConversationCoordinator.activeConversationId },
+                setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+                startTimelineObserver = ::startTimelineObserver,
+                runtimeEventObserver = ::onRuntimeEvents,
+            ),
             selectedOwner = selectedSendOwner,
-            runtimeEventObserver = ::onRuntimeEvents,
         )
 
     private val composerCoordinator: AdminChatComposerCoordinator
@@ -513,16 +501,6 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private val truncatedToolReturnCoordinator: AdminChatTruncatedToolReturnCoordinator by lazy {
-        AdminChatTruncatedToolReturnCoordinator(
-            scope = viewModelScope,
-            agentId = agentId,
-            timelineRepository = timelineRepository,
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            fallbackConversationId = { conversationId?.value },
-        )
-    }
-
     private val screenLifecycleCoordinator: AdminChatScreenLifecycleCoordinator by lazy {
         AdminChatScreenLifecycleCoordinator(
             currentConversationTracker = currentConversationTracker,
@@ -541,7 +519,7 @@ internal class AdminChatViewModel @Inject constructor(
         val gen = chatConversationCoordinator.currentHydrationGeneration(convId)?.id ?: 0L
         viewModelScope.launch {
             try {
-                (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
+                selectedRuntime?.writer?.reconcileRecentMessages(
                     agentId = agentId.value,
                     conversationId = convId,
                     reason = "screen_resumed",
@@ -711,9 +689,6 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
 
-    fun onTruncatedToolResultExpanded(messageId: String) =
-        truncatedToolReturnCoordinator.onTruncatedToolResultExpanded(messageId)
-
     // letta-mobile-ah1ng: terminal-run reconciliation runs on every projection
     // publication (see ChatTimelineObserver), not only on the streaming edge.
     private fun reconcileCollapsedRunsOnProjection(
@@ -738,37 +713,11 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private val chatTimelineObserver: ChatTimelineObserver = ChatTimelineObserver(
-        scope = viewModelScope,
-        timelineRepository = timelineRepository,
-        currentConversationTracker = currentConversationTracker,
-        activeReplyStreams = MutableStateFlow(emptySet()),
-        uiState = _uiState,
-        // letta-mobile-c4igq.7: hold presence across inter-round gaps of a
-        // multi-tool turn. wsChatBridge.hasActiveChatTurn(conversationId) is true
-        // from turn start until the real terminal (spans all tool rounds), so the
-        // thinking/streaming indicator and send button stay steady instead of
-        // flickering / looking finished between rounds.
-        //
-        // letta-mobile-or40x: SCOPED to THIS observer's own conversation. The
-        // unscoped read made a background conversation's in-flight turn render a
-        // thinking indicator on every other open chat surface. No conversation yet
-        // (pre-hydrate) means no turn this surface can own — false.
-        hasActiveChatTurn = { conversationId?.value?.let { wsChatBridge.hasActiveChatTurn(it) } ?: false },
-        a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },
-        clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
-        isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
-        clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
-        reconcileCollapsedRunsOnProjection = ::reconcileCollapsedRunsOnProjection,
-        syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
-        hydrationIdentity = ::hydrationIdentity,
-    )
-    private val timelineRouteSession = com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession(
-        startLegacyObserver = { conversationId ->
-            chatTimelineObserver.start(agentId.value, conversationId, timelineObserverProvenance())
-        },
-        stopLegacyObserver = { chatTimelineObserver.stopAndJoin() },
-    )
+    /** A route's initial message goes to the backend's send strategy, unless a runtime swap is mid-flight. */
+    private val sendInitialMessage: (String) -> Unit = { message ->
+        if (!replacingSendRuntime) sendPipeline.sendInitialMessage(message)
+    }
+
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
         config = ChatConversationCoordinatorConfig(
             scope = viewModelScope,
@@ -794,18 +743,18 @@ internal class AdminChatViewModel @Inject constructor(
             reconcileLauncher = RecentMessagesReconcileLauncher(
                 scope = viewModelScope,
                 reconcile = { request ->
-                    (selectedRuntime?.writer ?: timelineRepository).reconcileRecentMessages(
+                    selectedRuntime?.writer?.reconcileRecentMessages(
                         agentId = agentId.value,
                         conversationId = request.conversationId,
                         reason = request.reason,
                         forceRefresh = false,
                         connectionGeneration = request.connectionGeneration,
-                    )
+                    ) ?: com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Skipped("no_runtime")
                 },
             ),
             send = ConversationSendConfig(
-                viaLocalRuntime = ::sendCoordinatorMessage,
-                viaTimeline = ::sendCoordinatorMessage,
+                viaLocalRuntime = sendInitialMessage,
+                viaTimeline = sendInitialMessage,
                 markDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
             ),
             localRuntimeRouting = ::localRuntimeRouting,
@@ -813,27 +762,11 @@ internal class AdminChatViewModel @Inject constructor(
         ),
     )
 
-    private fun sendCoordinatorMessage(message: String) {
-        if (replacingSendRuntime) return
-        sendPipeline.timelineSendCoordinator.send(message)
-    }
-
     private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(
         agent = activeAgent.value,
         localRuntimeBackendAvailable = sessionManager.current.localRuntimeBackend != null,
     )
 
-    private val chatHistoryPager: ChatHistoryPager by lazy {
-        ChatHistoryPager(
-            scope = viewModelScope,
-            agentId = agentId.value,
-            messageRepository = messageRepository,
-            chatTimelineObserver = chatTimelineObserver,
-            uiState = _uiState,
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            selectionGeneration = { _sessionState.value.selectionGeneration },
-        )
-    }
     private val projectChatCoordinator: ProjectChatCoordinator = ProjectChatCoordinator(
         scope = viewModelScope,
         agentId = agentId.value,
@@ -886,17 +819,6 @@ internal class AdminChatViewModel @Inject constructor(
         resolveConversationAndLoad()
     }
 
-    fun loadOlderMessages() {
-        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
-        chatHistoryPager.loadOlderMessages()
-    }
-
-    /** See [ChatHistoryPager.releaseOlderMessages]. */
-    fun releaseOlderMessages() {
-        if (_pagingPresentation.value != null || localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
-        chatHistoryPager.releaseOlderMessages()
-    }
-
     fun reportComposerError(message: String) = composerCoordinator.reportComposerError(message)
 
     fun clearComposerError() = composerCoordinator.clearComposerError()
@@ -909,38 +831,6 @@ internal class AdminChatViewModel @Inject constructor(
         composerCoordinator.addAttachment(image)
 
     fun removeAttachment(index: Int) = composerCoordinator.removeAttachment(index)
-
-    /**
-     * letta-mobile-grrhq: build the provenance for this bind from the
-     * coordinator's recorded resolver/route decision, so the resolver decision,
-     * any alias refusal, and the resulting second-holder creation all carry one
-     * acquisitionId. Diagnostic only — nothing here affects what is observed.
-     */
-    private fun timelineObserverProvenance(): TimelineAcquisitionProvenance {
-        val selection = chatConversationCoordinator.lastConversationSelection
-            ?: return TimelineAcquisitionProvenance(
-                acquisitionId = "",
-                source = TimelineAcquisitionSource.UI_NAVIGATION,
-                operation = "observer.start",
-                callSite = "AdminChatViewModel.kt:startTimelineObserver",
-                frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
-            )
-        val resolved = selection.selectionMode == TimelineConversationSelectionMode.MOST_RECENT_FALLBACK ||
-            selection.selectionMode == TimelineConversationSelectionMode.DEFAULT_FALLBACK
-        return TimelineAcquisitionProvenance(
-            acquisitionId = selection.acquisitionId,
-            source = if (resolved) {
-                TimelineAcquisitionSource.UI_RESOLVED_ROUTE
-            } else {
-                TimelineAcquisitionSource.UI_NAVIGATION
-            },
-            operation = "observer.start",
-            callSite = "AdminChatViewModel.kt:startTimelineObserver",
-            frameFamily = TimelineAcquisitionFrameFamily.DIRECT_NAVIGATION,
-            selectionMode = selection.selectionMode,
-            attribution = selection.capture,
-        )
-    }
 
     private var canonicalPresentationJob: kotlinx.coroutines.Job? = null
     private var canonicalRoute: Triple<String, Long, String?>? = null
@@ -969,16 +859,8 @@ internal class AdminChatViewModel @Inject constructor(
                 return
             }
             stopTimelineObserverLocked()
-            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-                startLegacyTimelineObserverLocked(ConversationId(conversationId))
-                return
-            }
             val capturedRuntime = selectedRuntime
             val hostOpen = pagingHost.openCanonical
-            if (capturedRuntime == null && hostOpen == null) {
-                startLegacyTimelineObserverLocked(ConversationId(conversationId))
-                return
-            }
             val route = Triple(conversationId, generation, scrollToMessageId)
             canonicalRoute = route
             val target = pagingBinding.effectiveRoute(route.third)
@@ -996,48 +878,30 @@ internal class AdminChatViewModel @Inject constructor(
                 try {
                     val viewport = canonicalViewports[conversationId]
                     val seek = target ?: viewport?.takeUnless { it.following }?.messageId
-                    when (
-                        val decided = timelineRouteSession.decide(
-                            runtime = capturedRuntime,
-                            conversationId = conversationId,
-                            target = seek,
-                            scope = this,
-                            agentId = agentId.value,
-                            hostOpen = hostOpen,
-                        )
-                    ) {
-                        com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.LegacyDeferred -> {
-                            if (canonicalRoute != route) return@launch
-                            _pagingPresentation.value = null
-                            timelineRouteSession.activateDeferred(conversationId)
-                            try {
-                                kotlinx.coroutines.awaitCancellation()
-                            } finally {
-                                timelineRouteSession.retirePresentation()
+                    // letta-mobile-by4vm.15: the canonical ledger is the only timeline.
+                    val presentation = when {
+                        capturedRuntime != null -> capturedRuntime.open(conversationId, seek, this)
+                        hostOpen != null -> hostOpen(agentId.value, conversationId, seek, this)
+                        else -> error("No chat runtime is captured for this backend")
+                    }
+                    try {
+                        if (canonicalRoute != route) return@launch
+                        presentation.hasBoundRoute = true
+                        presentation.routeTarget = target
+                        presentation.viewport = if (target == null) viewport else null
+                        presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
+                        presentation.clearViewport = { canonicalViewports.remove(conversationId) }
+                        presentation.requestTail = {
+                            if (_pagingPresentation.value === presentation) {
+                                canonicalViewports.remove(conversationId)
+                                replacePresentation = true
+                                startTimelineObserver(conversationId)
                             }
                         }
-                        is com.letta.mobile.feature.chat.coordination.SelectedTimelineRouteSession.Presentation.Canonical -> {
-                            val presentation = decided.value
-                            try {
-                                if (canonicalRoute != route) return@launch
-                                presentation.hasBoundRoute = true
-                                presentation.routeTarget = target
-                                presentation.viewport = if (target == null) viewport else null
-                                presentation.saveViewport = { if (_pagingPresentation.value === presentation) canonicalViewports[conversationId] = it }
-                                presentation.clearViewport = { canonicalViewports.remove(conversationId) }
-                                presentation.requestTail = {
-                                    if (_pagingPresentation.value === presentation) {
-                                        canonicalViewports.remove(conversationId)
-                                        replacePresentation = true
-                                        startTimelineObserver(conversationId)
-                                    }
-                                }
-                                _pagingPresentation.value = presentation
-                                kotlinx.coroutines.awaitCancellation()
-                            } finally {
-                                presentation.close()
-                            }
-                        }
+                        _pagingPresentation.value = presentation
+                        kotlinx.coroutines.awaitCancellation()
+                    } finally {
+                        presentation.close()
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -1050,10 +914,6 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob?.start()
     }
 
-    private fun startLegacyTimelineObserverLocked(conversationId: ConversationId) {
-        chatTimelineObserver.start(agentId.value, conversationId.value, timelineObserverProvenance())
-    }
-
     private suspend fun stopTimelineObserver() = presentationSwitch.withLock { stopTimelineObserverLocked() }
 
     private suspend fun stopTimelineObserverLocked() {
@@ -1063,7 +923,6 @@ internal class AdminChatViewModel @Inject constructor(
         _pagingPresentation.value = null
         pagingBinding.close()
         job?.cancelAndJoin()
-        timelineRouteSession.retirePresentation()
     }
 
     private fun abandonTimelineObserver() {
@@ -1072,7 +931,6 @@ internal class AdminChatViewModel @Inject constructor(
         canonicalPresentationJob = null
         _pagingPresentation.value = null
         pagingBinding.close()
-        chatTimelineObserver.stop()
     }
 
     fun submitApproval(
