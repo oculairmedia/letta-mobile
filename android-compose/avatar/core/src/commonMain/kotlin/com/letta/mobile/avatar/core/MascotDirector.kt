@@ -234,9 +234,11 @@ class MascotDirector(
         keysSinceTick = 0
         val target = if (signals.userTyping) (cadence / config.listenFullCadence).coerceIn(config.listenFloor, 1f) else 0f
         listenLevel += (target - listenLevel) * alpha
-        if (target == 0f && listenLevel < LEVEL_EPSILON) listenLevel = 0f
+        // Settling to silence snaps to exactly zero, and that last step is always written.
+        if (target == 0f) listenLevel = listenLevel.takeIf { it >= LEVEL_EPSILON } ?: 0f
         frame.listenLevel = listenLevel
-        if (abs(listenLevel - listenLevelSent) > LEVEL_EPSILON || (listenLevel == 0f && listenLevelSent != 0f)) {
+        val threshold = if (listenLevel == 0f) 0f else LEVEL_EPSILON
+        if (abs(listenLevel - listenLevelSent) > threshold) {
             listenLevelSent = listenLevel
             runtime.setListenLevel(listenLevel)
         }

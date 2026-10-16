@@ -1,7 +1,12 @@
 package com.letta.mobile.ui.mascot
 
+import com.letta.mobile.avatar.core.AvatarExpression
+import com.letta.mobile.avatar.core.AvatarGesture
+import com.letta.mobile.avatar.core.AvatarLookTarget
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.core.AvatarReaction
+import com.letta.mobile.avatar.core.AvatarRuntime
+import com.letta.mobile.avatar.core.AvatarRuntimeState
 import com.letta.mobile.avatar.core.AvatarState
 import com.letta.mobile.avatar.core.GazePose
 import com.letta.mobile.avatar.core.GazeTarget
@@ -25,7 +30,8 @@ import com.letta.mobile.runtime.ToolApprovalRequest
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,12 +43,28 @@ import kotlin.test.assertTrue
  * director about presence.
  */
 class MascotPresenceSignalsTest {
-    private class RecordingRuntime : HeadlessAvatarRuntime() {
+    /**
+     * Records the reactions and nothing else. Never loaded: this module's common tests also run on
+     * wasm, which has no coroutine test runner, and the director drives a runtime whatever its state.
+     */
+    private class RecordingRuntime : AvatarRuntime {
         val reactions = mutableListOf<AvatarReaction>()
+        override val state: StateFlow<AvatarRuntimeState> = MutableStateFlow(AvatarRuntimeState.Idle)
 
         override fun react(reaction: AvatarReaction, arg: Float) {
             reactions += reaction
         }
+
+        override suspend fun load(model: AvatarModel) = Unit
+        override suspend fun unload() = Unit
+        override fun setExpression(expression: AvatarExpression, weight: Float) = Unit
+        override fun setMouthOpen(value: Float) = Unit
+        override fun setLookTarget(target: AvatarLookTarget?) = Unit
+        override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) = Unit
+        override fun playAnimation(animationId: String, loop: Boolean) = Unit
+        override fun setAccessoryEnabled(accessoryId: String, enabled: Boolean) = Unit
+        override fun update(deltaSeconds: Float) = Unit
+        override fun dispose() = Unit
     }
 
     private class Rig(val runtime: RecordingRuntime) {
@@ -69,10 +91,7 @@ class MascotPresenceSignalsTest {
         fun sample() = present(registry.runs.value.presenceByAgent()[AGENT] ?: AgentPresence.IDLE)
     }
 
-    private suspend fun rig(): Rig {
-        val runtime = RecordingRuntime().also { it.load(AvatarModel(id = "m", displayName = "M", uri = "res://raw/mascot.riv")) }
-        return Rig(runtime)
-    }
+    private fun rig(): Rig = Rig(RecordingRuntime())
 
     private fun send(id: String) = RuntimeEventPayload.LocalUserAppend(id, "hi")
     private fun toolCall(id: String) = RuntimeEventPayload.ToolCallObserved(ToolCallId(id), ToolName("grep"))
@@ -81,7 +100,7 @@ class MascotPresenceSignalsTest {
     private fun assistant() = RuntimeEventPayload.RemoteStreamFrame(frameId = "f", messageType = "assistant_message", body = "")
 
     @Test
-    fun anAndroidShapedTurnSendsWorksSpeaksAndSucceeds() = runTest {
+    fun anAndroidShapedTurnSendsWorksSpeaksAndSucceeds() {
         // Android folds each event batch and the shell samples the registry after it.
         val rig = rig()
         rig.publish(send("l1"), lifecycle(RuntimeRunStatus.Started))
@@ -108,7 +127,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun aDesktopShapedConflatedSampleStillSeesEveryFinish() = runTest {
+    fun aDesktopShapedConflatedSampleStillSeesEveryFinish() {
         // Desktop's shell reads a conflated state flow: two whole turns can land between samples.
         val rig = rig()
         rig.publisher.onEvent(RunScope("c1", AGENT), send("l1"))
@@ -126,7 +145,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun anApprovalIsAskedOnceAndWaits() = runTest {
+    fun anApprovalIsAskedOnceAndWaits() {
         val rig = rig()
         val request = ToolApprovalRequest(ToolApprovalId("ap-1"), ToolCallId("t1"), ToolName("Bash"), "ls")
         val ask = RuntimeEventPayload.ApprovalRequested(request)
@@ -138,7 +157,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun aFailureFlashesOnceAndStaysThroughTyping() = runTest {
+    fun aFailureFlashesOnceAndStaysThroughTyping() {
         val rig = rig()
         rig.publish(send("l1"))
         rig.publish(lifecycle(RuntimeRunStatus.Failed))
@@ -152,7 +171,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun aCancelEndsTheTurnWithoutASuccess() = runTest {
+    fun aCancelEndsTheTurnWithoutASuccess() {
         val rig = rig()
         rig.publish(send("l1"))
         rig.publish(lifecycle(RuntimeRunStatus.Cancelled))
@@ -161,7 +180,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun aDreamingAgentDreamsAndATurnWakesIt() = runTest {
+    fun aDreamingAgentDreamsAndATurnWakesIt() {
         val rig = rig()
         rig.present(AgentPresence(dreaming = true))
         assertEquals(AvatarState.DREAMING, rig.director.state)
@@ -173,8 +192,8 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun theFirstPresenceIsABaselineNotAReplay() = runTest {
-        val runtime = RecordingRuntime().also { it.load(AvatarModel(id = "m", displayName = "M", uri = "res://raw/mascot.riv")) }
+    fun theFirstPresenceIsABaselineNotAReplay() {
+        val runtime = RecordingRuntime()
         val director = MascotDirector(runtime, Random(5))
         MascotPresenceSignals().apply(director, AgentPresence(edges = RunEdges(sent = 4, completed = 4)))
         assertTrue(runtime.reactions.isEmpty())
@@ -188,7 +207,7 @@ class MascotPresenceSignalsTest {
     }
 
     @Test
-    fun platformFactsReachTheSignalsWithoutReplayingPresence() = runTest {
+    fun platformFactsReachTheSignalsWithoutReplayingPresence() {
         val rig = rig()
         rig.present(AgentPresence(activity = AgentActivityKind.THINKING, edges = RunEdges(sent = 1)))
         val reactions = rig.runtime.reactions.size

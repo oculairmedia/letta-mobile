@@ -182,6 +182,21 @@ private enum class FrameShape(val label: String, val shape: Shape) {
 
 private enum class Ground(val label: String) { PAGE("page"), FRAME("frame") }
 
+/**
+ * Shows a picked state on the bench. Success and error flashes are reactions, not states
+ * (letta-mobile-te3n1.1), so picking one also fires it.
+ */
+private fun RiveAvatarRuntime.playBenchState(state: AvatarState) {
+    applyState(state)
+    benchFlash(state)?.let { react(it) }
+}
+
+private fun benchFlash(state: AvatarState): AvatarReaction? = when (state) {
+    AvatarState.SUCCESS -> AvatarReaction.RUN_DONE
+    AvatarState.ERROR -> AvatarReaction.RUN_FAILED
+    else -> null
+}
+
 /** How the host drives the gaze. JUSTIFIED is the product behaviour; CURSOR is for checking range. */
 private enum class GazeMode(val label: String) { JUSTIFIED("justified"), CURSOR("cursor"), OFF("sliders") }
 
@@ -225,13 +240,7 @@ private fun MascotBench(file: File, modifier: Modifier) {
 
     fun setState(state: AvatarState) {
         current = state
-        runtime.applyState(state)
-        // Success and error flashes are reactions, not states (letta-mobile-te3n1.1).
-        when (state) {
-            AvatarState.SUCCESS -> runtime.react(AvatarReaction.RUN_DONE)
-            AvatarState.ERROR -> runtime.react(AvatarReaction.RUN_FAILED)
-            else -> Unit
-        }
+        runtime.playBenchState(state)
     }
 
     fun setIdentity(value: MascotIdentity) {

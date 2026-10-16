@@ -52,24 +52,39 @@ data class RunEdges(
             next: ConversationRunState,
             event: RuntimeEventPayload,
         ): RunEdges {
-            val edges = previous.edges
-            val started = next.openToolCallIds.count { it !in rested.openToolCallIds }
-            val ended = rested.openToolCallIds.count { it !in next.openToolCallIds }
-            val lifecycle = (event as? RuntimeEventPayload.RunLifecycleChanged)?.status
-            // A terminal re-reported (stop reason and turn-done both map to Completed) is one finish.
-            val finishing = previous.phase != RunPhase.DONE && next.phase == RunPhase.DONE
-            val askedAnew = event is RuntimeEventPayload.ApprovalRequested &&
-                event.request.approvalId.value != previous.awaitingApprovalId
-            val delta = RunEdges(
-                sent = if (event is RuntimeEventPayload.LocalUserAppend || event is RuntimeEventPayload.RetryRequested) 1 else 0,
-                toolsStarted = started,
-                toolsEnded = ended,
-                approvals = if (askedAnew) 1 else 0,
-                completed = if (finishing && lifecycle == RuntimeRunStatus.Completed) 1 else 0,
-                cancelled = if (finishing && lifecycle == RuntimeRunStatus.Cancelled) 1 else 0,
-                failed = if (previous.phase != RunPhase.FAILED && next.phase == RunPhase.FAILED) 1 else 0,
-            )
-            return if (delta == NONE) edges else edges + delta
+            val delta = RunStep(previous, rested, next, event).delta()
+            return if (delta == NONE) previous.edges else previous.edges + delta
         }
     }
+}
+
+/** One reducer step, read as the moments it was; each count is its own small rule. */
+private class RunStep(
+    private val previous: ConversationRunState,
+    private val rested: ConversationRunState,
+    private val next: ConversationRunState,
+    private val event: RuntimeEventPayload,
+) {
+    fun delta(): RunEdges = RunEdges(
+        sent = sent(),
+        toolsStarted = next.openToolCallIds.count { it !in rested.openToolCallIds },
+        toolsEnded = rested.openToolCallIds.count { it !in next.openToolCallIds },
+        approvals = approvalAskedAnew().once(),
+        completed = finishedAs(RuntimeRunStatus.Completed).once(),
+        cancelled = finishedAs(RuntimeRunStatus.Cancelled).once(),
+        failed = (previous.phase != RunPhase.FAILED && next.phase == RunPhase.FAILED).once(),
+    )
+
+    private fun sent(): Int = (event is RuntimeEventPayload.LocalUserAppend || event is RuntimeEventPayload.RetryRequested).once()
+
+    private fun approvalAskedAnew(): Boolean =
+        event is RuntimeEventPayload.ApprovalRequested && event.request.approvalId.value != previous.awaitingApprovalId
+
+    /** A terminal re-reported (stop reason and turn-done both map to Completed) is one finish. */
+    private val finishing: Boolean = previous.phase != RunPhase.DONE && next.phase == RunPhase.DONE
+
+    private fun finishedAs(status: RuntimeRunStatus): Boolean =
+        finishing && (event as? RuntimeEventPayload.RunLifecycleChanged)?.status == status
+
+    private fun Boolean.once(): Int = if (this) 1 else 0
 }

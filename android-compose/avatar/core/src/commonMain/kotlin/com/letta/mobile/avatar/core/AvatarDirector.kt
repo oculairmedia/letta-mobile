@@ -384,25 +384,30 @@ class AvatarDirector(
         transitionTo(next)
     }
 
-    private fun resolveState(): AvatarState {
-        // Lifecycle overrides everything: a broken/loading asset has no behavior.
-        when (lifecycle) {
-            AvatarLifecycle.LOADING -> return AvatarState.LOADING
-            AvatarLifecycle.FAILED -> return AvatarState.FAILED
-            AvatarLifecycle.DEGRADED -> return AvatarState.DEGRADED
-            AvatarLifecycle.NONE -> Unit
-        }
+    private fun resolveState(): AvatarState = gateState() ?: behaviorState()
 
-        // DRAGGED and ERROR bypass SLEEPING gating (§4 P2).
-        if (dragged) return AvatarState.DRAGGED
-        val error = failed || errorLatched || legacyActivity == AvatarActivity.ERROR
-        if (error) return AvatarState.ERROR
+    /**
+     * The states that override behavior: lifecycle (a broken/loading asset has no behavior), then
+     * DRAGGED and ERROR, which bypass SLEEPING gating, then SLEEPING, which gates the rest (§4 P2).
+     */
+    private fun gateState(): AvatarState? = when {
+        lifecycle == AvatarLifecycle.LOADING -> AvatarState.LOADING
+        lifecycle == AvatarLifecycle.FAILED -> AvatarState.FAILED
+        lifecycle == AvatarLifecycle.DEGRADED -> AvatarState.DEGRADED
+        dragged -> AvatarState.DRAGGED
+        showsError() -> AvatarState.ERROR
+        quietHours -> AvatarState.SLEEPING
+        else -> null
+    }
 
-        // SLEEPING gates every remaining behavior (§4 P2).
-        if (quietHours) return AvatarState.SLEEPING
+    /** A standing failure ([setFailed]), else the legacy latch or activity. */
+    private fun showsError(): Boolean {
+        if (failed) return true
+        return errorLatched || legacyActivity == AvatarActivity.ERROR
+    }
 
-        // Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS > WORKING >
-        // THINKING > LISTENING > DREAMING > IDLE.
+    /** Remaining priority order: WAITING_INPUT > SPEAKING > SUCCESS > WORKING > THINKING > LISTENING > DREAMING > IDLE. */
+    private fun behaviorState(): AvatarState {
         if (awaitingApproval) return AvatarState.WAITING_INPUT
         if (legacyActivity == AvatarActivity.SPEAKING) return AvatarState.SPEAKING
         if (successRemaining > 0f) return AvatarState.SUCCESS

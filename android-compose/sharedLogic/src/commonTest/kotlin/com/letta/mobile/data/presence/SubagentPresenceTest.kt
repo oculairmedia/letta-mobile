@@ -19,13 +19,16 @@ class SubagentPresenceTest {
     private var now = 0L
     private val publisher = ConversationRunPhasePublisher(registry) { ++now }
 
-    private fun entry(id: String, type: String, status: String = "running", conversation: String? = "c1", agent: String? = "a1") =
+    /** Where an entry says it runs; either half may be missing on the wire. */
+    private data class Parent(val conversation: String? = "c1", val agent: String? = "a1")
+
+    private fun entry(id: String, type: String, status: String = "running", parent: Parent = Parent()) =
         SubagentEntry(
             toolCallId = id,
             subagentType = type,
             status = status,
-            parentAgentId = agent,
-            parentConversationId = conversation,
+            parentAgentId = parent.agent,
+            parentConversationId = parent.conversation,
         )
 
     @Test
@@ -42,7 +45,7 @@ class SubagentPresenceTest {
     @Test
     fun aBackgroundRunIsADreamAndNeverChangesTheTurn() {
         publisher.onEvent(RunScope("c1", "a1"), RuntimeEventPayload.LocalUserAppend("l1", "hi"))
-        val finished = entry("s2", "Reflection", status = "completed", agent = "a2", conversation = "c2")
+        val finished = entry("s2", "Reflection", status = "completed", parent = Parent("c2", "a2"))
         publisher.setSubagents(listOf(entry("s1", "Reflection"), finished))
         val presence = registry.runs.value.presenceByAgent()
         assertTrue(presence.getValue("a1").dreaming)
@@ -52,7 +55,7 @@ class SubagentPresenceTest {
 
     @Test
     fun anAgentWithNoTurnStillDreams() {
-        publisher.setSubagents(listOf(entry("s1", "Memory", conversation = "c9", agent = "a9")))
+        publisher.setSubagents(listOf(entry("s1", "Memory", parent = Parent("c9", "a9"))))
         val presence = registry.runs.value.presenceByAgent().getValue("a9")
         assertTrue(presence.dreaming)
         assertEquals(AgentActivityKind.IDLE, presence.activity)
@@ -60,7 +63,9 @@ class SubagentPresenceTest {
 
     @Test
     fun entriesWithoutAParentScopeAreLeftOut() {
-        publisher.setSubagents(listOf(entry("s1", "Reflection", conversation = null), entry("s2", "Reflection", agent = " ")))
+        val noConversation = entry("s1", "Reflection", parent = Parent(conversation = null))
+        val blankAgent = entry("s2", "Reflection", parent = Parent(agent = " "))
+        publisher.setSubagents(listOf(noConversation, blankAgent))
         assertTrue(registry.runs.value.isEmpty())
     }
 

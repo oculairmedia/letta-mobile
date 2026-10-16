@@ -162,8 +162,8 @@ class RiveAvatarRuntime(
             trigger != null -> {
                 // The argument rides on its own input, written before the trigger reads it.
                 when (reaction) {
-                    AvatarReaction.LAND -> number(RiveAvatarContract.INPUT_IMPACT, arg.coerceIn(0f, 1f))
-                    AvatarReaction.TRICK -> number(RiveAvatarContract.INPUT_TRICK_ID, arg.coerceIn(0f, MAX_TRICK_ID))
+                    AvatarReaction.LAND -> optional(IMPACT)?.setNumber(IMPACT, arg.coerceIn(0f, 1f))
+                    AvatarReaction.TRICK -> optional(TRICK_ID)?.setNumber(TRICK_ID, arg.coerceIn(0f, MAX_TRICK_ID))
                     else -> Unit
                 }
                 sink.fire(trigger)
@@ -172,31 +172,33 @@ class RiveAvatarRuntime(
         }
     }
 
-    override fun setListenLevel(level: Float) = number(RiveAvatarContract.INPUT_LISTEN_LEVEL, level.coerceIn(0f, 1f))
-
-    override fun setHovered(hovered: Boolean) = boolean(RiveAvatarContract.INPUT_HOVERED, hovered)
-
-    override fun setPetting(petting: Boolean) = boolean(RiveAvatarContract.INPUT_PETTING, petting)
-
-    override fun setMotion(vx: Float, vy: Float) {
-        number(RiveAvatarContract.INPUT_MOVE_X, vx.coerceIn(-1f, 1f))
-        number(RiveAvatarContract.INPUT_MOVE_Y, vy.coerceIn(-1f, 1f))
+    override fun setListenLevel(level: Float) {
+        optional(LISTEN_LEVEL)?.setNumber(LISTEN_LEVEL, level.coerceIn(0f, 1f))
     }
 
-    override fun setReducedMotion(reduced: Boolean) = boolean(RiveAvatarContract.INPUT_REDUCE_MOTION, reduced)
+    override fun setHovered(hovered: Boolean) {
+        optional(HOVERED)?.setBoolean(HOVERED, hovered)
+    }
+
+    override fun setPetting(petting: Boolean) {
+        optional(PETTING)?.setBoolean(PETTING, petting)
+    }
+
+    override fun setMotion(vx: Float, vy: Float) {
+        optional(MOVE_X)?.setNumber(MOVE_X, vx.coerceIn(-1f, 1f))
+        optional(MOVE_Y)?.setNumber(MOVE_Y, vy.coerceIn(-1f, 1f))
+    }
+
+    override fun setReducedMotion(reduced: Boolean) {
+        optional(REDUCE_MOTION)?.setBoolean(REDUCE_MOTION, reduced)
+    }
 
     override val honorsReducedMotion: Boolean get() = rig.honorsReducedMotion
 
     override val carriesBody: Boolean get() = rig.carriesBody
 
-    /** An optional input, written only when the loaded file declares it. */
-    private fun number(input: String, value: Float) {
-        if (ready() && input in rig.inputs) sink.setNumber(input, if (value.isNaN()) 0f else value)
-    }
-
-    private fun boolean(input: String, value: Boolean) {
-        if (ready() && input in rig.inputs) sink.setBoolean(input, value)
-    }
+    /** The sink for an optional te3n1.5 input, or null when the loaded file does not declare it. */
+    private fun optional(input: String): RiveInputSink? = sink.takeIf { ready() && input in rig.inputs }
 
     private fun ready(): Boolean = !disposed && _state.value is AvatarRuntimeState.Ready
 
@@ -206,6 +208,15 @@ class RiveAvatarRuntime(
 
         /** The highest trick id the rig plays (rig/contract.py `trickId` 0..3). */
         private const val MAX_TRICK_ID = 3f
+
+        private const val IMPACT = RiveAvatarContract.INPUT_IMPACT
+        private const val TRICK_ID = RiveAvatarContract.INPUT_TRICK_ID
+        private const val LISTEN_LEVEL = RiveAvatarContract.INPUT_LISTEN_LEVEL
+        private const val HOVERED = RiveAvatarContract.INPUT_HOVERED
+        private const val PETTING = RiveAvatarContract.INPUT_PETTING
+        private const val MOVE_X = RiveAvatarContract.INPUT_MOVE_X
+        private const val MOVE_Y = RiveAvatarContract.INPUT_MOVE_Y
+        private const val REDUCE_MOTION = RiveAvatarContract.INPUT_REDUCE_MOTION
 
         /**
          * What a flat mascot can actually do: expressions and gaze are state-machine inputs, so
