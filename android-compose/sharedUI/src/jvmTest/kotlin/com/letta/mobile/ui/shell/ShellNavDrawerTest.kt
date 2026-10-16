@@ -74,7 +74,6 @@ class ShellNavDrawerTest {
         // Pins and the favourite in roster order, then the newest recent; Meridian is the panel's subject.
         assertEquals(listOf("Agent 5", "Agent 6", "Agent 3"), rail.entries.map { it.name })
         assertEquals(listOf(true, false, false), rail.entries.map { it.pinned })
-        assertEquals(3, rail.hiddenAgentCount)
     }
 
     @Test
@@ -87,9 +86,8 @@ class ShellNavDrawerTest {
             pinnedAgentIds = setOf("meridian"),
         )
         val rail = ShellNavDrawerMapping.state(bigInput, now).rail
-        // Eight orbs, newest activity first then roster order; the focused agent is neither an orb nor hidden.
+        // Eight orbs, newest activity first then roster order; the focused agent is not an orb.
         assertEquals(listOf("Agent 40") + (1..7).map { "Agent $it" }, rail.entries.map { it.name })
-        assertEquals(138 - 8, rail.hiddenAgentCount)
     }
 
     @Test

@@ -154,9 +154,8 @@ internal fun sharedDrawerRailActions(state: AgentScaffoldRuntimeState, drawer: S
             }
         },
         onHome = { closeDrawerAndRun(state) { navigation.onNavigateToAdmin?.invoke() } },
+        // The rail is a recents strip; New opens the agent switcher, which lists every agent.
         onNewSession = openAgentSwitcher,
-        // The rail is a recents strip; "All agents" opens the agent switcher, which lists every agent.
-        onShowAllAgents = openAgentSwitcher,
         // The orb's long-press menu: pin to Home, and that agent's settings.
         onAgentPinnedChange = drawer::setAgentPinned,
         onAgentSettings = { agentId -> closeDrawerAndRun(state) { navigation.onNavigateToSettings(agentId) } },

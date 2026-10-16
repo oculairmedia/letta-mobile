@@ -153,7 +153,6 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
     ShellLibraryRail(
         state = ShellLibraryRailState(
             agents = recents.agents,
-            hiddenAgentCount = recents.hiddenCount,
             focus = ShellRailFocus(
                 selectedAgentId = focus.selectedAgentId,
                 activityByAgentId = focus.railActivityByAgentId,
@@ -172,10 +171,9 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
                 navigator.railExpanded = false
                 context.router.openAgent(AgentId(agentId))
             },
-            // Contacts-style picker over the persistent-agent roster; agent creation lives inside it.
+            // Contacts-style picker over the persistent-agent roster: agent creation lives inside it, and
+            // it lists every agent the recents cut left off the rail.
             onNewSession = { context.overlays.newConversation = true },
-            // The same roster picker lists every agent the recents cut left off the rail.
-            onShowAllAgents = { context.overlays.newConversation = true },
             onAgentSettings = { navigator.editAgentId = it },
         ),
     )

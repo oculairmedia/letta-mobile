@@ -29,7 +29,7 @@ data class ShellNavDrawerInput(
     val agent: ShellPanelAgent,
     /**
      * Every agent as (id, name). The rail shows the shared recents cut of it ([RecentAgents.cut],
-     * the desktop rail's rule); the rest stay one tap away behind "All agents".
+     * the desktop rail's rule); the rest stay one tap away in New's agent picker.
      */
     val agents: List<Pair<String, String>> = emptyList(),
     /** Each agent's latest activity, for the recents cut. */
@@ -73,7 +73,6 @@ object ShellNavDrawerMapping {
         val recents = recentAgents(input, now)
         val rail = ShellAgentRailState(
             entries = ShellRailMapping.entries(ShellRailMapping.groups(recents.agents, agentId), focus),
-            hiddenAgentCount = recents.hiddenCount,
         )
         val summaries = input.conversations.toChatConversationSummaries()
         val marks = ShellConversationMarks(

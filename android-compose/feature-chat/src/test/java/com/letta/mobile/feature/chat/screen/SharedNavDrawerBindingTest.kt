@@ -34,6 +34,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -207,8 +208,8 @@ class SharedNavDrawerBindingTest {
             listOf("Agent 11", "Agent 12") + (2..9).map { "Agent $it" },
             state.rail.entries.map { it.name },
         )
-        // Only a10 fell off the strip; the rail's "All agents" reaches it through the agent switcher.
-        assertEquals(1, state.rail.hiddenAgentCount)
+        // Only a10 fell off the strip; the rail's New reaches it through the agent switcher.
+        assertFalse(state.rail.entries.any { it.agentId == "a10" })
     }
 
     @Test
@@ -219,7 +220,6 @@ class SharedNavDrawerBindingTest {
             .withRoster(SharedDrawerRoster(agents = agents, favoriteAgentId = "a50"))
         val rail = ShellNavDrawerMapping.state(input, now).rail
         assertEquals(listOf("Agent 50") + (2..9).map { "Agent $it" }, rail.entries.map { it.name })
-        assertEquals(138 - 9, rail.hiddenAgentCount)
     }
 
     @Test
@@ -244,7 +244,6 @@ class SharedNavDrawerBindingTest {
             .withRoster(SharedDrawerRoster(agents = agents, conversationActivity = vm.agentActivity.value))
         val rail = ShellNavDrawerMapping.state(input, now).rail
         assertEquals(listOf("Agent 7", "Agent 3", "Agent 5", "Agent 2", "Agent 4", "Agent 6", "Agent 8", "Agent 9"), rail.entries.map { it.name })
-        assertEquals(1, rail.hiddenAgentCount)
     }
 
     @Test
