@@ -11,6 +11,7 @@ import com.letta.mobile.data.runtime.RelayedPermissionModes
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.ui.chat.session.ChatPermissionModeSource
 import com.letta.mobile.ui.chat.session.ChatPermissionModeUiState
 import com.letta.mobile.ui.chat.session.toUiState
 import javax.inject.Inject
@@ -90,17 +91,20 @@ internal class ChatApprovalBinding(private val relay: ChatApprovalRelay?, privat
     suspend fun deliver(entry: OutboxApproval, overChannel: Boolean): OutboxSubmitResult? =
         relay?.outbox?.takeIf { overChannel }?.submit(entry)
 
-    /** The chip for whichever conversation [conversationIds] names now. */
+    /**
+     * The chip for whichever conversation [conversationIds] names now, as the page's shared
+     * [ChatPermissionModeSource]; a change goes to the conversation [current] names.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun permissionMode(conversationIds: Flow<String?>): Flow<ChatPermissionModeUiState?> {
-        val owner = relay ?: return flowOf(null)
-        return conversationIds.map(::runtimeOf).distinctUntilChanged().flatMapLatest(owner::permissionMode)
-    }
+    fun permissionModes(scope: CoroutineScope, conversationIds: Flow<String?>, current: () -> String?) = object : ChatPermissionModeSource {
+        override val permissionMode: Flow<ChatPermissionModeUiState?> =
+            relay?.let { conversationIds.map(::runtimeOf).distinctUntilChanged().flatMapLatest(it::permissionMode) } ?: flowOf(null)
 
-    fun setPermissionMode(scope: CoroutineScope, conversationId: String?, mode: AppServerPermissionMode) {
-        val owner = relay ?: return
-        val runtime = runtimeOf(conversationId) ?: return
-        scope.launch { owner.setPermissionMode(runtime, mode) }
+        override fun setPermissionMode(mode: AppServerPermissionMode) {
+            val owner = relay ?: return
+            val runtime = runtimeOf(current()) ?: return
+            scope.launch { owner.setPermissionMode(runtime, mode) }
+        }
     }
 
     private fun runtimeOf(conversationId: String?): AppServerRuntimeScope? {

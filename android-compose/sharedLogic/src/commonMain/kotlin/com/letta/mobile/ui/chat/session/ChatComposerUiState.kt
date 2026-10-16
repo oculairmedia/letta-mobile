@@ -5,7 +5,6 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.runtime.PermissionModeState
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import kotlinx.collections.immutable.ImmutableList
@@ -81,15 +80,6 @@ data class ChatComposerCommand(
             description = "Fork this chat (/fork [name])",
             fillsComposer = true,
         )
-
-        fun fromSlashCommand(command: SlashCommand): ChatComposerCommand =
-            ChatComposerCommand(
-                id = command.command,
-                label = command.command,
-                description = command.description,
-                fillsComposer = true,
-                removable = command.installed,
-            )
     }
 }
 

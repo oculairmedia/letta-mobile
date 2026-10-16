@@ -8,7 +8,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatBranchView
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -46,7 +46,7 @@ class ChatConversationBranchingTest {
         val opened = mutableListOf<String>()
         val branching = ChatConversationBranching(this, repository, onError = {}, history = { stored }, drafts = drafts)
 
-        branching.editAndResend(origin(opened::add), prompt)
+        branching.page(opened::add).editAndResend(prompt, view)
 
         coVerify { repository.forkConversation(ConversationId("conv-1"), AgentId("agent-1"), "message-2") }
         assertEquals(listOf("fork-1"), opened)
@@ -60,7 +60,7 @@ class ChatConversationBranchingTest {
         val drafts = PendingComposerDrafts()
         val branching = ChatConversationBranching(this, repository, onError = {}, history = { stored }, drafts = drafts)
 
-        branching.rerun(origin {}, prompt)
+        branching.page {}.rerun(prompt, view)
 
         assertTrue(drafts.take("fork-1")?.sendNow == true)
     }
@@ -71,11 +71,13 @@ class ChatConversationBranchingTest {
         coEvery { repository.forkConversation(any<ConversationId>(), any<AgentId>(), any()) } throws IllegalStateException("host offline")
         val branching = ChatConversationBranching(this, repository, onError = { errors += it }, history = { stored })
 
-        branching.forkFrom(origin {}, prompt)
+        branching.page {}.forkFrom(prompt, view)
 
         assertEquals(listOf("host offline"), errors)
     }
 
-    private fun origin(onOpen: (String) -> Unit) =
-        ChatConversationBranching.Origin("conv-1", "agent-1", ChatUiState(), open = { _, conversationId -> onOpen(conversationId) })
+    private val view = ChatBranchView(emptyList(), hasOlderMessages = false)
+
+    private fun ChatConversationBranching.page(onOpen: (String) -> Unit) =
+        Page { view -> ChatConversationBranching.Origin("conv-1", "agent-1", view, open = { _, conversationId -> onOpen(conversationId) }) }
 }

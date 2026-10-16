@@ -28,10 +28,11 @@ abstract class ChatExtensionActions(
     private val options: TimelineChatSessionOptions,
     private val state: ChatExtensionActionState,
 ) : ChatActions {
-    override fun runComposerCommand(command: ChatComposerCommand) =
-        options.composerHost?.value?.commands?.firstOrNull { it.label == command.id }?.run?.invoke() ?: Unit
+    override fun runComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.run?.invoke() ?: Unit
 
-    override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
+    override fun uninstallComposerCommand(command: ChatComposerCommand) = hostCommand(command)?.uninstall?.invoke() ?: Unit
+
+    private fun hostCommand(command: ChatComposerCommand) = options.composerHost?.value?.commands?.firstOrNull { it.label == command.id }
 
     override fun dismissRecompileStatus() = options.recompile?.dismiss() ?: Unit
 

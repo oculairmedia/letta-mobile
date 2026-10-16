@@ -1,12 +1,10 @@
 package com.letta.mobile.ui.chat.session
 
-import com.letta.mobile.data.model.SlashCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.serialization.json.Json
 
 class ChatSessionPortContractTest {
     @Test
@@ -32,23 +30,6 @@ class ChatSessionPortContractTest {
     }
 
     @Test
-    fun serverSlashCommandsFillTheComposer() {
-        val command = ChatComposerCommand.fromSlashCommand(
-            Json.decodeFromString(SlashCommand.serializer(), SLASH_COMMAND_FIXTURE),
-        )
-        assertEquals(
-            ChatComposerCommand(
-                id = "/review",
-                label = "/review",
-                description = "Review the diff",
-                fillsComposer = true,
-                removable = true,
-            ),
-            command,
-        )
-    }
-
-    @Test
     fun defaultCapabilitiesHideHostSpecificControls() {
         val caps = FakeChatSessionPort().capabilities.value
         assertFalse(caps.workingDirectory)
@@ -64,10 +45,5 @@ class ChatSessionPortContractTest {
         )
         val state = ChatComposerUiState(commands = commands)
         assertEquals(listOf("canvas", "/review"), state.commands.map { it.id })
-    }
-
-    private companion object {
-        const val SLASH_COMMAND_FIXTURE =
-            """{"name":"review","command":"/review","description":"Review the diff","source":"skill","installed":true}"""
     }
 }
