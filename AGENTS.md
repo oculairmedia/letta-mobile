@@ -341,7 +341,7 @@ git tag -a v0.1.0 -m "release: 0.1.0"
 git push origin v0.1.0
 ```
 
-The `.github/workflows/release.yml` workflow picks up the tag, builds the signed play-release APK, creates a GitHub Release with auto-generated notes, attaches `letta-mobile-v0.1.0.apk`. Mistakes are reversible with `git push --delete origin <tag>` + `gh release delete`.
+The `.github/workflows/release.yml` workflow picks up the tag, builds the signed play-release APKs, creates a GitHub Release with auto-generated notes, attaches `letta-mobile-v0.1.0-full.apk` (arm64, embedded runtime + LiteRT-LM) and `letta-mobile-v0.1.0-lite.apk` (arm64-v8a/armeabi-v7a/x86_64, neither; matrix in `docs/RELEASE.md`). Mistakes are reversible with `git push --delete origin <tag>` + `gh release delete`.
 
 ### Rules for agents
 
@@ -580,7 +580,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - Build logic: versions only in `android-compose/gradle/libs.versions.toml` (one per library,
   no per-module forks); convention plugins in `android-compose/build-logic/`. The embedded
-  (dev-only) letta-code runtime prep is the `com.letta.mobile.embedded-runtime` plugin, with pins
+  letta-code runtime prep is the `com.letta.mobile.embedded-runtime` plugin, with pins
   in `letta-code-runtime/letta-code-runtime.properties` (the one letta-code pin, also read by the
   desktop build) and letta.js patches as real files in `letta-code-runtime/patches/` — edit
   those, not `app/build.gradle.kts`.
@@ -596,11 +596,11 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   still runs **`0.33.6`** until redeployed (the client must keep working against it: never
   require a 0.34-only field, gate 0.34-only commands on an advertised capability); the
   restart-replay evidence is still the older **`0.29.12`** capture (it needs a live server +
-  model provider to re-capture). The Android embedded runtime is still **dev-only**
-  (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a only, driven through
-  the headless stream-json protocol until letta-mobile-by4vm.110.6; on-device execution is a
-  Google Play policy risk), so production Android is remote-only and anything "verified against
-  a 0.33/0.34 server" is desktop/remote-only. One table lists every pin:
+  model provider to re-capture). The Android embedded runtime ships in the
+  `full` release APK only (nodejs-mobile Node 18 plus the `node18-compat.cjs` preload, arm64-v8a
+  only, driven through the headless stream-json protocol until letta-mobile-by4vm.110.6; the
+  `lite` APK has none, `docs/RELEASE.md`), so anything "verified against a 0.33/0.34 server" is
+  desktop/remote-only until then. One table lists every pin:
   `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`
   ("letta-code version pins"). Install the package under test at
   `~/letta-code-install/node_modules/@letta-ai/letta-code` (older VM snapshots carry 0.29.9 there;

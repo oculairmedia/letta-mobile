@@ -5,20 +5,17 @@ name: Release
 #   git push origin v1.2.3
 #
 # Builds:
-#   - the signed play-release APK WITH the embedded Letta Code runtime
-#     (nodejs-mobile libnode + npm assets baked in, so the app can run the
-#     agent on-device with no remote shim). That runtime is the dev-only
-#     embedded runtime from android-compose/letta-code-runtime/letta-code-runtime.properties
-#     (letta-code 0.34.14 on Node 18, arm64-v8a only: the embedded build filters every
-#     other ABI, letta-mobile-by4vm.110 D2); whether the
-#     Play release keeps shipping it is an open product call (letta-mobile-by4vm.92),
-#     so the embed flags below are deliberately unchanged,
+#   - two signed play-release APKs (the variant matrix, docs/RELEASE.md, letta-mobile-by4vm.110.8):
+#       full: arm64-v8a only, WITH the embedded letta-code runtime (nodejs-mobile libnode,
+#             NDK helpers, npm assets; android-compose/letta-code-runtime/letta-code-runtime.properties)
+#             and the LiteRT-LM on-device model, so agents can run on the phone with no host;
+#       lite: arm64-v8a + armeabi-v7a + x86_64, no embedded runtime, no LiteRT-LM (remote/desktop hosts),
 #   - the Windows desktop EXE + MSI installers, and
 #   - the Linux Iroh wrapper CLI distribution (the Kotlin app-server gateway
 #     that meridian-iroh-wrapper.service runs), so server binaries ship with
 #     every release instead of being hand-built on the host.
 # Creates a GitHub Release with auto-generated notes from PRs merged since the
-# previous tag, and attaches the APK + EXE + MSI as release assets.
+# previous tag, and attaches both APKs + EXE + MSI as release assets.
 #
 # Trigger by accident? Delete the tag (`git push --delete origin v1.2.3`)
 # and the release before anyone downloads it.
@@ -42,9 +39,15 @@ permissions:
   contents: write
 
 jobs:
-  # ── Android: signed play-release APK WITH embedded runtime ──────────────
+  # ── Android: signed play-release APKs, one per variant ──────────────────
   android-apk:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        # -PembedLettaCodeNative is THE variant switch: on = arm64-v8a + runtime + LiteRT-LM,
+        # off = arm64-v8a/armeabi-v7a/x86_64 without either (build-logic/.../embedded/EmbeddedRuntimeAndroid.kt).
+        variant: [full, lite]
     defaults:
       run:
         working-directory: android-compose
@@ -64,6 +67,7 @@ jobs:
           java-version: 26
 
       - name: Setup Node 22 (embedded runtime npm asset packaging)
+        if: matrix.variant == 'full'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -74,11 +78,7 @@ jobs:
       - name: Decode signing keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
 
-      - name: Build signed play-release APK (embedded runtime)
-        # -PembedLettaCodeNative=true bakes the nodejs-mobile libnode .so + the
-        # npm-packaged Letta Code assets into the APK so the agent can run
-        # on-device (local runtime), not only via the remote shim.
-        # -PembedLettaCodeAssets=true is implied by Native but set explicitly.
+      - name: Build signed play-release APK (${{ matrix.variant }})
         env:
           SIGNING_STORE_FILE: letta-release.jks
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -88,7 +88,8 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_URL: ${{ secrets.SENTRY_URL }}
-        run: ./gradlew :app:assemblePlayRelease -PembedLettaCodeNative=true -PembedLettaCodeAssets=true --build-cache
+          EMBED: ${{ matrix.variant == 'full' }}
+        run: ./gradlew :app:assemblePlayRelease -PembedLettaCodeNative="$EMBED" -PembedLettaCodeAssets="$EMBED" --build-cache
 
       - name: Remove signing keystore
         # Runner is ephemeral, but don't leave the decoded keystore on disk
@@ -97,9 +98,9 @@ jobs:
         run: rm -f app/letta-release.jks
 
       - name: Verify embedded runtime is present in the APK
-        # Fail loudly if the embedded libnode .so didn't make it into the APK —
-        # a non-embedded release APK is a silent regression of this workflow's
-        # whole purpose.
+        # Fail loudly if the embedded libnode .so didn't make it into the full APK —
+        # a full APK without the runtime is a silent regression.
+        if: matrix.variant == 'full'
         working-directory: android-compose/app/build/outputs/apk/play/release
         run: |
           set -euo pipefail
@@ -115,16 +116,25 @@ jobs:
         # Inspect the built APK, not Gradle intermediates or the upstream AAR.
         # This is a packaging/ELF check, not a device-load or license clearance claim.
         working-directory: android-compose/app/build/outputs/apk/play/release
+        env:
+          VARIANT: ${{ matrix.variant }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import glob
+          import os
           import struct
           import sys
           import zipfile
 
-          abis = ("arm64-v8a",)  # the embedded (full-fat) build is arm64-v8a only (by4vm.110 D2)
+          full = os.environ["VARIANT"] == "full"
+          # full is arm64-v8a only (by4vm.110 D2); lite adds armeabi-v7a and x86_64 (emulators).
+          # 16 KiB pages only exist on 64-bit devices, so the 64-bit ABIs are the ones checked.
+          expected_abis = {"arm64-v8a"} if full else {"arm64-v8a", "armeabi-v7a", "x86_64"}
+          abis = ("arm64-v8a",) if full else ("arm64-v8a", "x86_64")
           jni = "libautomerge_jni_0_2_0.so"  # org.automerge:androidnative:0.0.9
+          # The runtime and LiteRT-LM ship in full only (by4vm.110.8).
+          variant_libs = ("libnode.so", "liblitertlm_jni.so")
           apks = glob.glob("*.apk")
           if len(apks) != 1:
               sys.exit(f"Expected exactly one release APK, found {len(apks)}: {apks}")
@@ -133,8 +143,14 @@ jobs:
               names = apk.namelist()
               if len(names) != len(set(names)):
                   sys.exit("Duplicate ZIP entries in release APK")
+              shipped_abis = {n.split("/")[1] for n in names if n.startswith("lib/") and n.endswith(".so")}
+              if shipped_abis != expected_abis:
+                  sys.exit(f"{os.environ['VARIANT']} APK must ship {sorted(expected_abis)}, ships {sorted(shipped_abis)}")
+              for lib in variant_libs:
+                  if full != any(n.endswith(f"/{lib}") for n in names):
+                      sys.exit(f"{lib} must ship {'in' if full else 'only in the full APK, not in'} {os.environ['VARIANT']}")
               for abi in abis:
-                  for lib in (jni, "libnode.so"):
+                  for lib in (jni, *variant_libs) if full else (jni,):
                       entry = f"lib/{abi}/{lib}"
                       if entry not in names:
                           sys.exit(f"Missing shipped native library: {entry}")
@@ -168,25 +184,24 @@ jobs:
           PY
 
       - name: Rename APK with tag
-        # The play-release build IS the prod artifact (package com.letta.mobile,
-        # release keystore, embedded runtime verified above). Name it -prod so
-        # the release page reads by audience, not by runtime packaging — the
-        # old -embedded name made the prod APK look like a side artifact.
+        # letta-mobile-<tag>-full.apk / -lite.apk: same package and signature, so a phone
+        # can move between them by installing the other one over it.
         id: artifact
         working-directory: android-compose/app/build/outputs/apk/play/release
         run: |
           set -euo pipefail
           tag="${{ github.event.inputs.tag || github.ref_name }}"
           src=$(ls *.apk | head -n 1)
-          dest="letta-mobile-${tag}-prod.apk"
+          dest="letta-mobile-${tag}-${{ matrix.variant }}.apk"
           cp -f "$src" "$dest"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "${{ matrix.variant }} APK: $(du -h "$dest" | cut -f1) ($(stat --printf='%s' "$dest") bytes)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: android-compose/app/build/outputs/apk/play/release/letta-mobile-*-prod.apk
+          name: android-apk-${{ matrix.variant }}
+          path: android-compose/app/build/outputs/apk/play/release/letta-mobile-*-${{ matrix.variant }}.apk
           if-no-files-found: error
 
   # ── Desktop: Windows EXE + MSI installers ───────────────────────────────
@@ -332,10 +347,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [android-apk, desktop-installers, server-wrapper]
     steps:
-      - name: Download APK artifact
+      - name: Download APK artifacts
         uses: actions/download-artifact@v4
         with:
-          name: android-apk
+          pattern: android-apk-*
+          merge-multiple: true
           path: release-assets
 
       - name: Download desktop installers

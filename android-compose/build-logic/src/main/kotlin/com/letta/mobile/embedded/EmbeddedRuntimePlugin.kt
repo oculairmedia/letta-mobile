@@ -10,15 +10,16 @@ import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.TaskProvider
 
 /**
- * `com.letta.mobile.embedded-runtime`: the dev-only on-device letta-code runtime for :app
+ * `com.letta.mobile.embedded-runtime`: the on-device letta-code runtime for :app
  * (nodejs-mobile libnode + NDK helpers + the patched letta.js asset tree), formerly ~1,100 lines
  * of app/build.gradle.kts. Pins live in `letta-code-runtime/letta-code-runtime.properties` (the one
  * letta-code pin, shared with the desktop bundle and the wire contract), the letta.js patches in
  * `letta-code-runtime/patches/`, shipped preloads in `letta-code-runtime/runtime/`.
  *
- * Everything is gated by `embedLettaCodeNative` / `embedLettaCodeAssets` ([EmbeddedRuntimeFlags]);
- * with both off (CI, the default) the tasks are registered but skipped and only the
- * EMBEDDED_LETTACODE_* BuildConfig fields are added.
+ * Everything is gated by `embedLettaCodeNative` / `embedLettaCodeAssets` ([EmbeddedRuntimeFlags]),
+ * which is also the release variant switch: on = `full` (arm64-v8a, runtime + LiteRT-LM), off =
+ * `lite` (arm64-v8a/armeabi-v7a/x86_64, neither; CI and the default) where the tasks are registered but skipped and
+ * only the EMBEDDED_LETTACODE_* BuildConfig fields are added. See docs/RELEASE.md.
  */
 class EmbeddedRuntimePlugin : Plugin<Project> {
     override fun apply(project: Project) {

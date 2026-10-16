@@ -85,7 +85,7 @@ object DreamingStrings {
         DreamUnsupportedReason.HostNeedsUpdate -> "This Iroh host is too old for dreaming controls. Update the host (meridian-iroh-wrapper)."
         DreamUnsupportedReason.NoNativeAppServer -> "This host has no App Server connection to letta-code, so it can't manage dreaming."
         DreamUnsupportedReason.RuntimeTooOld ->
-            "This letta-code runtime can't dream on request. The on-phone runtime is for development only; " +
+            "This letta-code runtime can't dream on request yet (the on-phone runtime included); " +
                 "use a desktop or server runtime."
     }
 
