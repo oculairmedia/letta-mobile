@@ -24,7 +24,7 @@ private fun desktopAgentEditorNavigation(context: DesktopShellContext): DesktopA
     return DesktopAgentEditorNavigation(
         onClose = { navigator.editAgentId = null },
         onOpen = navigator::navigate,
-        onIdentityChange = { agentId, identity -> navigator.avatarOverrides = navigator.avatarOverrides + (agentId to identity) },
+        onIdentityChange = { agentId, identity -> context.avatarOverrides.value += agentId to identity },
         onRosterChanged = context.core.chatController::retryConnection,
     )
 }

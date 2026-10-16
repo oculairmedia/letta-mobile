@@ -2,12 +2,14 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.dreaming.DreamNotifyPrefs
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.shell.ShellWorkspaceState
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 
 /**
@@ -19,9 +21,9 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 internal fun DesktopShellEffects(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    tabs: MutableState<ConversationTabsState>,
 ) {
-    DesktopShellChatEffects(context, frame, tabs)
+    DesktopShellChatEffects(context, frame)
+    SyncShellWorkspace(context.navigator, frame.chatState)
     DesktopShellNucleusEffects(context, frame)
     DesktopShellQuickQueryBridge(context, frame)
     DesktopShellFocusedAgentLoaders(context, frame)
@@ -31,7 +33,6 @@ internal fun DesktopShellEffects(
 private fun DesktopShellChatEffects(
     context: DesktopShellContext,
     frame: DesktopShellFrame,
-    tabs: MutableState<ConversationTabsState>,
 ) {
     val chatController = context.core.chatController
     val chatState = frame.chatState
@@ -56,8 +57,29 @@ private fun DesktopShellChatEffects(
             cronPanel = context.panels.cronPanel,
         ),
     )
-    SyncConversationTabs(chatState, selectedDestination, tabs.value) { tabs.value = it }
 }
+
+/**
+ * Reports the chat's selection to the shared workspace (letta-mobile-ckmub.17.3): a new session
+ * resets it, the shown conversation is the agent's last active one and gets a tab while the chat is
+ * the page, and once the gateway has reported its conversations, gone ones lose their tabs.
+ */
+@Composable
+private fun SyncShellWorkspace(workspace: ShellWorkspaceState, chatState: DesktopChatSurfaceState) {
+    LaunchedEffect(workspace, chatState.sessionGraphId) { workspace.sessionChanged(chatState.sessionGraphId) }
+    val shown = chatState.selectedConversationId?.let(::ConversationId)
+    val shownAgent = chatState.selectedConversation?.agentId?.let(::AgentId)
+    LaunchedEffect(workspace, workspace.page.kind, shown, shownAgent) { workspace.conversationShown(shown, shownAgent) }
+    LaunchedEffect(workspace, chatState.connectionState, chatState.conversations) {
+        if (chatState.connectionState.reportedConversations) {
+            workspace.conversationsReported(chatState.conversations.mapTo(mutableSetOf()) { ConversationId(it.id) })
+        }
+    }
+}
+
+/** Live and NoConversations are the states in which the gateway's conversation list is authoritative. */
+private val DesktopChatConnectionState.reportedConversations: Boolean
+    get() = this == DesktopChatConnectionState.Live || this == DesktopChatConnectionState.NoConversations
 
 /**
  * Background work can belong to a conversation the user has switched away from; the

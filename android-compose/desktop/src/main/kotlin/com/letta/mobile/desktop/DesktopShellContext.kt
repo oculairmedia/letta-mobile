@@ -1,15 +1,21 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.letta.mobile.avatar.core.MascotIdentity
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.mayForwardAsUserAction
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.shell.ShellOverlays
+import com.letta.mobile.data.shell.ShellWorkspaceNavigator
+import com.letta.mobile.data.shell.ShellWorkspaceState
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSessionPort
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -31,9 +37,16 @@ internal data class DesktopShellContext(
     val shell: DesktopAppShellBindings,
     val core: DesktopShellCore,
     val panels: DesktopShellPanels,
-    val navigator: DesktopShellNavigator,
-    val router: DesktopShellRouter,
-    val overlays: DesktopOverlayVisibility,
+    /** What the shell shows: the shared workspace state (letta-mobile-ckmub.17.3). */
+    val navigator: ShellWorkspaceState,
+    /** The shared navigation verbs over [navigator] and this window's chat. */
+    val router: ShellWorkspaceNavigator,
+    val overlays: ShellOverlays,
+    /**
+     * Avatar styles chosen via the editor this session, applied immediately to the orbs
+     * regardless of whether the backend round-trips agent metadata.
+     */
+    val avatarOverrides: MutableState<Map<String, MascotIdentity>>,
     val chatState: State<DesktopChatSurfaceState>,
     /** Sends an A2UI action over the live session, defaulting to the selected conversation. */
     val onA2uiAction: (A2uiAction) -> Unit,
@@ -44,16 +57,16 @@ internal data class DesktopShellContext(
 @Composable
 internal fun rememberDesktopShellContext(
     shell: DesktopAppShellBindings,
-    navigator: DesktopShellNavigator,
+    navigator: ShellWorkspaceState,
 ): DesktopShellContext {
-    val overlays = remember { DesktopOverlayVisibility() }
     val core = rememberDesktopShellCore()
     val chatController = core.chatController
     val chatState = chatController.state.collectAsState()
     val panels = rememberDesktopShellPanels(core, chatState.value)
     val router = remember(navigator, chatController, chatState) {
-        DesktopShellRouter(navigator, chatController, chatState)
+        ShellWorkspaceNavigator(navigator, DesktopShellChatPort(chatController, chatState))
     }
+    val avatarOverrides = remember { mutableStateOf(emptyMap<String, MascotIdentity>()) }
     val onA2uiAction: (A2uiAction) -> Unit = { action ->
         val resolved = resolveA2uiAction(action, chatState.value.selectedConversationId)
         // letta-mobile-by4vm.2: desktop has no registry-backed A2UI approval path, so a
@@ -66,7 +79,8 @@ internal fun rememberDesktopShellContext(
         panels = panels,
         navigator = navigator,
         router = router,
-        overlays = overlays,
+        overlays = navigator.overlays,
+        avatarOverrides = avatarOverrides,
         chatState = chatState,
         onA2uiAction = onA2uiAction,
         sharedChat = rememberDesktopSharedChatWiring(chatController, onA2uiAction, core.bootstrap.dataBindings.modelControl?.catalog),

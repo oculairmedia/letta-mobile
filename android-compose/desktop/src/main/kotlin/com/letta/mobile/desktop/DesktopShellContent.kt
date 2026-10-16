@@ -174,7 +174,7 @@ private fun DesktopShellAgentRail(context: DesktopShellContext, frame: DesktopSh
             // Contacts-style picker over the persistent-agent roster: agent creation lives inside it, and
             // it lists every agent the recents cut left off the rail.
             onNewSession = { context.overlays.newConversation = true },
-            onAgentSettings = { navigator.editAgentId = it },
+            onAgentSettings = { navigator.editAgentId = AgentId(it) },
         ),
     )
 }
