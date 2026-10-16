@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * letta-mobile-ckmub.5: there is ONE letta-code wire contract (0.34.8). The contract matrix's
+ * letta-mobile-ckmub.5: there is ONE letta-code wire contract (0.34.14). The contract matrix's
  * `baseline.version` is its source of truth; the desktop bundled runtime, the
  * `appserver-contract-baseline` CI job, the README pin table, [LettaCodeContract] and the pins
  * quoted in CLAUDE.md / AGENTS.md / the CLI READMEs must all name it, and this test fails the

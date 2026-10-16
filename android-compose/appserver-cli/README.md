@@ -19,9 +19,9 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --listen ws://127.0.0.1:4500
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.14 --listen ws://127.0.0.1:4500
 .\bin\meridian-app-server.bat app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.8 --dry-run
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.34.14 --dry-run
 ```
 
 Loopback development uses no WebSocket auth. Non-loopback listeners require
@@ -59,7 +59,7 @@ server that requires bearer auth.
 hand-authored. `AppServerRestartReplayEvidenceTest` runs everywhere and hard-fails
 when the evidence's `source.version` drifts from
 `AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`. The evidence is still
-the 0.29.12 capture; re-capturing it at the 0.34.8 contract is letta-mobile-ckmub.13
+the 0.29.12 capture; re-capturing it at the 0.34.14 contract is letta-mobile-ckmub.13
 (it needs a model provider, so it runs on the Linux host). `AppServerRestartReplayProbeTest` is the
 capture tool: it launches a real `letta.js app-server`, runs a turn, kills and
 restarts the process against the same backend root, replays the same
@@ -73,7 +73,7 @@ version you are capturing):
 
 ```bash
 NODE=~/.nvm/versions/node/v24.18.0/bin/node
-LETTA_JS=~/letta-code-0.34.8/node_modules/@letta-ai/letta-code/letta.js   # the 0.34.8 contract
+LETTA_JS=~/letta-code-0.34.14/node_modules/@letta-ai/letta-code/letta.js   # the 0.34.14 contract
 "$NODE" --version   # must match the `source.node` you are about to record
 ```
 

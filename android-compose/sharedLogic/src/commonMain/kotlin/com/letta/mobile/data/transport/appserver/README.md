@@ -1,30 +1,32 @@
 # App Server protocol client
 
 Kotlin client for the Letta App Server (Protocol V2, alpha hard-cut): one bidirectional
-WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.34.8`
+WebSocket at `/ws`. Wire types are pinned to `@letta-ai/letta-code@0.34.14`
 (`APP_SERVER_PROTOCOL_VERSION = 1`), the one contract (letta-mobile-ckmub.5). Its command and
 message unions are those of 0.32.10 plus `launch_subagent` / `launch_subagent_response` (0.33.6)
-plus the `turn_finished_ack` command (0.34.8), with optional 0.34 fields:
+plus the `turn_finished_ack` command (0.34.8) plus `browser_device_mcp_oauth` /
+`browser_device_mcp_oauth_cancel` / `browser_device_mcp_oauth_response` (0.34.14, not used by the
+client), with optional 0.34 fields:
 `input.terminal_consumer_id`, `turn_finished.terminal_consumer_ids`, `client_preferences` on
 `create_message` / `teleport_continue`, workflow `progress`, the `memory_palace` experiment.
 
 ## letta-code version pins
 
-There is **one** wire contract: **0.34.8**. Every other version below is a runtime or a
+There is **one** wire contract: **0.34.14**. Every other version below is a runtime or a
 capture that is knowingly not the contract, and says why. Each pin has one source of truth;
 everything else cites it (letta-mobile-bzvro.10, letta-mobile-ckmub.5).
 
 | Pin | Version | Source of truth | What it means |
 |---|---|---|---|
-| Wire contract | 0.34.8 | `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` (`baseline.version`) | THE contract. The protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`). 102 commands, 112 messages. The same version is, and must stay: the desktop bundled runtime (`desktop/build.gradle.kts` `desktopLettaCodeVersion`, mirrored in `desktop/runtime/package.json`, `package-lock.json`, `runtime-manifest.json`); the `appserver-contract-baseline` CI job (it reads `baseline.version` from the matrix, never a literal); `LettaCodeContract.VERSION` (user-facing text); the forward-compatibility frames (`commonTest/.../LettaCode0348Frames.kt`); and the pins quoted in CLAUDE.md, AGENTS.md and the CLI READMEs. `LettaCodeVersionPinsTest` (appserver-cli) fails if any of them disagree. |
+| Wire contract | 0.34.14 | `sharedLogic/src/jvmTest/resources/appserver/app-server-v2-contract-matrix.json` (`baseline.version`) | THE contract. The protocol `.d.ts` corpus the Kotlin wire types are verified against (`scripts/appserver/verify-contract-baseline.mjs`). 104 commands, 113 messages. The same version is, and must stay: the desktop bundled runtime (`desktop/build.gradle.kts` `desktopLettaCodeVersion`, mirrored in `desktop/runtime/package.json`, `package-lock.json`, `runtime-manifest.json`); the `appserver-contract-baseline` CI job (it reads `baseline.version` from the matrix, never a literal); `LettaCodeContract.VERSION` (user-facing text); the forward-compatibility frames (`commonTest/.../LettaCode0348Frames.kt`); and the pins quoted in CLAUDE.md, AGENTS.md and the CLI READMEs. `LettaCodeVersionPinsTest` (appserver-cli) fails if any of them disagree. |
 | Deployed Linux host | 0.33.6 | the host (not in this repo) | Not the contract: the host has not been redeployed to 0.34.x yet (redeploy item, letta-mobile-ckmub.14). The client keeps working against it: decoding is additive-tolerant (0.34-only fields are optional, unknown frames decode to `Unknown`), and the 0.34-only `turn_finished_ack` / `terminal_consumer_id` / `client_preferences` are never sent by production code, so nothing requires a 0.34 server. Any future use must be gated on an advertised capability. |
 | Live golden capture | 0.32.3 | `golden/letta-code-0.32.3-live.jsonl` (same matrix) | A historical capture, not the contract. To be re-captured after the host redeploy (letta-mobile-ckmub.14); it needs a live server (`scripts/appserver/capture-live-goldens.mjs`). Its unions equal 0.32.10, so it covers neither `launch_subagent` nor `turn_finished_ack`. |
-| Restart-replay evidence | 0.29.12 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Not the contract until re-captured: it is produced by a live probe against a real local server plus a model provider, which a pin bump cannot fake. Durability and identity observations (restart, reconnect, `client_message_id`) were measured on 0.29.12 and are not re-measured on 0.34.8 yet; the re-capture at 0.34.8 is letta-mobile-ckmub.13. |
+| Restart-replay evidence | 0.29.12 | `appserver-cli/src/test/resources/appserver/restart-replay-evidence.json` (`AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION`) | Not the contract until re-captured: it is produced by a live probe against a real local server plus a model provider, which a pin bump cannot fake. Durability and identity observations (restart, reconnect, `client_message_id`) were measured on 0.29.12 and are not re-measured on the contract yet; the re-capture at the contract is letta-mobile-ckmub.13. |
 | Android embedded runtime (dev-only) | 0.26.1 | `app/embedded-runtime/embedded-runtime.properties` (`lettaCodeVersion`, read by the `com.letta.mobile.embedded-runtime` build-logic plugin), cited as `LettaCodeContract.ANDROID_EMBEDDED_VERSION` | **Development only, not a production path.** The letta-code the Android app runs in-process on nodejs-mobile. It cannot reach the contract (nodejs-mobile ships Node 18; letta-code 0.26.2+ needs Node >= 22.19), and a full on-device execution runtime is a Google Play arbitrary-code-execution policy risk. Production Android reaches letta-code remotely (desktop host or Iroh host running the contract). Android Settings says so next to the runtime. |
 
 ### What "verified against a 0.33/0.34 server" means
 
-The desktop bundled runtime and any remote 0.34.x App Server speak the 0.34.8 wire. The Android
+The desktop bundled runtime and any remote 0.34.x App Server speak the contract wire. The Android
 embedded runtime does not: it is 0.26.1 and never emits the 0.33/0.34-only shapes (for example
 `execute_command_response`, `approval_classification_end`, `removed[]` on scope updates,
 `cron_pause`, `terminal_consumer_ids`). So any acceptance criterion of the form "verified against

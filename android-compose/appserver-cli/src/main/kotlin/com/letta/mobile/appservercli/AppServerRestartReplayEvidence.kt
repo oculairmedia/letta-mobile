@@ -148,9 +148,9 @@ data class AppServerRestartReplayEvidence(
     companion object {
         /**
          * letta-code version this evidence was captured against. Deliberately NOT tied to the
-         * desktop bundled runtime or the wire contract baseline (both 0.34.8): re-capturing
+         * desktop bundled runtime or the wire contract baseline (both 0.34.14): re-capturing
          * needs a live local server plus a model provider, so the evidence stays at the version
-         * it was observed on until the probe is re-run (0.34.8: letta-mobile-ckmub.13). The README pin
+         * it was observed on until the probe is re-run (letta-mobile-ckmub.13). The README pin
          * table states this and `LettaCodeVersionPinsTest` keeps it honest.
          */
         const val PINNED_LETTA_CODE_VERSION: String = "0.29.12"

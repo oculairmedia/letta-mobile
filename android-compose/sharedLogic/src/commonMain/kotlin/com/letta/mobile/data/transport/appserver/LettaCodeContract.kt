@@ -15,7 +15,7 @@ object LettaCodeContract {
      * is not redeployed) must keep working: decoding is additive-tolerant and 0.34-only commands
      * are not sent without a capability.
      */
-    const val VERSION: String = "0.34.8"
+    const val VERSION: String = "0.34.14"
 
     /**
      * The letta-code the Android app embeds (nodejs-mobile, Node 18). Developer use only: it

@@ -7,7 +7,7 @@ Letta Mobile is a Kotlin Multiplatform project that ships **two clients** from o
 - **Android app** (`com.letta.mobile` / `.dev`) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code wire contract, `@letta-ai/letta-code@0.34.8` (= desktop bundled runtime = `appserver-contract-baseline` CI job); the Android embedded runtime 0.26.1 is **dev-only** (nodejs-mobile Node 18, Google Play policy), production Android is remote-only; the Linux host still runs 0.33.6 until redeployed; restart-replay evidence stays at 0.29.12 until re-captured live. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server is reached over a single bidirectional `/ws` connection. There is ONE letta-code wire contract, `@letta-ai/letta-code@0.34.14` (= desktop bundled runtime = `appserver-contract-baseline` CI job); the Android embedded runtime 0.26.1 is **dev-only** (nodejs-mobile Node 18, Google Play policy), production Android is remote-only; the Linux host still runs 0.33.6 until redeployed; restart-replay evidence stays at 0.29.12 until re-captured live. All pins are tabulated in `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/appserver/README.md`.
 
 **Location:** `/opt/stacks/letta-mobile`
 **Build root:** `android-compose/` (the Gradle workspace)
@@ -40,7 +40,7 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 
 To iterate on the phone UI from a desktop (`:desktop:runPhone`, `:desktop:runPhonePlayground`, hot reload), see `docs/development/phone-preview.md`.
 
-For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.8`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
+For App Server contract work, also provision Node `v24.18.0` and the contract `@letta-ai/letta-code@0.34.14`; restart-replay evidence is still the 0.29.12 capture (see the App Server section of `AGENTS.md`). Anything "verified against a 0.33/0.34 server" is desktop/remote-only, never the embedded Android runtime.
 
 ---
 

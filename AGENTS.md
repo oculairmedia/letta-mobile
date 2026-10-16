@@ -587,7 +587,7 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
   `~/.nvm/versions/node/v24.18.0/bin/node`). There is ONE wire contract:
-  **`@letta-ai/letta-code@0.34.8`** (`app-server-v2-contract-matrix.json` `baseline.version`),
+  **`@letta-ai/letta-code@0.34.14`** (`app-server-v2-contract-matrix.json` `baseline.version`),
   which is also the desktop's bundled runtime and what the `appserver-contract-baseline` CI job
   installs; `LettaCodeVersionPinsTest` fails if they disagree. Not the contract: the Linux host
   still runs **`0.33.6`** until redeployed (the client must keep working against it: never

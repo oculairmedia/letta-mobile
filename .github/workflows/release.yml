@@ -9,7 +9,7 @@ name: Release
 #     (nodejs-mobile libnode + npm assets baked in, so the app can run the
 #     agent on-device with no remote shim). That runtime is the dev-only
 #     embedded pin in android-compose/app/embedded-runtime/embedded-runtime.properties
-#     (letta-code 0.26.1 on Node 18, below the 0.34.8 wire contract); whether the
+#     (letta-code 0.26.1 on Node 18, below the 0.34.14 wire contract); whether the
 #     Play release keeps shipping it is an open product call (letta-mobile-by4vm.92),
 #     so the embed flags and libnode checks below are deliberately unchanged,
 #   - the Windows desktop EXE + MSI installers, and

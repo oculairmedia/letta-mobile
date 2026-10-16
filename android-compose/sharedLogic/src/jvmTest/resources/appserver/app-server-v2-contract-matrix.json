@@ -1,12 +1,12 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.34.8",
+    "version": "0.34.14",
     "node": "v24.18.0",
     "package_engine": ">=22.19.0",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
-    "protocol_sha256": "87e0cf05f1f4e726f880dcd42c3f165c56f64d846c8375a8cb386dc3f763110e",
-    "protocol_corpus_sha256": "f1be347e560f37d9899c5ae2c9d2de7b347f7eae71c9495e8ace5191bdbec344",
+    "protocol_sha256": "1a37d456a5e48ed003e4f5f0b1f6fcf29b0ec4e3f44d5b3b07b6ade3ac418498",
+    "protocol_corpus_sha256": "aad6304f10e25203679d0dfdca1ae45e176665ca26c0b1421199acc0e5f6e8ac",
     "protocol_corpus_files": [
       "dist/types/backend/api/ephemeral-conversations.d.ts",
       "dist/types/runtime-execution-settings.d.ts",
@@ -19,6 +19,7 @@
       "dist/types/types/conversation-fork-protocol.d.ts",
       "dist/types/types/cwd-protocol.d.ts",
       "dist/types/types/external-tool-protocol.d.ts",
+      "dist/types/types/file-write-protocol.d.ts",
       "dist/types/types/loop-status-protocol.d.ts",
       "dist/types/types/protocol_v2.d.ts",
       "dist/types/types/provider-oauth-config.d.ts",
@@ -32,18 +33,18 @@
       "dist/types/types/toolset-protocol.d.ts",
       "dist/types/types/turn-finished-protocol.d.ts"
     ],
-    "captured_at": "2026-10-11",
+    "captured_at": "2026-10-16",
     "capture_method": "executed the resolved installed package entrypoint with the pinned Node v24.18.0 runtime; retained stdout fixtures and omitted local wrapper stderr",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.34.8 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.34.14 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
     "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage",
     "live_server_golden_fixture": "golden/letta-code-0.32.3-live.jsonl",
-    "live_server_note": "The golden was captured when the deployed App Server ran 0.32.3 (the host runs 0.33.6 now; redeploy to the 0.34.8 contract is letta-mobile-ckmub.14); 0.32.3's WsProtocolCommand/WsProtocolMessage unions equal the 0.32.10 baseline (100 commands, 111 messages); 0.33.6 added exactly launch_subagent and launch_subagent_response (101 commands, 112 messages); the 0.34.8 baseline adds exactly the turn_finished_ack command (102 commands, 112 messages)."
+    "live_server_note": "The golden was captured when the deployed App Server ran 0.32.3 (the host runs 0.33.6 now; redeploy to the 0.34.14 contract is letta-mobile-ckmub.14); 0.32.3's WsProtocolCommand/WsProtocolMessage unions equal the 0.32.10 baseline (100 commands, 111 messages); 0.33.6 added exactly launch_subagent and launch_subagent_response (101 commands, 112 messages); the 0.34.8 baseline adds exactly the turn_finished_ack command (102 commands, 112 messages). 0.34.14 adds exactly the browser_device_mcp_oauth / browser_device_mcp_oauth_cancel commands and the browser_device_mcp_oauth_response message (104 commands, 113 messages); its other declaration changes are optional fields (launch_subagent notify/runtime, update_subagent_state result/error_code, write_file encoding/append/move_to moved into file-write-protocol.d.ts, two app_server_info capability flags)."
   },
   "downstream_ownership_policy": {
     "status": "mobile migration policy, not an upstream protocol limitation",
@@ -52,7 +53,7 @@
     "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
   },
   "upstream_socket_behavior": {
-    "source": "installed letta.js 0.34.8 (re-checked 2026-10-11; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
+    "source": "installed letta.js 0.34.14 (re-checked 2026-10-16; behaviour unchanged from 0.29.12) one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
     "multiple_clients": "the listener accepts independent concurrent /ws clients; request correlation and runtime subscriptions are connection-local",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",
