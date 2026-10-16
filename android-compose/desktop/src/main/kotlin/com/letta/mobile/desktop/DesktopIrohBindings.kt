@@ -228,18 +228,17 @@ internal fun rememberDesktopChatController(
         buildDesktopChatController(bindings)
     }
     // The canonical (paginated) route is installed per controller so it retires with the transport
-    // generation that opened it. It stays dormant unless explicitly switched on: while enabled,
-    // selecting a conversation takes the windowed ledger path INSTEAD of legacy whole-history
-    // hydration, and sends are not on that path yet.
+    // generation that opened it. Its shared send coordinator sends over the Iroh channel transport,
+    // the same instance the chat gateway uses, so only Iroh mode can serve it; App Server backends
+    // keep the controller's in-memory timeline loop.
     val canonicalHost = remember(controller) {
         DesktopCanonicalTimelineHost().also { host ->
-            if (!host.isEnabled) return@also
-            val graph = runtime.dataBindings.sessionGraphProvider.current
+            val irohTransport = bindings.irohTransport ?: return@also
             host.installOn(
                 controller,
                 DesktopCanonicalSendInstall(
-                    frameSource = graph.channelTransport,
-                    conversationRepository = graph.conversationRepository,
+                    frameSource = irohTransport,
+                    conversationRepository = { runtime.dataBindings.sessionGraphProvider.current.conversationRepository },
                     scope = runtime.chatScope,
                     activeConfig = { runtime.bootstrapState.config },
                     clientVersion = { DESKTOP_CANONICAL_CLIENT_VERSION },
