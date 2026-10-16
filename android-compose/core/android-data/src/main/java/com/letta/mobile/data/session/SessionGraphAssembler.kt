@@ -13,7 +13,7 @@ import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.backendKind
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationRepository
@@ -28,8 +28,8 @@ import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcConversationListSource
+import com.letta.mobile.data.repository.routedBackendKind
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import dagger.Lazy
 import javax.inject.Inject
@@ -71,15 +71,14 @@ class SessionGraphAssembler @Inject constructor(
             scope = request.scope,
             snapshots = settingsStore?.let(::ContextReadingSnapshots),
         )
-        val forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
-        val useIroh = request.activeConfig.sessionBackendBinding(forceIroh = forceIroh).bindsIroh()
+        val useIroh = request.activeConfig.routedBackendKind() == BackendKind.IROH
         val repositories = SharedSessionRepositoryGraph(
             identity = SessionGraphIdentity(
                 id = request.graphId,
                 backendDescriptor = request.backendDescriptor,
                 localRuntimeBackend = request.localRuntimeBackend,
                 channelTransport = request.channelTransport,
-                capabilities = sessionCapabilities(request, forceIroh),
+                capabilities = sessionCapabilities(request),
             ),
             host = HostSessionRepositories(
                 agentRepository = agentRepository,
@@ -172,10 +171,10 @@ class SessionGraphAssembler @Inject constructor(
      * [com.letta.mobile.data.backend.SessionRouteMatrix] for the config's backend kind, plus any route
      * a bound remote source adds. The Iroh host's advertised features are read live.
      */
-    private fun sessionCapabilities(request: SessionGraphAssembleRequest, forceIroh: Boolean): SessionCapabilities =
+    private fun sessionCapabilities(request: SessionGraphAssembleRequest): SessionCapabilities =
         SessionCapabilities.forSession(
             platform = SessionPlatform.ANDROID,
-            kind = request.activeConfig?.backendKind(forceIroh = forceIroh),
+            kind = request.activeConfig?.routedBackendKind(),
             hostCapabilities = { request.channelTransport.hostCapabilities },
             extraBound = remoteSources.boundRoutes(),
         )

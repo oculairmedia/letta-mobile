@@ -1,10 +1,11 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.backendKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import com.letta.mobile.runtime.BackendKind as RuntimeBackendKind
 
 class SessionBackendSelectionTest {
@@ -17,13 +18,8 @@ class SessionBackendSelectionTest {
             serverUrl = "iroh://deadbeef@127.0.0.1:1122",
         )
 
-        assertEquals(SessionBackendBinding.LocalRuntime, config.sessionBackendBinding())
-        assertEquals(
-            SessionBackendBinding.LocalRuntime,
-            config.sessionBackendBinding(forceIroh = true),
-        )
-        assertTrue(config.sessionBackendBinding().bindsLocalRuntime())
-        assertFalse(config.sessionBackendBinding().bindsIroh())
+        assertEquals(BackendKind.LOCAL_RUNTIME, config.backendKind())
+        assertEquals(BackendKind.LOCAL_RUNTIME, config.backendKind(forceIroh = true))
     }
 
     @Test
@@ -34,25 +30,19 @@ class SessionBackendSelectionTest {
             serverUrl = "iroh://node@127.0.0.1:1122",
         )
 
-        assertEquals(SessionBackendBinding.Iroh, config.sessionBackendBinding())
-        assertTrue(config.sessionBackendBinding().bindsIroh())
+        assertEquals(BackendKind.IROH, config.backendKind())
     }
 
     @Test
-    fun forceIrohBindsIrohForNonLocalHttpConfig() {
+    fun forceIrohBindsIrohForNonLocalDirectConfig() {
         val config = LettaConfig(
             id = "http",
             mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "http://localhost:8283",
         )
 
-        assertEquals(SessionBackendBinding.RemoteHttp, config.sessionBackendBinding())
-        assertEquals(SessionBackendBinding.Iroh, config.sessionBackendBinding(forceIroh = true))
-    }
-
-    @Test
-    fun nullConfigBindsRemoteHttp() {
-        assertEquals(SessionBackendBinding.RemoteHttp, null.sessionBackendBinding())
+        assertEquals(BackendKind.DIRECT_WS, config.backendKind())
+        assertEquals(BackendKind.IROH, config.backendKind(forceIroh = true))
     }
 }
 

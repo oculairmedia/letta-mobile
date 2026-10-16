@@ -12,16 +12,17 @@ import kotlinx.coroutines.Job
  * down the shim-shaped path).
  *
  * The mapping is total and exclusive:
- *  - [BackendKind.LOCAL_RUNTIME] -> [LocalRuntimeChatSendStrategy]
- *  - [BackendKind.IROH]          -> [IrohChatSendStrategy]
- *  - [BackendKind.DIRECT_WS]     -> [TimelineChatSendStrategy]
+ *  - [BackendKind.LOCAL_RUNTIME] -> the `local` route
+ *  - [BackendKind.IROH]          -> the `iroh` route
+ *  - [BackendKind.DIRECT_WS]     -> the `timeline` route
  *
  * letta-mobile-by4vm.26: [BackendKind.DIRECT_WS] is a live configuration (a Settings "Remote
  * host" with a ws:// App Server address; LettaConfigMigration keeps such addresses), not a
  * shim-era leftover, so its strategy stays. Iroh and direct ws:// therefore still reach the same
- * App Server through two send paths ([IrohChatSendStrategy] over the frame channel,
- * [TimelineChatSendStrategy] through the timeline repository); collapsing them is a behaviour
- * change tracked separately.
+ * App Server through two send paths (`iroh` over the frame channel, `timeline` through the
+ * timeline repository): a direct ws:// session binds no frame channel (`SessionChannelTransportFactory`
+ * gives it a NoOp transport), so collapsing them needs a channel transport for DIRECT_WS first —
+ * a wire change tracked on letta-mobile-by4vm.52.
  */
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
@@ -61,18 +62,10 @@ internal class ChatSendStrategySelector(
             "backendKind" to context.backendKind.name,
             "isLocalRuntime" to context.isLocalRuntime,
         )
-        return strategy.send(text, attachments, context)
+        return strategy.send(text, attachments)
     }
 
     fun cancel(context: ChatSendContext) {
         select(context).cancel()
     }
 }
-
-private val ChatSendStrategy.routeName: String
-    get() = when (this) {
-        is LocalRuntimeChatSendStrategy -> "local"
-        is IrohChatSendStrategy -> "iroh"
-        is TimelineChatSendStrategy -> "timeline"
-        else -> this::class.simpleName.orEmpty()
-    }

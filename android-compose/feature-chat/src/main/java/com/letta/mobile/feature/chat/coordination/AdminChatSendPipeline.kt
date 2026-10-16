@@ -9,10 +9,8 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.feature.chat.send.ChatSendStrategy
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
-import com.letta.mobile.feature.chat.send.IrohChatSendStrategy
-import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
-import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.runtime.isPresentationOnly
@@ -72,10 +70,6 @@ internal class AdminChatSendPipeline(
         )
     }
 
-    val timelineChatSendStrategy: TimelineChatSendStrategy by lazy {
-        TimelineChatSendStrategy(timelineSendCoordinator)
-    }
-
     val wsChatSendCoordinator: WsChatSendCoordinator by lazy {
         WsChatSendCoordinator(
             scope = selectedOwner?.scope ?: scope,
@@ -120,24 +114,17 @@ internal class AdminChatSendPipeline(
         )
     }
 
-    val localRuntimeChatSendStrategy: LocalRuntimeChatSendStrategy by lazy {
-        LocalRuntimeChatSendStrategy(localRuntimeChatSendCoordinator)
-    }
-
     /**
-     * lgns8.10.4.1: Iroh's own send route, driving [wsChatSendCoordinator]
-     * (transport-neutral: it talks to whichever `IChannelTransport` the session
-     * graph bound).
+     * lgns8.10.4.1: Iroh's route drives [wsChatSendCoordinator] (transport-neutral: it talks to
+     * whichever `IChannelTransport` the session graph bound).
      */
-    val irohChatSendStrategy: IrohChatSendStrategy by lazy {
-        IrohChatSendStrategy(wsChatSendCoordinator)
-    }
-
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
-            timelineStrategy = timelineChatSendStrategy,
-            localStrategy = localRuntimeChatSendStrategy,
-            irohStrategy = irohChatSendStrategy,
+            timelineStrategy = ChatSendStrategy("timeline", timelineSendCoordinator::send),
+            localStrategy = ChatSendStrategy("local", localRuntimeChatSendCoordinator::send) {
+                localRuntimeChatSendCoordinator.cancel()
+            },
+            irohStrategy = ChatSendStrategy("iroh", wsChatSendCoordinator::send) { wsChatSendCoordinator.cancel() },
         )
     }
 
