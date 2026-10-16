@@ -21,19 +21,11 @@ class SelectedGenerationRetirementTest {
         val firstWriter = FakeTimelineExternalTransportWriter()
         val first = RoutingSelectedChatRuntime(
             generation = 1L,
-            routes = mapOf("old" to SelectedTimelineRoute.LegacyDeferred),
+            conversations = setOf("old"),
             presentations = emptyMap(),
-            canonicalWriter = FakeTimelineExternalTransportWriter(),
-            legacyWriter = firstWriter,
+            canonicalWriter = firstWriter,
             parent = this,
             onRetire = { events += "runtime-retired" },
-        )
-        val session = SelectedTimelineRouteSession(
-            startLegacyObserver = { events += "start:$it" },
-            stopLegacyObserver = {
-                delay(50)
-                events += "old-cleanup"
-            },
         )
         val pipeline = ChatPipelineLifetime(this)
         val pipelineStarted = CompletableDeferred<Unit>()
@@ -60,31 +52,33 @@ class SelectedGenerationRetirementTest {
         pipelineStarted.await()
         ownerStarted.await()
 
-        val observerStarted = CompletableDeferred<Unit>()
-        val observerJob = launch {
+        // The presentation's own cleanup is slow; retirement must still join it first.
+        val presentationStarted = CompletableDeferred<Unit>()
+        val presentationJob = launch {
             try {
-                val decided = session.decide(first, "old", null, this, "agent", null)
-                assertEquals(SelectedTimelineRouteSession.Presentation.LegacyDeferred, decided)
-                session.activateDeferred("old")
-                observerStarted.complete(Unit)
+                events += "start:old"
+                presentationStarted.complete(Unit)
                 awaitCancellation()
             } finally {
-                session.retirePresentation()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    delay(50)
+                    events += "old-cleanup"
+                }
             }
         }
-        observerStarted.await()
+        presentationStarted.await()
         owner.ready("old")
         first.writer.appendExternalTransportLocal("old", "hello", "in-flight")
 
         retireSelectedGeneration(
-            stopPresentation = { observerJob.cancelAndJoin() },
+            stopPresentation = { presentationJob.cancelAndJoin() },
             pipeline = pipeline,
             owner = owner,
             runtime = first,
         )
 
-        assertFalse(observerJob.isActive)
-        assertTrue(observerJob.isCancelled)
+        assertFalse(presentationJob.isActive)
+        assertTrue(presentationJob.isCancelled)
         assertEquals("start:old", events.first())
         assertTrue(events.indexOf("old-cleanup") < events.indexOf("pipeline-closed"))
         assertTrue(events.indexOf("pipeline-closed") < events.indexOf("owner-retired"))
@@ -99,14 +93,11 @@ class SelectedGenerationRetirementTest {
         val secondWriter = FakeTimelineExternalTransportWriter()
         val second = RoutingSelectedChatRuntime(
             generation = 2L,
-            routes = mapOf("old" to SelectedTimelineRoute.LegacyDeferred),
+            conversations = setOf("old"),
             presentations = emptyMap(),
-            canonicalWriter = FakeTimelineExternalTransportWriter(),
-            legacyWriter = secondWriter,
+            canonicalWriter = secondWriter,
             parent = this,
         )
-        session.activateDeferred("old")
-        assertTrue(events.indexOf("old-cleanup") < events.lastIndexOf("start:old"))
         second.writer.appendExternalTransportLocal("old", "hello", "fresh")
         second.writer.markExternalTransportLocalSent("old", "fresh")
         assertEquals("fresh", secondWriter.externalLocals.single().otid)
@@ -120,109 +111,6 @@ class SelectedGenerationRetirementTest {
             assertTrue(failure.message.orEmpty().contains("retired"))
         }
         second.retire()
-    }
-
-    @Test fun conversationSwitchJoinsOldCleanupBeforeReplacementStarts() = runTest {
-        val events = mutableListOf<String>()
-        val first = RoutingSelectedChatRuntime(
-            generation = 1L,
-            routes = mapOf(
-                "old" to SelectedTimelineRoute.LegacyDeferred,
-                "next" to SelectedTimelineRoute.LegacyDeferred,
-            ),
-            presentations = emptyMap(),
-            canonicalWriter = FakeTimelineExternalTransportWriter(),
-            legacyWriter = FakeTimelineExternalTransportWriter(),
-            parent = this,
-        )
-        val session = SelectedTimelineRouteSession(
-            startLegacyObserver = { events += "start:$it" },
-            stopLegacyObserver = {
-                delay(50)
-                events += "stop"
-            },
-        )
-        val oldJob = launch {
-            try {
-                assertEquals(SelectedTimelineRouteSession.Presentation.LegacyDeferred, session.decide(first, "old", null, this, "agent", null))
-                session.activateDeferred("old")
-                awaitCancellation()
-            } finally {
-                session.retirePresentation()
-            }
-        }
-        delay(10)
-        oldJob.cancelAndJoin()
-        session.retirePresentation()
-        events += "replacement-start"
-        val nextJob = launch {
-            try {
-                assertEquals(SelectedTimelineRouteSession.Presentation.LegacyDeferred, session.decide(first, "next", null, this, "agent", null))
-                session.activateDeferred("next")
-                awaitCancellation()
-            } finally {
-                session.retirePresentation()
-            }
-        }
-        delay(10)
-        assertTrue(nextJob.isActive)
-        assertEquals(listOf("start:old", "stop", "replacement-start", "start:next"), events.take(4))
-        nextJob.cancelAndJoin()
-        first.retire()
-    }
-
-    @Test fun teardownAbandonDoesNotJoinAndLateCleanupCannotStopReplacement() = runTest {
-        val events = mutableListOf<String>()
-        val first = RoutingSelectedChatRuntime(
-            generation = 1L,
-            routes = mapOf("old" to SelectedTimelineRoute.LegacyDeferred),
-            presentations = emptyMap(),
-            canonicalWriter = FakeTimelineExternalTransportWriter(),
-            legacyWriter = FakeTimelineExternalTransportWriter(),
-            parent = this,
-        )
-        val releaseOld = CompletableDeferred<Unit>()
-        val session = SelectedTimelineRouteSession(
-            startLegacyObserver = { events += "start:$it" },
-            stopLegacyObserver = {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    events += "old-cleanup-entered"
-                    releaseOld.await()
-                    events += "old-cleanup"
-                }
-            },
-        )
-        val oldJob = launch {
-            try {
-                session.decide(first, "old", null, this, "agent", null)
-                session.activateDeferred("old")
-                awaitCancellation()
-            } finally {
-                session.retirePresentation()
-            }
-        }
-        delay(10)
-        oldJob.cancel()
-        events += "abandoned"
-        val replacement = launch {
-            try {
-                session.decide(first, "old", null, this, "agent", null)
-                session.activateDeferred("next")
-                awaitCancellation()
-            } finally {
-                events += "replacement-stopped"
-            }
-        }
-        delay(10)
-        assertTrue(replacement.isActive)
-        releaseOld.complete(Unit)
-        oldJob.join()
-        assertTrue(replacement.isActive)
-        assertEquals("start:old", events.first())
-        assertTrue(events.indexOf("abandoned") < events.indexOf("old-cleanup"))
-        assertFalse(events.contains("replacement-stopped"))
-        replacement.cancelAndJoin()
-        first.retire()
     }
 
     @Test fun delayedRetryAndTailOfOldPresentationDoNotJoinReplacement() {

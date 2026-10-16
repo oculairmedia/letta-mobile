@@ -10,14 +10,14 @@ import org.junit.Test
 
 class ChatSendStrategySelectorTest {
     @Test
-    fun `selects timeline strategy for a direct ws backend`() {
+    fun `a direct ws backend uses the channel strategy`() {
         val f = Fixture()
 
         val selected = f.selector.select(
             ChatSendContext(explicitConversationId = "conv-1"),
         )
 
-        assertSame(f.timeline.strategy, selected)
+        assertSame(f.iroh.strategy, selected)
     }
 
     // ---------------------------------------------------------------------
@@ -34,7 +34,7 @@ class ChatSendStrategySelectorTest {
         val f = Fixture()
         val selected = f.selectFor(BackendKind.IROH)
         assertSame(f.iroh.strategy, selected)
-        assertNotSame(f.timeline.strategy, selected)
+        assertNotSame(f.local.strategy, selected)
     }
 
     @Test
@@ -78,13 +78,12 @@ class ChatSendStrategySelectorTest {
 
         f.selector.send("hello", listOf(image), context)
 
-        assertEquals(listOf(RecordedSend("hello", listOf(image))), f.timeline.sent)
+        assertEquals(listOf(RecordedSend("hello", listOf(image))), f.iroh.sent)
         assertEquals(0, f.local.sent.size)
-        assertEquals(0, f.iroh.sent.size)
     }
 
     @Test
-    fun `send and cancel over an iroh backend never reach the timeline strategy`() {
+    fun `send and cancel over an iroh backend never reach the local strategy`() {
         val f = Fixture()
         val context = ChatSendContext(
             explicitConversationId = "conv-1",
@@ -96,16 +95,14 @@ class ChatSendStrategySelectorTest {
 
         assertEquals(1, f.iroh.sent.size)
         assertEquals(1, f.iroh.cancels)
-        assertEquals(0, f.timeline.sent.size)
-        assertEquals(0, f.timeline.cancels)
+        assertEquals(0, f.local.sent.size)
+        assertEquals(0, f.local.cancels)
     }
 
     private class Fixture {
-        val timeline = Recorder("timeline")
         val local = Recorder("local")
         val iroh = Recorder("iroh")
         val selector = ChatSendStrategySelector(
-            timelineStrategy = timeline.strategy,
             localStrategy = local.strategy,
             irohStrategy = iroh.strategy,
         )

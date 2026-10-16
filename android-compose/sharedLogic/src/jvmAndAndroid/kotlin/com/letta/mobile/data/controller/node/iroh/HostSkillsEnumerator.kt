@@ -117,6 +117,9 @@ object HostSkillsEnumerator {
             // round-trip an entry from this catalog straight into skill.install.
             put("skill_path", dir.path)
             put("source", "host_enumeration")
+            // letta-code's skill_disable only unlinks a symlink under the skills root
+            // and refuses a real directory, so only a symlinked skill is removable.
+            put("removable", runCatching { java.nio.file.Files.isSymbolicLink(dir.toPath()) }.getOrDefault(false))
         }
     }
 

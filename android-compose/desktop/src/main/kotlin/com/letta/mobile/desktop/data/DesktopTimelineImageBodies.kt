@@ -9,9 +9,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
-import java.nio.file.attribute.FileTime
 import java.security.MessageDigest
-import java.time.Instant
 import java.util.Base64
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -27,7 +25,6 @@ import kotlinx.coroutines.ensureActive
 internal object DesktopTimelineImageBodies {
     const val MAX_IMAGE_BYTES = 8 * 1024 * 1024
     private const val PROVENANCE = "canonical-inline-v1"
-    const val DIRECTORY_SUFFIX = ".images"
     private const val BODY_SUFFIX = ".bin"
     private const val STAGING_PREFIX = "body-"
     private const val STAGING_SUFFIX = ".tmp"
@@ -52,9 +49,6 @@ internal object DesktopTimelineImageBodies {
         currentCoroutineContext().ensureActive()
         return Base64.getEncoder().encodeToString(bytes)
     }
-
-    /** Whether [file] already holds exactly the body [reference] names. */
-    fun holds(file: Path, reference: StoredImageBodyReference): Boolean = load(file, reference) != null
 
     private fun load(file: Path, reference: StoredImageBodyReference): ByteArray? {
         if (reference.provenance != PROVENANCE ||
@@ -95,50 +89,6 @@ internal object DesktopTimelineImageBodies {
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING)
         }
-    }
-
-    /** Marks a deduplicated body as freshly used so a concurrent [sweep] keeps it. */
-    fun touch(file: Path) {
-        try {
-            Files.setLastModifiedTime(file, FileTime.from(Instant.now()))
-        } catch (_: IOException) {
-            // A body that vanished here is re-checked by the reader; nothing to keep alive.
-        }
-    }
-
-    /**
-     * Deletes bodies no longer named by [referenced], and abandoned staging files. Anything modified
-     * after [cutoff] is kept: a body is written before the snapshot that names it, so a fresh
-     * unreferenced body may belong to the next write.
-     */
-    fun sweep(directory: Path, referenced: Set<String>, cutoff: Instant): Int {
-        if (!Files.isDirectory(directory)) return 0
-        var deleted = 0
-        Files.newDirectoryStream(directory).use { entries ->
-            for (entry in entries) {
-                val name = entry.fileName.toString()
-                val reclaimable = when {
-                    name.endsWith(BODY_SUFFIX) -> name.removeSuffix(BODY_SUFFIX) !in referenced
-                    name.startsWith(STAGING_PREFIX) && name.endsWith(STAGING_SUFFIX) -> true
-                    else -> false
-                }
-                if (reclaimable && olderThan(entry, cutoff) && Files.deleteIfExists(entry)) deleted++
-            }
-        }
-        return deleted
-    }
-
-    fun deleteDirectory(directory: Path) {
-        if (!Files.exists(directory)) return
-        Files.walk(directory).use { paths ->
-            paths.sorted(Comparator.reverseOrder()).toList().forEach { Files.deleteIfExists(it) }
-        }
-    }
-
-    private fun olderThan(file: Path, cutoff: Instant): Boolean = try {
-        Files.getLastModifiedTime(file).toInstant().isBefore(cutoff)
-    } catch (_: IOException) {
-        false
     }
 
     private fun sha256Hex(bytes: ByteArray): String =

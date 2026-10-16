@@ -6,21 +6,13 @@ import com.letta.mobile.data.local.BugReportDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.MemFsDao
-import com.letta.mobile.data.local.PendingLocalDao
-import com.letta.mobile.data.local.RoomPendingLocalStore
 import com.letta.mobile.data.local.RuntimeEventDao
-import com.letta.mobile.data.local.ConfirmedTimelineSnapshotDao
-import com.letta.mobile.data.local.RoomConfirmedTimelineStore
 import com.letta.mobile.data.canvas.CanvasDocumentStore
 import com.letta.mobile.data.canvas.CanvasOpLog
 import com.letta.mobile.data.canvas.NotebookCanvasDocumentStore
 import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.local.CanvasOpDao
 import com.letta.mobile.data.local.RoomCanvasOpLog
-import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
-import com.letta.mobile.data.timeline.PendingLocalStore
-import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,29 +22,11 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class PendingLocalStoreModule {
-    @Binds
-    @Singleton
-    abstract fun bindPendingLocalStore(impl: RoomPendingLocalStore): PendingLocalStore
-
-    @Binds
-    @Singleton
-    abstract fun bindConfirmedTimelineStore(impl: RoomConfirmedTimelineStore): ConfirmedTimelineStore
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
 object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): LettaDatabase {
         return LettaDatabase.getDatabase(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideRoomConfirmedTimelineStore(database: LettaDatabase, authority: com.letta.mobile.data.local.TimelineOwnershipAuthority): RoomConfirmedTimelineStore {
-        return RoomConfirmedTimelineStore(database, ownership = authority)
     }
 
     @Provides
@@ -99,26 +73,6 @@ object DatabaseModule {
     }
 
     @Provides
-    fun providePendingLocalDao(database: LettaDatabase): PendingLocalDao {
-        return database.pendingLocalDao()
-    }
-
-    /**
-     * letta-mobile-by4vm.17: pending (unsent) rows are backend-scoped; the store reads the
-     * active backend id lazily so a backend switch clears the outgoing backend's rows.
-     */
-    @Provides
-    @Singleton
-    fun provideRoomPendingLocalStore(
-        dao: PendingLocalDao,
-        settingsRepository: com.letta.mobile.data.repository.api.ISettingsRepository,
-    ): RoomPendingLocalStore =
-        RoomPendingLocalStore(
-            dao,
-            activeBackendId = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
-        )
-
-    @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {
         return database.conversationDao()
     }
@@ -131,11 +85,6 @@ object DatabaseModule {
     @Provides
     fun provideMemFsDao(database: LettaDatabase): MemFsDao {
         return database.memFsDao()
-    }
-
-    @Provides
-    fun provideConfirmedTimelineSnapshotDao(database: LettaDatabase): ConfirmedTimelineSnapshotDao {
-        return database.confirmedTimelineSnapshotDao()
     }
 
     @Provides

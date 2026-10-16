@@ -44,19 +44,14 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
-import com.letta.mobile.data.session.ProcessScope
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.session.SessionScopedChannelTransport
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
-import com.letta.mobile.data.session.UNCONFIGURED_BACKEND_KEY
 import com.letta.mobile.data.session.scopedAgentRepository
 import com.letta.mobile.data.session.scopedAllConversationsRepository
 import com.letta.mobile.data.session.sessionBackendScopedCaches
 import com.letta.mobile.data.session.sessionScoped
 import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
-import com.letta.mobile.data.timeline.PendingLocalStore
-import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -78,8 +73,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.ElementsIntoSet
-import dagger.multibindings.IntoSet
-import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
 @Module
@@ -199,16 +192,12 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter =
-            impl.admittedExternalWriter
-
-        @Provides
-        @Singleton
         fun provideAndroidCanonicalRuntimeFactory(
-            legacy: TimelineRepository,
             authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
             storage: com.letta.mobile.data.local.TimelineOwnedStorageFactory,
-        ) = AndroidCanonicalTimelineRuntimeFactory(legacy, authority, storage)
+            local: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
+            writers: com.letta.mobile.data.session.CanonicalConversationWriters,
+        ) = AndroidCanonicalTimelineRuntimeFactory(authority, storage, local, writers)
 
         @Provides
         @Singleton
@@ -302,26 +291,6 @@ abstract class AppModule {
         @Singleton
         fun provideSessionRemoteSources(): com.letta.mobile.data.session.SessionRemoteSources =
             com.letta.mobile.data.session.SessionRemoteSources.None
-
-        @Provides
-        @Singleton
-        fun provideTimelineRepository(
-            timelineTransport: com.letta.mobile.data.timeline.TimelineTransport,
-            pendingLocalStore: PendingLocalStore,
-            confirmedTimelineStore: com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore,
-            settingsRepository: ISettingsRepository,
-            @ProcessScope processScope: CoroutineScope,
-        ): TimelineRepository {
-            return TimelineRepository(
-                // local-conv-* hydrates from the on-device letta.js transcript
-                // (letta-mobile-czomn); everything else uses the active remote route.
-                timelineTransport = timelineTransport,
-                pendingLocalStore = pendingLocalStore,
-                confirmedTimelineStore = confirmedTimelineStore,
-                backendIdProvider = { settingsRepository.activeConfig.value?.id ?: UNCONFIGURED_BACKEND_KEY },
-                repositoryScope = processScope,
-            )
-        }
     }
 
     @Binds
@@ -395,19 +364,6 @@ abstract class AppModule {
     abstract fun bindChannelNotificationPublisher(
         impl: ChannelNotificationPublisher,
     ): IChannelNotificationPublisher
-
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindTimelineBackendScopedCache(impl: TimelineRepository): BackendScopedCache
-
-    /** letta-mobile-by4vm.17: unsent messages are backend-owned too; drop them on a switch. */
-    @Binds
-    @IntoSet
-    @Singleton
-    abstract fun bindPendingLocalBackendScopedCache(
-        impl: com.letta.mobile.data.local.RoomPendingLocalStore,
-    ): BackendScopedCache
 
     @Binds
     @Singleton

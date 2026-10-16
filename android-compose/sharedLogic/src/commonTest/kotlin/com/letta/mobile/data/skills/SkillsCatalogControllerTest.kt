@@ -86,6 +86,27 @@ class SkillsCatalogControllerTest {
     }
 
     @Test
+    fun aFailedRemoveNamesTheSkillWithoutReplacingTheLoadedList() = runTest {
+        val api = FakeSkillsApi(
+            registry = listOf(github, notion),
+            installed = mutableMapOf("agent-1" to mutableSetOf("notion")),
+            refuseWith = "not a symlink",
+        )
+        val controller = SkillsCatalogController(api, this, agentId = "agent-1")
+        controller.reload()
+        advanceUntilIdle()
+        controller.uninstall("notion")
+        advanceUntilIdle()
+        val state = controller.state.value
+        assertEquals("Couldn't remove notion: not a symlink", state.actionError)
+        assertNull(state.errorMessage)
+        assertEquals(listOf("github", "notion"), state.skills.map { it.name })
+        assertEquals(setOf("notion"), state.installedSkillNames)
+        controller.dismissActionError()
+        assertNull(controller.state.value.actionError)
+    }
+
+    @Test
     fun noApiMeansUnavailable() {
         val state = SkillsCatalogController(api = null, scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Job()), agentId = "agent-1").state.value
         assertFalse(state.available)
@@ -106,6 +127,7 @@ class SkillsCatalogControllerTest {
         private val registry: List<Skill> = emptyList(),
         val installed: MutableMap<String, MutableSet<String>> = mutableMapOf(),
         private val failWith: String? = null,
+        private val refuseWith: String? = null,
     ) : SkillsApi {
         var mutations = 0
 
@@ -124,6 +146,7 @@ class SkillsCatalogControllerTest {
 
         override suspend fun uninstallSkill(agentId: String, skillName: String) {
             mutations++
+            refuseWith?.let { throw IllegalStateException(it) }
             installed[agentId]?.remove(skillName)
         }
     }
