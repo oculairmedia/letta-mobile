@@ -39,6 +39,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillCategories
 import com.letta.mobile.data.skills.SkillCategory
+import com.letta.mobile.data.skills.SkillSourceLabels
 import com.letta.mobile.ui.components.LettaCatalogCard
 import com.letta.mobile.ui.components.LettaChipTab
 import com.letta.mobile.ui.components.LettaInfoBox
@@ -175,15 +176,34 @@ private fun SkillCard(skill: Skill, page: SkillsPageScope, modifier: Modifier) {
         accent = SkillCategories.categorize(skill.name, skill.tags).accentColor(),
         onClick = { page.controls.onSelectSkill(skill.name) },
         modifier = modifier.testTag(SkillsPageTags.skill(skill.name)),
-        trailing = { SkillToggle(skill, page) },
+        trailing = { SkillControl(skill, page) },
     )
 }
+
+/**
+ * A skill letta-code can't turn off (anything but a symlink in its skills folder) shows its source,
+ * not a toggle: a control that can only fail is never offered.
+ */
+@Composable
+private fun SkillControl(skill: Skill, page: SkillsPageScope) {
+    if (skill.isReadOnly(page)) {
+        LettaPill(
+            SkillSourceLabels.label(skill.source),
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            Modifier.testTag(SkillsPageTags.skillSource(skill.name)),
+        )
+    } else {
+        SkillToggle(skill, page)
+    }
+}
+
+private fun Skill.isReadOnly(page: SkillsPageScope): Boolean = name in page.state.installedSkillNames && !controllable
 
 /** The card's add / check button: installs or removes the skill on the agent. */
 @Composable
 private fun SkillToggle(skill: Skill, page: SkillsPageScope) {
     val installed = skill.name in page.state.installedSkillNames
-    val canManage = page.state.canManageSkills && (!installed || skill.removable)
+    val canManage = page.state.canManageSkills
     val background = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = INSTALLED_ALPHA) else MaterialTheme.colorScheme.surfaceContainerHighest
     // On touch the 28dp button keeps its look but reaches the 48dp touch target.
     val target = if (page.options.touch) Modifier.minimumInteractiveComponentSize() else Modifier
@@ -274,12 +294,17 @@ internal fun SkillDetail(skill: Skill, page: SkillsPageScope) {
 
 @Composable
 private fun SkillDetailAction(skill: Skill, installed: Boolean, page: SkillsPageScope) {
-    val canManage = page.state.canManageSkills
-    val hint = when {
-        !canManage -> SELECT_AGENT_HINT
-        installed && !skill.removable -> HOST_MANAGED_HINT
-        else -> null
+    if (skill.isReadOnly(page)) {
+        LettaPill(SkillSourceLabels.label(skill.source), MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            SkillSourceLabels.readOnlyHint(skill.source),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
     }
+    val canManage = page.state.canManageSkills
+    val hint = if (canManage) null else SELECT_AGENT_HINT
     if (installed) {
         OutlinedButton(onClick = { page.toggle(skill.name, installed = true) }, enabled = hint == null) { Text(REMOVE) }
     } else {
@@ -319,5 +344,4 @@ private const val CLOSE = "Close"
 private const val INSTALL = "Install"
 private const val REMOVE = "Remove"
 private const val SELECT_AGENT_HINT = "Open an agent to install or remove skills."
-private const val HOST_MANAGED_HINT = "This skill lives in the host's skills folder and can't be removed from here."
 private const val DISMISS = "Dismiss"

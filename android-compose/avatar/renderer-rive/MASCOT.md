@@ -23,6 +23,61 @@ plan: topology, phases, timing.
 Check any state headless, no app needed:
 `rive . --screenshot=out.png --data=state=success --data=lookX=-1 --advance=30`.
 
+### The view-model contract
+
+Every property of the `Avatar` view model, in the file's order (state machine `Avatar`). The
+list is data in `rive/mascot/rig/contract.py`; `native/rivdump/check_contract.py` fails unless the
+shipped `.riv` exposes exactly these names with these types and `RiveAvatarContract.kt` writes only
+host/both names of the right kind, and `test_contract.py` (CI: `mascot-rig.yml`) also holds this
+table to that list. Writer: `host` the app, `both` the app and the file's own pointer listeners,
+`bench` the desktop review bench only.
+
+| Property | Type | Writer | Drives |
+|---|---|---|---|
+| `state` | enum `AvatarState` | host | sustained state (keys below) |
+| `mouthOpen` | number 0..1 | host | speech amplitude; the mouth morphs closed/half/open |
+| `lookX` | number -1..1 | host | horizontal gaze; the glyph moves inside the plate |
+| `lookY` | number -1..1 | host | vertical gaze |
+| `blink` | trigger | host | one blink (the plate also blinks on its own) |
+| `shape` | enum `MascotShape` | host | identity: one of eight bodies |
+| `color` | color | host | identity: body, soft edge and halo are bound to it |
+| `hovered` | boolean | both | pointer over the mascot: perk-up, attentive hold |
+| `success` | trigger | host | happy flash (hop + spin), self-returning |
+| `error` | trigger | host | sad flash (shake + drop); `state` then settles to error |
+| `dragged` | boolean | both | held while dragging: the dragged glyph, compression |
+| `tunePlate` | number 0..1 | bench | plate scale (0.5 = shipped) |
+| `tuneGlyph` | number 0..1 | bench | glyph scale (0.5 = shipped) |
+| `tuneMouth` | number 0..1 | bench | mouth scale (0.5 = shipped) |
+| `tuneMouthY` | number 0..1 | bench | mouth height (0.5 = shipped) |
+| `tuneScale` | number 0..1 | bench | whole-entity scale (0.5 = shipped) |
+| `turnX` | number -1..1 | host | head turn toward what the eyes look at |
+| `turnY` | number -1..1 | host | vertical head turn |
+| `shapeRotation` | number 0..360 | host | identity: the body's turn in degrees |
+| `reduceMotion` | boolean | host | calm everything: no idle beats, wander or breath bob; flashes and reactions become a blink or a glyph change |
+| `petting` | boolean | host | held while petted: content glyph, slow side sway, purr |
+| `listenLevel` | number 0..1 | host | listening intensity (typing cadence): the face lifts up to 10 px and leans in up to 5 % |
+| `moveX` | number -1..1 | host | horizontal travel / drag velocity: the body leans, top trailing, up to 8 deg about the feet |
+| `moveY` | number -1..1 | host | vertical travel velocity, + is down: up stretches, down squashes, about the feet |
+| `impact` | number 0..1 | host | how hard the next `land` is (soft < 0.34 <= mid < 0.67 <= hard) |
+| `trickId` | number 0..3 | host | which trick the next `trick` plays: 0 spin-flip, 1 jump-twirl, 2 peekaboo, 3 melt-and-reform |
+| `poke` | trigger | host | 420 ms squish, startled glyph, rebound |
+| `dizzy` | trigger | host | 1.5 s dizzy glyph and a decaying wobble on the base |
+| `sent` | trigger | host | 350 ms 'got it' catch-dip and lift |
+| `toolStart` | trigger | host | 300 ms small hop with a glance down |
+| `toolDone` | trigger | host | 250 ms nod |
+| `land` | trigger | host | arrival squash about the feet, scaled by `impact` |
+| `wake` | trigger | host | 700 ms startle stretch out of sleeping/dreaming |
+| `yawn` | trigger | host | 1.2 s yawn (closed eye, open mouth) entering sleeping/dreaming |
+| `trick` | trigger | host | plays trick `trickId` |
+
+`AvatarState` keys, in order: `idle listening thinking waitingInput speaking error sleeping
+loading failed degraded working dreaming`. `working` (tool execution) and `dreaming`
+(sleep-time compute, distinct from quiet-hours `sleeping`) are new with letta-mobile-te3n1.5;
+`RiveAvatarContract.stateKey` still maps `WORKING` to `thinking` until the Kotlin side adopts
+them (the renderer is outside te3n1.5). Every new trigger is a one-shot on the `React` layer that
+starts and ends at rest; with `reduceMotion` on, each plays one blink instead (`ReactCalm`).
+`impact` and `trickId` are read when `land` / `trick` fires, so write them first.
+
 ## 1. Art spec (original brief; face rules superseded by the plate design)
 
 ### Identity
