@@ -34,15 +34,13 @@ class WasmAppServerSessionTest {
         val client = DefaultAppServerClient(transport)
         val router = AppServerRuntimeEventRouter()
         val session = WasmAppServerSession(
-            client = client,
-            engine = AppServerTurnEngine(client = client, eventRouter = router),
-            router = router,
-            isConnected = transport.isConnected,
-            failureReason = { null },
-            label = "test",
+            link = WasmAppServerLink(client, transport.isConnected, failureReason = { null }, label = "test", close = {}),
+            services = WasmAppServerServices(
+                engine = AppServerTurnEngine(client = client, eventRouter = router),
+                router = router,
+                appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
+            ),
             scope = this,
-            closeTransport = {},
-            appServerAdmin = AppServerLocalAdminGateway(client) { operation -> "test-$operation" },
         )
         val (_, events) = router.subscribe(AgentId("agent-1"), ConversationId("conv-1"))
         val started = CompletableDeferred<Unit>()

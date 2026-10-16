@@ -40,20 +40,19 @@ import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class WasmAppServerSession(
-    val client: DefaultAppServerClient,
-    val engine: AppServerTurnEngine,
-    val router: AppServerRuntimeEventRouter,
-    val isConnected: Flow<Boolean>,
-    /** Why the connection ended, when the transport knows (the Iroh binding does). */
-    val failureReason: () -> String?,
-    val label: String,
+    private val link: WasmAppServerLink,
+    services: WasmAppServerServices,
     private val scope: CoroutineScope,
-    private val closeTransport: suspend () -> Unit,
-    /** The session's own App Server reads and writes (models, a conversation's record), as desktop's gateway makes them. */
-    val appServerAdmin: AppServerLocalAdminGateway,
-    /** letta-mobile-ckmub.17.2: the composer's mode chip; null over Iroh, whose host sets its own mode (as on desktop). */
-    val permissionModes: PermissionModeGateway? = null,
 ) {
+    val client: DefaultAppServerClient get() = link.client
+    val isConnected: Flow<Boolean> get() = link.isConnected
+    val failureReason: () -> String? get() = link.failureReason
+    val label: String get() = link.label
+    val engine: AppServerTurnEngine = services.engine
+    val router: AppServerRuntimeEventRouter = services.router
+    val appServerAdmin: AppServerLocalAdminGateway = services.appServerAdmin
+    val permissionModes: PermissionModeGateway? = services.permissionModes
+
     val conversationByAgent = mutableMapOf<String, String>()
     private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
 
@@ -117,7 +116,7 @@ internal class WasmAppServerSession(
             conversationInFlight.values.forEach { it.cancel() }
             conversationInFlight.clear()
             conversationByAgent.clear()
-            closeTransport()
+            link.close()
         }
     }
 
@@ -131,78 +130,111 @@ internal class WasmAppServerSession(
     }
 }
 
+/** One open connection to an App Server: its client, whether it is up, and how to end it. */
+internal class WasmAppServerLink(
+    val client: DefaultAppServerClient,
+    val isConnected: Flow<Boolean>,
+    /** Why the connection ended, when the transport knows (the Iroh binding does). */
+    val failureReason: () -> String?,
+    val label: String,
+    val close: suspend () -> Unit,
+)
+
+/** What a session serves on top of its [WasmAppServerLink]: its turn engine and the reads and writes it makes. */
+internal class WasmAppServerServices(
+    val engine: AppServerTurnEngine,
+    val router: AppServerRuntimeEventRouter,
+    /** The session's own App Server reads and writes (models, a conversation's record), as desktop's gateway makes them. */
+    val appServerAdmin: AppServerLocalAdminGateway,
+    /** letta-mobile-ckmub.17.2: the composer's mode chip; null over Iroh, whose host sets its own mode (as on desktop). */
+    val permissionModes: PermissionModeGateway? = null,
+)
+
 internal suspend fun connectWasmAppServerSession(
     config: LettaConfig,
     scope: CoroutineScope,
     httpClient: HttpClient,
     nextRequestId: (String) -> String,
 ): WasmAppServerSession {
-    val label: String
-    val client: DefaultAppServerClient
-    val isConnected: Flow<Boolean>
-    val failureReason: () -> String?
-    val closeTransport: suspend () -> Unit
     val iroh = isIrohBackendUrl(config.serverUrl)
-    if (iroh) {
-        // letta-mobile-ckmub.8: read the address here (a ticket, a short URL or a bare id) so a bad one
-        // fails with a message that says what is expected, and the browser binding only ever gets
-        // the endpoint id it can dial (through the relay; direct UDP is not available in a browser).
-        val address = IrohServerAddress.parse(config.serverUrl)
-        val irohTransport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
-        try {
-            bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { irohTransport.isConnected.first { it } }
-        } catch (error: Throwable) {
-            withContext(NonCancellable) { irohTransport.close() }
-            throw error
-        }
-        label = "Iroh"
-        client = DefaultAppServerClient(irohTransport, parentScope = scope)
-        isConnected = irohTransport.isConnected
-        failureReason = { irohTransport.failureReason.value }
-        closeTransport = irohTransport::close
-    } else {
-        // letta-mobile-by4vm.110.6: the ws:// open desktop and Android share; it fails at once with
-        // the socket's reason instead of waiting out the timeout.
-        val connection = openAppServerWebSocket(
-            AppServerWebSocketDial(resolveWebSocketUrl(config.serverUrl), config.accessToken),
-            httpClient,
-            scope,
-        )
-        label = "WebSocket"
-        client = connection.client
-        isConnected = connection.connectionState.map { it.isReady }
-        failureReason = { null }
-        closeTransport = { connection.close("closed") }
-    }
+    val link = if (iroh) openIrohLink(config, scope) else openWebSocketLink(config, httpClient, scope)
     var router: AppServerRuntimeEventRouter? = null
     try {
-        val eventRouter = AppServerRuntimeEventRouter().also { router = it }
-        // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
-        val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeUnless { iroh }
-        val engine = eventRouter.attachTurnStack(
-            client,
-            scope,
-            permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
-        )
-        return WasmAppServerSession(
-            client = client,
-            engine = engine,
-            router = eventRouter,
-            isConnected = isConnected,
-            failureReason = failureReason,
-            label = label,
-            scope = scope,
-            closeTransport = closeTransport,
-            appServerAdmin = AppServerLocalAdminGateway(client, nextRequestId),
-            permissionModes = modes?.let { EnginePermissionModes(engine, it) },
-        )
+        val services = attachServices(link, scope, governModes = !iroh, nextRequestId) { router = it }
+        return WasmAppServerSession(link, services, scope)
     } catch (error: Throwable) {
         withContext(NonCancellable) {
             router?.detach()
-            closeTransport()
+            link.close()
         }
         throw error
     }
+}
+
+/**
+ * letta-mobile-ckmub.8: the address is read here (a ticket, a short URL or a bare id) so a bad one
+ * fails with a message that says what is expected, and the browser binding only ever gets the
+ * endpoint id it can dial (through the relay; direct UDP is not available in a browser).
+ */
+private suspend fun openIrohLink(config: LettaConfig, scope: CoroutineScope): WasmAppServerLink {
+    val address = IrohServerAddress.parse(config.serverUrl)
+    val transport = IrohWasmAppServerTransport.connect(address.endpointUrl, scope)
+    try {
+        bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
+    } catch (error: Throwable) {
+        withContext(NonCancellable) { transport.close() }
+        throw error
+    }
+    return WasmAppServerLink(
+        client = DefaultAppServerClient(transport, parentScope = scope),
+        isConnected = transport.isConnected,
+        failureReason = { transport.failureReason.value },
+        label = "Iroh",
+        close = transport::close,
+    )
+}
+
+/**
+ * letta-mobile-by4vm.110.6: the ws:// open desktop and Android share; it fails at once with the
+ * socket's reason instead of waiting out the timeout.
+ */
+private suspend fun openWebSocketLink(config: LettaConfig, httpClient: HttpClient, scope: CoroutineScope): WasmAppServerLink {
+    val connection = openAppServerWebSocket(
+        AppServerWebSocketDial(resolveWebSocketUrl(config.serverUrl), config.accessToken),
+        httpClient,
+        scope,
+    )
+    return WasmAppServerLink(
+        client = connection.client,
+        isConnected = connection.connectionState.map { it.isReady },
+        failureReason = { null },
+        label = "WebSocket",
+        close = { connection.close("closed") },
+    )
+}
+
+/** The turn stack over [link]; [governModes] gives the composer a mode chip (ws:// only, as on desktop). */
+private fun attachServices(
+    link: WasmAppServerLink,
+    scope: CoroutineScope,
+    governModes: Boolean,
+    nextRequestId: (String) -> String,
+    onRouter: (AppServerRuntimeEventRouter) -> Unit,
+): WasmAppServerServices {
+    val router = AppServerRuntimeEventRouter().also(onRouter)
+    // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
+    val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeIf { governModes }
+    val engine = router.attachTurnStack(
+        link.client,
+        scope,
+        permissionGovernedTurnStackSpec(modes, requestIdFactory = { nextRequestId("turn") }),
+    )
+    return WasmAppServerServices(
+        engine = engine,
+        router = router,
+        appServerAdmin = AppServerLocalAdminGateway(link.client, nextRequestId),
+        permissionModes = modes?.let { EnginePermissionModes(engine, it) },
+    )
 }
 
 internal suspend fun <T> bounded(timeoutMs: Long, message: String, block: suspend () -> T): T = try {
