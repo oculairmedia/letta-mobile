@@ -107,7 +107,6 @@ class SessionGraphAssembler @Inject constructor(
             localRuntimeBackend = request.localRuntimeBackend,
             scope = request.scope,
             allConversationsRepository = conversationRepos.allConversations,
-            conversationCursorStore = request.capturedCursorStore,
             capturedConfig = request.activeConfig,
         )
     }

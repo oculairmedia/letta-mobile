@@ -100,7 +100,7 @@ internal fun sessionTestConfig(id: String): LettaConfig = LettaConfig(
     serverUrl = "https://$id.example.test",
 )
 
-internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
+internal data class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),
     var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
@@ -118,7 +118,6 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var settingsRepository: ISettingsRepository? = null,
     var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     var appContext: android.content.Context = mockk(relaxed = true),
-    var cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
 ) {
     /** Tests own the graph's outer bound; production uses the process lifecycle. */
     var graphParentScope: () -> CoroutineScope = { CoroutineScope(SupervisorJob()) }
@@ -154,7 +153,6 @@ internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
         channelTransportFactory = SessionChannelTransportFactory(appContext = appContext),
         settingsRepository = settingsRepository,
         localRuntimeOptions = localRuntimeOptions,
-        cursorFactory = cursorFactory,
         graphParentScope = graphParentScope,
         cacheClearContext = cacheClearContext,
     )

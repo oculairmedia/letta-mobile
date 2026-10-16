@@ -1574,8 +1574,6 @@
     <ID>NestedBlockDepth:TimelineSyncLoop.kt$TimelineSyncLoop$private suspend fun processEventQueue()</ID>
     <ID>NewLineAtEndOfFile:AppServerRuntimeEventRouterTest.kt$com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouterTest.kt</ID>
     <ID>NewLineAtEndOfFile:AppServerWebSocketClientDefaultsTest.kt$com.letta.mobile.data.transport.appserver.AppServerWebSocketClientDefaultsTest.kt</ID>
-    <ID>NewLineAtEndOfFile:BackgroundStreamBudget.kt$com.letta.mobile.data.transport.appserver.BackgroundStreamBudget.kt</ID>
-    <ID>NewLineAtEndOfFile:BackgroundStreamBudgetTest.kt$com.letta.mobile.data.transport.appserver.BackgroundStreamBudgetTest.kt</ID>
     <ID>NewLineAtEndOfFile:ConversationModelSelections.kt$com.letta.mobile.data.repository.modelcontrol.ConversationModelSelections.kt</ID>
     <ID>NewLineAtEndOfFile:ImmutableListJson.kt$com.letta.mobile.data.model.ImmutableListJson.kt</ID>
     <ID>NewLineAtEndOfFile:ImmutableListJsonTest.kt$com.letta.mobile.data.model.ImmutableListJsonTest.kt</ID>

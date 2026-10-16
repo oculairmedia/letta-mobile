@@ -39,6 +39,7 @@ object DatabaseModule {
         ).addMigrations(
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_1_2,
             com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_2_3,
+            com.letta.mobile.data.local.TimelineLedgerDatabase.MIGRATION_3_4,
         ).build()
 
     @Provides
@@ -49,11 +50,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideOwnedTimelineStorage(
-        legacy: LettaDatabase,
         ledger: com.letta.mobile.data.local.TimelineLedgerDatabase,
         authority: com.letta.mobile.data.local.TimelineOwnershipAuthority,
     ): com.letta.mobile.data.local.TimelineOwnedStorageFactory =
-        com.letta.mobile.data.local.TimelineOwnedStorageFactory(legacy, ledger, authority)
+        com.letta.mobile.data.local.TimelineOwnedStorageFactory(ledger, authority)
 
     // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
     // singleton is the only thing that triggers Room.databaseBuilder.build().

@@ -54,7 +54,6 @@ android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/Agen
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/CanvasOpEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/ConversationEntity.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomMemFsStore.kt
-android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomPendingLocalStore.kt
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/local/RoomRuntimeEventOutbox.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
 android-compose/core/android-data/src/main/java/com/letta/mobile/data/repository/IrohAdminRpcSlashCommandSource.kt

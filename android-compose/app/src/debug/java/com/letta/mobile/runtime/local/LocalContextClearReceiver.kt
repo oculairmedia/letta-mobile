@@ -40,16 +40,6 @@ class LocalContextClearReceiver : BroadcastReceiver() {
                 "agentId = ? OR conversationId = ?",
                 arrayOf(agentId, conversationId),
             )
-            val deletedPending = db.delete(
-                "pending_local_messages",
-                "conversationId = ?",
-                arrayOf(conversationId),
-            )
-            val deletedCursors = db.delete(
-                "conversation_cursors",
-                "conv_id = ?",
-                arrayOf(conversationId),
-            )
             val deletedRefresh = db.delete(
                 "conversation_refresh_state",
                 "agentId = ?",
@@ -63,7 +53,7 @@ class LocalContextClearReceiver : BroadcastReceiver() {
             db.setTransactionSuccessful()
             Log.i(
                 TAG,
-                "CLEARED agent=$agentId conversation=$conversationId events=$deletedEvents pending=$deletedPending cursors=$deletedCursors refresh=$deletedRefresh conversations=$deletedConversations",
+                "CLEARED agent=$agentId conversation=$conversationId events=$deletedEvents refresh=$deletedRefresh conversations=$deletedConversations",
             )
         } catch (error: Throwable) {
             Log.e(TAG, "FAILED agent=$agentId conversation=$conversationId", error)

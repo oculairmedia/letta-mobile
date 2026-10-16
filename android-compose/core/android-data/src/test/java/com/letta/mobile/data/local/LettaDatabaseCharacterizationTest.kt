@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.testutil.TestData
-import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -30,34 +29,28 @@ class LettaDatabaseCharacterizationTest {
         database = null
     }
 
+    /**
+     * letta-mobile-by4vm.15: v24 squashed the history. A device on an older schema (here v23 with a
+     * dropped legacy chat table) opens on a fresh v24 database instead of failing on a missing path.
+     */
     @Test
-    fun `production database builder must not use destructive migration`() {
-        val source = lettaDatabaseSource().readText()
+    fun `an older schema resets to the current one instead of failing to open`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val name = "letta-squash-${System.nanoTime()}.db"
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("CREATE TABLE pending_local_messages (otid TEXT NOT NULL PRIMARY KEY)")
+            db.execSQL("INSERT INTO pending_local_messages (otid) VALUES ('stale')")
+            db.version = 23
+        }
 
-        assertTrue(
-            "Production Room builder must preserve local data instead of using fallbackToDestructiveMigration.",
-            !source.contains("fallbackToDestructiveMigration"),
-        )
-    }
+        val db = LettaDatabase.builder(context, name).allowMainThreadQueries().build().also { database = it }
 
-    @Test
-    fun `pending local messages round trip through Room`() = runTest {
-        val db = inMemoryDatabase()
-        val row = PendingLocalEntity(
-            otid = "otid-1",
-            conversationId = "conversation-1",
-            content = "message with local image",
-            attachmentsJson = """[{"base64":"abc123","mediaType":"image/png"}]""",
-            sentAtEpochMs = 123_456L,
-            deliveryState = "SENT",
-            backendId = "backend-1",
-            agentId = "agent-1",
-        )
-
-        db.pendingLocalDao().upsert(row)
-
-        assertEquals(listOf(row), db.pendingLocalDao().listForScope("backend-1", "agent-1", "conversation-1"))
-        assertEquals(emptyList<PendingLocalEntity>(), db.pendingLocalDao().listForScope("backend-1", "agent-1", "conversation-2"))
+        assertEquals(emptyList<ConversationEntity>(), db.conversationDao().getForAgentOnce("agent-1"))
+        val tables = db.openHelper.readableDatabase.query("SELECT name FROM sqlite_master WHERE type = 'table'").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
+        assertTrue("legacy table survived the reset: $tables", "pending_local_messages" !in tables)
+        assertEquals(24, db.openHelper.readableDatabase.version)
     }
 
     @Test
@@ -122,17 +115,5 @@ class LettaDatabaseCharacterizationTest {
             .allowMainThreadQueries()
             .build()
             .also { database = it }
-    }
-
-    private fun lettaDatabaseSource(): File {
-        val relativePaths = listOf(
-            "src/main/java/com/letta/mobile/data/local/LettaDatabase.kt",
-            "android-compose/core/src/main/java/com/letta/mobile/data/local/LettaDatabase.kt",
-        )
-        val start = File(requireNotNull(System.getProperty("user.dir"))).canonicalFile
-        return generateSequence(start) { it.parentFile }
-            .flatMap { parent -> relativePaths.asSequence().map { relative -> File(parent, relative) } }
-            .firstOrNull { it.exists() }
-            ?: error("Could not locate LettaDatabase.kt from ${start.path}")
     }
 }
