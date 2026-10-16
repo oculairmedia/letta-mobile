@@ -20,7 +20,6 @@ class UnservedConversationRepository :
     IConversationRepository {
     override fun getConversations(agentId: AgentId): Flow<List<Conversation>> = unserved("getConversations")
     override fun getCachedConversations(agentId: AgentId): List<Conversation> = unserved("getCachedConversations")
-    override fun canForkConversations(): Boolean = unserved("canForkConversations")
     override fun canCancelConversationRuns(): Boolean = unserved("canCancelConversationRuns")
     override fun canRecompileConversations(): Boolean = unserved("canRecompileConversations")
 }
