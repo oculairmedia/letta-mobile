@@ -165,7 +165,6 @@ fun timelineComposerUiState(
     error = draft.hostError ?: draft.state.error?.message(options.attachmentLimits),
     canSend = draft.state.hasPayload && !gate.blocked,
     canQueueWhileStreaming = gate.canQueue,
-    placeholder = options.placeholder,
     maxAttachments = options.attachmentLimits.maxAttachmentCount,
     attachmentLimits = options.attachmentLimits,
 )

@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import androidx.compose.runtime.MutableState
 import androidx.compose.foundation.background
@@ -117,7 +118,7 @@ internal data class DesktopSharedChatPageNavigation(
 internal data class DesktopSharedChatPageState(
     val port: DesktopChatSessionPort,
     val pagedTimeline: CanonicalTimelinePresentation?,
-    val hostInputs: DesktopChatComposerHostInputs,
+    val hostInputs: ChatComposerHostInputs,
     /** Tints the ambient glow "failed" (the controller keeps its error until the next send). */
     val errorMessage: String?,
     /** Where the conversation's board lives, and whose it is: the docked canvas. */

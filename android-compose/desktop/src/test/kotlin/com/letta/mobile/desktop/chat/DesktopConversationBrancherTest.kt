@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.data.DesktopInMemorySecureSettingsStore
+import com.letta.mobile.ui.chat.session.ChatBranchView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,7 +34,7 @@ class DesktopConversationBrancherTest {
         val host = RecordingHost(gateway)
         host.pins.setPinned("conv-1", true)
 
-        DesktopConversationBrancher(this, host).forkFrom(timeline[0], DesktopBranchView(timeline, hasOlderMessages = false))
+        DesktopConversationBrancher(this, host).forkFrom(timeline[0], ChatBranchView(timeline, hasOlderMessages = false))
 
         assertEquals(listOf(ConversationForkRequest("conv-1", "agent-0", "m2")), gateway.forks)
         assertEquals(listOf<Pair<String, String?>>("conv-fork" to null), host.opened)
@@ -47,7 +48,7 @@ class DesktopConversationBrancherTest {
         val gateway = ForkingGateway()
         val host = RecordingHost(gateway)
 
-        DesktopConversationBrancher(this, host).editAndResend(timeline[2], DesktopBranchView(timeline, hasOlderMessages = false))
+        DesktopConversationBrancher(this, host).editAndResend(timeline[2], ChatBranchView(timeline, hasOlderMessages = false))
 
         assertEquals(listOf(ConversationForkRequest("conv-1", "agent-0", "m2")), gateway.forks)
         assertEquals(listOf<Pair<String, String?>>("conv-fork" to "typo hree"), host.opened)
@@ -59,7 +60,7 @@ class DesktopConversationBrancherTest {
         val gateway = ForkingGateway()
         val host = RecordingHost(gateway)
 
-        DesktopConversationBrancher(this, host).rerun(timeline[2], DesktopBranchView(timeline, hasOlderMessages = false))
+        DesktopConversationBrancher(this, host).rerun(timeline[2], ChatBranchView(timeline, hasOlderMessages = false))
 
         assertEquals(listOf(ConversationForkRequest("conv-1", "agent-0", "m2")), gateway.forks)
         val opened = host.branches.single()
@@ -73,7 +74,7 @@ class DesktopConversationBrancherTest {
         val brancher = DesktopConversationBrancher(this, host)
 
         assertFalse(brancher.supported)
-        brancher.forkFrom(timeline[0], DesktopBranchView(timeline, hasOlderMessages = false))
+        brancher.forkFrom(timeline[0], ChatBranchView(timeline, hasOlderMessages = false))
 
         assertEquals(listOf("This backend can't fork conversations."), host.errors)
         assertEquals(emptyList(), host.opened)

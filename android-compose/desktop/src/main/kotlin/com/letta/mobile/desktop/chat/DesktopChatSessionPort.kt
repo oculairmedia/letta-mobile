@@ -1,42 +1,38 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.chat.send.ConversationSendQueue
-import com.letta.mobile.data.chat.send.QueuedSendId
-import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
-import com.letta.mobile.data.repository.modelcontrol.ReasoningEffortChoice
 import com.letta.mobile.data.chat.display.ChatDisplayOptions
 import com.letta.mobile.data.chat.recompile.RecompileStatus
+import com.letta.mobile.data.chat.send.ConversationSendQueue
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.repository.modelcontrol.ModelCatalogRepository
 import com.letta.mobile.data.runtime.RuntimeLiveStatus
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.session.A2uiSnackbarId
-import com.letta.mobile.ui.chat.session.A2uiSurfaceId
 import com.letta.mobile.ui.chat.session.ChatActions
 import com.letta.mobile.ui.chat.session.ChatApprovalAnswer
-import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.session.ChatBranchView
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
 import com.letta.mobile.ui.chat.session.ChatComposerUiState
-import com.letta.mobile.ui.chat.session.ChatMessageId
-import com.letta.mobile.ui.chat.session.ChatModelHandle
-import com.letta.mobile.ui.chat.session.ChatRunId
+import com.letta.mobile.ui.chat.session.ChatExtensionActionState
+import com.letta.mobile.ui.chat.session.ChatExtensionActions
+import com.letta.mobile.ui.chat.session.ChatSessionExtensions
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceCapabilities
-import com.letta.mobile.ui.chat.session.ChatWorkingDirectory
 import com.letta.mobile.ui.chat.session.GatewayPermissionModes
+import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
 import com.letta.mobile.ui.chat.session.TimelineLocalState
-import com.letta.mobile.ui.chat.session.acknowledge
 import com.letta.mobile.ui.chat.session.currentHostApprovals
 import com.letta.mobile.ui.chat.session.forgetAcknowledgedOnceCleared
 import com.letta.mobile.ui.chat.session.hostApprovals
+import com.letta.mobile.ui.chat.session.runLiveStatus
+import com.letta.mobile.ui.chat.session.withChrome
+import com.letta.mobile.ui.chat.session.withExtensions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.runningFold
@@ -60,7 +56,8 @@ internal data class DesktopChatSessionBindings(
  * letta-mobile-bglj6.1: desktop's [ChatSessionPort], an adapter over [DesktopChatController].
  *
  * The controller stays the conversation owner; this only maps its flows onto the shared page's
- * contracts (see DesktopChatSessionMapping.kt) and forwards [ChatActions] to it. Construct one per
+ * contracts (see DesktopChatSessionMapping.kt), reads the shared extension points
+ * ([ChatSessionExtensions]) and forwards the owner's [ChatActions] to it. Construct one per
  * controller and share it across every presentation, so the draft and the run are the same object
  * in each mode.
  */
@@ -69,22 +66,38 @@ internal class DesktopChatSessionPort(
     private val scope: CoroutineScope,
     private val bindings: DesktopChatSessionBindings = DesktopChatSessionBindings(),
 ) : ChatSessionPort {
-    private val hostInputs = MutableStateFlow(DesktopChatComposerHostInputs())
+    private val hostInputs = MutableStateFlow(ChatComposerHostInputs())
     private val localTimeline = MutableStateFlow(TimelineLocalState())
 
-    /** letta-mobile-bzvro.13, by4vm.98: the selected conversation's mode chip, the shared gateway binding. */
-    private val permissionModes = GatewayPermissionModes(
-        scope = scope,
-        targets = controller.state.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
-        current = { controller.activeGateway.permissionModeTarget(controller.state.value.selectedConversation) },
+    /**
+     * by4vm.98: the selected conversation's extension points, the shared bindings
+     * TimelineChatSessionPort reads too (chips, queue, composer host inputs, A2UI, branching,
+     * `/recompile` and the live status from the window's run registry).
+     */
+    private val options = TimelineChatSessionOptions(
+        workingDirectory = controller.workingDirectory,
+        permissionModes = GatewayPermissionModes(
+            scope = scope,
+            targets = controller.state.map { controller.activeGateway.permissionModeTarget(it.selectedConversation) },
+            current = { controller.activeGateway.permissionModeTarget(controller.state.value.selectedConversation) },
+        ),
+        models = controller.models,
+        sendQueue = controller.sendQueue,
+        composerHost = hostInputs,
+        onA2uiAction = bindings.onA2uiAction,
+        branching = controller.conversationManagement,
+        recompile = controller.conversationManagement.recompile,
+        liveStatus = runLiveStatus(controller.runs, controller.state.map { it.selectedConversationId }),
+        attachmentLimits = controller.attachmentLimits,
     )
+    private val extensions = ChatSessionExtensions(options, scope)
 
     init {
         controller.models.bindCatalog(bindings.modelCatalog, follow = scope)
     }
 
     /** Feeds the composer chrome the shell computes (commands, mentionables, context usage). */
-    fun updateHostInputs(inputs: DesktopChatComposerHostInputs) {
+    fun updateHostInputs(inputs: ChatComposerHostInputs) {
         hostInputs.value = inputs
     }
 
@@ -93,69 +106,48 @@ internal class DesktopChatSessionPort(
         .map { it ?: initialUiState() }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialUiState())
 
-    override val composer: StateFlow<ChatComposerUiState> = composerInputs()
-        .map(::desktopChatComposerUiState)
-        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), desktopChatComposerUiState(currentComposerInputs()))
+    override val composer: StateFlow<ChatComposerUiState> = combine(controller.state, extensions.chrome) { surface, chrome ->
+        surface.composerUiState(controller.attachmentLimits).withChrome(chrome)
+    }.stateIn(
+        scope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        controller.state.value.composerUiState(controller.attachmentLimits).withChrome(extensions.chrome.value),
+    )
 
-    /** letta-mobile-bzvro.7: the selected conversation's live status, from the window's run registry. */
-    override val liveStatus: StateFlow<RuntimeLiveStatus> = combine(
-        controller.runs,
-        controller.state.map { it.selectedConversationId }.distinctUntilChanged(),
-    ) { runs, selected -> selected?.let(runs::get)?.live ?: RuntimeLiveStatus.Idle }
-        .distinctUntilChanged()
-        .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), RuntimeLiveStatus.Idle)
+    override val liveStatus: StateFlow<RuntimeLiveStatus> get() = extensions.liveStatus
 
     /** letta-mobile-zxk2n.5: what the Chat options show and hide, for the page's appearance. */
     val displayOptions: StateFlow<ChatDisplayOptions> = controller.conversationManagement.marks.displayOptions
 
-    /** letta-mobile-zxk2n.5: `/recompile`'s status, from the controller. */
-    override val recompileStatus: StateFlow<RecompileStatus> = controller.conversationManagement.recompile.status
+    override val recompileStatus: StateFlow<RecompileStatus> get() = extensions.recompileStatus
 
     override val actions: ChatActions = DesktopChatActions(
         controller = controller,
-        bindings = bindings,
-        commandsById = { hostInputs.value.commands.associateBy(ComposerCommand::label) },
-        localTimeline = localTimeline,
-        branchView = { uiState.value.let { DesktopBranchView(it.messages, it.hasMoreOlderMessages) } },
-        onSetPermissionMode = permissionModes::setPermissionMode,
+        options = options,
+        state = ChatExtensionActionState(
+            local = localTimeline,
+            branchView = { uiState.value.let { ChatBranchView(it.messages, it.hasMoreOlderMessages) } },
+            error = { controller.state.value.errorMessage },
+        ),
+        onSetFontScale = bindings.onSetFontScale,
     )
 
     /**
-     * Follows the controller: approval support and the working directory follow the active
-     * gateway, and paged history the canonical (paged) route, all of which change after
-     * construction. The gateway has no flow of its own, so a state change re-reads it.
+     * Follows the controller: approval support follows the active gateway and paged history the
+     * canonical (paged) route, both of which change after construction; the extension points
+     * (working directory, model switch, branching) follow their own sources.
      */
     override val capabilities: StateFlow<ChatSurfaceCapabilities> = combine(
         controller.approvals.canSubmitApprovals,
         controller.canonicalPresentation,
-        controller.workingDirectory.current.map { it != null }.distinctUntilChanged(),
-        controller.state.map { branchFacts() }.distinctUntilChanged(),
-    ) { approvals, canonical, workingDirectory, branching ->
-        desktopCapabilities(
-            DesktopCapabilityFacts(
-                approvals,
-                paged = canonical != null,
-                workingDirectory = workingDirectory,
-                branching = branching.first,
-                namedForks = branching.second,
-            ),
-        )
-    }
+        extensions.facts,
+    ) { approvals, canonical, facts -> desktopCapabilities(approvals, paged = canonical != null).withExtensions(facts) }
         .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), currentCapabilities())
 
     private fun currentCapabilities(): ChatSurfaceCapabilities = desktopCapabilities(
-        DesktopCapabilityFacts(
-            approvals = controller.approvals.canSubmitApprovals.value,
-            paged = controller.canonicalPresentation.value != null,
-            workingDirectory = controller.workingDirectory.current.value != null,
-            branching = controller.conversationManagement.supportsBranching,
-            namedForks = controller.conversationManagement.canNameForks,
-        ),
-    )
-
-    /** letta-mobile-7mys7: whether the gateway can fork, and whether it can name a fork. */
-    private fun branchFacts(): Pair<Boolean, Boolean> =
-        controller.conversationManagement.let { it.supportsBranching to it.canNameForks }
+        approvals = controller.approvals.canSubmitApprovals.value,
+        paged = controller.canonicalPresentation.value != null,
+    ).withExtensions(extensions.facts.value)
 
     private fun initialUiState(): ChatUiState = desktopChatUiState(currentTimelineInputs(), previous = null)
 
@@ -180,61 +172,18 @@ internal class DesktopChatSessionPort(
         // Once the error is gone (a send cleared it), the same message later is a new error.
         localTimeline.update { it.forgetAcknowledgedOnceCleared(inputs.surface.errorMessage) }
     }
-
-    private fun currentComposerInputs() = DesktopChatComposerInputs(
-        surface = controller.state.value,
-        host = hostInputs.value,
-        model = controller.models.model.value,
-        workingDirectory = controller.workingDirectory.current.value,
-        canQueueWhileStreaming = controller.sendQueue.canQueueWhileStreaming.value,
-        attachmentLimits = controller.attachmentLimits,
-    )
-
-    private fun composerInputs(): Flow<DesktopChatComposerInputs> = combine(
-        controller.state,
-        hostInputs,
-        controller.models.model,
-        combine(controller.workingDirectory.current, permissionModes.permissionMode, ::Pair),
-        controller.sendQueue.canQueueWhileStreaming,
-    ) { surface, host, model, (workingDirectory, permissionMode), canQueue ->
-        DesktopChatComposerInputs(
-            surface = surface,
-            host = host,
-            model = model,
-            workingDirectory = workingDirectory,
-            canQueueWhileStreaming = canQueue,
-            attachmentLimits = controller.attachmentLimits,
-            permissionMode = permissionMode,
-        )
-    }
 }
 
-/** What the controller supports right now: the inputs of [desktopCapabilities]. */
-internal data class DesktopCapabilityFacts(
-    /** The active gateway can answer approvals. */
-    val approvals: Boolean,
-    /** The selected conversation is on the canonical (paged) route. */
-    val paged: Boolean,
-    /** The active gateway can change a conversation's working directory. */
-    val workingDirectory: Boolean,
-    /** letta-mobile-bzvro.15/.16, 7mys7: the active gateway can fork (fork, edit and resend, rerun). */
-    val branching: Boolean = false,
-    /** letta-mobile-7mys7: the active gateway can retitle, so a fork can be named as it is made. */
-    val namedForks: Boolean = false,
-)
-
-internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCapabilities(
-    fork = facts.branching,
-    editAndResend = facts.branching,
-    rerunInFork = facts.branching,
-    nameForks = facts.branching && facts.namedForks,
+/**
+ * What desktop's controller supports beyond the extension points: approvals where the active
+ * gateway answers them ([approvals]) and paged history on the canonical route ([paged]).
+ */
+internal fun desktopCapabilities(approvals: Boolean, paged: Boolean) = ChatSurfaceCapabilities(
     attachImages = true,
     rerun = false,
-    approvals = facts.approvals,
-    modelSwitch = true,
-    workingDirectory = facts.workingDirectory,
+    approvals = approvals,
     search = false,
-    pagedHistory = facts.paged,
+    pagedHistory = paged,
     fontScale = true,
     goals = false,
 )
@@ -245,19 +194,13 @@ internal fun desktopCapabilities(facts: DesktopCapabilityFacts) = ChatSurfaceCap
  */
 private const val STOP_TIMEOUT_MS = 5_000L
 
-/** [ChatActions] forwarded to [DesktopChatController]; what desktop cannot do is a no-op. */
+/** [ChatActions] forwarded to [DesktopChatController]; the extension points answer the rest. */
 internal class DesktopChatActions(
     private val controller: DesktopChatController,
-    private val bindings: DesktopChatSessionBindings,
-    private val commandsById: () -> Map<String, ComposerCommand>,
-    private val localTimeline: MutableStateFlow<TimelineLocalState>,
-    /** The page's timeline now, which a fork or edit plans against. */
-    private val branchView: () -> DesktopBranchView = { DesktopBranchView(emptyList(), hasOlderMessages = true) },
-    private val onSetPermissionMode: (AppServerPermissionMode) -> Unit = {},
-) : ChatActions {
-    private val selectedConversationId: String?
-        get() = controller.state.value.selectedConversationId
-
+    options: TimelineChatSessionOptions,
+    state: ChatExtensionActionState,
+    private val onSetFontScale: (Float) -> Unit = {},
+) : ChatExtensionActions(options, state) {
     override fun updateComposerText(text: String) = controller.updateComposerText(text)
 
     override fun send() = controller.sendOrBranch()
@@ -273,26 +216,9 @@ internal class DesktopChatActions(
 
     override fun clearComposerError() = controller.clearComposerError()
 
-    override fun runComposerCommand(command: ChatComposerCommand) {
-        commandsById()[command.id]?.run?.invoke()
-    }
-
-    override fun uninstallComposerCommand(command: ChatComposerCommand) = Unit
-
-    override fun dismissRecompileStatus() = controller.conversationManagement.recompile.dismiss()
-
     override fun stopRun() {
-        selectedConversationId?.let(controller::stopActiveRun)
+        controller.state.value.selectedConversationId?.let(controller::stopActiveRun)
     }
-
-    override fun rerun(message: UiMessage) = Unit
-
-    override fun forkFromMessage(message: UiMessage, name: String?) =
-        controller.conversationManagement.forkFrom(message, branchView(), name)
-
-    override fun editAndResend(message: UiMessage) = controller.conversationManagement.editAndResend(message, branchView())
-
-    override fun rerunInFork(message: UiMessage) = controller.conversationManagement.rerun(message, branchView())
 
     override fun submitApproval(answer: ChatApprovalAnswer) {
         // A second press while the first answer is in flight must not answer twice.
@@ -302,53 +228,7 @@ internal class DesktopChatActions(
         }
     }
 
-    override fun submitA2uiAction(action: A2uiAction) = bindings.onA2uiAction(action)
-
-    override fun dismissA2uiSurface(surfaceId: A2uiSurfaceId) = Unit
-
-    override fun markA2uiSnackbarShown(id: A2uiSnackbarId) = Unit
-
-    override fun cancelQueuedSend(id: QueuedSendId) = controller.sendQueue.cancel(id)
-
-    override fun sendQueuedNow(id: QueuedSendId) = controller.sendQueue.sendNow(id)
-
-    override fun resumeSendQueue() = controller.sendQueue.resume()
-
-    override fun toggleRunCollapsed(runId: ChatRunId) = localTimeline.update { it.toggleRun(runId.value) }
-
-    override fun toggleReasoningExpanded(messageId: ChatMessageId) = localTimeline.update { it.toggleReasoning(messageId.value) }
-
-    /** The canonical paged timeline pages itself; the in-memory list has no older-history window. */
-    override fun loadOlderMessages() = Unit
-
-    override fun releaseOlderMessages() = Unit
-
-    override fun expandTruncatedToolResult(messageId: ChatMessageId) = Unit
-
     override fun retryLoad() = controller.retryConnection()
 
-    /**
-     * The page showed the error in its snackbar: acknowledge it so it is not shown again, but
-     * leave the controller's error in place so the ambient glow stays "failed" until the next send.
-     */
-    override fun clearError() = localTimeline.update { it.acknowledge(controller.state.value.errorMessage) }
-
-    override fun setFontScale(scale: Float) = bindings.onSetFontScale(scale)
-
-    /** letta-mobile-by4vm.85: the selection value and the effort go to the conversation together. */
-    override fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice) = controller.models.selectModel(handle, effort)
-
-    override fun setPermissionMode(mode: AppServerPermissionMode) = onSetPermissionMode(mode)
-
-    override fun changeWorkingDirectory(directory: ChatWorkingDirectory) =
-        controller.workingDirectory.changeWorkingDirectory(directory)
-
-    override fun updateSearchQuery(query: String) = Unit
-
-    override fun clearSearch() = Unit
-
-    /** Desktop has no goal coordinator; the port reports `goals = false`. */
-    override fun refreshGoalStatus() = Unit
-
-    override fun continueGoal() = Unit
+    override fun setFontScale(scale: Float) = onSetFontScale(scale)
 }
