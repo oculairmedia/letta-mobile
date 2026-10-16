@@ -17,6 +17,8 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
+import com.letta.mobile.data.model.A2uiComponentId
+import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.data.timeline.timelineLogger
 
 private const val A2UI_LOG_TAG = "A2UI"
@@ -24,14 +26,14 @@ private val a2uiLog by lazy { timelineLogger(A2UI_LOG_TAG) }
 
 @Composable
 fun A2uiRenderer(
-    surfaceId: String,
+    surfaceId: A2uiSurfaceId,
     surfaceManager: A2uiSurfaceManager,
     modifier: Modifier = Modifier,
     onAction: (A2uiAction) -> Unit = {},
 ) {
     val surfaces by surfaceManager.surfaces.collectAsState()
     A2uiSurfaceRenderer(
-        surface = surfaces[surfaceId],
+        surface = surfaces[surfaceId.value],
         modifier = modifier,
         onAction = onAction,
     )
@@ -63,9 +65,9 @@ fun A2uiSurfaceRenderer(
     }
 
     var pendingActionCount by remember(surface.surfaceId) { mutableStateOf(0) }
-    val localStateScope = remember(surface.surfaceId) { A2uiLocalStateScope.root(surface.surfaceId) }
+    val localStateScope = remember(surface.surfaceId) { A2uiLocalStateScope.root(A2uiSurfaceId(surface.surfaceId)) }
     // letta-mobile-by4vm.3: one budget per surface and component set; nodes claim slots from it.
-    val renderBudget = remember(surface.surfaceId, surface.components) { A2uiRenderBudget.forSurface(surface.surfaceId) }
+    val renderBudget = remember(surface.surfaceId, surface.components) { A2uiRenderBudget.forSurface(A2uiSurfaceId(surface.surfaceId)) }
     val submitting = pendingActionCount > 0
     fun updatePendingActionCount(delta: Int) {
         pendingActionCount = (pendingActionCount + delta).coerceAtLeast(0)
@@ -150,14 +152,14 @@ internal fun A2uiComponentNode(
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
-    if (rememberA2uiRenderClaim(component.id, renderScope) != A2uiRenderClaim.Granted) {
+    if (rememberA2uiRenderClaim(A2uiComponentId(component.id), renderScope) != A2uiRenderClaim.Granted) {
         A2uiRenderLimitPlaceholder(modifier = modifier)
         return
     }
     val parentLocalState = LocalA2uiLocalState.current
     val componentLocalState = remember(parentLocalState, component.id, component.raw["localState"]) {
         parentLocalState?.child(
-            componentId = component.id,
+            componentId = A2uiComponentId(component.id),
             defaults = component.localStateDefaults(),
         )
     }
@@ -204,7 +206,7 @@ private fun A2uiComponentNodeContent(
 ) {
     val nextVisited = visited + component.id
     androidx.compose.runtime.SideEffect {
-        logA2uiRender(surface.surfaceId, component.id, component.component)
+        logA2uiRender(A2uiSurfaceId(surface.surfaceId), A2uiComponentId(component.id), component.component)
     }
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -432,7 +434,7 @@ private fun A2uiComponentNodeContent(
     }
 }
 
-private fun logA2uiRender(surfaceId: String, componentId: String, componentType: String) {
+private fun logA2uiRender(surfaceId: A2uiSurfaceId, componentId: A2uiComponentId, componentType: String) {
     if (!a2uiLog.isDebugEnabled) return
     a2uiLog.debug("Render component surfaceId=$surfaceId componentId=$componentId type=$componentType")
 }

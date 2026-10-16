@@ -26,6 +26,7 @@ import com.letta.mobile.data.a2ui.A2uiLinkPolicy
 import com.letta.mobile.data.a2ui.A2uiRenderBudget
 import com.letta.mobile.data.a2ui.A2uiRenderClaim
 import com.letta.mobile.data.a2ui.A2uiSurfaceLimits
+import com.letta.mobile.data.model.A2uiComponentId
 
 /** letta-mobile-by4vm.3: the render budget of the surface pass being composed; null outside a surface. */
 internal val LocalA2uiRenderBudget = compositionLocalOf<A2uiRenderBudget?> { null }
@@ -39,7 +40,7 @@ val LocalA2uiLinkPolicy = compositionLocalOf { A2uiLinkPolicy.ConfirmAll }
  * re-counts an instance already on screen.
  */
 @Composable
-internal fun rememberA2uiRenderClaim(componentId: String, renderScope: A2uiRenderScope): A2uiRenderClaim {
+internal fun rememberA2uiRenderClaim(componentId: A2uiComponentId, renderScope: A2uiRenderScope): A2uiRenderClaim {
     val budget = LocalA2uiRenderBudget.current ?: return A2uiRenderClaim.Granted
     val scopeKey = renderScope.basePath.orEmpty()
     return remember(budget, componentId, scopeKey) { A2uiRenderSlot(budget, componentId, scopeKey) }.claim
@@ -47,7 +48,7 @@ internal fun rememberA2uiRenderClaim(componentId: String, renderScope: A2uiRende
 
 private class A2uiRenderSlot(
     private val budget: A2uiRenderBudget,
-    private val componentId: String,
+    private val componentId: A2uiComponentId,
     private val scopeKey: String,
 ) : RememberObserver {
     val claim: A2uiRenderClaim = budget.claim(componentId, scopeKey)
