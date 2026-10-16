@@ -22,7 +22,7 @@ import com.letta.mobile.data.secrets.AgentVaultController
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.chat.DesktopChatController
-import com.letta.mobile.desktop.data.DesktopSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.desktop.workspace.DesktopDreamingDeps
 import com.letta.mobile.desktop.workspace.DesktopDreamingPane
 import com.letta.mobile.desktop.workspace.DesktopWorkspaceSources
@@ -37,7 +37,7 @@ import com.letta.mobile.ui.shell.shellAgentEditorPage
 
 /** What the desktop's agent editor works over: this session's repositories, the chat, the device store. */
 internal class DesktopAgentEditorDeps(
-    val sessionGraph: DesktopSessionGraph,
+    val sessionGraph: SharedSessionRepositoryGraph,
     val chatController: DesktopChatController,
     val settings: SecureSettingsStore,
     val subagents: ISubagentRepository?,

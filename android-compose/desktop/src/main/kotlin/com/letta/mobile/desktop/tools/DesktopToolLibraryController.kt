@@ -3,13 +3,13 @@ package com.letta.mobile.desktop.tools
 import com.letta.mobile.data.tools.ToolLibraryController
 import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.data.backend.AppServerRouteUnavailable
-import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
+import com.letta.mobile.data.session.graph.HostSessionGraphProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
 
 class DesktopToolLibraryController(
-    sessionGraphProvider: DesktopSessionGraphProvider,
+    sessionGraphProvider: HostSessionGraphProvider,
     scope: CoroutineScope,
 ) : AutoCloseable {
     private val graph = sessionGraphProvider.current

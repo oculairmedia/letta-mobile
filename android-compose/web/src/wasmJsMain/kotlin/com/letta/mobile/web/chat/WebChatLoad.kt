@@ -3,8 +3,8 @@ package com.letta.mobile.web.chat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.BackendConnectionStatus
-import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.displayMessage
 import kotlinx.coroutines.CancellationException
 
@@ -22,7 +22,7 @@ sealed interface WebChatLoad {
 
 /** Opens the conversation for an agent on the live connection. */
 fun interface WebChatOpener {
-    suspend fun open(agent: AgentItemState): WebChatBinding
+    suspend fun open(agent: Agent): WebChatBinding
 }
 
 /**
@@ -33,7 +33,7 @@ fun interface WebChatOpener {
 @Composable
 internal fun rememberWebChatLoad(
     opener: WebChatOpener,
-    agent: AgentItemState?,
+    agent: Agent?,
     connection: BackendConnectionStatus,
 ): WebChatLoad {
     val load by produceState<WebChatLoad>(WebChatLoad.Idle, opener, agent?.id, connection) {

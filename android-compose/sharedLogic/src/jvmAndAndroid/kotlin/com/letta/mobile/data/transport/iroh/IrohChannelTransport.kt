@@ -4,7 +4,9 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.repository.shouldUseIrohTransport
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -1107,12 +1109,8 @@ class IrohChannelTransport(
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
         internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
-        // Debug override for local Iroh testing. MUST stay blank in committed
-        // code — a non-blank value forces EVERY backend through Iroh regardless
-        // of the active config (breaks REST/local-runtime selection). Set it
-        // only in a throwaway local build when dialing a hand-run wrapper.
-        private const val DEBUG_FORCE_IROH_URL = ""
-        fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
+        // The debug force-Iroh override lives beside the commonMain predicate (letta-mobile-ckmub.17.1).
+        fun shouldUseIroh(url: String?): Boolean = shouldUseIrohTransport(url)
 
         internal val READ_ONLY_ADMIN_RPC_METHODS = IrohTransportSupport.READ_ONLY_ADMIN_RPC_METHODS
 

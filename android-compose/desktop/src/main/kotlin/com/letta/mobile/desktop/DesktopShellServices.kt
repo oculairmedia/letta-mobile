@@ -26,7 +26,7 @@ import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopChatDockGeometryStore
-import com.letta.mobile.desktop.data.DesktopSessionGraph
+import com.letta.mobile.data.session.graph.SharedSessionRepositoryGraph
 import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.phone.LocalDesktopPhone
 import com.letta.mobile.desktop.phone.reducedMotionOr
@@ -51,7 +51,7 @@ internal data class DesktopIrohLink(
 internal data class DesktopShellCore(
     val bootstrap: DesktopConfigBootstrap,
     /** Follows transport publishes too, which rebuild the graph without going through applyConfig. */
-    val sessionGraph: State<DesktopSessionGraph>,
+    val sessionGraph: State<SharedSessionRepositoryGraph>,
     val layout: DesktopShellLayout,
     val chatScope: CoroutineScope,
     val railPrefs: DesktopRailPrefs,

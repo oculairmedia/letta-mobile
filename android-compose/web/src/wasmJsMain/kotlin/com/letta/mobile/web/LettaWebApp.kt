@@ -83,7 +83,7 @@ fun LettaWebApp() {
     val browserRoute = remember(workspace) { BrowserRouteBinding(workspace) }
     DisposableEffect(browserRoute) { onDispose(browserRoute.start()) }
     LaunchedEffect(browserRoute, workspace.route) { browserRoute.publish(workspace.route) }
-    val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId?.value }
+    val focusedAgent = backend.agents.value.firstOrNull { it.id == workspace.focusedAgentId }
     val chat = rememberWebChatLoad(remember(gateway) { WebChatOpener(gateway::openChat) }, focusedAgent, connection)
     val page = WebPageInputs(
         chat = chat,
