@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.serialization.LettaJson
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -25,7 +26,7 @@ import kotlinx.serialization.json.put
 class IrohAdminRpcApprovalSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
+    private val json: Json = LettaJson.adminRpc,
 ) {
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendUsesChannel()

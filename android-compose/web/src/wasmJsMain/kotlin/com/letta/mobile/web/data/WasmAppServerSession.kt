@@ -158,13 +158,13 @@ internal suspend fun connectWasmAppServerSession(
 ): WasmAppServerSession {
     val iroh = isIrohBackendUrl(config.serverUrl)
     val link = if (iroh) openIrohLink(config, scope) else openWebSocketLink(config, httpClient, scope)
-    var router: AppServerRuntimeEventRouter? = null
+    val router = AppServerRuntimeEventRouter()
     try {
-        val services = attachServices(link, scope, governModes = !iroh, nextRequestId) { router = it }
+        val services = attachServices(link, router, scope, TurnStackOptions(governModes = !iroh, nextRequestId))
         return WasmAppServerSession(link, services, scope)
     } catch (error: Throwable) {
         withContext(NonCancellable) {
-            router?.detach()
+            router.detach()
             link.close()
         }
         throw error
@@ -213,17 +213,19 @@ private suspend fun openWebSocketLink(config: LettaConfig, httpClient: HttpClien
     )
 }
 
-/** The turn stack over [link]; [governModes] gives the composer a mode chip (ws:// only, as on desktop). */
+/** How a session's turn stack is built: [governModes] gives the composer a mode chip (ws:// only, as on desktop). */
+private class TurnStackOptions(val governModes: Boolean, val nextRequestId: (String) -> String)
+
+/** The turn stack over [link], routed by [router]. */
 private fun attachServices(
     link: WasmAppServerLink,
+    router: AppServerRuntimeEventRouter,
     scope: CoroutineScope,
-    governModes: Boolean,
-    nextRequestId: (String) -> String,
-    onRouter: (AppServerRuntimeEventRouter) -> Unit,
+    options: TurnStackOptions,
 ): WasmAppServerServices {
-    val router = AppServerRuntimeEventRouter().also(onRouter)
+    val nextRequestId = options.nextRequestId
     // Per tab: the web has no settings store for the choices yet (letta-mobile-ckmub.17.7).
-    val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeIf { governModes }
+    val modes = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)).takeIf { options.governModes }
     val engine = router.attachTurnStack(
         link.client,
         scope,

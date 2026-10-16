@@ -21,14 +21,10 @@ fun appServerAdminRpcParams(path: String, body: String?): JsonObject = buildJson
 }
 
 private fun adminRpcPathParams(path: String): Map<String, String> {
-    val withoutPrefix = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
+    val segments = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
     val values = mutableMapOf<String, String>()
-    if (withoutPrefix.size >= 3 && withoutPrefix[0] == "v1" && withoutPrefix[1] == "conversations") {
-        values["conversation_id"] = withoutPrefix[2]
-        if (withoutPrefix.size >= 5 && withoutPrefix[3] == "messages") {
-            values["message_id"] = withoutPrefix[4]
-        }
-    }
+    conversationIdIn(segments)?.let { values["conversation_id"] = it }
+    messageIdIn(segments)?.let { values["message_id"] = it }
     path.substringAfter('?', missingDelimiterValue = "")
         .split('&')
         .filter { it.isNotBlank() }
@@ -39,3 +35,13 @@ private fun adminRpcPathParams(path: String): Map<String, String> {
         }
     return values
 }
+
+/** The {id} of a /v1/conversations/{id}/... path, or null for any other path. */
+private fun conversationIdIn(segments: List<String>): String? =
+    segments.getOrNull(2)?.takeIf { segments.take(2) == CONVERSATIONS_PREFIX }
+
+/** The message {id} of a /v1/conversations/{conversation}/messages/{id} path. */
+private fun messageIdIn(segments: List<String>): String? =
+    segments.getOrNull(4)?.takeIf { conversationIdIn(segments) != null && segments[3] == "messages" }
+
+private val CONVERSATIONS_PREFIX = listOf("v1", "conversations")

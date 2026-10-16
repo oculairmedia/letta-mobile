@@ -152,9 +152,7 @@ android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/contr
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/SubagentRegistryPublisher.kt
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/CachedMessageRepository.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/IrohAdminRpcApprovalSource.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: ignoreUnknownKeys=true isLenient=true
-android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/repository/IrohAdminRpcConversationListSource.kt
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/subagents/FileSubagentRegistryStore.kt
 # wire path, flags differ from LettaJson.wire/adminRpc: encodeDefaults=true ignoreUnknownKeys=true
 android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/transport/iroh/IrohAgentMessage.kt
