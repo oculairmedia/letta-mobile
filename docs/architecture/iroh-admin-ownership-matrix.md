@@ -72,9 +72,10 @@ approval.submit shim-fallback removal at cutover.
   0.29.12. `skill.list` serves an authoritative enumeration or reports
   `capability_unavailable` / `hydrated=false`; it never fabricates one. Since
   2026-08-01 that enumeration exists: `HostSkillsEnumerator` reads the letta-code
-  skills root (`--skills-dir` / `LETTA_SKILLS_DIR`, default `~/.letta/skills`; one
-  directory per skill, each with a `SKILL.md`) at startup and hydrates the catalog
-  through `NativeSkillsCatalog.hydrateFromHost` (`letta-mobile-7dm1q`).
+  skills root (`--skills-dir` / `LETTA_SKILLS_DIR`, default letta-code's own
+  `<LETTA_HOME>/skills`; one directory per skill, each with a `SKILL.md`) and
+  hydrates the catalog (`letta-mobile-7dm1q`); since skills-honest-controls it
+  re-reads that root on every `skill.list`. See "Skill controls" below.
   `skill.list_agent` no longer denies. That denial was reversed on live evidence:
   the desktop Skills surface issues `listSkills()` **and** `listAgentSkills(agentId)`
   in one snapshot load, so the typed capability error threw out of the loader and
@@ -85,6 +86,34 @@ approval.submit shim-fallback removal at cutover.
   served with an explicit `process_global: true` so a client can tell availability
   from assignment, and that flips false when upstream grows real per-agent
   assignment.
+- **Skill controls follow stock letta-code (2026-10-16, skills-honest-controls).**
+  letta-code's `skill_disable {name}` only unlinks a SYMLINK at
+  `<LETTA_HOME>/skills/<name>` (it refuses a real folder: "is not a symlink —
+  refusing to delete"), and `skill_enable {skill_path}` creates that symlink.
+  Nothing on the wire turns off a bundled, agent-memory or project skill. So every
+  `skill.list` entry carries `source` (`global` / `bundled` / `agent` / `project`)
+  and an explicit `controllable`, true only for a symlink directly in the control
+  root (`LETTA_HOME`, else `~/.letta`, plus `skills`; an enumerated root that is
+  not that directory is entirely read-only). The Skills page shows a toggle only
+  for controllable skills and a plain source label, with a one-line hint, for the
+  rest; a missing flag decodes as read-only. Skills the App Server advertises in
+  `device_status.current_available_skills` (populated from letta-code 0.34) are
+  merged in read-only; they no longer replace the host enumeration — that
+  replacement dropped every controllability flag, so the client defaulted all 92
+  skills to removable and the toggle could only fail. `skill.uninstall` of a
+  listed read-only skill is refused by the wrapper with `read_only: …`.
+  Known upstream caveat: on Node (22, as the live App Server runs) letta-code's
+  skills cache is invalidated by a recursive `fs.watch` that misses a symlink
+  being removed or added at the root, so an agent keeps seeing a just-disabled
+  skill until the App Server restarts; under Bun it updates immediately.
+  *Optional, this host only:* a host whose `~/.letta/skills` is one directory
+  link into a checkout (here `-> /opt/skills`) has only real folders, so all its
+  global skills are read-only. `scripts/deploy/skills-library-layout.sh` (dry run
+  by default, `--apply`, `--rollback`) makes them individually controllable by
+  turning the skills folder into a real directory of per-skill links into the
+  checkout, keeping the old link at `skills.pre-library-layout` for rollback; the
+  wrapper's `--skills-dir` must then name `~/.letta/skills` (the control root),
+  and the App Server should be restarted. The product never requires it.
 - **The store tier must be wired explicitly (2026-08-01).** `local_backend_store`
   owns six read-only methods, but the wrapper deployment template forbids
   inheriting `LETTA_LOCAL_BACKEND_DIR` from `appserver.env`. After the cutover the

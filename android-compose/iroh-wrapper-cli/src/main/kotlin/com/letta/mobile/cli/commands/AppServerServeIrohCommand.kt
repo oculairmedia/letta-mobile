@@ -227,9 +227,9 @@ class AppServerServeIrohCommand : CliktCommand(
     private val skillsDir by option(
         "--skills-dir",
         envvar = HostSkillsEnumerator.SKILLS_DIR_ENV,
-        help = "letta-code skills root to enumerate for skill.list " +
+        help = "letta-code global skills root to enumerate for skill.list " +
             "(one directory per skill, each with a SKILL.md). " +
-            "Defaults to ~/.letta/skills.",
+            "Defaults to letta-code's <LETTA_HOME>/skills; only symlinks there are controllable.",
     )
 
     /**
