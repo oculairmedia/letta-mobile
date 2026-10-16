@@ -41,6 +41,7 @@ import com.letta.mobile.ui.host.rememberOverlayHost
 import com.letta.mobile.ui.mascot.MascotTransportLayer
 import com.letta.mobile.ui.notify.LocalAttentionPrefs
 import com.letta.mobile.ui.shell.UndoDeleteOverlay
+import com.letta.mobile.ui.theme.LocalReducedMotion
 import com.letta.mobile.ui.shell.rail.ShellAgentRailActions
 import com.letta.mobile.ui.shell.rail.ShellLibraryRail
 import com.letta.mobile.ui.shell.rail.ShellLibraryRailState
@@ -74,6 +75,7 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 CompositionLocalProvider(
                     LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
                     LocalAttentionPrefs provides context.core.attentionPrefs,
+                    LocalReducedMotion provides context.core.layout.reducedMotion,
                 ) {
                     ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {
                         DesktopShellLayoutBody(context, frame)
@@ -111,7 +113,7 @@ private fun DesktopShellLayoutBody(context: DesktopShellContext, frame: DesktopS
         DriveMascotStage(frame.focus.selectedAgentId, agentPaneVisible = phone.agentPaneVisible(isSidebarVisible))
         ReportShellWidth(phone, measuredWidthDp) { layout.controller.dispatch(ShellLayoutEvent.WindowWidthChanged(it)) }
         // Every seated mascot draws here, over the shell, and travels between seats (wbin4.4).
-        MascotTransportLayer(reducedMotion = layout.reducedMotion) {
+        MascotTransportLayer {
             ProvideInspectorHost(inspectors) {
                 DesktopShellRow(
                     phone,

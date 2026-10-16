@@ -8,7 +8,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * motion (row placement, disclosures, label swaps, composer morphs) and stills its loops.
  *
  * Providers: Android's shared chat page (feature-chat SharedChatPage, from the OS "Remove
- * animations" setting, letta-mobile-bglj6.1.19) and the desktop phone preview
+ * animations" setting, letta-mobile-bglj6.1.19), the desktop window's shell root
+ * (DesktopShellContent, from the OS setting, letta-mobile-te3n1.3) and the desktop phone preview
  * (DesktopPhoneScreen). Anything outside them sees the default `false`.
  */
 val LocalReducedMotion: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { false }

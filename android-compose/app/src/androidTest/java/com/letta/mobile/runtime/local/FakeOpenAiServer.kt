@@ -4,6 +4,7 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -23,11 +24,16 @@ import kotlinx.serialization.json.put
  * A loopback OpenAI-compatible model for the on-device App Server smoke (letta-mobile-by4vm.110.5),
  * ported from the embedded-runtime prototype's fake-llm.cjs: the first completion calls the shell
  * tool once, the one after the tool result answers [REPLY]. Streams SSE like LM Studio.
+ *
+ * letta-mobile-by4vm.121.1: it serves the routes [OnDeviceOpenAiBridge] serves (`/v1/models`,
+ * `/v1/chat/completions`, 404 otherwise, so letta-code's `/api/v0/models` probe falls back the same
+ * way) and advertises the model exactly as the bridge does: [lettaCodeLookupId] of [modelHandle].
  */
-internal class FakeOpenAiServer : AutoCloseable {
+internal class FakeOpenAiServer(val modelHandle: String = MODEL_HANDLE) : AutoCloseable {
     private val socket = ServerSocket(0, BACKLOG, InetAddress.getByName("127.0.0.1"))
     private val completions = AtomicInteger()
     private val json = Json { ignoreUnknownKeys = true }
+    private val servedModel = lettaCodeLookupId(modelHandle)
 
     val baseUrl: String = "http://127.0.0.1:${socket.localPort}/v1"
 
@@ -52,12 +58,16 @@ internal class FakeOpenAiServer : AutoCloseable {
         val headers = head.drop(1).associate { it.substringBefore(':').trim().lowercase() to it.substringAfter(':').trim() }
         val body = readBody(input, headers)
         val out = client.getOutputStream()
-        if (path.endsWith("/models")) {
+        if (path == "/v1/models") {
             val models = buildJsonObject {
                 put("object", "list")
-                put("data", buildJsonArray { add(buildJsonObject { put("id", MODEL); put("object", "model") }) })
+                put("data", buildJsonArray { add(buildJsonObject { put("id", servedModel); put("object", "model") }) })
             }.toString()
-            out.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${models.length}\r\nConnection: close\r\n\r\n$models".toByteArray())
+            out.writeJson(200, models)
+            return
+        }
+        if (path != "/v1/chat/completions") {
+            out.writeJson(404, """{"error":{"type":"not_found","message":"Unknown route: $path"}}""")
             return
         }
         completions.incrementAndGet()
@@ -100,7 +110,7 @@ internal class FakeOpenAiServer : AutoCloseable {
     private fun chunk(delta: JsonObject, finish: String?): String = buildJsonObject {
         put("id", "chatcmpl-${completions.get()}")
         put("object", "chat.completion.chunk")
-        put("model", MODEL)
+        put("model", servedModel)
         put("choices", buildJsonArray {
             add(buildJsonObject {
                 put("index", 0)
@@ -109,6 +119,12 @@ internal class FakeOpenAiServer : AutoCloseable {
             })
         })
     }.toString()
+
+    private fun OutputStream.writeJson(status: Int, body: String) {
+        val bytes = body.toByteArray(Charsets.UTF_8)
+        write("HTTP/1.1 $status ${if (status == 200) "OK" else "Not Found"}\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+        write(bytes)
+    }
 
     private fun readHead(input: InputStream): List<String> {
         val lines = mutableListOf<String>()
@@ -147,7 +163,8 @@ internal class FakeOpenAiServer : AutoCloseable {
     }
 
     companion object {
-        const val MODEL = "device-smoke-model"
+        /** Real-style handle: a vendor/model id with a slash, like `lmstudio/google/gemma-3n-E2B-it-litert-lm`. */
+        const val MODEL_HANDLE = "lmstudio/google/device-smoke-litert-lm"
         const val REPLY = "DEVICE-SMOKE-OK"
         const val TOOL_COMMAND = "echo DEVICE-TOOL-\$((6*7))"
         private const val BACKLOG = 16
