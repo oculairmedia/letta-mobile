@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.chat.surface.composer
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
@@ -28,11 +28,12 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import com.letta.mobile.avatar.core.MascotBody
+import com.letta.mobile.avatar.core.MascotBodyTune
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
 import com.letta.mobile.ui.mascot.mascotAvailable
 import com.letta.mobile.ui.theme.ChatMascotDimens
-import com.letta.mobile.ui.theme.ChatMotionTokens
 import com.letta.mobile.ui.theme.LocalReducedMotion
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.collectLatest
@@ -184,9 +185,10 @@ internal fun CompanionSeatOverlay(
                     // on drawing it there and taking its taps over the bar.
                     val shown = (1f - pageWeight().coerceIn(0f, 1f) * (1f - anchors.pageShown)).coerceAtLeast(0f)
                     // Fully hidden collapses to nothing so the mascot layer publishes no bounds
-                    // (TouchCompanionHiddenSeatTest). While appearing it matches legacy
-                    // ChatComposerCompanion: fade + scale 0.5→1 from the feet + a half-height rise.
-                    val appearScale = if (shown <= 0f) 0f else HIDDEN_SCALE + (1f - HIDDEN_SCALE) * shown
+                    // (TouchCompanionHiddenSeatTest). Appearing, it rises from the feet with one
+                    // overshoot and a half-height rise; going, it sinks back the same way
+                    // (letta-mobile-te3n1.3). Uniform: the layer reads the seat's bounds as a square.
+                    val appearScale = MascotBody.entranceScale(shown)
                     placeable.placeWithLayer(
                         (rect.center.x - placeable.width / 2f - placement.origin.x).roundToInt(),
                         (rect.center.y - placeable.height / 2f - placement.origin.y).roundToInt(),
@@ -210,13 +212,6 @@ internal fun CompanionSeatOverlay(
         )
     }
 }
-
-/**
- * A hidden companion shrinks away into the bar (the mascot layer draws the character at the seat's
- * bounds, so a zero scale is what reaches it when [shown] is 0). While it appears, legacy
- * ChatComposerCompanion scaled from 0.5 at the feet.
- */
-private const val HIDDEN_SCALE = 0.5f
 
 /** Resolves the seat's rect from the anchors; keeps the last one for the frames between anchors. */
 @Stable
@@ -282,11 +277,12 @@ private fun rememberDockedGlide(): DockedGlide {
         snapshotFlow { glide.handoffs }.filter { it > 0 }.collectLatest {
             glide.progress.snapTo(0f)
             glide.pending = false
-            glide.progress.animateTo(
-                1f,
-                tween(ChatMotionTokens.DockCollapse.MILLIS, easing = ChatMotionTokens.SurfaceMorph.easing),
-            )
+            // The body's travel spring (letta-mobile-te3n1.3): the same one overshoot and settle
+            // as a hop between seats, so every move of the character has one feel.
+            glide.progress.animateTo(1f, spring(dampingRatio = GLIDE_TUNE.travelDamping, stiffness = GLIDE_TUNE.travelStiffness))
         }
     }
     return glide
 }
+
+private val GLIDE_TUNE = MascotBodyTune()
