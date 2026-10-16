@@ -117,4 +117,29 @@ class EmbeddedLettaCodeModelSelectionTest {
         assertEquals("lmstudio/claude-proxy-model", selection.lettaCodeModelHandle)
         assertEquals(null, selection.modelPath)
     }
+
+    @Test
+    fun `lookup id strips the lmstudio prefix once and keeps nested slashes like letta code`() {
+        assertEquals("google/gemma-3n-E2B-it-litert-lm", lettaCodeLookupId("lmstudio/google/gemma-3n-E2B-it-litert-lm"))
+        assertEquals("default", lettaCodeLookupId("lmstudio/default"))
+        assertEquals("lmstudio/nested", lettaCodeLookupId("lmstudio/lmstudio/nested"))
+        assertEquals("openai/gpt-x", lettaCodeLookupId("openai/gpt-x"))
+    }
+
+    @Test
+    fun `model server agents look up the id the server lists`() {
+        listOf("deepseek-v4-flash", "lmstudio/deepseek-v4-flash", "qwen/qwen3-8b").forEach { providerModel ->
+            val selection = EmbeddedLettaCodeModelSelection.from(
+                LettaConfig(
+                    id = "local",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local-lettacode://device",
+                    localProviderBaseUrl = "http://192.168.1.10:1234/v1",
+                    localProviderModel = providerModel,
+                ),
+            )
+
+            assertEquals(providerModel.removePrefix("lmstudio/"), lettaCodeLookupId(selection.lettaCodeModelHandle))
+        }
+    }
 }
