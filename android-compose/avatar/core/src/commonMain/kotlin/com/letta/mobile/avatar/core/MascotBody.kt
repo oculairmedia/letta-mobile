@@ -163,11 +163,11 @@ class MascotBody(val tune: MascotBodyTune = MascotBodyTune()) {
         var impact = 0f
         if (crouchLeft > 0f) {
             crouchLeft -= h
-        } else if (!landed || travel != 1f || travelVelocity != 0f) {
+        } else if (travelling()) {
             val before = travel
             travelVelocity += ((1f - travel) * tune.travelStiffness - 2f * tune.travelDamping * travelOmega * travelVelocity) * h
             travel += travelVelocity * h
-            if (!landed && before < 1f && travel >= 1f) {
+            if (arrivedFrom(before)) {
                 landed = true
                 impact = (abs(speedDp()) / tune.impactSpeedDp).coerceIn(0f, 1f)
                 impulse(impact)
@@ -175,6 +175,18 @@ class MascotBody(val tune: MascotBodyTune = MascotBodyTune()) {
         }
         stepDeform(h)
         return impact
+    }
+
+    /** The travel spring has anything left to do: a hop not yet landed, or an overshoot settling. */
+    private fun travelling(): Boolean {
+        if (!landed) return true
+        return travel != 1f || travelVelocity != 0f
+    }
+
+    /** This sub-step carried a hop that had not landed across its seat (from [before]). */
+    private fun arrivedFrom(before: Float): Boolean {
+        if (landed) return false
+        return before < 1f && travel >= 1f
     }
 
     /** The body's speed along the hop, in dp/s. */

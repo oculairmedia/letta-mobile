@@ -82,21 +82,30 @@ internal fun MascotTransport.Flight.placement(to: Rect, drawWidth: Float, origin
 
 /**
  * The character's shape this frame on its layer: the seat-to-seat size as a scale, the body's
- * squash, stretch and lean, and the entrance, all about its feet. Under [reducedMotion] only the
- * entrance's fade remains: no squash, no lean, no rise.
+ * squash, stretch and lean (unless [deform] is off because the rig draws them from the body's
+ * motion), and the entrance, all about its feet. Under [reducedMotion] only the entrance's fade
+ * remains: no squash, no lean, no rise.
  */
-internal fun MascotTransport.Flight.applyPose(scope: GraphicsLayerScope, to: Rect, drawWidth: Float, reducedMotion: Boolean) {
+internal fun MascotTransport.Flight.applyPose(
+    scope: GraphicsLayerScope,
+    to: Rect,
+    drawWidth: Float,
+    reducedMotion: Boolean,
+    deform: Boolean,
+) {
     // Read so a moving body re-draws the layer each frame (draw only, never composition).
     observeFrame()
     val flightScale = if (drawWidth > 0f) width(to) / drawWidth else 1f
     val shown = presence.value
     val enter = if (reducedMotion) 1f else MascotBody.entranceScale(shown)
     val enterDeform = if (reducedMotion) 0f else MascotBody.entranceDeform(shown, body.tune)
+    val bodyX = if (deform) body.scaleX else 1f
+    val bodyY = if (deform) body.scaleY else 1f
     with(scope) {
         transformOrigin = FEET
-        scaleX = flightScale * enter * body.scaleX * exp(-enterDeform)
-        scaleY = flightScale * enter * body.scaleY * exp(enterDeform)
-        rotationZ = body.rotationDegrees
+        scaleX = flightScale * enter * bodyX * exp(-enterDeform)
+        scaleY = flightScale * enter * bodyY * exp(enterDeform)
+        rotationZ = if (deform) body.rotationDegrees else 0f
         alpha = if (reducedMotion) shown else (shown * ENTRANCE_ALPHA_RATE).coerceAtMost(1f)
         // Scaled about the feet, a smaller seat would drop the character's middle: lift it by the
         // unused height so the seat-to-seat scale stays centred, as it was before the body.

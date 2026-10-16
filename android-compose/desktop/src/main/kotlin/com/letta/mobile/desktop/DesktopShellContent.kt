@@ -75,8 +75,6 @@ internal fun DesktopShellWindowContent(context: DesktopShellContext, frame: Desk
                 CompositionLocalProvider(
                     LocalDesktopPermissionModeSettings provides context.core.bootstrap.dataBindings.permissionModeSettings,
                     LocalAttentionPrefs provides context.core.attentionPrefs,
-                    // The OS reduced-motion setting (or the phone preview's toggle) for every shared
-                    // surface in the window, the mascot's hops included (letta-mobile-te3n1.3).
                     LocalReducedMotion provides context.core.layout.reducedMotion,
                 ) {
                     ShellPluginViews(context.core.bootstrap.dataBindings.pluginViews) {

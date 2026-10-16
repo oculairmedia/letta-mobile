@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -37,8 +38,10 @@ class MascotHopUiTest {
             shell.Provide {
                 MascotTransportLayer(reducedMotion = reducedMotion) {
                     Box(Modifier.size(WIDTH.dp, HEIGHT.dp)) {
-                        MascotSeat(AGENT, MascotStage.COMPOSER_COMPANION, size = SMALL.dp, modifier = Modifier.offset(40.dp, 520.dp), empty = {})
-                        MascotSeat(AGENT, MascotStage.AGENT_PANE_HERO, size = LARGE.dp, modifier = Modifier.offset(640.dp, 40.dp), empty = {})
+                        val companion = Modifier.offset(40.dp, 520.dp)
+                        val hero = Modifier.offset(640.dp, 40.dp)
+                        MascotSeat(AGENT, MascotStage.COMPOSER_COMPANION, size = SMALL.dp, modifier = companion, empty = {})
+                        MascotSeat(AGENT, MascotStage.AGENT_PANE_HERO, size = LARGE.dp, modifier = hero, empty = {})
                     }
                 }
             }
@@ -79,6 +82,24 @@ class MascotHopUiTest {
         assertTrue(centers.any { it.x > to.x + 1f }, "overshot the seat")
         assertTrue(abs(to.x - centers[centers.size - 2].x) < 1f, "settled")
         assertEquals(1, stage.landings.size, "landed once")
+    }
+
+    @Test
+    fun whenTheRigCarriesTheBodyTheLayerOnlyMovesIt() = runComposeUiTest {
+        val stage = stage(reducedMotion = false)
+        stage.shell.transport.rigCarriesBody = true
+        stage.shell.transport.transportTo(AGENT, MascotStage.AGENT_PANE_HERO)
+        var moved = false
+        val start = character().center
+        repeat(FLIGHT_FRAMES / 2) {
+            mainClock.advanceTimeByFrame()
+            val shown = character()
+            if (shown.center != start) moved = true
+            assertEquals(shown.width, shown.height, 0.5f, "no squash, stretch or lean on the layer")
+        }
+        assertTrue(moved, "still carried along the hop")
+        assertNotNull(stage.shell.transport.bodyOf(AGENT), "the director can read the body's motion")
+        assertEquals(2, stage.landings.size, "the entrance's and the hop's landings still reach the director")
     }
 
     @Test

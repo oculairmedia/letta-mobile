@@ -230,18 +230,22 @@ class MascotTransport {
      */
     var motionListener: MascotMotionListener? = null
 
-    /** [agentId]'s body as drawn now (its squash, lean and motion for the rig), or null when no slot shows it. */
-    fun bodyOf(agentId: String): MascotBody? = flights.values.firstOrNull { it.shownAgent == agentId }?.body
+    /**
+     * True once the mascot director writes the body's motion to a rig that animates it itself
+     * (letta-mobile-te3n1.5 inputs: [MascotBody.motionX] -> `moveX`, [MascotBody.motionY] ->
+     * `moveY`, each landing's impact -> `impact` then `land`). The layer then still carries the
+     * character along its hop, between seat sizes and in on its entrance, but leaves the squash,
+     * stretch and lean to the file, so they are not applied twice. False (the default) draws them
+     * on the layer, which is also what stills and orbs get.
+     */
+    var rigCarriesBody: Boolean by mutableStateOf(false)
 
     /**
-     * A squash of [impact] (0..1) on [agentId]'s character from outside the transport - a poke, a
-     * drop after a drag (letta-mobile-te3n1.4). Nothing when no slot shows it.
+     * [agentId]'s body as drawn now, or null when no slot shows it: host motion data for the
+     * director - [MascotBody.motionX]/[MascotBody.motionY] (seat travel plus drag velocity, -1..1)
+     * for the rig's moveX/moveY. Landings arrive through [motionListener].
      */
-    fun impulse(agentId: String, impact: Float) {
-        val flight = flights.values.firstOrNull { it.shownAgent == agentId } ?: return
-        flight.body.impulse(impact)
-        flight.wakes++
-    }
+    fun bodyOf(agentId: String): MascotBody? = flights.values.firstOrNull { it.shownAgent == agentId }?.body
 
     /** Sends [agentId]'s mascot to [stage]. It goes as soon as that stage has a seat and comes back to rest when the seat leaves. */
     fun transportTo(agentId: String, stage: MascotStage) {
@@ -314,9 +318,10 @@ private fun TransportedMascot(
         if (reducedMotion) flight.body.snap()
         launch { flight.enter(reducedMotion) { impact -> transport.landed(flight, impact) } }
         launch { flight.drive(reducedMotion) { impact -> transport.landed(flight, impact) } }
+        val motion = HopMotion(reducedMotion, density.density)
         snapshotFlow { transport.activeStage(currentAgent) }
             .distinctUntilChanged()
-            .collect { next -> transport.beginHop(flight, currentAgent, next, reducedMotion, density.density) }
+            .collect { next -> transport.beginHop(flight, currentAgent, next, motion) }
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
     // is a layer scale: a Rive surface re-allocates its readback buffer and restarts its frame
@@ -332,7 +337,7 @@ private fun TransportedMascot(
         modifier = Modifier
             .offset { flight.placement(to, drawWidth, origin) }
             .requiredSize(boxSize)
-            .graphicsLayer { flight.applyPose(this, to, drawWidth, reducedMotion) }
+            .graphicsLayer { flight.applyPose(this, to, drawWidth, reducedMotion, deform = !transport.rigCarriesBody) }
             // Hover (for the pencil) and drag only where the seat has them: a seat with neither
             // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
             .seatInput(seat.handlers, hover, flight),
@@ -352,30 +357,37 @@ private fun TransportedMascot(
  * is drawn this frame; nothing when [next] is no stage or the one already shown. The slot's first
  * stage is no hop: the character enters there ([MascotTransport.Flight.enter]).
  */
-private fun MascotTransport.beginHop(
-    flight: MascotTransport.Flight,
-    agentId: String,
-    next: MascotStage?,
-    reducedMotion: Boolean,
-    density: Float,
-) {
+private fun MascotTransport.beginHop(flight: MascotTransport.Flight, agentId: String, next: MascotStage?, motion: HopMotion) {
     if (next == null || next == flight.shownStage) return
-    val previous = flight.shownStage
-    val shownSeat = MascotTransport.SeatKey(flight.shownAgent ?: agentId, previous ?: next)
-    val leaving = seat(shownSeat)?.bounds
-    val destination = seat(MascotTransport.SeatKey(agentId, next))?.bounds
+    val ends = hopEnds(flight, agentId, next)
     flight.shownStage = next
     flight.shownAgent = agentId
-    val from = leaving?.let { flight.shownRect(it) } ?: flight.drawnRect()
-    if (previous == null || reducedMotion || from == null || destination == null) {
+    if (ends == null || motion.reducedMotion) {
         flight.body.snap()
         flight.frame++
         return
     }
+    val (from, destination) = ends
     flight.from = from
+    val density = motion.density
     flight.body.hop((destination.center.x - from.center.x) / density, (destination.center.y - from.center.y) / density)
     flight.wakes++
 }
+
+/**
+ * Where [flight]'s hop to [next] runs from (the character as drawn now) and to; null for the
+ * slot's first stage, or when either end has no place yet - the character then simply stands.
+ */
+private fun MascotTransport.hopEnds(flight: MascotTransport.Flight, agentId: String, next: MascotStage): Pair<Rect, Rect>? {
+    val previous = flight.shownStage ?: return null
+    val leaving = seat(MascotTransport.SeatKey(flight.shownAgent ?: agentId, previous))?.bounds
+    val from = leaving?.let { flight.shownRect(it) } ?: flight.drawnRect() ?: return null
+    val destination = seat(MascotTransport.SeatKey(agentId, next))?.bounds ?: return null
+    return from to destination
+}
+
+/** How the layer moves: whether motion is reduced, and the screen density that turns px into the body's dp. */
+private class HopMotion(val reducedMotion: Boolean, val density: Float)
 
 /** Reports [flight]'s landing to the transport's listener, for whichever agent stands in the slot. */
 private fun MascotTransport.landed(flight: MascotTransport.Flight, impact: Float) {
