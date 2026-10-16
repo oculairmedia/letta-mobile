@@ -238,21 +238,22 @@ class AppServerServeIrohCommand : CliktCommand(
     /**
      * letta-mobile-bn008.6: a2a (direct agent-to-agent) receiver wiring.
      *
-     * The wrapper binds a SECOND Iroh endpoint on this UDP port, exposed only
-     * over the `/letta/a2a/0` ALPN. Inbound QUIC connections land through
-     * [IrohAgentMessageReceiver], which routes by the target agent's most-recent
-     * interactive conversation and lands the body as a user message on it via
-     * the same App Server client the rest of the wrapper uses. The wrapper's
-     * stable secret-key file is reused so the a2a node id matches the
-     * app-server node id (demux is by `toAgentId`, not by node id).
+     * letta-mobile-by4vm.112: the `/letta/a2a/0` ALPN is served on the host's
+     * ONE Iroh endpoint (`--iroh-port`), demultiplexed next to the App Server
+     * ALPN. Inbound connections land through [IrohAgentMessageReceiver], which
+     * routes by the target agent's most-recent interactive conversation and
+     * lands the body as a user message on it via the same App Server client the
+     * rest of the wrapper uses.
      *
-     * `--a2a-port 0` => OS-assigned random (testing only). Production should pin.
+     * There is no second endpoint, so no second port: a negative value disables
+     * the receiver; any other value enables it and is otherwise ignored (the
+     * option stays so deployed units that pass it keep parsing).
      */
     private val a2aPort by option(
         "--a2a-port",
         envvar = "LETTA_A2A_PORT",
-        help = "letta-mobile-bn008.6: UDP port for the a2a receiver (0 = OS-assigned). " +
-            "Set to -1 to disable the a2a receiver entirely (default: 0).",
+        help = "letta-mobile-bn008.6: -1 disables the a2a receiver; any other value enables it " +
+            "(default: 0). The a2a ALPN rides the --iroh-port endpoint; no separate port is bound.",
     ).int().default(0)
 
     private val a2aAddressBook by option(
@@ -349,6 +350,10 @@ class AppServerServeIrohCommand : CliktCommand(
             val (store, protocol) = initNotebookSync(scope) { irohEndpoint }
             notebookStore = store
             notebookProtocol = protocol
+            // The a2a protocol must be registered before the endpoint binds (ALPNs are fixed at
+            // bind); its App Server client is created after, so the receiver reads it late.
+            val a2aClient = java.util.concurrent.atomic.AtomicReference<AppServerClient?>()
+            val a2a = a2aWiringOrNull(a2aClient::get)
 
             // Create the Iroh endpoint
             val endpoint = IrohNodeEndpoint(
@@ -358,13 +363,14 @@ class AppServerServeIrohCommand : CliktCommand(
                 authPolicy = authPolicy,
                 pairingService = pairingService,
                 canvasRelay = canvasRelay,
-                protocolHandlers = listOfNotNull(notebookProtocol),
+                protocolHandlers = listOfNotNull(notebookProtocol, a2a?.receiver),
                 turnIdentity = turnIdentity,
             )
             irohEndpoint = endpoint
             endpoint.create()
             
             printDialInfo(endpoint)
+            a2a?.let { publishA2aHost(it, endpoint) }
 
             // lgns8.18 (Path A, desktop): optionally run + OWN the App Server child on an
             // ephemeral loopback port, instead of connecting to an external URL.
@@ -377,6 +383,7 @@ class AppServerServeIrohCommand : CliktCommand(
             val appServerEndpoint = ownedLease?.let { AppServerEndpoint.fromWebSocketUrl(it.serverUrl, it.bearerToken) }
                 ?: appServerUrl?.let(AppServerEndpoint::fromWebSocketUrl)
             val (controller, nativeAdminClient) = createController(appServerEndpoint, requestTimeout.toLong(), scope)
+            a2aClient.set(nativeAdminClient)
 
             setupAdminRpc(
                 endpoint = endpoint,
@@ -391,8 +398,6 @@ class AppServerServeIrohCommand : CliktCommand(
             // Start accepting connections
             endpoint.start(controller)
             println("[iroh-app-server] Listening on Iroh... (Ctrl+C to stop)")
-
-            setupA2aReceiver(scope, nativeAdminClient)
 
             awaitServerLoop()
         }
@@ -413,58 +418,47 @@ class AppServerServeIrohCommand : CliktCommand(
         MeridianToolsEndpoint(config, productionToolRegistry, client.events, ::println).start(scope)
     }
 
-    private suspend fun setupA2aReceiver(
-        scope: CoroutineScope,
-        nativeAdminClient: AppServerClient?,
-    ) {
-        if (a2aPort < 0) {
-            println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
-            return
-        }
+    private fun a2aConfig(): A2aWiringConfig {
         val irohHome = java.io.File(
             System.getenv("LETTA_IROH_HOME") ?: "${System.getProperty("user.home")}/.letta/iroh",
         )
-        val effectiveAddressBook: java.io.File = a2aAddressBook
-            ?.let { java.io.File(it) }
-            ?: java.io.File(irohHome, "agent-addresses.kv")
-        val effectiveIdentityDir: java.io.File = a2aIdentityDir
-            ?.let { java.io.File(it) }
-            ?: java.io.File(irohHome, "identities")
-        val localBackendFile = (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
+        return A2aWiringConfig(
+            identityDir = a2aIdentityDir?.let { java.io.File(it) } ?: java.io.File(irohHome, "identities"),
+            addressBook = a2aAddressBook?.let { java.io.File(it) } ?: java.io.File(irohHome, "agent-addresses.kv"),
+        )
+    }
+
+    private fun a2aLocalBackendDir(): java.io.File? =
+        (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
             ?.takeIf { it.isNotBlank() }
             ?.let { java.io.File(it) }
-        val a2aCfg = A2aWiringConfig(
-            port = a2aPort,
-            secretKeyPath = irohSecretKeyPath,
-            identityDir = effectiveIdentityDir,
-            addressBook = effectiveAddressBook,
-        )
-        val wiring = runCatching {
-            buildA2aWiring(
-                config = a2aCfg,
-                client = nativeAdminClient,
-                localBackendDir = localBackendFile,
-            )
-        }.getOrElse { t ->
-            println(
-                "[iroh-app-server] a2a receiver: DISABLED (${t.message}). " +
-                    "Check $effectiveAddressBook is writable.",
-            )
-            null
+
+    /** letta-mobile-by4vm.112: the a2a protocol handler for the host endpoint, or null when disabled. */
+    private fun a2aWiringOrNull(client: () -> AppServerClient?): A2aWiring? {
+        if (a2aPort < 0) {
+            println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
+            return null
         }
-        if (wiring != null) {
-            val acceptJob = wiring.start(scope)
-            scope.coroutineContext[Job]?.invokeOnCompletion { _ ->
-                runCatching { acceptJob.cancel() }
-                runCatching { wiring.close() }
+        return runCatching { buildA2aWiring(a2aConfig(), client, a2aLocalBackendDir()) }
+            .onFailure { println("[iroh-app-server] a2a receiver: DISABLED (${it.message})") }
+            .getOrNull()
+    }
+
+    /** Write the host's address-book record once the endpoint is bound; the receiver itself is already served. */
+    private suspend fun publishA2aHost(wiring: A2aWiring, endpoint: IrohNodeEndpoint) {
+        val config = a2aConfig()
+        runCatching { publishHost(config, endpoint.addr(), wiring.addressStore) }
+            .onSuccess { record ->
+                println(
+                    "[iroh-app-server] a2a receiver: ON host endpoint " +
+                        "(node=${record.nodeIdHex}, alpn=/letta/a2a/0, " +
+                        "address_book=${config.addressBook.absolutePath}, " +
+                        "local_backend=${a2aLocalBackendDir()?.absolutePath ?: "UNSET (membership gate disabled)"})",
+                )
             }
-            println(
-                "[iroh-app-server] a2a receiver: BOUND " +
-                    "(node=${wiring.nodeIdHex}, port=$a2aPort, " +
-                    "address_book=${effectiveAddressBook.absolutePath}, " +
-                    "local_backend=${localBackendFile?.absolutePath ?: "UNSET (membership gate disabled)"})",
-            )
-        }
+            .onFailure {
+                println("[iroh-app-server] a2a host record: NOT published (${it.message}). Check ${config.addressBook} is writable.")
+            }
     }
 
     internal suspend fun awaitServerLoop() {
