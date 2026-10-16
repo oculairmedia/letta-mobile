@@ -124,7 +124,7 @@
     <ID>TooGenericExceptionCaught:SharedNavDrawerViewModel.kt$SharedNavDrawerViewModel$error: Exception</ID>
     <ID>TooGenericExceptionCaught:TimelineSendCoordinator.kt$TimelineSendCoordinator$e: Exception</ID>
     <ID>TooManyFunctions:AdminChatA2uiCoordinator.kt$AdminChatA2uiCoordinator</ID>
-    <ID>TooManyFunctions:AdminChatActions.kt$AdminChatActions : ChatActions</ID>
+    <ID>TooManyFunctions:AdminChatActions.kt$AdminChatActions : ChatExtensionActions</ID>
     <ID>TooManyFunctions:AdminChatComposerCoordinator.kt$AdminChatComposerCoordinator</ID>
     <ID>TooManyFunctions:AdminChatViewModel.kt$AdminChatViewModel : ViewModel</ID>
     <ID>TooManyFunctions:ChatConversationCoordinator.kt$ChatConversationCoordinator</ID>

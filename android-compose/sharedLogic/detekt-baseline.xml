@@ -1962,7 +1962,6 @@
     <ID>TooManyFunctions:CanvasSceneValidator.kt$CanvasSceneValidator</ID>
     <ID>TooManyFunctions:CanvasSession.kt$CanvasSession</ID>
     <ID>TooManyFunctions:CanvasShare.kt$CanvasShare</ID>
-    <ID>TooManyFunctions:ChatActions.kt$ChatActions</ID>
     <ID>TooManyFunctions:ChatDockGeometry.kt$ChatDockGeometryMath</ID>
     <ID>TooManyFunctions:ChatRenderModelBuilder.kt$com.letta.mobile.data.chat.projection.ChatRenderModelBuilder.kt</ID>
     <ID>TooManyFunctions:ChatSendCoordinator.kt$ChatSendCoordinator</ID>

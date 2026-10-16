@@ -13,8 +13,12 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.session.ChatBranchSupport
+import com.letta.mobile.ui.chat.session.ChatBranchView
+import com.letta.mobile.ui.chat.session.ChatBranchingSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * letta-mobile-bzvro.15 / .16, letta-mobile-7mys7: Android's binding of the shared
@@ -64,24 +68,33 @@ class ChatConversationBranching(
     data class Origin(
         val conversationId: String,
         val agentId: String,
-        val ui: ChatUiState,
+        val view: ChatBranchView,
         val open: (agentId: String, conversationId: String) -> Unit,
     ) {
         val source: BranchSource
-            get() = BranchSource(conversationId, agentId, ui.messages, historyComplete = !ui.hasMoreOlderMessages)
+            get() = BranchSource(conversationId, agentId, view.messages, historyComplete = !view.hasOlderMessages)
     }
 
-    fun forkFrom(origin: Origin, message: UiMessage) = start(origin) { controller.fork(origin.source, message) }
+    /**
+     * letta-mobile-by4vm.98.4: these branches as a page's shared [ChatBranchingSource]; [origin] is
+     * where a branch from the page's view starts now (null: no conversation yet, nothing happens).
+     */
+    inner class Page(private val origin: (ChatBranchView) -> Origin?) : ChatBranchingSource {
+        override val support: StateFlow<ChatBranchSupport> = MutableStateFlow(ChatBranchSupport(fork = true))
 
-    fun editAndResend(origin: Origin, message: UiMessage) = start(origin) { controller.editAndResend(origin.source, message) }
+        override fun forkFrom(message: UiMessage, view: ChatBranchView, name: String?) = from(view) { controller.fork(it.source, message) }
 
-    fun rerun(origin: Origin, message: UiMessage) = start(origin) { controller.rerun(origin.source, message) }
+        override fun editAndResend(message: UiMessage, view: ChatBranchView) = from(view) { controller.editAndResend(it.source, message) }
 
-    /** letta-mobile-7mys7: `/fork [name]`: all of the conversation, named when given. */
-    fun forkConversation(origin: Origin, name: String?) = start(origin) { controller.forkConversation(origin.source, name) }
+        override fun rerun(message: UiMessage, view: ChatBranchView) = from(view) { controller.rerun(it.source, message) }
 
-    private fun start(origin: Origin, request: () -> Boolean) {
-        open = origin.open
-        request()
+        /** letta-mobile-7mys7: `/fork [name]`: all of the conversation, named when given. */
+        fun forkConversation(name: String?, view: ChatBranchView) = from(view) { controller.forkConversation(it.source, name) }
+
+        private fun from(view: ChatBranchView, request: (Origin) -> Boolean) {
+            val start = origin(view) ?: return
+            open = start.open
+            request(start)
+        }
     }
 }

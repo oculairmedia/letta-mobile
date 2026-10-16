@@ -115,6 +115,7 @@ import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.send.QueuedSendId
 import com.letta.mobile.data.timeline.TimelineAcquisitionFrameFamily
 import com.letta.mobile.data.timeline.TimelineAcquisitionProvenance
 import com.letta.mobile.data.timeline.TimelineAcquisitionSource
@@ -1084,14 +1085,10 @@ internal class AdminChatViewModel @Inject constructor(
     /** letta-mobile-bzvro.40: an answer from the shared card, always-allow rule ids included. */
     fun submitApproval(answer: com.letta.mobile.ui.chat.session.ChatApprovalAnswer) = chatApprovalController.submit(answer)
 
-    /** letta-mobile-bzvro.40: the conversation's permission-mode chip; null while the host offers none. */
-    val permissionMode: Flow<com.letta.mobile.ui.chat.session.ChatPermissionModeUiState?> by lazy(LazyThreadSafetyMode.NONE) {
-        approvalBinding.permissionMode(_uiState.map { conversationId?.value })
+    /** letta-mobile-bzvro.40: the conversation's permission-mode chip, none while the host offers none; pending until confirmed. */
+    val permissionModes: com.letta.mobile.ui.chat.session.ChatPermissionModeSource by lazy(LazyThreadSafetyMode.NONE) {
+        approvalBinding.permissionModes(viewModelScope, _uiState.map { conversationId?.value }) { conversationId?.value }
     }
-
-    /** letta-mobile-bzvro.40: asks the host for [mode]; the chip shows it pending until confirmed. */
-    fun setPermissionMode(mode: com.letta.mobile.data.transport.appserver.AppServerPermissionMode) =
-        approvalBinding.setPermissionMode(viewModelScope, conversationId?.value, mode)
 
     fun resetMessages() {
         viewModelScope.launch {
@@ -1172,32 +1169,17 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
-    /** Whether this backend can fork (the embedded runtime cannot), so the page offers the branch actions. */
-    val canBranchConversations: Boolean
-        get() = conversationRepository.canForkConversations()
-
-    private fun branchOrigin(open: (agentId: String, conversationId: String) -> Unit) =
-        conversationId?.let { id ->
-            com.letta.mobile.feature.chat.coordination.ChatConversationBranching.Origin(id.value, agentId.value, uiState.value, open)
-        }
-
-    fun forkFromMessage(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
-        branchOrigin(open)?.let { conversationBranching.forkFrom(it, message) }
-    }
-
-    fun editAndResend(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
-        branchOrigin(open)?.let { conversationBranching.editAndResend(it, message) }
-    }
-
-    /** letta-mobile-7mys7: forks before the prompt and sends it again in the fork; this conversation is unchanged. */
-    fun rerunInFork(message: UiMessage, open: (agentId: String, conversationId: String) -> Unit) {
-        branchOrigin(open)?.let { conversationBranching.rerun(it, message) }
-    }
-
-    /** letta-mobile-7mys7: `/fork [name]` from the composer forks all of this conversation and opens the fork. */
-    fun forkConversation(name: String?, open: (agentId: String, conversationId: String) -> Unit) {
-        branchOrigin(open)?.let { conversationBranching.forkConversation(it, name) }
-    }
+    /**
+     * The branches of a page whose forks open with [open] (a rerun forks before the prompt and
+     * sends it again there; this conversation is unchanged). Null where this backend cannot fork
+     * (the embedded runtime), so the page offers no branch actions.
+     */
+    fun branching(open: (agentId: String, conversationId: String) -> Unit) =
+        conversationBranching.Page { view ->
+            conversationId?.let {
+                com.letta.mobile.feature.chat.coordination.ChatConversationBranching.Origin(it.value, agentId.value, view, open)
+            }
+        }.takeIf { conversationRepository.canForkConversations() }
 
     /** The prompt a branch left for this conversation: into the composer, and sent at once for a rerun. */
     private fun applyBranchDraft(pending: com.letta.mobile.data.chat.branch.PendingDraft) {
@@ -1210,20 +1192,28 @@ internal class AdminChatViewModel @Inject constructor(
         if (!replacingSendRuntime) composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
     }
 
-    // --- Send queue (letta-mobile-1n5py) ---
-    /** True when a message sent during a turn is queued behind it (the Iroh route). */
-    val canQueueWhileStreaming: Boolean
-        get() = composerCoordinator.canQueueWhileStreaming()
+    /**
+     * letta-mobile-1n5py: the queued-sends panel's queue and controls (Send now and Resume start a
+     * new turn); a message sent during a turn is queued behind it on the Iroh route.
+     */
+    val sendQueue: com.letta.mobile.ui.chat.session.ChatSendQueueSource by lazy(LazyThreadSafetyMode.NONE) {
+        object : com.letta.mobile.ui.chat.session.ChatSendQueueSource {
+            override val queue = uiState.map { it.sendQueue }
+            override val canQueueWhileStreaming = com.letta.mobile.ui.chat.session.DerivedStateFlow(
+                uiState.map { composerCoordinator.canQueueWhileStreaming() },
+                composerCoordinator::canQueueWhileStreaming,
+            )
 
-    /** letta-mobile-1n5py: the queued-sends panel's controls; Send now and Resume start a new turn. */
-    val queuedSendActions: com.letta.mobile.ui.chat.QueuedSendActions by lazy(LazyThreadSafetyMode.NONE) {
-        com.letta.mobile.ui.chat.QueuedSendActions(
-            onCancel = { id -> if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id) },
-            onSendNow = { id -> startQueuedTurn { sendNow(id) } },
-            onResume = {
+            override fun cancel(id: QueuedSendId) {
+                if (!replacingSendRuntime) sendPipeline.wsChatSendCoordinator.sendQueue.cancel(id)
+            }
+
+            override fun sendNow(id: QueuedSendId) = startQueuedTurn { sendNow(id) }
+
+            override fun resume() {
                 uiState.value.sendQueue.items.firstOrNull()?.conversationId?.let { id -> startQueuedTurn { resume(id) } }
-            },
-        )
+            }
+        }
     }
 
     private fun startQueuedTurn(action: com.letta.mobile.data.chat.send.ChatSendQueueControls.() -> Unit) {

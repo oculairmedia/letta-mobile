@@ -14,7 +14,17 @@ import com.letta.mobile.feature.chat.screen.FixtureSession
 import com.letta.mobile.feature.chat.screen.ChatPagingPresentation
 import com.letta.mobile.feature.chat.screen.openedChatViewModel
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.data.repository.modelcontrol.ConversationModelChoices
+import com.letta.mobile.feature.chat.coordination.ChatConversationBranching
+import com.letta.mobile.ui.chat.session.ChatBranchSupport
+import com.letta.mobile.ui.chat.session.ChatBranchView
 import com.letta.mobile.ui.chat.session.ChatComposerCommand
+import com.letta.mobile.ui.chat.session.ChatComposerHostInputs
+import com.letta.mobile.ui.chat.session.ChatExtensionActionState
+import com.letta.mobile.ui.chat.session.ChatExtensionFacts
+import com.letta.mobile.ui.chat.session.TimelineChatSessionOptions
+import com.letta.mobile.ui.chat.session.TimelineLocalState
+import com.letta.mobile.ui.chat.session.withExtensions
 import com.letta.mobile.ui.chat.session.ChatModelHandle
 import io.mockk.every
 import io.mockk.mockk
@@ -43,8 +53,8 @@ class AdminChatSessionPortTest {
 
     @Test
     fun `fork, edit and rerun come and go together with the page's ability to branch`() {
-        val on = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = true)
-        val off = AdminChatSessionPort.branchCapabilities(AdminChatSessionPort.Capabilities, branches = false)
+        val on = AdminChatSessionPort.Capabilities.withExtensions(ChatExtensionFacts(branching = ChatBranchSupport(fork = true)))
+        val off = AdminChatSessionPort.Capabilities.withExtensions(ChatExtensionFacts())
 
         assertTrue(on.fork && on.editAndResend && on.rerunInFork)
         assertFalse(off.fork || off.editAndResend || off.rerunInFork)
@@ -102,7 +112,7 @@ class AdminChatSessionPortTest {
         val vm = mockViewModel(ChatComposerState(inputText = "draft"))
         every { vm.submitComposer(any()) } returns null
 
-        AdminChatActions(vm, onOpenBugReport = {}).send()
+        actions(vm).send()
 
         verify(exactly = 1) { vm.submitComposer("draft") }
         verify(exactly = 0) { vm.sendMessage(any()) }
@@ -111,7 +121,7 @@ class AdminChatSessionPortTest {
     @Test
     fun `goal refresh and continue forward to the view model and the port offers goals`() {
         val vm = mockViewModel(ChatComposerState())
-        val actions = AdminChatActions(vm, onOpenBugReport = {})
+        val actions = actions(vm)
 
         actions.refreshGoalStatus()
         actions.continueGoal()
@@ -127,7 +137,7 @@ class AdminChatSessionPortTest {
         every { vm.submitComposer(any()) } returns ChatComposerEffect.OpenBugReport
         var opened = 0
 
-        AdminChatActions(vm, onOpenBugReport = { opened++ }).send()
+        actions(vm, onOpenBugReport = { opened++ }).send()
 
         assertEquals(1, opened)
     }
@@ -138,9 +148,11 @@ class AdminChatSessionPortTest {
         val other = SlashCommand(name = "plan", command = "/plan")
         val state = ChatComposerState(slashCommands = persistentListOf(skill, other))
         val vm = mockViewModel(state)
-        val actions = AdminChatActions(vm, onOpenBugReport = {})
+        val host = AdminChatComposerMapping.hostCommands(state.slashCommands, false, vm::selectSlashCommand, vm::uninstallSlashCommand)
+        val actions = actions(vm, TimelineChatSessionOptions(composerHost = MutableStateFlow(ChatComposerHostInputs(host))))
 
-        val commands = AdminChatComposerMapping.composerUiState(composerInputs(state)).commands
+        val commands = host.map { it.command }
+        assertEquals(ChatComposerCommand("/review", "/review", "Review", fillsComposer = true, removable = true), commands.first())
         assertEquals(listOf("/review", "/plan"), commands.map { it.id })
         assertTrue(commands.first().fillsComposer)
         assertTrue(commands.first().removable)
@@ -160,23 +172,26 @@ class AdminChatSessionPortTest {
         // letta-mobile-7mys7: letta-code runs /fork in its terminal only, so the client runs it.
         val state = ChatComposerState(inputText = "/fork Plan B")
         val vm = mockViewModel(state)
-        every { vm.canBranchConversations } returns true
-        val actions = AdminChatActions(vm, onOpenBugReport = {}, onOpenConversation = { _, _ -> })
+        val branching = mockk<ChatConversationBranching.Page>(relaxed = true)
+        val actions = actions(vm, branching = branching)
 
-        val commands = AdminChatComposerMapping.composerUiState(composerInputs(state).copy(canFork = true)).commands
-        assertEquals(ChatComposerCommand.Fork, commands.first())
-        assertFalse(AdminChatComposerMapping.composerUiState(composerInputs(state)).commands.contains(ChatComposerCommand.Fork))
+        fun commands(canFork: Boolean) = AdminChatComposerMapping.hostCommands(emptyList(), canFork, {}, {}).map { it.command }
+        assertEquals(listOf(ChatComposerCommand.Fork), commands(canFork = true))
+        assertEquals(emptyList<ChatComposerCommand>(), commands(canFork = false))
 
         actions.send()
 
-        verify(exactly = 1) { vm.forkConversation("Plan B", any()) }
+        verify(exactly = 1) { branching.forkConversation("Plan B", any()) }
         verify(exactly = 0) { vm.submitComposer(any()) }
     }
 
     @Test
-    fun `model selection maps each reasoning effort choice`() {
+    fun `model selection maps each reasoning effort choice`() = runTest {
         val vm = mockViewModel(ChatComposerState())
-        val actions = AdminChatActions(vm, onOpenBugReport = {})
+        every { vm.activeAgent } returns MutableStateFlow(null)
+        every { vm.llmModels } returns MutableStateFlow(emptyList())
+        every { vm.conversationModelSelections } returns MutableStateFlow(ConversationModelChoices())
+        val actions = actions(vm, TimelineChatSessionOptions(models = AdminChatModels(vm, backgroundScope)))
 
         actions.selectModel(ChatModelHandle("openai/gpt"), ReasoningEffortChoice.Named("high"))
         actions.selectModel(ChatModelHandle("openai/gpt"), ReasoningEffortChoice.ProviderDefault)
@@ -291,12 +306,16 @@ class AdminChatSessionPortTest {
         every { composerState } returns MutableStateFlow(state)
     }
 
-    private fun composerInputs(state: ChatComposerState) = AdminChatComposerMapping.ComposerInputs(
-        composer = state,
-        canSend = true,
-        canQueueWhileStreaming = false,
-        maxAttachments = 4,
-        model = null,
-        contextUsage = com.letta.mobile.data.context.ContextWindowUsageState(),
+    private fun actions(
+        vm: AdminChatViewModel,
+        options: TimelineChatSessionOptions = TimelineChatSessionOptions(),
+        branching: ChatConversationBranching.Page? = null,
+        onOpenBugReport: () -> Unit = {},
+    ) = AdminChatActions(
+        vm,
+        options,
+        ChatExtensionActionState(MutableStateFlow(TimelineLocalState()), { ChatBranchView(emptyList(), false) }, { null }),
+        onOpenBugReport,
+        branching,
     )
 }

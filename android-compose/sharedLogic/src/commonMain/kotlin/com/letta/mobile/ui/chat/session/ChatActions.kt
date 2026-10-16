@@ -22,8 +22,50 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
  * An owner that cannot do something reports it through [ChatSurfaceCapabilities] so
  * the page hides the control, rather than offering a control that silently does nothing.
  */
-interface ChatActions {
-    // Composer
+interface ChatActions :
+    ChatComposerActions,
+    ChatHostCommandActions,
+    ChatBranchActions,
+    ChatSendQueueActions,
+    ChatTimelineViewActions,
+    ChatConversationSettingsActions {
+    // Run
+    /** Stops the active run. A second call while a stop is outstanding force-clears locally. */
+    fun stopRun()
+
+    /** Stops a background process or monitor on the server (letta-mobile-bzvro.21). */
+    fun stopBackgroundProcess(processId: String) = Unit
+
+    fun rerun(message: UiMessage)
+
+    fun submitApproval(answer: ChatApprovalAnswer)
+
+    fun dismissA2uiSurface(surfaceId: A2uiSurfaceId)
+
+    fun markA2uiSnackbarShown(id: A2uiSnackbarId)
+
+    /** Retries the conversation or connection load after a failure. */
+    fun retryLoad()
+
+    fun clearError()
+
+    fun setFontScale(scale: Float)
+
+    // Search
+    fun updateSearchQuery(query: String)
+
+    fun clearSearch()
+
+    // Goal (only when ChatSurfaceCapabilities.goals)
+    /** Re-reads the conversation's goal status. */
+    fun refreshGoalStatus()
+
+    /** Asks the agent to keep working on the active goal. */
+    fun continueGoal()
+}
+
+/** The draft: its text, attachments and error, and sending it. */
+interface ChatComposerActions {
     fun updateComposerText(text: String)
 
     /** Sends (or queues, during a run) the current draft. */
@@ -39,20 +81,22 @@ interface ChatActions {
     fun reportComposerError(message: String)
 
     fun clearComposerError()
+}
 
+/** What the host's own commands answer: composer commands, `/recompile`'s status and A2UI actions. */
+interface ChatHostCommandActions {
     fun runComposerCommand(command: ChatComposerCommand)
 
     fun uninstallComposerCommand(command: ChatComposerCommand)
 
-    // Run
-    /** Stops the active run. A second call while a stop is outstanding force-clears locally. */
-    fun stopRun()
+    /** letta-mobile-zxk2n.5: the page has shown a finished `/recompile` answer; the owner may clear it. */
+    fun dismissRecompileStatus() = Unit
 
-    /** Stops a background process or monitor on the server (letta-mobile-bzvro.21). */
-    fun stopBackgroundProcess(processId: String) = Unit
+    fun submitA2uiAction(action: A2uiAction)
+}
 
-    fun rerun(message: UiMessage)
-
+/** Branching the conversation from one of its messages. */
+interface ChatBranchActions {
     /**
      * letta-mobile-bzvro.15 (F15): branch the conversation from [message] into a new one and open
      * it ([ChatSurfaceCapabilities.fork]), named [name] when given ([ChatSurfaceCapabilities.nameForks]).
@@ -69,27 +113,23 @@ interface ChatActions {
     /**
      * letta-mobile-7mys7 (G36): fork just before the user's [message], open the fork and send the
      * prompt there again, so it is answered afresh while the original keeps its answer
-     * ([ChatSurfaceCapabilities.rerunInFork]). Unlike [rerun] ("Send again"), nothing is appended
-     * to this conversation.
+     * ([ChatSurfaceCapabilities.rerunInFork]). Unlike [ChatActions.rerun] ("Send again"), nothing
+     * is appended to this conversation.
      */
     fun rerunInFork(message: UiMessage) = Unit
+}
 
-    fun submitApproval(answer: ChatApprovalAnswer)
-
-    fun submitA2uiAction(action: A2uiAction)
-
-    fun dismissA2uiSurface(surfaceId: A2uiSurfaceId)
-
-    fun markA2uiSnackbarShown(id: A2uiSnackbarId)
-
-    // Send queue
+/** Sends queued behind a run. */
+interface ChatSendQueueActions {
     fun cancelQueuedSend(id: QueuedSendId)
 
     fun sendQueuedNow(id: QueuedSendId)
 
     fun resumeSendQueue()
+}
 
-    // Timeline
+/** How the timeline is shown: collapsed runs, expanded reasoning, paged history. */
+interface ChatTimelineViewActions {
     fun toggleRunCollapsed(runId: ChatRunId)
 
     fun toggleReasoningExpanded(messageId: ChatMessageId)
@@ -99,36 +139,16 @@ interface ChatActions {
     fun releaseOlderMessages()
 
     fun expandTruncatedToolResult(messageId: ChatMessageId)
+}
 
-    /** Retries the conversation or connection load after a failure. */
-    fun retryLoad()
-
-    fun clearError()
-
-    fun setFontScale(scale: Float)
-
-    // Conversation settings
+/** The conversation's model, working directory and permission mode. */
+interface ChatConversationSettingsActions {
     fun selectModel(handle: ChatModelHandle, effort: ReasoningEffortChoice)
 
     fun changeWorkingDirectory(directory: ChatWorkingDirectory)
 
     /** letta-mobile-bzvro.13: asks for another permission mode on this conversation (owners with a mode chip). */
     fun setPermissionMode(mode: AppServerPermissionMode) = Unit
-
-    // Search
-    fun updateSearchQuery(query: String)
-
-    fun clearSearch()
-
-    // Goal (only when ChatSurfaceCapabilities.goals)
-    /** Re-reads the conversation's goal status. */
-    fun refreshGoalStatus()
-
-    /** Asks the agent to keep working on the active goal. */
-    fun continueGoal()
-
-    /** letta-mobile-zxk2n.5: the page has shown a finished `/recompile` answer; the owner may clear it. */
-    fun dismissRecompileStatus() = Unit
 }
 
 /**
