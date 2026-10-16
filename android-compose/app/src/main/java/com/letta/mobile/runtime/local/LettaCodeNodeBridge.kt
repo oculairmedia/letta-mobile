@@ -3,6 +3,7 @@ package com.letta.mobile.runtime.local
 import android.util.Log
 import ca.oculair.meridian.BuildConfig
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -28,7 +29,7 @@ interface LettaCodeNodeBridge {
 }
 
 @Singleton
-class NativeLettaCodeNodeBridge @Inject constructor() : LettaCodeNodeBridge {
+class NativeLettaCodeNodeBridge @Inject constructor() : LettaCodeNodeBridge, EmbeddedNode {
     private val startMutex = Mutex()
     private val _outputLines = MutableSharedFlow<String>(extraBufferCapacity = OUTPUT_BUFFER_CAPACITY)
     override val outputLines: Flow<String> = _outputLines
@@ -42,26 +43,20 @@ class NativeLettaCodeNodeBridge @Inject constructor() : LettaCodeNodeBridge {
         null
     }
 
+    private val headlessOutput = HeadlessNodeOutput(_outputLines)
+
     override suspend fun start(request: LettaCodeNodeStartRequest): Result<Unit> = startMutex.withLock {
-        if (!BuildConfig.EMBEDDED_LETTACODE_NATIVE_ENABLED) {
-            return Result.failure(
-                IllegalStateException(
-                    "Embedded LettaCode native runtime is not enabled in this build. " +
-                        "Build with -PembedLettaCodeNative=true after adding nodejs-mobile libnode.",
-                )
-            )
-        }
-        loadFailure?.let { return Result.failure(it) }
+        nativeUnavailable()?.let { return Result.failure(it) }
         startFailure?.let { return Result.failure(it) }
         if (started) return Result.success(Unit)
+        // The headless path keeps its old behaviour; it only refuses a node the App Server owns.
+        nodeOwner.compareAndSet(null, NodeOwner.HEADLESS)
+        if (nodeOwner.get() == NodeOwner.APP_SERVER) return Result.failure(IllegalStateException(APP_SERVER_OWNS_NODE))
 
-        activeBridge = this
-        val env = request.environment.map { (key, value) -> "$key=$value" }.toTypedArray()
-        val args = request.arguments.toTypedArray()
-        val cwd = request.workingDirectory.absolutePath
+        activeOutput = headlessOutput
         started = true
-        thread(name = "letta-code-node", isDaemon = true) {
-            val exitCode = runCatching { nativeStart(args, env, cwd) }
+        runNode(NodeOwner.HEADLESS, request) { result ->
+            val exitCode = result
                 .onFailure { error ->
                     startFailure = error
                     Log.e(TAG, "Embedded LettaCode node runtime crashed", error)
@@ -76,6 +71,35 @@ class NativeLettaCodeNodeBridge @Inject constructor() : LettaCodeNodeBridge {
             started = false
         }
         Result.success(Unit)
+    }
+
+    override fun launch(request: LettaCodeNodeStartRequest, output: EmbeddedNodeOutput) {
+        nativeUnavailable()?.let { throw IllegalStateException(it.message, it) }
+        check(nodeOwner.compareAndSet(null, NodeOwner.APP_SERVER)) { NODE_ALREADY_RAN }
+        activeOutput = output
+        runNode(NodeOwner.APP_SERVER, request) { result ->
+            val exitCode = result
+                .onFailure { error -> Log.e(TAG, "Embedded App Server node crashed", error) }
+                .getOrDefault(-1)
+            Log.w(TAG, "Embedded App Server node::Start returned $exitCode")
+            output.exited(exitCode)
+        }
+    }
+
+    /** Runs `node::Start` on a dedicated thread; [onExit] gets its exit code or what it threw. */
+    private fun runNode(owner: NodeOwner, request: LettaCodeNodeStartRequest, onExit: (Result<Int>) -> Unit) {
+        val args = request.arguments.toTypedArray()
+        val env = request.environment.map { (key, value) -> "$key=$value" }.toTypedArray()
+        val cwd = request.workingDirectory.absolutePath
+        thread(name = owner.threadName, isDaemon = true) { onExit(runCatching { nativeStart(args, env, cwd) }) }
+    }
+
+    private fun nativeUnavailable(): Throwable? = when {
+        !BuildConfig.EMBEDDED_LETTACODE_NATIVE_ENABLED -> IllegalStateException(
+            "Embedded LettaCode native runtime is not enabled in this build. " +
+                "Build with -PembedLettaCodeNative=true after adding nodejs-mobile libnode.",
+        )
+        else -> loadFailure
     }
 
     override suspend fun writeLine(line: String): Result<Unit> {
@@ -109,20 +133,32 @@ class NativeLettaCodeNodeBridge @Inject constructor() : LettaCodeNodeBridge {
 
     private external fun nativeStop(): Boolean
 
+    private enum class NodeOwner(val threadName: String) {
+        HEADLESS("letta-code-node"),
+        APP_SERVER("letta-app-server-node"),
+    }
+
     private companion object {
         private const val TAG = "LettaCodeNodeBridge"
         private const val OUTPUT_BUFFER_CAPACITY = 256
+        private const val NODE_ALREADY_RAN =
+            "The on-device node already ran in this app process and cannot start again. Restart the app."
+        private const val APP_SERVER_OWNS_NODE =
+            "The on-device App Server owns node in this app process. Restart the app to use the headless runtime."
 
-        @Volatile private var activeBridge: NativeLettaCodeNodeBridge? = null
+        /** Process-wide, like node itself: the first path to start node keeps it. */
+        private val nodeOwner = AtomicReference<NodeOwner?>(null)
+
+        @Volatile private var activeOutput: EmbeddedNodeOutput? = null
 
         @JvmStatic
         fun onNativeStdoutLine(line: String) {
-            activeBridge?._outputLines?.tryEmit(line)
+            activeOutput?.stdout(line)
         }
 
         @JvmStatic
         fun onNativeStderrLine(line: String) {
-            Log.w(TAG, line)
+            activeOutput?.stderr(line) ?: Log.w(TAG, line)
         }
     }
 }
