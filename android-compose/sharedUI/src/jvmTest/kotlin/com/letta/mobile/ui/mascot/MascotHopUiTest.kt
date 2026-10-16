@@ -12,6 +12,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.AgentId
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,8 +30,8 @@ class MascotHopUiTest {
     private fun ComposeUiTest.stage(reducedMotion: Boolean): Stage {
         val shell = FakeMascotShell(AGENT, layerMounted = false)
         val landings = mutableListOf<Float>()
-        shell.transport.motionListener = MascotMotionListener { agentId, impact ->
-            assertEquals(AGENT, agentId)
+        shell.transport.motionListener = MascotMotionListener { agent, impact ->
+            assertEquals(AGENT, agent.value)
             landings += impact
         }
         mainClock.autoAdvance = false
@@ -98,7 +99,7 @@ class MascotHopUiTest {
             assertEquals(shown.width, shown.height, 0.5f, "no squash, stretch or lean on the layer")
         }
         assertTrue(moved, "still carried along the hop")
-        assertNotNull(stage.shell.transport.bodyOf(AGENT), "the director can read the body's motion")
+        assertNotNull(stage.shell.transport.bodyOf(AgentId(AGENT)), "the director can read the body's motion")
         assertEquals(2, stage.landings.size, "the entrance's and the hop's landings still reach the director")
     }
 

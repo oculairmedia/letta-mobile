@@ -402,7 +402,7 @@ sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotIdentityStore.kt
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotInPlace.kt 1
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotLoading.kt 1
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotSeat.kt 5
-sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotTransport.kt 7
+sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/mascot/MascotTransport.kt 5
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/memory/MemoryGraphDrawing.kt 1
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/memory/MemoryPageChrome.kt 1
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/modelcontrol/ModelControlParts.kt 1

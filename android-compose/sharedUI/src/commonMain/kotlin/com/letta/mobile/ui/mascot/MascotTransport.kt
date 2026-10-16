@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import com.letta.mobile.avatar.core.MascotBody
 import com.letta.mobile.avatar.core.MascotIdentity
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.theme.LettaDimens
@@ -245,7 +246,7 @@ class MascotTransport {
      * director - [MascotBody.motionX]/[MascotBody.motionY] (seat travel plus drag velocity, -1..1)
      * for the rig's moveX/moveY. Landings arrive through [motionListener].
      */
-    fun bodyOf(agentId: String): MascotBody? = flights.values.firstOrNull { it.shownAgent == agentId }?.body
+    fun bodyOf(agent: AgentId): MascotBody? = flights.values.firstOrNull { it.shownAgent == agent.value }?.body
 
     /** Sends [agentId]'s mascot to [stage]. It goes as soon as that stage has a seat and comes back to rest when the seat leaves. */
     fun transportTo(agentId: String, stage: MascotStage) {
@@ -319,25 +320,23 @@ private fun TransportedMascot(
         launch { flight.enter(reducedMotion) { impact -> transport.landed(flight, impact) } }
         launch { flight.drive(reducedMotion) { impact -> transport.landed(flight, impact) } }
         val motion = HopMotion(reducedMotion, density.density)
-        snapshotFlow { transport.activeStage(currentAgent) }
+        snapshotFlow { currentAgent.let { agent -> transport.activeStage(agent)?.let { MascotTransport.SeatKey(agent, it) } } }
             .distinctUntilChanged()
-            .collect { next -> transport.beginHop(flight, currentAgent, next, motion) }
+            .collect { next -> if (next != null) transport.beginHop(flight, next, motion) }
     }
     // The renderer's node keeps the DESTINATION size for the whole flight and the change of size
     // is a layer scale: a Rive surface re-allocates its readback buffer and restarts its frame
     // loop on every size change, so resizing it per frame is what made a hop stutter. Where the
     // character is and how it is shaped are read at placement and draw time only (the flight's
     // frame counter), so a hop moves the layer without recomposing it.
-    val drawWidth = seat.drawWidth
-    val boxSize = with(density) { drawWidth.toDp() }
-    val to = seat.bounds
+    val boxSize = with(density) { seat.drawWidth.toDp() }
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
     Box(
         modifier = Modifier
-            .offset { flight.placement(to, drawWidth, origin) }
+            .offset { flight.placement(seat, origin) }
             .requiredSize(boxSize)
-            .graphicsLayer { flight.applyPose(this, to, drawWidth, reducedMotion, deform = !transport.rigCarriesBody) }
+            .graphicsLayer { flight.applyPose(this, seat, reducedMotion, deform = !transport.rigCarriesBody) }
             // Hover (for the pencil) and drag only where the seat has them: a seat with neither
             // takes no input at all, and what it stands over (the Touch chat head) keeps its own.
             .seatInput(seat.handlers, hover, flight),
@@ -353,15 +352,15 @@ private fun TransportedMascot(
 }
 
 /**
- * Starts [flight]'s hop (the slot [agentId] stands in now) to the stage [next], from wherever it
- * is drawn this frame; nothing when [next] is no stage or the one already shown. The slot's first
- * stage is no hop: the character enters there ([MascotTransport.Flight.enter]).
+ * Starts [flight]'s hop to the seat [next] (the agent the slot shows now, at its active stage),
+ * from wherever it is drawn this frame; nothing when that stage is the one already shown. The
+ * slot's first stage is no hop: the character enters there ([MascotTransport.Flight.enter]).
  */
-private fun MascotTransport.beginHop(flight: MascotTransport.Flight, agentId: String, next: MascotStage?, motion: HopMotion) {
-    if (next == null || next == flight.shownStage) return
-    val ends = hopEnds(flight, agentId, next)
-    flight.shownStage = next
-    flight.shownAgent = agentId
+private fun MascotTransport.beginHop(flight: MascotTransport.Flight, next: MascotTransport.SeatKey, motion: HopMotion) {
+    if (next.stage == flight.shownStage) return
+    val ends = hopEnds(flight, next)
+    flight.shownStage = next.stage
+    flight.shownAgent = next.agentId
     if (ends == null || motion.reducedMotion) {
         flight.body.snap()
         flight.frame++
@@ -378,11 +377,11 @@ private fun MascotTransport.beginHop(flight: MascotTransport.Flight, agentId: St
  * Where [flight]'s hop to [next] runs from (the character as drawn now) and to; null for the
  * slot's first stage, or when either end has no place yet - the character then simply stands.
  */
-private fun MascotTransport.hopEnds(flight: MascotTransport.Flight, agentId: String, next: MascotStage): Pair<Rect, Rect>? {
+private fun MascotTransport.hopEnds(flight: MascotTransport.Flight, next: MascotTransport.SeatKey): Pair<Rect, Rect>? {
     val previous = flight.shownStage ?: return null
-    val leaving = seat(MascotTransport.SeatKey(flight.shownAgent ?: agentId, previous))?.bounds
+    val leaving = seat(MascotTransport.SeatKey(flight.shownAgent ?: next.agentId, previous))?.bounds
     val from = leaving?.let { flight.shownRect(it) } ?: flight.drawnRect() ?: return null
-    val destination = seat(MascotTransport.SeatKey(agentId, next))?.bounds ?: return null
+    val destination = seat(next)?.bounds ?: return null
     return from to destination
 }
 
@@ -392,7 +391,7 @@ private class HopMotion(val reducedMotion: Boolean, val density: Float)
 /** Reports [flight]'s landing to the transport's listener, for whichever agent stands in the slot. */
 private fun MascotTransport.landed(flight: MascotTransport.Flight, impact: Float) {
     val agentId = flight.shownAgent ?: return
-    motionListener?.onLanded(agentId, impact)
+    motionListener?.onLanded(AgentId(agentId), impact)
 }
 
 /** Hover for the pencil when the seat is [SeatHandlers.editable], drag when it is [SeatHandlers.draggable]. */
@@ -473,8 +472,8 @@ private val EDIT_BADGE_SIZE = LettaDimens.Space.xl
 
 /** Hears the transport's motion events; the mascot director's hook (letta-mobile-te3n1.1). */
 fun interface MascotMotionListener {
-    /** [agentId]'s character landed at a seat, with [impact] 0..1 (how fast it came in). */
-    fun onLanded(agentId: String, impact: Float)
+    /** [agent]'s character landed at a seat, with [impact] 0..1 (how fast it came in). */
+    fun onLanded(agent: AgentId, impact: Float)
 }
 
 /** Every agent with an active seat, in what look it draws there; an agent with no seat or no identity draws nothing. */

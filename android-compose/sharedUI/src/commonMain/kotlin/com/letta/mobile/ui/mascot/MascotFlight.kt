@@ -68,7 +68,9 @@ internal fun MascotTransport.Flight.shownRect(to: Rect): Rect {
  * The box's offset in the layer for this frame, a [drawWidth] square centred on the character;
  * also remembers where it was placed so a hop whose seat has gone starts from there.
  */
-internal fun MascotTransport.Flight.placement(to: Rect, drawWidth: Float, origin: Offset): IntOffset {
+internal fun MascotTransport.Flight.placement(seat: MascotSeatInfo, origin: Offset): IntOffset {
+    val to = seat.bounds
+    val drawWidth = seat.drawWidth
     // Read so a moving body re-places the box each frame (placement only, never composition).
     observeFrame()
     val x = centerX(to)
@@ -86,15 +88,11 @@ internal fun MascotTransport.Flight.placement(to: Rect, drawWidth: Float, origin
  * motion), and the entrance, all about its feet. Under [reducedMotion] only the entrance's fade
  * remains: no squash, no lean, no rise.
  */
-internal fun MascotTransport.Flight.applyPose(
-    scope: GraphicsLayerScope,
-    to: Rect,
-    drawWidth: Float,
-    reducedMotion: Boolean,
-    deform: Boolean,
-) {
+internal fun MascotTransport.Flight.applyPose(scope: GraphicsLayerScope, seat: MascotSeatInfo, reducedMotion: Boolean, deform: Boolean) {
     // Read so a moving body re-draws the layer each frame (draw only, never composition).
     observeFrame()
+    val to = seat.bounds
+    val drawWidth = seat.drawWidth
     val flightScale = if (drawWidth > 0f) width(to) / drawWidth else 1f
     val shown = presence.value
     val enter = if (reducedMotion) 1f else MascotBody.entranceScale(shown)
