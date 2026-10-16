@@ -120,7 +120,9 @@ class DesktopSessionGraphAdaptersTest {
 
     @Test
     fun remoteAppServerKeepsAdminReadsWithoutARoute() = runTest {
-        val graph = graphFor(LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://localhost:8283"))
+        val graph = graphFor(
+            LettaConfig(id = "desktop-self-hosted", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://localhost:8283"),
+        )
 
         assertIs<com.letta.mobile.data.repository.CronRepository>(graph.cronRepository)
         assertUnserved(SessionRoute.PASSAGES) { graph.passageRepository.searchArchival(AgentId("agent-1"), "query") }

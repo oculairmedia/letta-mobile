@@ -1,7 +1,10 @@
-package com.letta.mobile.data.transport.appserver
+package com.letta.mobile.data.transport.api
 
 import com.letta.mobile.data.transport.ChannelTransportState
-import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.appServerAdminRpcParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

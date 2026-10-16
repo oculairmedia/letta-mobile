@@ -103,6 +103,16 @@ class HostSessionGraphFactoryTest {
             SessionRoute.CONVERSATIONS -> host.conversationRepository.getCachedConversations(AgentId(AGENT))
             SessionRoute.CONVERSATION_RECOMPILE ->
                 host.conversationRepository.canRecompileConversations().takeIf { it } ?: unserved(route)
+            SessionRoute.SKILLS -> adapters.servesIrohRelays.takeIf { it } ?: unserved(route)
+            SessionRoute.STEPS -> host.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
+            SessionRoute.VIBESYNC -> host.vibesyncEventStreamRepository.start()
+            else -> probeAdmin(route, host)
+        }
+    }
+
+    /** The admin, schedule and project-work routes: one refresh each. */
+    private suspend fun probeAdmin(route: SessionRoute, host: HostSessionRepositories): Any? {
+        return when (route) {
             SessionRoute.MCP_SERVERS -> host.mcpServerRepository.refreshServers()
             SessionRoute.MODELS -> host.modelRepository.refreshLlmModels()
             SessionRoute.PASSAGES -> host.passageRepository.refreshPassages(AgentId(AGENT))
@@ -111,10 +121,8 @@ class HostSessionGraphFactoryTest {
             SessionRoute.PROVIDERS -> host.providerRepository.refreshProviders()
             SessionRoute.RUNS -> host.runRepository.refreshRuns(RunListParams())
             SessionRoute.SCHEDULES -> host.scheduleRepository.refreshSchedules(AGENT)
-            SessionRoute.SKILLS -> adapters.servesIrohRelays.takeIf { it } ?: unserved(route)
-            SessionRoute.STEPS -> host.stepRepository.supportsStepQueries.takeIf { it } ?: unserved(route)
             SessionRoute.TOOLS -> host.toolRepository.refreshTools()
-            SessionRoute.VIBESYNC -> host.vibesyncEventStreamRepository.start()
+            else -> error("$route is probed by probe()")
         }
     }
 

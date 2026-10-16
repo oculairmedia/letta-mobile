@@ -5,21 +5,11 @@ import com.letta.mobile.data.repository.api.ScheduleRemoteSource
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.schedules.CronTask
 
 open class FakeScheduleApi : ScheduleRemoteSource {
     var schedules = mutableMapOf<String, MutableList<ScheduledMessage>>()
     var shouldFail = false
     val calls = mutableListOf<String>()
-
-    /**
-     * Crons served by the `/v1/crons` fallback. When [cronRouteAvailable]
-     * is false (the default), [listCrons] throws — mirroring a backend
-     * that serves neither the native schedule route nor the cron route, so
-     * tests that expect the "admin unavailable" state keep passing.
-     */
-    var crons = mutableListOf<CronTask>()
-    var cronRouteAvailable = false
 
     override suspend fun listSchedules(agentId: String, limit: Int?, after: String?): ScheduleListResponse {
         calls.add("listSchedules:$agentId")
@@ -61,13 +51,4 @@ open class FakeScheduleApi : ScheduleRemoteSource {
         schedules[agentId]?.removeAll { it.id == scheduledMessageId }
     }
 
-    override suspend fun listCrons(agentId: String?): List<CronTask> {
-        calls.add("listCrons:${agentId ?: "all"}")
-        if (!cronRouteAvailable) throw ApiException(404, "Not found")
-        return if (agentId == null) {
-            crons
-        } else {
-            crons.filter { it.agentId == null || it.agentId == agentId }
-        }
-    }
 }

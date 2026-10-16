@@ -4,7 +4,9 @@ import com.letta.mobile.data.canvas.NotebookLocalStore
 import com.letta.mobile.data.controller.SyncBudgetPolicy
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL
 import com.letta.mobile.data.repository.api.SubagentParentScope
+import com.letta.mobile.data.repository.shouldUseIrohTransport
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.FrameCollectorOverflowAwareChannelTransport
@@ -264,7 +266,7 @@ class IrohChannelTransport(
     }
 
     private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
-        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
         return irohDialer.dial(
             config = config,
             effectiveUrlOverride = forcedUrl,
@@ -465,7 +467,7 @@ class IrohChannelTransport(
         Telemetry.event(
             "IrohTrace", "transport.connect.begin",
             "baseShimUrl" to baseShimUrl,
-            "forced" to com.letta.mobile.data.repository.DEBUG_FORCE_IROH_URL.isNotBlank(),
+            "forced" to DEBUG_FORCE_IROH_URL.isNotBlank(),
             "state" to state.value::class.simpleName,
         )
         supervisor.refreshConfig()
@@ -1099,7 +1101,7 @@ class IrohChannelTransport(
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
         internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
         // The debug force-Iroh override lives beside the commonMain predicate (letta-mobile-ckmub.17.1).
-        fun shouldUseIroh(url: String?): Boolean = com.letta.mobile.data.repository.shouldUseIrohTransport(url)
+        fun shouldUseIroh(url: String?): Boolean = shouldUseIrohTransport(url)
 
         internal val READ_ONLY_ADMIN_RPC_METHODS = IrohTransportSupport.READ_ONLY_ADMIN_RPC_METHODS
 

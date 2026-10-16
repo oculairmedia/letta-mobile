@@ -5,7 +5,6 @@ import com.letta.mobile.data.backend.SessionRoute
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
-import com.letta.mobile.data.schedules.CronTask
 
 /**
  * Per-agent scheduled messages a non-App-Server backend would serve. letta-mobile-ckmub.4: this is
@@ -26,8 +25,6 @@ interface ScheduleRemoteSource {
     suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage = noRoute("createSchedule")
 
     suspend fun deleteSchedule(agentId: String, scheduledMessageId: String): Unit = noRoute("deleteSchedule")
-
-    suspend fun listCrons(agentId: String? = null): List<CronTask> = noRoute("listCrons")
 }
 
 private fun noRoute(operation: String): Nothing =

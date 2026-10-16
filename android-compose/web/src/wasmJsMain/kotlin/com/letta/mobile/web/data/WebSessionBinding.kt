@@ -6,8 +6,8 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.session.graph.HostAppServerClients
 import com.letta.mobile.data.session.graph.HostSessionBinding
+import com.letta.mobile.data.transport.api.AppServerClientChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.data.transport.appserver.AppServerClientChannel
 import kotlinx.coroutines.CoroutineScope
 
 /**
