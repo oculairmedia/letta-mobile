@@ -14,7 +14,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Default [SessionRepositoryGraphFactory] for Android.
@@ -36,6 +36,8 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
      * supply their own.
      */
     private val graphParentScope: () -> CoroutineScope,
+    /** Where each generation's background cache clear runs; tests pass a deterministic dispatcher. */
+    cacheClearContext: CoroutineContext = Dispatchers.IO,
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
@@ -64,15 +66,17 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
 
     private val nextId = AtomicLong(0L)
 
+    // letta-mobile-by4vm.94: the clear no longer blocks create() (it used to runBlocking on the
+    // caller, which is the main thread when the first graph is built during Hilt injection); the
+    // new generation's DAOs wait on its gate instead.
+    private val cacheClears = SessionCacheClearChain(cacheClearContext) { assembler.clearCachesForNewSession() }
+
     override fun create(): SessionGraph {
         val graphId = nextId.incrementAndGet()
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
         val descriptor = localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX)
         val cursors = cursorFactory?.capture(descriptor.backendId.value)
-        runBlocking(Dispatchers.IO) {
-            assembler.clearCachesForNewSession()
-        }
         // SessionGraph owns and cancels this scope; parenting it means a graph that is never
         // closed dies with its owner rather than outliving everything.
         val parent = graphParentScope()
@@ -83,6 +87,10 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
             localRuntimeBackend = localRuntimeBackend,
             settingsRepository = settingsRepository,
         )
+        // Started last, once nothing above can fail, so a failed create never supersedes the live
+        // generation's gate. It runs in the parent (process) scope, not the graph scope: closing
+        // this graph on the next switch must not cancel a delete half-way.
+        val cacheGate = cacheClears.startGeneration(parent)
         return assembler.assemble(
             SessionGraphAssembleRequest(
                 graphId = graphId,
@@ -93,6 +101,7 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
                 scope = scope,
                 channelTransport = channelTransport,
                 settingsRepository = settingsRepository,
+                cacheGate = cacheGate,
             ),
         )
     }

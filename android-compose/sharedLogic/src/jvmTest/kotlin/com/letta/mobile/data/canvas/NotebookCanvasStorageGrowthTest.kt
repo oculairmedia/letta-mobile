@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasNoteId
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -200,15 +201,15 @@ class NotebookCanvasStorageGrowthTest {
             val session = CanvasSession(canvasId, store)
             session.load()
             for (i in 0 until work.notes) {
-                assertNotNull(session.setDocument("note-$i", NoteText("note-$i").json(), frame = noteFrame(i)))
+                assertNotNull(session.setDocument(CanvasNoteId("note-$i"), NoteText("note-$i").json(), frame = noteFrame(i)))
                 saves++
             }
             for (i in 0 until work.moves) {
-                assertNotNull(session.moveDocument("note-2", noteFrame(2).let { it.copy(x = it.x + i + 1f) }))
+                assertNotNull(session.moveDocument(CanvasNoteId("note-2"), noteFrame(2).let { it.copy(x = it.x + i + 1f) }))
                 saves++
             }
             for (i in 0 until work.edits) {
-                assertNotNull(session.setDocument("note-2", NoteText("note-2", typed = "x".repeat(i + 1)).json()))
+                assertNotNull(session.setDocument(CanvasNoteId("note-2"), NoteText("note-2", typed = "x".repeat(i + 1)).json()))
                 saves++
             }
             session.sceneJsonOrEmpty()

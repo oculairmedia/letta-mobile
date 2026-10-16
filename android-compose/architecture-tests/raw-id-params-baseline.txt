@@ -42,8 +42,6 @@ core/android-data/src/main/java/com/letta/mobile/data/timeline/IrohAdminRpcTimel
 core/ids/src/commonMain/kotlin/com/letta/mobile/data/model/IdFormats.kt 1
 core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/RuntimeProjection.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/appserver/AppServerSmokeRunner.kt 6
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiSurfaceLimits.kt 6
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiSurfaceManager.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/PendingToolApprovalRegistry.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/agenteditor/AgentEditorController.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/agenteditor/AgentEditorModel.kt 1
@@ -52,8 +50,6 @@ sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasExternalToo
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpLog.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasOpReferences.kt 3
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSceneValidator.kt 2
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSession.kt 11
-sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSessionPluginElements.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/CanvasSnap.kt 2
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/HostCanvasTools.kt 1
 sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/canvas/plugin/PluginKindProps.kt 2
@@ -374,9 +370,6 @@ sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/chat/render/RenderDiagn
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PlacementCompiler.kt 3
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/host/PluginViewCalls.kt 1
 sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/plugin/wire/LcpAssetUploads.kt 2
-sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderLimits.kt 1
-sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderer.kt 3
-sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererState.kt 2
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiScheduleWidgets.kt 2
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiToolApprovalWidgets.kt 1
 sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/agenteditor/AgentEditorPage.kt 2

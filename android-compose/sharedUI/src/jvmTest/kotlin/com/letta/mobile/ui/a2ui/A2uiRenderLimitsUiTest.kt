@@ -22,6 +22,7 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceLimits
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.A2uiUpdateComponentsPayload
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -78,7 +79,7 @@ class A2uiRenderLimitsUiTest {
         val tooMany = (0..A2uiSurfaceLimits.MAX_COMPONENTS_PER_SURFACE).map { text("t$it", "item $it") }
         manager.applyMessage(A2uiMessage.UpdateComponents(updateComponents = A2uiUpdateComponentsPayload("s1", tooMany)))
 
-        setContent { A2uiRenderer(surfaceId = "s1", surfaceManager = manager) }
+        setContent { A2uiRenderer(surfaceId = A2uiSurfaceId("s1"), surfaceManager = manager) }
 
         onNodeWithTag(A2uiTestTags.SURFACE_TOO_LARGE).assertExists()
         onAllNodesWithText("item ", substring = true).fetchSemanticsNodes().let { assertTrue(it.isEmpty()) }

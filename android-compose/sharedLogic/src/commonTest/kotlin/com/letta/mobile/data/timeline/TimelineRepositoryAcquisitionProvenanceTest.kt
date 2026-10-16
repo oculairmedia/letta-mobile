@@ -78,7 +78,6 @@ class TimelineRepositoryAcquisitionProvenanceTest {
     ): TimelineRepository = TimelineRepository(
         timelineTransport = EmptyTimelineTransport,
         pendingLocalStore = NoOpPendingLocalStore,
-        conversationCursorStore = NoOpConversationCursorStore,
         confirmedTimelineStore = store,
         repositoryScope = scope,
         startLoopStreamSubscribers = false,

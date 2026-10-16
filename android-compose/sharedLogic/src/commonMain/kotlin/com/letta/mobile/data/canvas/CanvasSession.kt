@@ -2,7 +2,10 @@ package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.canvas.plugin.CanvasPluginElement
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasCheckpointId
+import com.letta.mobile.data.model.CanvasElementId
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasNoteId
 import com.letta.mobile.data.model.CanvasOpId
 import com.letta.mobile.data.model.ConversationId
 import kotlinx.coroutines.CoroutineScope
@@ -97,7 +100,7 @@ class CanvasSession(
         metadata: CanvasCommitMetadata = CanvasCommitMetadata(actorId = "system"),
     ) {
         val checkpoint = CanvasCheckpoint(
-            checkpointId = "cp-${doc.revision}-${clock()}",
+            checkpointId = CanvasCheckpointId("cp-${doc.revision}-${clock()}"),
             canvasId = doc.id,
             revision = doc.revision,
             lamport = lamportClock,
@@ -375,14 +378,14 @@ class CanvasSession(
      * [color] when given; a no-op when nothing would change.
      */
     suspend fun setDocument(
-        documentId: String,
+        documentId: CanvasNoteId,
         documentJson: String,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
         frame: CanvasDocumentFrame? = null,
         color: String? = null,
         style: CanvasTextStyle? = null,
         title: String? = null,
-    ): CanvasDocument? = writeDocument(CanvasDocumentWrite(documentId, documentJson, frame, color, style, title, actorId = actorId))
+    ): CanvasDocument? = writeDocument(CanvasDocumentWrite(documentId.value, documentJson, frame, color, style, title, actorId = actorId))
 
     /**
      * Writes a block document (Cascade JSON) as a local op, as [write] says (its frame, owner and
@@ -416,31 +419,31 @@ class CanvasSession(
 
     /** Renames a block document; an empty [title] clears it. A no-op for a document that is not there. */
     suspend fun retitleDocument(
-        documentId: String,
+        documentId: CanvasNoteId,
         title: String,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        val existing = documents().firstOrNull { it.id == documentId.value } ?: return null
         return setDocument(documentId, existing.json, actorId, title = title)
     }
 
     /** Changes how a block document's text is set; a no-op for a document that is not there. */
     suspend fun restyleDocument(
-        documentId: String,
+        documentId: CanvasNoteId,
         style: CanvasTextStyle,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        val existing = documents().firstOrNull { it.id == documentId.value } ?: return null
         return setDocument(documentId, existing.json, actorId, style = style)
     }
 
     /** Recolours a block document on the board; a no-op for a document that is not there. */
     suspend fun recolorDocument(
-        documentId: String,
+        documentId: CanvasNoteId,
         colorHex: String,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return null
+        val existing = documents().firstOrNull { it.id == documentId.value } ?: return null
         return setDocument(documentId, existing.json, actorId, color = colorHex)
     }
 
@@ -449,19 +452,19 @@ class CanvasSession(
      * person's move: the document becomes [CanvasGeometryOwner.USER]-owned and is never auto-fitted again.
      */
     suspend fun moveDocument(
-        documentId: String,
+        documentId: CanvasNoteId,
         frame: CanvasDocumentFrame,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
         style: CanvasTextStyle? = null,
     ): CanvasDocument? = locked {
-        val existing = documents().firstOrNull { it.id == documentId } ?: return@locked null
+        val existing = documents().firstOrNull { it.id == documentId.value } ?: return@locked null
         if (isMoveRedundant(existing, frame, style)) return@locked null
         applyLocalLocked(
             CanvasOp.SetDocumentOp(
                 opId = CanvasOpDiffer.generateOpId("doc"),
                 actorId = actorId.value,
                 lamport = lamportClock + 1,
-                documentId = documentId,
+                documentId = documentId.value,
                 documentJson = existing.json,
                 frame = frame,
                 style = style,
@@ -544,32 +547,32 @@ class CanvasSession(
      * written by whoever creates the label and never inferred from the document's name.
      */
     suspend fun setLabelOwner(
-        documentId: String,
-        shapeId: String?,
+        documentId: CanvasNoteId,
+        shapeId: CanvasElementId?,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument = applyLocal(
         CanvasOp.SetLabelOwnerOp(
             opId = CanvasOpDiffer.generateOpId("label"),
             actorId = actorId.value,
             lamport = lamportClock + 1,
-            documentId = documentId,
-            shapeId = shapeId,
+            documentId = documentId.value,
+            shapeId = shapeId?.value,
         ),
     )
 
     suspend fun bindArrow(
-        elementId: String,
+        elementId: CanvasElementId,
         binding: CanvasArrowBinding,
         actorId: CanvasActorId = LOCAL_USER_ACTOR,
     ): CanvasDocument? {
-        val current = arrowBindings()[elementId] ?: CanvasArrowBinding()
+        val current = arrowBindings()[elementId.value] ?: CanvasArrowBinding()
         if (current == binding) return null
         return applyLocal(
             CanvasOp.SetArrowBindingOp(
                 opId = CanvasOpDiffer.generateOpId("bind"),
                 actorId = actorId.value,
                 lamport = lamportClock + 1,
-                elementId = elementId,
+                elementId = elementId.value,
                 binding = binding,
             ),
         )
@@ -640,15 +643,15 @@ class CanvasSession(
      * projected scene. Without the guard each one appends an op, commits a revision and publishes
      * to peers, for a note that is deleted once.
      */
-    suspend fun removeDocument(documentId: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument? =
+    suspend fun removeDocument(documentId: CanvasNoteId, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument? =
         locked {
-            if (documents().none { it.id == documentId }) return@locked null
+            if (documents().none { it.id == documentId.value }) return@locked null
             applyLocalLocked(
                 CanvasOp.RemoveDocumentOp(
                     opId = CanvasOpDiffer.generateOpId("doc"),
                     actorId = actorId.value,
                     lamport = lamportClock + 1,
-                    documentId = documentId,
+                    documentId = documentId.value,
                 ),
             )
         }
@@ -716,7 +719,7 @@ class CanvasSession(
      * Restores canvas to a prior [CanvasCheckpoint], generating and applying a [CanvasOp.ReplaceSceneOp]
      * locally and broadcasting to peers.
      */
-    suspend fun restoreCheckpoint(checkpointId: String, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument = locked {
+    suspend fun restoreCheckpoint(checkpointId: CanvasCheckpointId, actorId: CanvasActorId = LOCAL_USER_ACTOR): CanvasDocument = locked {
         val checkpoint = _checkpoints.value.firstOrNull { it.checkpointId == checkpointId }
             ?: throw IllegalArgumentException("Checkpoint not found: $checkpointId")
 
@@ -816,13 +819,13 @@ class CanvasSession(
          */
         suspend fun getOrCreateForConversation(
             store: CanvasDocumentStore,
-            conversationId: String,
+            conversationId: ConversationId,
             options: CanvasConversationOptions = CanvasConversationOptions(),
         ): CanvasSession {
             val createOptions = CanvasCreateOptions(
-                canvasId = CanvasId.forConversation(ConversationId(conversationId)),
+                canvasId = CanvasId.forConversation(conversationId),
                 title = options.title,
-                conversationId = conversationId,
+                conversationId = conversationId.value,
                 agentId = options.agentId,
                 opLog = options.opLog,
                 syncTransport = options.syncTransport,

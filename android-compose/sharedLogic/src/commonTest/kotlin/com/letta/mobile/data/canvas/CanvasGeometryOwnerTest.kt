@@ -1,6 +1,7 @@
 package com.letta.mobile.data.canvas
 
 import com.letta.mobile.data.model.CanvasId
+import com.letta.mobile.data.model.CanvasNoteId
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -181,7 +182,7 @@ class CanvasGeometryOwnerTest {
         session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance))
         assertEquals(CanvasGeometryOwner.AUTO, session.documents().single().owner)
 
-        session.moveDocument("n", frame.copy(x = 999f))
+        session.moveDocument(CanvasNoteId("n"), frame.copy(x = 999f))
         val moved = session.documents().single()
         assertEquals(CanvasGeometryOwner.USER, moved.owner)
         assertEquals(provenance, moved.compose)
@@ -210,7 +211,7 @@ class CanvasGeometryOwnerTest {
             session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance)),
             "the same document is not written again",
         )
-        assertNull(session.setDocument("n", "{}"), "a write that names no owner keeps it")
+        assertNull(session.setDocument(CanvasNoteId("n"), "{}"), "a write that names no owner keeps it")
         assertNotNull(session.writeDocument(CanvasDocumentWrite("n", "{}", owner = CanvasGeometryOwner.USER)), "a different owner is a change")
         assertEquals(CanvasGeometryOwner.USER, session.documents().single().owner)
         assertNotNull(session.writeDocument(CanvasDocumentWrite("n", "{}", compose = provenance.copy(key = "other"))), "so is different provenance")
@@ -221,7 +222,7 @@ class CanvasGeometryOwnerTest {
         val session = CanvasSession.create(InMemoryCanvasDocumentStore(), CanvasCreateOptions(title = "t", canvasId = CanvasId("own-4")))
         session.writeDocument(CanvasDocumentWrite("n", "{}", frame = frame, owner = CanvasGeometryOwner.AUTO, compose = provenance))
         val before = session.documents()
-        session.moveDocument("n", frame.copy(x = 999f))
+        session.moveDocument(CanvasNoteId("n"), frame.copy(x = 999f))
         val step = assertNotNull(CanvasDocumentUndo.stepBetween(before, session.documents()))
 
         session.applyLocalStamped(step.undo)

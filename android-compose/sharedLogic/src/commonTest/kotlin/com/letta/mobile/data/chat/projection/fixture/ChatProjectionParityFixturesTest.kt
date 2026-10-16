@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.projection.projectToolTimelineGroups
+import com.letta.mobile.data.model.A2uiSurfaceId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -50,7 +51,7 @@ class ChatProjectionParityFixturesTest {
         val manager = A2uiSurfaceManager()
         manager.apply(event)
         val surfaceId = event.messages.single().surfaceId
-        val surface = assertNotNull(manager.surface(surfaceId))
+        val surface = assertNotNull(manager.surface(A2uiSurfaceId(surfaceId)))
         val rendered = buildChatRenderModel(fixture.messages, ChatDisplayMode.Interactive).renderItems
 
         assertEquals(event.conversationId, surface.conversationId)

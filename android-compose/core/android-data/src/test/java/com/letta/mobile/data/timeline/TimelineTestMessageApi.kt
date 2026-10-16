@@ -19,23 +19,6 @@ internal data class ConversationListQuery(
     val order: String? = null,
 )
 
-internal data class TimelineCursorRecord(
-    val conversationId: String,
-    val seq: Long,
-)
-
-internal data class TimelineCursorKey(
-    val conversationId: String,
-)
-
-internal data class TimelineCursorMapView(
-    val highestByConversation: Map<String, Long>,
-)
-
-internal data class TimelineCursorClearRequest(
-    val key: TimelineCursorKey,
-)
-
 internal data class TimelineMessageBatch(
     val messages: List<LettaMessage>,
 )
@@ -89,10 +72,6 @@ internal data class TimelineStreamOpenSignal(
     val streamOpened: CompletableDeferred<Unit>,
 )
 
-internal data class TimelineCursorPairView(
-    val records: List<Pair<String, Long>>,
-)
-
 internal data class TimelineUserPersistPlan(
     val sink: TimelineStoredMessageSink,
     val request: MessageCreateRequest,
@@ -102,56 +81,6 @@ internal data class TimelineSendPipeline(
     val sink: TimelineStoredMessageSink,
     val capture: TimelineSendCapture,
 )
-
-internal class RecordingConversationCursorStore : ConversationCursorStore {
-    val records = mutableListOf<Pair<String, Long>>()
-    internal val highestByConversation = mutableMapOf<String, Long>()
-
-    override suspend fun recordFrame(conversationId: String, seq: Long) {
-        rememberCursorRecord(TimelineCursorRecord(conversationId, seq))
-    }
-
-    fun record(record: TimelineCursorRecord) {
-        rememberCursorRecord(record)
-    }
-
-    override suspend fun getCursor(conversationId: String): Long? =
-        highestSeqFor(TimelineCursorKey(conversationId))
-
-    override suspend fun getAllCursors(): Map<String, Long> =
-        snapshotHighestCursors(TimelineCursorMapView(highestByConversation))
-
-    override suspend fun clearCursor(conversationId: String) {
-        clearCursorFor(TimelineCursorClearRequest(TimelineCursorKey(conversationId)))
-    }
-
-    private fun rememberCursorRecord(record: TimelineCursorRecord) {
-        appendCursorPair(record)
-        bumpHighestCursor(record)
-    }
-
-    private fun appendCursorPair(record: TimelineCursorRecord) {
-        records += record.conversationId to record.seq
-    }
-
-    private fun bumpHighestCursor(record: TimelineCursorRecord) {
-        val previous = highestByConversation[record.conversationId] ?: Long.MIN_VALUE
-        highestByConversation[record.conversationId] = maxOf(previous, record.seq)
-    }
-
-    private fun highestSeqFor(key: TimelineCursorKey): Long? =
-        highestByConversation[key.conversationId]?.takeIf { it != Long.MIN_VALUE }
-
-    private fun snapshotHighestCursors(view: TimelineCursorMapView): Map<String, Long> =
-        view.highestByConversation.filterValues { it != Long.MIN_VALUE }
-
-    private fun clearCursorFor(request: TimelineCursorClearRequest) {
-        highestByConversation.remove(request.key.conversationId)
-    }
-
-    internal fun recordedPairs(): TimelineCursorPairView =
-        TimelineCursorPairView(records.toList())
-}
 
 internal open class TimelineTestMessageApi : TestMessageSource() {
     final override suspend fun listConversationMessages(
@@ -469,26 +398,6 @@ private fun takeMessageBatch(
 private fun reverseMessageBatch(batch: TimelineMessageBatch): TimelineMessageBatch =
     TimelineMessageBatch(batch.messages.reversed())
 
-private fun cursorRecordKey(record: TimelineCursorRecord): TimelineCursorKey =
-    TimelineCursorKey(record.conversationId)
-
-private fun cursorClearRequest(key: TimelineCursorKey): TimelineCursorClearRequest =
-    TimelineCursorClearRequest(key)
-
-private fun cursorMapView(store: RecordingConversationCursorStore): TimelineCursorMapView =
-    TimelineCursorMapView(store.highestByConversation.toMap())
-
-private fun cursorPairView(store: RecordingConversationCursorStore): TimelineCursorPairView =
-    store.recordedPairs()
-
-private fun withCursorRecord(
-    store: RecordingConversationCursorStore,
-    record: TimelineCursorRecord,
-): TimelineCursorRecord {
-    store.record(record)
-    return record
-}
-
 private fun sendCaptureMessages(capture: TimelineSendCapture): TimelineMessageBatch =
     TimelineMessageBatch(capture.streamMessages)
 
@@ -533,11 +442,6 @@ private fun touchMessageSpec(spec: TimelineTestMessageSpec): TimelineTestMessage
     return spec
 }
 
-private fun touchCursorRecord(record: TimelineCursorRecord): TimelineCursorRecord {
-    cursorRecordKey(record)
-    return record
-}
-
 private fun touchQueryBatch(
     query: ConversationListQuery,
     batch: TimelineMessageBatch,
@@ -567,10 +471,3 @@ private fun limitedOrderedView(view: TimelineOrderedMessageView): TimelineMessag
 private fun reversedOrderedView(view: TimelineOrderedMessageView): TimelineMessageBatch =
     reverseMessageBatch(TimelineMessageBatch(view.messages))
 
-private fun clearRequestFromRecord(record: TimelineCursorRecord): TimelineCursorClearRequest =
-    cursorClearRequest(cursorRecordKey(record))
-
-private fun pairViewRecords(view: TimelineCursorPairView): List<Pair<String, Long>> = view.records
-
-private fun mapViewEntries(view: TimelineCursorMapView): Map<String, Long> =
-    view.highestByConversation

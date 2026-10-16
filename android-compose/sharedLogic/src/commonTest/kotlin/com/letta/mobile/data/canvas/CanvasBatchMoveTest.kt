@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasNoteId
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,8 +13,8 @@ class CanvasBatchMoveTest {
         val session = CanvasSession.create(store = store, options = CanvasCreateOptions(title = "Group", initialSceneJson = ""))
         val a = CanvasDocumentFrame(100f, 100f, 200f, 100f)
         val b = CanvasDocumentFrame(400f, 100f, 200f, 100f)
-        session.setDocument("a", "{}", frame = a)
-        session.setDocument("b", "{}", frame = b)
+        session.setDocument(CanvasNoteId("a"), "{}", frame = a)
+        session.setDocument(CanvasNoteId("b"), "{}", frame = b)
         val before = session.document.value!!.revision
 
         val moved = session.moveDocuments(

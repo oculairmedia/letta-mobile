@@ -1,5 +1,6 @@
 package com.letta.mobile.data.canvas
 
+import com.letta.mobile.data.model.CanvasCheckpointId
 import com.letta.mobile.data.model.CanvasId
 import kotlinx.serialization.Serializable
 
@@ -8,7 +9,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CanvasCheckpoint(
-    val checkpointId: String,
+    val checkpointId: CanvasCheckpointId,
     val canvasId: CanvasId,
     val revision: Long,
     val lamport: Long,

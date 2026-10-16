@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.letta.mobile.data.canvas.CanvasSession
 import com.letta.mobile.data.canvas.CanvasTextStyle
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasNoteId
 import io.github.linreal.cascade.editor.action.FocusBlock
 import io.github.linreal.cascade.editor.core.Block
 import io.github.linreal.cascade.editor.serialization.loadFromJson
@@ -101,7 +102,7 @@ fun CanvasBlockEditor(
         if (current == lastEditorJson) return
         lastEditorJson = current
         lastStoredJson = current
-        val write: suspend () -> Unit = { runCatching { session.setDocument(documentId, current, actorId) } }
+        val write: suspend () -> Unit = { runCatching { session.setDocument(CanvasNoteId(documentId), current, actorId) } }
         if (recorder == null) write() else recorder.recording("typing", write)
     }
 

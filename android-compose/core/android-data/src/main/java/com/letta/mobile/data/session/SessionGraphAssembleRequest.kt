@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.local.SessionCacheGate
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -15,6 +16,11 @@ data class SessionGraphAssembleRequest(
     val scope: CoroutineScope,
     val channelTransport: IChannelTransport,
     val settingsRepository: ISettingsRepository?,
+    /**
+     * letta-mobile-by4vm.94: opens once the previous session's Room cache is cleared; this
+     * generation's repositories await it before every Room access.
+     */
+    val cacheGate: SessionCacheGate,
     val backendDescriptor: com.letta.mobile.runtime.BackendDescriptor =
         localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX),
     val capturedCursorStore: com.letta.mobile.data.local.CapturedBackendConversationCursorStore? = null,

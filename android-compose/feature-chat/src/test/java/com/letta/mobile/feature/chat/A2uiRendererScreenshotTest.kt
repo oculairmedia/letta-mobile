@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.letta.mobile.data.model.A2uiSurfaceId
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
@@ -88,7 +89,7 @@ class A2uiRendererScreenshotTest {
         appTheme: AppTheme,
         manager: com.letta.mobile.data.a2ui.A2uiSurfaceManager = confirmationSurfaceManager(),
     ) {
-        val surface = manager.surface(SurfaceId)
+        val surface = manager.surface(A2uiSurfaceId(SurfaceId))
 
         captureRoboImage("src/test/snapshots/images/$name.png", ScreenshotOptions) {
             A2uiSnapshotTheme(appTheme = appTheme) {

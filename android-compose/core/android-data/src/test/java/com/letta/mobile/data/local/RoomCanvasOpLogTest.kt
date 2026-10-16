@@ -18,6 +18,7 @@ import com.letta.mobile.data.canvas.movePluginElement
 import com.letta.mobile.data.canvas.plugin.CanvasPluginFallback
 import com.letta.mobile.data.canvas.removePluginElement
 import com.letta.mobile.data.model.CanvasActorId
+import com.letta.mobile.data.model.CanvasElementId
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.CanvasOpId
 import kotlinx.serialization.json.JsonObject
@@ -178,9 +179,9 @@ class RoomCanvasOpLogTest {
             ),
         )
         session.applyAgentBatch(listOf(place("pe-a"), place("pe-b")), CanvasActorId(agent))
-        assertTrue(session.movePluginElement("pe-a", moved) != null)
+        assertTrue(session.movePluginElement(CanvasElementId("pe-a"), moved) != null)
         session.applyAgentBatch(listOf(update), CanvasActorId(agent))
-        assertTrue(session.removePluginElement("pe-b") != null)
+        assertTrue(session.removePluginElement(CanvasElementId("pe-b")) != null)
         val before = session.pluginElements()
 
         val restartedLog = RoomCanvasOpLog(database.canvasOpDao())
@@ -198,7 +199,7 @@ class RoomCanvasOpLogTest {
         assertEquals(session.opLog.getOps(canvasId, 0L), logged)
         assertEquals(before, CanvasOpProjector.pluginElementsOf(CanvasOpProjector.project(CanvasOpProjector.emptySceneJson(), logged)))
 
-        assertTrue(reopened.movePluginElement("pe-a", frame) != null)
+        assertTrue(reopened.movePluginElement(CanvasElementId("pe-a"), frame) != null)
         val stored = documents.get(canvasId)!!
         assertEquals(frame, CanvasOpProjector.pluginElementsOf(stored.sceneJson).single().frame)
     }

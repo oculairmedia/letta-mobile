@@ -22,6 +22,7 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.singleWindowApplication
 import com.letta.mobile.data.canvas.CanvasConversationOptions
 import com.letta.mobile.data.canvas.CanvasSession
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
 import com.letta.mobile.ui.canvas.CanvasWorkspace
 import kotlinx.coroutines.Dispatchers
@@ -126,7 +127,7 @@ private fun ReproContent(window: java.awt.Window) {
             val created = withContext(Dispatchers.Default) {
                 CanvasSession.getOrCreateForConversation(
                     store = store,
-                    conversationId = "repro-conversation-$index",
+                    conversationId = ConversationId("repro-conversation-$index"),
                     options = CanvasConversationOptions(agentId = null, title = "Repro $index"),
                 )
             }

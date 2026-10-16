@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.canvas.CanvasSceneDocument
+import com.letta.mobile.data.model.CanvasNoteId
 import io.ak1.drawbox.domain.model.Element
 import kotlinx.coroutines.launch
 
@@ -84,13 +85,13 @@ private fun CanvasBoard.noteBarActions(activeNote: CanvasSceneDocument?): NoteBa
         style = activeNote.style,
         onStyle = { style ->
             scope.launch {
-                recordingDocuments("restyling a note") { runCatching { s.restyleDocument(activeNote.id, style) } }
+                recordingDocuments("restyling a note") { runCatching { s.restyleDocument(CanvasNoteId(activeNote.id), style) } }
             }
         },
         color = tint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
         onColor = { color ->
             scope.launch {
-                recordingDocuments("recolouring a note") { runCatching { s.recolorDocument(activeNote.id, color.toHex()) } }
+                recordingDocuments("recolouring a note") { runCatching { s.recolorDocument(CanvasNoteId(activeNote.id), color.toHex()) } }
             }
         },
         defaultTextColor = noteTextColor(tint, plain),

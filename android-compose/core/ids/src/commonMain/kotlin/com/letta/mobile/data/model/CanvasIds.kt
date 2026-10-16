@@ -75,3 +75,37 @@ value class CanvasOpId(val value: String) {
 value class CanvasArtifactId(val value: String) {
     override fun toString(): String = value
 }
+
+/**
+ * The id of one element drawn on a canvas board (letta-mobile-by4vm.99.2): a DrawBox shape,
+ * connector or stroke, or a plugin element (`ext:` kind). A shape a label belongs to is named by
+ * its element id too. Ops and the projected scene carry it as a bare string ([value]); the canvas
+ * session's element writes take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasElementId(val value: String) {
+    override fun toString(): String = value
+}
+
+/**
+ * The id of one block document on a canvas board (letta-mobile-by4vm.99.2): a note, text box or
+ * shape label written in Cascade JSON. Not `data.document.DocumentId` (a standalone document) and
+ * not a [CanvasElementId] (a drawn element). Ops and the projected scene carry it as a bare string
+ * ([value]); the canvas session's document writes take it typed.
+ */
+@JvmInline
+@Serializable
+value class CanvasNoteId(val value: String) {
+    override fun toString(): String = value
+}
+
+/**
+ * The id of a canvas checkpoint (letta-mobile-by4vm.99.2), a point the board can be restored to.
+ * A value class, so a serialized checkpoint keeps its bare-string `checkpointId`.
+ */
+@JvmInline
+@Serializable
+value class CanvasCheckpointId(val value: String) {
+    override fun toString(): String = value
+}

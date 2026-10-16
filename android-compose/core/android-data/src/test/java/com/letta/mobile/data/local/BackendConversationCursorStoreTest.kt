@@ -18,7 +18,6 @@ class BackendConversationCursorStoreTest {
     @Test fun capturedNamespacesReplacementAndClosedCallbacksAreIsolated() = runBlocking {
         val db = Room.inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext(), LettaDatabase::class.java).build()
         try {
-            db.conversationCursorDao().upsertCursor("same", 999, 1)
             val factory = BackendConversationCursorFactory(db)
             val old = factory.capture("backend-a")
             val next = factory.capture("backend-b")
@@ -43,7 +42,6 @@ class BackendConversationCursorStoreTest {
             try { old.replaceExpiredWatermark("same", 4, 0); fail("Closed graph accepted repair") }
             catch (_: IllegalStateException) { }
             assertEquals(20L, next.getCursor("same"))
-            assertEquals(999L, db.conversationCursorDao().getCursor("same")!!.highestSeenSeq)
             assertEquals(4L, factory.capture("backend-a").getCursor("same"))
             assertTrue(next.clearExpiredWatermark("same", 20))
             assertNull(next.getCursor("same"))
