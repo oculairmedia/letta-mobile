@@ -85,6 +85,18 @@ PROBES = (
     # the joystick is what scrubs TurnX/TurnY, so Turn.* is its effect, not its value.
     Probe("Joystick.x", ids.JOYSTICK, JOYSTICK_X, "unit"),
     Probe("Joystick.y", ids.JOYSTICK, JOYSTICK_Y, "unit"),
+    # te3n1.5: the reaction nodes. Squash pivots at the feet (Pet and React key it), Peek carries
+    # the plate's duck / nod / glance, the Base bone shears for `dizzy`. Travel and Listen are NOT
+    # probed: they are bound to the view model already, and a second bind on the same property
+    # would fight the first.
+    Probe("Squash.x", ids.SQUASH_NODE, X, "px"),
+    Probe("Squash.y", ids.SQUASH_NODE, Y, "px"),
+    Probe("Squash.rotation", ids.SQUASH_NODE, ROT, "rad"),
+    Probe("Squash.scaleX", ids.SQUASH_NODE, SX, "x"),
+    Probe("Squash.scaleY", ids.SQUASH_NODE, SY, "x"),
+    Probe("Peek.y", ids.PEEK_NODE, Y, "px"),
+    Probe("Peek.scaleX", ids.PEEK_NODE, SX, "x"),
+    Probe("Base.x", ids.BONE_BASE, 90, "px"),                # RootBone.x, not Node.x
 )
 
 

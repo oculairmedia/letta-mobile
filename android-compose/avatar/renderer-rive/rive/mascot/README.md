@@ -25,7 +25,8 @@ there are no star imports, so the definition of anything is one jump away.
 | `rig/face.py` | The face assembly: the FacePlacement > HostTurn > Turn > Arc > Face chain that carries the plate, the TurnX/TurnY pose ranges, the trails, `spin_keys()` | yes |
 | `rig/plate.py` | The Plate component: glyph per state, mouth morph, pupil overlay, tunable ranges, and the plate's own four layers (Expression, Blink, AutoBlink, Saccade) | yes |
 | `rig/motion.py` | Every root animation: sustained loops (`STATE_ROWS` / `sustained_rest`), the 90 entries, the flashes, the nine idle beats, wander | yes |
-| `rig/machine.py` | The `Avatar` state machine: ten layers, their states and transitions, and the file's hover/drag listeners | yes |
+| `rig/machine.py` | The `Avatar` state machine: twelve layers, their states and transitions, and the file's hover/drag listeners | yes |
+| `rig/contract.py` | The `Avatar` view-model contract as data: every property, its type, range and writer, plus the enum keys. `gen_scene.py` emits the newer properties from it; `check_contract.py` holds the built file, `RiveAvatarContract.kt` and the MASCOT.md / ARTIST.md tables to it | when the contract changes |
 | `rig/layers.py` | Typed layer builder (`Layer` / `State` / `Exit` / `OnEnum` / `OnBool` / `OnTrigger` / `OnInput` / `Raw`). Validates targets, weights and exit-time-on-a-loop in Python instead of at runtime | rarely |
 | `rig/seams.py` | The seam ledger and the blend policy: what each animation leaves a property at, what the next one picks it up at, and which 0 ms hand-offs tear. `python -m rig.seams` lists them worst first; `Layer.rml()` refuses an unsigned one. A hard cut is signed `cut=True`, a deliberate hand-back `hold=True`, both with a reason | rarely |
 | `rig/chart.py` | Timing charts, both ways: `Chart(extremes, breakdown, spacing).keys()` authors a beat as poses and spacing (the in-betweens are real keys, not a bezier's guess), `Chart.of(keys)` / `Chart.of_samples(values)` read a curve or a telemetry series back and classify it (ease-in / ease-out / s / linear / hold / pop), `chart.text()` draws the margin chart | yes |
@@ -48,6 +49,8 @@ there are no star imports, so the definition of anything is one jump away.
 | `test_rig.py` | `python -m unittest test_rig`: regenerate parity, unique ids, resolvable state/animation references, the contract check, a `timeline.py` smoke | rarely |
 | `test_probe.py` | `python -m unittest test_probe`: every golden scenario's signature, plus one pixel cross-check (a screenshot at frame 20 of `success` against the probed plate height) | rarely |
 | `test_tools.py` | `python -m unittest test_tools`: the review tools themselves - halving fractions, spacing classification, the pop detector, a `Chart.keys()` round trip, x-sheet and `timeline --chart` smokes | rarely |
+| `test_contract.py` | `python -m unittest test_contract`: the shipped `.riv` (both copies, byte-identical) exposes exactly `rig/contract.py`; a drifted app name / kind / file property / enum order fails and names itself; the doc tables match. Standard library only, no CLI - CI runs it (`.github/workflows/mascot-rig.yml`, with `test_rig`) | rarely |
+| `../../native/rivdump/rivfile.py` | A pure-Python `.riv` object-stream reader (header, table of contents, objects; field kinds from `schema.tsv`) - what lets the contract check read the shipped file without the CLI | rarely |
 | `SPEC.md`, `MOTION-REFERENCES.md` | Numbers and references from the design agent; §8 is the implementation map, §9 the human-touch patch (amplitudes, alphas, glyphs) the rig now follows | with them |
 | `art/validation/` | The design agent's static proofs and `validate.py` (needs numpy, Pillow, CairoSVG); not part of the build | - |
 | `RIVE-PLATFORM-POWER.md` | The design agent's platform brief; the audit below answers it | - |
@@ -61,7 +64,8 @@ with Pillow. The user has run `rive login`; `rive push` works from this director
 | The change | Where |
 |---|---|
 | A new idle or wander beat | the animation in `rig/motion.py`, its two ids from `alloc(3, ...)` in `rig/ids.py`, its state and weight in `_idle_layer` / `_wander_layer` in `rig/machine.py` |
-| A new sustained state | the `STATES` vocabulary in `rig/ids.py` (append - the id ranges are indexed by that order), a `ROW` entry and a facing in `rig/motion.py`, a glyph in `rig/plate.py`'s `STATE_GLYPH` plus `art/glyph-<name>.svg`, then `RiveAvatarContract.kt` (`check_contract.py` enforces the match) |
+| A new sustained state | the `STATES` vocabulary in `rig/ids.py` (append - the id ranges are indexed by that order; its entry pairs get ids from `alloc()`, the legacy 90 keep theirs), a `ROW` entry and a facing in `rig/motion.py`, a glyph in `rig/plate.py`'s `STATE_GLYPH` plus `art/glyph-<name>.svg` (a new glyph name goes in `NEW_GLYPHS`), the enum keys in `rig/contract.py`, then `RiveAvatarContract.kt` (`check_contract.py` enforces the match) |
+| A new view-model property or reaction | a `Prop` in `rig/contract.py` (order = file order), its id in `rig/ids.py` `VM_NEW`, then what it drives: a binding (`gen_scene.py` / `rig/face.py`), or a one-shot in `rig/motion.py` `react_animations()` wired in `rig/machine.py` `_react_layer()` with a `ReactCalm` twin for `reduceMotion`; MASCOT.md and ARTIST.md tables (`test_contract.py` checks them) |
 | Body shape or geometry | `art/*.svg` first, then `rig/body.py` (paths, bones, weights, paints) |
 | The plate: glyph, mouth, card, blink, saccade | `rig/plate.py` |
 | Timings, amplitudes, waits, tints | `rig/constants.py` - almost nothing else should carry a number |
@@ -89,6 +93,23 @@ cp build/mascot.riv ../../src/jvmMain/resources/mascot/mascot.riv      # desktop
 python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt
 $R push                            # new revision in the Rive workspace (see the rule below)
 ```
+
+**Regenerating the shipped file** (the whole of it, deterministic - the same `scene.rml` and the
+same CLI give the same bytes, so both copies are always `rive . --once` output):
+
+```bash
+python gen_scene.py && $R . --verify && $R . --once
+cp build/mascot.riv ../../src/androidMain/res/raw/mascot.riv
+cp build/mascot.riv ../../src/jvmMain/resources/mascot/mascot.riv
+python ../../native/rivdump/check_contract.py . ../../src/commonMain/kotlin/com/letta/mobile/avatar/rive/RiveAvatarContract.kt
+python -m unittest test_rig test_contract test_tools test_probe   # test_probe needs the CLI
+python -m rig.seams                                                  # 0 unexplained, or stop
+```
+
+`check_contract.py` reads the shipped `.riv` files themselves (`native/rivdump/rivfile.py`, no
+CLI) and also compares them with `build/mascot.riv` when that exists, so a copy that was not
+refreshed fails. CI runs `test_contract` and `test_rig` on every change under `avatar/renderer-rive/`
+(`.github/workflows/mascot-rig.yml`).
 
 **Checks.** `python -m unittest test_rig` (about 15 s, standard library only) is the cheap gate
 that does not need the CLI: it regenerates into a tempdir and compares against the committed
@@ -236,15 +257,38 @@ Root state machine `Avatar`, layers in order:
 | `Hover` | perk-up: tall stretch, face lift, tilt of interest; attentive hold (beat tempo) | Rest -> Perk -> Held -> Rest on `hovered` (file listeners); exit blends 220-260 ms |
 | `Flash` | success/error | triggers; success 800 ms hop + spin with trails, error 600 ms shake; self-returning |
 | `Drag` | `expr` dragged | boolean + dragStart/dragEnd listeners |
-| `IdleVariety` | face, body, joystick | four waits of unequal length (6.1 / 8 / 10.7 / 14 s) picked at random, then one of nine beats by weight (glance, tilt, look-around, shift, stretch, sigh, shiver, wobble, bounce); beats blend in 160 ms / out 320 ms over Breath and the host turn. `BEAT_TEMPO` 1.4 stretches every beat |
-| `Wander` | joystick | four waits of unequal length (9.3 / 12 / 17.5 / 24 s) at random, then glance 55 % / peek 35 % / spin 10 %; beats blend in 200 ms / out 320 ms |
+| `IdleVariety` | face, body, joystick | four waits of unequal length (6.1 / 8 / 10.7 / 14 s) picked at random, then one of nine beats by weight (glance, tilt, look-around, shift, stretch, sigh, shiver, wobble, bounce); beats blend in 160 ms / out 320 ms over Breath and the host turn. `BEAT_TEMPO` 1.4 stretches every beat. Parked asleep (sleeping or dreaming); held by `reduceMotion` |
+| `Wander` | joystick | four waits of unequal length (9.3 / 12 / 17.5 / 24 s) at random, then glance 55 % / peek 35 % / spin 10 %; beats blend in 200 ms / out 320 ms. Parked asleep (a slow shift every ~30 s); held by `reduceMotion` or `working` |
+| `Pet` | Squash (rotation, x) | `petting` (and not `reduceMotion`): a 1.8 s side sway about the feet with a purr shiver; blends in 250 / out 320 ms |
+| `PetFace` | `expr` content | `petting`: the content glyph, cut in and out under a blink (a blended `expr` sweeps through every glyph between) |
+| `React` | Squash, Peek, Base bone, `expr` | one one-shot per trigger, fired from AnyState and self-returning at rest: `poke` `dizzy` `sent` `toolStart` `toolDone` `wake` `yawn`, `land` by `impact` band (soft / mid / hard), `trick` by `trickId` band (0..3). With `reduceMotion`, every trigger plays `ReactCalm`: one blink |
+
+With `reduceMotion` on, `Expression` blends (300 ms) each loop to its `Calm_<state>` twin - the
+same pose with the bob, inflate, light and gaze drift held - and entries hand off to the twin in
+at most 80 ms; `Breath` holds the gloss; `Flash` plays `SuccessCalm` / `ErrorCalm` (the glyph under
+a blink, no hop, spin or shake). `probe.py reduce-motion-idle --every 30` is the proof: 60 s, every
+probed property flat (`idle-60s` is the control). Not gated: `Hover` (the perk is small) and the
+host channels `listenLevel` / `moveX` / `moveY`, which the host should hold at 0.
+
+The plate gained two layers: `Squint` (while `expr` is thinking: random 3.2 / 5.1 / 6.9 s waits,
+then 650 ms of the old squint glyph over the open-narrowed rest - wbin4.8) and `Rem` (while
+dreaming: 6 / 8.1 / 9.9 s waits, then a 560 ms decaying side flicker of the closed eye). Saccade
+and AutoBlink now park for dreaming as well as sleeping.
+
+Host channels bound straight to nodes (no layer): `listenLevel` lifts `Listen` (face chain, up to
+10 px and 5 %), `moveX` / `moveY` lean and stretch `Travel` (pivot at the feet, above `Squash` and
+`Lean`).
 
 Facing per state (`sustained_facing()`): idle -0.15, listening 0 (square-on), thinking -0.6/-0.2,
-speaking 0.15, error -0.3/0.25, sleeping 0.4/0.5, degraded 0.5/-0.1, the rest ~0.
+speaking 0.15, error -0.3/0.25, sleeping 0.4/0.5, degraded 0.5/-0.1, working 0 (square-on),
+dreaming 0.35/0.45, the rest ~0.
 
 Id namespaces (all ids must be numeric `client:object`, unique, object 0 reserved): `0:*` root
-objects, `3:*` root animations/nodes (60-77 shapes, 100-140 states, 160-244 misc layers,
-250-439 entries), `7:*` Plate. Add new ranges above 3:440 and note them here.
+objects, `1:*` view model, `2:*` converters, `3:*` root animations/nodes (60-77 shapes, 100-148
+states, 160-244 misc layers, 250-439 the legacy entries), `7:*` Plate. Everything newer comes
+from `alloc()` and is recorded in `rig/ids.json`: 0:400+, 1:300+, 2:100+, 3:460+ (the te3n1.5
+entries, calm twins and reactions among them), 7:300+. Layer ids are written inline: root 3:1-3:13,
+plate 7:10-7:15.
 
 ## Rive gotchas (each of these was learned the hard way)
 
@@ -348,7 +392,7 @@ Must:
 - [x] `shape` enum wired as a vertex morph (Shape layer)
 - [x] `mouthOpen` / `lookX` / `lookY` scrub pose-range timelines through range-mapper converters (no keyframe hops); facing is a Joystick
 - [x] `dragged` / `hovered` written by file listeners and by the app
-- [x] One SM `Avatar`, ten layers
+- [x] One SM `Avatar`, twelve layers (nine until te3n1.5; this line said ten)
 - [x] Glyphs in a `Solo` (keyed `activeComponentId`), mouths opacity-switched per SPEC §4
 - [x] `check_contract.py` passes on the shipped `.riv`
 - [x] Feathering is stroke-only and rendered through the Rive Renderer on both targets
@@ -361,8 +405,8 @@ Should / deliberately not:
 - [ ] Blend states — **not used**: the scrubbed ranges are the equivalent and verify headless. Revisit if the editor pass wants additive look layers.
 - [ ] Scripts / test scripts — not used; random waits are two-state alternations, which the runtime handles natively.
 - [ ] Transition actions — not needed; the error flash lands on the sustained error pose by construction.
-- [ ] `reduceMotion` — needs a contract property and a host write; follow-up bead.
-- [x] `rive inspect . --json` is the structural check; `check_contract.py` reads it.
+- [x] `reduceMotion` — a contract boolean (te3n1.5): calm loop twins, idle/wander held, calm flashes and reactions. The host write is M6 (te3n1.6).
+- [x] `check_contract.py` reads the shipped `.riv` directly (`rivfile.py`) and checks names AND types against `rig/contract.py`; CI runs it.
 
 ## Gaze and attention: what the rig does, what the host does
 
@@ -421,7 +465,7 @@ calls the same class):**
   node at 1. Deviations: weights are per vertex index, so the other seven identities share the
   default body's (vertex order matches; positions nearly do); no area correction q (bones
   cannot); breath stays at the user's 1.06 / 6500 ms rather than the spec's 1.03 / 4600.
-- **Working glyph**: art only; not wired (z4b83).
+- **Working glyph**: wired to the `working` state (te3n1.5; z4b83's rig half).
 
 ## Host rules (for the identity slice, 1zti3)
 
@@ -431,17 +475,25 @@ calls the same class):**
   should hold the node until identity has been applied - no startup flash.
 - Fit is `contain` on a fixed 500x500 artboard; the mascot is an element, not a layout, so the
   responsive `layout` fit does not apply.
-- The interaction logic (hover, drag, blink, wander, entries) lives in the file. The host only
-  writes the contract properties; it must not try to sequence transitions itself.
+- Ownership (user decision, epic te3n1 "Option A", 2026-10-16): the HOST interprets gestures and
+  pointer velocity and writes the contract inputs - `hovered`, `dragged`, `petting`,
+  `moveX`/`moveY`, `poke` / `trick` (+ `trickId`) and the other reaction triggers; the FILE owns
+  every animation (curves, poses, blink cadence, idle beats, wander, entries). The file's
+  hover/drag listeners stay only as a desktop fallback. Drag tilt is the `Travel` lean on
+  `moveX`/`moveY`, which applies whether or not `dragged` is set. The host must not try to
+  sequence transitions itself.
 
 ## Open items
 
 - `-small` profile (SPEC) needs a host size signal the contract does not carry.
-- Drag tilt needs pointer velocity the file cannot see (0 degrees now).
+- Drag tilt: the file now leans on `moveX` / `moveY` (te3n1.5); the host has to write them.
 - The idle glance moves the plate, not the glyph (the root cannot key a nested node); the
   glyph-only glance belongs in the editor pass.
 - Wander is not gated during `speaking`/`sleeping`; decide if it should be.
 - Kotlin identity slice (`1zti3`): picker, persistence, chat-header hero.
-- `WORKING` (tool execution) as a state distinct from `THINKING` - decided as a v2 gap, filed as
-  its own bead; needs `glyph-working.svg` (+ `-small`) from the design side, a sustained state
-  with square-on facing and Wander gated off, and the director wired to tool-call events.
+- `working` and `dreaming` exist in the file (te3n1.5); `RiveAvatarContract.stateKey` still
+  writes `thinking` for `WORKING` and nothing produces `dreaming` until the Kotlin side adopts them.
+- Placeholder glyphs (dreaming, thinkingOpen, content, startled, dizzy, trick) wait for the art
+  pass, te3n1.7 - the list is in ARTIST.md.
+- Bone shear: `bone_pose()` keys crown/base `x` with Node.x (13), which a RootBone ignores - the
+  shear has always been a no-op (every pose uses H = 0). `dizzy` keys RootBone.x (90) directly.

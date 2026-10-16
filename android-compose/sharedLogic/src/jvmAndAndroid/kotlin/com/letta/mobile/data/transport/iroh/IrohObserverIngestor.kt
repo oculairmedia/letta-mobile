@@ -25,8 +25,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.time.Instant
-import java.util.UUID
 
 /**
  * Generation-bound observer ingestion collaborator for [IrohChannelTransport].
@@ -52,8 +50,6 @@ internal class IrohObserverIngestor(
     internal val engineOwnedSkipTelemetry: EngineOwnedSkipTelemetry = EngineOwnedSkipTelemetry(),
     /** How long the engine has to publish its own terminal before the observer's copy stands in. */
     private val observerTerminalGraceMs: Long = OBSERVER_TERMINAL_GRACE_MS,
-    /** Capabilities of the host this transport is connected to (letta-mobile-fxoew.2). */
-    private val hostCapabilities: () -> Set<String> = { emptySet() },
 ) {
     /** Observer terminal fallbacks waiting out their grace window, one per engine-owned turn. */
     private val pendingObserverTerminals = java.util.concurrent.ConcurrentHashMap<String, Job>()
@@ -73,19 +69,6 @@ internal class IrohObserverIngestor(
 
     @Volatile
     private var resubscribeJob: Job? = null
-
-    @Volatile
-    private var lastEmittedSubagentRevision: Long = 0L
-
-    /**
-     * letta-mobile-fxoew.2: the connected host pushes its authoritative
-     * registry (`subagents_updated`, capability [SUBAGENT_PUSH_CAPABILITY]),
-     * read from the current Ready handle. While true the correlator keeps
-     * tracking dispatches (return sanitizing still needs it) but no longer
-     * emits its own RUNNING-only snapshots, so the host is the one writer.
-     */
-    private val hostPushesSubagents: Boolean
-        get() = SUBAGENT_PUSH_CAPABILITY in hostCapabilities()
 
     val isIngesting: Boolean get() = observerJob?.isActive == true
     val currentObserverGeneration: Int get() = observerGeneration.value
@@ -199,7 +182,7 @@ internal class IrohObserverIngestor(
             return
         }
         if (isRetiredObserverRun(streamDelta, scope.conversationId)) return
-        correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
+        correlateAgentFrame(streamDelta)
         projectPassiveObserverDelta(scope, sanitizeAgentReturn(streamDelta, received))
     }
 
@@ -396,11 +379,18 @@ internal class IrohObserverIngestor(
         }
     }
 
-    private fun correlateAgentFrame(
-        streamDelta: AppServerInboundFrame.StreamDelta,
-    ): List<ServerFrame> = runCatching {
-        val delta = streamDelta.delta as? JsonObject ?: return@runCatching emptyList()
-        val messageType = delta.string("message_type") ?: return@runCatching emptyList()
+    /**
+     * Tracks `Agent` dispatches and returns so [sanitizeAgentReturn] can recognise a subagent's
+     * return. The host's `subagents_updated` push (letta-mobile-fxoew.2) is the only registry
+     * writer; the client correlator emits nothing.
+     */
+    private fun correlateAgentFrame(streamDelta: AppServerInboundFrame.StreamDelta) {
+        runCatching { correlateAgentDelta(streamDelta) }
+    }
+
+    private fun correlateAgentDelta(streamDelta: AppServerInboundFrame.StreamDelta) {
+        val delta = streamDelta.delta as? JsonObject ?: return
+        val messageType = delta.string("message_type") ?: return
         val toolCall = delta["tool_call"]?.jsonObject
         val parent = ParentContext(
             agentId = streamDelta.runtime.agentId,
@@ -410,31 +400,28 @@ internal class IrohObserverIngestor(
         when (messageType) {
             "tool_call_message", "approval_request_message" -> processAgentDispatch(delta, toolCall, parent)
             "tool_return_message" -> processAgentReturn(delta, toolCall, parent)
-            else -> emptyList()
         }
-    }.getOrElse { emptyList() }
+    }
 
     private fun processAgentDispatch(
         delta: JsonObject,
         toolCall: JsonObject?,
         parent: ParentContext,
-    ): List<ServerFrame> {
-        val name = toolCall?.string("name") ?: return emptyList()
-        if (name != "Agent") return emptyList()
-        val toolCallId = toolCall.string("tool_call_id") ?: delta.string("tool_call_id") ?: return emptyList()
+    ) {
+        val name = toolCall?.string("name") ?: return
+        if (name != "Agent") return
+        val toolCallId = toolCall.string("tool_call_id") ?: delta.string("tool_call_id") ?: return
         val arguments = toolCall["arguments"]?.toString() ?: delta["arguments"]?.toString()
         subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
-        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_STARTED)
     }
 
     private fun processAgentReturn(
         delta: JsonObject,
         toolCall: JsonObject?,
         parent: ParentContext,
-    ): List<ServerFrame> {
-        val toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id") ?: return emptyList()
+    ) {
+        val toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id") ?: return
         subagentCorrelator.onDispatchReturn(toolCallId, parent)
-        return buildSubagentsUpdatedIfChanged(toolCallId, SUBAGENT_REASON_DISPATCHED)
     }
 
     private fun observeChildActivity(streamDelta: AppServerInboundFrame.StreamDelta) {
@@ -471,35 +458,6 @@ internal class IrohObserverIngestor(
         return received.copy(frame = frame, raw = raw)
     }
 
-    /**
-     * The client correlator's own `subagents_updated`. RULE (letta-mobile-fxoew.2):
-     * a host that advertises [SUBAGENT_PUSH_CAPABILITY] is authoritative and
-     * this emits nothing; against older hosts it stays the only live source.
-     * Kept in place for those hosts; a later cleanup deletes it.
-     */
-    private fun buildSubagentsUpdatedIfChanged(
-        changedToolCallId: String,
-        reason: String,
-    ): List<ServerFrame> {
-        if (hostPushesSubagents) return emptyList()
-        val revision = subagentCorrelator.revision
-        if (revision == lastEmittedSubagentRevision) return emptyList()
-        lastEmittedSubagentRevision = revision
-        val snapshot = subagentCorrelator.snapshot()
-        val changed = snapshot.firstOrNull { it.toolCallId == changedToolCallId }
-        val nowIso = nowIso()
-        return listOf(
-            ServerFrame.SubagentsUpdated(
-                id = frameId("subagents_updated"),
-                ts = nowIso,
-                reason = reason,
-                subagent = changed,
-                subagentsActive = snapshot,
-                at = nowIso,
-            ),
-        )
-    }
-
     fun currentSubagentScope(): SubagentRpcScope? {
         val conversationId = viewedConversationId ?: return null
         val agentId = turnRegistry.getActiveTurn(IrohConversationId(conversationId))?.agentId
@@ -511,7 +469,6 @@ internal class IrohObserverIngestor(
         resubscribeJob = null
         subagentCorrelator.reset()
         engineOwnedSkipTelemetry.endTurn()
-        lastEmittedSubagentRevision = 0L
     }
 
     private fun conversationIdFromMessageListPath(path: String): String? {
@@ -553,18 +510,10 @@ internal class IrohObserverIngestor(
             com.letta.mobile.data.runtime.PermissionModeRpc.FRAME_TYPE,
         )
 
-        /** Mirrors ControllerSubagentRegistrySource.PUSH_CAPABILITY on the host (not imported across layers). */
-        internal const val SUBAGENT_PUSH_CAPABILITY = "subagent_registry_push_v1"
-
         /** Longer than the engine's settle window (1.5 s), so a healthy engine always wins. */
         internal const val OBSERVER_TERMINAL_GRACE_MS = 3_000L
         private val DEVICE_PUSH_JSON = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
-        internal const val SUBAGENT_REASON_STARTED = "started"
-        internal const val SUBAGENT_REASON_DISPATCHED = "dispatched"
-
-        private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
-        private fun nowIso(): String = Instant.now().toString()
 
         private fun JsonObject.string(key: String): String? =
             this[key]?.jsonPrimitive?.contentOrNull

@@ -61,13 +61,19 @@ class LocalAppServerStoppedException :
  * after the [policy] backoff; giving up waits for [forceRestart]. Our own stops and clean exits
  * never restart. [onSuspended]/[onResumed] keep a laptop sleep from counting as crashes.
  *
+ * Single launch (letta-mobile-by4vm.110.5, decision D3): a [LocalAppServerLauncher.singleLaunch]
+ * launcher can run the server once per OS process (Android runs node in-process, and `node::Start` cannot run
+ * twice). The host then keeps the server when the last lease closes, leaves a live one alone on
+ * [forceRestart], and never restarts it: any exit gives up with [RESTART_THE_APP], since only a
+ * new app process can start it again.
+ *
  * Locking: [lifecycle] serialises starting and stopping the server; [lock] guards the crash
  * bookkeeping and is never held while waiting on [lifecycle].
  */
 @Suppress("TooManyFunctions") // One supervisor: lease, lifecycle and crash handling share the same state.
 class LocalAppServerHost(
     private val launcher: LocalAppServerLauncher,
-    private val launch: () -> LocalAppServerLaunch,
+    private val launch: suspend () -> LocalAppServerLaunch,
     private val readyz: suspend (serverUrl: String) -> Boolean,
     private val scope: CoroutineScope,
     private val logLine: (String) -> Unit = {},
@@ -81,6 +87,7 @@ class LocalAppServerHost(
         var stoppedByUs: Boolean = false
     }
 
+    private val singleLaunch = launcher.singleLaunch
     private val lifecycle = Mutex()
     private val lock = SynchronizedObject()
     private val stderr = StderrRing()
@@ -130,6 +137,7 @@ class LocalAppServerHost(
 
     /** The user pressed Force restart: forget past crashes, stop the server, start a fresh one. */
     fun forceRestart() {
+        if (singleLaunch && isRunning) return
         synchronized(lock) {
             cancelPendingRestart()
             policy.reset()
@@ -248,7 +256,7 @@ class LocalAppServerHost(
 
     private fun release() {
         // Never below zero: a lease may outlive close(), which drops every claim at once.
-        if (owners.updateAndGet { maxOf(it - 1, 0) } > 0) return
+        if (owners.updateAndGet { maxOf(it - 1, 0) } > 0 || singleLaunch) return
         scope.launch { lifecycle.withLock { if (owners.value == 0) stopLocked() } }
     }
 
@@ -282,7 +290,7 @@ class LocalAppServerHost(
         synchronized(lock) {
             val recent = stderr.snapshot()
             val inUse = owners.value > 0
-            val decision = if (inUse) policy.onExit(clockMs(), exit) else RuntimeCrashDecision.Ignore("no lease holders")
+            val decision = crashDecision(exit, inUse)
             logLine("[supervisor] runtime exited unexpectedly (exit=${exit.exitCode}); decision=$decision")
             recent.forEach { logLine("[supervisor] stderr: $it") }
             _health.update {
@@ -295,7 +303,7 @@ class LocalAppServerHost(
                     restartPending = decision is RuntimeCrashDecision.Restart,
                     gaveUp = decision is RuntimeCrashDecision.GiveUp,
                     stoppedUnexpectedly = inUse,
-                    lastError = error ?: it.lastError,
+                    lastError = error ?: RESTART_THE_APP.takeIf { singleLaunch } ?: it.lastError,
                 )
             }
             if (decision is RuntimeCrashDecision.Restart) {
@@ -306,6 +314,13 @@ class LocalAppServerHost(
                 }
             }
         }
+    }
+
+    /** Caller holds [lock]. A single-launch server can never start again in this process. */
+    private fun crashDecision(exit: RuntimeExit, inUse: Boolean): RuntimeCrashDecision = when {
+        singleLaunch -> RuntimeCrashDecision.GiveUp(policy.consecutiveCrashes)
+        inUse -> policy.onExit(clockMs(), exit)
+        else -> RuntimeCrashDecision.Ignore("no lease holders")
     }
 
     private suspend fun restartNow() {
@@ -345,6 +360,10 @@ class LocalAppServerHost(
         /** The capability-token file inside the backend directory. */
         const val TOKEN_FILE_NAME: String = "ws-token"
         const val DEFAULT_READY_TIMEOUT_MS: Long = 30_000L
+
+        /** Why a single-launch host gave up: the server ran once in this process and cannot run again. */
+        const val RESTART_THE_APP: String =
+            "The on-device runtime stopped and cannot start again in this app run. Restart the app."
         private const val READY_POLL_MS = 100L
         private const val EXIT_WAIT_MS = 2_000L
         private const val TOKEN_BYTES = 32

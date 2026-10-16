@@ -25,7 +25,10 @@ import javax.inject.Singleton
  *    the event in the self-hosted Sentry UI.
  *  - On app start, read any prior record and expose it as a StateFlow for
  *    the UI to surface (e.g. via a Snackbar with a "Copy id" action).
- *  - Allow dismissal, which deletes the on-disk record.
+ *  - Surface each crash at most once: dismissal records the crash's
+ *    timestamp in a sidecar marker so later launches stay quiet until a
+ *    newer crash is persisted. The diagnostic record itself stays on disk
+ *    and remains readable via [readDiagnosticRecord].
  *
  * Motivation:
  *   Emmanuel reported that when the agent chat crashed on scroll-up,
@@ -48,8 +51,15 @@ class CrashReporter @Inject constructor(
     private val _lastCrash = MutableStateFlow<LastCrash?>(null)
     val lastCrash: StateFlow<LastCrash?> = _lastCrash.asStateFlow()
 
+    private val crashDir: File
+        get() = File(context.filesDir, CRASH_DIR).apply { mkdirs() }
+
     private val crashFile: File
-        get() = File(File(context.filesDir, CRASH_DIR).apply { mkdirs() }, CRASH_FILE)
+        get() = File(crashDir, CRASH_FILE)
+
+    /** Holds the timestamp of the last crash already surfaced to the user. */
+    private val surfacedFile: File
+        get() = File(crashDir, SURFACED_FILE)
 
     /**
      * Install the global uncaught-exception handler. Chains the previous
@@ -58,9 +68,10 @@ class CrashReporter @Inject constructor(
      * fallback summary on the way out.
      */
     fun install() {
-        // Load any prior record into the StateFlow synchronously so the UI
-        // can show it as soon as composition starts.
-        loadFromDiskInto(_lastCrash)
+        // Publish a prior record synchronously so the UI can show it as soon
+        // as composition starts, but only if it has not been surfaced yet.
+        _lastCrash.value = readDiagnosticRecord()
+            ?.takeIf { it.timestamp > readSurfacedTimestamp() }
 
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -73,10 +84,33 @@ class CrashReporter @Inject constructor(
         }
     }
 
-    /** Dismiss this session's notification without deleting the diagnostic record. */
+    /**
+     * Dismiss the notification without deleting the diagnostic record, and
+     * remember that this crash was surfaced so later launches do not re-show it.
+     */
     fun dismiss() {
+        val shown = _lastCrash.value ?: return
         _lastCrash.value = null
+        runCatching { surfacedFile.writeText(shown.timestamp.toString()) }
+            .onFailure { Log.w(TAG, "Failed to record surfaced crash", it) }
     }
+
+    /** The most recent persisted crash, whether or not it was already surfaced. */
+    fun readDiagnosticRecord(): LastCrash? {
+        val file = crashFile
+        if (!file.exists()) return null
+        return try {
+            parseRecord(JSONObject(file.readText()))
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to parse prior crash record, discarding", t)
+            runCatching { file.delete() }
+            null
+        }
+    }
+
+    private fun readSurfacedTimestamp(): Long =
+        runCatching { surfacedFile.takeIf { it.exists() }?.readText()?.trim()?.toLong() }
+            .getOrNull() ?: Long.MIN_VALUE
 
     private fun persistCrash(thread: Thread, throwable: Throwable) {
         val sentryId = runCatching { Sentry.getLastEventId().toString() }
@@ -109,30 +143,21 @@ class CrashReporter @Inject constructor(
         crashFile.writeText(json.toString())
     }
 
-    private fun loadFromDiskInto(sink: MutableStateFlow<LastCrash?>) {
-        val file = crashFile
-        if (!file.exists()) return
-        try {
-            val json = JSONObject(file.readText())
-            sink.value = LastCrash(
-                timestamp = json.optLong("timestamp"),
-                threadName = json.optString("threadName"),
-                type = json.optString("type"),
-                message = json.optString("message"),
-                stackHead = json.optString("stackHead"),
-                sentryEventId = json.optString("sentryEventId", "")
-                    .takeIf { it.isNotBlank() && it != "null" },
-            )
-        } catch (t: Throwable) {
-            Log.w(TAG, "Failed to parse prior crash record, discarding", t)
-            runCatching { file.delete() }
-        }
-    }
+    private fun parseRecord(json: JSONObject): LastCrash = LastCrash(
+        timestamp = json.optLong("timestamp"),
+        threadName = json.optString("threadName"),
+        type = json.optString("type"),
+        message = json.optString("message"),
+        stackHead = json.optString("stackHead"),
+        sentryEventId = json.optString("sentryEventId", "")
+            .takeIf { it.isNotBlank() && it != "null" },
+    )
 
     private companion object {
         const val TAG = "CrashReporter"
         const val CRASH_DIR = "crash"
         const val CRASH_FILE = "last.json"
+        const val SURFACED_FILE = "last-surfaced"
         const val SCHEMA_VERSION = 1
         const val STACK_HEAD_LINES = 20
         const val MAX_MESSAGE_LEN = 512

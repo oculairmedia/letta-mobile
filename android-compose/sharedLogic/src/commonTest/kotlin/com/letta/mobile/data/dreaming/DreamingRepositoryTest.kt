@@ -142,11 +142,6 @@ class DreamingRepositoryTest {
             DreamOutcome.Unsupported(DreamUnsupportedReason.NoNativeAppServer),
             failing("capability_unavailable: 'reflection.get' has no injected 'native App Server client' service on this controller").settings(onDefault),
         )
-        // The message hosts sent before this change.
-        assertEquals(
-            DreamOutcome.Unsupported(DreamUnsupportedReason.NoNativeAppServer),
-            failing("reflection settings require the native App Server client").settings(onDefault),
-        )
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.RuntimeTooOld), failing("capability_unavailable: this App Server has no /dream").runNow(onDefault))
         assertEquals(DreamOutcome.Unsupported(DreamUnsupportedReason.NoConnection), failing("admin_rpc is not supported by this transport").settings(onDefault))
         assertEquals("the App Server did not answer", assertIs<DreamOutcome.Failed>(failing("dream_failed: the App Server did not answer").runNow(onDefault)).message)

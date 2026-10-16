@@ -97,7 +97,6 @@
     <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "msg-1", contentRaw = JsonPrimitive("I"), runId = "run-app")))</ID>
     <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = false))</ID>
     <ID>MaxLineLength:WsChatSendCoordinatorTest.kt$WsChatSendCoordinatorTest$coordinator.handleEvent(WsTimelineEvent.TurnStarted(turnId = "turn-2", agentId = "agent-1", conversationId = "conv-default-agent-1", runId = "run-2"))</ID>
-    <ID>NestedBlockDepth:AdminChatA2uiCoordinator.kt$AdminChatA2uiCoordinator$fun syncA2uiHistorySnapshot( conversationId: String, messages: List&lt;A2uiMessage&gt;, ): Map&lt;String, A2uiSurfaceState&gt;</ID>
     <ID>NewLineAtEndOfFile:SharedChatHaptics.kt$com.letta.mobile.feature.chat.screen.shared.SharedChatHaptics.kt</ID>
     <ID>NewLineAtEndOfFile:SharedChatRichMarkdown.kt$com.letta.mobile.feature.chat.screen.shared.SharedChatRichMarkdown.kt</ID>
     <ID>NewLineAtEndOfFile:SharedRichMarkdownScreenshotTest.kt$com.letta.mobile.feature.chat.SharedRichMarkdownScreenshotTest.kt</ID>
@@ -122,7 +121,6 @@
     <ID>TooGenericExceptionCaught:ProjectChatCoordinator.kt$ProjectChatCoordinator$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SharedNavDrawerViewModel.kt$SharedNavDrawerViewModel$error: Exception</ID>
     <ID>TooGenericExceptionCaught:TimelineSendCoordinator.kt$TimelineSendCoordinator$e: Exception</ID>
-    <ID>TooManyFunctions:AdminChatA2uiCoordinator.kt$AdminChatA2uiCoordinator</ID>
     <ID>TooManyFunctions:AdminChatActions.kt$AdminChatActions : ChatExtensionActions</ID>
     <ID>TooManyFunctions:AdminChatComposerCoordinator.kt$AdminChatComposerCoordinator</ID>
     <ID>TooManyFunctions:AdminChatViewModel.kt$AdminChatViewModel : ViewModel</ID>

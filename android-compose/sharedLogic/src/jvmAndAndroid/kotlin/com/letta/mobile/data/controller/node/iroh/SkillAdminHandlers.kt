@@ -4,7 +4,10 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 /**
@@ -76,6 +79,7 @@ object SkillAdminHandlers {
         }
         router.register("skill.uninstall") { params ->
             val skillName = params.requireParam(AdminParamKey("name"))
+            refuseReadOnly(skillsListing, skillName)
             val result = NativeAdmin.require(nativeClient, NativeAdminOp.SkillUninstall) { c ->
                 val response = c.skillDisable(
                     AppServerCommand.SkillDisable(
@@ -101,20 +105,37 @@ object SkillAdminHandlers {
                     "SkillsListingSource backed by host skill-root enumeration to enable this method.",
             )
         }
+        // Read first: a host-backed source re-reads its root here, which is what
+        // hydrates it on the first listing.
+        val current = skillsListing.currentSkills()
         val hydrated = skillsListing.isHydrated()
         // Cold start: report an explicitly non-authoritative empty listing so the
         // UI can wait, instead of claiming hydrated=true over an invented catalog.
-        val skills = if (hydrated) {
-            skillsListing.currentSkills() ?: JsonArray(emptyList())
-        } else {
-            JsonArray(emptyList())
-        }
+        val skills = if (hydrated) current ?: JsonArray(emptyList()) else JsonArray(emptyList())
         return buildJsonObject {
             put("skills", skills)
             put("hydrated", hydrated)
             put("stale", skillsListing.isStale())
             put("catalog_source", skillsListing.catalogSource())
         }
+    }
+
+    /**
+     * letta-code can only disable a symlink in its skills root, so a listed skill the
+     * host marked non-controllable is refused here, naming why, instead of round-tripping
+     * to an App Server refusal. A skill the listing does not know is left to letta-code.
+     */
+    private fun refuseReadOnly(skillsListing: SkillsListingSource?, skillName: String) {
+        val entry = skillsListing?.takeIf { it.isHydrated() }?.currentSkills()
+            ?.mapNotNull { it as? kotlinx.serialization.json.JsonObject }
+            ?.firstOrNull { (it["name"] as? JsonPrimitive)?.contentOrNull == skillName }
+            ?: return
+        if ((entry["controllable"] as? JsonPrimitive)?.booleanOrNull == true) return
+        val source = (entry["source"] as? JsonPrimitive)?.contentOrNull ?: "unknown"
+        adminError(
+            "read_only: $skillName ($source source) is not a symlink in letta-code's skills folder, " +
+                "so letta-code cannot disable it. Manage it on disk.",
+        )
     }
 
     private fun resolveSkillPath(params: kotlinx.serialization.json.JsonObject?): String? {
