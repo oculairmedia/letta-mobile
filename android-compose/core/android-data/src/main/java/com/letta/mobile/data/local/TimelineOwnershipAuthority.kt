@@ -89,6 +89,22 @@ class TimelineOwnershipAuthority internal constructor(
         if (Files.exists(statePath(scope))) read(scope).scope.agentId else null
     }
 
+    /**
+     * letta-mobile-by4vm.15: returns the canonical lease for [scope], publishing the Canonical phase
+     * first when the scope has none (unclaimed, Legacy, or an interrupted migration). No history is
+     * copied: the ledger is the only timeline and pages anything it lacks from the server.
+     */
+    suspend fun claimCanonical(scope: TimelineScope): Lease = locked(scope.backendId) { claimLocked(scope) }
+
+    private suspend fun claimLocked(scope: TimelineScope): Lease {
+        val state = if (Files.exists(statePath(scope))) read(scope) else State(scope, 0, Phase.Legacy)
+        check(state.scope == scope) { "Timeline ownership scope mismatch: stored=${state.scope} requested=$scope" }
+        if (state.phase == Phase.Canonical) return Lease(scope, state.epoch, Route.Canonical)
+        val next = State(scope, Math.addExact(state.epoch, 1), Phase.Canonical, CLAIMED_RECEIPT)
+        publish(next)
+        return Lease(scope, next.epoch, Route.Canonical)
+    }
+
     /** Capture before admitting work; a lease is checked again while holding the storage lock. */
     suspend fun acquire(scope: TimelineScope, route: Route): Lease = locked(scope.backendId) {
         val state = read(scope)
@@ -336,7 +352,11 @@ class TimelineOwnershipAuthority internal constructor(
     }.toByteArray()
     private fun digest(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
     private fun hash(bytes: ByteArray) = digest(bytes).joinToString("") { "%02x".format(it.toInt() and 255) }
-    private companion object { const val MAX_STATE = 64 * 1024 }
+    private companion object {
+        const val MAX_STATE = 64 * 1024
+        /** A claim certifies nothing it copied: there is no source, generation or revision. */
+        val CLAIMED_RECEIPT = Receipt(sourceToken = "claimed", targetGeneration = "claimed", targetRevision = 0)
+    }
 }
 
 private fun forceDirectory(path: Path) {

@@ -7,7 +7,6 @@ import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.feature.chat.send.ChatSendStrategy
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
@@ -18,57 +17,75 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 
+/** The repositories and channels a send reaches. */
+internal data class AdminChatSendSources(
+    val conversationRepository: IConversationRepository,
+    val settingsRepository: ISettingsRepository,
+    val sessionManager: SessionManager,
+    val messageRepository: MessageRepository,
+    val slashCommandRepository: com.letta.mobile.data.repository.api.ISlashCommandRepository,
+    val wsChatBridge: WsChatBridge,
+    val runtimeEventOutbox: RuntimeEventOutbox,
+    val clientVersionProvider: ChatClientVersionProvider,
+)
+
+/** The screen state a send updates. */
+internal data class AdminChatSendUi(
+    val uiState: MutableStateFlow<ChatUiState>,
+    val composerController: ChatComposerController,
+    val chatBannerController: ChatBannerController,
+)
+
+/** What the pipeline asks of its screen. */
+internal data class AdminChatSendHooks(
+    val submitApproval: (String, List<String>, Boolean, String?) -> Unit,
+    val backendKind: () -> BackendKind,
+    val activeConversationId: () -> String?,
+    val setActiveConversationId: (String?) -> Unit,
+    val startTimelineObserver: (conversationId: String) -> Unit,
+    /**
+     * Every runtime event this screen's transport produces, as it is recorded. The view model
+     * folds these through the shared run-phase reducer so the registry carries honest phases;
+     * the pipeline itself stays a wire and owns no presence logic.
+     */
+    val runtimeEventObserver: (List<com.letta.mobile.runtime.RuntimeEventDraft>) -> Unit = {},
+)
+
 /**
  * Wires send strategies and the composer coordinator for admin chat.
  */
 internal class AdminChatSendPipeline(
     private val scope: CoroutineScope,
     private val agentId: AgentId,
-    private val isFreshRoute: Boolean,
     private val explicitConversationId: String?,
     private val projectContextAvailable: Boolean,
-    private val conversationRepository: IConversationRepository,
-    private val timelineRepository: TimelineRepository,
-    private val externalTimelineWriter: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter,
-    private val settingsRepository: ISettingsRepository,
-    private val sessionManager: SessionManager,
-    private val messageRepository: MessageRepository,
-    private val slashCommandRepository: com.letta.mobile.data.repository.api.ISlashCommandRepository,
-    private val wsChatBridge: WsChatBridge,
-    private val runtimeEventOutbox: RuntimeEventOutbox,
-    private val clientVersionProvider: ChatClientVersionProvider,
-    private val uiState: MutableStateFlow<ChatUiState>,
-    private val composerController: ChatComposerController,
-    private val chatBannerController: ChatBannerController,
-    private val submitApproval: (String, List<String>, Boolean, String?) -> Unit,
-    private val backendKind: () -> BackendKind,
-    private val activeConversationId: () -> String?,
-    private val setActiveConversationId: (String?) -> Unit,
-    private val startTimelineObserver: (conversationId: String) -> Unit,
+    sources: AdminChatSendSources,
+    ui: AdminChatSendUi,
+    hooks: AdminChatSendHooks,
     private val selectedOwner: SelectedChatSendOwner? = null,
-    /**
-     * Every runtime event this screen's transport produces, as it is recorded. The view model
-     * folds these through the shared run-phase reducer so the registry carries honest phases;
-     * the pipeline itself stays a wire and owns no presence logic.
-     */
-    private val runtimeEventObserver: (List<com.letta.mobile.runtime.RuntimeEventDraft>) -> Unit = {},
 ) {
+    private val conversationRepository = sources.conversationRepository
+    private val settingsRepository = sources.settingsRepository
+    private val sessionManager = sources.sessionManager
+    private val messageRepository = sources.messageRepository
+    private val slashCommandRepository = sources.slashCommandRepository
+    private val wsChatBridge = sources.wsChatBridge
+    private val runtimeEventOutbox = sources.runtimeEventOutbox
+    private val clientVersionProvider = sources.clientVersionProvider
+    private val uiState = ui.uiState
+    private val composerController = ui.composerController
+    private val chatBannerController = ui.chatBannerController
+    private val submitApproval = hooks.submitApproval
+    private val backendKind = hooks.backendKind
+    private val activeConversationId = hooks.activeConversationId
+    private val setActiveConversationId = hooks.setActiveConversationId
+    private val startTimelineObserver = hooks.startTimelineObserver
+    private val runtimeEventObserver = hooks.runtimeEventObserver
+
     suspend fun retireSelectedOwner() { selectedOwner?.retire() }
-    val timelineSendCoordinator: TimelineSendCoordinator by lazy {
-        TimelineSendCoordinator(
-            scope = scope,
-            agentId = agentId.value,
-            isFreshRoute = isFreshRoute,
-            explicitConversationId = explicitConversationId,
-            conversationRepository = conversationRepository,
-            timelineRepository = timelineRepository,
-            uiState = uiState,
-            clearComposerAfterSend = { composerController.clearAfterSend() },
-            activeConversationId = activeConversationId,
-            setActiveConversationId = setActiveConversationId,
-            startTimelineObserver = startTimelineObserver,
-        )
-    }
+    /** The captured runtime's canonical writer; without one a send fails instead of writing nowhere. */
+    private val writer: com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter =
+        selectedOwner?.writer ?: UnboundTimelineWriter
 
     val wsChatSendCoordinator: WsChatSendCoordinator by lazy {
         WsChatSendCoordinator(
@@ -78,7 +95,7 @@ internal class AdminChatSendPipeline(
                 selectedOwner?.let { it.requireCurrent(); it.config } ?: settingsRepository.activeConfig.value
             },
             wsChatBridge = wsChatBridge,
-            timelineRepository = selectedOwner?.writer ?: externalTimelineWriter,
+            timelineRepository = writer,
             conversationRepository = conversationRepository,
             uiState = uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
@@ -105,7 +122,7 @@ internal class AdminChatSendPipeline(
             scope = scope,
             agentId = agentId.value,
             localBackend = { sessionManager.current.localRuntimeBackend },
-            timelineRepository = timelineRepository,
+            timelineRepository = writer,
             uiState = uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
             activeConversationId = activeConversationId,
@@ -120,7 +137,6 @@ internal class AdminChatSendPipeline(
      */
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
-            timelineStrategy = ChatSendStrategy("timeline", timelineSendCoordinator::send),
             localStrategy = ChatSendStrategy("local", localRuntimeChatSendCoordinator::send) {
                 localRuntimeChatSendCoordinator.cancel()
             },
@@ -166,6 +182,11 @@ internal class AdminChatSendPipeline(
             },
             projectContextAvailable = projectContextAvailable,
         )
+    }
+
+    /** A route's initial message goes straight to the backend's send strategy, past the composer's gates. */
+    fun sendInitialMessage(text: String) {
+        chatSendStrategySelector.send(text, emptyList(), composerCoordinator.chatSendContext())
     }
 
     fun ensureEagerInit() {

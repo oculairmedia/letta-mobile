@@ -7,25 +7,19 @@ import kotlinx.coroutines.Job
 
 /**
  * letta-mobile-lgns8.10.4.1: strategy selection keys on the active config's
- * [BackendKind], not on a URL heuristic or on the old `isShimBackend` boolean
- * (which was `true` for Iroh and therefore routed the production transport
- * down the shim-shaped path).
+ * [BackendKind], not on a URL heuristic.
  *
- * The mapping is total and exclusive:
- *  - [BackendKind.LOCAL_RUNTIME] -> the `local` route
- *  - [BackendKind.IROH]          -> the `iroh` route
- *  - [BackendKind.DIRECT_WS]     -> the `timeline` route
+ *  - [BackendKind.LOCAL_RUNTIME] (or a local-bound agent) -> the `local` route
+ *  - [BackendKind.IROH] and [BackendKind.DIRECT_WS]       -> the `iroh` route
  *
- * letta-mobile-by4vm.26: [BackendKind.DIRECT_WS] is a live configuration (a Settings "Remote
- * host" with a ws:// App Server address; LettaConfigMigration keeps such addresses), not a
- * shim-era leftover, so its strategy stays. Iroh and direct ws:// therefore still reach the same
- * App Server through two send paths (`iroh` over the frame channel, `timeline` through the
- * timeline repository): a direct ws:// session binds no frame channel (`SessionChannelTransportFactory`
- * gives it a NoOp transport), so collapsing them needs a channel transport for DIRECT_WS first —
- * a wire change tracked on letta-mobile-by4vm.52.
+ * letta-mobile-by4vm.15: the legacy `timeline` route (a send through the in-memory
+ * TimelineRepository) is gone with the legacy timeline. Direct ws:// goes through the same
+ * channel route as Iroh; a direct ws:// session binds a NoOp frame channel
+ * (`SessionChannelTransportFactory`), which refuses the send until letta-mobile-by4vm.52 gives
+ * DIRECT_WS a real channel. The timeline route failed the same send already: its transport has
+ * had no HTTP send since letta-mobile-ckmub.4.
  */
 internal class ChatSendStrategySelector(
-    private val timelineStrategy: ChatSendStrategy,
     private val localStrategy: ChatSendStrategy,
     private val irohStrategy: ChatSendStrategy,
 ) {
@@ -35,8 +29,7 @@ internal class ChatSendStrategySelector(
         context.isLocalRuntime -> localStrategy
         else -> when (context.backendKind) {
             BackendKind.LOCAL_RUNTIME -> localStrategy
-            BackendKind.IROH -> irohStrategy
-            BackendKind.DIRECT_WS -> timelineStrategy
+            BackendKind.IROH, BackendKind.DIRECT_WS -> irohStrategy
         }
     }
 

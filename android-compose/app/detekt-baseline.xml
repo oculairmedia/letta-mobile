@@ -13,7 +13,6 @@
     <ID>DestructuringDeclarationWithTooManyEntries:HomeScreen.kt$val (navigation, routes, backend, title) = spec</ID>
     <ID>LargeClass:ConfigViewModelTest.kt$ConfigViewModelTest</ID>
     <ID>LongMethod:AdminGraph.kt$fun NavGraphBuilder.adminGraph( navController: NavHostController, activeBackendLabel: String?, openBackendSwitcher: () -&gt; Unit, clearAllData: () -&gt; Unit, )</ID>
-    <ID>LongMethod:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$private suspend fun readyLeaseGuarded(target: TimelineScope): TimelineOwnershipAuthority.Lease?</ID>
     <ID>LongMethod:AndroidDeviceSensorSampler.kt$AndroidDeviceSensorSampler$override fun sample( descriptor: SensorDescriptor, sampleCount: Int, timeoutMs: Long, ): SensorSampleResponse</ID>
     <ID>LongMethod:AndroidEmbeddedLettaCodeLaunchSpecTest.kt$AndroidEmbeddedLettaCodeLaunchSpecTest$@Test fun `shared launch spec preserves Android env bridge preload and stream-json fallback parity`()</ID>
     <ID>LongMethod:AndroidLettaCodeRuntimeController.kt$AndroidLettaCodeRuntimeController$private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean</ID>
@@ -52,7 +51,6 @@
     <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$assertEquals("MiniMax-M3", captured.captured.metadata?.get(LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY)?.jsonPrimitive?.contentOrNull)</ID>
     <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$private fun remoteConfig(): LettaConfig</ID>
     <ID>MaxLineLength:AndroidAgentCreatorTest.kt$AndroidAgentCreatorTest$val params = AgentCreateParams(name = "Remote", model = "openai/gpt-4o", toolIds = persistentListOf(ToolId("t1")), includeBaseTools = true)</ID>
-    <ID>MaxLineLength:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$BindResult.Canonical(Binding(coordinator, owner, com.letta.mobile.data.timeline.AdmittedTimelineExternalWriter(writer, admission), admission))</ID>
     <ID>MaxLineLength:AndroidCanonicalTimelineRuntime.kt$AndroidCanonicalTimelineRuntime$check(!retired &amp;&amp; graphScope.coroutineContext[kotlinx.coroutines.Job]?.isActive == true &amp;&amp; scope.backendId == backendId) { "Stale canonical backend generation" }</ID>
     <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))</ID>
     <ID>MaxLineLength:AndroidLettaCodeRuntimeControllerTest.kt$AndroidLettaCodeRuntimeControllerTest$assetExtractor = FakeAssetExtractor(File(System.getProperty("java.io.tmpdir"), "letta-timeout-${System.nanoTime()}").apply { mkdirs() })</ID>
