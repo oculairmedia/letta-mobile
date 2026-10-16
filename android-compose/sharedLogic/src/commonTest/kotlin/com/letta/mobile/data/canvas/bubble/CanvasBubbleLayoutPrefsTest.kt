@@ -17,7 +17,7 @@ class CanvasBubbleLayoutPrefsTest {
     fun platformDefaultsKeepThePhoneAsItWasAndShrinkTheDesktop() {
         assertEquals(120f, CanvasBubbleLayout.Touch.mascotSizeDp)
         assertNull(CanvasBubbleLayout.Touch.composerWidthDp)
-        assertEquals(72f, desktop.mascotSizeDp)
+        assertEquals(96f, desktop.mascotSizeDp)
         assertEquals(640f, desktop.composerWidthDp)
     }
 
@@ -36,6 +36,29 @@ class CanvasBubbleLayoutPrefsTest {
     }
 
     @Test
+    fun theMascotRangeIsLargerAtBothEnds() {
+        // The old 48..200 range was too small at both ends; the bar may be narrower than before.
+        assertEquals(72f, MASCOT_MIN_DP)
+        assertEquals(400f, MASCOT_MAX_DP)
+        assertTrue(COMPOSER_MIN_DP < 360f)
+    }
+
+    @Test
+    fun theBarHeightClampsAndStartsAtOneLine() {
+        val prefs = CanvasBubbleLayoutPrefs(desktop)
+        assertNull(prefs.layout.value.composerHeightDp)
+        assertFalse(prefs.layout.value.composerMultiLine)
+        prefs.setComposerHeight(5f)
+        assertEquals(CanvasBubbleLayout.COMPOSER_HEIGHT_MIN_DP, prefs.layout.value.composerHeightDp)
+        assertFalse(prefs.layout.value.composerMultiLine)
+        prefs.setComposerHeight(9000f)
+        assertEquals(CanvasBubbleLayout.COMPOSER_HEIGHT_MAX_DP, prefs.layout.value.composerHeightDp)
+        assertTrue(prefs.layout.value.composerMultiLine)
+        prefs.reset()
+        assertNull(prefs.layout.value.composerHeightDp)
+    }
+
+    @Test
     fun notANumberKeepsTheCurrentValue() {
         val prefs = CanvasBubbleLayoutPrefs(desktop)
         prefs.setMascotSize(Float.NaN)
@@ -47,7 +70,7 @@ class CanvasBubbleLayoutPrefsTest {
     fun stepsMoveTheMascotByANotchAndStopAtTheEnds() {
         val prefs = CanvasBubbleLayoutPrefs(desktop)
         prefs.stepMascot(2)
-        assertEquals(72f + 2 * CanvasBubbleLayout.MASCOT_STEP_DP, prefs.layout.value.mascotSizeDp)
+        assertEquals(96f + 2 * CanvasBubbleLayout.MASCOT_STEP_DP, prefs.layout.value.mascotSizeDp)
         prefs.stepMascot(-100)
         assertEquals(MASCOT_MIN_DP, prefs.layout.value.mascotSizeDp)
     }
@@ -69,11 +92,12 @@ class CanvasBubbleLayoutPrefsTest {
     @Test
     fun theCodecRoundTripsWhatThePersonSet() {
         val prefs = CanvasBubbleLayoutPrefs(desktop)
-        prefs.setMascotSize(96f)
+        prefs.setMascotSize(240f)
         prefs.setComposerWidth(820f)
+        prefs.setComposerHeight(160f)
         val stored = CanvasBubbleLayoutCodec.encode(prefs.layout.value)
         val reloaded = CanvasBubbleLayoutPrefs(desktop, initial = CanvasBubbleLayoutCodec.decode(stored, desktop))
-        assertEquals(CanvasBubbleLayout(96f, 820f), reloaded.layout.value)
+        assertEquals(CanvasBubbleLayout(240f, 820f, composerHeightDp = 160f), reloaded.layout.value)
     }
 
     @Test
@@ -83,7 +107,7 @@ class CanvasBubbleLayoutPrefsTest {
             CanvasBubbleLayoutCodec.KEY_MASCOT_SIZE to "huge",
             CanvasBubbleLayoutCodec.KEY_COMPOSER_WIDTH to "9999",
         )
-        assertEquals(CanvasBubbleLayout(72f, COMPOSER_FULL_DP), CanvasBubbleLayoutCodec.decode(damaged, desktop))
+        assertEquals(CanvasBubbleLayout(96f, COMPOSER_FULL_DP), CanvasBubbleLayoutCodec.decode(damaged, desktop))
     }
 
     @Test

@@ -100,7 +100,7 @@ private fun secondaryControls(model: ComposerModel): (@Composable () -> Unit)? {
     if (permission == null && usage == null) return null
     return {
         permission?.let { ComposerPermissionModeChip(it, model.actions::setPermissionMode) }
-        usage?.let { ComposerContextChip(it) }
+        usage?.let { ComposerContextIndicator(it) }
     }
 }
 

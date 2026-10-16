@@ -154,7 +154,7 @@ internal fun ComposerErrorRow(message: String, onDismiss: () -> Unit) {
  * space, so typing the first character dims a line instead of shifting the composer. Lifted
  * from desktop's ComposerHintRow.
  *
- * The context chip ([contextUsage]) sits at the line's right end. It does not fade with the hint:
+ * The context indicator ([contextUsage]) sits at the line's right end. It does not fade with the hint:
  * it stays visible, announced and clickable while the draft has text.
  */
 @Composable
@@ -186,6 +186,6 @@ internal fun ComposerHintRow(visible: Boolean, contextUsage: ContextWindowUsageS
                 // Hidden copy must not be announced or hit-tested.
                 .clearAndSetSemantics { },
         )
-        contextUsage?.let { ComposerContextChip(it) }
+        contextUsage?.let { ComposerContextIndicator(it) }
     }
 }

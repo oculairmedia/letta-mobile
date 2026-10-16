@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.ui.chat.ChatColumnMaxWidth
 import com.letta.mobile.ui.mascot.LocalMascotTransport
 import com.letta.mobile.ui.mascot.MascotSeat
 import com.letta.mobile.ui.mascot.MascotStage
@@ -60,7 +59,7 @@ internal fun ComposerCompanionRow(model: ComposerModel, content: @Composable () 
     )
     Row(
         // Order matters: widthIn BEFORE fillMaxWidth, or fillMaxWidth pins min == max and the cap is lost.
-        modifier = Modifier.widthIn(max = ChatColumnMaxWidth + slot).fillMaxWidth(),
+        modifier = Modifier.widthIn(max = composerBarMaxWidth() + slot).fillMaxWidth(),
         verticalAlignment = Alignment.Bottom,
     ) {
         // Kept while it closes, so the bar widens smoothly when the companion leaves the row.

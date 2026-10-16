@@ -10,10 +10,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -29,6 +32,7 @@ import com.letta.mobile.ui.chat.session.ChatDockGeometry
 import com.letta.mobile.ui.chat.session.ChatSessionPort
 import com.letta.mobile.ui.chat.session.ChatSurfaceHost
 import com.letta.mobile.ui.chat.session.ChatSurfacePresentation
+import com.letta.mobile.ui.chat.surface.composer.ComposerTestTags
 import com.letta.mobile.ui.mascot.FakeMascotShell
 import kotlin.math.abs
 import kotlin.test.Test
@@ -96,6 +100,26 @@ class CanvasBubbleLayoutUiTest {
 
     private fun ComposeUiTest.barWidthDp(): Float = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot().let { (it.right - it.left).value }
 
+    private fun ComposeUiTest.mascotWidthDp(): Float =
+        onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).getBoundsInRoot().let { (it.right - it.left).value }
+
+    private fun ComposeUiTest.barHeightDp(): Float =
+        onNodeWithTag(ComposerTestTags.DOCKED_BAR).getBoundsInRoot().let { (it.bottom - it.top).value }
+
+    private fun ComposeUiTest.layoutButtonRevealed(): Boolean? =
+        onNodeWithTag(BUBBLE_LAYOUT_BUTTON_TAG).fetchSemanticsNode().config.getOrNull(LayoutButtonRevealedKey)
+
+    /** Presses [tag]'s handle, drags it by [by] px in a few moves, and lets go. */
+    private fun ComposeUiTest.dragHandle(tag: String, by: Offset) {
+        onNodeWithTag(tag, useUnmergedTree = true).performMouseInput {
+            moveTo(center)
+            press()
+            repeat(DRAG_STEPS) { moveBy(by / DRAG_STEPS.toFloat()) }
+            release()
+        }
+        settle()
+    }
+
     private fun ComposeUiTest.openMenu() {
         onNodeWithTag(BUBBLE_LAYOUT_BUTTON_TAG).performClick()
         settle()
@@ -109,8 +133,75 @@ class CanvasBubbleLayoutUiTest {
     fun theDesktopDefaultsDrawASmallMascotOverANarrowBar() = runComposeUiTest {
         show(CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop))
         assertNear(640f, barWidthDp(), "bar")
-        val mascot = onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).getBoundsInRoot()
-        assertNear(72f, (mascot.right - mascot.left).value, "mascot")
+        assertNear(96f, mascotWidthDp(), "mascot")
+    }
+
+    @Test
+    fun theMascotSliderReachesTheLargerRangeAndClampsAtItsEnds() = runComposeUiTest {
+        val prefs = CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop)
+        show(prefs)
+        openMenu()
+        onNodeWithTag(BUBBLE_LAYOUT_MASCOT_SLIDER_TAG).performSemanticsAction(SemanticsActions.SetProgress) { it(10_000f) }
+        settle()
+        assertEquals(CanvasBubbleLayout.MASCOT_MAX_DP, prefs.layout.value.mascotSizeDp)
+        assertNear(CanvasBubbleLayout.MASCOT_MAX_DP, mascotWidthDp(), "largest mascot")
+        onNodeWithTag(BUBBLE_LAYOUT_MASCOT_SLIDER_TAG).performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
+        settle()
+        assertNear(CanvasBubbleLayout.MASCOT_MIN_DP, mascotWidthDp(), "smallest mascot")
+    }
+
+    @Test
+    fun theLayoutButtonIsHiddenUntilThePointerIsOverTheMascot() = runComposeUiTest {
+        show(CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop))
+        waitUntil(timeoutMillis = WAIT_MILLIS) { layoutButtonRevealed() == false }
+
+        onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).performMouseInput { moveTo(center) }
+        settle()
+        assertEquals(true, layoutButtonRevealed(), "shown while the pointer is over the mascot")
+
+        // Off the mascot it lingers long enough to be reached, then goes.
+        onRoot().performMouseInput { moveTo(Offset(1f, 1f)) }
+        settle(BubbleLayoutDimens.REVEAL_LINGER_MS / 2)
+        assertEquals(true, layoutButtonRevealed(), "still there on the way to it")
+        settle(BubbleLayoutDimens.REVEAL_LINGER_MS)
+        assertEquals(false, layoutButtonRevealed(), "gone once the pointer left")
+    }
+
+    @Test
+    fun keyboardFocusRevealsTheLayoutButton() = runComposeUiTest {
+        show(CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop))
+        waitUntil(timeoutMillis = WAIT_MILLIS) { layoutButtonRevealed() == false }
+        onNodeWithTag(BUBBLE_LAYOUT_BUTTON_TAG).performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        assertEquals(true, layoutButtonRevealed(), "shown while focused")
+    }
+
+    @Test
+    fun draggingTheTopEdgeMakesThePromptTallerAndClampsToTheCanvas() = runComposeUiTest {
+        val prefs = CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop)
+        show(prefs)
+        val before = barHeightDp()
+        dragHandle(BUBBLE_HEIGHT_HANDLE_TOP_TAG, Offset(0f, -100f * density.density))
+        val grown = prefs.layout.value.composerHeightDp ?: 0f
+        assertTrue(grown > CanvasBubbleLayout.COMPOSER_HEIGHT_MIN_DP, "the field is taller: $grown")
+        assertTrue(barHeightDp() > before + 40f, "the bar grew from $before to ${barHeightDp()}")
+
+        // Far past the top of the canvas: it stops inside it, never past the range.
+        dragHandle(BUBBLE_HEIGHT_HANDLE_TOP_TAG, Offset(0f, -5_000f * density.density))
+        val tallest = prefs.layout.value.composerHeightDp ?: 0f
+        assertTrue(tallest <= CanvasBubbleLayout.COMPOSER_HEIGHT_MAX_DP, "within the range: $tallest")
+        val dock = onNodeWithTag(DOCK_PANEL_TAG).getBoundsInRoot()
+        assertTrue(dock.top.value >= 0f, "the dock stays on the canvas: $dock")
+    }
+
+    @Test
+    fun theBarNarrowsBelowTheOldMinimumAndStopsAtTheNewOne() = runComposeUiTest {
+        val prefs = CanvasBubbleLayoutPrefs(CanvasBubbleLayout.Desktop)
+        show(prefs)
+        dragHandle(BUBBLE_WIDTH_HANDLE_RIGHT_TAG, Offset(-2_000f * density.density, 0f))
+        assertEquals(CanvasBubbleLayout.COMPOSER_MIN_DP, prefs.layout.value.composerWidthDp)
+        assertNear(CanvasBubbleLayout.COMPOSER_MIN_DP, barWidthDp(), "narrowest bar")
+        assertTrue(barWidthDp() < 360f, "narrower than the old 360dp floor")
     }
 
     @Test
@@ -136,7 +227,7 @@ class CanvasBubbleLayoutUiTest {
         onNodeWithTag(BUBBLE_LAYOUT_RESET_TAG).performClick()
         settle()
         mascot = onNodeWithTag(DOCK_COLLAPSED_MASCOT_TAG).getBoundsInRoot()
-        assertNear(72f, (mascot.right - mascot.left).value, "mascot after reset")
+        assertNear(96f, (mascot.right - mascot.left).value, "mascot after reset")
         assertEquals(CanvasBubbleLayout.Desktop, prefs.layout.value)
     }
 
@@ -149,8 +240,8 @@ class CanvasBubbleLayoutUiTest {
         onNodeWithTag(BUBBLE_WIDTH_HANDLE_RIGHT_TAG, useUnmergedTree = true).performMouseInput {
             moveTo(center)
             press()
-            moveBy(androidx.compose.ui.geometry.Offset(travelPx / 2f, 0f))
-            moveBy(androidx.compose.ui.geometry.Offset(travelPx / 2f, 0f))
+            moveBy(Offset(travelPx / 2f, 0f))
+            moveBy(Offset(travelPx / 2f, 0f))
             release()
         }
         settle()
@@ -191,5 +282,7 @@ class CanvasBubbleLayoutUiTest {
     private companion object {
         const val AGENT = "agent-1"
         const val SETTLE_MILLIS = 2_000L
+        const val WAIT_MILLIS = 5_000L
+        const val DRAG_STEPS = 4
     }
 }

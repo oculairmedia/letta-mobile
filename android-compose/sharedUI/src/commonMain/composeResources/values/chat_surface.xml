@@ -51,6 +51,8 @@
     <string name="chat_surface_bubble_layout">Bubble layout</string>
     <string name="chat_surface_bubble_layout_mascot">Mascot size</string>
     <string name="chat_surface_bubble_layout_width">Text box width</string>
+    <string name="chat_surface_bubble_layout_height">Text box height</string>
+    <string name="chat_surface_bubble_layout_one_line">One line</string>
     <string name="chat_surface_bubble_layout_hold">Reply bubble stays for</string>
     <string name="chat_surface_bubble_layout_reset">Reset</string>
     <string name="chat_surface_bubble_layout_full">Full</string>
@@ -59,4 +61,5 @@
     <string name="chat_surface_bubble_layout_dp">%1$d dp</string>
     <string name="chat_surface_bubble_layout_seconds">%1$d s</string>
     <string name="chat_surface_bubble_layout_resize">Resize the text box</string>
+    <string name="chat_surface_bubble_layout_resize_height">Resize the text box height</string>
 </resources>
