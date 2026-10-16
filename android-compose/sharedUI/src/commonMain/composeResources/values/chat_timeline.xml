@@ -3,10 +3,8 @@
     <!-- letta-mobile-bglj6.1: the shared chat timeline's strings. Every name starts with timeline_. -->
 
     <!-- Content phases -->
-    <string name="timeline_loading_conversation">Loading conversation…</string>
     <string name="timeline_error_title">Something went wrong</string>
     <string name="timeline_retry">Retry</string>
-    <string name="timeline_no_messages">No messages yet</string>
     <string name="timeline_welcome_greeting">Hi, I’m %1$s</string>
     <string name="timeline_welcome_default_agent">your agent</string>
     <string name="timeline_welcome_subtitle">Ask a question, paste an error, or point me at a repo.</string>
@@ -28,11 +26,6 @@
     <string name="timeline_thinking_elapsed">%1$s  %2$s</string>
     <string name="timeline_today">Today</string>
     <string name="timeline_yesterday">Yesterday</string>
-    <string name="timeline_tool_calls_count">%1$d tool calls</string>
-    <string name="timeline_tool_group_expand">Expand tool calls</string>
-    <string name="timeline_tool_group_collapse">Collapse tool calls</string>
-    <string name="timeline_expanded">Expanded</string>
-    <string name="timeline_collapsed">Collapsed</string>
     <string name="timeline_font_scale_percent">%1$d%</string>
 
     <!-- A2UI -->

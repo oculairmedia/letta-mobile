@@ -4,7 +4,6 @@ import android.content.Context
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LettaConfigMigration
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -26,7 +25,6 @@ class AutomationAuthBootstrapTest {
     private lateinit var stagingPrefs: android.content.SharedPreferences
     private val savedConfigs = mutableListOf<LettaConfig>()
     private var activeConfig: LettaConfig? = null
-    private var clientModeSettings: AutomationAuthBootstrap.AutomationClientModeSettings? = null
 
     @Before
     fun setUp() {
@@ -35,7 +33,6 @@ class AutomationAuthBootstrapTest {
         stagingPrefs.edit().clear().commit()
         savedConfigs.clear()
         activeConfig = null
-        clientModeSettings = null
     }
 
     @After
@@ -58,23 +55,6 @@ class AutomationAuthBootstrapTest {
         assertEquals("wss://demo.letta.internal/ws", activeConfig?.serverUrl)
         assertEquals("test-token", activeConfig?.accessToken)
         assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
-    }
-
-    @Test
-    fun importPendingConfig_aRetiredCloudPayloadBecomesARemoteHostToSetUp() = runBlocking {
-        // letta-mobile-ckmub.9: no Letta Cloud backend; the migration drops its address and key.
-        stagePayload(
-            """
-            {"serverUrl":"https://api.letta.com","accessToken":"cloud-key","mode":"CLOUD"}
-            """.trimIndent(),
-        )
-
-        AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
-
-        assertEquals(LettaConfig.Mode.SELF_HOSTED, activeConfig?.mode)
-        assertEquals("", activeConfig?.serverUrl)
-        assertNull(activeConfig?.accessToken)
-        assertEquals(LettaConfigMigration.CLOUD_NOTICE, activeConfig?.migrationNotice)
     }
 
     @Test
@@ -149,32 +129,6 @@ class AutomationAuthBootstrapTest {
         )
         AutomationAuthBootstrap.importPendingConfig(context, ::recordConfig)
         assertEquals("wss://demo.letta.internal", activeConfig?.serverUrl)
-    }
-
-    @Test
-    fun importPendingConfig_promotesClientModeSettingsWhenPresent() = runBlocking {
-        stagePayload(
-            """
-            {
-              "serverUrl":"https://demo.letta.internal",
-              "accessToken":"test-token",
-              "clientModeEnabled":true,
-              "clientModeBaseUrl":" ws://192.168.50.90:8407/api/v1/agent-gateway/ ",
-              "clientModeApiKey":" gateway-token "
-            }
-            """.trimIndent(),
-        )
-
-        AutomationAuthBootstrap.importPendingConfig(
-            context = context,
-            saveConfig = ::recordConfig,
-            saveClientModeSettings = { settings -> clientModeSettings = settings },
-        )
-
-        assertEquals(true, clientModeSettings?.enabled)
-        assertEquals("ws://192.168.50.90:8407/api/v1/agent-gateway", clientModeSettings?.baseUrl)
-        assertEquals("gateway-token", clientModeSettings?.apiKey)
-        assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.ui.chat.session.ChatPermissionModeTarget
 import com.letta.mobile.ui.chat.session.ChatWorkingDirectoryTarget
@@ -26,7 +27,7 @@ internal fun DesktopChatGateway?.workingDirectoryTarget(conversation: DesktopCon
  * govern modes or the conversation has no agent yet.
  */
 internal fun DesktopChatGateway?.permissionModeTarget(conversation: DesktopConversationSummary?): ChatPermissionModeTarget? {
-    val modes = this as? DesktopPermissionModeController ?: return null
+    val modes = this as? PermissionModeGateway ?: return null
     val agentId = conversation?.agentId?.takeIf(String::isNotBlank) ?: return null
     return ChatPermissionModeTarget(modes, AppServerRuntimeScope(agentId, conversation.id))
 }

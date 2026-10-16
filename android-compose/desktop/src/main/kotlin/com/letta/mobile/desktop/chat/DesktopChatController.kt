@@ -79,7 +79,6 @@ class DesktopChatController(
     // PATCHes the server so this lights up automatically once the backend lands.
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
-    private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
     /** Window-scoped run state; every conversation this window drives publishes its phase here. */
     private val runRegistry: ConversationRunRegistry = ConversationRunRegistry(),
     private val loopFactory: suspend (
@@ -87,7 +86,7 @@ class DesktopChatController(
         conversation: DesktopConversationSummary,
         scope: CoroutineScope,
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
-        RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
+        RealDesktopTimelineLoop(gateway, conversation, loopScope)
     },
     /**
      * letta-mobile-lks7m: the transport carrying Meridian's `conversation_updated` pushes. When set,
@@ -1155,7 +1154,7 @@ class DesktopChatController(
     }
 
     /**
-     * Installed by the dev-gated writer host only; null keeps the existing desktop route.
+     * Installed by the canonical host on Iroh backends; null keeps the in-memory timeline loop.
      *
      * The request carries the transport because per-conversation routing lives here, not in the
      * host: a default-shim conversation is served by a different transport than the gateway, and a

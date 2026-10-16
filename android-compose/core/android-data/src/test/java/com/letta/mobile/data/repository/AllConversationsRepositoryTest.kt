@@ -349,22 +349,6 @@ class AllConversationsRepositoryTest {
     }
 
     @Test
-    fun `countConversations compatibility shim does not fetch`() = runTest {
-        repeat(125) { index ->
-            fakeApi.conversations.add(TestData.conversation(id = "conv-$index"))
-        }
-        repository.refresh()
-        fakeApi.calls.clear()
-        fakeApi.listLimits.clear()
-
-        val count = repository.countConversations()
-
-        assertEquals(50, count)
-        assertTrue(fakeApi.calls.none { it == "listConversations" })
-        assertTrue(fakeApi.listLimits.isEmpty())
-    }
-
-    @Test
     fun `empty refresh response is fresh and exact zero estimate`() = runTest {
         repository.refresh()
         fakeApi.calls.clear()

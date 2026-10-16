@@ -228,7 +228,7 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew --no-daemon detekt -Parch
 #    - what behavior changes
 #    - how the regression test exercises it
 #    - which transport / module surface it touches (mobile, desktop,
-#      iroh, appserver, shim)
+#      iroh, appserver)
 #    - whether it requires a matched wrapper + APK deploy (only when
 #      touching `sharedLogic` App Server transport)
 

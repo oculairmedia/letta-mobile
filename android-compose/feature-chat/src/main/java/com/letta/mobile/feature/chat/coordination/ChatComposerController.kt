@@ -15,22 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/**
- * Legacy aliases for [AttachmentLimits.Default]. Prefer the injected
- * [AttachmentLimits] for per-call configurability.
- */
-@Deprecated(
-    "Read from injected AttachmentLimits.maxAttachmentCount instead.",
-    ReplaceWith("AttachmentLimits.Default.maxAttachmentCount"),
-)
-const val MAX_COMPOSER_ATTACHMENTS = 4
-
-@Deprecated(
-    "Read from injected AttachmentLimits.maxTotalBase64Bytes instead.",
-    ReplaceWith("AttachmentLimits.Default.maxTotalBase64Bytes"),
-)
-const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
-
 @Immutable
 internal data class ChatComposerState(
     val inputText: String = "",
@@ -71,7 +55,7 @@ internal object ChatSlashCommandParser {
 }
 
 internal fun interface ChatComposerTelemetry {
-    fun event(name: String, vararg attrs: Pair<String, Any?>)
+    fun event(name: String, vararg attrs: Pair<String, String>)
 }
 
 internal class ChatComposerController(
@@ -143,8 +127,8 @@ internal class ChatComposerController(
                         telemetry.event(
                             "attachment.rejected",
                             "reason" to "count_cap",
-                            "current" to current.pendingAttachments.size,
-                            "max" to limits.maxAttachmentCount,
+                            "current" to current.pendingAttachments.size.toString(),
+                            "max" to limits.maxAttachmentCount.toString(),
                         )
                         "Attachment limit reached (${limits.maxAttachmentCount} max)."
                     }
@@ -153,8 +137,8 @@ internal class ChatComposerController(
                         telemetry.event(
                             "attachment.rejected",
                             "reason" to "size_cap",
-                            "newTotal" to newTotal,
-                            "max" to limits.maxTotalBase64Bytes,
+                            "newTotal" to newTotal.toString(),
+                            "max" to limits.maxTotalBase64Bytes.toString(),
                         )
                         "Attachments too large — downscale or remove some before sending."
                     }
@@ -168,9 +152,9 @@ internal class ChatComposerController(
             } else {
                 telemetry.event(
                     "attachment.added",
-                    "size" to image.base64.length,
+                    "size" to image.base64.length.toString(),
                     "mediaType" to image.mediaType,
-                    "totalCount" to (current.pendingAttachments.size + 1),
+                    "totalCount" to (current.pendingAttachments.size + 1).toString(),
                 )
                 current.copy(
                     pendingAttachments = nextShared.pendingImageAttachments.toPersistentList(),
@@ -196,7 +180,7 @@ internal class ChatComposerController(
         }
         telemetry.event(
             "attachment.removed",
-            "index" to index,
+            "index" to index.toString(),
         )
     }
 

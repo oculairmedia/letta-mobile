@@ -15,7 +15,6 @@ import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
-import com.letta.mobile.data.transport.iroh.IdentityMigrationAction
 import com.letta.mobile.data.transport.iroh.IrohAgentAddress
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
@@ -278,10 +277,6 @@ suspend fun publishHost(
     val addr = endpoint.addr()
     val nodeHex = endpointIdHex(endpoint)
     val direct = sortDirectAddresses(addr.directAddresses())
-    // Collapse any legacy per-agent rows on the first write — `register()`
-    // rewrites the file with exactly one host record, evicting all of the
-    // O(agents) duplicates the previous shape left behind.
-    migrateLegacyIdentities(config.identityDir)
     val hostAddr = IrohAgentAddress(
         agentId = HOST_ONLY_AGENT_ID,
         nodeIdHex = nodeHex,
@@ -317,51 +312,6 @@ data class HostEndpointRecord(
  * kv format (still parses as `nodeIdHex@directAddrs`).
  */
 private const val HOST_ONLY_AGENT_ID = "host"
-
-/**
- * letta-mobile-oi147: collapse identity files left under the retired `letta_`
- * namespace onto their canonical (bare) names, once, at bind.
- *
- * Runs here because bind is the only moment the wrapper is guaranteed to own the
- * identity dir and no dial is in flight. Each action is emitted as telemetry: this
- * moves SECRET KEY MATERIAL, so it must be greppable after the fact rather than
- * happening silently. Failures are reported at WARN and do not abort the bind — a
- * stranded legacy file is a cleanup problem, not a reason to take messaging down.
- *
- * letta-mobile-xmpqm: still runs at bind, but is no longer coupled to
- * per-agent publishing — it is its own concern.
- */
-internal fun migrateLegacyIdentities(identityDir: File) {
-    val actions = runCatching { IrohAgentIdentity.migrateLegacyNamespacedFiles(identityDir) }
-        .getOrElse { t ->
-            Telemetry.event(
-                "A2aHost", "identity.migration_failed",
-                "reason" to (t.message ?: t::class.simpleName ?: "error"),
-                level = Telemetry.Level.WARN,
-            )
-            return
-        }
-    actions.forEach { action ->
-        when (action) {
-            is IdentityMigrationAction.DeletedOrphan -> Telemetry.event(
-                "A2aHost", "identity.orphan_deleted",
-                "legacyAgentId" to action.legacyAgentId,
-                "canonicalAgentId" to action.canonicalAgentId,
-            )
-            is IdentityMigrationAction.RenamedToCanonical -> Telemetry.event(
-                "A2aHost", "identity.renamed_to_canonical",
-                "legacyAgentId" to action.legacyAgentId,
-                "canonicalAgentId" to action.canonicalAgentId,
-            )
-            is IdentityMigrationAction.Failed -> Telemetry.event(
-                "A2aHost", "identity.migration_failed",
-                "legacyAgentId" to action.legacyAgentId,
-                "reason" to action.reason,
-                level = Telemetry.Level.WARN,
-            )
-        }
-    }
-}
 
 
 /**

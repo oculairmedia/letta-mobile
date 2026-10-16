@@ -56,7 +56,7 @@ class ProjectAdminHandlersTest {
     fun projectMethodsDialTheVibeSyncBaseDirectlyNotTheShim() = runTest {
         val r = router("http://127.0.0.1:3099")
         dispatch(r, "project.list", mapOf("limit" to "10"))
-        dispatch(r, "project.get", mapOf("project_id" to "proj-1"))
+        dispatch(r, "project.get", mapOf("identifier" to "proj-1"))
 
         assertTrue(dialedUrls.isNotEmpty())
         dialedUrls.forEach { url ->
@@ -76,7 +76,7 @@ class ProjectAdminHandlersTest {
     fun withoutAVibeSyncServiceProjectsReturnCapabilityUnavailableWithoutDialing() = runTest {
         val r = router(vibesyncBaseUrl = null)
         ProjectAdminHandlers.PROJECT_METHODS.forEach { method ->
-            val response = dispatch(r, method, mapOf("project_id" to "p"))
+            val response = dispatch(r, method, mapOf("identifier" to "p"))
             assertTrue(response.contains("\"success\":false"), "$method must fail closed")
             assertTrue(response.contains("capability_unavailable"), "$method must be capability-unavailable")
         }

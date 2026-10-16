@@ -22,7 +22,6 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.BackendConnectionStatus
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LettaConfigMigration
 import com.letta.mobile.data.settings.BackendConnectionTester
 import com.letta.mobile.data.settings.SettingsContribution
 import com.letta.mobile.data.settings.SettingsGroup
@@ -124,20 +123,6 @@ class SettingsPageTest {
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).performTextClearance()
         onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).performTextInput("wss://letta.example.com/ws")
         onNodeWithTag(BackendSettingsTags.PROBLEM, useUnmergedTree = true).assertDoesNotExist()
-    }
-
-    @Test
-    fun aMigratedCloudConfigSaysWhyAndSavingClearsTheNotice() = runComposeUiTest {
-        var saved: LettaConfig? = null
-        val migrated = LettaConfigMigration.migrate("CLOUD", remote.copy(serverUrl = "https://api.letta.com", accessToken = "sk"))
-        page(SettingsPageState(migrated), SettingsPageServices(BackendSettingsActions(onConfigSaved = { saved = it })))
-
-        onNodeWithText(LettaConfigMigration.CLOUD_NOTICE).assertExists()
-        onNodeWithTag(field(BackendSettingsTags.SERVER_URL)).performTextInput("ws://10.0.0.2:4500")
-        onNodeWithTag(action(BackendSettingsTags.SAVE)).performClick()
-
-        assertNull(saved?.migrationNotice)
-        assertEquals("ws://10.0.0.2:4500", saved?.serverUrl)
     }
 
     @Test

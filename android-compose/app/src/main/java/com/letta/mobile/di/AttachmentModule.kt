@@ -10,8 +10,7 @@ import javax.inject.Singleton
 /**
  * lcp-dlj: single source of truth for image-attachment caps.
  *
- * Default values follow Anthropic vision-input guidance and keep
- * us comfortably under the admin-shim's 10 MB content_parts cap.
+ * Default values follow Anthropic vision-input guidance.
  * Swap this provider to read from SettingsRepository when the
  * settings-UI tunable surface lands.
  */

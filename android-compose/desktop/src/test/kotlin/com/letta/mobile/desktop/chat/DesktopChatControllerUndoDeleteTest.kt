@@ -208,6 +208,5 @@ class DesktopChatControllerUndoDeleteTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = backgroundScope,
             gatewayFactory = factory,
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }

@@ -39,7 +39,7 @@ object ProjectAdminHandlers {
             val identifier = params.requireProjectIdentifierParam()
             api.post(
                 AdminPath.api("projects", identifier, "beads-remote", "provision"),
-                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
+                body = passthroughBody(params, listOf(PROJECT_IDENTIFIER)),
             )
         }
 
@@ -55,7 +55,7 @@ object ProjectAdminHandlers {
             val identifier = params.requireProjectIdentifierParam()
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
-                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
+                body = passthroughBody(params, listOf(PROJECT_IDENTIFIER)),
             )
         }
 
@@ -63,7 +63,7 @@ object ProjectAdminHandlers {
             val identifier = params.requireProjectIdentifierParam()
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
-                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
+                body = passthroughBody(params, listOf(PROJECT_IDENTIFIER)),
             )
         }
 

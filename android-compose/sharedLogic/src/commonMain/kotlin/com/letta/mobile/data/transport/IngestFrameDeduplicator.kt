@@ -14,8 +14,8 @@ import kotlinx.atomicfu.locks.synchronized
  * duplicate is recognised once, from the [TransportFrameEvent.timelineEvent]
  * projection the subscribers would share anyway, and never published.
  *
- * Frames with no timeline projection (A2UI, cron, subagent snapshots, the
- * self-todo chip frame, ...) are never deduplicated: they have no key.
+ * Frames with no timeline projection (A2UI, cron, subagent snapshots, ...)
+ * are never deduplicated: they have no key.
  *
  * Owned by one transport instance; the window is bounded like the coordinator's.
  */

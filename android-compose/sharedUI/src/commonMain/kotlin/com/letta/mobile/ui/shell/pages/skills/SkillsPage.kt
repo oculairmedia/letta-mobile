@@ -103,6 +103,8 @@ data class SkillsPageState(
     val installedSkillNames: Set<String> = emptySet(),
     val skillsLoading: Boolean = false,
     val skillsError: String? = null,
+    /** A failed install / remove: a dismissible notice above the (still listed) skills. */
+    val skillActionError: String? = null,
     /** False hides add / remove (no skill API, or no agent to install onto). */
     val canManageSkills: Boolean = false,
     val focusedAgentName: String? = null,
@@ -122,6 +124,7 @@ data class SkillsPageActions(
     val onRefreshSkills: () -> Unit = {},
     val onInstallSkill: (String) -> Unit = {},
     val onUninstallSkill: (String) -> Unit = {},
+    val onDismissSkillActionError: () -> Unit = {},
     val onRefreshTools: () -> Unit = {},
     val onToolTagToggled: (String) -> Unit = {},
     val onClearToolTags: () -> Unit = {},
@@ -156,6 +159,7 @@ object SkillsPageTags {
     const val ALL_SKILLS = "skills_all"
     const val LOAD_MORE_TOOLS = "skills_load_more_tools"
     const val TOOL_DETAIL = "skills_tool_detail"
+    const val ACTION_ERROR = "skills_action_error"
 
     fun section(section: SkillsPageSection): String = "skills_section_${section.name}"
 

@@ -68,14 +68,6 @@ interface DesktopWorkingDirectoryController {
     suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean
 }
 
-/** letta-mobile-bzvro.11/.12: see [com.letta.mobile.data.chat.runtime.PendingApprovalSource]. */
-typealias DesktopPendingApprovalSource = com.letta.mobile.data.chat.runtime.PendingApprovalSource
-
-/**
- * letta-mobile-bzvro.13: see [com.letta.mobile.data.chat.runtime.PermissionModeGateway]. Since
- * letta-mobile-bzvro.40 an Iroh gateway implements it too, through its host's `permission_mode.*` relay.
- */
-typealias DesktopPermissionModeController = com.letta.mobile.data.chat.runtime.PermissionModeGateway
 
 /**
  * A decision for a parked approval. [reason] carries an AskUserQuestion answer

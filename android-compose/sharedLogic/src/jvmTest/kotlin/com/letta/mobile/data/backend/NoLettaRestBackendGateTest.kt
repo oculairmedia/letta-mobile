@@ -35,7 +35,7 @@ class NoLettaRestBackendGateTest {
 
     @Test
     fun productSourcesBuildNoLettaRestClient() {
-        val findings = scan().filterNot { it.isAllowlisted() }
+        val findings = scan()
         assertEquals(
             emptyList(),
             findings,
@@ -73,8 +73,6 @@ class NoLettaRestBackendGateTest {
                 .map { (rule, _) -> Finding(rule, path, index + 1, code.take(MAX_SNIPPET)) }
         }
     }
-
-    private fun Finding.isAllowlisted(): Boolean = ALLOWLIST.any { (rule, pathSuffix) -> this.rule == rule && path.endsWith(pathSuffix) }
 
     private fun productRoots(): List<Path> {
         val compose = repoRoot.resolve("android-compose")
@@ -123,14 +121,6 @@ class NoLettaRestBackendGateTest {
                     """DesktopLettaHttpChatGateway|DesktopLettaHttpAdminRepositories|DesktopHttpBlockApi)\b""",
             ),
             "cloud-host" to Regex("""api\.letta\.com"""),
-        )
-
-        /**
-         * Known remainders; each is a detector or a probe, never a client for a Letta server's data.
-         * - The Cloud-config migration recognises Letta Cloud's hosts to drop their saved key.
-         */
-        val ALLOWLIST: List<Pair<String, String>> = listOf(
-            "cloud-host" to "sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/LettaConfigMigration.kt",
         )
     }
 }

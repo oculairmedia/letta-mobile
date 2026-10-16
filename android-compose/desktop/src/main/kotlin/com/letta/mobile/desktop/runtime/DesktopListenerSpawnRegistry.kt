@@ -29,13 +29,6 @@ internal fun interface DesktopProcessTable {
     fun find(pid: Long): DesktopLiveProcess?
 }
 
-/** Told about every runtime child the manager starts and stops. */
-internal interface DesktopRuntimeSpawnLog {
-    fun onSpawned(childPid: Long)
-
-    fun onEnded(childPid: Long)
-}
-
 /** What a launch-time reap did, for the runtime log. */
 internal data class DesktopReapReport(
     val killed: List<Long> = emptyList(),
@@ -73,12 +66,12 @@ internal class DesktopListenerSpawnRegistry(
     private val processTable: DesktopProcessTable,
     private val self: () -> DesktopProcessIdentity?,
     private val logLine: (String) -> Unit = {},
-) : DesktopRuntimeSpawnLog {
+) {
     private val lock = Any()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     /** Records [childPid] as spawned by this desktop. */
-    override fun onSpawned(childPid: Long) {
+    fun onSpawned(childPid: Long) {
         val child = processTable.find(childPid)?.identity ?: return
         val owner = self() ?: return
         synchronized(lock) {
@@ -88,7 +81,7 @@ internal class DesktopListenerSpawnRegistry(
     }
 
     /** Forgets [childPid] after it was stopped or exited. */
-    override fun onEnded(childPid: Long) {
+    fun onEnded(childPid: Long) {
         synchronized(lock) {
             val current = readOrEmpty()
             val kept = current.entries.filterNot { it.pid == childPid }

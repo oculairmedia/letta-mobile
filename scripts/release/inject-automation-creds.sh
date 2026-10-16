@@ -10,13 +10,10 @@ AUTOMATION_CONFIG_ID="${AUTOMATION_CONFIG_ID:-automation-auth}"
 AUTOMATION_MODE="${AUTOMATION_MODE:-}"
 AUTOMATION_SERVER_URL="${AUTOMATION_SERVER_URL:-${LETTA_SERVER_URL:-}}"
 AUTOMATION_ACCESS_TOKEN="${AUTOMATION_ACCESS_TOKEN:-${LETTA_TOKEN:-}}"
-AUTOMATION_GATEWAY_ENABLED="${AUTOMATION_GATEWAY_ENABLED:-}"
-AUTOMATION_GATEWAY_URL="${AUTOMATION_GATEWAY_URL:-}"
-AUTOMATION_GATEWAY_API_KEY="${AUTOMATION_GATEWAY_API_KEY:-}"
 
 print_usage() {
   printf 'Usage: AUTOMATION_SERVER_URL=... AUTOMATION_ACCESS_TOKEN=... %s\n' "$0"
-  printf 'Optional env: AUTOMATION_CONFIG_ID, AUTOMATION_MODE, AUTOMATION_GATEWAY_ENABLED, AUTOMATION_GATEWAY_URL, AUTOMATION_GATEWAY_API_KEY, ANDROID_SERIAL, APP_PACKAGE, APP_COMPONENT\n'
+  printf 'Optional env: AUTOMATION_CONFIG_ID, AUTOMATION_MODE, ANDROID_SERIAL, APP_PACKAGE, APP_COMPONENT\n'
   printf 'Payload JSON contract:\n'
   printf '%s\n' '{"serverUrl":"iroh://<endpoint id>@<host>:<port>","accessToken":"token-value","configId":"automation-auth","mode":"SELF_HOSTED"}'
 }
@@ -69,9 +66,6 @@ payload_json="$({
   AUTOMATION_ACCESS_TOKEN="$AUTOMATION_ACCESS_TOKEN" \
   AUTOMATION_CONFIG_ID="$AUTOMATION_CONFIG_ID" \
   AUTOMATION_MODE="$AUTOMATION_MODE" \
-  AUTOMATION_GATEWAY_ENABLED="$AUTOMATION_GATEWAY_ENABLED" \
-  AUTOMATION_GATEWAY_URL="$AUTOMATION_GATEWAY_URL" \
-  AUTOMATION_GATEWAY_API_KEY="$AUTOMATION_GATEWAY_API_KEY" \
   python3 - <<'PY'
 import json
 import os
@@ -84,15 +78,6 @@ payload = {
 mode = os.environ.get("AUTOMATION_MODE", "").strip()
 if mode:
     payload["mode"] = mode
-gateway_enabled = os.environ.get("AUTOMATION_GATEWAY_ENABLED", "").strip().lower()
-gateway_url = os.environ.get("AUTOMATION_GATEWAY_URL", "").strip()
-gateway_api_key = os.environ.get("AUTOMATION_GATEWAY_API_KEY", "").strip()
-if gateway_enabled:
-    payload["clientModeEnabled"] = gateway_enabled in {"1", "true", "yes", "on"}
-if gateway_url:
-    payload["clientModeBaseUrl"] = gateway_url
-if gateway_api_key:
-    payload["clientModeApiKey"] = gateway_api_key
 print(json.dumps(payload, separators=(",", ":")))
 PY
 } | base64 | tr -d '\n')"

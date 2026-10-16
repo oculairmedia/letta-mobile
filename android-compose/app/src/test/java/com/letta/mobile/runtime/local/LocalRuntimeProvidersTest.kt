@@ -44,8 +44,6 @@ class LocalRuntimeProvidersTest {
         assertTrue(capabilities.supportsToolExecution)
         // But turns are auto-approved — no approval round-trip UI
         assertFalse(capabilities.supportsApprovals)
-        // The legacy compat flag should be true (tools do work)
-        assertTrue(capabilities.supportsTools)
     }
 
     @Test

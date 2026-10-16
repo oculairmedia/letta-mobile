@@ -7,54 +7,6 @@ import java.io.File
 import java.util.Base64
 
 /**
- * letta-mobile-oi147: one action taken by [IrohAgentIdentity.migrateLegacyNamespacedFiles].
- * Returned rather than logged internally so the caller owns the audit surface —
- * this records changes to SECRET KEY MATERIAL and must never happen silently.
- */
-sealed interface IdentityMigrationAction {
-    val legacyAgentId: String
-
-    /** A canonical file already held this agent's live keypair; the orphan was removed. */
-    data class DeletedOrphan(override val legacyAgentId: String, val canonicalAgentId: String) : IdentityMigrationAction
-
-    /** No canonical file existed; the keypair was preserved verbatim under the bare name. */
-    data class RenamedToCanonical(override val legacyAgentId: String, val canonicalAgentId: String) : IdentityMigrationAction
-
-    /** The file could not be migrated. Left in place — never leave a key half-moved. */
-    data class Failed(override val legacyAgentId: String, val reason: String) : IdentityMigrationAction
-}
-
-/**
- * letta-mobile-oi147: a legacy `letta_`-prefixed identity file paired with the
- * canonical file it should collapse onto. Keeping the two names and the two Files
- * together as one value means the migration steps cannot mix up which side is which
- * — the failure mode here would overwrite a live secret key with an orphan's.
- */
-private data class LegacyIdentityFile(
-    val legacyId: String,
-    val canonicalId: String,
-    val legacyFile: File,
-    val canonicalFile: File,
-) {
-    companion object {
-        private const val SUFFIX = ".json"
-
-        /** Null when the file name canonicalizes to an empty id (e.g. bare `letta_.json`). */
-        fun of(dir: File, legacy: File): LegacyIdentityFile? {
-            val legacyId = legacy.name.removeSuffix(SUFFIX)
-            val canonicalId = AgentIdNamespace.normalizeToBareId(legacyId)
-            if (canonicalId.isBlank()) return null
-            return LegacyIdentityFile(
-                legacyId = legacyId,
-                canonicalId = canonicalId,
-                legacyFile = legacy,
-                canonicalFile = File(dir, "$canonicalId$SUFFIX"),
-            )
-        }
-    }
-}
-
-/**
  * letta-mobile-bn008.1: per-agent persistent Iroh identity.
  *
  * Each agent gets a stable Ed25519 [SecretKey] (the Iroh identity), persisted
@@ -74,8 +26,7 @@ private data class LegacyIdentityFile(
  * prefixed file). The node id IS the identity on the wire, so a fallback would mean
  * "failed to load key A, so silently sign as principal B" — an agent that does not
  * degrade but impersonates. Authentication lookups canonicalize first and then match
- * exactly. Legacy prefixed files are handled ONCE by [migrateLegacyNamespacedFiles],
- * an explicit auditable migration, not by a lookup-time fallback.
+ * exactly.
  */
 class IrohAgentIdentity private constructor(
     val agentId: String,
@@ -121,73 +72,6 @@ class IrohAgentIdentity private constructor(
             restrictFile(file)
             return IrohAgentIdentity(agentId, bytes, nodeIdHex)
         }
-
-        /**
-         * letta-mobile-oi147: one-shot migration of identity files written under the
-         * retired `letta_`-prefixed namespace, so a given agent ends up with exactly
-         * one keypair under its canonical (bare) name.
-         *
-         * This exists because canonicalizing [loadOrCreate] alone would silently
-         * strand the prefixed files: still on disk, holding a DIFFERENT keypair, no
-         * longer read by anything. That is key material with no owner — precisely the
-         * state an audit should never find.
-         *
-         * Rules, and why:
-         *  - Bare counterpart exists -> DELETE the prefixed orphan. Bare is the form
-         *    the live publish path writes, so it is the keypair peers currently see.
-         *    Keeping the loser would leave a second credential for one principal.
-         *  - No bare counterpart -> RENAME prefixed to bare, preserving the key bytes
-         *    verbatim. A regenerate here would silently change the agent's node id and
-         *    break every peer that cached it; a rename keeps that identity valid.
-         *  - Anything else (already-bare files, unrelated files) is left untouched.
-         *
-         * Idempotent: a second run over a canonical directory changes nothing and
-         * reports nothing. Never throws — a migration failure must not take the
-         * wrapper down at bind time; the per-file outcome is reported instead.
-         *
-         * @return an audit trail of what was done, one entry per file acted on.
-         */
-        fun migrateLegacyNamespacedFiles(dir: File): List<IdentityMigrationAction> {
-            if (!dir.isDirectory) return emptyList()
-            val files = dir.listFiles() ?: return emptyList()
-            return files.asSequence()
-                .filter { it.isFile && it.name.endsWith(SUFFIX) }
-                .filter { it.name.startsWith(LEGACY_PREFIX) }
-                .sortedBy { it.name } // deterministic audit order
-                .mapNotNull { legacy -> migrateOne(dir, legacy) }
-                .toList()
-        }
-
-        /** Migrate a single legacy file. Returns null when its id canonicalizes to nothing. */
-        private fun migrateOne(dir: File, legacy: File): IdentityMigrationAction? {
-            val candidate = LegacyIdentityFile.of(dir, legacy) ?: return null
-            return runCatching {
-                if (candidate.canonicalFile.exists()) candidate.deleteOrphan()
-                else candidate.adoptAsCanonical()
-            }.getOrElse { IdentityMigrationAction.Failed(candidate.legacyId, it::class.simpleName ?: "error") }
-        }
-
-        /** The canonical file already holds this agent's live keypair — drop the duplicate. */
-        private fun LegacyIdentityFile.deleteOrphan(): IdentityMigrationAction =
-            if (legacyFile.delete()) IdentityMigrationAction.DeletedOrphan(legacyId, canonicalId)
-            else IdentityMigrationAction.Failed(legacyId, "delete_failed")
-
-        /**
-         * No canonical file exists — carry the key bytes over verbatim.
-         *
-         * Copy-then-delete rather than renameTo: a half-completed rename would lose
-         * the only copy of a secret key. If the delete fails after a successful copy,
-         * the canonical file already holds the key and the next run cleans up.
-         */
-        private fun LegacyIdentityFile.adoptAsCanonical(): IdentityMigrationAction {
-            canonicalFile.writeText(legacyFile.readText())
-            restrictFile(canonicalFile)
-            return if (legacyFile.delete()) IdentityMigrationAction.RenamedToCanonical(legacyId, canonicalId)
-            else IdentityMigrationAction.Failed(legacyId, "delete_after_copy_failed")
-        }
-
-        private const val SUFFIX = ".json"
-        private const val LEGACY_PREFIX = "letta_"
 
         private fun nodeIdHexFromSecret(secretBytes: ByteArray): String {
             SecretKey.fromBytes(secretBytes).use { key ->

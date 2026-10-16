@@ -25,7 +25,4 @@ interface IAllConversationsRepository {
     fun handleOptimisticUpdate(conversation: Conversation)
     fun handleOptimisticDelete(conversationId: ConversationId)
     fun loadedCountEstimate(): ConversationCountEstimate?
-
-    @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
-    suspend fun countConversations(): Int
 }

@@ -4,6 +4,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.chat.send.ConversationSendQueue
 import com.letta.mobile.data.model.CanvasId
 import com.letta.mobile.data.model.MessageContentPart
@@ -421,7 +422,7 @@ class DesktopChatSessionPortTest {
 
     private class ModeGateway(
         registry: PermissionModeRegistry? = PermissionModeRegistry(MutableStateFlow(RuntimePermissionDefaults.DEFAULT_MODE)),
-    ) : FakeDesktopChatGateway(), DesktopPermissionModeController {
+    ) : FakeDesktopChatGateway(), PermissionModeGateway {
         override val permissionModes = registry
         val requested = mutableListOf<Pair<AppServerRuntimeScope, AppServerPermissionMode>>()
 
@@ -449,6 +450,5 @@ class DesktopChatSessionPortTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
-            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }

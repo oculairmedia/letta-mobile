@@ -9,16 +9,30 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RoomDatabase
 
-/** Dormant, separately named database. Never register as a LettaDatabase 13 -> 14 migration. */
+/**
+ * The canonical timeline ledger (`timeline-ledger.db`), separate from [LettaDatabase]: every Android
+ * conversation's history (letta-mobile-by4vm.15). Unlike [LettaDatabase] it migrates explicitly.
+ */
 @Database(
-    entities = [LedgerHead::class, LedgerRow::class, LedgerBlob::class, LedgerChunk::class, LedgerEvidence::class, LedgerMigrationState::class, LedgerMigrationRow::class, LedgerToolCall::class, LedgerToolSweep::class, LedgerValidationState::class],
-    version = 3,
+    entities = [
+        LedgerHead::class, LedgerRow::class, LedgerBlob::class, LedgerChunk::class, LedgerEvidence::class,
+        LedgerToolCall::class, LedgerToolSweep::class,
+    ],
+    version = 4,
     exportSchema = true,
 )
 abstract class TimelineLedgerDatabase : RoomDatabase() {
     abstract fun ledger(): TimelineLedgerDao
 
     companion object {
+        /** letta-mobile-by4vm.15: the legacy-snapshot copy/validation stack and its three tables are gone. */
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS ledger_migration")
+                db.execSQL("DROP TABLE IF EXISTS ledger_migration_row")
+                db.execSQL("DROP TABLE IF EXISTS ledger_validation")
+            }
+        }
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS ledger_validation (scope BLOB NOT NULL, payload BLOB NOT NULL, checksum TEXT NOT NULL, PRIMARY KEY(scope))")
@@ -75,69 +89,8 @@ data class LedgerChunk(
 @Entity(tableName = "ledger_evidence", primaryKeys = ["scope", "identity"])
 data class LedgerEvidence(val scope: ByteArray, val identity: ByteArray, val pointer: String, val bytes: Long)
 
-@Entity(tableName = "ledger_migration", primaryKeys = ["scope"])
-data class LedgerMigrationState(
-    val scope: ByteArray,
-    val sourceToken: String,
-    val generation: String,
-    val afterOrder: Long,
-    val copiedRows: Long,
-    val complete: Boolean,
-    val pendingPointer: String? = null,
-    val pendingOffset: Long = 0,
-    val pendingDigest: String = "",
-)
-
-@Entity(tableName = "ledger_migration_row", primaryKeys = ["scope", "generation", "position"])
-data class LedgerMigrationRow(
-    val scope: ByteArray,
-    val generation: String,
-    val position: Long,
-    val primaryIdentity: Long,
-    val secondaryIdentity: Long,
-    val pointer: String,
-    val bytes: Long,
-    val checksum: String,
-)
-
-@Entity(tableName = "ledger_validation", primaryKeys = ["scope"])
-data class LedgerValidationState(val scope: ByteArray, val payload: ByteArray, val checksum: String)
-
 @Dao
 interface TimelineLedgerDao {
-    @Query("""SELECT EXISTS(SELECT 1 FROM ledger_head WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_row WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_blob WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_chunk WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_evidence WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_tool_call WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_tool_sweep WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_migration WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_migration_row WHERE scope = :scope)
-        OR EXISTS(SELECT 1 FROM ledger_validation WHERE scope = :scope)""")
-    suspend fun hasScopeEvidence(scope: ByteArray): Boolean
-
-    @Query("SELECT scope, substr(payload, 1, 16385) AS payload, checksum FROM ledger_validation WHERE scope = :scope")
-    suspend fun validation(scope: ByteArray): LedgerValidationState?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun validation(state: LedgerValidationState)
-
-    @Query("SELECT substr(payload, max(0, :start) + 1, min(32768, max(0, :limit))) FROM ledger_chunk WHERE scope = :scope AND pointer = :pointer AND ordinal = :ordinal")
-    suspend fun auditChunk(scope: ByteArray, pointer: String, ordinal: Long, start: Int, limit: Int): ByteArray?
-
-    @Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded AND identity > :after ORDER BY identity LIMIT 1")
-    suspend fun auditEvidence(scope: ByteArray, excluded: ByteArray, after: ByteArray): LedgerEvidence?
-
-    @Query("SELECT scope, identity, pointer, bytes FROM ledger_evidence WHERE scope = :scope AND identity != :excluded ORDER BY identity LIMIT 1")
-    suspend fun auditEvidenceFirst(scope: ByteArray, excluded: ByteArray): LedgerEvidence?
-
-    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND callId > :after ORDER BY callId LIMIT 1")
-    suspend fun auditTool(scope: ByteArray, after: ByteArray): LedgerToolCall?
-
-    @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope ORDER BY callId LIMIT 1")
-    suspend fun auditToolFirst(scope: ByteArray): LedgerToolCall?
-
     @Query("SELECT scope, callId, owner, returned, unresolved FROM ledger_tool_call WHERE scope = :scope AND callId = :callId")
     suspend fun toolCall(scope: ByteArray, callId: ByteArray): LedgerToolCall?
 
@@ -155,18 +108,6 @@ interface TimelineLedgerDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun toolSweep(entry: LedgerToolSweep)
-
-    @Query("SELECT scope, sourceToken, generation, afterOrder, copiedRows, complete, pendingPointer, pendingOffset, pendingDigest FROM ledger_migration WHERE scope = :scope")
-    suspend fun migration(scope: ByteArray): LedgerMigrationState?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun migration(state: LedgerMigrationState)
-
-    @Insert
-    suspend fun migrationRow(row: LedgerMigrationRow)
-
-    @Query("SELECT scope, generation, position, primaryIdentity, secondaryIdentity, pointer, bytes, checksum FROM ledger_migration_row WHERE scope = :scope AND generation = :generation AND position > :after ORDER BY position LIMIT min(128, max(0, :limit))")
-    suspend fun migrationRows(scope: ByteArray, generation: String, after: Long, limit: Int): List<LedgerMigrationRow>
 
     @Query("SELECT scope, revision, checkpoint FROM ledger_head WHERE scope = :scope")
     suspend fun head(scope: ByteArray): LedgerHead?

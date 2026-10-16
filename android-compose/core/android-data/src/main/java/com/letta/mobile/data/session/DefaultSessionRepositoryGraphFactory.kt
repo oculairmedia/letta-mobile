@@ -29,7 +29,6 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
     private val channelTransportFactory: SessionChannelTransportFactory,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
-    private val cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory? = null,
     /**
      * Outer bound for every graph this factory creates, read on each [create]. Production hands
      * back the [ProcessScope] so a graph that is never closed still dies with the process; tests
@@ -47,13 +46,11 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         settingsRepository: ISettingsRepository,
-        cursorFactory: com.letta.mobile.data.local.BackendConversationCursorFactory,
         // letta-mobile-by4vm.89: injected from :app instead of read off ProcessLifecycleOwner here;
         // Lazy keeps it resolved on first create(), as the old default lambda was.
         @ProcessScope processScope: Lazy<CoroutineScope>,
     ) : this(
         assembler = assembler,
-        cursorFactory = cursorFactory,
         channelTransportFactory = channelTransportFactory,
         settingsRepository = settingsRepository,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
@@ -76,7 +73,6 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
         val descriptor = localRuntimeBackend?.descriptor ?: remoteLettaBackendDescriptor(activeConfig, ANDROID_REMOTE_LETTA_ID_PREFIX)
-        val cursors = cursorFactory?.capture(descriptor.backendId.value)
         // SessionGraph owns and cancels this scope; parenting it means a graph that is never
         // closed dies with its owner rather than outliving everything.
         val parent = graphParentScope()
@@ -95,7 +91,6 @@ class DefaultSessionRepositoryGraphFactory internal constructor(
             SessionGraphAssembleRequest(
                 graphId = graphId,
                 backendDescriptor = descriptor,
-                capturedCursorStore = cursors,
                 activeConfig = activeConfig,
                 localRuntimeBackend = localRuntimeBackend,
                 scope = scope,

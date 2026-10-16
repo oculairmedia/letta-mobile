@@ -9,6 +9,8 @@ import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationDeleteBehavior
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.PendingApprovalSource
+import com.letta.mobile.data.chat.runtime.PermissionModeGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
@@ -141,8 +143,8 @@ class DesktopAppServerChatGateway internal constructor(
     ConversationForkGateway,
     ConversationRecompileGateway,
     DesktopApprovalSubmitter,
-    DesktopPendingApprovalSource,
-    DesktopPermissionModeController,
+    PendingApprovalSource,
+    PermissionModeGateway,
     DesktopTurnAborter,
     DesktopWorkingDirectoryController,
     DesktopRuntimeEventSource,

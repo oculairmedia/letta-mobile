@@ -14,11 +14,11 @@ import com.letta.mobile.data.memory.memfs.MemfsPageController
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.shell.ShellDestination
 import com.letta.mobile.data.skills.SkillsCatalogState
+import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionPanel
 import com.letta.mobile.ui.shell.pages.home.HomeConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.home.DesktopHomeInputs
-import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.shell.ShellAdminPages
 import com.letta.mobile.ui.shell.ShellPageContent
 import com.letta.mobile.ui.shell.ShellPageDeps
@@ -49,6 +49,7 @@ internal data class DestinationSkillsActions(
     val onRefresh: () -> Unit,
     val onInstall: (String) -> Unit,
     val onUninstall: (String) -> Unit,
+    val onDismissActionError: () -> Unit,
 )
 
 internal data class DestinationToolsActions(
@@ -68,7 +69,7 @@ internal data class DestinationContentInputs(
     val memoryState: MemoryPageState,
     val schedule: SchedulesPageState,
     val channels: ChannelsPageState,
-    val toolLibraryState: DesktopToolLibraryState,
+    val toolLibraryState: ToolLibraryState,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
     val localRuntimeProvider: DesktopLocalRuntimeProviderState,
@@ -196,6 +197,7 @@ private fun desktopSkillsPage(
             installedSkillNames = skills.catalog.installedSkillNames,
             skillsLoading = skills.catalog.isLoading,
             skillsError = skills.catalog.errorMessage,
+            skillActionError = skills.catalog.actionError,
             canManageSkills = skills.catalog.canManage,
             focusedAgentName = skills.focusedAgentName,
             tools = inputs.toolLibraryState,
@@ -204,6 +206,7 @@ private fun desktopSkillsPage(
             onRefreshSkills = actions.skills.onRefresh,
             onInstallSkill = actions.skills.onInstall,
             onUninstallSkill = actions.skills.onUninstall,
+            onDismissSkillActionError = actions.skills.onDismissActionError,
             onRefreshTools = actions.tools.onRefresh,
             onToolTagToggled = actions.tools.onTagToggled,
             onClearToolTags = actions.tools.onClearTags,
